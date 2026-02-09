@@ -19,15 +19,33 @@ limitations under the License.
 package v1beta3
 
 import (
-	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 )
 
 // PriorityLevelConfigurationSpecApplyConfiguration represents a declarative configuration of the PriorityLevelConfigurationSpec type for use
 // with apply.
+//
+// PriorityLevelConfigurationSpec specifies the configuration of a priority level.
 type PriorityLevelConfigurationSpecApplyConfiguration struct {
-	Type    *v1beta3.PriorityLevelEnablement                     `json:"type,omitempty"`
+	// `type` indicates whether this priority level is subject to
+	// limitation on request execution.  A value of `"Exempt"` means
+	// that requests of this priority level are not subject to a limit
+	// (and thus are never queued) and do not detract from the
+	// capacity made available to other priority levels.  A value of
+	// `"Limited"` means that (a) requests of this priority level
+	// _are_ subject to limits and (b) some of the server's limited
+	// capacity is made available exclusively to this priority level.
+	// Required.
+	Type *flowcontrolv1beta3.PriorityLevelEnablement `json:"type,omitempty"`
+	// `limited` specifies how requests are handled for a Limited priority level.
+	// This field must be non-empty if and only if `type` is `"Limited"`.
 	Limited *LimitedPriorityLevelConfigurationApplyConfiguration `json:"limited,omitempty"`
-	Exempt  *ExemptPriorityLevelConfigurationApplyConfiguration  `json:"exempt,omitempty"`
+	// `exempt` specifies how requests are handled for an exempt priority level.
+	// This field MUST be empty if `type` is `"Limited"`.
+	// This field MAY be non-empty if `type` is `"Exempt"`.
+	// If empty and `type` is `"Exempt"` then the default values
+	// for `ExemptPriorityLevelConfiguration` apply.
+	Exempt *ExemptPriorityLevelConfigurationApplyConfiguration `json:"exempt,omitempty"`
 }
 
 // PriorityLevelConfigurationSpecApplyConfiguration constructs a declarative configuration of the PriorityLevelConfigurationSpec type for use with
@@ -39,7 +57,7 @@ func PriorityLevelConfigurationSpec() *PriorityLevelConfigurationSpecApplyConfig
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *PriorityLevelConfigurationSpecApplyConfiguration) WithType(value v1beta3.PriorityLevelEnablement) *PriorityLevelConfigurationSpecApplyConfiguration {
+func (b *PriorityLevelConfigurationSpecApplyConfiguration) WithType(value flowcontrolv1beta3.PriorityLevelEnablement) *PriorityLevelConfigurationSpecApplyConfiguration {
 	b.Type = &value
 	return b
 }

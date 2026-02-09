@@ -17,11 +17,9 @@ limitations under the License.
 package prober
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -38,7 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 // TCP sockets goes through a TIME-WAIT state (default 60 sec) before being freed,
@@ -80,17 +79,12 @@ func TestTCPPortExhaustion(t *testing.T) {
 		{"HTTP", true},
 	}
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf(tt.name), func(t *testing.T) {
-			testRootDir := ""
-			if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
-				t.Fatalf("can't make a temp rootdir: %v", err)
-			} else {
-				testRootDir = tempDir
-			}
+		t.Run(tt.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
 			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 			m := NewManager(
-				status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, testRootDir),
+				status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
 				results.NewManager(),
 				results.NewManager(),
 				results.NewManager(),
@@ -136,17 +130,17 @@ func TestTCPPortExhaustion(t *testing.T) {
 								StartedAt: metav1.Now(),
 							},
 						},
-						Started: utilpointer.Bool(true),
+						Started: ptr.To(true),
 					})
 				}
 				podManager.AddPod(&pod)
-				m.statusManager.SetPodStatus(&pod, pod.Status)
-				m.AddPod(&pod)
+				m.statusManager.SetPodStatus(logger, &pod, pod.Status)
+				m.AddPod(tCtx, &pod)
 			}
 			t.Logf("Adding %d pods with %d containers each in %v", numTestPods, numContainers, time.Since(now))
 
-			ctx, cancel := context.WithTimeout(context.Background(), 59*time.Second)
-			defer cancel()
+			ctx := tCtx.WithTimeout(59*time.Second, "timeout 59 Second")
+			defer ctx.Cancel("TestTCPPortExhaustion completed")
 			var wg sync.WaitGroup
 
 			wg.Add(1)

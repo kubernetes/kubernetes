@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	goruntime "runtime"
 	"testing"
 
@@ -24,58 +25,67 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	"k8s.io/utils/ptr"
 )
 
 var (
-	quantity = *resource.NewQuantity(1, resource.DecimalSI)
+	quantity                    = *resource.NewQuantity(1, resource.DecimalSI)
+	extendedResource            = v1.ResourceName("foo.com/bar")
+	implicitDRAExtendedResource = v1.ResourceName("deviceclass.resource.kubernetes.io/bar")
 )
 
 func TestRemoveMissingExtendedResources(t *testing.T) {
 	for _, test := range []struct {
-		desc string
-		pod  *v1.Pod
-		node *v1.Node
+		desc                      string
+		pod                       *v1.Pod
+		node                      *v1.Node
+		enableDRAExtendedResource bool
 
 		expectedPod *v1.Pod
 	}{
 		{
 			desc: "requests in Limits should be ignored",
 			pod: makeTestPod(
-				v1.ResourceList{},                        // Requests
-				v1.ResourceList{"foo.com/bar": quantity}, // Limits
+				v1.ResourceList{}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
 			),
 			node: makeTestNode(
 				v1.ResourceList{"foo.com/baz": quantity}, // Allocatable
 			),
 			expectedPod: makeTestPod(
-				v1.ResourceList{},                        // Requests
-				v1.ResourceList{"foo.com/bar": quantity}, // Limits
+				v1.ResourceList{}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
 			),
 		},
 		{
 			desc: "requests for resources available in node should not be removed",
 			pod: makeTestPod(
-				v1.ResourceList{"foo.com/bar": quantity}, // Requests
-				v1.ResourceList{},                        // Limits
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{}, // Limits
 			),
 			node: makeTestNode(
-				v1.ResourceList{"foo.com/bar": quantity}, // Allocatable
+				v1.ResourceList{extendedResource: quantity}, // Allocatable
 			),
 			expectedPod: makeTestPod(
-				v1.ResourceList{"foo.com/bar": quantity}, // Requests
-				v1.ResourceList{}),                       // Limits
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{}), // Limits
 		},
 		{
 			desc: "requests for resources unavailable in node should be removed",
 			pod: makeTestPod(
-				v1.ResourceList{"foo.com/bar": quantity}, // Requests
-				v1.ResourceList{},                        // Limits
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{}, // Limits
 			),
 			node: makeTestNode(
 				v1.ResourceList{"foo.com/baz": quantity}, // Allocatable
@@ -85,13 +95,71 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 				v1.ResourceList{}, // Limits
 			),
 		},
+		{
+			desc: "requests for extended resources with Allocatable 0 should not be removed",
+			pod: makeTestPod(
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+			node: makeTestNode(
+				v1.ResourceList{extendedResource: *resource.NewQuantity(0, resource.DecimalSI)}, // Allocatable = 0
+			),
+			expectedPod: makeTestPod(
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+		},
+		{
+			desc: "requests for extended resources that are not available in node should be removed",
+			pod: makeTestPod(
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+			node: makeTestNode(
+				v1.ResourceList{}, // Allocatable is absent for foo.com/bar
+			),
+			expectedPod: makeTestPod(
+				v1.ResourceList{}, // Requests are filtered
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+		},
+		{
+			desc: "request for extended resource backed by DRA should be removed if Allocatable is 0",
+			pod:  makeTestPodWithDRAResource(extendedResource, quantity),
+			node: makeTestNode(
+				v1.ResourceList{extendedResource: *resource.NewQuantity(0, resource.DecimalSI)}, // Allocatable = 0
+			),
+			enableDRAExtendedResource: true,
+			expectedPod:               emptyRequests(makeTestPodWithDRAResource(extendedResource, quantity)),
+		},
+		{
+			desc: "request for extended resource backed by DRA should be removed if Allocatable is absent",
+			pod:  makeTestPodWithDRAResource(extendedResource, quantity),
+			node: makeTestNode(
+				v1.ResourceList{}, // Allocatable is absent for foo.com/bar
+			),
+			enableDRAExtendedResource: true,
+			expectedPod:               emptyRequests(makeTestPodWithDRAResource(extendedResource, quantity)),
+		},
+		{
+			desc: "request for implicit extended resource backed by DRA should be removed",
+			pod:  makeTestPodWithDRAResource(implicitDRAExtendedResource, quantity),
+			node: makeTestNode(
+				v1.ResourceList{},
+			),
+			enableDRAExtendedResource: true,
+			expectedPod:               emptyRequests(makeTestPodWithDRAResource(implicitDRAExtendedResource, quantity)),
+		},
 	} {
-		nodeInfo := schedulerframework.NewNodeInfo()
-		nodeInfo.SetNode(test.node)
-		pod := removeMissingExtendedResources(test.pod, nodeInfo)
-		if diff := cmp.Diff(test.expectedPod, pod); diff != "" {
-			t.Errorf("unexpected pod (-want, +got):\n%s", diff)
-		}
+		t.Run(test.desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableDRAExtendedResource)
+			nodeInfo := schedulerframework.NewNodeInfo()
+			nodeInfo.SetNode(test.node)
+			pod := removeMissingExtendedResources(test.pod, nodeInfo)
+			if diff := cmp.Diff(test.expectedPod, pod); diff != "" {
+				t.Errorf("unexpected pod (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -106,8 +174,54 @@ func makeTestPod(requests, limits v1.ResourceList) *v1.Pod {
 					},
 				},
 			},
+			InitContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: requests,
+						Limits:   limits,
+					},
+				},
+			},
 		},
 	}
+}
+
+func makeTestPodWithDRAResource(resourceName v1.ResourceName, quantity resource.Quantity) *v1.Pod {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "test-container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{resourceName: quantity},
+						Limits:   v1.ResourceList{resourceName: quantity},
+					},
+				},
+			},
+		},
+	}
+	pod.Status = v1.PodStatus{
+		ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+			RequestMappings: []v1.ContainerExtendedResourceRequest{
+				{
+					ResourceName:  string(resourceName),
+					ContainerName: pod.Spec.Containers[0].Name,
+				},
+			},
+		},
+	}
+	return pod
+}
+
+func emptyRequests(pod *v1.Pod) *v1.Pod {
+	newPod := pod.DeepCopy()
+	for i := range newPod.Spec.Containers {
+		newPod.Spec.Containers[i].Resources.Requests = v1.ResourceList{}
+	}
+	for i := range newPod.Spec.InitContainers {
+		newPod.Spec.InitContainers[i].Resources.Requests = v1.ResourceList{}
+	}
+	return newPod
 }
 
 func makeTestNode(allocatable v1.ResourceList) *v1.Node {
@@ -177,11 +291,12 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 
 func TestGeneralPredicates(t *testing.T) {
 	resourceTests := []struct {
-		pod      *v1.Pod
-		nodeInfo *schedulerframework.NodeInfo
-		node     *v1.Node
-		name     string
-		reasons  []PredicateFailureReason
+		pod        *v1.Pod
+		nodeInfo   *schedulerframework.NodeInfo
+		cachedNode *v1.Node
+		syncNode   *v1.Node
+		name       string
+		reasons    []PredicateFailureReason
 	}{
 		{
 			pod: &v1.Pod{},
@@ -190,7 +305,7 @@ func TestGeneralPredicates(t *testing.T) {
 					v1.ResourceCPU:    *resource.NewMilliQuantity(9, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
 				})),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
@@ -206,7 +321,7 @@ func TestGeneralPredicates(t *testing.T) {
 					v1.ResourceCPU:    *resource.NewMilliQuantity(5, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
 				})),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
@@ -223,7 +338,7 @@ func TestGeneralPredicates(t *testing.T) {
 				},
 			},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
@@ -233,7 +348,7 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod:      newPodWithPort(123),
 			nodeInfo: schedulerframework.NewNodeInfo(newPodWithPort(123)),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
@@ -250,7 +365,7 @@ func TestGeneralPredicates(t *testing.T) {
 				},
 			},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -265,7 +380,7 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod:      &v1.Pod{},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -279,7 +394,7 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod:      &v1.Pod{},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -294,7 +409,7 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod:      &v1.Pod{},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -314,7 +429,7 @@ func TestGeneralPredicates(t *testing.T) {
 				},
 			},
 			nodeInfo: schedulerframework.NewNodeInfo(),
-			node: &v1.Node{
+			cachedNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
@@ -326,11 +441,197 @@ func TestGeneralPredicates(t *testing.T) {
 			},
 			name: "static pods ignore taints",
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name: "node affinity failure",
+			reasons: []PredicateFailureReason{
+				&PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod},
+			},
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					NodeName: "some-node-name",
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "machine1",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec:   v1.NodeSpec{},
+				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name: "node affinity failure on cached node and node name doesn't match",
+			// Ensure that both reasons are returned, because we do not fetch the node synchronously on multiple failures.
+			reasons: []PredicateFailureReason{
+				&PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod},
+				&PredicateFailureError{nodename.Name, nodename.ErrReason},
+			},
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "machine1",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec:   v1.NodeSpec{},
+				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name: "node affinity failure on cached node, but not the fresh one",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						types.ConfigSourceAnnotationKey: types.FileSource,
+					},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpExists,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			cachedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "machine1",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec:   v1.NodeSpec{},
+				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			syncNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec:       v1.NodeSpec{},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name: "node affinity failure on fresh node, but not the cached one",
+		},
 	}
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
-			test.nodeInfo.SetNode(test.node)
-			reasons := generalFilter(test.pod, test.nodeInfo)
+			test.nodeInfo.SetNode(test.cachedNode)
+			w := &predicateAdmitHandler{getNodeAnyWayFunc: func(ctx context.Context, useCache bool) (*v1.Node, error) {
+				if useCache {
+					return test.cachedNode, nil
+				}
+				return test.syncNode, nil
+			}}
+			reasons := w.generalFilter(context.Background(), test.pod, test.nodeInfo)
 			if diff := cmp.Diff(test.reasons, reasons); diff != "" {
 				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
 			}
@@ -417,6 +718,118 @@ func TestRejectPodAdmissionBasedOnOSField(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actualResult := rejectPodAdmissionBasedOnOSField(test.pod)
+			if test.expectRejection != actualResult {
+				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
+			}
+		})
+	}
+}
+
+func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
+	nodeWithFeature := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+		Status: v1.NodeStatus{
+			Features: &v1.NodeFeatures{
+				SupplementalGroupsPolicy: ptr.To(true),
+			},
+		},
+	}
+	nodeWithoutFeature := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+	}
+	podNotUsingFeature := &v1.Pod{}
+	podUsingFeature := &v1.Pod{Spec: v1.PodSpec{
+		SecurityContext: &v1.PodSecurityContext{
+			SupplementalGroupsPolicy: ptr.To(v1.SupplementalGroupsPolicyStrict),
+		},
+	}}
+	tests := []struct {
+		name             string
+		emulationVersion *utilversion.Version
+		node             *v1.Node
+		pod              *v1.Pod
+		expectRejection  bool
+	}{
+		// The feature is Beta in v1.33
+		{
+			name:             "feature=Beta, node=feature not supported, pod=in use: it should REJECT",
+			emulationVersion: utilversion.MustParse("1.33"),
+			node:             nodeWithoutFeature,
+			pod:              podUsingFeature,
+			expectRejection:  true,
+		},
+		{
+			name:             "feature=Beta, node=feature supported, pod=in use: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.33"),
+			node:             nodeWithFeature,
+			pod:              podUsingFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Beta, node=feature not supported, pod=not in use: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.33"),
+			node:             nodeWithoutFeature,
+			pod:              podNotUsingFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Beta, node=feature supported, pod=not in use: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.33"),
+			node:             nodeWithFeature,
+			pod:              podNotUsingFeature,
+			expectRejection:  false,
+		},
+		// The feature is Alpha(v1.31, v1.32) in emulated version
+		// Note: When the feature is alpha in emulated version, it should always admit for backward compatibility
+		{
+			name:             "feature=Alpha, node=feature not supported, pod=feature used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.32"),
+			node:             nodeWithoutFeature,
+			pod:              podUsingFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Alpha, node=feature not supported, pod=feature not used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.32"),
+			node:             nodeWithoutFeature,
+			pod:              podNotUsingFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Alpha, node=feature supported, pod=feature used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.32"),
+			node:             nodeWithFeature,
+			pod:              podUsingFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Alpha, node=feature supported, pod=feature not used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.32"),
+			node:             nodeWithFeature,
+			pod:              podNotUsingFeature,
+			expectRejection:  false,
+		},
+		// The feature is not yet released (< v1.31) in emulated version (this can happen when only kubelet downgraded).
+		// Note: When the feature is not yet released in emulated version, it should always admit for backward compatibility
+		{
+			name:             "feature=NotReleased, node=feature not supported, pod=feature used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.30"),
+			node:             nodeWithoutFeature,
+			pod:              podUsingFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=NotReleased, node=feature not supported, pod=feature not used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.30"),
+			node:             nodeWithoutFeature,
+			pod:              podNotUsingFeature,
+			expectRejection:  false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, test.emulationVersion)
+			actualResult := rejectPodAdmissionBasedOnSupplementalGroupsPolicy(test.pod, test.node)
 			if test.expectRejection != actualResult {
 				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
 			}

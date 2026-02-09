@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/defaulter-gen/args"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -64,24 +65,46 @@ const tagName = "k8s:defaulter-gen"
 const inputTagName = "k8s:defaulter-gen-input"
 const defaultTagName = "default"
 
-func extractDefaultTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[defaultTagName]
-}
-
-func extractTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[tagName]
-}
-
-func extractInputTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[inputTagName]
-}
-
-func checkTag(comments []string, require ...string) bool {
-	values := gengo.ExtractCommentTags("+", comments)[tagName]
-	if len(require) == 0 {
-		return len(values) == 1 && values[0] == ""
+func extractDefaultTag(comments []string) ([]string, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{defaultTagName}, comments)
+	if err != nil {
+		return nil, err
 	}
-	return reflect.DeepEqual(values, require)
+	return tags[defaultTagName], nil
+}
+
+func extractTag(comments []string) ([]string, bool) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
+	if err != nil {
+		klog.Fatalf("Error extracting %s tag: %v", tagName, err)
+	}
+
+	values, found := tags[tagName]
+	if !found || len(values) == 0 {
+		return nil, false
+	}
+
+	return values, true
+}
+
+func extractInputTag(comments []string) ([]string, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{inputTagName}, comments)
+	if err != nil {
+		return nil, err
+	}
+	return tags[inputTagName], nil
+}
+
+func checkTag(comments []string, require ...string) (bool, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
+	if err != nil {
+		return false, err
+	}
+
+	if len(require) == 0 {
+		return len(tags[tagName]) == 1 && tags[tagName][0] == "", nil
+	}
+	return reflect.DeepEqual(tags[tagName], require), nil
 }
 
 func defaultFnNamer() *namer.NameStrategy {
@@ -165,7 +188,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 		if len(signature.Results) != 0 {
 			continue
 		}
-		inType := signature.Parameters[0]
+		inType := signature.Parameters[0].Type
 		if inType.Kind != types.Pointer {
 			continue
 		}
@@ -222,7 +245,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 }
 
 func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
-	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, args.GeneratedBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
@@ -246,7 +269,10 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		pkg := context.Universe[i]
 
 		// if the types are not in the same package where the defaulter functions to be generated
-		inputTags := extractInputTag(pkg.Comments)
+		inputTags, err := extractInputTag(pkg.Comments)
+		if err != nil {
+			panic(fmt.Sprintf("error extracting input tag: %v", err))
+		}
 		if len(inputTags) > 1 {
 			panic(fmt.Sprintf("there may only be one input tag, got %#v", inputTags))
 		}
@@ -310,7 +336,11 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			getManualDefaultingFunctions(context, context.Universe[pp], existingDefaulters)
 		}
 
-		typesWith := extractTag(pkg.Comments)
+		typesWith, found := extractTag(pkg.Comments)
+		if !found {
+			klog.V(2).InfoS("  did not find required tag", "tag", tagName)
+			continue
+		}
 		shouldCreateObjectDefaulterFn := func(t *types.Type) bool {
 			if defaults, ok := existingDefaulters[t]; ok && defaults.object != nil {
 				// A default generator is defined
@@ -322,11 +352,19 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				return false
 			}
 			// opt-out
-			if checkTag(t.SecondClosestCommentLines, "false") {
+			optOut, err := checkTag(t.SecondClosestCommentLines, "false")
+			if err != nil {
+				klog.Fatalf("Error extracting %s tags: %v", tagName, err)
+			}
+			if optOut {
 				return false
 			}
 			// opt-in
-			if checkTag(t.SecondClosestCommentLines, "true") {
+			optIn, err := checkTag(t.SecondClosestCommentLines, "true")
+			if err != nil {
+				klog.Fatalf("Error extracting %s tags: %v", tagName, err)
+			}
+			if optIn {
 				return true
 			}
 			// For every k8s:defaulter-gen tag at the package level, interpret the value as a
@@ -497,13 +535,16 @@ func getPointerElementPath(t *types.Type) []*types.Type {
 }
 
 // getNestedDefault returns the first default value when resolving alias types
-func getNestedDefault(t *types.Type) string {
+func getNestedDefault(t *types.Type) (string, error) {
 	var prev *types.Type
 	for prev != t {
 		prev = t
-		defaultMap := extractDefaultTag(t.CommentLines)
+		defaultMap, err := extractDefaultTag(t.CommentLines)
+		if err != nil {
+			return "", err
+		}
 		if len(defaultMap) == 1 && defaultMap[0] != "" {
-			return defaultMap[0]
+			return defaultMap[0], nil
 		}
 		if t.Kind == types.Alias {
 			t = t.Underlying
@@ -511,7 +552,7 @@ func getNestedDefault(t *types.Type) string {
 			t = t.Elem
 		}
 	}
-	return ""
+	return "", nil
 }
 
 var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
@@ -538,7 +579,11 @@ func parseSymbolReference(s, sourcePackage string) (types.Name, bool) {
 }
 
 func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLines []string, commentPackage string) *callNode {
-	defaultMap := extractDefaultTag(commentLines)
+	defaultMap, err := extractDefaultTag(commentLines)
+	if err != nil {
+		klog.Fatalf("Error extracting default tag: %v", err)
+	}
+
 	var defaultString string
 	if len(defaultMap) == 1 {
 		defaultString = defaultMap[0]
@@ -548,7 +593,10 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 
 	baseT, depth := resolveTypeAndDepth(t)
 	if depth > 0 && defaultString == "" {
-		defaultString = getNestedDefault(t)
+		defaultString, err = getNestedDefault(t)
+		if err != nil {
+			klog.Fatalf("Error extracting nested default tag: %v", err)
+		}
 	}
 
 	if len(defaultString) == 0 {
@@ -622,7 +670,11 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		parent.call = append(parent.call, defaults.base)
 		// if the base function indicates it "covers" (it already includes defaulters)
 		// we can halt recursion
-		if checkTag(defaults.base.CommentLines, "covers") {
+		isCovers, err := checkTag(defaults.base.CommentLines, "covers")
+		if err != nil {
+			klog.Fatalf("error extracting %s tag: %v", tagName, err)
+		}
+		if isCovers {
 			klog.V(6).Infof("the defaulter %s indicates it covers all sub generators", t.Name)
 			return parent
 		}
@@ -823,7 +875,7 @@ func (g *genDefaulter) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	})
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	g.generateDefaulter(t, callTree, sw)
+	g.generateDefaulter(c, t, callTree, sw)
 	return sw.Error()
 }
 
@@ -833,9 +885,9 @@ func defaultingArgsFromType(inType *types.Type) generator.Args {
 	}
 }
 
-func (g *genDefaulter) generateDefaulter(inType *types.Type, callTree *callNode, sw *generator.SnippetWriter) {
+func (g *genDefaulter) generateDefaulter(c *generator.Context, inType *types.Type, callTree *callNode, sw *generator.SnippetWriter) {
 	sw.Do("func $.inType|objectdefaultfn$(in *$.inType|raw$) {\n", defaultingArgsFromType(inType))
-	callTree.WriteMethod("in", 0, nil, sw)
+	callTree.WriteMethod(c, "in", 0, nil, sw)
 	sw.Do("}\n\n", nil)
 }
 
@@ -996,15 +1048,19 @@ func getTypeZeroValue(t string) (interface{}, error) {
 	return defaultZero, nil
 }
 
-func (n *callNode) writeDefaulter(varName string, index string, isVarPointer bool, sw *generator.SnippetWriter) {
+func (n *callNode) writeDefaulter(c *generator.Context, varName string, index string, isVarPointer bool, sw *generator.SnippetWriter) {
 	if n.defaultValue.IsEmpty() {
 		return
 	}
+
+	jsonUnmarshalType := c.Universe.Type(types.Name{Package: "encoding/json", Name: "Unmarshal"})
+
 	args := generator.Args{
-		"defaultValue": n.defaultValue.Resolved(),
-		"varName":      varName,
-		"index":        index,
-		"varTopType":   n.defaultTopLevelType,
+		"defaultValue":  n.defaultValue.Resolved(),
+		"varName":       varName,
+		"index":         index,
+		"varTopType":    n.defaultTopLevelType,
+		"jsonUnmarshal": jsonUnmarshalType,
 	}
 
 	variablePlaceholder := ""
@@ -1101,13 +1157,13 @@ func (n *callNode) writeDefaulter(varName string, index string, isVarPointer boo
 		// This applies to maps with non-primitive values (eg: map[string]SubStruct)
 		if n.key {
 			sw.Do("$.mapDefaultVar$ := $.varName$[$.index$]\n", args)
-			sw.Do("if err := json.Unmarshal([]byte(`$.defaultValue$`), &$.mapDefaultVar$); err != nil {\n", args)
+			sw.Do("if err := $.jsonUnmarshal|raw$([]byte(`$.defaultValue$`), &$.mapDefaultVar$); err != nil {\n", args)
 		} else {
 			variablePointer := variablePlaceholder
 			if !isVarPointer {
 				variablePointer = "&" + variablePointer
 			}
-			sw.Do(fmt.Sprintf("if err := json.Unmarshal([]byte(`$.defaultValue$`), %s); err != nil {\n", variablePointer), args)
+			sw.Do(fmt.Sprintf("if err := $.jsonUnmarshal|raw$([]byte(`$.defaultValue$`), %s); err != nil {\n", variablePointer), args)
 		}
 		sw.Do("panic(err)\n", nil)
 		sw.Do("}\n", nil)
@@ -1121,7 +1177,7 @@ func (n *callNode) writeDefaulter(varName string, index string, isVarPointer boo
 // WriteMethod performs an in-order traversal of the calltree, generating loops and if blocks as necessary
 // to correctly turn the call tree into a method body that invokes all calls on all child nodes of the call tree.
 // Depth is used to generate local variables at the proper depth.
-func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode, sw *generator.SnippetWriter) {
+func (n *callNode) WriteMethod(c *generator.Context, varName string, depth int, ancestors []*callNode, sw *generator.SnippetWriter) {
 	// if len(n.call) > 0 {
 	// 	sw.Do(fmt.Sprintf("// %s\n", callPath(append(ancestors, n)).String()), nil)
 	// }
@@ -1153,10 +1209,10 @@ func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode,
 			}
 		}
 
-		n.writeDefaulter(varName, index, isPointer, sw)
+		n.writeDefaulter(c, varName, index, isPointer, sw)
 		n.writeCalls(local, true, sw)
 		for i := range n.children {
-			n.children[i].WriteMethod(local, depth+1, append(ancestors, n), sw)
+			n.children[i].WriteMethod(c, local, depth+1, append(ancestors, n), sw)
 		}
 		sw.Do("}\n", nil)
 	case n.key:
@@ -1165,14 +1221,14 @@ func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode,
 			index = index + "_" + ancestors[len(ancestors)-1].field
 			vars["index"] = index
 			sw.Do("for $.index$ := range $.var$ {\n", vars)
-			n.writeDefaulter(varName, index, isPointer, sw)
+			n.writeDefaulter(c, varName, index, isPointer, sw)
 			sw.Do("}\n", nil)
 		}
 	default:
-		n.writeDefaulter(varName, index, isPointer, sw)
+		n.writeDefaulter(c, varName, index, isPointer, sw)
 		n.writeCalls(varName, isPointer, sw)
 		for i := range n.children {
-			n.children[i].WriteMethod(varName, depth, append(ancestors, n), sw)
+			n.children[i].WriteMethod(c, varName, depth, append(ancestors, n), sw)
 		}
 	}
 

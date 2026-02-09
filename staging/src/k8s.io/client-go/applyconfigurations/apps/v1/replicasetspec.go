@@ -20,16 +20,32 @@ package v1
 
 import (
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ReplicaSetSpecApplyConfiguration represents a declarative configuration of the ReplicaSetSpec type for use
 // with apply.
+//
+// ReplicaSetSpec is the specification of a ReplicaSet.
 type ReplicaSetSpecApplyConfiguration struct {
-	Replicas        *int32                                    `json:"replicas,omitempty"`
-	MinReadySeconds *int32                                    `json:"minReadySeconds,omitempty"`
-	Selector        *v1.LabelSelectorApplyConfiguration       `json:"selector,omitempty"`
-	Template        *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
+	// Replicas is the number of desired pods.
+	// This is a pointer to distinguish between explicit zero and unspecified.
+	// Defaults to 1.
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
+	Replicas *int32 `json:"replicas,omitempty"`
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
+	// Selector is a label query over pods that should match the replica count.
+	// Label keys and values that must match in order to be controlled by this replica set.
+	// It must match the pod template's labels.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+	Selector *metav1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
+	// Template is the object that describes the pod that will be created if
+	// insufficient replicas are detected.
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/#pod-template
+	Template *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
 // ReplicaSetSpecApplyConfiguration constructs a declarative configuration of the ReplicaSetSpec type for use with
@@ -57,7 +73,7 @@ func (b *ReplicaSetSpecApplyConfiguration) WithMinReadySeconds(value int32) *Rep
 // WithSelector sets the Selector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Selector field is set to the value of the last call.
-func (b *ReplicaSetSpecApplyConfiguration) WithSelector(value *v1.LabelSelectorApplyConfiguration) *ReplicaSetSpecApplyConfiguration {
+func (b *ReplicaSetSpecApplyConfiguration) WithSelector(value *metav1.LabelSelectorApplyConfiguration) *ReplicaSetSpecApplyConfiguration {
 	b.Selector = value
 	return b
 }

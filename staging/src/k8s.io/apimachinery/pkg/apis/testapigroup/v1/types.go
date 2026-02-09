@@ -28,6 +28,7 @@ type (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.1
 
 // Carp is a collection of containers, used as either input (create, update) or as output (list, get).
 type Carp struct {
@@ -60,8 +61,12 @@ type CarpStatus struct {
 	Phase CarpPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=CarpPhase"`
 	// Current service state of carp.
 	// More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +listType=map
+	// +listMapKey=type
 	// +optional
-	Conditions []CarpCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
+	Conditions []CarpCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,opt,name=conditions"`
 	// A human readable message indicating details about why the carp is in this condition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
@@ -82,6 +87,14 @@ type CarpStatus struct {
 	// This is before the Kubelet pulled the container image(s) for the carp.
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,7,opt,name=startTime"`
+
+	// Carp infos are provided by different clients, hence the map type.
+	//
+	// +listType=map
+	// +listMapKey=a
+	// +listMapKey=b
+	// +listMapKey=c
+	Infos []CarpInfo `json:"infos,omitempty" protobuf:"bytes,8,rep,name=infos"`
 }
 
 type CarpCondition struct {
@@ -105,6 +118,21 @@ type CarpCondition struct {
 	// Human-readable message indicating details about last transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+}
+
+type CarpInfo struct {
+	// A is the first map key.
+	// +required
+	A int64 `json:"a" protobuf:"bytes,1,name=a"`
+	// B is the second map key.
+	// +required
+	B string `json:"b" protobuf:"bytes,2,name=b"`
+	// C is the third, optional map key
+	// +optional
+	C *string `json:"c,omitempty" protobuf:"bytes,4,opt,name=c"`
+
+	// Some data for each pair of A and B.
+	Data string `json:"data" protobuf:"bytes,3,name=data"`
 }
 
 // CarpSpec is a description of a carp
@@ -143,7 +171,7 @@ type CarpSpec struct {
 	// Deprecated: Use serviceAccountName instead.
 	// +k8s:conversion-gen=false
 	// +optional
-	DeprecatedServiceAccount string `json:"serviceAccount,omitempty" protobuf:"bytes,9,opt,name=serviceAccount"`
+	DeprecatedServiceAccount string `json:"deprecatedServiceAccount,omitempty" protobuf:"bytes,9,opt,name=deprecatedServiceAccount"`
 
 	// NodeName is a request to schedule this carp onto a specific node. If it is non-empty,
 	// the scheduler simply schedules this carp onto that node, assuming that it fits resource
@@ -151,7 +179,6 @@ type CarpSpec struct {
 	// +optional
 	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,10,opt,name=nodeName"`
 	// Host networking requested for this carp. Use the host's network namespace.
-	// If this option is set, the ports that will be used must be specified.
 	// Default to false.
 	// +k8s:conversion-gen=false
 	// +optional
@@ -177,10 +204,11 @@ type CarpSpec struct {
 	// If specified, the carp will be dispatched by specified scheduler.
 	// If not specified, the carp will be dispatched by default scheduler.
 	// +optional
-	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
+	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,19,opt,name=schedulerName"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.1
 
 // CarpList is a list of Carps.
 type CarpList struct {

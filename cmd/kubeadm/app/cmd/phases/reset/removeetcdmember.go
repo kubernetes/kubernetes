@@ -21,8 +21,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -32,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	utilstaticpod "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
@@ -74,8 +73,8 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 					}
 				}
 			} else {
-				fmt.Println("[reset] Would remove the etcd member on this node from the etcd cluster")
-				fmt.Printf("[reset] Would delete contents of the etcd data directory: %v\n", etcdDataDir)
+				fmt.Println("[dryrun] Would remove the etcd member on this node from the etcd cluster")
+				fmt.Printf("[dryrun] Would delete contents of the etcd data directory: %v\n", etcdDataDir)
 			}
 		}
 		// This could happen if the phase `cleanup-node` is run before the `remove-etcd-member`.

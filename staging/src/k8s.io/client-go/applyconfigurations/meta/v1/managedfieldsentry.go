@@ -19,19 +19,44 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ManagedFieldsEntryApplyConfiguration represents a declarative configuration of the ManagedFieldsEntry type for use
 // with apply.
+//
+// ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource
+// that the fieldset applies to.
 type ManagedFieldsEntryApplyConfiguration struct {
-	Manager     *string                        `json:"manager,omitempty"`
-	Operation   *v1.ManagedFieldsOperationType `json:"operation,omitempty"`
-	APIVersion  *string                        `json:"apiVersion,omitempty"`
-	Time        *v1.Time                       `json:"time,omitempty"`
-	FieldsType  *string                        `json:"fieldsType,omitempty"`
-	FieldsV1    *v1.FieldsV1                   `json:"fieldsV1,omitempty"`
-	Subresource *string                        `json:"subresource,omitempty"`
+	// Manager is an identifier of the workflow managing these fields.
+	Manager *string `json:"manager,omitempty"`
+	// Operation is the type of operation which lead to this ManagedFieldsEntry being created.
+	// The only valid values for this field are 'Apply' and 'Update'.
+	Operation *metav1.ManagedFieldsOperationType `json:"operation,omitempty"`
+	// APIVersion defines the version of this resource that this field set
+	// applies to. The format is "group/version" just like the top-level
+	// APIVersion field. It is necessary to track the version of a field
+	// set because it cannot be automatically converted.
+	APIVersion *string `json:"apiVersion,omitempty"`
+	// Time is the timestamp of when the ManagedFields entry was added. The
+	// timestamp will also be updated if a field is added, the manager
+	// changes any of the owned fields value or removes a field. The
+	// timestamp does not update when a field is removed from the entry
+	// because another manager took it over.
+	Time *metav1.Time `json:"time,omitempty"`
+	// FieldsType is the discriminator for the different fields format and version.
+	// There is currently only one possible value: "FieldsV1"
+	FieldsType *string `json:"fieldsType,omitempty"`
+	// FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
+	FieldsV1 *metav1.FieldsV1 `json:"fieldsV1,omitempty"`
+	// Subresource is the name of the subresource used to update that object, or
+	// empty string if the object was updated through the main resource. The
+	// value of this field is used to distinguish between managers, even if they
+	// share the same name. For example, a status update will be distinct from a
+	// regular update using the same manager name.
+	// Note that the APIVersion field is not related to the Subresource field and
+	// it always corresponds to the version of the main resource.
+	Subresource *string `json:"subresource,omitempty"`
 }
 
 // ManagedFieldsEntryApplyConfiguration constructs a declarative configuration of the ManagedFieldsEntry type for use with
@@ -51,7 +76,7 @@ func (b *ManagedFieldsEntryApplyConfiguration) WithManager(value string) *Manage
 // WithOperation sets the Operation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Operation field is set to the value of the last call.
-func (b *ManagedFieldsEntryApplyConfiguration) WithOperation(value v1.ManagedFieldsOperationType) *ManagedFieldsEntryApplyConfiguration {
+func (b *ManagedFieldsEntryApplyConfiguration) WithOperation(value metav1.ManagedFieldsOperationType) *ManagedFieldsEntryApplyConfiguration {
 	b.Operation = &value
 	return b
 }
@@ -67,7 +92,7 @@ func (b *ManagedFieldsEntryApplyConfiguration) WithAPIVersion(value string) *Man
 // WithTime sets the Time field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Time field is set to the value of the last call.
-func (b *ManagedFieldsEntryApplyConfiguration) WithTime(value v1.Time) *ManagedFieldsEntryApplyConfiguration {
+func (b *ManagedFieldsEntryApplyConfiguration) WithTime(value metav1.Time) *ManagedFieldsEntryApplyConfiguration {
 	b.Time = &value
 	return b
 }
@@ -83,7 +108,7 @@ func (b *ManagedFieldsEntryApplyConfiguration) WithFieldsType(value string) *Man
 // WithFieldsV1 sets the FieldsV1 field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FieldsV1 field is set to the value of the last call.
-func (b *ManagedFieldsEntryApplyConfiguration) WithFieldsV1(value v1.FieldsV1) *ManagedFieldsEntryApplyConfiguration {
+func (b *ManagedFieldsEntryApplyConfiguration) WithFieldsV1(value metav1.FieldsV1) *ManagedFieldsEntryApplyConfiguration {
 	b.FieldsV1 = &value
 	return b
 }

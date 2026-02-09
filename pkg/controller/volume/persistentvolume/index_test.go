@@ -134,6 +134,24 @@ func TestMatchVolume(t *testing.T) {
 				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 			}),
 		},
+		"successful-match-with-empty-vac": {
+			expectedMatch: "gce-pd-10",
+			claim: makePVC("8G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.VolumeAttributesClassName = &classEmpty
+			}),
+		},
+		"successful-match-with-vac": {
+			expectedMatch: "gce-pd-vac-silver1",
+			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.VolumeAttributesClassName = &classSilver
+			}),
+		},
+		"successful-no-match-vac-nonexisting": {
+			expectedMatch: "",
+			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.VolumeAttributesClassName = &classNonExisting
+			}),
+		},
 		"successful-match-with-class": {
 			expectedMatch: "gce-pd-silver1",
 			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
@@ -960,6 +978,29 @@ func createTestVolumes() []*v1.PersistentVolume {
 				StorageClassName: classWait,
 				NodeAffinity:     createNodeAffinity("key1", "value4"),
 				VolumeMode:       &fs,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "gce-pd-vac-silver1",
+				Name: "gce-pd-vac-silver1",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("100G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+				},
+				VolumeAttributesClassName: &classSilver,
+				VolumeMode:                &fs,
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
 			},
 		},
 	}

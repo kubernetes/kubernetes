@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloud
+package nodelifecycle
 
 import (
 	"context"
@@ -163,10 +163,11 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 			klog.V(2).Infof("deleting node since it is no longer present in cloud provider: %s", node.Name)
 
 			ref := &v1.ObjectReference{
-				Kind:      "Node",
-				Name:      node.Name,
-				UID:       types.UID(node.UID),
-				Namespace: "",
+				APIVersion: "v1",
+				Kind:       "Node",
+				Name:       node.Name,
+				UID:        node.UID,
+				Namespace:  "",
 			}
 
 			c.recorder.Eventf(ref, v1.EventTypeNormal, deleteNodeEvent,

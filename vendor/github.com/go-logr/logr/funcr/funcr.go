@@ -77,7 +77,7 @@ func newSink(fn func(prefix, args string), formatter Formatter) logr.LogSink {
 		write:     fn,
 	}
 	// For skipping fnlogger.Info and fnlogger.Error.
-	l.Formatter.AddCallDepth(1)
+	l.AddCallDepth(1) // via Formatter
 	return l
 }
 
@@ -164,17 +164,17 @@ type fnlogger struct {
 }
 
 func (l fnlogger) WithName(name string) logr.LogSink {
-	l.Formatter.AddName(name)
+	l.AddName(name) // via Formatter
 	return &l
 }
 
 func (l fnlogger) WithValues(kvList ...any) logr.LogSink {
-	l.Formatter.AddValues(kvList)
+	l.AddValues(kvList) // via Formatter
 	return &l
 }
 
 func (l fnlogger) WithCallDepth(depth int) logr.LogSink {
-	l.Formatter.AddCallDepth(depth)
+	l.AddCallDepth(depth) // via Formatter
 	return &l
 }
 

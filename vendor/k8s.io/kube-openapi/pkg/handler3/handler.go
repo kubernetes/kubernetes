@@ -29,10 +29,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 	"github.com/google/uuid"
 	"github.com/munnerz/goautoneg"
+	"google.golang.org/protobuf/proto"
 
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/cached"

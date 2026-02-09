@@ -17,7 +17,7 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -71,19 +71,58 @@ var (
 	)
 )
 
-// shouldHide be used to check if a specific metric with deprecated version should be hidden
+// shouldHide is used to check if a specific metric with deprecated version should be hidden
 // according to metrics deprecation lifecycle.
-func shouldHide(currentVersion *semver.Version, deprecatedVersion *semver.Version) bool {
-	guardVersion, err := semver.Make(fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor))
-	if err != nil {
-		panic("failed to make version from current version")
-	}
+func shouldHide(stabilityLevel StabilityLevel, currentVersion *semver.Version, deprecatedVersion *semver.Version) bool {
+	hiddenMinor := deprecatedVersion.Minor + deprecationPeriodMinorVersions(stabilityLevel)
 
-	if deprecatedVersion.LT(guardVersion) {
+	switch {
+	case deprecatedVersion.Major < currentVersion.Major:
+		return true
+	case deprecatedVersion.Major > currentVersion.Major:
+		return false
+
+	// deprecatedVersion.Major == currentVersion.Major
+	case hiddenMinor < currentVersion.Minor:
+		return true
+	case hiddenMinor > currentVersion.Minor:
+		return false
+
+	// deprecatedVersion.Minor == currentVersion.Minor
+	case strings.Contains(currentVersion.String(), "alpha.0"):
+		// Wait until we're past the alpha.0 period of a minor development cycle to hide metrics whose deprecation period ends in that minor version.
+		// See discussion in https://github.com/kubernetes/kubernetes/issues/133429#issuecomment-3165551443
+		return false
+	default:
+		return true
+	}
+}
+
+// getDeprecationReleaseWindow returns the number of minor releases a metric should be served
+// after its deprecated version, based on its stability level.
+func deprecationPeriodMinorVersions(stabilityLevel StabilityLevel) uint64 {
+	switch stabilityLevel {
+	case STABLE:
+		return 3
+	case BETA:
+		return 1
+	default: // ALPHA, INTERNAL
+		return 0
+	}
+}
+
+// isDeprecated returns true if the current version, ignoring pre-release tags,
+// is greater than or equal to the deprecated version.
+func isDeprecated(currentVersion, deprecatedVersion semver.Version) bool {
+	switch {
+	case currentVersion.Major < deprecatedVersion.Major:
+		return false
+	case currentVersion.Major > deprecatedVersion.Major:
 		return true
 	}
 
-	return false
+	// currentVersion.Major == deprecatedVersion.Major
+	return currentVersion.Minor >= deprecatedVersion.Minor
 }
 
 // ValidateShowHiddenMetricsVersion checks invalid version for which show hidden metrics.
@@ -117,10 +156,10 @@ func SetShowHidden() {
 	})
 }
 
-// ShouldShowHidden returns whether showing hidden deprecated metrics
+// shouldShowHidden returns whether showing hidden deprecated metrics
 // is enabled. While the primary usecase for this is internal (to determine
 // registration behavior) this can also be used to introspect
-func ShouldShowHidden() bool {
+func shouldShowHidden() bool {
 	return showHidden.Load()
 }
 

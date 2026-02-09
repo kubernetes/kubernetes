@@ -29,7 +29,7 @@ type FakeCrV1 struct {
 }
 
 func (c *FakeCrV1) Examples(namespace string) v1.ExampleInterface {
-	return &FakeExamples{c, namespace}
+	return newFakeExamples(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

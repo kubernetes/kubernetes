@@ -19,17 +19,18 @@ package cm
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
+	resourcehelper "k8s.io/component-helpers/resource"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -51,6 +52,10 @@ const (
 	// defined here:
 	// https://github.com/torvalds/linux/blob/cac03ac368fabff0122853de2422d4e17a32de08/kernel/sched/core.c#L10546
 	MinQuotaPeriod = 1000
+
+	// From the inverse of the conversion in MilliCPUToQuota:
+	// MinQuotaPeriod * MilliCPUToCPU / QuotaPeriod
+	MinMilliCPULimit = 10
 )
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
@@ -118,19 +123,22 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
-	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling)
+func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
 	// sum requests and limits.
-	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,
+	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources: !podLevelResourcesEnabled,
+		UseStatusResources:    false,
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
 	cpuLimitsDeclared := true
 
-	limits := resource.PodLimits(pod, resource.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,
-		ContainerFn: func(res v1.ResourceList, containerType podutil.ContainerType) {
+	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources: !podLevelResourcesEnabled,
+		ContainerFn: func(res v1.ResourceList, containerType resourcehelper.ContainerType) {
 			if res.Cpu().IsZero() {
 				cpuLimitsDeclared = false
 			}
@@ -139,6 +147,16 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 			}
 		},
 	})
+
+	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(allocatedPod) {
+		if !allocatedPod.Spec.Resources.Limits.Cpu().IsZero() {
+			cpuLimitsDeclared = true
+		}
+
+		if !allocatedPod.Spec.Resources.Limits.Memory().IsZero() {
+			memoryLimitsDeclared = true
+		}
+	}
 	// map hugepage pagesize (bytes) to limits (bytes)
 	hugePageLimits := HugePageLimits(reqs)
 
@@ -165,7 +183,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	}
 
 	// determine the qos class
-	qosClass := v1qos.GetPodQOS(pod)
+	qosClass := v1qos.GetPodQOS(allocatedPod)
 
 	// build the result
 	result := &ResourceConfig{}
@@ -315,13 +333,67 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 }
 
 // GetKubeletContainer returns the cgroup the kubelet will use
-func GetKubeletContainer(kubeletCgroups string) (string, error) {
+func GetKubeletContainer(logger klog.Logger, kubeletCgroups string) (string, error) {
 	if kubeletCgroups == "" {
-		cont, err := getContainer(os.Getpid())
+		cont, err := getContainer(logger, os.Getpid())
 		if err != nil {
 			return "", err
 		}
 		return cont, nil
 	}
 	return kubeletCgroups, nil
+}
+
+func CPURequestsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
+	var cpuRequest *resource.Quantity
+	if podConfig != nil && *podConfig.CPUShares > 0 {
+		milliCPU := sharesToMilliCPU(int64(*podConfig.CPUShares))
+		if milliCPU > 0 {
+			cpuRequest = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
+		}
+	}
+
+	return cpuRequest
+}
+
+func CPULimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
+	var cpuLimit *resource.Quantity
+
+	if podConfig != nil && *podConfig.CPUPeriod > 0 {
+		milliCPU := quotaToMilliCPU(*podConfig.CPUQuota, int64(*podConfig.CPUPeriod))
+		if milliCPU > 0 {
+			cpuLimit = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
+		}
+	}
+
+	return cpuLimit
+}
+
+func MemoryLimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
+	var memLimit *resource.Quantity
+
+	if podConfig != nil && *podConfig.Memory > int64(0) {
+		memLimit = resource.NewQuantity(*podConfig.Memory, resource.BinarySI)
+	}
+	return memLimit
+}
+
+// sharesToMilliCPU converts CpuShares (cpu.shares) to milli-CPU value
+// TODO - dedup sharesToMilliCPU with sharesToMilliCPU in pkg/kubelet/kuberuntime/helpers_linux.go
+func sharesToMilliCPU(shares int64) int64 {
+	milliCPU := int64(0)
+	if shares >= int64(MinShares) {
+		milliCPU = int64(math.Ceil(float64(shares*MilliCPUToCPU) / float64(SharesPerCPU)))
+	}
+	return milliCPU
+}
+
+// quotaToMilliCPU converts cpu.cfs_quota_us and cpu.cfs_period_us to milli-CPU
+// value
+// TODO - dedup quotaToMilliCPU with sharesToMilliCPU in pkg/kubelet/kuberuntime/helpers_linux.go
+func quotaToMilliCPU(quota int64, period int64) int64 {
+	if quota == -1 {
+		return int64(0)
+	}
+	return (quota * MilliCPUToCPU) / period
 }

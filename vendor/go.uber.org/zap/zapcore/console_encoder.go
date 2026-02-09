@@ -77,7 +77,7 @@ func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 	// If this ever becomes a performance bottleneck, we can implement
 	// ArrayEncoder for our plain-text format.
 	arr := getSliceEncoder()
-	if c.TimeKey != "" && c.EncodeTime != nil {
+	if c.TimeKey != "" && c.EncodeTime != nil && !ent.Time.IsZero() {
 		c.EncodeTime(ent.Time, arr)
 	}
 	if c.LevelKey != "" && c.EncodeLevel != nil {
@@ -105,7 +105,7 @@ func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 		if i > 0 {
 			line.AppendString(c.ConsoleSeparator)
 		}
-		fmt.Fprint(line, arr.elems[i])
+		_, _ = fmt.Fprint(line, arr.elems[i])
 	}
 	putSliceEncoder(arr)
 

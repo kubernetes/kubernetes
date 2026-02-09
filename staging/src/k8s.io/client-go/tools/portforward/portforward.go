@@ -37,7 +37,13 @@ import (
 // TODO move to API machinery and re-unify with kubelet/server/portfoward
 const PortForwardProtocolV1Name = "portforward.k8s.io"
 
-var ErrLostConnectionToPod = errors.New("lost connection to pod")
+var (
+	// error returned whenever we lost connection to a pod
+	ErrLostConnectionToPod = errors.New("lost connection to pod")
+
+	// set of error we're expecting during port-forwarding
+	networkClosedError = "use of closed network connection"
+)
 
 // PortForwarder knows how to listen for local connections and forward them to
 // a remote pod via an upgraded HTTP request.
@@ -312,7 +318,7 @@ func (pf *PortForwarder) waitForConnection(listener net.Listener, port Forwarded
 			conn, err := listener.Accept()
 			if err != nil {
 				// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
-				if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
+				if !strings.Contains(strings.ToLower(err.Error()), networkClosedError) {
 					runtime.HandleError(fmt.Errorf("error accepting connection on port %d: %v", port.Local, err))
 				}
 				return
@@ -381,7 +387,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 
 	go func() {
 		// Copy from the remote side to the local port.
-		if _, err := io.Copy(conn, dataStream); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		if _, err := io.Copy(conn, dataStream); err != nil && !strings.Contains(strings.ToLower(err.Error()), networkClosedError) {
 			runtime.HandleError(fmt.Errorf("error copying from remote stream to local connection: %v", err))
 		}
 
@@ -394,7 +400,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 		defer dataStream.Close()
 
 		// Copy from the local port to the remote side.
-		if _, err := io.Copy(dataStream, conn); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		if _, err := io.Copy(dataStream, conn); err != nil && !strings.Contains(strings.ToLower(err.Error()), networkClosedError) {
 			runtime.HandleError(fmt.Errorf("error copying from local connection to remote stream: %v", err))
 			// break out of the select below without waiting for the other copy to finish
 			close(localError)
@@ -406,6 +412,11 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	case <-remoteDone:
 	case <-localError:
 	}
+
+	// reset dataStream to discard any unsent data, preventing port forwarding from being blocked.
+	// we must reset dataStream before waiting on errorChan, otherwise,
+	// the blocking data will affect errorStream and cause <-errorChan to block indefinitely.
+	_ = dataStream.Reset()
 
 	// always expect something on errorChan (it may be nil)
 	err = <-errorChan

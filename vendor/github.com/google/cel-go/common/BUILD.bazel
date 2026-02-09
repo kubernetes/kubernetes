@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cost.go",
+        "doc.go",
         "error.go",
         "errors.go",
         "location.go",
@@ -18,7 +19,6 @@ go_library(
     deps = [
         "//common/runes:go_default_library",
         "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
-        "@org_golang_x_text//width:go_default_library",
     ],
 )
 
@@ -26,6 +26,7 @@ go_test(
     name = "go_default_test",
     size = "small",
     srcs = [
+        "doc_test.go",
         "errors_test.go",
         "source_test.go",
     ],

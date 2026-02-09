@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -145,16 +146,21 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 		DeleteFunc: func(obj interface{}) {
 			// The informer cache no longer has the object, and since Node doesn't have a finalizer,
 			// we don't see the Update with DeletionTimestamp != 0.
-			// TODO: instead of executing the operation directly in the handler, build a small cache with key node.Name
-			// and value PodCIDRs use ReleaseCIDR on the reconcile loop so we can retry on `ReleaseCIDR` failures.
-			if err := ra.ReleaseCIDR(logger, obj.(*v1.Node)); err != nil {
-				utilruntime.HandleError(fmt.Errorf("error while processing CIDR Release: %w", err))
+			node, ok := obj.(*v1.Node)
+			if !ok {
+				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					utilruntime.HandleErrorWithContext(ctx, nil, "Could not get object from tombstone", "obj", obj)
+					return
+				}
+				node, ok = tombstone.Obj.(*v1.Node)
+				if !ok {
+					utilruntime.HandleErrorWithContext(ctx, nil, "Tombstone contained object that is not a node", "type", fmt.Sprintf("%T", obj))
+					return
+				}
 			}
-			// IndexerInformer uses a delta nodeQueue, therefore for deletes we have to use this
-			// key function.
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				ra.queue.Add(key)
+			if err := ra.ReleaseCIDR(logger, node); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "Error while processing CIDR Release")
 			}
 		},
 	})
@@ -163,7 +169,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 }
 
 func (r *rangeAllocator) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	r.broadcaster.StartStructuredLogging(3)
@@ -172,19 +178,24 @@ func (r *rangeAllocator) Run(ctx context.Context) {
 	r.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: r.client.CoreV1().Events("")})
 	defer r.broadcaster.Shutdown()
 
-	defer r.queue.ShutDown()
-
 	logger.Info("Starting range CIDR allocator")
-	defer logger.Info("Shutting down range CIDR allocator")
 
-	if !cache.WaitForNamedCacheSync("cidrallocator", ctx.Done(), r.nodesSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down range CIDR allocator")
+		r.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, r.nodesSynced) {
 		return
 	}
 
 	for i := 0; i < cidrUpdateWorkers; i++ {
-		go wait.UntilWithContext(ctx, r.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, r.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
@@ -225,7 +236,7 @@ func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 			// Forget here else we'd go into a loop of attempting to
 			// process a work item that is invalid.
 			r.queue.Forget(obj)
-			utilruntime.HandleError(fmt.Errorf("expected string in workNodeQueue but got %#v", obj))
+			utilruntime.HandleErrorWithContext(ctx, nil, "Expected string but got unexpected type in work node queue", "type", fmt.Sprintf("%T", obj))
 			return nil
 		}
 		// Run the syncHandler, passing it the namespace/name string of the
@@ -238,12 +249,12 @@ func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 		// Finally, if no error occurs we Forget this item so it does not
 		// get queue again until another change happens.
 		r.queue.Forget(obj)
-		logger.Info("Successfully synced", "key", key)
+		logger.V(4).Info("Successfully synced", "key", key)
 		return nil
 	}(klog.FromContext(ctx), obj)
 
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "Error processing node work item")
 		return true
 	}
 
@@ -270,7 +281,7 @@ func (r *rangeAllocator) syncNode(ctx context.Context, key string) error {
 	// Check the DeletionTimestamp to determine if object is under deletion.
 	if !node.DeletionTimestamp.IsZero() {
 		logger.V(3).Info("node is being deleted", "node", key)
-		return r.ReleaseCIDR(logger, node)
+		return nil
 	}
 	return r.AllocateOrOccupyCIDR(ctx, node)
 }

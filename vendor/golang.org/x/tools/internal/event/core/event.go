@@ -28,11 +28,6 @@ type Event struct {
 	dynamic []label.Label  // dynamically sized storage for remaining labels
 }
 
-// eventLabelMap implements label.Map for a the labels of an Event.
-type eventLabelMap struct {
-	event Event
-}
-
 func (ev Event) At() time.Time { return ev.at }
 
 func (ev Event) Format(f fmt.State, r rune) {

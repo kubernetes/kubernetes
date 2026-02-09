@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -24,13 +23,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/trace"
 	traceservice "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -42,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	kmsv2mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2"
 	client "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	utiltesting "k8s.io/client-go/util/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -83,21 +87,20 @@ resources:
 	defer os.Remove(tracingConfigFile.Name())
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
-samplingRatePerMillion: 1000000
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
 	}
 
 	srv := grpc.NewServer()
 	fakeServer := &traceServer{t: t}
-	fakeServer.resetExpectations([]*spanExpectation{})
+	fakeServer.resetExpectations([]*spanExpectation{}, trace.TraceID{})
 	traceservice.RegisterTraceServiceServer(srv, fakeServer)
 
 	go func() {
-		if err := srv.Serve(listener); err != nil {
-			t.Error(err)
+		if serveErr := srv.Serve(listener); serveErr != nil {
+			t.Error(serveErr)
 			return
 		}
 	}()
@@ -122,13 +125,13 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 
 	for _, tc := range []struct {
 		desc          string
-		apiCall       func(client.Interface) error
+		apiCall       func(context.Context, client.Interface) error
 		expectedTrace []*spanExpectation
 	}{
 		{
 			desc: "create secret",
-			apiCall: func(c client.Interface) error {
-				_, err = clientSet.CoreV1().Secrets(v1.NamespaceDefault).Create(context.Background(),
+			apiCall: func(ctx context.Context, c client.Interface) error {
+				_, err = clientSet.CoreV1().Secrets(v1.NamespaceDefault).Create(ctx,
 					&v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "fake"}, Data: map[string][]byte{"foo": []byte("bar")}}, metav1.CreateOptions{})
 				return err
 			},
@@ -151,9 +154,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		},
 		{
 			desc: "get secret",
-			apiCall: func(c client.Interface) error {
+			apiCall: func(ctx context.Context, c client.Interface) error {
 				// This depends on the "create secret" step having completed successfully
-				_, err = clientSet.CoreV1().Secrets(v1.NamespaceDefault).Get(context.Background(), "fake", metav1.GetOptions{})
+				_, err = clientSet.CoreV1().Secrets(v1.NamespaceDefault).Get(ctx, "fake", metav1.GetOptions{})
 				return err
 			},
 			expectedTrace: []*spanExpectation{
@@ -175,10 +178,11 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			fakeServer.resetExpectations(tc.expectedTrace)
+			ctx, traceID := sampledContext()
+			fakeServer.resetExpectations(tc.expectedTrace, traceID)
 
 			// Make our call to the API server
-			if err := tc.apiCall(clientSet); err != nil {
+			if err := tc.apiCall(ctx, clientSet); err != nil {
 				t.Fatal(err)
 			}
 
@@ -208,7 +212,7 @@ func TestAPIServerTracingWithEgressSelector(t *testing.T) {
 	defer os.Remove(egressSelectorConfigFile.Name())
 
 	if err := os.WriteFile(egressSelectorConfigFile.Name(), []byte(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.k8s.io/v1beta1
 kind: EgressSelectorConfiguration
 egressSelections:
 - name: cluster
@@ -226,7 +230,7 @@ egressSelections:
 	defer utiltesting.CloseAndRemove(t, tracingConfigFile)
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
@@ -253,7 +257,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 	}
 }
 
-func TestAPIServerTracing(t *testing.T) {
+func TestUnauthenticatedAPIServerTracing(t *testing.T) {
 	// Listen for traces from the API Server before starting it, so the
 	// API Server will successfully connect right away during the test.
 	listener, err := net.Listen("tcp", "localhost:")
@@ -268,19 +272,91 @@ func TestAPIServerTracing(t *testing.T) {
 	defer os.Remove(tracingConfigFile.Name())
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
-samplingRatePerMillion: 1000000
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
 	}
 
 	srv := grpc.NewServer()
 	fakeServer := &traceServer{t: t}
-	fakeServer.resetExpectations([]*spanExpectation{})
+	fakeServer.resetExpectations([]*spanExpectation{{}}, trace.TraceID{})
 	traceservice.RegisterTraceServiceServer(srv, fakeServer)
 
 	go srv.Serve(listener)
+	defer srv.Stop()
+
+	// Start the API Server with our tracing configuration
+	testServer := kubeapiservertesting.StartTestServerOrDie(t,
+		kubeapiservertesting.NewDefaultTestServerOptions(),
+		[]string{"--tracing-config-file=" + tracingConfigFile.Name()},
+		framework.SharedEtcd(),
+	)
+	defer testServer.TearDownFn()
+
+	ctx, testTraceID := sampledContext()
+	// Match any span that has the tests' Trace ID
+	fakeServer.resetExpectations([]*spanExpectation{{}}, testTraceID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, testServer.ClientConfig.Host+"/healthz", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unauthenticatedConfig := rest.CopyConfig(testServer.ClientConfig)
+	// Remove the bearer token from the request to make it unauthenticated.
+	unauthenticatedConfig.BearerToken = ""
+	transport, err := rest.TransportFor(unauthenticatedConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Transport: otelhttp.NewTransport(transport)}
+	if _, err = client.Do(req); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure we do not find any matching traces, since the request was not authenticated
+	select {
+	case <-fakeServer.traceFound:
+		t.Fatal("Found a trace when none was expected")
+	case <-time.After(10 * time.Second):
+	}
+}
+
+func TestAPIServerTracing(t *testing.T) {
+	// Listen for traces from the API Server before starting it, so the
+	// API Server will successfully connect right away during the test.
+	listener, err := net.Listen("tcp", "localhost:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Write the configuration for tracing to a file
+	tracingConfigFile, err := os.CreateTemp("", "tracing-config.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err = os.Remove(tracingConfigFile.Name()); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: TracingConfiguration
+endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := grpc.NewServer()
+	fakeServer := &traceServer{t: t}
+	fakeServer.resetExpectations([]*spanExpectation{}, trace.TraceID{})
+	traceservice.RegisterTraceServiceServer(srv, fakeServer)
+
+	go func() {
+		if serveErr := srv.Serve(listener); serveErr != nil {
+			t.Error(serveErr)
+		}
+	}()
 	defer srv.Stop()
 
 	// Start the API Server with our tracing configuration
@@ -297,13 +373,13 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 
 	for _, tc := range []struct {
 		desc          string
-		apiCall       func(*client.Clientset) error
+		apiCall       func(context.Context) error
 		expectedTrace []*spanExpectation
 	}{
 		{
 			desc: "create node",
-			apiCall: func(c *client.Clientset) error {
-				_, err = clientSet.CoreV1().Nodes().Create(context.Background(),
+			apiCall: func(ctx context.Context) error {
+				_, err = clientSet.CoreV1().Nodes().Create(ctx,
 					&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "fake"}}, metav1.CreateOptions{})
 				return err
 			},
@@ -314,16 +390,16 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "POST"
 						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
 					},
-				},
-				{
-					name: "authentication",
 				},
 				{
 					name: "Create",
@@ -421,9 +497,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		},
 		{
 			desc: "get node",
-			apiCall: func(c *client.Clientset) error {
+			apiCall: func(ctx context.Context) error {
 				// This depends on the "create node" step having completed successfully
-				_, err = clientSet.CoreV1().Nodes().Get(context.Background(), "fake", metav1.GetOptions{})
+				_, err = clientSet.CoreV1().Nodes().Get(ctx, "fake", metav1.GetOptions{})
 				return err
 			},
 			expectedTrace: []*spanExpectation{
@@ -433,16 +509,16 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "GET"
 						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
 					},
-				},
-				{
-					name: "authentication",
 				},
 				{
 					name: "Get",
@@ -470,6 +546,23 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"About to Get from storage",
 						"About to write a response",
 						"Writing http response done",
+					},
+				},
+				{
+					name: "cacher.Get",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"key": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/minions/fake"
+						},
+						"resource-version": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == ""
+						},
+					},
+					events: []string{
+						"About to Get from underlying storage",
 					},
 				},
 				{
@@ -512,8 +605,8 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		},
 		{
 			desc: "list nodes",
-			apiCall: func(c *client.Clientset) error {
-				_, err = clientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			apiCall: func(ctx context.Context) error {
+				_, err = clientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 				return err
 			},
 			expectedTrace: []*spanExpectation{
@@ -523,16 +616,16 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "GET"
 						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
 					},
-				},
-				{
-					name: "authentication",
 				},
 				{
 					name: "List",
@@ -561,6 +654,15 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"Listing from storage done",
 						"Writing http response done",
 					},
+				},
+				{
+					name: "etcdserverpb.KV/Range",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"rpc.system": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "grpc"
+						},
+					},
+					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -593,9 +695,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		},
 		{
 			desc: "update node",
-			apiCall: func(c *client.Clientset) error {
+			apiCall: func(ctx context.Context) error {
 				// This depends on the "create node" step having completed successfully
-				_, err = clientSet.CoreV1().Nodes().Update(context.Background(),
+				_, err = clientSet.CoreV1().Nodes().Update(ctx,
 					&v1.Node{ObjectMeta: metav1.ObjectMeta{
 						Name:        "fake",
 						Annotations: map[string]string{"foo": "bar"},
@@ -609,16 +711,16 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "PUT"
 						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
 					},
-				},
-				{
-					name: "authentication",
 				},
 				{
 					name: "Update",
@@ -719,7 +821,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		},
 		{
 			desc: "patch node",
-			apiCall: func(c *client.Clientset) error {
+			apiCall: func(ctx context.Context) error {
 				// This depends on the "create node" step having completed successfully
 				oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{
 					Name:        "fake",
@@ -743,7 +845,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 				if err != nil {
 					return err
 				}
-				_, err = clientSet.CoreV1().Nodes().Patch(context.Background(), "fake", types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+				_, err = clientSet.CoreV1().Nodes().Patch(ctx, "fake", types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 				return err
 			},
 			expectedTrace: []*spanExpectation{
@@ -753,16 +855,16 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "PATCH"
 						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
 					},
-				},
-				{
-					name: "authentication",
 				},
 				{
 					name: "Patch",
@@ -863,9 +965,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		},
 		{
 			desc: "delete node",
-			apiCall: func(c *client.Clientset) error {
+			apiCall: func(ctx context.Context) error {
 				// This depends on the "create node" step having completed successfully
-				return clientSet.CoreV1().Nodes().Delete(context.Background(), "fake", metav1.DeleteOptions{})
+				return clientSet.CoreV1().Nodes().Delete(ctx, "fake", metav1.DeleteOptions{})
 			},
 			expectedTrace: []*spanExpectation{
 				{
@@ -874,16 +976,16 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "DELETE"
 						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
 					},
-				},
-				{
-					name: "authentication",
 				},
 				{
 					name: "Delete",
@@ -957,10 +1059,11 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			fakeServer.resetExpectations(tc.expectedTrace)
+			ctx, testTraceID := sampledContext()
+			fakeServer.resetExpectations(tc.expectedTrace, testTraceID)
 
 			// Make our call to the API server
-			if err := tc.apiCall(clientSet); err != nil {
+			if err := tc.apiCall(ctx); err != nil {
 				t.Fatal(err)
 			}
 
@@ -968,6 +1071,11 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 			select {
 			case <-fakeServer.traceFound:
 			case <-time.After(30 * time.Second):
+				for _, spanExpectation := range fakeServer.expectations {
+					if !spanExpectation.met {
+						t.Logf("Unmet expectation: %s", spanExpectation.name)
+					}
+				}
 				t.Fatal("Timed out waiting for trace")
 			}
 		})
@@ -983,13 +1091,14 @@ type traceServer struct {
 	lock         sync.Mutex
 	traceFound   chan struct{}
 	expectations traceExpectation
+	testTraceID  trace.TraceID
 }
 
 func (t *traceServer) Export(ctx context.Context, req *traceservice.ExportTraceServiceRequest) (*traceservice.ExportTraceServiceResponse, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	t.expectations.update(req)
+	t.expectations.update(req, t.testTraceID)
 	// if all expectations are met, notify the test scenario by closing traceFound
 	if t.expectations.met() {
 		select {
@@ -1004,11 +1113,12 @@ func (t *traceServer) Export(ctx context.Context, req *traceservice.ExportTraceS
 
 // resetExpectations is used by a new test scenario to set new expectations for
 // the test server.
-func (t *traceServer) resetExpectations(newExpectations traceExpectation) {
+func (t *traceServer) resetExpectations(newExpectations traceExpectation, traceID trace.TraceID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.traceFound = make(chan struct{})
 	t.expectations = newExpectations
+	t.testTraceID = traceID
 }
 
 // traceExpectation is an expectation for an entire trace
@@ -1017,25 +1127,8 @@ type traceExpectation []*spanExpectation
 // met returns true if all span expectations the server is looking for have
 // been satisfied.
 func (t traceExpectation) met() bool {
-	if len(t) == 0 {
-		return true
-	}
-	// we want to find any trace ID which all span IDs contain.
-	// try each trace ID met by the first span.
-	possibleTraceIDs := t[0].metTraceIDs
-	for _, tid := range possibleTraceIDs {
-		if t.contains(tid) {
-			return true
-		}
-	}
-	return false
-}
-
-// contains returns true if the all spans in the trace expectation contain the
-// trace ID
-func (t traceExpectation) contains(checkTID string) bool {
-	for _, expectation := range t {
-		if !expectation.contains(checkTID) {
+	for _, se := range t {
+		if !se.met {
 			return false
 		}
 	}
@@ -1044,20 +1137,23 @@ func (t traceExpectation) contains(checkTID string) bool {
 
 // update finds all expectations that are met by a span in the
 // incoming request.
-func (t traceExpectation) update(req *traceservice.ExportTraceServiceRequest) {
+func (t traceExpectation) update(req *traceservice.ExportTraceServiceRequest, traceID trace.TraceID) {
 	for _, resourceSpans := range req.GetResourceSpans() {
 		for _, instrumentationSpans := range resourceSpans.GetScopeSpans() {
 			for _, span := range instrumentationSpans.GetSpans() {
-				t.updateForSpan(span)
+				t.updateForSpan(span, traceID)
 			}
 		}
 	}
 }
 
 // updateForSpan updates expectations based on a single incoming span.
-func (t traceExpectation) updateForSpan(span *tracev1.Span) {
+func (t traceExpectation) updateForSpan(span *tracev1.Span, traceID trace.TraceID) {
+	if hex.EncodeToString(span.TraceId) != traceID.String() {
+		return
+	}
 	for i, spanExpectation := range t {
-		if span.Name != spanExpectation.name {
+		if spanExpectation.name != "" && span.Name != spanExpectation.name {
 			continue
 		}
 		if !spanExpectation.attributes.matches(span.GetAttributes()) {
@@ -1066,7 +1162,7 @@ func (t traceExpectation) updateForSpan(span *tracev1.Span) {
 		if !spanExpectation.events.matches(span.GetEvents()) {
 			continue
 		}
-		t[i].metTraceIDs = append(spanExpectation.metTraceIDs, hex.EncodeToString(span.TraceId[:]))
+		t[i].met = true
 	}
 
 }
@@ -1076,18 +1172,7 @@ type spanExpectation struct {
 	name       string
 	attributes attributeExpectation
 	events     eventExpectation
-	// For each trace ID that meets this expectation, record it here.
-	// This way, we can ensure that all spans that should be in the same trace have the same trace ID
-	metTraceIDs []string
-}
-
-func (s *spanExpectation) contains(tid string) bool {
-	for _, metTID := range s.metTraceIDs {
-		if tid == metTID {
-			return true
-		}
-	}
-	return false
+	met        bool
 }
 
 // eventExpectation is the expectation for an event attached to a span.
@@ -1124,4 +1209,19 @@ func (a attributeExpectation) matches(attrs []*commonv1.KeyValue) bool {
 		}
 	}
 	return true
+}
+
+var r = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+func sampledContext() (context.Context, trace.TraceID) {
+	tid := trace.TraceID{}
+	_, _ = r.Read(tid[:])
+	sid := trace.SpanID{}
+	_, _ = r.Read(sid[:])
+	sc := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    tid,
+		SpanID:     sid,
+		TraceFlags: trace.FlagsSampled,
+	})
+	return trace.ContextWithSpanContext(context.Background(), sc), tid
 }

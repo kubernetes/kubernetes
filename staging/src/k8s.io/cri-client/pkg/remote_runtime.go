@@ -50,6 +50,7 @@ type remoteRuntimeService struct {
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
 	logger       *klog.Logger
+	conn         *grpc.ClientConn
 }
 
 const (
@@ -104,8 +105,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
 		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 		dialOpts = append(dialOpts,
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
-			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler(tracingOpts...)))
 	}
 
 	connParams := grpc.ConnectParams{
@@ -128,6 +128,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 		timeout:      connectionTimeout,
 		logReduction: logreduction.NewLogReduction(identicalErrorDelay),
 		logger:       logger,
+		conn:         conn,
 	}
 
 	if err := service.validateServiceConnection(ctx, conn, endpoint); err != nil {
@@ -135,6 +136,12 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 	}
 
 	return service, nil
+}
+
+// Close will shutdown the internal gRPC client connection.
+func (r *remoteRuntimeService) Close() error {
+	r.log(3, "Closing runtime service connection")
+	return r.conn.Close()
 }
 
 func (r *remoteRuntimeService) log(level int, msg string, keyAndValues ...any) {
@@ -180,8 +187,21 @@ func (r *remoteRuntimeService) versionV1(ctx context.Context, apiVersion string)
 
 	r.log(10, "[RemoteRuntimeService] Version Response", "apiVersion", typedVersion)
 
-	if typedVersion.Version == "" || typedVersion.RuntimeName == "" || typedVersion.RuntimeApiVersion == "" || typedVersion.RuntimeVersion == "" {
-		return nil, fmt.Errorf("not all fields are set in VersionResponse (%q)", *typedVersion)
+	var missingFields []string
+	if typedVersion.Version == "" {
+		missingFields = append(missingFields, "Version")
+	}
+	if typedVersion.RuntimeName == "" {
+		missingFields = append(missingFields, "RuntimeName")
+	}
+	if typedVersion.RuntimeApiVersion == "" {
+		missingFields = append(missingFields, "RuntimeApiVersion")
+	}
+	if typedVersion.RuntimeVersion == "" {
+		missingFields = append(missingFields, "RuntimeVersion")
+	}
+	if len(missingFields) > 0 {
+		return nil, fmt.Errorf("not all fields are set in VersionResponse (missing %s)", strings.Join(missingFields, ", "))
 	}
 
 	return typedVersion, err
@@ -606,6 +626,23 @@ func (r *remoteRuntimeService) portForwardV1(ctx context.Context, req *runtimeap
 		r.logErr(err, "PortForward failed")
 		return nil, err
 	}
+
+	return resp, nil
+}
+
+// UpdatePodSandboxResources synchronously updates the PodSandboxConfig with
+// the pod-level resource configuration.
+func (r *remoteRuntimeService) UpdatePodSandboxResources(ctx context.Context, req *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error) {
+	r.log(10, "[RemoteRuntimeService] UpdatePodSandboxResources", "PodSandboxId", req.PodSandboxId, "timeout", r.timeout)
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.UpdatePodSandboxResources(ctx, req)
+	if err != nil {
+		r.logErr(err, "UpdatePodSandboxResources from runtime service failed", "podSandboxID", req.PodSandboxId)
+		return nil, err
+	}
+	r.log(10, "[RemoteRuntimeService] UpdatePodSandboxResources Response", "podSandboxID", req.PodSandboxId)
 
 	return resp, nil
 }

@@ -29,10 +29,11 @@ import (
 	"sync"
 	"time"
 
-	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -78,12 +79,15 @@ const (
 // https://github.com/kubernetes/kubernetes/issues/111476 for more.
 var etcd3ClientLogger *zap.Logger
 
+// grpcpromClientMetrics is a singleton instance of grpc client prometheus metrics.
+var grpcpromClientMetrics = grpcprom.NewClientMetrics()
+
 func init() {
-	// grpcprom auto-registers (via an init function) their client metrics, since we are opting out of
-	// using the global prometheus registry and using our own wrapped global registry,
-	// we need to explicitly register these metrics to our global registry here.
+	// Since we are opting out of using the global prometheus registry and using
+	// our own wrapped global registry, we need to explicitly register the client
+	// metrics to our global registry here.
 	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
-	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
+	legacyregistry.RawMustRegister(grpcpromClientMetrics)
 	dbMetricsMonitors = make(map[string]struct{})
 
 	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
@@ -228,7 +232,7 @@ func newETCD3ProberMonitor(c storagebackend.Config) (*etcd3ProberMonitor, error)
 		return nil, err
 	}
 	return &etcd3ProberMonitor{
-		client:    client,
+		client:    client.Client,
 		prefix:    c.Prefix,
 		endpoints: c.Transport.ServerList,
 	}, nil
@@ -282,7 +286,7 @@ func (t *etcd3ProberMonitor) Monitor(ctx context.Context) (metrics.StorageMetric
 	}, nil
 }
 
-var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
 		KeyFile:       c.KeyFile,
@@ -312,8 +316,8 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, e
 		//
 		// these optional interceptors will be placed after the default ones.
 		// which seems to be what we want as the metrics will be collected on each attempt (retry)
-		grpc.WithChainUnaryInterceptor(grpcprom.UnaryClientInterceptor),
-		grpc.WithChainStreamInterceptor(grpcprom.StreamClientInterceptor),
+		grpc.WithChainUnaryInterceptor(grpcpromClientMetrics.UnaryClientInterceptor()),
+		grpc.WithChainStreamInterceptor(grpcpromClientMetrics.StreamClientInterceptor()),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		tracingOpts := []otelgrpc.Option{
@@ -324,8 +328,7 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, e
 		// Even with Noop  TracerProvider, the otelgrpc still handles context propagation.
 		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 		dialOptions = append(dialOptions,
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
-			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler(tracingOpts...)))
 	}
 	if egressDialer != nil {
 		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
@@ -352,14 +355,15 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, e
 		Logger:               etcd3ClientLogger,
 	}
 
-	return clientv3.New(cfg)
+	return kubernetes.New(cfg)
 }
 
 type runningCompactor struct {
-	interval time.Duration
-	cancel   context.CancelFunc
-	client   *clientv3.Client
-	refs     int
+	interval  time.Duration
+	client    *clientv3.Client
+	compactor etcd3.Compactor
+	cancel    DestroyFunc
+	refs      int
 }
 
 var (
@@ -374,39 +378,41 @@ var (
 // startCompactorOnce start one compactor per transport. If the interval get smaller on repeated calls, the
 // compactor is replaced. A destroy func is returned. If all destroy funcs with the same transport are called,
 // the compactor is stopped.
-func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration) (func(), error) {
+func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration) (etcd3.Compactor, func(), error) {
 	compactorsMu.Lock()
 	defer compactorsMu.Unlock()
 
+	if interval == 0 {
+		// short circuit, if the compaction request from apiserver is disabled
+		return nil, func() {}, nil
+	}
 	key := fmt.Sprintf("%v", c) // gives: {[server1 server2] keyFile certFile caFile}
 	if compactor, foundBefore := compactors[key]; !foundBefore || compactor.interval > interval {
-		compactorClient, err := newETCD3Client(c)
+		client, err := newETCD3Client(c)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		compactorClient := client.Client
 
 		if foundBefore {
 			// replace compactor
 			compactor.cancel()
-			compactor.client.Close()
 		} else {
 			// start new compactor
 			compactor = &runningCompactor{}
 			compactors[key] = compactor
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-
 		compactor.interval = interval
-		compactor.cancel = cancel
 		compactor.client = compactorClient
-
-		etcd3.StartCompactor(ctx, compactorClient, interval)
+		c := etcd3.StartCompactorPerEndpoint(compactorClient, interval)
+		compactor.compactor = c
+		compactor.cancel = c.Stop
 	}
 
 	compactors[key].refs++
 
-	return func() {
+	return compactors[key].compactor, func() {
 		compactorsMu.Lock()
 		defer compactorsMu.Unlock()
 
@@ -421,7 +427,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 }
 
 func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc func() runtime.Object, resourcePrefix string) (storage.Interface, DestroyFunc, error) {
-	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
+	compactor, stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -435,11 +441,32 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 	// decorate the KV instance so we can track etcd latency per request.
 	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
 
-	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client, c.DBMetricPollInterval)
+	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client.Client, c.DBMetricPollInterval)
 	if err != nil {
+		stopCompactor()
+		_ = client.Close()
 		return nil, nil, err
 	}
 
+	transformer := c.Transformer
+	if transformer == nil {
+		transformer = identity.NewEncryptCheckTransformer()
+	}
+
+	versioner := storage.APIObjectVersioner{}
+	decoder := etcd3.NewDefaultDecoder(c.Codec, versioner)
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
+		transformer = etcd3.WithCorruptObjErrorHandlingTransformer(transformer)
+		decoder = etcd3.WithCorruptObjErrorHandlingDecoder(decoder)
+	}
+	store, err := etcd3.New(client, compactor, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
+	if err != nil {
+		stopCompactor()
+		stopDBSizeMonitor()
+		_ = client.Close()
+		return nil, nil, err
+	}
 	var once sync.Once
 	destroyFunc := func() {
 		// we know that storage destroy funcs are called multiple times (due to reuse in subresources).
@@ -448,14 +475,15 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 		once.Do(func() {
 			stopCompactor()
 			stopDBSizeMonitor()
-			client.Close()
+			store.Close()
+			_ = client.Close()
 		})
 	}
-	transformer := c.Transformer
-	if transformer == nil {
-		transformer = identity.NewEncryptCheckTransformer()
+	var storage storage.Interface = store
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
+		storage = etcd3.NewStoreWithUnsafeCorruptObjectDeletion(storage, c.GroupResource)
 	}
-	return etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig), destroyFunc, nil
+	return storage, destroyFunc, nil
 }
 
 // startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the

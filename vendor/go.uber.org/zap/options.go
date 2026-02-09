@@ -125,10 +125,29 @@ func IncreaseLevel(lvl zapcore.LevelEnabler) Option {
 	return optionFunc(func(log *Logger) {
 		core, err := zapcore.NewIncreaseLevelCore(log.core, lvl)
 		if err != nil {
-			fmt.Fprintf(log.errorOutput, "failed to IncreaseLevel: %v\n", err)
+			_, _ = fmt.Fprintf(
+				log.errorOutput,
+				"failed to IncreaseLevel: %v\n",
+				err,
+			)
 		} else {
 			log.core = core
 		}
+	})
+}
+
+// WithPanicHook sets a CheckWriteHook to run on Panic/DPanic logs.
+// Zap will call this hook after writing a log statement with a Panic/DPanic level.
+//
+// For example, the following builds a logger that will exit the current
+// goroutine after writing a Panic/DPanic log message, but it will not start a panic.
+//
+//	zap.New(core, zap.WithPanicHook(zapcore.WriteThenGoexit))
+//
+// This is useful for testing Panic/DPanic log output.
+func WithPanicHook(hook zapcore.CheckWriteHook) Option {
+	return optionFunc(func(log *Logger) {
+		log.onPanic = hook
 	})
 }
 

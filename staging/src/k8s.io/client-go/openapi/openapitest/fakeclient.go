@@ -77,3 +77,8 @@ func (f FakeGroupVersion) Schema(contentType string) ([]byte, error) {
 	}
 	return f.GVSpec, nil
 }
+
+// ServerRelativeURL returns an empty string.
+func (f FakeGroupVersion) ServerRelativeURL() string {
+	panic("unimplemented")
+}

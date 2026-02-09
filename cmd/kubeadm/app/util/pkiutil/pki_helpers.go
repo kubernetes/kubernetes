@@ -32,9 +32,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -46,17 +45,14 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 const (
-	// PrivateKeyBlockType is a possible value for pem.Block.Type.
-	PrivateKeyBlockType = "PRIVATE KEY"
 	// PublicKeyBlockType is a possible value for pem.Block.Type.
 	PublicKeyBlockType = "PUBLIC KEY"
 	// CertificateBlockType is a possible value for pem.Block.Type.
 	CertificateBlockType = "CERTIFICATE"
-	// RSAPrivateKeyBlockType is a possible value for pem.Block.Type.
-	RSAPrivateKeyBlockType = "RSA PRIVATE KEY"
 )
 
 // CertConfig is a wrapper around certutil.Config extending it with EncryptionAlgorithm.
@@ -131,12 +127,7 @@ func NewCSRAndKey(config *CertConfig) (*x509.CertificateRequest, crypto.Signer, 
 
 // HasServerAuth returns true if the given certificate is a ServerAuth
 func HasServerAuth(cert *x509.Certificate) bool {
-	for i := range cert.ExtKeyUsage {
-		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageServerAuth {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(cert.ExtKeyUsage, x509.ExtKeyUsageServerAuth)
 }
 
 // WriteCertAndKey stores certificate and key at the specified location
@@ -359,18 +350,6 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, c
 	}
 }
 
-// TryLoadCSRFromDisk tries to load the CSR from the disk
-func TryLoadCSRFromDisk(pkiPath, name string) (*x509.CertificateRequest, error) {
-	csrPath := pathForCSR(pkiPath, name)
-
-	csr, err := CertificateRequestFromFile(csrPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not load the CSR %s", csrPath)
-	}
-
-	return csr, nil
-}
-
 // PathsForCertAndKey returns the paths for the certificate and key given the path and basename.
 func PathsForCertAndKey(pkiPath, name string) (string, string) {
 	return pathForCert(pkiPath, name), pathForKey(pkiPath, name)
@@ -406,15 +385,18 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 		return nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR: %v", cfg.Networking.ServiceSubnet)
 	}
 
+	var dnsNames []string
+	if len(cfg.NodeRegistration.Name) > 0 {
+		dnsNames = append(dnsNames, cfg.NodeRegistration.Name)
+	}
+	dnsNames = append(dnsNames, "kubernetes", "kubernetes.default", "kubernetes.default.svc")
+	if len(cfg.Networking.DNSDomain) > 0 {
+		dnsNames = append(dnsNames, fmt.Sprintf("kubernetes.default.svc.%s", cfg.Networking.DNSDomain))
+	}
+
 	// create AltNames with defaults DNSNames/IPs
 	altNames := &certutil.AltNames{
-		DNSNames: []string{
-			cfg.NodeRegistration.Name,
-			"kubernetes",
-			"kubernetes.default",
-			"kubernetes.default.svc",
-			fmt.Sprintf("kubernetes.default.svc.%s", cfg.Networking.DNSDomain),
-		},
+		DNSNames: dnsNames,
 		IPs: []net.IP{
 			internalAPIServerVirtualIP,
 			advertiseAddress,
@@ -462,9 +444,16 @@ func getAltNames(cfg *kubeadmapi.InitConfiguration, certName string) (*certutil.
 			cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
+	var dnsNames []string
+	if len(cfg.NodeRegistration.Name) > 0 {
+		dnsNames = []string{cfg.NodeRegistration.Name, "localhost"}
+	} else {
+		dnsNames = []string{"localhost"}
+	}
+
 	// create AltNames with defaults DNSNames/IPs
 	altNames := &certutil.AltNames{
-		DNSNames: []string{cfg.NodeRegistration.Name, "localhost"},
+		DNSNames: dnsNames,
 		IPs:      []net.IP{advertiseAddress, net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 	}
 
@@ -511,34 +500,6 @@ func EncodeCSRPEM(csr *x509.CertificateRequest) []byte {
 	return pem.EncodeToMemory(&block)
 }
 
-func parseCSRPEM(pemCSR []byte) (*x509.CertificateRequest, error) {
-	block, _ := pem.Decode(pemCSR)
-	if block == nil {
-		return nil, errors.New("data doesn't contain a valid certificate request")
-	}
-
-	if block.Type != certutil.CertificateRequestBlockType {
-		return nil, errors.Errorf("expected block type %q, but PEM had type %q", certutil.CertificateRequestBlockType, block.Type)
-	}
-
-	return x509.ParseCertificateRequest(block.Bytes)
-}
-
-// CertificateRequestFromFile returns the CertificateRequest from a given PEM-encoded file.
-// Returns an error if the file could not be read or if the CSR could not be parsed.
-func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
-	pemBlock, err := os.ReadFile(file)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read file")
-	}
-
-	csr, err := parseCSRPEM(pemBlock)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error reading certificate request file %s", file)
-	}
-	return csr, nil
-}
-
 // NewCSR creates a new CSR
 func NewCSR(cfg CertConfig, key crypto.Signer) (*x509.CertificateRequest, error) {
 	RemoveDuplicateAltNames(&cfg.AltNames)
@@ -561,7 +522,7 @@ func NewCSR(cfg CertConfig, key crypto.Signer) (*x509.CertificateRequest, error)
 	return x509.ParseCertificateRequest(csrBytes)
 }
 
-// EncodeCertPEM returns PEM-endcoded certificate data
+// EncodeCertPEM returns PEM-encoded certificate data
 func EncodeCertPEM(cert *x509.Certificate) []byte {
 	block := pem.Block{
 		Type:  CertificateBlockType,
@@ -570,7 +531,7 @@ func EncodeCertPEM(cert *x509.Certificate) []byte {
 	return pem.EncodeToMemory(&block)
 }
 
-// EncodeCertBundlePEM returns PEM-endcoded certificate bundle
+// EncodeCertBundlePEM returns PEM-encoded certificate bundle
 func EncodeCertBundlePEM(certs []*x509.Certificate) ([]byte, error) {
 	buf := bytes.Buffer{}
 
@@ -622,8 +583,11 @@ func rsaKeySizeFromAlgorithmType(keyType kubeadmapi.EncryptionAlgorithmType) int
 
 // GeneratePrivateKey is the default function for generating private keys.
 func GeneratePrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Signer, error) {
-	if keyType == kubeadmapi.EncryptionAlgorithmECDSAP256 {
+	switch keyType {
+	case kubeadmapi.EncryptionAlgorithmECDSAP256:
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	case kubeadmapi.EncryptionAlgorithmECDSAP384:
+		return ecdsa.GenerateKey(elliptic.P384(), cryptorand.Reader)
 	}
 
 	rsaKeySize := rsaKeySizeFromAlgorithmType(keyType)
@@ -711,12 +675,14 @@ func NewSelfSignedCACert(cfg *CertConfig, key crypto.Signer) (*x509.Certificate,
 			CommonName:   cfg.CommonName,
 			Organization: cfg.Organization,
 		},
-		DNSNames:              []string{cfg.CommonName},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		KeyUsage:              keyUsage,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
+	}
+	if len(cfg.CommonName) > 0 {
+		tmpl.DNSNames = []string{cfg.CommonName}
 	}
 
 	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &tmpl, &tmpl, key.Public(), key)

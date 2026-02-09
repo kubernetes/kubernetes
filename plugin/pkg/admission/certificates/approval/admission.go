@@ -21,14 +21,12 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/plugin/pkg/admission/certificates"
+	"k8s.io/kubernetes/pkg/certauthorization"
 )
 
 // PluginName is a string with the name of the plugin
@@ -90,7 +88,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, _ admissi
 		return admission.NewForbidden(a, fmt.Errorf("expected type CertificateSigningRequest, got: %T", a.GetOldObject()))
 	}
 
-	if !certificates.IsAuthorizedForSignerName(ctx, p.authz, a.GetUserInfo(), "approve", csr.Spec.SignerName) {
+	if !certauthorization.IsAuthorizedForSignerName(ctx, p.authz, a.GetUserInfo(), "approve", csr.Spec.SignerName) {
 		klog.V(4).Infof("user not permitted to approve CertificateSigningRequest %q with signerName %q", csr.Name, csr.Spec.SignerName)
 		return admission.NewForbidden(a, fmt.Errorf("user not permitted to approve requests with signerName %q", csr.Spec.SignerName))
 	}

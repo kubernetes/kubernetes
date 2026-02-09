@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -23,9 +22,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // WindowsInitSystem is the windows implementation of InitSystem

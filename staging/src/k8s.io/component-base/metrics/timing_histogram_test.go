@@ -20,64 +20,159 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	testclock "k8s.io/utils/clock/testing"
 )
 
 func TestTimingHistogram(t *testing.T) {
-	v115 := semver.MustParse("1.15.0")
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*TimingHistogramOpts
-		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			TimingHistogramOpts: &TimingHistogramOpts{
-				Namespace:    "namespace",
-				Name:         "metric_test_name",
-				Subsystem:    "subsystem",
-				Help:         "histogram help message",
-				Buckets:      DefBuckets,
-				InitialValue: 13,
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: ALPHA,
+				Help:           "histogram help message",
+				Buckets:        DefBuckets,
+				InitialValue:   13,
 			},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "EXPERIMENTAL: [ALPHA] histogram help message",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Help:           "histogram help message",
+				Buckets:        DefBuckets,
+				InitialValue:   17,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [BETA] histogram help message",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "histogram help message",
+				Buckets:        DefBuckets,
+				InitialValue:   19,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [STABLE] histogram help message",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			TimingHistogramOpts: &TimingHistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.15.0",
 				Buckets:           DefBuckets,
 				InitialValue:      3,
 			},
-			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "EXPERIMENTAL: [ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedMetricCount: 0,
+			expectedHelp:        "histogram help message",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
 			TimingHistogramOpts: &TimingHistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           DefBuckets,
+				InitialValue:      11,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [BETA] (Deprecated since 1.15.0) histogram help message",
+		},
+		{
+			desc: "STABLE metric deprecated",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           DefBuckets,
+				InitialValue:      23,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [STABLE] (Deprecated since 1.15.0) histogram help message",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.14.0",
 				Buckets:           DefBuckets,
 				InitialValue:      5,
 			},
-			registryVersion:     &v115,
+			expectedMetricCount: 0,
+			expectedHelp:        "EXPERIMENTAL: histogram help message",
+		},
+		{
+			desc: "BETA metric hidden",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.14.0",
+				Buckets:           DefBuckets,
+				InitialValue:      7,
+			},
+			expectedMetricCount: 0,
+			expectedHelp:        "EXPERIMENTAL: histogram help message",
+		},
+		{
+			desc: "STABLE metric hidden",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.12.0",
+				Buckets:           DefBuckets,
+				InitialValue:      9,
+			},
 			expectedMetricCount: 0,
 			expectedHelp:        "EXPERIMENTAL: histogram help message",
 		},
@@ -85,11 +180,7 @@ func TestTimingHistogram(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			t0 := time.Now()
 			clk := testclock.NewFakePassiveClock(t0)
 			c := NewTestableTimingHistogram(clk.Now, test.TimingHistogramOpts)
@@ -112,7 +203,7 @@ func TestTimingHistogram(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -137,13 +228,13 @@ func TestTimingHistogram(t *testing.T) {
 			expectedCount := uint64(dt1 + dt2 + dt3)
 			expectedSum := float64(dt1)*v0 + float64(dt2)*v1 + float64(dt3)*v2
 			ms, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				t.Logf("Considering metric family %s", mf.GetName())
 				for _, m := range mf.GetMetric() {
 					assert.Equalf(t, expectedCount, m.GetHistogram().GetSampleCount(), "Got %v, want %v as the sample count of metric %s", m.GetHistogram().GetSampleCount(), expectedCount, m.String())
-					assert.Equalf(t, expectedSum, m.GetHistogram().GetSampleSum(), "Got %v, want %v as the sample sum of metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
+					assert.InDeltaf(t, expectedSum, m.GetHistogram().GetSampleSum(), 0.01, "Got %v, want %v as the sample sum of metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
 				}
 			}
 		})
@@ -151,59 +242,161 @@ func TestTimingHistogram(t *testing.T) {
 }
 
 func TestTimingHistogramVec(t *testing.T) {
-	v115 := semver.MustParse("1.15.0")
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*TimingHistogramOpts
 		labels              []string
-		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			TimingHistogramOpts: &TimingHistogramOpts{
-				Namespace:    "namespace",
-				Name:         "metric_test_name",
-				Subsystem:    "subsystem",
-				Help:         "histogram help message",
-				Buckets:      DefBuckets,
-				InitialValue: 5,
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: ALPHA,
+				Help:           "histogram help message",
+				Buckets:        DefBuckets,
+				InitialValue:   5,
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "EXPERIMENTAL: [ALPHA] histogram help message",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Help:           "histogram help message",
+				Buckets:        DefBuckets,
+				InitialValue:   7,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [BETA] histogram help message",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "histogram help message",
+				Buckets:        DefBuckets,
+				InitialValue:   9,
+			},
+			labels: []string{"label_a", "label_b"},
+
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [STABLE] histogram help message",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			TimingHistogramOpts: &TimingHistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.15.0",
 				Buckets:           DefBuckets,
 				InitialValue:      13,
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "EXPERIMENTAL: [ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedMetricCount: 0,
+			expectedHelp:        "histogram help message",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
 			TimingHistogramOpts: &TimingHistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           DefBuckets,
+				InitialValue:      11,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [BETA] (Deprecated since 1.15.0) histogram help message",
+		},
+		{
+			desc: "STABLE metric deprecated",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           DefBuckets,
+				InitialValue:      17,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [STABLE] (Deprecated since 1.15.0) histogram help message",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.14.0",
 				Buckets:           DefBuckets,
 				InitialValue:      42,
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
+			expectedMetricCount: 0,
+			expectedHelp:        "EXPERIMENTAL: histogram help message",
+		},
+		{
+			desc: "BETA metric hidden",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.14.0",
+				Buckets:           DefBuckets,
+				InitialValue:      19,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 0,
+			expectedHelp:        "EXPERIMENTAL: histogram help message",
+		},
+		{
+			desc: "STABLE metric hidden",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.12.0",
+				Buckets:           DefBuckets,
+				InitialValue:      23,
+			},
+			labels:              []string{"label_a", "label_b"},
 			expectedMetricCount: 0,
 			expectedHelp:        "EXPERIMENTAL: histogram help message",
 		},
@@ -211,11 +404,7 @@ func TestTimingHistogramVec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			t0 := time.Now()
 			clk := testclock.NewFakePassiveClock(t0)
 			c := NewTestableTimingHistogramVec(clk.Now, test.TimingHistogramOpts, test.labels)
@@ -243,7 +432,7 @@ func TestTimingHistogramVec(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 			for _, metric := range ms {
 				if metric.GetHelp() != test.expectedHelp {
 					assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -260,7 +449,7 @@ func TestTimingHistogramVec(t *testing.T) {
 			c.WithLabelValues("1", "3").Add(5.0)
 			c.WithLabelValues("2", "3").Add(5.0)
 			ms, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				t.Logf("Considering metric family %s", mf.String())
@@ -269,7 +458,7 @@ func TestTimingHistogramVec(t *testing.T) {
 					expectedCount := uint64(dt1)
 					expectedSum := float64(dt1) * v0
 					assert.Equalf(t, expectedCount, m.GetHistogram().GetSampleCount(), "Got %v, expected histogram sample count to equal %d for metric %s", m.GetHistogram().GetSampleCount(), expectedCount, m.String())
-					assert.Equalf(t, expectedSum, m.GetHistogram().GetSampleSum(), "Got %v, expected histogram sample sum to equal %v for metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
+					assert.InDeltaf(t, expectedSum, m.GetHistogram().GetSampleSum(), 0.01, "Got %v, expected histogram sample sum to equal %v for metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
 				}
 			}
 		})
@@ -312,7 +501,8 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			SetLabelAllowListFromCLI(labelAllowValues)
+			labelValueAllowLists = map[string]*MetricLabelAllowList{}
+
 			registry := newKubeRegistry(apimachineryversion.Info{
 				Major:      "1",
 				Minor:      "15",
@@ -322,6 +512,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 			clk := testclock.NewFakePassiveClock(t0)
 			c := NewTestableTimingHistogramVec(clk.Now, opts, labels)
 			registry.MustRegister(c)
+			SetLabelAllowListFromCLI(labelAllowValues)
 			var v0 float64 = 13
 			for _, lv := range test.labelValues {
 				c.WithLabelValues(lv...).Set(v0)
@@ -335,7 +526,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 				c.WithLabelValues(lv...).Add(1.0)
 			}
 			mfs, err := registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
@@ -362,7 +553,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 					actualCount := m.GetHistogram().GetSampleCount()
 					actualSum := m.GetHistogram().GetSampleSum()
 					assert.Equalf(t, expectedCount, actualCount, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", actualCount, expectedCount, aValue, bValue)
-					assert.Equalf(t, expectedSum, actualSum, "Got %v, wanted %v as the sum while setting label_a to %v and label b to %v", actualSum, expectedSum, aValue, bValue)
+					assert.InDeltaf(t, expectedSum, actualSum, 0.01, "Got %v, wanted %v as the sum while setting label_a to %v and label b to %v", actualSum, expectedSum, aValue, bValue)
 				}
 			}
 		})

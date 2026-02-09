@@ -17,28 +17,51 @@ limitations under the License.
 package prober
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
 }
 
+// newTestWorkerWithRestartableInitContainer creates a test worker with an init container setup
+func newTestWorkerWithRestartableInitContainer(m *manager, probeType probeType) *worker {
+	pod := getTestPod()
+
+	// Set up init container with restart policy
+	initContainer := pod.Spec.Containers[0]
+	initContainer.Name = testContainerName
+	restartPolicy := v1.ContainerRestartPolicyAlways
+	initContainer.RestartPolicy = &restartPolicy
+
+	// Move container to init containers and add a regular container
+	pod.Spec.InitContainers = []v1.Container{initContainer}
+	pod.Spec.Containers = []v1.Container{{
+		Name: "main-container",
+	}}
+
+	return newWorker(m, probeType, pod, initContainer)
+}
+
 func TestDoProbe(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
@@ -132,10 +155,9 @@ func TestDoProbe(t *testing.T) {
 		}
 
 		for i, test := range tests {
-			ctx := context.Background()
 			w := newTestWorker(m, probeType, test.probe)
 			if test.podStatus != nil {
-				m.statusManager.SetPodStatus(w.pod, *test.podStatus)
+				m.statusManager.SetPodStatus(logger, w.pod, *test.podStatus)
 			}
 			if test.setDeletionTimestamp {
 				now := metav1.Now()
@@ -152,28 +174,255 @@ func TestDoProbe(t *testing.T) {
 				t.Errorf("[%s-%d] Expected result: %v but got %v", probeType, i, test.expectedResult, result)
 			}
 
-			// Clean up.
-			testRootDir := ""
-			if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
-				t.Fatalf("can't make a temp rootdir: %v", err)
-			} else {
-				testRootDir = tempDir
-			}
-			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker(), testRootDir)
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}
 }
 
+func TestDoProbeWithContainerRestartRules(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules: true,
+	})
+	TestDoProbe(t)
+
+	var (
+		restartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		restartPolicyNever     = v1.ContainerRestartPolicyNever
+		restartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+	)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	for _, probeType := range [...]probeType{liveness, readiness, startup} {
+		testcases := []struct {
+			name           string
+			container      v1.Container
+			podStatus      v1.PodStatus
+			expectContinue bool
+		}{
+			{
+				name: "container failed with container restartPolicy=OnFailure",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyOnFailure,
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: true,
+			},
+			{
+				name: "container succeeded with containerRestartPolicy=OnFailure",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyOnFailure,
+				},
+				podStatus:      getTestRunningStatusWithSucceededContainer(),
+				expectContinue: false,
+			},
+			{
+				name: "container failed with containerRestartPolicy=Always",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyAlways,
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: true,
+			},
+			{
+				name: "container succeeded with containerRestartPolicy=Always",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyAlways,
+				},
+				podStatus:      getTestRunningStatusWithSucceededContainer(),
+				expectContinue: true,
+			},
+			{
+				name: "container failed with containerRestartPolicy=Never",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyNever,
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: false,
+			},
+			{
+				name: "container succeeded with containerRestartPolicy=Never",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyNever,
+				},
+				podStatus:      getTestRunningStatusWithSucceededContainer(),
+				expectContinue: false,
+			},
+			{
+				name: "container terminated with matching restartPolicyRules",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{1},
+						},
+					}},
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: true,
+			},
+			{
+				name: "container terminated with non-matching restartPolicyRules",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{99},
+						},
+					}},
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: false,
+			},
+		}
+
+		for _, tc := range testcases {
+			pod := getTestPod()
+			setTestProbe(pod, probeType, v1.Probe{})
+			c := pod.Spec.Containers[0]
+			c.RestartPolicy = tc.container.RestartPolicy
+			c.RestartPolicyRules = tc.container.RestartPolicyRules
+			pod.Spec.Containers[0] = c
+			w := newWorker(m, probeType, pod, pod.Spec.Containers[0])
+
+			m.statusManager.SetPodStatus(logger, w.pod, tc.podStatus)
+
+			if c := w.doProbe(ctx); c != tc.expectContinue {
+				t.Errorf("[%s-%s] Expected continue to be %v but got %v", probeType, tc.name, tc.expectContinue, c)
+			}
+		}
+	}
+}
+
+func TestDoProbeWithContainerRestartAllContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
+	TestDoProbe(t)
+	TestDoProbeWithContainerRestartRules(t)
+
+	var (
+		restartPolicyNever = v1.ContainerRestartPolicyNever
+	)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	for _, probeType := range [...]probeType{liveness, readiness, startup} {
+		testcases := []struct {
+			name           string
+			pod            func() v1.Pod
+			podStatus      func() v1.PodStatus
+			expectContinue bool
+		}{
+			{
+				name: "container terminated with matching restartAllContainers",
+				pod: func() v1.Pod {
+					pod := getTestPod()
+					setTestProbe(pod, probeType, v1.Probe{})
+					c := pod.Spec.Containers[0]
+					c.RestartPolicy = &restartPolicyNever
+					c.RestartPolicyRules = []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestartAllContainers,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{1},
+						},
+					}}
+					pod.Spec.Containers[0] = c
+					return *pod
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer,
+				expectContinue: true,
+			},
+			{
+				name: "container terminated by restartAllContainers",
+				pod: func() v1.Pod {
+					pod := getTestPod()
+					setTestProbe(pod, probeType, v1.Probe{})
+					triggerContainer := v1.Container{
+						Name:          "trigger",
+						RestartPolicy: &restartPolicyNever,
+						RestartPolicyRules: []v1.ContainerRestartRule{{
+							Action: v1.ContainerRestartRuleActionRestartAllContainers,
+							ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+								Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+								Values:   []int32{1},
+							},
+						}},
+					}
+					pod.Spec.Containers = append(pod.Spec.Containers, triggerContainer)
+					return *pod
+				},
+				podStatus: func() v1.PodStatus {
+					status := getTestRunningStatusWithFailedContainer()
+					// Mark the trigger container as terminated.
+					status.ContainerStatuses = append(status.ContainerStatuses, v1.ContainerStatus{
+						Name: "trigger",
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode: 1,
+							},
+						},
+					})
+					return status
+				},
+				expectContinue: true,
+			},
+			{
+				name: "container cleaned up by restartAllContainers",
+				pod: func() v1.Pod {
+					pod := getTestPod()
+					setTestProbe(pod, probeType, v1.Probe{})
+					triggerContainer := v1.Container{
+						Name:          "trigger",
+						RestartPolicy: &restartPolicyNever,
+						RestartPolicyRules: []v1.ContainerRestartRule{{
+							Action: v1.ContainerRestartRuleActionRestartAllContainers,
+							ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+								Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+								Values:   []int32{1},
+							},
+						}},
+					}
+					pod.Spec.Containers = append(pod.Spec.Containers, triggerContainer)
+					return *pod
+				},
+				// After cleanup, the container will be in Waiting state, and pod in Pending state
+				podStatus:      getTestPendingStatus,
+				expectContinue: true,
+			},
+		}
+
+		for _, tc := range testcases {
+			pod := tc.pod()
+			podStatus := tc.podStatus()
+			w := newWorker(m, probeType, &pod, pod.Spec.Containers[0])
+
+			m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+
+			if c := w.doProbe(ctx); c != tc.expectContinue {
+				t.Errorf("[%s: %s] Expected continue to be %v but got %v", probeType, tc.name, tc.expectContinue, c)
+			}
+		}
+	}
+}
+
 func TestInitialDelay(t *testing.T) {
-	ctx := context.Background()
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		w := newTestWorker(m, probeType, v1.Probe{
 			InitialDelaySeconds: 10,
 		})
-		m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(probeType != startup))
+		m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(probeType != startup))
 
 		expectContinue(t, w, w.doProbe(ctx), "during initial delay")
 		// Default value depends on probe, Success for liveness, Failure for readiness, Unknown for startup
@@ -190,7 +439,7 @@ func TestInitialDelay(t *testing.T) {
 		laterStatus := getTestRunningStatusWithStarted(probeType != startup)
 		laterStatus.ContainerStatuses[0].State.Running.StartedAt.Time =
 			time.Now().Add(-100 * time.Second)
-		m.statusManager.SetPodStatus(w.pod, laterStatus)
+		m.statusManager.SetPodStatus(logger, w.pod, laterStatus)
 
 		// Second call should succeed (already waited).
 		expectContinue(t, w, w.doProbe(ctx), "after initial delay")
@@ -199,10 +448,10 @@ func TestInitialDelay(t *testing.T) {
 }
 
 func TestFailureThreshold(t *testing.T) {
-	ctx := context.Background()
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
 
 	for i := 0; i < 2; i++ {
 		// First probe should succeed.
@@ -234,10 +483,10 @@ func TestFailureThreshold(t *testing.T) {
 }
 
 func TestSuccessThreshold(t *testing.T) {
-	ctx := context.Background()
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 3, FailureThreshold: 1})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
 
 	// Start out failure.
 	w.resultsManager.Set(testContainerID, results.Failure, &v1.Pod{})
@@ -268,14 +517,100 @@ func TestSuccessThreshold(t *testing.T) {
 	}
 }
 
+func TestStartupProbeSuccessThreshold(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	successThreshold := 1
+	failureThreshold := 3
+	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestNotRunningStatus())
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+
+	for i := 0; i < successThreshold+1; i++ {
+		if i < successThreshold {
+			// Probe should not be on hold and will continue to be excuted
+			// until successThreshold is met
+			if w.onHold {
+				t.Errorf("Prober should not be on hold")
+			}
+			msg := fmt.Sprintf("%d success", i+1)
+			expectContinue(t, w, w.doProbe(ctx), msg)
+			expectResult(t, w, results.Success, msg)
+		} else {
+			// Probe should be on hold and will not be executed anymore
+			// when successThreshold is met
+			if !w.onHold {
+				t.Errorf("Prober should be on hold because successThreshold is exceeded")
+			}
+			// Meeting or exceeding successThreshold should cause resultRun to reset to 0
+			if w.resultRun != 0 {
+				t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
+			}
+		}
+	}
+}
+
+func TestStartupProbeFailureThreshold(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	successThreshold := 1
+	failureThreshold := 3
+	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestNotRunningStatus())
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+
+	for i := 0; i < failureThreshold+1; i++ {
+		if i < failureThreshold {
+			// Probe should not be on hold and will continue to be excuted
+			// until failureThreshold is met
+			if w.onHold {
+				t.Errorf("Prober should not be on hold")
+			}
+			msg := fmt.Sprintf("%d failure", i+1)
+			expectContinue(t, w, w.doProbe(ctx), msg)
+			switch i {
+			case 0, 1:
+				// At this point, the expected result is Unknown
+				// because w.resultsManager.Set() will be called after FailureThreshold is reached
+				expectResult(t, w, results.Unknown, msg)
+				// resultRun should be incremented until failureThreshold is met
+				if w.resultRun != i+1 {
+					t.Errorf("Prober resultRun should be %d, but %d", i+1, w.resultRun)
+				}
+			case 2:
+				// The expected result is Failure
+				// because w.resultsManager.Set() will be called due to resultRun reaching failureThreshold,
+				// updating the cached result to Failure.
+				// After that, resultRun will be reset to 0.
+				expectResult(t, w, results.Failure, msg)
+				// Meeting failureThreshold should cause resultRun to reset to 0
+				if w.resultRun != 0 {
+					t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
+				}
+			}
+		} else {
+			// Probe should be on hold and will not be executed anymore
+			// when failureThreshold is met
+			if !w.onHold {
+				t.Errorf("Prober should be on hold because failureThreshold is exceeded")
+			}
+			// Exceeding failureThreshold should cause resultRun to reset to 0
+			if w.resultRun != 0 {
+				t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
+			}
+		}
+	}
+}
+
 func TestCleanUp(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		key := probeKey{testPodUID, testContainerName, probeType}
 		w := newTestWorker(m, probeType, v1.Probe{})
-		m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(probeType != startup))
-		go w.run()
+		m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(probeType != startup))
+		go w.run(ctx)
 		m.workers[key] = w
 
 		// Wait for worker to run.
@@ -334,13 +669,13 @@ func resultsManager(m *manager, probeType probeType) results.Manager {
 }
 
 func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
-	ctx := context.Background()
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, startup} {
 		w := newTestWorker(m, probeType, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
 		status := getTestRunningStatusWithStarted(probeType != startup)
-		m.statusManager.SetPodStatus(w.pod, status)
+		m.statusManager.SetPodStatus(logger, w.pod, status)
 
 		// First probe should fail.
 		m.prober.exec = fakeExecProber{probe.Failure, nil}
@@ -362,21 +697,23 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 
 		// Set a new container ID to lift the hold. The next probe will succeed.
 		status.ContainerStatuses[0].ContainerID = "test://newCont_ID"
-		m.statusManager.SetPodStatus(w.pod, status)
+		m.statusManager.SetPodStatus(logger, w.pod, status)
 		msg = "hold lifted"
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Success, msg)
-		if w.onHold {
+		if probeType == liveness && w.onHold {
 			t.Errorf("Prober should not be on hold anymore")
+		} else if probeType == startup && !w.onHold {
+			t.Errorf("Prober should be on hold due to %s check success", probeType)
 		}
 	}
 }
 
 func TestResultRunOnLivenessCheckFailure(t *testing.T) {
-	ctx := context.Background()
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
 
 	m.prober.exec = fakeExecProber{probe.Success, nil}
 	msg := "initial probe success"
@@ -415,10 +752,11 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 }
 
 func TestResultRunOnStartupCheckFailure(t *testing.T) {
-	ctx := context.Background()
+	logger, ctx := ktesting.NewTestContext(t)
+
 	m := newTestManager()
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(false))
 
 	// Below FailureThreshold leaves probe state unchanged
 	// which is failed for startup at first.
@@ -450,18 +788,84 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 	}
 }
 
+func TestDoProbe_TerminatedRestartableInitContainerWithRestartPolicyNever(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+
+	// Test restartable init container (sidecar) behavior
+	w := newTestWorkerWithRestartableInitContainer(m, startup)
+
+	// Set pod restart policy to Never
+	w.pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
+	// Create terminated status for init container
+	terminatedStatus := getTestRunningStatus()
+	terminatedStatus.InitContainerStatuses = []v1.ContainerStatus{{
+		Name:        testContainerName,
+		ContainerID: "test://test_container_id",
+		State: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{
+				StartedAt: metav1.Now(),
+			},
+		},
+	}}
+	terminatedStatus.ContainerStatuses[0].State.Running = nil
+
+	m.statusManager.SetPodStatus(logger, w.pod, terminatedStatus)
+
+	// Test: Terminated restartable init container with restartPolicy=Always should continue probing
+	// even when pod has restartPolicy=Never
+	if !w.doProbe(ctx) {
+		t.Error("Expected to continue probing for terminated restartable init container with pod restart policy Never")
+	}
+
+	// Verify result is set to Failure for terminated container
+	expectResult(t, w, results.Failure, "restartable init container with pod restart policy Never")
+}
+
+func TestDoProbe_TerminatedContainerWithRestartPolicyNever(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+
+	// Test that regular containers (without RestartPolicy) still work as before
+	w := newTestWorker(m, startup, v1.Probe{})
+
+	// Regular container without explicit restart policy
+	w.container.RestartPolicy = nil
+
+	// Set pod restart policy to Never
+	w.pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
+	// Create terminated status
+	terminatedStatus := getTestRunningStatus()
+	terminatedStatus.ContainerStatuses[0].State.Running = nil
+	terminatedStatus.ContainerStatuses[0].State.Terminated = &v1.ContainerStateTerminated{
+		StartedAt: metav1.Now(),
+	}
+
+	m.statusManager.SetPodStatus(logger, w.pod, terminatedStatus)
+
+	// Should stop probing (existing behavior preserved)
+	if w.doProbe(ctx) {
+		t.Error("Expected to stop probing for regular container with pod RestartPolicy=Never")
+	}
+
+	// Verify result is set to Failure for terminated container
+	expectResult(t, w, results.Failure, "regular container with pod restart policy Never")
+}
+
 func TestLivenessProbeDisabledByStarted(t *testing.T) {
-	ctx := context.Background()
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(false))
 	// livenessProbe fails, but is disabled
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg := "Not started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
 	// setting started state
-	m.statusManager.SetContainerStartup(w.pod.UID, w.containerID, true)
+	m.statusManager.SetContainerStartup(logger, w.pod.UID, w.containerID, true)
 	// livenessProbe fails
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg = "Started, probe failure, result failure"
@@ -470,10 +874,11 @@ func TestLivenessProbeDisabledByStarted(t *testing.T) {
 }
 
 func TestStartupProbeDisabledByStarted(t *testing.T) {
-	ctx := context.Background()
+	logger, ctx := ktesting.NewTestContext(t)
+
 	m := newTestManager()
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(false))
 	// startupProbe fails < FailureThreshold, stays unknown
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg := "Not started, probe failure, result unknown"
@@ -485,10 +890,147 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
 	// setting started state
-	m.statusManager.SetContainerStartup(w.pod.UID, w.containerID, true)
+	m.statusManager.SetContainerStartup(logger, w.pod.UID, w.containerID, true)
 	// startupProbe fails, but is disabled
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
+}
+
+func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		isRestart      bool
+		probeType      probeType
+		initialValue   results.Result
+		expectSet      bool
+	}{
+		{
+			name:           "feature enabled, is restart, readiness",
+			featureEnabled: true,
+			isRestart:      true,
+			probeType:      readiness,
+			initialValue:   results.Failure,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, is restart, liveness",
+			featureEnabled: true,
+			isRestart:      true,
+			probeType:      liveness,
+			initialValue:   results.Success,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, is restart, startup",
+			featureEnabled: true,
+			isRestart:      true,
+			probeType:      startup,
+			initialValue:   results.Unknown,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, not restart, readiness",
+			featureEnabled: true,
+			isRestart:      false,
+			probeType:      readiness,
+			initialValue:   results.Failure,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, not restart, liveness",
+			featureEnabled: true,
+			isRestart:      false,
+			probeType:      liveness,
+			initialValue:   results.Success,
+			expectSet:      true,
+		},
+		{
+			name:           "feature enabled, not restart, startup",
+			featureEnabled: true,
+			isRestart:      false,
+			probeType:      startup,
+			initialValue:   results.Unknown,
+			expectSet:      true,
+		},
+		{
+			name:           "feature disabled, is restart, readiness",
+			featureEnabled: false,
+			isRestart:      true,
+			probeType:      readiness,
+			expectSet:      false,
+		},
+		{
+			name:           "feature disabled, is restart, liveness",
+			featureEnabled: false,
+			isRestart:      true,
+			probeType:      liveness,
+			expectSet:      false,
+		},
+		{
+			name:           "feature disabled, is restart, startup",
+			featureEnabled: false,
+			isRestart:      true,
+			probeType:      startup,
+			expectSet:      false,
+		},
+		{
+			name:           "feature disabled, not restart, readiness",
+			featureEnabled: false,
+			isRestart:      false,
+			probeType:      readiness,
+			initialValue:   results.Failure,
+			expectSet:      true,
+		},
+		{
+			name:           "feature disabled, not restart, liveness",
+			featureEnabled: false,
+			isRestart:      false,
+			probeType:      liveness,
+			initialValue:   results.Success,
+			expectSet:      true,
+		},
+		{
+			name:           "feature disabled, not restart, startup",
+			featureEnabled: false,
+			isRestart:      false,
+			probeType:      startup,
+			initialValue:   results.Unknown,
+			expectSet:      true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
+
+			m := newTestManager()
+			podStatus := getTestRunningStatus()
+			podStatus.ContainerStatuses[0].ContainerID = "test://container-id"
+			if tc.isRestart {
+				podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(-5 * time.Minute)}
+			} else {
+				podStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(5 * time.Minute)}
+			}
+
+			w := newTestWorker(m, tc.probeType, v1.Probe{InitialDelaySeconds: 1000})
+			m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+
+			w.doProbe(ctx)
+
+			containerID := kubecontainer.ParseContainerID(podStatus.ContainerStatuses[0].ContainerID)
+			result, ok := resultsManager(m, tc.probeType).Get(containerID)
+
+			if ok != tc.expectSet {
+				t.Errorf("Expected result to be set: %v, but got: %v", tc.expectSet, ok)
+			}
+			if tc.expectSet && result != tc.initialValue {
+				t.Errorf("Expected result %v, but got: %v", tc.initialValue, result)
+			}
+		})
+	}
 }

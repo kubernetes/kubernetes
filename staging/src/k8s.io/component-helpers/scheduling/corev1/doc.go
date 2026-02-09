@@ -20,4 +20,4 @@ limitations under the License.
 // - Be used by a core component and another kubernetes project (cluster-autoscaler, descheduler)
 //
 // And be a scheduling feature.
-package corev1 // import "k8s.io/component-helpers/scheduling/corev1"
+package corev1

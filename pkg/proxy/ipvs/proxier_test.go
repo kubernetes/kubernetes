@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -31,16 +30,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
@@ -51,9 +48,9 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	ipvstest "k8s.io/kubernetes/pkg/proxy/ipvs/util/testing"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
-	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -61,7 +58,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-const testHostname = "test-hostname"
+const testNodeName = "test-node"
 
 // fakeIpvs implements utilipvs.Interface
 type fakeIpvs struct {
@@ -139,17 +136,16 @@ func NewFakeProxier(ctx context.Context, ipt utiliptables.Interface, ipvs utilip
 	}
 	p := &Proxier{
 		svcPortMap:            make(proxy.ServicePortMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, nil, nil),
+		serviceChanges:        proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointsChangeTracker(testHostname, nil, ipFamily, nil, nil),
+		endpointsChanges:      proxy.NewEndpointsChangeTracker(ipFamily, testNodeName, nil, nil),
 		excludeCIDRs:          excludeCIDRs,
 		iptables:              ipt,
 		ipvs:                  ipvs,
 		ipset:                 ipset,
 		conntrack:             conntrack.NewFake(),
-		strictARP:             false,
 		localDetector:         proxyutil.NewNoOpLocalDetector(),
-		hostname:              testHostname,
+		nodeName:              testNodeName,
 		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
 		ipvsScheduler:         defaultScheduler,
 		iptablesData:          bytes.NewBuffer(nil),
@@ -166,7 +162,7 @@ func NewFakeProxier(ctx context.Context, ipt utiliptables.Interface, ipvs utilip
 		ipFamily:              ipFamily,
 	}
 	p.setInitialized(true)
-	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
+	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, 30*time.Second, time.Minute)
 	return p
 }
 
@@ -223,113 +219,6 @@ func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*d
 	}
 	epsFunc(eps)
 	return eps
-}
-
-func TestCleanupLeftovers(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
-	svcIP := "10.20.30.41"
-	svcPort := 80
-	svcNodePort := 3001
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-	}
-
-	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
-			svc.Spec.Type = "NodePort"
-			svc.Spec.ClusterIP = svcIP
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
-				Protocol: v1.ProtocolTCP,
-				NodePort: int32(svcNodePort),
-			}}
-		}),
-	)
-	epIP := "10.180.0.1"
-	populateEndpointSlices(fp,
-		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
-			eps.AddressType = discovery.AddressTypeIPv4
-			eps.Endpoints = []discovery.Endpoint{{
-				Addresses: []string{epIP},
-			}}
-			eps.Ports = []discovery.EndpointPort{{
-				Name:     ptr.To(svcPortName.Port),
-				Port:     ptr.To(int32(svcPort)),
-				Protocol: ptr.To(v1.ProtocolTCP),
-			}}
-		}),
-	)
-
-	fp.syncProxyRules()
-
-	// test cleanup left over
-	if CleanupLeftovers(ctx, ipvs, ipt, ipset) {
-		t.Errorf("Cleanup leftovers failed")
-	}
-}
-
-func TestCanUseIPVSProxier(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	testCases := []struct {
-		name         string
-		scheduler    string
-		ipsetVersion string
-		ipsetErr     error
-		ipvsErr      string
-		ok           bool
-	}{
-		{
-			name:         "happy days",
-			ipsetVersion: MinIPSetCheckVersion,
-			ok:           true,
-		},
-		{
-			name:         "ipset error",
-			scheduler:    "",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipsetErr:     fmt.Errorf("oops"),
-			ok:           false,
-		},
-		{
-			name:         "ipset version too low",
-			scheduler:    "rr",
-			ipsetVersion: "4.3.0",
-			ok:           false,
-		},
-		{
-			name:         "GetVirtualServers fail",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipvsErr:      "GetVirtualServers",
-			ok:           false,
-		},
-		{
-			name:         "AddVirtualServer fail",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipvsErr:      "AddVirtualServer",
-			ok:           false,
-		},
-		{
-			name:         "DeleteVirtualServer fail",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipvsErr:      "DeleteVirtualServer",
-			ok:           false,
-		},
-	}
-
-	for _, tc := range testCases {
-		ipvs := &fakeIpvs{tc.ipvsErr, false}
-		versioner := &fakeIPSetVersioner{version: tc.ipsetVersion, err: tc.ipsetErr}
-		err := CanUseIPVSProxier(ctx, ipvs, versioner, tc.scheduler)
-		if (err == nil) != tc.ok {
-			t.Errorf("Case [%s], expect %v, got err: %v", tc.name, tc.ok, err)
-		}
-	}
 }
 
 func TestGetNodeIPs(t *testing.T) {
@@ -846,10 +735,10 @@ func TestNodePortIPv4(t *testing.T) {
 					eps.AddressType = discovery.AddressTypeIPv4
 					eps.Endpoints = []discovery.Endpoint{{
 						Addresses: []string{"10.180.0.1"},
-						NodeName:  ptr.To(testHostname),
+						NodeName:  ptr.To(testNodeName),
 					}, {
 						Addresses: []string{"10.180.1.1"},
-						NodeName:  ptr.To("otherHost"),
+						NodeName:  ptr.To("other-node"),
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
@@ -1863,18 +1752,18 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	)
 	epIP := "10.180.0.1"
 	epIP1 := "10.180.1.1"
-	thisHostname := testHostname
-	otherHostname := "other-hostname"
+	thisNodeName := testNodeName
+	otherNodeName := "other-node"
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
-				NodeName:  ptr.To(thisHostname),
+				NodeName:  ptr.To(thisNodeName),
 			},
 				{
 					Addresses: []string{epIP1},
-					NodeName:  ptr.To(otherHostname),
+					NodeName:  ptr.To(otherNodeName),
 				}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2034,10 +1923,10 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
-				NodeName:  ptr.To(testHostname),
+				NodeName:  ptr.To(testNodeName),
 			}, {
 				Addresses: []string{epIP1},
-				NodeName:  ptr.To("other-hostname"),
+				NodeName:  ptr.To("other-node"),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2385,11 +2274,11 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			eps.Endpoints = []discovery.Endpoint{
 				{ // **local** endpoint address, should be added as RS
 					Addresses: []string{epIP},
-					NodeName:  ptr.To(testHostname),
+					NodeName:  ptr.To(testNodeName),
 				},
 				{ // **remote** endpoint address, should not be added as RS
 					Addresses: []string{epIP1},
-					NodeName:  ptr.To("other-hostname"),
+					NodeName:  ptr.To("other-node"),
 				}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2516,14 +2405,9 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	for i := range services {
 		fp.OnServiceAdd(services[i])
 	}
-	result := fp.svcPortMap.Update(fp.serviceChanges)
+	fp.svcPortMap.Update(fp.serviceChanges)
 	if len(fp.svcPortMap) != 12 {
 		t.Errorf("expected service map length 12, got %v", fp.svcPortMap)
-	}
-
-	if len(result.DeletedUDPClusterIPs) != 0 {
-		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
 	}
 
 	// The only-local-loadbalancer ones get added
@@ -2550,24 +2434,10 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	fp.OnServiceDelete(services[2])
 	fp.OnServiceDelete(services[3])
 
-	result = fp.svcPortMap.Update(fp.serviceChanges)
+	fp.svcPortMap.Update(fp.serviceChanges)
 	if len(fp.svcPortMap) != 1 {
 		t.Errorf("expected service map length 1, got %v", fp.svcPortMap)
 	}
-
-	// All services but one were deleted. While you'd expect only the ClusterIPs
-	// from the three deleted services here, we still have the ClusterIP for
-	// the not-deleted service, because one of it's ServicePorts was deleted.
-	expectedStaleUDPServices := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
-	if len(result.DeletedUDPClusterIPs) != len(expectedStaleUDPServices) {
-		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.DeletedUDPClusterIPs.UnsortedList())
-	}
-	for _, ip := range expectedStaleUDPServices {
-		if !result.DeletedUDPClusterIPs.Has(ip) {
-			t.Errorf("expected stale UDP service service %s", ip)
-		}
-	}
-
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
 	if len(healthCheckNodePorts) != 0 {
 		t.Errorf("expected 0 healthcheck ports, got %v", healthCheckNodePorts)
@@ -2599,13 +2469,9 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	)
 
 	// Headless service should be ignored
-	result := fp.svcPortMap.Update(fp.serviceChanges)
+	fp.svcPortMap.Update(fp.serviceChanges)
 	if len(fp.svcPortMap) != 0 {
 		t.Errorf("expected service map length 0, got %d", len(fp.svcPortMap))
-	}
-
-	if len(result.DeletedUDPClusterIPs) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
 	}
 
 	// No proxied services, so no healthchecks
@@ -2631,12 +2497,9 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 		}),
 	)
 
-	result := fp.svcPortMap.Update(fp.serviceChanges)
+	fp.svcPortMap.Update(fp.serviceChanges)
 	if len(fp.svcPortMap) != 0 {
 		t.Errorf("expected service map length 0, got %v", fp.svcPortMap)
-	}
-	if len(result.DeletedUDPClusterIPs) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs)
 	}
 
 	// No proxied services, so no healthchecks
@@ -2676,15 +2539,10 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	fp.OnServiceAdd(servicev1)
 
-	result := fp.svcPortMap.Update(fp.serviceChanges)
+	fp.svcPortMap.Update(fp.serviceChanges)
 	if len(fp.svcPortMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
-	if len(result.DeletedUDPClusterIPs) != 0 {
-		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
-	}
-
 	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
 	if len(healthCheckNodePorts) != 0 {
 		t.Errorf("expected healthcheck ports length 0, got %v", healthCheckNodePorts)
@@ -2692,12 +2550,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// Change service to load-balancer
 	fp.OnServiceUpdate(servicev1, servicev2)
-	result = fp.svcPortMap.Update(fp.serviceChanges)
+	fp.svcPortMap.Update(fp.serviceChanges)
 	if len(fp.svcPortMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
-	}
-	if len(result.DeletedUDPClusterIPs) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.UnsortedList())
 	}
 
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
@@ -2708,12 +2563,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	// No change; make sure the service map stays the same and there are
 	// no health-check changes
 	fp.OnServiceUpdate(servicev2, servicev2)
-	result = fp.svcPortMap.Update(fp.serviceChanges)
+	fp.svcPortMap.Update(fp.serviceChanges)
 	if len(fp.svcPortMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
-	}
-	if len(result.DeletedUDPClusterIPs) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.UnsortedList())
 	}
 
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
@@ -2723,13 +2575,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// And back to ClusterIP
 	fp.OnServiceUpdate(servicev2, servicev1)
-	result = fp.svcPortMap.Update(fp.serviceChanges)
+	fp.svcPortMap.Update(fp.serviceChanges)
 	if len(fp.svcPortMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
-	}
-	if len(result.DeletedUDPClusterIPs) != 0 {
-		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
 	}
 
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
@@ -2827,7 +2675,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
 					Addresses: []string{"1.1.1.1"},
-					NodeName:  ptr.To(testHostname),
+					NodeName:  ptr.To(testNodeName),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -2875,7 +2723,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 					Addresses: []string{"1.1.1.1"},
 				}, {
 					Addresses: []string{"1.1.1.2"},
-					NodeName:  ptr.To(testHostname),
+					NodeName:  ptr.To(testNodeName),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -2896,7 +2744,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
@@ -2912,7 +2760,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.1"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -2945,7 +2793,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}, {
 			Addresses: []string{"1.1.1.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -2963,7 +2811,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.3"},
 		}, {
 			Addresses: []string{"1.1.1.4"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
@@ -2981,7 +2829,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			Addresses: []string{"2.2.2.1"},
 		}, {
 			Addresses: []string{"2.2.2.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
@@ -3002,10 +2850,10 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"2.2.2.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"2.2.2.22"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
@@ -3017,7 +2865,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"2.2.2.3"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
@@ -3029,10 +2877,10 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.4"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"4.4.4.5"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -3044,7 +2892,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.6"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
@@ -3095,7 +2943,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.4"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -3126,22 +2974,20 @@ func Test_updateEndpointsMap(t *testing.T) {
 		// previousEndpoints and currentEndpoints are used to call appropriate
 		// handlers OnEndpoints* (based on whether corresponding values are nil
 		// or non-nil) and must be of equal length.
-		name                           string
-		previousEndpoints              []*discovery.EndpointSlice
-		currentEndpoints               []*discovery.EndpointSlice
-		oldEndpoints                   map[proxy.ServicePortName][]endpointExpectation
-		expectedResult                 map[proxy.ServicePortName][]endpointExpectation
-		expectedDeletedUDPEndpoints    []proxy.ServiceEndpoint
-		expectedNewlyActiveUDPServices map[proxy.ServicePortName]bool
-		expectedReadyEndpoints         map[types.NamespacedName]int
+		name                             string
+		previousEndpoints                []*discovery.EndpointSlice
+		currentEndpoints                 []*discovery.EndpointSlice
+		oldEndpoints                     map[proxy.ServicePortName][]endpointExpectation
+		expectedResult                   map[proxy.ServicePortName][]endpointExpectation
+		expectedConntrackCleanupRequired bool
+		expectedReadyEndpoints           map[types.NamespacedName]int
 	}{{
 		// Case[0]: nothing
-		name:                           "nothing",
-		oldEndpoints:                   map[proxy.ServicePortName][]endpointExpectation{},
-		expectedResult:                 map[proxy.ServicePortName][]endpointExpectation{},
-		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
-		expectedReadyEndpoints:         map[types.NamespacedName]int{},
+		name:                             "nothing",
+		oldEndpoints:                     map[proxy.ServicePortName][]endpointExpectation{},
+		expectedResult:                   map[proxy.ServicePortName][]endpointExpectation{},
+		expectedConntrackCleanupRequired: false,
+		expectedReadyEndpoints:           map[types.NamespacedName]int{},
 	}, {
 		// Case[1]: no change, named port, local
 		name:              "no change, named port, local",
@@ -3157,8 +3003,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.1:11", isLocal: true},
 			},
 		},
-		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
+		expectedConntrackCleanupRequired: false,
 		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
@@ -3183,9 +3028,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.2:12", isLocal: false},
 			},
 		},
-		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
-		expectedReadyEndpoints:         map[types.NamespacedName]int{},
+		expectedConntrackCleanupRequired: false,
+		expectedReadyEndpoints:           map[types.NamespacedName]int{},
 	}, {
 		// Case[3]: no change, multiple subsets, multiple ports, local
 		name:              "no change, multiple subsets, multiple ports, local",
@@ -3213,8 +3057,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.3:13", isLocal: false},
 			},
 		},
-		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
+		expectedConntrackCleanupRequired: false,
 		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
@@ -3275,8 +3118,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "2.2.2.2:22", isLocal: true},
 			},
 		},
-		expectedDeletedUDPEndpoints:    []proxy.ServiceEndpoint{},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
+		expectedConntrackCleanupRequired: false,
 		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 2,
 			makeNSN("ns2", "ep2"): 1,
@@ -3292,10 +3134,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.1:11", isLocal: true},
 			},
 		},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): true,
-		},
+		expectedConntrackCleanupRequired: true,
 		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
@@ -3309,13 +3148,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.1:11", isLocal: true},
 			},
 		},
-		expectedResult: map[proxy.ServicePortName][]endpointExpectation{},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
-		}},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
-		expectedReadyEndpoints:         map[types.NamespacedName]int{},
+		expectedConntrackCleanupRequired: true,
+		expectedResult:                   map[proxy.ServicePortName][]endpointExpectation{},
+		expectedReadyEndpoints:           map[types.NamespacedName]int{},
 	}, {
 		// Case[7]: add an IP and port
 		name:              "add an IP and port",
@@ -3336,10 +3171,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.2:12", isLocal: true},
 			},
 		},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
-		},
+		expectedConntrackCleanupRequired: true,
 		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
@@ -3363,18 +3195,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.1:11", isLocal: false},
 			},
 		},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.2:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
-		}, {
-			Endpoint:        "1.1.1.1:12",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
-		}, {
-			Endpoint:        "1.1.1.2:12",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
-		}},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
-		expectedReadyEndpoints:         map[types.NamespacedName]int{},
+		expectedConntrackCleanupRequired: true,
+		expectedReadyEndpoints:           map[types.NamespacedName]int{},
 	}, {
 		// Case[9]: add a subset
 		name:              "add a subset",
@@ -3393,10 +3215,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.2:12", isLocal: true},
 			},
 		},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
-		},
+		expectedConntrackCleanupRequired: true,
 		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
@@ -3418,12 +3237,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.1:11", isLocal: false},
 			},
 		},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.2:12",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
-		}},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
-		expectedReadyEndpoints:         map[types.NamespacedName]int{},
+		expectedConntrackCleanupRequired: true,
+		expectedReadyEndpoints:           map[types.NamespacedName]int{},
 	}, {
 		// Case[11]: rename a port
 		name:              "rename a port",
@@ -3439,14 +3254,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.1:11", isLocal: false},
 			},
 		},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
-		}},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): true,
-		},
-		expectedReadyEndpoints: map[types.NamespacedName]int{},
+		expectedConntrackCleanupRequired: true,
+		expectedReadyEndpoints:           map[types.NamespacedName]int{},
 	}, {
 		// Case[12]: renumber a port
 		name:              "renumber a port",
@@ -3462,12 +3271,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.1:22", isLocal: false},
 			},
 		},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
-		}},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{},
-		expectedReadyEndpoints:         map[types.NamespacedName]int{},
+		expectedConntrackCleanupRequired: true,
+		expectedReadyEndpoints:           map[types.NamespacedName]int{},
 	}, {
 		// Case[13]: complex add and remove
 		name:              "complex add and remove",
@@ -3510,27 +3315,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "4.4.4.4:44", isLocal: true},
 			},
 		},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "2.2.2.2:22",
-			ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
-		}, {
-			Endpoint:        "2.2.2.22:22",
-			ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
-		}, {
-			Endpoint:        "2.2.2.3:23",
-			ServicePortName: makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP),
-		}, {
-			Endpoint:        "4.4.4.5:44",
-			ServicePortName: makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP),
-		}, {
-			Endpoint:        "4.4.4.6:45",
-			ServicePortName: makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP),
-		}},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP):  true,
-			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): true,
-			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP):  true,
-		},
+		expectedConntrackCleanupRequired: true,
 		expectedReadyEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns4", "ep4"): 1,
 		},
@@ -3545,11 +3330,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 				{endpoint: "1.1.1.1:11", isLocal: false},
 			},
 		},
-		expectedDeletedUDPEndpoints: []proxy.ServiceEndpoint{},
-		expectedNewlyActiveUDPServices: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): true,
-		},
-		expectedReadyEndpoints: map[types.NamespacedName]int{},
+		expectedConntrackCleanupRequired: true,
+		expectedReadyEndpoints:           map[types.NamespacedName]int{},
 	},
 	}
 
@@ -3560,7 +3342,6 @@ func Test_updateEndpointsMap(t *testing.T) {
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
 			fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
-			fp.hostname = testHostname
 
 			// First check that after adding all previous versions of endpoints,
 			// the fp.oldEndpoints is as we expect.
@@ -3591,35 +3372,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 			result := fp.endpointsMap.Update(fp.endpointsChanges)
 			newMap := fp.endpointsMap
 			checkEndpointExpectations(t, tci, newMap, tc.expectedResult)
-			if len(result.DeletedUDPEndpoints) != len(tc.expectedDeletedUDPEndpoints) {
-				t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedDeletedUDPEndpoints), len(result.DeletedUDPEndpoints), result.DeletedUDPEndpoints)
-			}
-			for _, x := range tc.expectedDeletedUDPEndpoints {
-				found := false
-				for _, stale := range result.DeletedUDPEndpoints {
-					if stale == x {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("[%d] expected staleEndpoints[%v], but didn't find it: %v", tci, x, result.DeletedUDPEndpoints)
-				}
-			}
-			if len(result.NewlyActiveUDPServices) != len(tc.expectedNewlyActiveUDPServices) {
-				t.Errorf("[%d] expected %d staleServiceNames, got %d: %v", tci, len(tc.expectedNewlyActiveUDPServices), len(result.NewlyActiveUDPServices), result.NewlyActiveUDPServices)
-			}
-			for svcName := range tc.expectedNewlyActiveUDPServices {
-				found := false
-				for _, stale := range result.NewlyActiveUDPServices {
-					if stale == svcName {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("[%d] expected staleServiceNames[%v], but didn't find it: %v", tci, svcName, result.NewlyActiveUDPServices)
-				}
+			if result.ConntrackCleanupRequired != tc.expectedConntrackCleanupRequired {
+				t.Errorf("[%d] expected conntrackCleanupRequired to be %t, got %t", tci, tc.expectedConntrackCleanupRequired, result.ConntrackCleanupRequired)
 			}
 			localReadyEndpoints := fp.endpointsMap.LocalReadyEndpoints()
 			if !reflect.DeepEqual(localReadyEndpoints, tc.expectedReadyEndpoints) {
@@ -4385,7 +4139,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
@@ -4410,14 +4164,14 @@ func TestEndpointSliceE2E(t *testing.T) {
 	assert.Equal(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-LOOP-BACK")
 	assert.True(t, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
 	virtualServers1, vsErr1 := ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr1, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr1, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers1, 1, "Expected 1 virtual server")
 	realServers1, rsErr1 := ipvs.GetRealServers(virtualServers1[0])
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.NoError(t, rsErr1, "Expected no error getting real servers")
 	assert.Len(t, realServers1, 3, "Expected 3 real servers")
-	assert.Equal(t, realServers1[0].String(), "10.0.1.1:80")
-	assert.Equal(t, realServers1[1].String(), "10.0.1.2:80")
-	assert.Equal(t, realServers1[2].String(), "10.0.1.3:80")
+	assert.Equal(t, "10.0.1.1:80", realServers1[0].String())
+	assert.Equal(t, "10.0.1.2:80", realServers1[1].String())
+	assert.Equal(t, "10.0.1.3:80", realServers1[2].String())
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
@@ -4427,10 +4181,10 @@ func TestEndpointSliceE2E(t *testing.T) {
 	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
 	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 	virtualServers2, vsErr2 := ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr2, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr2, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers2, 1, "Expected 1 virtual server")
 	realServers2, rsErr2 := ipvs.GetRealServers(virtualServers2[0])
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.NoError(t, rsErr2, "Expected no error getting real servers")
 	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
@@ -4526,18 +4280,18 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 		}, { // not ready endpoints should be ignored
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}},
 	}
 
@@ -4568,7 +4322,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(true),
 				Terminating: ptr.To(false),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{
@@ -4576,7 +4330,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(true),
 				Terminating: ptr.To(true),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{
@@ -4584,7 +4338,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(true),
 				Terminating: ptr.To(true),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}, { // not ready endpoints should be ignored
 			Addresses: []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{
@@ -4592,7 +4346,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(false),
 				Terminating: ptr.To(true),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}},
 	}
 
@@ -4663,7 +4417,7 @@ func TestCreateAndLinkKubeChain(t *testing.T) {
 func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 	type endpoint struct {
 		ip       string
-		hostname string
+		nodeName string
 	}
 
 	testCases := []struct {
@@ -4679,9 +4433,9 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is cluster with non-zero local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectVirtualServer:      true,
 			expectLocalEntries:       true,
@@ -4696,9 +4450,9 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is cluster with zero local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectVirtualServer:      false,
 			expectLocalEntries:       false,
@@ -4713,9 +4467,9 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is local with non-zero local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectVirtualServer:      true,
 			expectLocalEntries:       true,
@@ -4728,9 +4482,9 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is local with zero local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectVirtualServer:      false,
 			expectLocalEntries:       false,
@@ -4785,7 +4539,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 				Addresses:  []string{ep.ip},
 				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-				NodeName:   ptr.To(ep.hostname),
+				NodeName:   ptr.To(ep.nodeName),
 			})
 		}
 
@@ -4805,13 +4559,13 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 
 		if tc.expectVirtualServer {
 			virtualServers1, vsErr1 := ipvs.GetVirtualServers()
-			assert.Nil(t, vsErr1, "Expected no error getting virtual servers")
+			assert.NoError(t, vsErr1, "Expected no error getting virtual servers")
 
 			assert.Len(t, virtualServers1, 1, "Expected 1 virtual server")
 			realServers1, rsErr1 := ipvs.GetRealServers(virtualServers1[0])
-			assert.Nil(t, rsErr1, "Expected no error getting real servers")
+			assert.NoError(t, rsErr1, "Expected no error getting real servers")
 
-			assert.Len(t, realServers1, tc.expectLocalRealServerNum, fmt.Sprintf("Expected %d real servers", tc.expectLocalRealServerNum))
+			assert.Lenf(t, realServers1, tc.expectLocalRealServerNum, "Expected %d real servers", tc.expectLocalRealServerNum)
 			for i := 0; i < tc.expectLocalRealServerNum; i++ {
 				assert.Equal(t, realServers1[i].String(), tc.expectLocalRealServers[i])
 			}
@@ -4825,10 +4579,10 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 		activeEntries3 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
 		assert.Equal(t, 0, activeEntries3.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 		virtualServers2, vsErr2 := ipvs.GetVirtualServers()
-		assert.Nil(t, vsErr2, "Expected no error getting virtual servers")
+		assert.NoError(t, vsErr2, "Expected no error getting virtual servers")
 		assert.Len(t, virtualServers2, 1, "Expected 1 virtual server")
 		realServers2, rsErr2 := ipvs.GetRealServers(virtualServers2[0])
-		assert.Nil(t, rsErr2, "Expected no error getting real servers")
+		assert.NoError(t, rsErr2, "Expected no error getting real servers")
 		assert.Empty(t, realServers2, "Expected 0 real servers")
 	}
 }
@@ -4891,7 +4645,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.2"},
@@ -4900,7 +4654,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.3"},
@@ -4909,7 +4663,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.4"},
@@ -4918,7 +4672,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.5"},
@@ -4927,7 +4681,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 		},
 	}
@@ -4945,7 +4699,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 	assert.True(t, activeEntries1.Has("10.0.1.4,tcp:80,10.0.1.4"), "Expected activeEntries to reference fourth pod")
 
 	virtualServers, vsErr := ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
@@ -4961,19 +4715,19 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 
 	// clusterIP should route to cluster-wide ready endpoints
 	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.NoError(t, rsErr1, "Expected no error getting real servers")
 	assert.Len(t, realServers1, 3, "Expected 3 real servers")
-	assert.Equal(t, realServers1[0].String(), "10.0.1.1:80")
-	assert.Equal(t, realServers1[1].String(), "10.0.1.2:80")
-	assert.Equal(t, realServers1[2].String(), "10.0.1.5:80")
+	assert.Equal(t, "10.0.1.1:80", realServers1[0].String())
+	assert.Equal(t, "10.0.1.2:80", realServers1[1].String())
+	assert.Equal(t, "10.0.1.5:80", realServers1[2].String())
 
 	// externalIP should route to cluster-wide ready endpoints
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.NoError(t, rsErr2, "Expected no error getting real servers")
 	assert.Len(t, realServers2, 3, "Expected 3 real servers")
-	assert.Equal(t, realServers2[0].String(), "10.0.1.1:80")
-	assert.Equal(t, realServers2[1].String(), "10.0.1.2:80")
-	assert.Equal(t, realServers1[2].String(), "10.0.1.5:80")
+	assert.Equal(t, "10.0.1.1:80", realServers2[0].String())
+	assert.Equal(t, "10.0.1.2:80", realServers2[1].String())
+	assert.Equal(t, "10.0.1.5:80", realServers1[2].String())
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
@@ -4984,7 +4738,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
@@ -4998,11 +4752,11 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 	}
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.NoError(t, rsErr1, "Expected no error getting real servers")
 	assert.Empty(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.NoError(t, rsErr2, "Expected no error getting real servers")
 	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
@@ -5064,7 +4818,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.2"},
@@ -5073,7 +4827,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.3"},
@@ -5082,7 +4836,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.4"},
@@ -5091,7 +4845,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.5"},
@@ -5100,7 +4854,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 		},
 	}
@@ -5118,7 +4872,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	assert.True(t, activeEntries1.Has("10.0.1.4,tcp:80,10.0.1.4"), "Expected activeEntries to reference second (local) pod")
 
 	virtualServers, vsErr := ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
@@ -5134,18 +4888,18 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 
 	// clusterIP should route to cluster-wide ready endpoints
 	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.NoError(t, rsErr1, "Expected no error getting real servers")
 	assert.Len(t, realServers1, 3, "Expected 3 real servers")
-	assert.Equal(t, realServers1[0].String(), "10.0.1.1:80")
-	assert.Equal(t, realServers1[1].String(), "10.0.1.2:80")
-	assert.Equal(t, realServers1[2].String(), "10.0.1.5:80")
+	assert.Equal(t, "10.0.1.1:80", realServers1[0].String())
+	assert.Equal(t, "10.0.1.2:80", realServers1[1].String())
+	assert.Equal(t, "10.0.1.5:80", realServers1[2].String())
 
 	// externalIP should route to local ready + non-terminating endpoints if they exist
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.NoError(t, rsErr2, "Expected no error getting real servers")
 	assert.Len(t, realServers2, 2, "Expected 2 real servers")
-	assert.Equal(t, realServers2[0].String(), "10.0.1.1:80")
-	assert.Equal(t, realServers2[1].String(), "10.0.1.2:80")
+	assert.Equal(t, "10.0.1.1:80", realServers2[0].String())
+	assert.Equal(t, "10.0.1.2:80", realServers2[1].String())
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
@@ -5156,7 +4910,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
@@ -5170,11 +4924,11 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	}
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.NoError(t, rsErr1, "Expected no error getting real servers")
 	assert.Empty(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.NoError(t, rsErr2, "Expected no error getting real servers")
 	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
@@ -5236,7 +4990,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.2"},
@@ -5245,7 +4999,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.3"},
@@ -5254,7 +5008,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.4"},
@@ -5263,7 +5017,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 			{
 				Addresses: []string{"10.0.1.5"},
@@ -5272,7 +5026,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 		},
 	}
@@ -5289,7 +5043,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 	assert.True(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
 
 	virtualServers, vsErr := ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
@@ -5305,19 +5059,19 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 
 	// clusterIP should fall back to cluster-wide ready + terminating endpoints
 	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.NoError(t, rsErr1, "Expected no error getting real servers")
 	assert.Len(t, realServers1, 3, "Expected 1 real servers")
-	assert.Equal(t, realServers1[0].String(), "10.0.1.1:80")
-	assert.Equal(t, realServers1[1].String(), "10.0.1.2:80")
-	assert.Equal(t, realServers1[2].String(), "10.0.1.4:80")
+	assert.Equal(t, "10.0.1.1:80", realServers1[0].String())
+	assert.Equal(t, "10.0.1.2:80", realServers1[1].String())
+	assert.Equal(t, "10.0.1.4:80", realServers1[2].String())
 
 	// externalIP should fall back to ready + terminating endpoints
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.NoError(t, rsErr2, "Expected no error getting real servers")
 	assert.Len(t, realServers2, 3, "Expected 2 real servers")
-	assert.Equal(t, realServers2[0].String(), "10.0.1.1:80")
-	assert.Equal(t, realServers2[1].String(), "10.0.1.2:80")
-	assert.Equal(t, realServers2[2].String(), "10.0.1.4:80")
+	assert.Equal(t, "10.0.1.1:80", realServers2[0].String())
+	assert.Equal(t, "10.0.1.2:80", realServers2[1].String())
+	assert.Equal(t, "10.0.1.4:80", realServers2[2].String())
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
@@ -5328,7 +5082,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
@@ -5342,11 +5096,11 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 	}
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.NoError(t, rsErr1, "Expected no error getting real servers")
 	assert.Empty(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.NoError(t, rsErr2, "Expected no error getting real servers")
 	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
@@ -5408,7 +5162,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.2"},
@@ -5417,7 +5171,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.3"},
@@ -5426,7 +5180,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.4"},
@@ -5435,7 +5189,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 			{
 				Addresses: []string{"10.0.1.5"},
@@ -5444,7 +5198,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 		},
 	}
@@ -5461,7 +5215,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 	assert.True(t, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
 
 	virtualServers, vsErr := ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
@@ -5477,16 +5231,16 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 
 	// clusterIP should route to cluster-wide Ready endpoints
 	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.NoError(t, rsErr1, "Expected no error getting real servers")
 	assert.Len(t, realServers1, 1, "Expected 1 real servers")
-	assert.Equal(t, realServers1[0].String(), "10.0.1.5:80")
+	assert.Equal(t, "10.0.1.5:80", realServers1[0].String())
 
 	// externalIP should fall back to local ready + terminating endpoints
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.NoError(t, rsErr2, "Expected no error getting real servers")
 	assert.Len(t, realServers2, 2, "Expected 2 real servers")
-	assert.Equal(t, realServers2[0].String(), "10.0.1.1:80")
-	assert.Equal(t, realServers2[1].String(), "10.0.1.2:80")
+	assert.Equal(t, "10.0.1.1:80", realServers2[0].String())
+	assert.Equal(t, "10.0.1.2:80", realServers2[1].String())
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
@@ -5497,7 +5251,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.NoError(t, vsErr, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
@@ -5511,11 +5265,11 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 	}
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.NoError(t, rsErr1, "Expected no error getting real servers")
 	assert.Empty(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.NoError(t, rsErr2, "Expected no error getting real servers")
 	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
@@ -5613,7 +5367,7 @@ func TestIpIsValidForSet(t *testing.T) {
 func TestNoEndpointsMetric(t *testing.T) {
 	type endpoint struct {
 		ip       string
-		hostname string
+		nodeName string
 	}
 
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPVS)
@@ -5630,18 +5384,18 @@ func TestNoEndpointsMetric(t *testing.T) {
 			name:                  "internalTrafficPolicy is set and there are local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 		},
 		{
 			name:                  "externalTrafficPolicy is set and there are local endpoints",
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 		},
 		{
@@ -5649,18 +5403,18 @@ func TestNoEndpointsMetric(t *testing.T) {
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 		},
 		{
 			name:                  "internalTrafficPolicy is set and there are no local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 		},
@@ -5668,9 +5422,9 @@ func TestNoEndpointsMetric(t *testing.T) {
 			name:                  "externalTrafficPolicy is set and there are no local endpoints",
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
 		},
@@ -5679,9 +5433,9 @@ func TestNoEndpointsMetric(t *testing.T) {
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
@@ -5746,14 +5500,14 @@ func TestNoEndpointsMetric(t *testing.T) {
 			endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 				Addresses:  []string{ep.ip},
 				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-				NodeName:   ptr.To(ep.hostname),
+				NodeName:   ptr.To(ep.nodeName),
 			})
 		}
 
 		fp.OnEndpointSliceAdd(endpointSlice)
 		fp.syncProxyRules()
 
-		syncProxyRulesNoLocalEndpointsTotalInternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal"))
+		syncProxyRulesNoLocalEndpointsTotalInternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal", string(fp.ipFamily)))
 		if err != nil {
 			t.Errorf("failed to get %s value(internal), err: %v", metrics.SyncProxyRulesNoLocalEndpointsTotal.Name, err)
 		}
@@ -5762,7 +5516,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(internal): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalInternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalInternal)
 		}
 
-		syncProxyRulesNoLocalEndpointsTotalExternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external"))
+		syncProxyRulesNoLocalEndpointsTotalExternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external", string(fp.ipFamily)))
 		if err != nil {
 			t.Errorf("failed to get %s value(external), err: %v", metrics.SyncProxyRulesNoLocalEndpointsTotal.Name, err)
 		}
@@ -5818,57 +5572,27 @@ func TestDismissLocalhostRuleExist(t *testing.T) {
 func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 	testCases := []struct {
 		name             string
-		ipModeEnabled    bool
 		svcIP            string
 		svcLBIP          string
 		ipMode           *v1.LoadBalancerIPMode
 		expectedServices int
 	}{
-		/* LoadBalancerIPMode disabled */
 		{
-			name:             "LoadBalancerIPMode disabled, ipMode Proxy",
-			ipModeEnabled:    false,
-			svcIP:            "10.20.30.41",
-			svcLBIP:          "1.2.3.4",
-			ipMode:           ptr.To(v1.LoadBalancerIPModeProxy),
-			expectedServices: 2,
-		},
-		{
-			name:             "LoadBalancerIPMode disabled, ipMode VIP",
-			ipModeEnabled:    false,
-			svcIP:            "10.20.30.42",
-			svcLBIP:          "1.2.3.5",
-			ipMode:           ptr.To(v1.LoadBalancerIPModeVIP),
-			expectedServices: 2,
-		},
-		{
-			name:             "LoadBalancerIPMode disabled, ipMode nil",
-			ipModeEnabled:    false,
-			svcIP:            "10.20.30.43",
-			svcLBIP:          "1.2.3.6",
-			ipMode:           nil,
-			expectedServices: 2,
-		},
-		/* LoadBalancerIPMode enabled */
-		{
-			name:             "LoadBalancerIPMode enabled, ipMode Proxy",
-			ipModeEnabled:    true,
+			name:             "ipMode Proxy",
 			svcIP:            "10.20.30.41",
 			svcLBIP:          "1.2.3.4",
 			ipMode:           ptr.To(v1.LoadBalancerIPModeProxy),
 			expectedServices: 1,
 		},
 		{
-			name:             "LoadBalancerIPMode enabled, ipMode VIP",
-			ipModeEnabled:    true,
+			name:             "ipMode VIP",
 			svcIP:            "10.20.30.42",
 			svcLBIP:          "1.2.3.5",
 			ipMode:           ptr.To(v1.LoadBalancerIPModeVIP),
 			expectedServices: 2,
 		},
 		{
-			name:             "LoadBalancerIPMode enabled, ipMode nil",
-			ipModeEnabled:    true,
+			name:             "ipMode nil",
 			svcIP:            "10.20.30.43",
 			svcLBIP:          "1.2.3.6",
 			ipMode:           nil,
@@ -5885,7 +5609,6 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)
 			_, fp := buildFakeProxier(t)
 			makeServiceMap(fp,
 				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {

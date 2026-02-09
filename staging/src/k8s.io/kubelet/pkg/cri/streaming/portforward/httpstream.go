@@ -140,7 +140,7 @@ func (h *httpStreamHandler) getStreamPair(requestID string) (*httpStreamPair, bo
 func (h *httpStreamHandler) monitorStreamPair(p *httpStreamPair, timeout <-chan time.Time) {
 	select {
 	case <-timeout:
-		err := fmt.Errorf("(conn=%v, request=%s) timed out waiting for streams", h.conn, p.requestID)
+		err := fmt.Errorf("(conn=%p, request=%s) timed out waiting for streams", h.conn, p.requestID)
 		utilruntime.HandleError(err)
 		p.printError(err.Error())
 	case <-p.complete:
@@ -256,6 +256,12 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
 		utilruntime.HandleError(msg)
 		fmt.Fprint(p.errorStream, msg.Error())
+		// receiving an error from a port-forward operation indicates a problem
+		// with data stream most probably, thus we want to reset the streams
+		// indicating there was a problem and allow a new set of streams be
+		// created to mitigate the problem
+		p.dataStream.Reset()  // nolint:errcheck
+		p.errorStream.Reset() // nolint:errcheck
 	}
 }
 

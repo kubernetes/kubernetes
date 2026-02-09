@@ -19,20 +19,25 @@ package storageversionmigrator
 import (
 	"bytes"
 	"context"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
-	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
-	"k8s.io/klog/v2/ktesting"
+	"go.uber.org/goleak"
 
-	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/wait"
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
+	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestStorageVersionMigration is an integration test that verifies storage version migration works.
@@ -46,15 +51,15 @@ import (
 // 7. Perform another Storage Version Migration for secrets
 // 8. Verify that the resource version of the secret is not updated. i.e. it was a no-op update
 func TestStorageVersionMigration(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+	})
 
 	// this makes the test super responsive. It's set to a default of 1 minute.
-	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Millisecond
+	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx := ktesting.Init(t)
 
 	svmTest := svmSetup(ctx, t)
 
@@ -74,9 +79,8 @@ func TestStorageVersionMigration(t *testing.T) {
 		ctx,
 		t,
 		svmName,
-		svmv1alpha1.GroupVersionResource{
+		metav1.GroupResource{
 			Group:    "",
-			Version:  "v1",
 			Resource: "secrets",
 		},
 	)
@@ -88,7 +92,7 @@ func TestStorageVersionMigration(t *testing.T) {
 	}
 
 	wantPrefix := "k8s:enc:aescbc:v1:key2"
-	etcdSecret, err := svmTest.getRawSecretFromETCD(t, secret.Name, secret.Namespace)
+	etcdSecret, err := svmTest.getRawSecretFromETCD(t, secret.Namespace, secret.Name)
 	if err != nil {
 		t.Fatalf("Failed to get secret from etcd: %v", err)
 	}
@@ -111,9 +115,8 @@ func TestStorageVersionMigration(t *testing.T) {
 		ctx,
 		t,
 		secondSVMName,
-		svmv1alpha1.GroupVersionResource{
+		metav1.GroupResource{
 			Group:    "",
-			Version:  "v1",
 			Resource: "secrets",
 		},
 	)
@@ -148,20 +151,28 @@ func TestStorageVersionMigration(t *testing.T) {
 // 10. Verify RV and Generations of CRs
 // 11. Verify the list of CRs at v2 works
 func TestStorageVersionMigrationWithCRD(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+	})
 	// decode errors are expected when using conversation webhooks
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
-	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
+	t.Cleanup(func() { etcd3watcher.TestOnlySetFatalOnDecodeError(true) })
+	framework.GoleakCheck(t, // block test clean up and let any lingering watches complete before making decode errors fatal again
+		goleak.IgnoreTopFunction("k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
+		goleak.IgnoreTopFunction("gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
+		goleak.IgnoreTopFunction("github.com/moby/spdystream.(*Connection).shutdown"),
+	)
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx := ktesting.Init(t)
 
 	crVersions := make(map[string]versions)
 
 	svmTest := svmSetup(ctx, t)
 	certCtx := svmTest.setupServerCert(t)
+
+	// simulate monkeys creating and deleting CRs
+	svmTest.createChaos(ctx, t)
 
 	// create CRD with v1 serving and storage
 	crd := svmTest.createCRD(t, crdName, crdGroup, certCtx, v1CRDVersion)
@@ -198,10 +209,24 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	svmTest.updateCRD(ctx, t, crd.Name, v2StorageCRDVersion, []string{"v1", "v2"}, "v2")
 
 	// create CR with v1
-	cr3 := svmTest.createCR(ctx, t, "cr3", "v1")
-	if ok := svmTest.isCRStoredAtVersion(t, "v2", cr3.GetName()); !ok {
-		t.Fatalf("CR not stored at version v2")
+	var cr3 *unstructured.Unstructured
+	// updateCRD checks discovery returns storageVersionHash matching storage version v2
+	// to make sure the API server uses v2 but CRD controllers may race and the resource
+	// might still get stored in v1.
+	// Attempt to recreate the CR until it gets stored as v2.
+	// https://github.com/kubernetes/kubernetes/issues/130235
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, func(waitCtx context.Context) (done bool, err error) {
+		cr3 = svmTest.createCR(waitCtx, t, "cr3", "v1")
+		if ok := svmTest.isCRStoredAtVersion(t, "v2", cr3.GetName()); !ok {
+			svmTest.deleteCR(waitCtx, t, cr3.GetName(), "v1")
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for CR to be stored as v2: %v", err)
 	}
+
 	crVersions[cr3.GetName()] = versions{
 		generation:  cr3.GetGeneration(),
 		rv:          cr3.GetResourceVersion(),
@@ -230,15 +255,14 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	// migrate CRs from v1 to v2
 	svm, err := svmTest.createSVMResource(
 		ctx, t, "crdsvm",
-		svmv1alpha1.GroupVersionResource{
+		metav1.GroupResource{
 			Group:    crd.Spec.Group,
-			Version:  "v1",
 			Resource: crd.Spec.Names.Plural,
 		})
 	if err != nil {
 		t.Fatalf("Failed to create SVM resource: %v", err)
 	}
-	if ok := svmTest.isCRDMigrated(ctx, t, svm.Name); !ok {
+	if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, "triggercr"); !ok {
 		t.Fatalf("CRD not migrated")
 	}
 
@@ -261,10 +285,71 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	shutdownServer()
 
 	// assert RV and Generations of CRs
-	svmTest.validateRVAndGeneration(ctx, t, crVersions)
+	svmTest.validateRVAndGeneration(ctx, t, crVersions, "v2")
 
 	// assert v2 CRs can be listed
 	if err := svmTest.listCR(ctx, t, "v2"); err != nil {
 		t.Fatalf("Failed to list CRs at version v2: %v", err)
 	}
+}
+
+// TestStorageVersionMigrationDuringChaos serves as a stress test for the SVM controller.
+// It creates a CRD and a reasonable number of static instances for that resource.
+// It also continuously creates and deletes instances of that resource.
+// During all of this, it attempts to perform multiple parallel migrations of the resource.
+// It asserts that all migrations are successful and that none of the static instances
+// were changed after they were initially created (as the migrations must be a no-op).
+func TestStorageVersionMigrationDuringChaos(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+	})
+
+	ctx := ktesting.Init(t)
+
+	svmTest := svmSetup(ctx, t)
+
+	svmTest.createChaos(ctx, t)
+
+	crd := svmTest.createCRD(t, crdName, crdGroup, nil, v1CRDVersion)
+
+	crVersions := make(map[string]versions)
+
+	for i := range 50 { // a more realistic number of total resources
+		cr := svmTest.createCR(ctx, t, "created-cr-"+strconv.Itoa(i), "v1")
+		crVersions[cr.GetName()] = versions{
+			generation:  cr.GetGeneration(),
+			rv:          cr.GetResourceVersion(),
+			isRVUpdated: false, // none of these CRs should change due to migrations
+		}
+	}
+
+	var wg sync.WaitGroup
+	const migrations = 10 // more than the total workers of SVM
+	wg.Add(migrations)
+	for i := range migrations {
+		go func() {
+			defer wg.Done()
+
+			svm, err := svmTest.createSVMResource(
+				ctx, t, "chaos-svm-"+strconv.Itoa(i),
+				metav1.GroupResource{
+					Group:    crd.Spec.Group,
+					Resource: crd.Spec.Names.Plural,
+				},
+			)
+			if err != nil {
+				t.Errorf("Failed to create SVM resource: %v", err)
+				return
+			}
+			triggerCRName := "chaos-trigger-" + strconv.Itoa(i)
+			if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, triggerCRName); !ok {
+				t.Errorf("CRD not migrated")
+				return
+			}
+		}()
+	}
+	wg.Wait()
+
+	svmTest.validateRVAndGeneration(ctx, t, crVersions, "v1")
 }

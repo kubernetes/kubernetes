@@ -25,7 +25,9 @@ import (
 	"testing"
 	"time"
 
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -40,11 +42,11 @@ func newTestAllocator(cidr *net.IPNet) (*Allocator, error) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
-	ipInformer := informerFactory.Networking().V1beta1().IPAddresses()
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
 	ipStore := ipInformer.Informer().GetIndexer()
 
 	client.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
-		ip := action.(k8stesting.CreateAction).GetObject().(*networkingv1beta1.IPAddress)
+		ip := action.(k8stesting.CreateAction).GetObject().(*networkingv1.IPAddress)
 		_, exists, err := ipStore.GetByKey(ip.Name)
 		if exists && err != nil {
 			return false, nil, fmt.Errorf("ip already exist")
@@ -56,15 +58,15 @@ func newTestAllocator(cidr *net.IPNet) (*Allocator, error) {
 	client.PrependReactor("delete", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
 		name := action.(k8stesting.DeleteAction).GetName()
 		obj, exists, err := ipStore.GetByKey(name)
-		ip := &networkingv1beta1.IPAddress{}
+		ip := &networkingv1.IPAddress{}
 		if exists && err == nil {
-			ip = obj.(*networkingv1beta1.IPAddress)
+			ip = obj.(*networkingv1.IPAddress)
 			err = ipStore.Delete(ip)
 		}
 		return false, ip, err
 	}))
 
-	c, err := NewIPAllocator(cidr, client.NetworkingV1beta1(), ipInformer)
+	c, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +195,58 @@ func TestAllocateIPAllocator(t *testing.T) {
 			}
 			if f := r.Used(); f != tc.free {
 				t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free, f)
+			}
+		})
+	}
+}
+
+func TestAddOffsetAddress(t *testing.T) {
+	baseAddr := netip.MustParseAddr("fd54:ceea:51ad:2f00::0")
+	for _, tc := range []struct {
+		offset   uint64
+		wantAddr netip.Addr
+	}{
+		{
+			offset:   0,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00::0"),
+		},
+		{
+			offset:   1,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00::1"),
+		},
+		{
+			offset:   math.MaxInt64,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:7fff:ffff:ffff:ffff"),
+		},
+		{
+			offset:   math.MaxInt64 + 1,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:8000::"),
+		},
+		{
+			offset:   math.MaxUint64,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:ffff:ffff:ffff:ffff"),
+		},
+		{
+			offset:   math.MaxUint64 - 1,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:ffff:ffff:ffff:fffe"),
+		},
+		{
+			offset:   math.MaxUint64>>13 - 1,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:7:ffff:ffff:fffe"),
+		},
+		{
+			offset:   math.MaxUint64 >> 59,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00::1f"),
+		},
+	} {
+		t.Run(fmt.Sprintf("base:%s,offset:%x,want:%s", baseAddr, tc.offset, tc.wantAddr), func(t *testing.T) {
+			gotAddr, err := addOffsetAddress(baseAddr, tc.offset)
+			if err != nil {
+				t.Fatalf("err: %v", err)
+			}
+
+			if gotAddr.Compare(tc.wantAddr) != 0 {
+				t.Fatalf("compareAddr: got %s, want %s", gotAddr, tc.wantAddr)
 			}
 		})
 	}
@@ -958,5 +1012,309 @@ func BenchmarkIPAllocatorAllocateNextIPv6Size65535(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		r.AllocateNext()
+	}
+}
+
+// TestUsedWithCIDRFiltering tests that Used() method only counts IPs within the allocator's CIDR
+func TestUsedWithCIDRFiltering(t *testing.T) {
+	// Create an allocator for 192.168.1.0/24
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create test components
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+	ipStore := ipInformer.Informer().GetIndexer()
+
+	r, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.ipAddressSynced = func() bool { return true }
+	defer r.Destroy()
+
+	// Add valid IPs (within CIDR) with correct labels
+	validIPAddr1 := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "192.168.1.10",
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	validIPAddr2 := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "192.168.1.20",
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	if err := ipStore.Add(validIPAddr1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ipStore.Add(validIPAddr2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add invalid IPs (outside CIDR) with correct labels - these should not be counted
+	invalidIP1 := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "192.168.2.10", // different subnet
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	invalidIP2 := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "10.0.0.1", // completely different network
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	if err := ipStore.Add(invalidIP1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ipStore.Add(invalidIP2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Used() should only count valid IPs (2), not all IPs (4)
+	used := r.Used()
+	if used != 2 {
+		t.Errorf("Expected Used() to return 2 (only IPs in CIDR), got %d", used)
+	}
+}
+
+// TestFreeWithOverflowProtection tests the overflow protection in Free() method
+func TestFreeWithOverflowProtection(t *testing.T) {
+	testCases := []struct {
+		name         string
+		cidr         string
+		simulateSize uint64
+		simulateUsed int
+		expectedFree int
+	}{
+		{
+			name:         "normal case",
+			cidr:         "192.168.1.0/30", // size = 2 (4 total - 2 reserved)
+			simulateSize: 2,
+			simulateUsed: 1,
+			expectedFree: 1,
+		},
+		{
+			name:         "size exceeds MaxInt",
+			cidr:         "192.168.1.0/24",
+			simulateSize: uint64(math.MaxInt) + 1,
+			simulateUsed: 100,
+			expectedFree: math.MaxInt - 100,
+		},
+		{
+			name:         "used exceeds size (data inconsistency)",
+			cidr:         "192.168.1.0/30",
+			simulateSize: 2,
+			simulateUsed: 5, // More than size
+			expectedFree: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, cidr, err := netutils.ParseCIDRSloppy(tc.cidr)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Create test components
+			client := fake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+			ipInformer := informerFactory.Networking().V1().IPAddresses()
+			ipStore := ipInformer.Informer().GetIndexer()
+
+			r, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.ipAddressSynced = func() bool { return true }
+			defer r.Destroy()
+
+			// Override the size for testing overflow scenarios
+			r.size = tc.simulateSize
+
+			// Mock the Used() method by adding IP addresses to simulate usage
+			for i := 0; i < tc.simulateUsed; i++ {
+				// Add valid IPs within the CIDR with correct labels
+				ip := &networkingv1.IPAddress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("192.168.1.%d", i+1),
+						Labels: map[string]string{
+							networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+							networkingv1.LabelManagedBy:       ControllerName,
+						},
+					},
+				}
+				if err := ipStore.Add(ip); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			free := r.Free()
+			if free != tc.expectedFree {
+				t.Errorf("Expected Free() to return %d, got %d", tc.expectedFree, free)
+			}
+		})
+	}
+}
+
+// TestUsedWithInvalidIPs tests that Used() handles invalid IP addresses gracefully
+func TestUsedWithInvalidIPs(t *testing.T) {
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create test components
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+	ipStore := ipInformer.Informer().GetIndexer()
+
+	r, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.ipAddressSynced = func() bool { return true }
+	defer r.Destroy()
+
+	// Add valid IP with correct labels
+	validIP := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "192.168.1.10",
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	if err := ipStore.Add(validIP); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add invalid IP address (malformed) with correct labels
+	invalidIP := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "invalid-ip-address",
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	if err := ipStore.Add(invalidIP); err != nil {
+		t.Fatal(err)
+	}
+
+	// Used() should only count the valid IP
+	used := r.Used()
+	if used != 1 {
+		t.Errorf("Expected Used() to return 1 (only valid IPs), got %d", used)
+	}
+}
+
+func TestAllocateNextStopOnError(t *testing.T) {
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+
+	calls := 0
+	client.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		calls++
+		return true, nil, fmt.Errorf("server error")
+	}))
+
+	c, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ipAddressSynced = func() bool { return true }
+	defer c.Destroy()
+
+	_, err = c.AllocateNext()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "server error" {
+		t.Fatalf("expected 'server error', got %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 call, got %d", calls)
+	}
+}
+
+func TestAllocateNext_Collision(t *testing.T) {
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+	ipStore := ipInformer.Informer().GetIndexer()
+
+	// Inject collision reactor FIRST
+	// We want to simulate that the first IP tried is already allocated in the underlying storage
+	// but NOT in the cache (so it passes the cache check in allocateFromRange).
+	// The allocator picks a random IP. To make it deterministic or easier to hit,
+	collisionCount := 0
+	client.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if collisionCount == 0 {
+			collisionCount++
+			// Simulate ErrAllocated (AlreadyExists)
+			return true, nil, apierrors.NewAlreadyExists(networkingv1.Resource("ipaddresses"), action.(k8stesting.CreateAction).GetObject().(*networkingv1.IPAddress).Name)
+		}
+		ip := action.(k8stesting.CreateAction).GetObject().(*networkingv1.IPAddress)
+		_, exists, err := ipStore.GetByKey(ip.Name)
+		if err != nil {
+			return false, nil, fmt.Errorf("failed to get ip %s from cache: %w", ip.Name, err)
+		}
+		if exists {
+			return false, nil, fmt.Errorf("ip already exist")
+		}
+		ip.Generation = 1
+		err = ipStore.Add(ip)
+		return false, ip, err
+	}))
+
+	a, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.ipAddressSynced = func() bool { return true }
+	defer a.Destroy()
+
+	// AllocateNext should succeed even if the first attempt hits a collision
+	ip, err := a.AllocateNext()
+	if err != nil {
+		t.Fatalf("AllocateNext failed: %v", err)
+	}
+	if collisionCount != 1 {
+		t.Errorf("Expected 1 collision, got %d", collisionCount)
+	}
+	if !cidr.Contains(ip) {
+		t.Errorf("Allocated IP %s not in CIDR %s", ip, cidr)
 	}
 }

@@ -19,16 +19,15 @@ package node
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	utilsexec "k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
-// NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new node join
+// NewPreflightPhase returns a new preflight phase.
 func NewPreflightPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "preflight",
@@ -36,6 +35,7 @@ func NewPreflightPhase() workflow.Phase {
 		Long:  "Run pre-flight checks for kubeadm upgrade node.",
 		Run:   runPreflight,
 		InheritFlags: []string{
+			options.CfgPath,
 			options.IgnorePreflightErrors,
 		},
 	}
@@ -47,14 +47,17 @@ func runPreflight(c workflow.RunData) error {
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}
-	fmt.Println("[preflight] Running pre-flight checks")
+	fmt.Println("[upgrade/preflight] Running pre-flight checks")
 
-	// First, check if we're root separately from the other preflight checks and fail fast
+	// First, check if we're root separately from the other preflight checks and fail fast.
 	if err := preflight.RunRootCheckOnly(data.IgnorePreflightErrors()); err != nil {
 		return err
 	}
+	if err := preflight.RunUpgradeChecks(utilsexec.New(), data.InitCfg(), data.IgnorePreflightErrors()); err != nil {
+		return err
+	}
 
-	// If this is a control-plane node, pull the basic images
+	// If this is a control-plane node, pull the basic images.
 	if data.IsControlPlaneNode() {
 		// Update the InitConfiguration used for RunPullImagesCheck with ImagePullPolicy and ImagePullSerial
 		// that come from UpgradeNodeConfiguration.
@@ -63,17 +66,17 @@ func runPreflight(c workflow.RunData) error {
 		initConfig.NodeRegistration.ImagePullSerial = data.Cfg().Node.ImagePullSerial
 
 		if !data.DryRun() {
-			fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
-			fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
-			fmt.Println("[preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
+			fmt.Println("[upgrade/preflight] Pulling images required for setting up a Kubernetes cluster")
+			fmt.Println("[upgrade/preflight] This might take a minute or two, depending on the speed of your internet connection")
+			fmt.Println("[upgrade/preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
 			if err := preflight.RunPullImagesCheck(utilsexec.New(), initConfig, data.IgnorePreflightErrors()); err != nil {
 				return err
 			}
 		} else {
-			fmt.Println("[preflight] Would pull the required images (like 'kubeadm config images pull')")
+			fmt.Println("[upgrade/preflight] Would pull the required images (like 'kubeadm config images pull')")
 		}
 	} else {
-		fmt.Println("[preflight] Skipping prepull. Not a control plane node.")
+		fmt.Println("[upgrade/preflight] Skipping prepull. Not a control plane node.")
 		return nil
 	}
 

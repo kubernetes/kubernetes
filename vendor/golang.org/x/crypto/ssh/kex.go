@@ -8,33 +8,31 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/fips140"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
+	"slices"
 
 	"golang.org/x/crypto/curve25519"
 )
 
 const (
-	kexAlgoDH1SHA1                = "diffie-hellman-group1-sha1"
-	kexAlgoDH14SHA1               = "diffie-hellman-group14-sha1"
-	kexAlgoDH14SHA256             = "diffie-hellman-group14-sha256"
-	kexAlgoDH16SHA512             = "diffie-hellman-group16-sha512"
-	kexAlgoECDH256                = "ecdh-sha2-nistp256"
-	kexAlgoECDH384                = "ecdh-sha2-nistp384"
-	kexAlgoECDH521                = "ecdh-sha2-nistp521"
-	kexAlgoCurve25519SHA256LibSSH = "curve25519-sha256@libssh.org"
-	kexAlgoCurve25519SHA256       = "curve25519-sha256"
-
-	// For the following kex only the client half contains a production
-	// ready implementation. The server half only consists of a minimal
-	// implementation to satisfy the automated tests.
-	kexAlgoDHGEXSHA1   = "diffie-hellman-group-exchange-sha1"
-	kexAlgoDHGEXSHA256 = "diffie-hellman-group-exchange-sha256"
+	// This is the group called diffie-hellman-group1-sha1 in RFC 4253 and
+	// Oakley Group 2 in RFC 2409.
+	oakleyGroup2 = "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF"
+	// This is the group called diffie-hellman-group14-sha1 in RFC 4253 and
+	// Oakley Group 14 in RFC 3526.
+	oakleyGroup14 = "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3BE39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF6955817183995497CEA956AE515D2261898FA051015728E5A8AACAA68FFFFFFFFFFFFFFFF"
+	// This is the group called diffie-hellman-group15-sha512 in RFC 8268 and
+	// Oakley Group 15 in RFC 3526.
+	oakleyGroup15 = "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3BE39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF6955817183995497CEA956AE515D2261898FA051015728E5A8AAAC42DAD33170D04507A33A85521ABDF1CBA64ECFB850458DBEF0A8AEA71575D060C7DB3970F85A6E1E4C7ABF5AE8CDB0933D71E8C94E04A25619DCEE3D2261AD2EE6BF12FFA06D98A0864D87602733EC86A64521F2B18177B200CBBE117577A615D6C770988C0BAD946E208E24FA074E5AB3143DB5BFCE0FD108E4B82D120A93AD2CAFFFFFFFFFFFFFFFF"
+	// This is the group called diffie-hellman-group16-sha512 in RFC 8268 and
+	// Oakley Group 16 in RFC 3526.
+	oakleyGroup16 = "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3BE39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF6955817183995497CEA956AE515D2261898FA051015728E5A8AAAC42DAD33170D04507A33A85521ABDF1CBA64ECFB850458DBEF0A8AEA71575D060C7DB3970F85A6E1E4C7ABF5AE8CDB0933D71E8C94E04A25619DCEE3D2261AD2EE6BF12FFA06D98A0864D87602733EC86A64521F2B18177B200CBBE117577A615D6C770988C0BAD946E208E24FA074E5AB3143DB5BFCE0FD108E4B82D120A92108011A723C12A787E6D788719A10BDBA5B2699C327186AF4E23C1A946834B6150BDA2583E9CA2AD44CE8DBBBC2DB04DE8EF92E8EFC141FBECAA6287C59474E6BC05D99B2964FA090C3A2233BA186515BE7ED1F612970CEE2D7AFB81BDD762170481CD0069127D5B05AA993B4EA988D8FDDC186FFB7DC90A6C08F4DF435C934063199FFFFFFFFFFFFFFFF"
 )
 
 // kexResult captures the outcome of a key exchange.
@@ -399,56 +397,64 @@ func ecHash(curve elliptic.Curve) crypto.Hash {
 	return crypto.SHA512
 }
 
+// kexAlgoMap defines the supported KEXs. KEXs not included are not supported
+// and will not be negotiated, even if explicitly configured. When FIPS mode is
+// enabled, only FIPS-approved algorithms are included.
 var kexAlgoMap = map[string]kexAlgorithm{}
 
 func init() {
-	// This is the group called diffie-hellman-group1-sha1 in
-	// RFC 4253 and Oakley Group 2 in RFC 2409.
-	p, _ := new(big.Int).SetString("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF", 16)
-	kexAlgoMap[kexAlgoDH1SHA1] = &dhGroup{
+	// mlkem768x25519-sha256 we'll work with fips140=on but not fips140=only
+	// until Go 1.26.
+	kexAlgoMap[KeyExchangeMLKEM768X25519] = &mlkem768WithCurve25519sha256{}
+	kexAlgoMap[KeyExchangeECDHP521] = &ecdh{elliptic.P521()}
+	kexAlgoMap[KeyExchangeECDHP384] = &ecdh{elliptic.P384()}
+	kexAlgoMap[KeyExchangeECDHP256] = &ecdh{elliptic.P256()}
+
+	if fips140.Enabled() {
+		defaultKexAlgos = slices.DeleteFunc(defaultKexAlgos, func(algo string) bool {
+			_, ok := kexAlgoMap[algo]
+			return !ok
+		})
+		return
+	}
+
+	p, _ := new(big.Int).SetString(oakleyGroup2, 16)
+	kexAlgoMap[InsecureKeyExchangeDH1SHA1] = &dhGroup{
 		g:        new(big.Int).SetInt64(2),
 		p:        p,
 		pMinus1:  new(big.Int).Sub(p, bigOne),
 		hashFunc: crypto.SHA1,
 	}
 
-	// This are the groups called diffie-hellman-group14-sha1 and
-	// diffie-hellman-group14-sha256 in RFC 4253 and RFC 8268,
-	// and Oakley Group 14 in RFC 3526.
-	p, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3BE39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF6955817183995497CEA956AE515D2261898FA051015728E5A8AACAA68FFFFFFFFFFFFFFFF", 16)
+	p, _ = new(big.Int).SetString(oakleyGroup14, 16)
 	group14 := &dhGroup{
 		g:       new(big.Int).SetInt64(2),
 		p:       p,
 		pMinus1: new(big.Int).Sub(p, bigOne),
 	}
 
-	kexAlgoMap[kexAlgoDH14SHA1] = &dhGroup{
+	kexAlgoMap[InsecureKeyExchangeDH14SHA1] = &dhGroup{
 		g: group14.g, p: group14.p, pMinus1: group14.pMinus1,
 		hashFunc: crypto.SHA1,
 	}
-	kexAlgoMap[kexAlgoDH14SHA256] = &dhGroup{
+	kexAlgoMap[KeyExchangeDH14SHA256] = &dhGroup{
 		g: group14.g, p: group14.p, pMinus1: group14.pMinus1,
 		hashFunc: crypto.SHA256,
 	}
 
-	// This is the group called diffie-hellman-group16-sha512 in RFC
-	// 8268 and Oakley Group 16 in RFC 3526.
-	p, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3BE39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF6955817183995497CEA956AE515D2261898FA051015728E5A8AAAC42DAD33170D04507A33A85521ABDF1CBA64ECFB850458DBEF0A8AEA71575D060C7DB3970F85A6E1E4C7ABF5AE8CDB0933D71E8C94E04A25619DCEE3D2261AD2EE6BF12FFA06D98A0864D87602733EC86A64521F2B18177B200CBBE117577A615D6C770988C0BAD946E208E24FA074E5AB3143DB5BFCE0FD108E4B82D120A92108011A723C12A787E6D788719A10BDBA5B2699C327186AF4E23C1A946834B6150BDA2583E9CA2AD44CE8DBBBC2DB04DE8EF92E8EFC141FBECAA6287C59474E6BC05D99B2964FA090C3A2233BA186515BE7ED1F612970CEE2D7AFB81BDD762170481CD0069127D5B05AA993B4EA988D8FDDC186FFB7DC90A6C08F4DF435C934063199FFFFFFFFFFFFFFFF", 16)
+	p, _ = new(big.Int).SetString(oakleyGroup16, 16)
 
-	kexAlgoMap[kexAlgoDH16SHA512] = &dhGroup{
+	kexAlgoMap[KeyExchangeDH16SHA512] = &dhGroup{
 		g:        new(big.Int).SetInt64(2),
 		p:        p,
 		pMinus1:  new(big.Int).Sub(p, bigOne),
 		hashFunc: crypto.SHA512,
 	}
 
-	kexAlgoMap[kexAlgoECDH521] = &ecdh{elliptic.P521()}
-	kexAlgoMap[kexAlgoECDH384] = &ecdh{elliptic.P384()}
-	kexAlgoMap[kexAlgoECDH256] = &ecdh{elliptic.P256()}
-	kexAlgoMap[kexAlgoCurve25519SHA256] = &curve25519sha256{}
-	kexAlgoMap[kexAlgoCurve25519SHA256LibSSH] = &curve25519sha256{}
-	kexAlgoMap[kexAlgoDHGEXSHA1] = &dhGEXSHA{hashFunc: crypto.SHA1}
-	kexAlgoMap[kexAlgoDHGEXSHA256] = &dhGEXSHA{hashFunc: crypto.SHA256}
+	kexAlgoMap[KeyExchangeCurve25519] = &curve25519sha256{}
+	kexAlgoMap[keyExchangeCurve25519LibSSH] = &curve25519sha256{}
+	kexAlgoMap[InsecureKeyExchangeDHGEXSHA1] = &dhGEXSHA{hashFunc: crypto.SHA1}
+	kexAlgoMap[KeyExchangeDHGEXSHA256] = &dhGEXSHA{hashFunc: crypto.SHA256}
 }
 
 // curve25519sha256 implements the curve25519-sha256 (formerly known as
@@ -464,14 +470,16 @@ func (kp *curve25519KeyPair) generate(rand io.Reader) error {
 	if _, err := io.ReadFull(rand, kp.priv[:]); err != nil {
 		return err
 	}
-	curve25519.ScalarBaseMult(&kp.pub, &kp.priv)
+	p, err := curve25519.X25519(kp.priv[:], curve25519.Basepoint)
+	if err != nil {
+		return fmt.Errorf("curve25519: %w", err)
+	}
+	if len(p) != 32 {
+		return fmt.Errorf("curve25519: internal error: X25519 returned %d bytes, expected 32", len(p))
+	}
+	copy(kp.pub[:], p)
 	return nil
 }
-
-// curve25519Zeros is just an array of 32 zero bytes so that we have something
-// convenient to compare against in order to reject curve25519 points with the
-// wrong order.
-var curve25519Zeros [32]byte
 
 func (kex *curve25519sha256) Client(c packetConn, rand io.Reader, magics *handshakeMagics) (*kexResult, error) {
 	var kp curve25519KeyPair
@@ -495,11 +503,9 @@ func (kex *curve25519sha256) Client(c packetConn, rand io.Reader, magics *handsh
 		return nil, errors.New("ssh: peer's curve25519 public value has wrong length")
 	}
 
-	var servPub, secret [32]byte
-	copy(servPub[:], reply.EphemeralPubKey)
-	curve25519.ScalarMult(&secret, &kp.priv, &servPub)
-	if subtle.ConstantTimeCompare(secret[:], curve25519Zeros[:]) == 1 {
-		return nil, errors.New("ssh: peer's curve25519 public value has wrong order")
+	secret, err := curve25519.X25519(kp.priv[:], reply.EphemeralPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("ssh: peer's curve25519 public value is not valid: %w", err)
 	}
 
 	h := crypto.SHA256.New()
@@ -541,11 +547,9 @@ func (kex *curve25519sha256) Server(c packetConn, rand io.Reader, magics *handsh
 		return nil, err
 	}
 
-	var clientPub, secret [32]byte
-	copy(clientPub[:], kexInit.ClientPubKey)
-	curve25519.ScalarMult(&secret, &kp.priv, &clientPub)
-	if subtle.ConstantTimeCompare(secret[:], curve25519Zeros[:]) == 1 {
-		return nil, errors.New("ssh: peer's curve25519 public value has wrong order")
+	secret, err := curve25519.X25519(kp.priv[:], kexInit.ClientPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("ssh: peer's curve25519 public value is not valid: %w", err)
 	}
 
 	hostKeyBytes := priv.PublicKey().Marshal()
@@ -601,9 +605,9 @@ const (
 func (gex *dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshakeMagics) (*kexResult, error) {
 	// Send GexRequest
 	kexDHGexRequest := kexDHGexRequestMsg{
-		MinBits:      dhGroupExchangeMinimumBits,
-		PreferedBits: dhGroupExchangePreferredBits,
-		MaxBits:      dhGroupExchangeMaximumBits,
+		MinBits:       dhGroupExchangeMinimumBits,
+		PreferredBits: dhGroupExchangePreferredBits,
+		MaxBits:       dhGroupExchangeMaximumBits,
 	}
 	if err := c.writePacket(Marshal(&kexDHGexRequest)); err != nil {
 		return nil, err
@@ -690,9 +694,7 @@ func (gex *dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshak
 }
 
 // Server half implementation of the Diffie Hellman Key Exchange with SHA1 and SHA256.
-//
-// This is a minimal implementation to satisfy the automated tests.
-func (gex dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshakeMagics, priv AlgorithmSigner, algo string) (result *kexResult, err error) {
+func (gex *dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshakeMagics, priv AlgorithmSigner, algo string) (result *kexResult, err error) {
 	// Receive GexRequest
 	packet, err := c.readPacket()
 	if err != nil {
@@ -702,13 +704,32 @@ func (gex dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshake
 	if err = Unmarshal(packet, &kexDHGexRequest); err != nil {
 		return
 	}
+	// We check that the request received is valid and that the MaxBits
+	// requested are at least equal to our supported minimum. This is the same
+	// check done in OpenSSH:
+	// https://github.com/openssh/openssh-portable/blob/80a2f64b/kexgexs.c#L94
+	//
+	// Furthermore, we also check that the required MinBits are less than or
+	// equal to 4096 because we can use up to Oakley Group 16.
+	if kexDHGexRequest.MaxBits < kexDHGexRequest.MinBits || kexDHGexRequest.PreferredBits < kexDHGexRequest.MinBits ||
+		kexDHGexRequest.MaxBits < kexDHGexRequest.PreferredBits || kexDHGexRequest.MaxBits < dhGroupExchangeMinimumBits ||
+		kexDHGexRequest.MinBits > 4096 {
+		return nil, fmt.Errorf("ssh: DH GEX request out of range, min: %d, max: %d, preferred: %d", kexDHGexRequest.MinBits,
+			kexDHGexRequest.MaxBits, kexDHGexRequest.PreferredBits)
+	}
 
-	// Send GexGroup
-	// This is the group called diffie-hellman-group14-sha1 in RFC
-	// 4253 and Oakley Group 14 in RFC 3526.
-	p, _ := new(big.Int).SetString("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3BE39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF6955817183995497CEA956AE515D2261898FA051015728E5A8AACAA68FFFFFFFFFFFFFFFF", 16)
+	var p *big.Int
+	// We hardcode sending Oakley Group 14 (2048 bits), Oakley Group 15 (3072
+	// bits) or Oakley Group 16 (4096 bits), based on the requested max size.
+	if kexDHGexRequest.MaxBits < 3072 {
+		p, _ = new(big.Int).SetString(oakleyGroup14, 16)
+	} else if kexDHGexRequest.MaxBits < 4096 {
+		p, _ = new(big.Int).SetString(oakleyGroup15, 16)
+	} else {
+		p, _ = new(big.Int).SetString(oakleyGroup16, 16)
+	}
+
 	g := big.NewInt(2)
-
 	msg := &kexDHGexGroupMsg{
 		P: p,
 		G: g,
@@ -746,9 +767,9 @@ func (gex dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshake
 	h := gex.hashFunc.New()
 	magics.write(h)
 	writeString(h, hostKeyBytes)
-	binary.Write(h, binary.BigEndian, uint32(dhGroupExchangeMinimumBits))
-	binary.Write(h, binary.BigEndian, uint32(dhGroupExchangePreferredBits))
-	binary.Write(h, binary.BigEndian, uint32(dhGroupExchangeMaximumBits))
+	binary.Write(h, binary.BigEndian, kexDHGexRequest.MinBits)
+	binary.Write(h, binary.BigEndian, kexDHGexRequest.PreferredBits)
+	binary.Write(h, binary.BigEndian, kexDHGexRequest.MaxBits)
 	writeInt(h, p)
 	writeInt(h, g)
 	writeInt(h, kexDHGexInit.X)

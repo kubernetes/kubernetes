@@ -17,11 +17,13 @@ limitations under the License.
 package util
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestGetNodenameForKernel(t *testing.T) {
@@ -141,5 +143,165 @@ func TestGetContainerByIndex(t *testing.T) {
 		if container.Name != tc.expectedContainer.Name || ok != tc.expectedOK {
 			t.Errorf("%s - Expected container: %v, got container: %v, expected ok: %v, got ok: %v", tc.title, tc.expectedContainer, container, tc.expectedOK, ok)
 		}
+	}
+}
+
+func TestGetLimits(t *testing.T) {
+	testCases := []struct {
+		name               string
+		containerResources *v1.ResourceRequirements
+		podResources       *v1.ResourceRequirements
+		expectedLimits     v1.ResourceList
+	}{
+		{
+			name:               "empty resources",
+			containerResources: &v1.ResourceRequirements{},
+			podResources:       &v1.ResourceRequirements{},
+			expectedLimits:     v1.ResourceList{},
+		},
+		{
+			name:               "nil resources",
+			containerResources: nil,
+			podResources:       nil,
+			expectedLimits:     v1.ResourceList{},
+		},
+		{
+			name: "nil pod-resources",
+			containerResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+				}},
+			podResources: nil,
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		{
+			name:               "nil container-resources",
+			containerResources: nil,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+				}},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		{
+			name: "container limits not set",
+			containerResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		{
+			name: "container cpu limits not set",
+			containerResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("5Mi"),
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("5Mi"),
+			},
+		},
+		{
+			name: "container memory limits not set",
+			containerResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("50m"),
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("50m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		{
+			name: "container and pod memory limits not set",
+			containerResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("50m"),
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("100m"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("50m"),
+			},
+		},
+		{
+			name: "container and pod cpu limits not set",
+			containerResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("5Mi"),
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("5Mi"),
+			},
+		},
+		{
+			name: "container and pod cpu memory limits set",
+			containerResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("5Mi"),
+					v1.ResourceCPU:    resource.MustParse("50m"),
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("10Mi"),
+					v1.ResourceCPU:    resource.MustParse("60m"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("5Mi"),
+				v1.ResourceCPU:    resource.MustParse("50m"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotLimits := GetLimits(&ResourceOpts{PodResources: tc.podResources, ContainerResources: tc.containerResources})
+			if !reflect.DeepEqual(tc.expectedLimits, gotLimits) {
+				t.Errorf("got limits: %v, expected limits: %v", gotLimits, tc.expectedLimits)
+			}
+		})
 	}
 }

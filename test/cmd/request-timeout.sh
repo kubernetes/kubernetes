@@ -39,7 +39,9 @@ run_kubectl_request_timeout_tests() {
 
   ## check --request-timeout on 'get pod' with --watch
   output_message=$(kubectl get pod valid-pod --request-timeout=1 --watch --v=5 2>&1)
-  kube::test::if_has_string "${output_message}" 'Timeout'
+  if ! kube::test::if_has_string "${output_message}" 'Timeout'; then
+    kube::test::if_has_string "${output_message}" 'context deadline exceeded'
+  fi
 
   ## check --request-timeout value with no time unit
   output_message=$(kubectl get pod valid-pod --request-timeout=1 2>&1)

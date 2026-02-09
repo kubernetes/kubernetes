@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -31,6 +30,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -60,25 +60,65 @@ func TestGetStaticPodSpecs(t *testing.T) {
 	}
 
 	// Executes GetStaticPodSpecs
-	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, []kubeadmapi.EnvVar{})
+	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{
+		BindPort: kubeadmconstants.KubeAPIServerPort,
+	}, []kubeadmapi.EnvVar{})
 
 	var tests = []struct {
-		name          string
-		staticPodName string
-		env           []v1.EnvVar
+		name                 string
+		staticPodName        string
+		expectLivenessProbe  bool
+		expectReadinessProbe bool
+		expectStartupProbe   bool
+		probePort            string
+		env                  []v1.EnvVar
+		containerPorts       []v1.ContainerPort
 	}{
 		{
-			name:          "KubeAPIServer",
-			staticPodName: kubeadmconstants.KubeAPIServer,
+			name:                 "KubeAPIServer",
+			staticPodName:        kubeadmconstants.KubeAPIServer,
+			expectLivenessProbe:  true,
+			expectReadinessProbe: true,
+			expectStartupProbe:   true,
+			probePort:            kubeadmconstants.ProbePort,
+			containerPorts: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: kubeadmconstants.KubeAPIServerPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		},
 		{
-			name:          "KubeControllerManager",
-			staticPodName: kubeadmconstants.KubeControllerManager,
+			name:                 "KubeControllerManager",
+			staticPodName:        kubeadmconstants.KubeControllerManager,
+			expectLivenessProbe:  true,
+			expectReadinessProbe: false,
+			expectStartupProbe:   true,
+			probePort:            kubeadmconstants.ProbePort,
+			containerPorts: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: kubeadmconstants.KubeControllerManagerPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		},
 		{
-			name:          "KubeScheduler",
-			staticPodName: kubeadmconstants.KubeScheduler,
-			env:           []v1.EnvVar{{Name: "Foo", Value: "Bar"}},
+			name:                 "KubeScheduler",
+			staticPodName:        kubeadmconstants.KubeScheduler,
+			expectLivenessProbe:  true,
+			expectReadinessProbe: true,
+			expectStartupProbe:   true,
+			probePort:            kubeadmconstants.ProbePort,
+			env:                  []v1.EnvVar{{Name: "Foo", Value: "Bar"}},
+			containerPorts: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: kubeadmconstants.KubeSchedulerPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		},
 	}
 
@@ -95,6 +135,35 @@ func TestGetStaticPodSpecs(t *testing.T) {
 						t.Errorf("expected env: %v, got: %v", tc.env, spec.Spec.Containers[0].Env)
 					}
 				}
+
+				if tc.expectLivenessProbe != (spec.Spec.Containers[0].LivenessProbe != nil) {
+					t.Errorf("expected livenessProbe: %v, got: %v", tc.expectLivenessProbe, (spec.Spec.Containers[0].LivenessProbe != nil))
+				}
+				if tc.expectReadinessProbe != (spec.Spec.Containers[0].ReadinessProbe != nil) {
+					t.Errorf("expected readinessProbe: %v, got: %v", tc.expectReadinessProbe, (spec.Spec.Containers[0].ReadinessProbe != nil))
+				}
+				if tc.expectStartupProbe != (spec.Spec.Containers[0].StartupProbe != nil) {
+					t.Errorf("expected startupProbe: %v, got: %v", tc.expectStartupProbe, (spec.Spec.Containers[0].StartupProbe != nil))
+				}
+
+				if len(tc.probePort) > 0 {
+					if spec.Spec.Containers[0].LivenessProbe != nil && !reflect.DeepEqual(intstr.FromString(tc.probePort), spec.Spec.Containers[0].LivenessProbe.HTTPGet.Port) {
+						t.Errorf("expected livenessProbe port: %v, got: %v", intstr.FromString(tc.probePort), spec.Spec.Containers[0].LivenessProbe.HTTPGet.Port)
+					}
+					if spec.Spec.Containers[0].ReadinessProbe != nil && len(tc.probePort) > 0 && !reflect.DeepEqual(intstr.FromString(tc.probePort), spec.Spec.Containers[0].ReadinessProbe.HTTPGet.Port) {
+						t.Errorf("expected readinessProbe port: %v, got: %v", intstr.FromString(tc.probePort), spec.Spec.Containers[0].ReadinessProbe.HTTPGet.Port)
+					}
+					if spec.Spec.Containers[0].StartupProbe != nil && !reflect.DeepEqual(intstr.FromString(tc.probePort), spec.Spec.Containers[0].StartupProbe.HTTPGet.Port) {
+						t.Errorf("expected startupProbe port: %v, got: %v", intstr.FromString(tc.probePort), spec.Spec.Containers[0].StartupProbe.HTTPGet.Port)
+					}
+				}
+
+				if len(tc.containerPorts) > 0 {
+					if !reflect.DeepEqual(spec.Spec.Containers[0].Ports, tc.containerPorts) {
+						t.Errorf("expected ports: %v, got: %v", tc.containerPorts, spec.Spec.Containers[0].Ports)
+					}
+				}
+
 			} else {
 				t.Errorf("getStaticPodSpecs didn't create spec for %s ", tc.staticPodName)
 			}
@@ -109,7 +178,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 		components []string
 	}{
 		{
-			name:       "KubeAPIServer KubeAPIServer KubeScheduler",
+			name:       "KubeAPIServer KubeControllerManager KubeScheduler",
 			components: []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler},
 		},
 		{
@@ -129,8 +198,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create temp folder for the test case
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			// Creates a Cluster Configuration
 			cfg := &kubeadmapi.ClusterConfiguration{
@@ -157,8 +225,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 func TestCreateStaticPodFilesWithPatches(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Creates a Cluster Configuration
 	cfg := &kubeadmapi.ClusterConfiguration{
@@ -636,7 +703,7 @@ func errorDiffArguments(t *testing.T, name string, actual, expected []string) {
 }
 
 // removeCommon removes common items from left list
-// makes compairing two cmdline (with lots of arguments) easier
+// makes comparing two cmdline (with lots of arguments) easier
 func removeCommon(left, right []string) []string {
 	origSet := sets.New(left...)
 	origSet.Delete(right...)
@@ -1004,8 +1071,7 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			pkiutiltesting.Reset()
 
 			// Create temp folder for the test case
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 			test.cfg.CertificatesDir = tmpdir
 
 			if err := certs.CreatePKIAssets(test.cfg); err != nil {

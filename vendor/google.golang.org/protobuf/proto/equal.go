@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/runtime/protoiface"
 )
 
 // Equal reports whether two messages are equal,
@@ -51,6 +52,14 @@ func Equal(x, y Message) bool {
 	if mx.IsValid() != my.IsValid() {
 		return false
 	}
+
+	// Only one of the messages needs to implement the fast-path for it to work.
+	pmx := protoMethods(mx)
+	pmy := protoMethods(my)
+	if pmx != nil && pmy != nil && pmx.Equal != nil && pmy.Equal != nil {
+		return pmx.Equal(protoiface.EqualInput{MessageA: mx, MessageB: my}).Equal
+	}
+
 	vx := protoreflect.ValueOfMessage(mx)
 	vy := protoreflect.ValueOfMessage(my)
 	return vx.Equal(vy)

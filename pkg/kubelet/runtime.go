@@ -19,6 +19,7 @@ package kubelet
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -36,6 +37,7 @@ type runtimeState struct {
 	cidr                     string
 	healthChecks             []*healthCheck
 	rtHandlers               []kubecontainer.RuntimeHandler
+	rtFeatures               *kubecontainer.RuntimeFeatures
 }
 
 // A health check function should be efficient and not rely on external
@@ -74,13 +76,29 @@ func (s *runtimeState) setRuntimeState(err error) {
 func (s *runtimeState) setRuntimeHandlers(rtHandlers []kubecontainer.RuntimeHandler) {
 	s.Lock()
 	defer s.Unlock()
-	s.rtHandlers = rtHandlers
+	// Copy and sort to ensure deterministic ordering of runtime handlers and avoid spurious Node status updates.
+	s.rtHandlers = append([]kubecontainer.RuntimeHandler(nil), rtHandlers...)
+	sort.Slice(s.rtHandlers, func(i, j int) bool {
+		return s.rtHandlers[i].Name < s.rtHandlers[j].Name
+	})
 }
 
 func (s *runtimeState) runtimeHandlers() []kubecontainer.RuntimeHandler {
 	s.RLock()
 	defer s.RUnlock()
 	return s.rtHandlers
+}
+
+func (s *runtimeState) setRuntimeFeatures(features *kubecontainer.RuntimeFeatures) {
+	s.Lock()
+	defer s.Unlock()
+	s.rtFeatures = features
+}
+
+func (s *runtimeState) runtimeFeatures() *kubecontainer.RuntimeFeatures {
+	s.RLock()
+	defer s.RUnlock()
+	return s.rtFeatures
 }
 
 func (s *runtimeState) setStorageState(err error) {

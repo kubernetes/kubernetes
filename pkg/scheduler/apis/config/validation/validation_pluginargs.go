@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 // supportedScoringStrategyTypes has to be a set of strings for use with field.Unsupported
@@ -188,7 +190,7 @@ func validateFunctionShape(shape []config.UtilizationShapePoint, path *field.Pat
 
 	for i := 1; i < len(shape); i++ {
 		if shape[i-1].Utilization >= shape[i].Utilization {
-			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("utilization"), shape[i].Utilization, "utilization values must be sorted in increasing order"))
+			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("utilization"), shape[i].Utilization, "values must be sorted in increasing order"))
 			break
 		}
 	}
@@ -261,13 +263,13 @@ func ValidateNodeAffinityArgs(path *field.Path, args *config.NodeAffinityArgs) e
 
 // VolumeBindingArgsValidationOptions contains the different settings for validation.
 type VolumeBindingArgsValidationOptions struct {
-	AllowVolumeCapacityPriority bool
+	AllowStorageCapacityScoring bool
 }
 
 // ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
 func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs) error {
 	return ValidateVolumeBindingArgsWithOptions(path, args, VolumeBindingArgsValidationOptions{
-		AllowVolumeCapacityPriority: utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
+		AllowStorageCapacityScoring: utilfeature.DefaultFeatureGate.Enabled(features.StorageCapacityScoring),
 	})
 }
 
@@ -279,13 +281,13 @@ func ValidateVolumeBindingArgsWithOptions(path *field.Path, args *config.VolumeB
 		allErrs = append(allErrs, field.Invalid(path.Child("bindTimeoutSeconds"), args.BindTimeoutSeconds, "invalid BindTimeoutSeconds, should not be a negative value"))
 	}
 
-	if opts.AllowVolumeCapacityPriority {
+	if opts.AllowStorageCapacityScoring {
 		allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
 	} else if args.Shape != nil {
 		// When the feature is off, return an error if the config is not nil.
 		// This prevents unexpected configuration from taking effect when the
 		// feature turns on in the future.
-		allErrs = append(allErrs, field.Invalid(path.Child("shape"), args.Shape, "unexpected field `shape`, remove it or turn on the feature gate VolumeCapacityPriority"))
+		allErrs = append(allErrs, field.Invalid(path.Child("shape"), args.Shape, "unexpected field `shape`, remove it or turn on the feature gate StorageCapacityScoring"))
 	}
 	return allErrs.ToAggregate()
 }
@@ -317,13 +319,55 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 			allErrs = append(allErrs, field.NotSupported(strategyPath.Child("type"), args.ScoringStrategy.Type, sets.List(supportedScoringStrategyTypes)))
 		}
 		allErrs = append(allErrs, validateResources(args.ScoringStrategy.Resources, strategyPath.Child("resources"))...)
-		if args.ScoringStrategy.RequestedToCapacityRatio != nil {
-			allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, strategyPath.Child("shape"))...)
+		if args.ScoringStrategy.Type == config.RequestedToCapacityRatio {
+			if args.ScoringStrategy.RequestedToCapacityRatio == nil {
+				allErrs = append(allErrs, field.Required(strategyPath.Child("requestedToCapacityRatio"), "must be specified when type is RequestedToCapacityRatio"))
+			} else {
+				allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, strategyPath.Child("requestedToCapacityRatio").Child("shape"))...)
+			}
+		} else if args.ScoringStrategy.RequestedToCapacityRatio != nil {
+			allErrs = append(allErrs, field.Forbidden(strategyPath.Child("requestedToCapacityRatio"), "must be nil when type is not RequestedToCapacityRatio"))
 		}
+	} else {
+		allErrs = append(allErrs, field.Required(strategyPath, "ScoringStrategy field is required"))
 	}
 
 	if len(allErrs) == 0 {
 		return nil
+	}
+	return allErrs.ToAggregate()
+}
+
+// ValidateDynamicResourcesArgs validates that DynamicResourcesArgs are correct.
+// In contrast to the REST API, setting fields that have no effect because
+// the corresponding feature is disabled is considered an error.
+func ValidateDynamicResourcesArgs(path *field.Path, args *config.DynamicResourcesArgs, fts feature.Features) error {
+	var allErrs field.ErrorList
+	if fts.EnableDRASchedulerFilterTimeout {
+		if args.FilterTimeout != nil && args.FilterTimeout.Duration < 0 {
+			allErrs = append(allErrs, field.Invalid(path.Child("filterTimeout"), args.FilterTimeout, "must be zero or positive"))
+		}
+	} else {
+		if args.FilterTimeout != nil {
+			allErrs = append(allErrs, field.Forbidden(path.Child("filterTimeout"), "DRASchedulingFilterTimeout feature gate is disabled"))
+		}
+	}
+
+	if fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus {
+		if args.BindingTimeout != nil && args.BindingTimeout.Duration < 1*time.Second {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("bindingTimeout"),
+				args.BindingTimeout,
+				"must be at least 1 second",
+			))
+		}
+	} else {
+		if args.BindingTimeout != nil {
+			allErrs = append(allErrs, field.Forbidden(
+				path.Child("bindingTimeout"),
+				"DRADeviceBindingConditions or DRAResourceClaimDeviceStatus feature gate is disabled",
+			))
+		}
 	}
 	return allErrs.ToAggregate()
 }

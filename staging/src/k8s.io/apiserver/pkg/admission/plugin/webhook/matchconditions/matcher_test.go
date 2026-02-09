@@ -35,7 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 )
 
-var _ cel.Filter = &fakeCelFilter{}
+var _ cel.ConditionEvaluator = &fakeCelFilter{}
 
 type fakeCelFilter struct {
 	evaluations []cel.EvaluationResult

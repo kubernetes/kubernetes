@@ -19,8 +19,6 @@ package node
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,6 +28,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // CreateNewTokens tries to create a token and fails if one with the same ID already exists
@@ -40,10 +39,12 @@ func CreateNewTokens(client clientset.Interface, tokens []bootstraptokenv1.Boots
 // UpdateOrCreateTokens attempts to update a token with the given ID, or create if it does not already exist.
 func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens []bootstraptokenv1.BootstrapToken) error {
 
+	secretsClient := client.CoreV1().Secrets(metav1.NamespaceSystem)
+
 	for _, token := range tokens {
 
 		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)
-		secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), secretName, metav1.GetOptions{})
+		secret, err := secretsClient.Get(context.Background(), secretName, metav1.GetOptions{})
 		if secret != nil && err == nil && failIfExists {
 			return errors.Errorf("a token with id %q already exists", token.Token.ID)
 		}
@@ -56,7 +57,7 @@ func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens 
 			kubeadmconstants.KubernetesAPICallRetryInterval,
 			kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
 			true, func(_ context.Context) (bool, error) {
-				if err := apiclient.CreateOrUpdateSecret(client, updatedOrNewSecret); err != nil {
+				if err := apiclient.CreateOrUpdate(secretsClient, updatedOrNewSecret); err != nil {
 					lastError = errors.Wrapf(err, "failed to create or update bootstrap token with name %s", secretName)
 					return false, nil
 				}

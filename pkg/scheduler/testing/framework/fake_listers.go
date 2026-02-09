@@ -28,7 +28,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 var _ corelisters.ServiceLister = &ServiceLister{}
@@ -224,11 +224,11 @@ func (pvcs PersistentVolumeClaimLister) PersistentVolumeClaims(namespace string)
 	}
 }
 
-// NodeInfoLister declares a framework.NodeInfo type for testing.
-type NodeInfoLister []*framework.NodeInfo
+// NodeInfoLister declares a fwk.NodeInfo type for testing.
+type NodeInfoLister []fwk.NodeInfo
 
 // Get returns a fake node object in the fake nodes.
-func (nodes NodeInfoLister) Get(nodeName string) (*framework.NodeInfo, error) {
+func (nodes NodeInfoLister) Get(nodeName string) (fwk.NodeInfo, error) {
 	for _, node := range nodes {
 		if node != nil && node.Node().Name == nodeName {
 			return node, nil
@@ -238,19 +238,19 @@ func (nodes NodeInfoLister) Get(nodeName string) (*framework.NodeInfo, error) {
 }
 
 // List lists all nodes.
-func (nodes NodeInfoLister) List() ([]*framework.NodeInfo, error) {
+func (nodes NodeInfoLister) List() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
 // HavePodsWithAffinityList is supposed to list nodes with at least one pod with affinity. For the fake lister
 // we just return everything.
-func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
+func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
 // HavePodsWithRequiredAntiAffinityList is supposed to list nodes with at least one pod with
 // required anti-affinity. For the fake lister we just return everything.
-func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
+func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
@@ -312,4 +312,28 @@ func (classes StorageClassLister) Get(name string) (*storagev1.StorageClass, err
 // List lists all StorageClass in the indexer.
 func (classes StorageClassLister) List(selector labels.Selector) ([]*storagev1.StorageClass, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+// VolumeAttachmentLister declares a []storagev1.VolumeAttachment type for testing.
+type VolumeAttachmentLister []storagev1.VolumeAttachment
+
+var _ storagelisters.VolumeAttachmentLister = VolumeAttachmentLister{}
+
+// List lists all VolumeAttachments in the indexer.
+func (val VolumeAttachmentLister) List(selector labels.Selector) (ret []*storagev1.VolumeAttachment, err error) {
+	var list []*storagev1.VolumeAttachment
+	for i := range val {
+		list = append(list, &val[i])
+	}
+	return list, nil
+}
+
+// Get returns a fake VolumeAttachment object from the fake VolumeAttachments by name.
+func (val VolumeAttachmentLister) Get(name string) (*storagev1.VolumeAttachment, error) {
+	for _, va := range val {
+		if va.Name == name {
+			return &va, nil
+		}
+	}
+	return nil, errors.NewNotFound(storagev1.Resource("volumeattachments"), name)
 }

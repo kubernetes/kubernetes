@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -373,13 +372,13 @@ func summarizeData(data []byte, maxLength int) string {
 func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	defer req.Body.Close()
 	if limit <= 0 {
-		return ioutil.ReadAll(req.Body)
+		return io.ReadAll(req.Body)
 	}
 	lr := &io.LimitedReader{
 		R: req.Body,
 		N: limit + 1,
 	}
-	data, err := ioutil.ReadAll(lr)
+	data, err := io.ReadAll(lr)
 	if err != nil {
 		return nil, err
 	}
@@ -389,11 +388,11 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	return data, nil
 }
 
-func limitedReadBodyWithRecordMetric(ctx context.Context, req *http.Request, limit int64, resourceGroup string, verb requestmetrics.RequestBodyVerb) ([]byte, error) {
+func limitedReadBodyWithRecordMetric(ctx context.Context, req *http.Request, limit int64, groupResource schema.GroupResource, verb requestmetrics.RequestBodyVerb) ([]byte, error) {
 	readBody, err := limitedReadBody(req, limit)
 	if err == nil {
 		// only record if we've read successfully
-		requestmetrics.RecordRequestBodySize(ctx, resourceGroup, verb, len(readBody))
+		requestmetrics.RecordRequestBodySize(ctx, groupResource, verb, len(readBody))
 	}
 	return readBody, err
 }

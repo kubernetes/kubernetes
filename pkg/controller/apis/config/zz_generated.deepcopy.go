@@ -48,10 +48,11 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	in.Generic.DeepCopyInto(&out.Generic)
 	out.KubeCloudShared = in.KubeCloudShared
 	out.AttachDetachController = in.AttachDetachController
+	out.CronJobController = in.CronJobController
 	out.CSRSigningController = in.CSRSigningController
 	out.DaemonSetController = in.DaemonSetController
 	out.DeploymentController = in.DeploymentController
-	out.StatefulSetController = in.StatefulSetController
+	out.DeviceTaintEvictionController = in.DeviceTaintEvictionController
 	out.DeprecatedController = in.DeprecatedController
 	out.EndpointController = in.EndpointController
 	out.EndpointSliceController = in.EndpointSliceController
@@ -60,7 +61,6 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	in.GarbageCollectorController.DeepCopyInto(&out.GarbageCollectorController)
 	out.HPAController = in.HPAController
 	out.JobController = in.JobController
-	out.CronJobController = in.CronJobController
 	out.LegacySATokenCleaner = in.LegacySATokenCleaner
 	out.NamespaceController = in.NamespaceController
 	out.NodeIPAMController = in.NodeIPAMController
@@ -72,8 +72,10 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.ResourceQuotaController = in.ResourceQuotaController
 	out.SAController = in.SAController
 	out.ServiceController = in.ServiceController
+	out.StatefulSetController = in.StatefulSetController
 	out.TTLAfterFinishedController = in.TTLAfterFinishedController
 	out.ValidatingAdmissionPolicyStatusController = in.ValidatingAdmissionPolicyStatusController
+	out.ResourceClaimController = in.ResourceClaimController
 	return
 }
 

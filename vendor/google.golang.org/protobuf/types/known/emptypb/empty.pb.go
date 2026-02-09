@@ -38,6 +38,7 @@ import (
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+	unsafe "unsafe"
 )
 
 // A generic empty message that you can re-use to avoid defining duplicated
@@ -48,18 +49,16 @@ import (
 //	  rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);
 //	}
 type Empty struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Empty) Reset() {
 	*x = Empty{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_google_protobuf_empty_proto_msgTypes[0]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
+	mi := &file_google_protobuf_empty_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
 }
 
 func (x *Empty) String() string {
@@ -70,7 +69,7 @@ func (*Empty) ProtoMessage() {}
 
 func (x *Empty) ProtoReflect() protoreflect.Message {
 	mi := &file_google_protobuf_empty_proto_msgTypes[0]
-	if protoimpl.UnsafeEnabled && x != nil {
+	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
@@ -87,29 +86,21 @@ func (*Empty) Descriptor() ([]byte, []int) {
 
 var File_google_protobuf_empty_proto protoreflect.FileDescriptor
 
-var file_google_protobuf_empty_proto_rawDesc = []byte{
-	0x0a, 0x1b, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
-	0x66, 0x2f, 0x65, 0x6d, 0x70, 0x74, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0f, 0x67,
-	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x22, 0x07,
-	0x0a, 0x05, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x42, 0x7d, 0x0a, 0x13, 0x63, 0x6f, 0x6d, 0x2e, 0x67,
-	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x42, 0x0a,
-	0x45, 0x6d, 0x70, 0x74, 0x79, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x2e, 0x67, 0x6f,
-	0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x67, 0x6f, 0x6c, 0x61, 0x6e, 0x67, 0x2e, 0x6f, 0x72, 0x67, 0x2f,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2f, 0x6b,
-	0x6e, 0x6f, 0x77, 0x6e, 0x2f, 0x65, 0x6d, 0x70, 0x74, 0x79, 0x70, 0x62, 0xf8, 0x01, 0x01, 0xa2,
-	0x02, 0x03, 0x47, 0x50, 0x42, 0xaa, 0x02, 0x1e, 0x47, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x50,
-	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x57, 0x65, 0x6c, 0x6c, 0x4b, 0x6e, 0x6f, 0x77,
-	0x6e, 0x54, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
-}
+const file_google_protobuf_empty_proto_rawDesc = "" +
+	"\n" +
+	"\x1bgoogle/protobuf/empty.proto\x12\x0fgoogle.protobuf\"\a\n" +
+	"\x05EmptyB}\n" +
+	"\x13com.google.protobufB\n" +
+	"EmptyProtoP\x01Z.google.golang.org/protobuf/types/known/emptypb\xf8\x01\x01\xa2\x02\x03GPB\xaa\x02\x1eGoogle.Protobuf.WellKnownTypesb\x06proto3"
 
 var (
 	file_google_protobuf_empty_proto_rawDescOnce sync.Once
-	file_google_protobuf_empty_proto_rawDescData = file_google_protobuf_empty_proto_rawDesc
+	file_google_protobuf_empty_proto_rawDescData []byte
 )
 
 func file_google_protobuf_empty_proto_rawDescGZIP() []byte {
 	file_google_protobuf_empty_proto_rawDescOnce.Do(func() {
-		file_google_protobuf_empty_proto_rawDescData = protoimpl.X.CompressGZIP(file_google_protobuf_empty_proto_rawDescData)
+		file_google_protobuf_empty_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_google_protobuf_empty_proto_rawDesc), len(file_google_protobuf_empty_proto_rawDesc)))
 	})
 	return file_google_protobuf_empty_proto_rawDescData
 }
@@ -131,25 +122,11 @@ func file_google_protobuf_empty_proto_init() {
 	if File_google_protobuf_empty_proto != nil {
 		return
 	}
-	if !protoimpl.UnsafeEnabled {
-		file_google_protobuf_empty_proto_msgTypes[0].Exporter = func(v any, i int) any {
-			switch v := v.(*Empty); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_google_protobuf_empty_proto_rawDesc,
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_google_protobuf_empty_proto_rawDesc), len(file_google_protobuf_empty_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
 			NumExtensions: 0,
@@ -160,7 +137,6 @@ func file_google_protobuf_empty_proto_init() {
 		MessageInfos:      file_google_protobuf_empty_proto_msgTypes,
 	}.Build()
 	File_google_protobuf_empty_proto = out.File
-	file_google_protobuf_empty_proto_rawDesc = nil
 	file_google_protobuf_empty_proto_goTypes = nil
 	file_google_protobuf_empty_proto_depIdxs = nil
 }

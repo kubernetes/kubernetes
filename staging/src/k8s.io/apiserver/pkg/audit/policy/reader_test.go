@@ -17,7 +17,6 @@ limitations under the License.
 package policy
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -123,7 +122,7 @@ func TestParsePolicyWithNoVersionOrKind(t *testing.T) {
 	defer os.Remove(f)
 
 	_, err = LoadPolicyFromFile(f)
-	assert.Contains(t, err.Error(), "unknown group version field")
+	assert.ErrorContains(t, err, "unknown group version field")
 }
 
 func TestParsePolicyWithUnknownField(t *testing.T) {
@@ -158,7 +157,7 @@ kind: Policy`,
 }
 
 func writePolicy(t *testing.T, policy string) (string, error) {
-	f, err := ioutil.TempFile("", "policy.yaml")
+	f, err := os.CreateTemp("", "policy.yaml")
 	require.NoError(t, err)
 
 	_, err = f.WriteString(policy)

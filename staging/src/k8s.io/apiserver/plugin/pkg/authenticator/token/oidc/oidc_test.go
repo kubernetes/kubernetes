@@ -25,27 +25,33 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
 
-	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/go-jose/go-jose.v2"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // utilities for loading JOSE keys.
@@ -151,6 +157,25 @@ type claimsTest struct {
 	fetchKeysFromRemote bool
 }
 
+type testClaimsServer struct {
+	*httptest.Server
+
+	keys jose.JSONWebKeySet
+	mu   sync.RWMutex
+}
+
+func (c *testClaimsServer) setKeys(keys jose.JSONWebKeySet) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.keys = keys
+}
+
+func (c *testClaimsServer) getKeys() jose.JSONWebKeySet {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.keys
+}
+
 // Replace formats the contents of v into the provided template.
 func replace(tmpl string, v interface{}) string {
 	t := template.Must(template.New("test").Parse(tmpl))
@@ -165,18 +190,28 @@ func replace(tmpl string, v interface{}) string {
 // OIDC responses to requests that resolve distributed claims. signer is the
 // signer used for the served JWT tokens.  claimToResponseMap is a map of
 // responses that the server will return for each claim it is given.
-func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, claimToResponseMap map[string]string, openIDConfig *string) *httptest.Server {
-	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, claimToResponseMap map[string]string, openIDConfig *string) *testClaimsServer {
+	cs := &testClaimsServer{
+		keys: keys,
+		mu:   sync.RWMutex{},
+	}
+
+	cs.Server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		klog.V(5).Infof("request: %+v", *r)
 		switch r.URL.Path {
 		case "/.testing/keys":
 			w.Header().Set("Content-Type", "application/json")
-			keyBytes, err := json.Marshal(keys)
+			keyBytes, err := json.Marshal(cs.getKeys())
 			if err != nil {
 				t.Fatalf("unexpected error while marshaling keys: %v", err)
 			}
 			klog.V(5).Infof("%v: returning: %+v", r.URL, string(keyBytes))
 			w.Write(keyBytes)
+
+		case "/.testing/invalidkeys":
+			w.Header().Set("Content-Type", "application/json")
+		case "/.testing/keys/badstatus":
+			w.WriteHeader(http.StatusInternalServerError)
 
 		// /c/d/bar/.well-known/openid-configuration is used to test issuer url and discovery url with a path
 		case "/.well-known/openid-configuration", "/c/d/bar/.well-known/openid-configuration":
@@ -210,8 +245,8 @@ func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, c
 			fmt.Fprintf(w, "unexpected URL: %v", r.URL)
 		}
 	}))
-	klog.V(4).Infof("Serving OIDC at: %v", ts.URL)
-	return ts
+	klog.V(4).Infof("Serving OIDC at: %v", cs.Server.URL)
+	return cs
 }
 
 func toKeySet(keys []*jose.JSONWebKey) jose.JSONWebKeySet {
@@ -378,8 +413,6 @@ func (c *claimsTest) run(t *testing.T) {
 }
 
 func TestToken(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	synchronizeTokenIDVerifierForTest = true
 	tests := []claimsTest{
 		{
@@ -393,7 +426,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -424,7 +457,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -452,7 +485,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -484,7 +517,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -515,7 +548,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -546,7 +579,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -577,11 +610,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -614,11 +647,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -671,11 +704,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -729,11 +762,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -783,11 +816,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -831,11 +864,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -885,11 +918,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "rabbits",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -942,11 +975,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -997,11 +1030,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1054,11 +1087,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1114,11 +1147,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1152,11 +1185,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1209,11 +1242,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1253,11 +1286,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1288,11 +1321,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1322,11 +1355,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1369,11 +1402,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1408,11 +1441,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1448,7 +1481,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1477,7 +1510,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1506,7 +1539,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1537,7 +1570,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1570,7 +1603,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1603,7 +1636,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1636,7 +1669,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1667,7 +1700,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1706,7 +1739,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1742,7 +1775,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1771,7 +1804,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("oidc:"),
+							Prefix: ptr.To("oidc:"),
 						},
 					},
 				},
@@ -1802,11 +1835,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("oidc:"),
+							Prefix: ptr.To("oidc:"),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String("groups:"),
+							Prefix: ptr.To("groups:"),
 						},
 					},
 				},
@@ -1839,11 +1872,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("oidc:"),
+							Prefix: ptr.To("oidc:"),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String("groups:"),
+							Prefix: ptr.To("groups:"),
 						},
 					},
 				},
@@ -1896,7 +1929,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1926,7 +1959,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1958,7 +1991,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1991,7 +2024,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2012,7 +2045,7 @@ func TestToken(t *testing.T) {
 					},
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -2034,7 +2067,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2057,7 +2090,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2082,7 +2115,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2106,7 +2139,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2126,7 +2159,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -2157,7 +2190,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2186,7 +2219,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("system:"),
+							Prefix: ptr.To("system:"),
 						},
 					},
 					UserValidationRules: []apiserver.UserValidationRule{
@@ -2224,7 +2257,7 @@ func TestToken(t *testing.T) {
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String("system:"),
+							Prefix: ptr.To("system:"),
 						},
 					},
 					UserValidationRules: []apiserver.UserValidationRule{
@@ -2260,7 +2293,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -2295,7 +2328,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -2333,7 +2366,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -2374,7 +2407,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -2472,6 +2505,586 @@ func TestToken(t *testing.T) {
 			},
 		},
 		{
+			name: "claim mappings with expressions and deeply nested claim - success",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: "claims.turtle.foo.other1.bit1 && !claims.turtle.foo.bar.other1.bit2",
+						},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[0]",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[1]",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "bio.snorlax.org/1",
+								ValueExpression: "string(claims.turtle.foo.bar.other1.bit2)",
+							},
+							{
+								Key:             "bio.snorlax.org/2",
+								ValueExpression: "string(claims.turtle.foo.bar.baz.other1.bit3)",
+							},
+							{
+								Key:             "bio.snorlax.org/3",
+								ValueExpression: "[string(claims.turtle.foo.bar.baz.other1.bit1)] + ['a', 'b', 'c']",
+							},
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username != "bad"`,
+						},
+						{
+							Expression: `user.uid == "007"`,
+						},
+						{
+							Expression: `"claus" in user.groups`,
+						},
+						{
+							Expression: `user.extra.bio__dot__snorlax__dot__org__slash__3.size() == 4`,
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"exp": %d,
+				"turtle": {
+					"foo": {
+						"1": "a",
+						"2": "b",
+						"other1": {
+							"bit1": true,
+							"bit2": false,
+							"bit3": 1
+						},
+						"bar": {
+							"3": "c",
+							"4": "d",
+							"other1": {
+								"bit1": true,
+								"bit2": false,
+								"bit3": 1
+							},
+							"baz": {
+								"5": "e",
+								"6": "f",
+								"panda": [
+									"snorlax",
+									"007",
+									"santa",
+									"claus"
+								],
+								"other1": {
+									"bit1": true,
+									"bit2": false,
+									"bit3": 1
+								}
+							}
+						}
+					}
+				}
+}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name:   "snorlax",
+				UID:    "007",
+				Groups: []string{"snorlax", "007", "santa", "claus"},
+				Extra: map[string][]string{
+					"bio.snorlax.org/1": {"false"},
+					"bio.snorlax.org/2": {"1"},
+					"bio.snorlax.org/3": {"true", "a", "b", "c"},
+				},
+			},
+		},
+		{
+			name: "claim mappings with expressions and deeply nested claim - success via optional",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: "claims.turtle.foo.other1.bit1 && !claims.turtle.foo.bar.other1.bit2",
+						},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[0]",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[1]",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.?a.b.c.d.orValue([ 'claus' ])", // this passes because of the optional
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "bio.snorlax.org/1",
+								ValueExpression: "string(claims.turtle.foo.bar.other1.bit2)",
+							},
+							{
+								Key:             "bio.snorlax.org/2",
+								ValueExpression: "string(claims.turtle.foo.bar.baz.other1.bit3)",
+							},
+							{
+								Key:             "bio.snorlax.org/3",
+								ValueExpression: "[string(claims.turtle.foo.bar.baz.other1.bit1)] + ['a', 'b', 'c']",
+							},
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username != "bad"`,
+						},
+						{
+							Expression: `user.uid == "007"`,
+						},
+						{
+							Expression: `"claus" in user.groups`,
+						},
+						{
+							Expression: `user.extra.bio__dot__snorlax__dot__org__slash__3.size() == 4`,
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"exp": %d,
+				"turtle": {
+					"foo": {
+						"1": "a",
+						"2": "b",
+						"other1": {
+							"bit1": true,
+							"bit2": false,
+							"bit3": 1
+						},
+						"bar": {
+							"3": "c",
+							"4": "d",
+							"other1": {
+								"bit1": true,
+								"bit2": false,
+								"bit3": 1
+							},
+							"baz": {
+								"5": "e",
+								"6": "f",
+								"panda": [
+									"snorlax",
+									"007",
+									"santa",
+									"claus"
+								],
+								"other1": {
+									"bit1": true,
+									"bit2": false,
+									"bit3": 1
+								}
+							}
+						}
+					}
+				}
+}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name:   "snorlax",
+				UID:    "007",
+				Groups: []string{"claus"},
+				Extra: map[string][]string{
+					"bio.snorlax.org/1": {"false"},
+					"bio.snorlax.org/2": {"1"},
+					"bio.snorlax.org/3": {"true", "a", "b", "c"},
+				},
+			},
+		},
+		{
+			name: "claim mappings with expressions and deeply nested claim - failure without optional",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: "claims.turtle.foo.other1.bit1 && !claims.turtle.foo.bar.other1.bit2",
+						},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[0]",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[1]",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.a.b.c.d", // this fails because the key does not exist
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "bio.snorlax.org/1",
+								ValueExpression: "string(claims.turtle.foo.bar.other1.bit2)",
+							},
+							{
+								Key:             "bio.snorlax.org/2",
+								ValueExpression: "string(claims.turtle.foo.bar.baz.other1.bit3)",
+							},
+							{
+								Key:             "bio.snorlax.org/3",
+								ValueExpression: "[string(claims.turtle.foo.bar.baz.other1.bit1)] + ['a', 'b', 'c']",
+							},
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username != "bad"`,
+						},
+						{
+							Expression: `user.uid == "007"`,
+						},
+						{
+							Expression: `"claus" in user.groups`,
+						},
+						{
+							Expression: `user.extra.bio__dot__snorlax__dot__org__slash__3.size() == 4`,
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"exp": %d,
+				"turtle": {
+					"foo": {
+						"1": "a",
+						"2": "b",
+						"other1": {
+							"bit1": true,
+							"bit2": false,
+							"bit3": 1
+						},
+						"bar": {
+							"3": "c",
+							"4": "d",
+							"other1": {
+								"bit1": true,
+								"bit2": false,
+								"bit3": 1
+							},
+							"baz": {
+								"5": "e",
+								"6": "f",
+								"panda": [
+									"snorlax",
+									"007",
+									"santa",
+									"claus"
+								],
+								"other1": {
+									"bit1": true,
+									"bit2": false,
+									"bit3": 1
+								}
+							}
+						}
+					}
+				}
+}`, valid.Unix()),
+			wantErr: "oidc: error evaluating group claim expression: expression 'claims.turtle.foo.bar.baz.a.b.c.d' resulted in error: no such key: a",
+		},
+		{
+			name: "claim mappings with expressions and deeply nested claim - success - service account payload",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://kubernetes.default.svc",
+						Audiences: []string{"https://kubernetes.default.svc"},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: `claims.sub == ("system:serviceaccount:" + claims.kubernetes__dot__io.namespace + ":" + claims.kubernetes__dot__io.serviceaccount.name)`,
+						},
+						{
+							Expression: `has(claims.kubernetes__dot__io.pod.uid)`, // has requires field based access
+						},
+						{
+							Expression: `claims["kubernetes.io"]["node"]["uid"] != ""`, // the [ based syntax is preferred and is easier to read
+						},
+						{
+							Expression: `claims[?"kubernetes.io"]["node"]["ip"].orValue(true)`, // optionals can be used even when has() cannot
+						},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: `"system:serviceaccount:" + claims.kubernetes__dot__io.namespace + ":" + claims.kubernetes__dot__io.serviceaccount.name`,
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.kubernetes__dot__io.serviceaccount.uid",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: `[ "system:serviceaccounts", "system:serviceaccounts:" + claims.kubernetes__dot__io.namespace ]`,
+						},
+						Extra: []apiserver.ExtraMapping{ // use x-kubernetes.io since validation prevents the use of kubernetes.io
+							{
+								Key:             "authentication.x-kubernetes.io/pod-name",
+								ValueExpression: "claims.kubernetes__dot__io.pod.name",
+							},
+							{
+								Key:             "authentication.x-kubernetes.io/pod-uid",
+								ValueExpression: "claims.kubernetes__dot__io.pod.uid",
+							},
+							{
+								Key:             "authentication.x-kubernetes.io/node-name",
+								ValueExpression: "claims.kubernetes__dot__io.node.name",
+							},
+							{
+								Key:             "authentication.x-kubernetes.io/node-uid",
+								ValueExpression: "claims.kubernetes__dot__io.node.uid",
+							},
+							{
+								Key:             "authentication.x-kubernetes.io/credential-id",
+								ValueExpression: `"JTI=" + claims.jti`,
+							},
+							{
+								Key:             "test.x-kubernetes.io/warnafter",
+								ValueExpression: "string(int(claims.kubernetes__dot__io.warnafter))",
+							},
+							{
+								Key:             "test.x-kubernetes.io/namespace",
+								ValueExpression: "claims.kubernetes__dot__io.namespace",
+							},
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username.startsWith("system:serviceaccount:" + user.extra["test.x-kubernetes.io/namespace"][0] + ":")`, // the [ based syntax is preferred and is easier to read
+						},
+						{
+							Expression: `user.uid != ""`,
+						},
+						{
+							Expression: `"system:serviceaccounts" in user.groups && user.groups.size() == 2`,
+						},
+						{
+							Expression: `user.extra.authentication__dot__x__dash__kubernetes__dot__io__slash__node__dash__name[0] == "127.0.0.1"`,
+						},
+						{
+							Expression: `user.extra.authentication__dot__x__dash__kubernetes__dot__io__slash__credential__dash__id[0] == user.extra.authentication__dot__kubernetes__dot__io__slash__credential__dash__id[0]`,
+						},
+						{
+							Expression: `user.extra["test.x-kubernetes.io/warnafter"][0] == "1700081020"`,
+						},
+						{
+							Expression: `has(user.extra.authentication__dot__x__dash__kubernetes__dot__io__slash__pod__dash__name)`, // has requires field based access
+						},
+						{
+							Expression: `user.extra[?"test.x-kubernetes.io/missing"].orValue([]) == []`, // optionals can be used even when has() cannot
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"aud": [
+					"https://kubernetes.default.svc"
+				],
+				"exp": %d,
+				"iat": 1700077413,
+				"iss": "https://kubernetes.default.svc",
+				"jti": "ea28ed49-2e11-4280-9ec5-bc3d1d84661a",
+				"kubernetes.io": {
+					"namespace": "kube-system",
+					"node": {
+						"name": "127.0.0.1",
+						"uid": "58456cb0-dd00-45ed-b797-5578fdceaced"
+					},
+					"pod": {
+						"name": "coredns-69cbfb9798-jv9gn",
+						"uid": "778a530c-b3f4-47c0-9cd5-ab018fb64f33"
+					},
+					"serviceaccount": {
+						"name": "coredns",
+						"uid": "a087d5a0-e1dd-43ec-93ac-f13d89cd13af"
+					},
+					"warnafter": 1700081020
+				},
+				"nbf": %d,
+				"sub": "system:serviceaccount:kube-system:coredns"
+}`, valid.Unix(), now.Unix()),
+			want: &user.DefaultInfo{
+				Name: "system:serviceaccount:kube-system:coredns",
+				UID:  "a087d5a0-e1dd-43ec-93ac-f13d89cd13af",
+				Groups: []string{
+					"system:serviceaccounts", "system:serviceaccounts:kube-system",
+				},
+				Extra: map[string][]string{
+					"authentication.x-kubernetes.io/pod-name": {
+						"coredns-69cbfb9798-jv9gn",
+					},
+					"authentication.x-kubernetes.io/pod-uid": {
+						"778a530c-b3f4-47c0-9cd5-ab018fb64f33",
+					},
+					"authentication.x-kubernetes.io/node-name": {
+						"127.0.0.1",
+					},
+					"authentication.x-kubernetes.io/node-uid": {
+						"58456cb0-dd00-45ed-b797-5578fdceaced",
+					},
+					"authentication.kubernetes.io/credential-id": {
+						"JTI=ea28ed49-2e11-4280-9ec5-bc3d1d84661a",
+					},
+					"authentication.x-kubernetes.io/credential-id": {
+						"JTI=ea28ed49-2e11-4280-9ec5-bc3d1d84661a",
+					},
+					"test.x-kubernetes.io/warnafter": {
+						"1700081020",
+					},
+					"test.x-kubernetes.io/namespace": {
+						"kube-system",
+					},
+				},
+			},
+		},
+		{
+			name: "claim mappings with expressions and deeply nested claim - success - claims payload with deep use of __dot__",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{ // has requires field based access
+						{
+							Expression: `has(claims.turtle.foo.bar.baz.username__dot__io)`,
+						},
+						{
+							Expression: `has(claims.turtle.foo.bar.baz.link[0].uid__dot__io)`,
+						},
+						{
+							Expression: `has(claims.data[0].groups__dot__io)`,
+						},
+						{
+							Expression: `claims.turtle.foo.bar.bee.username__dot__io.company__dot__io == "fun-corp"`,
+						},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: `claims.turtle.foo.bar.baz.username__dot__io`,
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: `claims.turtle.foo.bar.baz.link[0].uid__dot__io`,
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: `claims.data[0].groups__dot__io`,
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"exp": %d,
+				"data": [
+					{
+						"groups.io": "gen1"
+					}
+				],
+				"turtle": {
+					"foo": {
+						"1": "a",
+						"2": "b",
+						"other1": {
+							"bit1": true,
+							"bit2": false,
+							"bit3": 1
+						},
+						"bar": {
+							"3": "c",
+							"4": "d",
+							"other1": {
+								"bit1": true,
+								"bit2": false,
+								"bit3": 1
+							},
+							"bee": {
+								"username.io": {
+									"company.io": "fun-corp"
+								}
+							},
+							"baz": {
+								"5": "e",
+								"6": "f",
+								"panda": [
+									"snorlax",
+									"007",
+									"santa",
+									"claus"
+								],
+								"other1": {
+									"bit1": true,
+									"bit2": false,
+									"bit3": 1
+								},
+								"username.io": "snorlax.io",
+								"link": [
+									{
+										"uid.io": "143"
+									}
+								]
+							}
+						}
+					}
+				}
+}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name:   "snorlax.io",
+				UID:    "143",
+				Groups: []string{"gen1"},
+			},
+		},
+		{
 			name: "groups claim mapping with expression",
 			options: Options{
 				JWTAuthenticator: apiserver.JWTAuthenticator{
@@ -2517,7 +3130,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("oidc:"),
+							Prefix: ptr.To("oidc:"),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Expression: `(claims.roles.split(",") + claims.other_roles.split(",")).map(role, "groups:" + role)`,
@@ -2880,6 +3493,378 @@ func TestToken(t *testing.T) {
 			wantInitErr: `issuer.url: Invalid value: "https://auth.example.com": URL must not overlap with disallowed issuers: [https://auth.example.com]`,
 		},
 		{
+			name: "invalid egress type",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "etcd",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					return nil, fmt.Errorf("should not be called")
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `issuer.egressSelectorType: Invalid value: "etcd": egress selector must be either controlplane or cluster`,
+		},
+		{
+			name: "valid egress type with error",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "cluster",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					if networkContext.EgressSelectionName != egressselector.Cluster {
+						return nil, fmt.Errorf("unexpected egress type %q", networkContext.EgressSelectionName)
+					}
+					return nil, fmt.Errorf("always fail, saw type %q", networkContext.EgressSelectionName)
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `oidc: egress lookup for "cluster" failed: always fail, saw type "cluster"`,
+		},
+		{
+			name: "valid egress type with error - again",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "controlplane",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					if networkContext.EgressSelectionName != egressselector.ControlPlane {
+						return nil, fmt.Errorf("unexpected egress type %q", networkContext.EgressSelectionName)
+					}
+					return nil, fmt.Errorf("always fail, saw type %q", networkContext.EgressSelectionName)
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `oidc: egress lookup for "controlplane" failed: always fail, saw type "controlplane"`,
+		},
+		{
+			name: "valid egress type with no egress config",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "controlplane",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: nil,
+				now:          func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `oidc: egress lookup required with egress selector type "controlplane"`,
+		},
+		{
+			name: "valid egress type with no egress config for the given type",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "controlplane",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					return nil, nil
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `oidc: egress lookup for "controlplane" is not configured`,
+		},
+		{
+			name: "valid egress type with broken dialer",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "controlplane",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					return func(ctx context.Context, net, addr string) (net.Conn, error) {
+						return nil, fmt.Errorf("broken dialer")
+					}, nil
+				},
+				now: func() time.Time { return now },
+			},
+			fetchKeysFromRemote: true,
+			wantHealthErrPrefix: `oidc: authenticator for issuer "https://auth.example.com" is not healthy: Get "https://auth.example.com/.well-known/openid-configuration": broken dialer`,
+		},
+		{
+			name: "valid egress type with working dialer",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						DiscoveryURL:       "{{.URL}}/.well-known/openid-configuration",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "cluster",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: ptr.To(""),
+						},
+					},
+				},
+				EgressLookup: func() egressselector.Lookup {
+					var called atomic.Bool
+					t.Cleanup(func() {
+						if !called.Load() {
+							t.Errorf("egress lookup was not called")
+						}
+					})
+					return func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+						return func(ctx context.Context, network, address string) (net.Conn, error) {
+							called.Store(true)
+							return (&net.Dialer{}).DialContext(ctx, network, address)
+						}, nil
+					}
+				}(),
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
 			name: "extra claim mapping, empty string value for key",
 			options: Options{
 				JWTAuthenticator: apiserver.JWTAuthenticator{
@@ -3098,7 +4083,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Expression: "claims.groups",
@@ -3183,7 +4168,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -3220,7 +4205,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -3257,7 +4242,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -3294,7 +4279,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -3331,7 +4316,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -3356,12 +4341,199 @@ func TestToken(t *testing.T) {
 				Name: "jane",
 			},
 		},
+		{
+			name: "credential id set in extra even when no extra claim mappings are defined",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d,
+				"jti": "1234"
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+				Extra: map[string][]string{
+					user.CredentialIDKey: {"JTI=1234"},
+				},
+			},
+		},
+		{
+			name: "credential id set in extra when extra claim mappings are defined",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d,
+				"jti": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+				Extra: map[string][]string{
+					user.CredentialIDKey: {"JTI=1234"},
+					"example.org/foo":    {"bar"},
+					"example.org/bar":    {"baz", "qux"},
+				},
+			},
+		},
+		{
+			name: "non-string jti claim does not set credential id in extra or error",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d,
+				"jti": 1234
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "missing jti claim does not set credential id in extra or error",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "using credential id and user validation rule to simulate revocation",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							// While full token revocation is not supported, it is possible to approximate revocation by writing user info validation rules
+							// based on a unique identifier in the token, such as the jti claim (if present).
+							Expression: `!(user.extra[?'authentication.kubernetes.io/credential-id'][0].orValue('') in ["JTI=ea28ed49-2e11-4280-9ec5-bc3d1d84661a"])`,
+							Message:    "credential is revoked",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d,
+				"jti": "ea28ed49-2e11-4280-9ec5-bc3d1d84661a"
+			}`, valid.Unix()),
+			wantErr: `oidc: error evaluating user info validation rule: validation expression '!(user.extra[?'authentication.kubernetes.io/credential-id'][0].orValue('') in ["JTI=ea28ed49-2e11-4280-9ec5-bc3d1d84661a"])' failed: credential is revoked`,
+		},
 	}
 
 	var successTestCount, failureTestCount int
 	for _, test := range tests {
-		t.Run(test.name, test.run)
-		if test.wantSkip || len(test.wantInitErr) > 0 || len(test.wantHealthErrPrefix) > 0 {
+		var called bool
+		t.Run(test.name, func(t *testing.T) {
+			called = true
+			test.run(t)
+		})
+		if test.wantSkip || len(test.wantInitErr) > 0 || len(test.wantHealthErrPrefix) > 0 || !called {
 			continue
 		}
 		// check metrics for success and failure
@@ -3470,6 +4642,417 @@ func TestUnmarshalClaim(t *testing.T) {
 				t.Errorf("wanted=%#v, got=%#v", test.want, got)
 			}
 		})
+	}
+}
+
+func TestJWKSMetricsKeySetError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationJWKSMetrics, true)
+
+	synchronizeTokenIDVerifierForTest = true
+	signingKey := loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256)
+	pubKeys := []*jose.JSONWebKey{
+		loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+	}
+	signer, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+		Key:       signingKey,
+	}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		openIDConfig string
+	}{
+		{
+			name: "invalid keyset",
+			openIDConfig: `{
+				"issuer": "{{.URL}}",
+				"jwks_uri": "{{.URL}}/.testing/invalidkeys"
+			}`,
+		},
+		{
+			name: "bad status code",
+			openIDConfig: `{
+				"issuer": "{{.URL}}",
+				"jwks_uri": "{{.URL}}/.testing/keys/badstatus"
+			}`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ResetMetrics()
+
+			ts := newClaimServer(t, toKeySet(pubKeys), signer, nil, &test.openIDConfig)
+			defer ts.Close()
+
+			v := struct {
+				URL string
+			}{
+				URL: ts.URL,
+			}
+			test.openIDConfig = replace(test.openIDConfig, &v)
+
+			opts := Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       ts.URL,
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: ptr.To(""),
+						},
+					},
+				},
+				now:         func() time.Time { return now },
+				APIServerID: "testAPIServerID",
+			}
+
+			// Make the certificate of the helper server available to the authenticator
+			caBundle := pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: ts.Certificate().Raw,
+			})
+			caContent, err := dynamiccertificates.NewStaticCAContent("oidc-authenticator", caBundle)
+			if err != nil {
+				t.Fatalf("initialize ca: %v", err)
+			}
+			opts.CAContentProvider = caContent
+
+			ctx := testContext(t)
+			// Initialize the authenticator.
+			a, err := New(ctx, opts)
+			if err != nil {
+				t.Fatalf("initialize authenticator: %v", err)
+			}
+
+			claims := fmt.Sprintf(`{
+"iss": "%s",
+"aud": "my-client",
+"username": "jane",
+"exp": %d
+}`, ts.URL, valid.Unix())
+
+			jws, err := signer.Sign([]byte(claims))
+			if err != nil {
+				t.Fatalf("sign claims: %v", err)
+			}
+			token, err := jws.CompactSerialize()
+			if err != nil {
+				t.Fatalf("serialize token: %v", err)
+			}
+
+			ia, ok := a.(*instrumentedAuthenticator)
+			if !ok {
+				t.Fatalf("expected authenticator to be instrumented")
+			}
+			authenticator, ok := ia.delegate.(*jwtAuthenticator)
+			if !ok {
+				t.Fatalf("expected delegate to be Authenticator")
+			}
+			// wait for the authenticator to be initialized
+			err = wait.PollUntilContextCancel(ctx, time.Millisecond, true, func(context.Context) (bool, error) {
+				if v, _ := authenticator.idTokenVerifier(); v == nil {
+					return false, nil
+				}
+				return true, nil
+			})
+			if err != nil {
+				t.Fatalf("failed to initialize the authenticator: %v", err)
+			}
+
+			if _, _, err = a.AuthenticateToken(ctx, token); err == nil {
+				t.Fatalf("expected error but got nil")
+			}
+
+			metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+			if err != nil {
+				t.Fatalf("failed to gather metrics: %v", err)
+			}
+
+			jwtIssuerHash := getHash(ts.URL)
+			var timestamp float64
+			for _, family := range metricFamilies {
+				if family.GetName() != "apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds" {
+					continue
+				}
+
+				labelFilter := map[string]string{
+					"apiserver_id_hash": "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",
+					"jwt_issuer_hash":   jwtIssuerHash,
+					"result":            "failure",
+				}
+				if !testutil.LabelsMatch(family.Metric[0], labelFilter) {
+					t.Fatalf("unexpected metric: %v", family.Metric[0])
+				}
+
+				timestamp = *family.Metric[0].Gauge.Value
+				break
+			}
+			if timestamp == 0 {
+				t.Fatalf("failed to get the timestamp")
+			}
+		})
+	}
+}
+
+func TestJWKSMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationJWKSMetrics, true)
+	ResetMetrics()
+
+	synchronizeTokenIDVerifierForTest = true
+	signingKey := loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256)
+	pubKeys := []*jose.JSONWebKey{
+		loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+	}
+	signer, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+		Key:       signingKey,
+	}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+	openIDConfig := `{
+		"issuer": "{{.URL}}",
+		"jwks_uri": "{{.URL}}/.testing/keys"
+	}`
+
+	ts := newClaimServer(t, toKeySet(pubKeys), signer, nil, &openIDConfig)
+	defer ts.Close()
+
+	v := struct {
+		URL string
+	}{
+		URL: ts.URL,
+	}
+	openIDConfig = replace(openIDConfig, &v)
+
+	opts := Options{
+		JWTAuthenticator: apiserver.JWTAuthenticator{
+			Issuer: apiserver.Issuer{
+				URL:       ts.URL,
+				Audiences: []string{"my-client"},
+			},
+			ClaimMappings: apiserver.ClaimMappings{
+				Username: apiserver.PrefixedClaimOrExpression{
+					Claim:  "username",
+					Prefix: ptr.To(""),
+				},
+			},
+		},
+		now:         func() time.Time { return now },
+		APIServerID: "testAPIServerID",
+	}
+
+	// Make the certificate of the helper server available to the authenticator
+	caBundle := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: ts.Certificate().Raw,
+	})
+	caContent, err := dynamiccertificates.NewStaticCAContent("oidc-authenticator", caBundle)
+	if err != nil {
+		t.Fatalf("initialize ca: %v", err)
+	}
+	opts.CAContentProvider = caContent
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Initialize the authenticator.
+	a, err := New(ctx, opts)
+	if err != nil {
+		t.Fatalf("initialize authenticator: %v", err)
+	}
+
+	claims := fmt.Sprintf(`{
+"iss": "%s",
+"aud": "my-client",
+"username": "jane",
+"exp": %d
+}`, ts.URL, valid.Unix())
+
+	jws, err := signer.Sign([]byte(claims))
+	if err != nil {
+		t.Fatalf("sign claims: %v", err)
+	}
+	token, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize token: %v", err)
+	}
+
+	ia, ok := a.(*instrumentedAuthenticator)
+	if !ok {
+		t.Fatalf("expected authenticator to be instrumented")
+	}
+	authenticator, ok := ia.delegate.(*jwtAuthenticator)
+	if !ok {
+		t.Fatalf("expected delegate to be Authenticator")
+	}
+	// wait for the authenticator to be initialized
+	err = wait.PollUntilContextCancel(ctx, time.Millisecond, true, func(context.Context) (bool, error) {
+		if v, _ := authenticator.idTokenVerifier(); v == nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to initialize the authenticator: %v", err)
+	}
+
+	jwtIssuerHash := getHash(ts.URL)
+	// 1. Remote JWKS fetch success the first time we fetch the keys.
+	if _, _, err = a.AuthenticateToken(ctx, token); err != nil {
+		t.Fatalf("authenticate token: %v", err)
+	}
+	checkJWKSMetrics(t, jwtIssuerHash, "sha256:6c22a3ad4bfe350786cb03d06c6e6d40a6d642d168935b88f1e72c407d969c83")
+
+	// 2. Rotate the keys and update the server.
+	signingKey = loadRSAPrivKey(t, "testdata/rsa_2.pem", jose.RS256)
+	pubKeys = []*jose.JSONWebKey{
+		loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+		loadRSAKey(t, "testdata/rsa_2.pem", jose.RS256),
+	}
+	signer, err = jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+		Key:       signingKey,
+	}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+	ts.setKeys(toKeySet(pubKeys))
+	// Sign and serialize the claims in a JWT with the new key.
+	// This should trigger a new JWKS fetch as kid not found in the cache.
+	jws, err = signer.Sign([]byte(claims))
+	if err != nil {
+		t.Fatalf("sign claims: %v", err)
+	}
+	token, err = jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize token: %v", err)
+	}
+	if _, _, err = a.AuthenticateToken(ctx, token); err != nil {
+		t.Fatalf("authenticate token: %v", err)
+	}
+	checkJWKSMetrics(t, jwtIssuerHash, "sha256:42444728eaa3a55f7a0192d60cfea88ff5a69ecb7bf9ef0d2ffa3f9db9ceff41")
+
+	// 3. Cancel the context and verify metrics are NOT updated after cancellation.
+	// Capture current metrics before cancellation.
+	metricsBeforeCancel := captureTimestampMetric(t, jwtIssuerHash, "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37")
+
+	// Cancel the authenticator's lifecycle context
+	cancel()
+
+	// Rotate keys again to trigger another JWKS fetch attempt.
+	// This should fail because the context is cancelled, but more importantly,
+	// even if the RoundTrip happens, metrics should NOT be recorded.
+	signingKey = loadRSAPrivKey(t, "testdata/rsa_3.pem", jose.RS256)
+	pubKeys = []*jose.JSONWebKey{
+		loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+		loadRSAKey(t, "testdata/rsa_2.pem", jose.RS256),
+		loadRSAKey(t, "testdata/rsa_3.pem", jose.RS256),
+	}
+	signer, err = jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+		Key:       signingKey,
+	}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+	ts.setKeys(toKeySet(pubKeys))
+
+	// Try to authenticate with a new token (this will likely fail due to cancelled context,
+	// but we're testing that even if any HTTP request happens, metrics won't be updated)
+	jws, err = signer.Sign([]byte(claims))
+	if err != nil {
+		t.Fatalf("sign claims: %v", err)
+	}
+	token, err = jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize token: %v", err)
+	}
+	// Authentication will likely fail with cancelled context, which is expected
+	_, _, err = a.AuthenticateToken(context.Background(), token)
+	if err == nil || !strings.Contains(err.Error(), "context canceled") {
+		t.Fatalf("expected context canceled error, got: %v", err)
+	}
+
+	// Verify metrics did NOT change after context cancellation
+	metricsAfterCancel := captureTimestampMetric(t, jwtIssuerHash, "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37")
+	if metricsAfterCancel != metricsBeforeCancel {
+		t.Errorf("metrics changed after context cancellation: before=%v, after=%v (should remain unchanged)", metricsBeforeCancel, metricsAfterCancel)
+	}
+}
+
+func captureTimestampMetric(t *testing.T, jwtIssuerHash, apiServerIDHash string) float64 {
+	t.Helper()
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	for _, family := range metricFamilies {
+		if family.GetName() != "apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds" {
+			continue
+		}
+
+		for _, metric := range family.Metric {
+			labelFilter := map[string]string{
+				"apiserver_id_hash": apiServerIDHash,
+				"jwt_issuer_hash":   jwtIssuerHash,
+				"result":            "success",
+			}
+			if testutil.LabelsMatch(metric, labelFilter) {
+				return *metric.Gauge.Value
+			}
+		}
+	}
+
+	return 0
+}
+
+func checkJWKSMetrics(t *testing.T, jwtIssuerHash string, expectedJWKSHash string) {
+	t.Helper()
+
+	expectedMetricValue := fmt.Sprintf(`
+       # HELP apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info [ALPHA] Information about the last JWKS fetched by the JWT authenticator with hash as label, split by api server identity and jwt issuer.
+	   # TYPE apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info gauge
+	   apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="%s",jwt_issuer_hash="%s"} 1
+	`, expectedJWKSHash, jwtIssuerHash)
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedMetricValue), "apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info"); err != nil {
+		t.Fatalf("unexpected metrics:\n%s", err)
+	}
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	var ts float64
+	for _, family := range metricFamilies {
+		if family.GetName() != "apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds" {
+			continue
+		}
+
+		labelFilter := map[string]string{
+			"apiserver_id_hash": "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",
+			"jwt_issuer_hash":   jwtIssuerHash,
+			"result":            "success",
+		}
+		if !testutil.LabelsMatch(family.Metric[0], labelFilter) {
+			t.Fatalf("unexpected metric: %v", family.Metric[0])
+		}
+
+		ts = *family.Metric[0].Gauge.Value
+		break
+	}
+	if ts == 0 {
+		t.Fatalf("failed to get the timestamp")
 	}
 }
 

@@ -28,7 +28,7 @@ import (
 // utils.go contains functions used across test suites.
 
 const (
-	cniVersion       = "v1.5.0"
+	cniVersion       = "v1.9.0"
 	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"
 
@@ -53,14 +53,32 @@ const cniConfig = `{
 const credentialGCPProviderConfig = `kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1
 providers:
-  - name: gcp-credential-provider
-    apiVersion: credentialprovider.kubelet.k8s.io/v1
-    matchImages:
-    - "gcr.io"
-    - "*.gcr.io"
-    - "container.cloud.google.com"
-    - "*.pkg.dev"
-    defaultCacheDuration: 1m`
+ - name: gcp-credential-provider
+   apiVersion: credentialprovider.kubelet.k8s.io/v1
+   matchImages:
+   - "gcr.io"
+   - "*.gcr.io"
+   - "container.cloud.google.com"
+   - "*.pkg.dev"
+   defaultCacheDuration: 1m
+ - name: gcp-credential-provider-with-sa
+   apiVersion: credentialprovider.kubelet.k8s.io/v1
+   matchImages:
+   - "gcr.io"
+   - "*.gcr.io"
+   - "container.cloud.google.com"
+   - "*.pkg.dev"
+   defaultCacheDuration: 1m
+   tokenAttributes:
+     serviceAccountTokenAudience: test-audience
+     cacheType: Token
+     requireServiceAccount: true
+     requiredServiceAccountAnnotationKeys:
+     - "domain.io/identity-id"
+     - "domain.io/identity-type"
+   env:
+   - name: PLUGIN_MODE
+     value: "serviceaccount"`
 
 const credentialAWSProviderConfig = `kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1
@@ -80,7 +98,7 @@ func getCNIURL() string {
 	if builder.IsTargetArchArm64() {
 		cniArch = "arm64"
 	}
-	cniURL := fmt.Sprintf("https://storage.googleapis.com/k8s-artifacts-cni/release/%s/cni-plugins-linux-%s-%s.tgz", cniVersion, cniArch, cniVersion)
+	cniURL := fmt.Sprintf("https://github.com/containernetworking/plugins/releases/download/%s/cni-plugins-linux-%s-%s.tgz", cniVersion, cniArch, cniVersion)
 	return cniURL
 
 }

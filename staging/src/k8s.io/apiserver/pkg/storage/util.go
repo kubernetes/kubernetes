@@ -17,16 +17,13 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"fmt"
-	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/validation/path"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -41,27 +38,33 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 }
 
 func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
+	if !strings.HasSuffix(prefix, "/") {
+		return "", fmt.Errorf("prefix should have '/' suffix")
+	}
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
 	}
 	name := meta.GetName()
-	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := content.IsPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
-	return prefix + "/" + meta.GetNamespace() + "/" + name, nil
+	return prefix + meta.GetNamespace() + "/" + name, nil
 }
 
 func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
+	if !strings.HasSuffix(prefix, "/") {
+		return "", fmt.Errorf("prefix should have '/' suffix")
+	}
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
 	}
 	name := meta.GetName()
-	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := content.IsPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
-	return prefix + "/" + name, nil
+	return prefix + name, nil
 }
 
 // HighWaterMark is a thread-safe object for tracking the maximum value seen
@@ -79,45 +82,6 @@ func (hwm *HighWaterMark) Update(current int64) bool {
 			return true
 		}
 	}
-}
-
-// GetCurrentResourceVersionFromStorage gets the current resource version from the underlying storage engine.
-// This method issues an empty list request and reads only the ResourceVersion from the object metadata
-func GetCurrentResourceVersionFromStorage(ctx context.Context, storage Interface, newListFunc func() runtime.Object, resourcePrefix, objectType string) (uint64, error) {
-	if storage == nil {
-		return 0, fmt.Errorf("storage wasn't provided for %s", objectType)
-	}
-	if newListFunc == nil {
-		return 0, fmt.Errorf("newListFunction wasn't provided for %s", objectType)
-	}
-	emptyList := newListFunc()
-	pred := SelectionPredicate{
-		Label: labels.Everything(),
-		Field: fields.Everything(),
-		Limit: 1, // just in case we actually hit something
-	}
-
-	err := storage.GetList(ctx, resourcePrefix, ListOptions{Predicate: pred}, emptyList)
-	if err != nil {
-		return 0, err
-	}
-	emptyListAccessor, err := meta.ListAccessor(emptyList)
-	if err != nil {
-		return 0, err
-	}
-	if emptyListAccessor == nil {
-		return 0, fmt.Errorf("unable to extract a list accessor from %T", emptyList)
-	}
-
-	currentResourceVersion, err := strconv.Atoi(emptyListAccessor.GetResourceVersion())
-	if err != nil {
-		return 0, err
-	}
-
-	if currentResourceVersion == 0 {
-		return 0, fmt.Errorf("the current resource version must be greater than 0")
-	}
-	return uint64(currentResourceVersion), nil
 }
 
 // AnnotateInitialEventsEndBookmark adds a special annotation to the given object

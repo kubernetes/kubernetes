@@ -1,12 +1,12 @@
 ---
 dir: .
-filename: "mock_{{.InterfaceName | snakecase}}_test.go"
-boilerplate-file: ../../../hack/boilerplate/boilerplate.generatego.txt
-inpackage: true
-with-expecter: true
+template: testify
+template-data:
+  boilerplate-file: ../../../hack/boilerplate/boilerplate.generatego.txt
+  unroll-variadic: true
 packages:
   k8s.io/kubernetes/pkg/kubelet/eviction:
     interfaces:
-      CgroupNotifier:
-      NotifierFactory:
-      ThresholdNotifier:
+      CgroupNotifier: {}
+      NotifierFactory: {}
+      ThresholdNotifier: {}

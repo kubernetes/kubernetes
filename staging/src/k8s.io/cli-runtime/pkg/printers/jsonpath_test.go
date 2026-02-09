@@ -46,7 +46,7 @@ func TestPrinters(t *testing.T) {
 	}
 
 	// Set of strings representing objects that should produce an error.
-	expectedErrors := sets.NewString("emptyPodList", "nonEmptyPodList", "endpoints")
+	expectedErrors := sets.New[string]("emptyPodList", "nonEmptyPodList", "endpoints")
 
 	for oName, obj := range objects {
 		b := &bytes.Buffer{}

@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"k8s.io/klog/v2"
 
 	"github.com/onsi/ginkgo/v2"
 
@@ -36,7 +37,7 @@ var _ = SIGDescribe("PodOSRejection", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("pod-os-rejection")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("Kubelet", func() {
-		ginkgo.It("should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
+		ginkgo.It("[LinuxOnly] should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
 			linuxNode, err := findLinuxNode(ctx, f)
 			framework.ExpectNoError(err)
 			pod := &v1.Pod{
@@ -67,6 +68,7 @@ var _ = SIGDescribe("PodOSRejection", framework.WithNodeConformance(), func() {
 
 // findLinuxNode finds a Linux node that is Ready and Schedulable
 func findLinuxNode(ctx context.Context, f *framework.Framework) (v1.Node, error) {
+	logger := klog.FromContext(ctx)
 	selector := labels.Set{"kubernetes.io/os": "linux"}.AsSelector()
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 
@@ -77,7 +79,7 @@ func findLinuxNode(ctx context.Context, f *framework.Framework) (v1.Node, error)
 	var targetNode v1.Node
 	foundNode := false
 	for _, n := range nodeList.Items {
-		if e2enode.IsNodeReady(&n) && e2enode.IsNodeSchedulable(&n) {
+		if e2enode.IsNodeReady(logger, &n) && e2enode.IsNodeSchedulable(logger, &n) {
 			targetNode = n
 			foundNode = true
 			break

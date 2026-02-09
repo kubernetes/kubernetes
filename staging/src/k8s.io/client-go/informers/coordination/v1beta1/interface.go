@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// Leases returns a LeaseInformer.
 	Leases() LeaseInformer
+	// LeaseCandidates returns a LeaseCandidateInformer.
+	LeaseCandidates() LeaseCandidateInformer
 }
 
 type version struct {
@@ -42,4 +44,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // Leases returns a LeaseInformer.
 func (v *version) Leases() LeaseInformer {
 	return &leaseInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// LeaseCandidates returns a LeaseCandidateInformer.
+func (v *version) LeaseCandidates() LeaseCandidateInformer {
+	return &leaseCandidateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

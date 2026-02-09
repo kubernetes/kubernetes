@@ -23,11 +23,17 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+)
+
+const (
+	testNamespace = "not-the-default"
+	testFinalizer = "noxu.example.com/finalizer"
 )
 
 func TestFinalization(t *testing.T) {
@@ -39,12 +45,12 @@ func TestFinalization(t *testing.T) {
 	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
-	ns := "not-the-default"
+	ns := testNamespace
 	name := "foo123"
 	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	instance := fixtures.NewNoxuInstance(ns, name)
-	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
+	instance.SetFinalizers([]string{testFinalizer})
 	createdNoxuInstance, err := instantiateCustomResource(t, instance, noxuResourceClient, noxuDefinition)
 	require.NoError(t, err)
 
@@ -104,12 +110,12 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a CR with a finalizer.
-	ns := "not-the-default"
+	ns := testNamespace
 	name := "foo123"
 	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	instance := fixtures.NewNoxuInstance(ns, name)
-	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
+	instance.SetFinalizers([]string{testFinalizer})
 	createdNoxuInstance, err := instantiateCustomResource(t, instance, noxuResourceClient, noxuDefinition)
 	require.NoError(t, err)
 
@@ -162,4 +168,44 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	if !errors.IsNotFound(err) {
 		t.Fatalf("unable to delete crd: %v", err)
 	}
+}
+
+func TestApplyCRDuringCRDFinalization(t *testing.T) {
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	require.NoError(t, err)
+	defer tearDown()
+
+	// Create a CRD with a finalizer which will stall deletion
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	noxuDefinition.SetFinalizers([]string{testFinalizer})
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	require.NoError(t, err)
+
+	// Delete the CRD. Since it has a finalizer it will be stuck in terminating state
+	err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(t.Context(), noxuDefinition.Name, metav1.DeleteOptions{})
+	require.NoError(t, err)
+
+	// Wait for the CRD to have the Terminating condition set to True.
+	// The handler checks IsCRDConditionTrue(crd, apiextensionsv1.Terminating) to block
+	// CR creation, and this condition is set asynchronously by the CRD finalizer controller
+	// after it observes the DeletionTimestamp. Without this wait, the Apply could succeed
+	// if it races ahead of the controller setting the condition.
+	err = wait.PollUntilContextTimeout(t.Context(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, noxuDefinition.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating), nil
+	})
+	require.NoError(t, err, "timed out waiting for CRD Terminating condition to be set")
+
+	// Try to create a CR using SSA. This should fail due to the CRD validation
+	ns := testNamespace
+	name := "foo123"
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+
+	instance := fixtures.NewNoxuInstance(ns, name)
+	_, err = noxuResourceClient.Apply(t.Context(), name, instance, metav1.ApplyOptions{DryRun: []string{"All"}, FieldManager: "manager"})
+	wantErr := `create not allowed while custom resource definition is terminating`
+	require.ErrorContains(t, err, wantErr)
 }

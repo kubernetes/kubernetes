@@ -29,10 +29,15 @@ import (
 
 // RoleApplyConfiguration represents a declarative configuration of the Role type for use
 // with apply.
+//
+// Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
+// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 Role, and will no longer be served in v1.22.
 type RoleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Rules                            []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
+	// Rules holds all the PolicyRules for this Role
+	Rules []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
 }
 
 // Role constructs a declarative configuration of the Role type for use with
@@ -46,29 +51,14 @@ func Role(name, namespace string) *RoleApplyConfiguration {
 	return b
 }
 
-// ExtractRole extracts the applied configuration owned by fieldManager from
-// role. If no managedFields are found in role for fieldManager, a
-// RoleApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractRoleFrom extracts the applied configuration owned by fieldManager from
+// role for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // role must be a unmodified Role API object that was retrieved from the Kubernetes API.
-// ExtractRole provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractRoleFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractRole(role *rbacv1beta1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
-	return extractRole(role, fieldManager, "")
-}
-
-// ExtractRoleStatus is the same as ExtractRole except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractRoleStatus(role *rbacv1beta1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
-	return extractRole(role, fieldManager, "status")
-}
-
-func extractRole(role *rbacv1beta1.Role, fieldManager string, subresource string) (*RoleApplyConfiguration, error) {
+func ExtractRoleFrom(role *rbacv1beta1.Role, fieldManager string, subresource string) (*RoleApplyConfiguration, error) {
 	b := &RoleApplyConfiguration{}
 	err := managedfields.ExtractInto(role, internal.Parser().Type("io.k8s.api.rbac.v1beta1.Role"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,11 +72,27 @@ func extractRole(role *rbacv1beta1.Role, fieldManager string, subresource string
 	return b, nil
 }
 
+// ExtractRole extracts the applied configuration owned by fieldManager from
+// role. If no managedFields are found in role for fieldManager, a
+// RoleApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// role must be a unmodified Role API object that was retrieved from the Kubernetes API.
+// ExtractRole provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractRole(role *rbacv1beta1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
+	return ExtractRoleFrom(role, fieldManager, "")
+}
+
+func (b RoleApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithKind(value string) *RoleApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -94,7 +100,7 @@ func (b *RoleApplyConfiguration) WithKind(value string) *RoleApplyConfiguration 
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithAPIVersion(value string) *RoleApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -103,7 +109,7 @@ func (b *RoleApplyConfiguration) WithAPIVersion(value string) *RoleApplyConfigur
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithName(value string) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -112,7 +118,7 @@ func (b *RoleApplyConfiguration) WithName(value string) *RoleApplyConfiguration 
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithGenerateName(value string) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -121,7 +127,7 @@ func (b *RoleApplyConfiguration) WithGenerateName(value string) *RoleApplyConfig
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithNamespace(value string) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -130,7 +136,7 @@ func (b *RoleApplyConfiguration) WithNamespace(value string) *RoleApplyConfigura
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithUID(value types.UID) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -139,7 +145,7 @@ func (b *RoleApplyConfiguration) WithUID(value types.UID) *RoleApplyConfiguratio
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithResourceVersion(value string) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -148,7 +154,7 @@ func (b *RoleApplyConfiguration) WithResourceVersion(value string) *RoleApplyCon
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithGeneration(value int64) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -157,7 +163,7 @@ func (b *RoleApplyConfiguration) WithGeneration(value int64) *RoleApplyConfigura
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithCreationTimestamp(value metav1.Time) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -166,7 +172,7 @@ func (b *RoleApplyConfiguration) WithCreationTimestamp(value metav1.Time) *RoleA
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -175,7 +181,7 @@ func (b *RoleApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *RoleA
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *RoleApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -185,11 +191,11 @@ func (b *RoleApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *Ro
 // overwriting an existing map entries in Labels field with the same key.
 func (b *RoleApplyConfiguration) WithLabels(entries map[string]string) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -200,11 +206,11 @@ func (b *RoleApplyConfiguration) WithLabels(entries map[string]string) *RoleAppl
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *RoleApplyConfiguration) WithAnnotations(entries map[string]string) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -218,7 +224,7 @@ func (b *RoleApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenc
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -229,7 +235,7 @@ func (b *RoleApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenc
 func (b *RoleApplyConfiguration) WithFinalizers(values ...string) *RoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -253,8 +259,24 @@ func (b *RoleApplyConfiguration) WithRules(values ...*PolicyRuleApplyConfigurati
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *RoleApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *RoleApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *RoleApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *RoleApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

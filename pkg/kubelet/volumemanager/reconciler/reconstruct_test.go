@@ -33,6 +33,7 @@ import (
 )
 
 func TestReconstructVolumes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name                                string
 		volumePaths                         []string
@@ -102,7 +103,7 @@ func TestReconstructVolumes(t *testing.T) {
 			rcInstance, _ := rc.(*reconciler)
 
 			// Act
-			rcInstance.reconstructVolumes()
+			rcInstance.reconstructVolumes(logger)
 
 			// Assert
 			// Convert to []UniqueVolumeName
@@ -195,7 +196,7 @@ func TestCleanOrphanVolumes(t *testing.T) {
 				volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 				podName := util.GetUniquePodName(pod)
 				volumeName, err := rcInstance.desiredStateOfWorld.AddPodToVolume(
-					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* SELinuxContext */)
+					logger, podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* SELinuxContext */)
 				if err != nil {
 					t.Fatalf("Error adding volume %s to dsow: %v", volumeSpec.Name(), err)
 				}
@@ -203,7 +204,7 @@ func TestCleanOrphanVolumes(t *testing.T) {
 			}
 
 			// Act
-			rcInstance.cleanOrphanVolumes()
+			rcInstance.cleanOrphanVolumes(logger)
 
 			// Assert
 			if len(rcInstance.volumesFailedReconstruction) != 0 {
@@ -245,6 +246,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 	// Since the volume is reconstructed, it must be marked as uncertain
 	// even after a final SetUp error, see https://github.com/kubernetes/kubernetes/issues/96635
 	// and https://github.com/kubernetes/kubernetes/pull/110670.
+	logger, ctx := ktesting.NewTestContext(t)
 
 	tests := []struct {
 		name            string
@@ -304,7 +306,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 			rcInstance, _ := rc.(*reconciler)
 
 			// Act 1 - reconstruction
-			rcInstance.reconstructVolumes()
+			rcInstance.reconstructVolumes(logger)
 
 			// Assert 1 - the volume is Uncertain
 			mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
@@ -318,7 +320,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 
 			podName := util.GetUniquePodName(pod)
 			volumeName, err := rcInstance.desiredStateOfWorld.AddPodToVolume(
-				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* SELinuxContext */)
+				logger, podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* SELinuxContext */)
 			if err != nil {
 				t.Fatalf("Error adding volume %s to dsow: %v", volumeSpec.Name(), err)
 			}
@@ -333,7 +335,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 			rcInstance.volumesNeedUpdateFromNodeStatus = nil
 
 			// Act 2 - reconcile once
-			rcInstance.reconcile()
+			rcInstance.reconcile(ctx)
 
 			// Assert 2
 			// MountDevice was attempted

@@ -18,14 +18,13 @@ package test
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/pod-security-admission/api"
 )
 
 func init() {
 	appArmorFixture_1_0 := fixtureGenerator{
 		expectErrorSubstring: "forbidden AppArmor profile",
-		generatePass: func(pod *corev1.Pod) []*corev1.Pod {
+		generatePass: func(pod *corev1.Pod, _ api.Level) []*corev1.Pod {
 			pod = ensureAnnotation(pod)
 			return []*corev1.Pod{
 				// container with runtime/default annotation
@@ -55,7 +54,6 @@ func init() {
 				}),
 			}
 		},
-		failRequiresFeatures: []featuregate.Feature{"AppArmor"},
 	}
 
 	registerFixtureGenerator(

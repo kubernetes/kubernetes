@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 )
 
 func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
@@ -41,7 +43,7 @@ func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
 	}
 	indexValidator := func(_ int) bool { return true }
 
-	return newCacheInterval(startIndex, endIndex, indexer, indexValidator, locker)
+	return newCacheInterval(startIndex, endIndex, indexer, indexValidator, 0, locker)
 }
 
 func bufferFromEvents(events []*watchCacheEvent) *watchCacheIntervalBuffer {
@@ -286,7 +288,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			wc := newTestWatchCache(capacity, &cache.Indexers{})
+			wc := newTestWatchCache(capacity, DefaultEventFreshDuration, &cache.Indexers{})
 			defer wc.Stop()
 			for i := 0; i < c.eventsAddedToWatchcache; i++ {
 				wc.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
@@ -300,6 +302,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 				wc.endIndex,
 				indexerFunc,
 				wc.isIndexValidLocked,
+				wc.resourceVersion,
 				&wc.RWMutex,
 			)
 
@@ -370,7 +373,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	const numEvents = 50
-	store := cache.NewIndexer(storeElementKey, storeElementIndexers(nil))
+	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
 	events := make(map[string]*watchCacheEvent)
 	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
 
@@ -391,7 +394,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		store.Add(elem)
 	}
 
-	wci, err := newCacheIntervalFromStore(rv, store, getAttrsFunc, "", false)
+	wci, err := newCacheIntervalFromStore(rv, store, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}

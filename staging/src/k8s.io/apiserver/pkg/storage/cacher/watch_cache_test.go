@@ -24,6 +24,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,11 +35,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher/progress"
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -64,9 +70,9 @@ func makeTestPodDetails(name string, resourceVersion uint64, nodeName string, la
 	}
 }
 
-func makeTestStoreElement(pod *v1.Pod) *storeElement {
-	return &storeElement{
-		Key:    "prefix/ns/" + pod.Name,
+func makeTestStoreElement(pod *v1.Pod) *store.Element {
+	return &store.Element{
+		Key:    "/prefix/ns/" + pod.Name,
 		Object: pod,
 		Labels: labels.Set(pod.Labels),
 		Fields: fields.Set{"spec.nodeName": pod.Spec.NodeName},
@@ -109,9 +115,9 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 }
 
 // newTestWatchCache just adds a fake clock.
-func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
+func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers *cache.Indexers) *testWatchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
-		return storage.NamespaceKeyFunc("prefix", obj)
+		return storage.NamespaceKeyFunc("/prefix/", obj)
 	}
 	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
 		pod, ok := obj.(*v1.Pod)
@@ -125,9 +131,12 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	wc := &testWatchCache{}
 	wc.bookmarkRevision = make(chan int64, 1)
 	wc.stopCh = make(chan struct{})
-	pr := newConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
+	pr := progress.NewConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
 	go pr.Run(wc.stopCh)
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), schema.GroupResource{Resource: "pods"}, pr)
+	getCurrentRV := func(context.Context) (uint64, error) {
+		return wc.resourceVersion, nil
+	}
+	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity
@@ -194,15 +203,15 @@ func (w *testWatchCache) Stop() {
 }
 
 func TestWatchCacheBasic(t *testing.T) {
-	store := newTestWatchCache(2, &cache.Indexers{})
-	defer store.Stop()
+	s := newTestWatchCache(2, DefaultEventFreshDuration, &cache.Indexers{})
+	defer s.Stop()
 
 	// Test Add/Update/Delete.
 	pod1 := makeTestPod("pod", 1)
-	if err := store.Add(pod1); err != nil {
+	if err := s.Add(pod1); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if item, ok, _ := store.Get(pod1); !ok {
+	if item, ok, _ := s.Get(pod1); !ok {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 1))
@@ -211,10 +220,10 @@ func TestWatchCacheBasic(t *testing.T) {
 		}
 	}
 	pod2 := makeTestPod("pod", 2)
-	if err := store.Update(pod2); err != nil {
+	if err := s.Update(pod2); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if item, ok, _ := store.Get(pod2); !ok {
+	if item, ok, _ := s.Get(pod2); !ok {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 2))
@@ -223,26 +232,26 @@ func TestWatchCacheBasic(t *testing.T) {
 		}
 	}
 	pod3 := makeTestPod("pod", 3)
-	if err := store.Delete(pod3); err != nil {
+	if err := s.Delete(pod3); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if _, ok, _ := store.Get(pod3); ok {
+	if _, ok, _ := s.Get(pod3); ok {
 		t.Errorf("found pod")
 	}
 
 	// Test List.
-	store.Add(makeTestPod("pod1", 4))
-	store.Add(makeTestPod("pod2", 5))
-	store.Add(makeTestPod("pod3", 6))
+	s.Add(makeTestPod("pod1", 4))
+	s.Add(makeTestPod("pod2", 5))
+	s.Add(makeTestPod("pod3", 6))
 	{
-		expected := map[string]storeElement{
-			"prefix/ns/pod1": *makeTestStoreElement(makeTestPod("pod1", 4)),
-			"prefix/ns/pod2": *makeTestStoreElement(makeTestPod("pod2", 5)),
-			"prefix/ns/pod3": *makeTestStoreElement(makeTestPod("pod3", 6)),
+		expected := map[string]store.Element{
+			"/prefix/ns/pod1": *makeTestStoreElement(makeTestPod("pod1", 4)),
+			"/prefix/ns/pod2": *makeTestStoreElement(makeTestPod("pod2", 5)),
+			"/prefix/ns/pod3": *makeTestStoreElement(makeTestPod("pod3", 6)),
 		}
-		items := make(map[string]storeElement)
-		for _, item := range store.List() {
-			elem := item.(*storeElement)
+		items := make(map[string]store.Element)
+		for _, item := range s.List() {
+			elem := item.(*store.Element)
 			items[elem.Key] = *elem
 		}
 		if !apiequality.Semantic.DeepEqual(expected, items) {
@@ -251,18 +260,18 @@ func TestWatchCacheBasic(t *testing.T) {
 	}
 
 	// Test Replace.
-	store.Replace([]interface{}{
+	s.Replace([]interface{}{
 		makeTestPod("pod4", 7),
 		makeTestPod("pod5", 8),
 	}, "8")
 	{
-		expected := map[string]storeElement{
-			"prefix/ns/pod4": *makeTestStoreElement(makeTestPod("pod4", 7)),
-			"prefix/ns/pod5": *makeTestStoreElement(makeTestPod("pod5", 8)),
+		expected := map[string]store.Element{
+			"/prefix/ns/pod4": *makeTestStoreElement(makeTestPod("pod4", 7)),
+			"/prefix/ns/pod5": *makeTestStoreElement(makeTestPod("pod5", 8)),
 		}
-		items := make(map[string]storeElement)
-		for _, item := range store.List() {
-			elem := item.(*storeElement)
+		items := make(map[string]store.Element)
+		for _, item := range s.List() {
+			elem := item.(*store.Element)
 			items[elem.Key] = *elem
 		}
 		if !apiequality.Semantic.DeepEqual(expected, items) {
@@ -272,7 +281,7 @@ func TestWatchCacheBasic(t *testing.T) {
 }
 
 func TestEvents(t *testing.T) {
-	store := newTestWatchCache(5, &cache.Indexers{})
+	store := newTestWatchCache(5, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 
 	// no dynamic-size cache to fit old tests.
@@ -283,7 +292,7 @@ func TestEvents(t *testing.T) {
 
 	// Test for Added event.
 	{
-		_, err := store.getAllEventsSince(1, storage.ListOptions{})
+		_, err := store.getAllEventsSince(1, storage.ListOptions{Predicate: storage.Everything})
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
@@ -292,7 +301,7 @@ func TestEvents(t *testing.T) {
 		}
 	}
 	{
-		result, err := store.getAllEventsSince(2, storage.ListOptions{})
+		result, err := store.getAllEventsSince(2, storage.ListOptions{Predicate: storage.Everything})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -316,13 +325,13 @@ func TestEvents(t *testing.T) {
 
 	// Test with not full cache.
 	{
-		_, err := store.getAllEventsSince(1, storage.ListOptions{})
+		_, err := store.getAllEventsSince(1, storage.ListOptions{Predicate: storage.Everything})
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
 	}
 	{
-		result, err := store.getAllEventsSince(3, storage.ListOptions{})
+		result, err := store.getAllEventsSince(3, storage.ListOptions{Predicate: storage.Everything})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -350,13 +359,13 @@ func TestEvents(t *testing.T) {
 
 	// Test with full cache - there should be elements from 5 to 9.
 	{
-		_, err := store.getAllEventsSince(3, storage.ListOptions{})
+		_, err := store.getAllEventsSince(3, storage.ListOptions{Predicate: storage.Everything})
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
 	}
 	{
-		result, err := store.getAllEventsSince(4, storage.ListOptions{})
+		result, err := store.getAllEventsSince(4, storage.ListOptions{Predicate: storage.Everything})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -375,7 +384,7 @@ func TestEvents(t *testing.T) {
 	store.Delete(makeTestPod("pod", uint64(10)))
 
 	{
-		result, err := store.getAllEventsSince(9, storage.ListOptions{})
+		result, err := store.getAllEventsSince(9, storage.ListOptions{Predicate: storage.Everything})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -397,7 +406,7 @@ func TestEvents(t *testing.T) {
 }
 
 func TestMarker(t *testing.T) {
-	store := newTestWatchCache(3, &cache.Indexers{})
+	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 
 	// First thing that is called when propagated from storage is Replace.
@@ -406,13 +415,13 @@ func TestMarker(t *testing.T) {
 		makeTestPod("pod2", 9),
 	}, "9")
 
-	_, err := store.getAllEventsSince(8, storage.ListOptions{})
+	_, err := store.getAllEventsSince(8, storage.ListOptions{Predicate: storage.Everything})
 	if err == nil || !strings.Contains(err.Error(), "too old resource version") {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Getting events from 8 should return no events,
 	// even though there is a marker there.
-	result, err := store.getAllEventsSince(9, storage.ListOptions{})
+	result, err := store.getAllEventsSince(9, storage.ListOptions{Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -423,7 +432,7 @@ func TestMarker(t *testing.T) {
 	pod := makeTestPod("pods", 12)
 	store.Add(pod)
 	// Getting events from 8 should still work and return one event.
-	result, err = store.getAllEventsSince(9, storage.ListOptions{})
+	result, err = store.getAllEventsSince(9, storage.ListOptions{Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -432,9 +441,9 @@ func TestMarker(t *testing.T) {
 	}
 }
 
-func TestWaitUntilFreshAndList(t *testing.T) {
+func TestWaitUntilFreshAndGetList(t *testing.T) {
 	ctx := context.Background()
-	store := newTestWatchCache(3, &cache.Indexers{
+	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{
 		"l:label": func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
@@ -462,71 +471,82 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(ctx, 5, "prefix/", nil)
+	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+	if resp.ResourceVersion != 5 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(list) != 3 {
-		t.Errorf("unexpected list returned: %#v", list)
+	if len(resp.Items) != 3 {
+		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "" {
 		t.Errorf("Used index %q but expected none to be used", indexUsed)
 	}
 
 	// list by label index.
-	matchValues := []storage.MatchValue{
-		{IndexName: "l:label", Value: "value1"},
-		{IndexName: "f:spec.nodeName", Value: "node2"},
-	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", matchValues)
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+		Label: labels.SelectorFromSet(map[string]string{
+			"label": "value1",
+		}),
+		Field: fields.SelectorFromSet(map[string]string{
+			"spec.nodeName": "node2",
+		}),
+		IndexLabels: []string{"label"},
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+	if resp.ResourceVersion != 5 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(list) != 2 {
-		t.Errorf("unexpected list returned: %#v", list)
+	if len(resp.Items) != 2 {
+		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "l:label" {
 		t.Errorf("Used index %q but expected %q", indexUsed, "l:label")
 	}
 
 	// list with spec.nodeName index.
-	matchValues = []storage.MatchValue{
-		{IndexName: "l:not-exist-label", Value: "whatever"},
-		{IndexName: "f:spec.nodeName", Value: "node2"},
-	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", matchValues)
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+		Label: labels.SelectorFromSet(map[string]string{
+			"not-exist-label": "whatever",
+		}),
+		Field: fields.SelectorFromSet(map[string]string{
+			"spec.nodeName": "node2",
+		}),
+		IndexFields: []string{"spec.nodeName"},
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+	if resp.ResourceVersion != 5 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(list) != 1 {
-		t.Errorf("unexpected list returned: %#v", list)
+	if len(resp.Items) != 1 {
+		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "f:spec.nodeName" {
 		t.Errorf("Used index %q but expected %q", indexUsed, "f:spec.nodeName")
 	}
 
 	// list with index not exists.
-	matchValues = []storage.MatchValue{
-		{IndexName: "l:not-exist-label", Value: "whatever"},
-	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", matchValues)
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+		Label: labels.SelectorFromSet(map[string]string{
+			"not-exist-label": "whatever",
+		}),
+		Field:       fields.Everything(),
+		IndexLabels: []string{"label"},
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resourceVersion != 5 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+	if resp.ResourceVersion != 5 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(list) != 3 {
-		t.Errorf("unexpected list returned: %#v", list)
+	if len(resp.Items) != 3 {
+		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "" {
 		t.Errorf("Used index %q but expected none to be used", indexUsed)
@@ -537,7 +557,7 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 	forceRequestWatchProgressSupport(t)
 	ctx := context.Background()
-	store := newTestWatchCache(3, &cache.Indexers{})
+	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 	// In background, update the store.
 	go func() {
@@ -546,15 +566,15 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	}()
 
 	// list from future revision. Requires watch cache to request bookmark to get it.
-	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(ctx, 3, "prefix/", nil)
+	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "3", Recursive: true, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resourceVersion != 3 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 6", resourceVersion)
+	if resp.ResourceVersion != 3 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 6", resp.ResourceVersion)
 	}
-	if len(list) != 1 {
-		t.Errorf("unexpected list returned: %#v", list)
+	if len(resp.Items) != 1 {
+		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "" {
 		t.Errorf("Used index %q but expected none to be used", indexUsed)
@@ -563,7 +583,7 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 
 func TestWaitUntilFreshAndGet(t *testing.T) {
 	ctx := context.Background()
-	store := newTestWatchCache(3, &cache.Indexers{})
+	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 
 	// In background, update the store.
@@ -572,7 +592,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, 5, "prefix/ns/bar")
+	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, 5, "/prefix/ns/bar")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -604,9 +624,12 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, tc.ConsistentListFromCache)
+			if !tc.ConsistentListFromCache {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, tc.ConsistentListFromCache)
+			}
 			ctx := context.Background()
-			store := newTestWatchCache(3, &cache.Indexers{})
+			store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 			defer store.Stop()
 			fc := store.clock.(*testingclock.FakeClock)
 
@@ -626,7 +649,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 				store.Add(makeTestPod("bar", 4))
 			}()
 
-			_, _, _, err := store.WaitUntilFreshAndList(ctx, 4, "", nil)
+			_, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "4", Predicate: storage.Everything})
 			if !errors.IsTimeout(err) {
 				t.Errorf("expected timeout error but got: %v", err)
 			}
@@ -651,16 +674,16 @@ func (t *testLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 
 func TestReflectorForWatchCache(t *testing.T) {
 	ctx := context.Background()
-	store := newTestWatchCache(5, &cache.Indexers{})
+	store := newTestWatchCache(5, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 
 	{
-		_, version, _, err := store.WaitUntilFreshAndList(ctx, 0, "", nil)
+		resp, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "", Recursive: true, Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if version != 0 {
-			t.Errorf("unexpected resource version: %d", version)
+		if resp.ResourceVersion != 0 {
+			t.Errorf("unexpected resource version: %d", resp.ResourceVersion)
 		}
 	}
 
@@ -678,12 +701,12 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		_, version, _, err := store.WaitUntilFreshAndList(ctx, 10, "", nil)
+		resp, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "10", Recursive: true, Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if version != 10 {
-			t.Errorf("unexpected resource version: %d", version)
+		if resp.ResourceVersion != 10 {
+			t.Errorf("unexpected resource version: %d", resp.ResourceVersion)
 		}
 	}
 }
@@ -702,212 +725,212 @@ func TestDynamicCache(t *testing.T) {
 		expectStartIndex   int
 	}{
 		{
-			name:               "[capacity not equals 4*n] events inside eventFreshDuration cause cache expanding",
+			name:               "[capacity not equals 4*n] events inside DefaultEventFreshDuration cause cache expanding",
 			eventCount:         5,
 			cacheCapacity:      5,
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
-			interval:           eventFreshDuration / 6,
+			interval:           DefaultEventFreshDuration / 6,
 			expectCapacity:     10,
 			expectStartIndex:   0,
 		},
 		{
-			name:               "[capacity not equals 4*n] events outside eventFreshDuration without change cache capacity",
+			name:               "[capacity not equals 4*n] events outside DefaultEventFreshDuration without change cache capacity",
 			eventCount:         5,
 			cacheCapacity:      5,
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
-			interval:           eventFreshDuration / 4,
+			interval:           DefaultEventFreshDuration / 4,
 			expectCapacity:     5,
 			expectStartIndex:   0,
 		},
 		{
-			name:               "[capacity not equals 4*n] quarter of recent events outside eventFreshDuration cause cache shrinking",
+			name:               "[capacity not equals 4*n] quarter of recent events outside DefaultEventFreshDuration cause cache shrinking",
 			eventCount:         5,
 			cacheCapacity:      5,
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
-			interval:           eventFreshDuration + time.Second,
+			interval:           DefaultEventFreshDuration + time.Second,
 			expectCapacity:     2,
 			expectStartIndex:   3,
 		},
 		{
-			name:               "[capacity not equals 4*n] quarter of recent events outside eventFreshDuration cause cache shrinking with given lowerBoundCapacity",
+			name:               "[capacity not equals 4*n] quarter of recent events outside DefaultEventFreshDuration cause cache shrinking with given lowerBoundCapacity",
 			eventCount:         5,
 			cacheCapacity:      5,
 			lowerBoundCapacity: 3,
 			upperBoundCapacity: 5 * 2,
-			interval:           eventFreshDuration + time.Second,
+			interval:           DefaultEventFreshDuration + time.Second,
 			expectCapacity:     3,
 			expectStartIndex:   2,
 		},
 		{
-			name:               "[capacity not equals 4*n] events inside eventFreshDuration cause cache expanding with given upperBoundCapacity",
+			name:               "[capacity not equals 4*n] events inside DefaultEventFreshDuration cause cache expanding with given upperBoundCapacity",
 			eventCount:         5,
 			cacheCapacity:      5,
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 8,
-			interval:           eventFreshDuration / 6,
+			interval:           DefaultEventFreshDuration / 6,
 			expectCapacity:     8,
 			expectStartIndex:   0,
 		},
 		{
-			name:               "[capacity not equals 4*n] [startIndex not equal 0] events inside eventFreshDuration cause cache expanding",
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] events inside DefaultEventFreshDuration cause cache expanding",
 			eventCount:         5,
 			cacheCapacity:      5,
 			startIndex:         3,
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
-			interval:           eventFreshDuration / 6,
+			interval:           DefaultEventFreshDuration / 6,
 			expectCapacity:     10,
 			expectStartIndex:   3,
 		},
 		{
-			name:               "[capacity not equals 4*n] [startIndex not equal 0] events outside eventFreshDuration without change cache capacity",
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] events outside DefaultEventFreshDuration without change cache capacity",
 			eventCount:         5,
 			cacheCapacity:      5,
 			startIndex:         3,
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
-			interval:           eventFreshDuration / 4,
+			interval:           DefaultEventFreshDuration / 4,
 			expectCapacity:     5,
 			expectStartIndex:   3,
 		},
 		{
-			name:               "[capacity not equals 4*n] [startIndex not equal 0] quarter of recent events outside eventFreshDuration cause cache shrinking",
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] quarter of recent events outside DefaultEventFreshDuration cause cache shrinking",
 			eventCount:         5,
 			cacheCapacity:      5,
 			startIndex:         3,
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
-			interval:           eventFreshDuration + time.Second,
+			interval:           DefaultEventFreshDuration + time.Second,
 			expectCapacity:     2,
 			expectStartIndex:   6,
 		},
 		{
-			name:               "[capacity not equals 4*n] [startIndex not equal 0] quarter of recent events outside eventFreshDuration cause cache shrinking with given lowerBoundCapacity",
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] quarter of recent events outside DefaultEventFreshDuration cause cache shrinking with given lowerBoundCapacity",
 			eventCount:         5,
 			cacheCapacity:      5,
 			startIndex:         3,
 			lowerBoundCapacity: 3,
 			upperBoundCapacity: 5 * 2,
-			interval:           eventFreshDuration + time.Second,
+			interval:           DefaultEventFreshDuration + time.Second,
 			expectCapacity:     3,
 			expectStartIndex:   5,
 		},
 		{
-			name:               "[capacity not equals 4*n] [startIndex not equal 0] events inside eventFreshDuration cause cache expanding with given upperBoundCapacity",
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] events inside DefaultEventFreshDuration cause cache expanding with given upperBoundCapacity",
 			eventCount:         5,
 			cacheCapacity:      5,
 			startIndex:         3,
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 8,
-			interval:           eventFreshDuration / 6,
+			interval:           DefaultEventFreshDuration / 6,
 			expectCapacity:     8,
 			expectStartIndex:   3,
 		},
 		{
-			name:               "[capacity equals 4*n] events inside eventFreshDuration cause cache expanding",
+			name:               "[capacity equals 4*n] events inside DefaultEventFreshDuration cause cache expanding",
 			eventCount:         8,
 			cacheCapacity:      8,
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
-			interval:           eventFreshDuration / 9,
+			interval:           DefaultEventFreshDuration / 9,
 			expectCapacity:     16,
 			expectStartIndex:   0,
 		},
 		{
-			name:               "[capacity equals 4*n] events outside eventFreshDuration without change cache capacity",
+			name:               "[capacity equals 4*n] events outside DefaultEventFreshDuration without change cache capacity",
 			eventCount:         8,
 			cacheCapacity:      8,
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
-			interval:           eventFreshDuration / 8,
+			interval:           DefaultEventFreshDuration / 8,
 			expectCapacity:     8,
 			expectStartIndex:   0,
 		},
 		{
-			name:               "[capacity equals 4*n] quarter of recent events outside eventFreshDuration cause cache shrinking",
+			name:               "[capacity equals 4*n] quarter of recent events outside DefaultEventFreshDuration cause cache shrinking",
 			eventCount:         8,
 			cacheCapacity:      8,
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
-			interval:           eventFreshDuration/2 + time.Second,
+			interval:           DefaultEventFreshDuration/2 + time.Second,
 			expectCapacity:     4,
 			expectStartIndex:   4,
 		},
 		{
-			name:               "[capacity equals 4*n] quarter of recent events outside eventFreshDuration cause cache shrinking with given lowerBoundCapacity",
+			name:               "[capacity equals 4*n] quarter of recent events outside DefaultEventFreshDuration cause cache shrinking with given lowerBoundCapacity",
 			eventCount:         8,
 			cacheCapacity:      8,
 			lowerBoundCapacity: 7,
 			upperBoundCapacity: 8 * 2,
-			interval:           eventFreshDuration/2 + time.Second,
+			interval:           DefaultEventFreshDuration/2 + time.Second,
 			expectCapacity:     7,
 			expectStartIndex:   1,
 		},
 		{
-			name:               "[capacity equals 4*n] events inside eventFreshDuration cause cache expanding with given upperBoundCapacity",
+			name:               "[capacity equals 4*n] events inside DefaultEventFreshDuration cause cache expanding with given upperBoundCapacity",
 			eventCount:         8,
 			cacheCapacity:      8,
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 10,
-			interval:           eventFreshDuration / 9,
+			interval:           DefaultEventFreshDuration / 9,
 			expectCapacity:     10,
 			expectStartIndex:   0,
 		},
 		{
-			name:               "[capacity equals 4*n] [startIndex not equal 0] events inside eventFreshDuration cause cache expanding",
+			name:               "[capacity equals 4*n] [startIndex not equal 0] events inside DefaultEventFreshDuration cause cache expanding",
 			eventCount:         8,
 			cacheCapacity:      8,
 			startIndex:         3,
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
-			interval:           eventFreshDuration / 9,
+			interval:           DefaultEventFreshDuration / 9,
 			expectCapacity:     16,
 			expectStartIndex:   3,
 		},
 		{
-			name:               "[capacity equals 4*n] [startIndex not equal 0] events outside eventFreshDuration without change cache capacity",
+			name:               "[capacity equals 4*n] [startIndex not equal 0] events outside DefaultEventFreshDuration without change cache capacity",
 			eventCount:         8,
 			cacheCapacity:      8,
 			startIndex:         3,
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
-			interval:           eventFreshDuration / 8,
+			interval:           DefaultEventFreshDuration / 8,
 			expectCapacity:     8,
 			expectStartIndex:   3,
 		},
 		{
-			name:               "[capacity equals 4*n] [startIndex not equal 0] quarter of recent events outside eventFreshDuration cause cache shrinking",
+			name:               "[capacity equals 4*n] [startIndex not equal 0] quarter of recent events outside DefaultEventFreshDuration cause cache shrinking",
 			eventCount:         8,
 			cacheCapacity:      8,
 			startIndex:         3,
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
-			interval:           eventFreshDuration/2 + time.Second,
+			interval:           DefaultEventFreshDuration/2 + time.Second,
 			expectCapacity:     4,
 			expectStartIndex:   7,
 		},
 		{
-			name:               "[capacity equals 4*n] [startIndex not equal 0] quarter of recent events outside eventFreshDuration cause cache shrinking with given lowerBoundCapacity",
+			name:               "[capacity equals 4*n] [startIndex not equal 0] quarter of recent events outside DefaultEventFreshDuration cause cache shrinking with given lowerBoundCapacity",
 			eventCount:         8,
 			cacheCapacity:      8,
 			startIndex:         3,
 			lowerBoundCapacity: 7,
 			upperBoundCapacity: 8 * 2,
-			interval:           eventFreshDuration/2 + time.Second,
+			interval:           DefaultEventFreshDuration/2 + time.Second,
 			expectCapacity:     7,
 			expectStartIndex:   4,
 		},
 		{
-			name:               "[capacity equals 4*n] [startIndex not equal 0] events inside eventFreshDuration cause cache expanding with given upperBoundCapacity",
+			name:               "[capacity equals 4*n] [startIndex not equal 0] events inside DefaultEventFreshDuration cause cache expanding with given upperBoundCapacity",
 			eventCount:         8,
 			cacheCapacity:      8,
 			startIndex:         3,
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 10,
-			interval:           eventFreshDuration / 9,
+			interval:           DefaultEventFreshDuration / 9,
 			expectCapacity:     10,
 			expectStartIndex:   3,
 		},
@@ -915,7 +938,7 @@ func TestDynamicCache(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			store := newTestWatchCache(test.cacheCapacity, &cache.Indexers{})
+			store := newTestWatchCache(test.cacheCapacity, DefaultEventFreshDuration, &cache.Indexers{})
 			defer store.Stop()
 			store.cache = make([]*watchCacheEvent, test.cacheCapacity)
 			store.startIndex = test.startIndex
@@ -964,7 +987,7 @@ func checkCacheElements(cache *testWatchCache) bool {
 }
 
 func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
-	store := newTestWatchCache(2, &cache.Indexers{})
+	store := newTestWatchCache(2, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 
 	now := store.clock.Now()
@@ -983,14 +1006,14 @@ func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
 	addEvent("key1", 20, now)
 
 	// Force "key1" to rotate our of cache.
-	later := now.Add(2 * eventFreshDuration)
+	later := now.Add(2 * DefaultEventFreshDuration)
 	addEvent("key2", 30, later)
 	addEvent("key3", 40, later)
 
 	// Force cache resize.
 	addEvent("key4", 50, later.Add(time.Second))
 
-	_, err := store.getAllEventsSince(15, storage.ListOptions{})
+	_, err := store.getAllEventsSince(15, storage.ListOptions{Predicate: storage.Everything})
 	if err == nil || !strings.Contains(err.Error(), "too old resource version") {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -998,122 +1021,162 @@ func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
 
 func TestSuggestedWatchChannelSize(t *testing.T) {
 	testCases := []struct {
-		name        string
-		capacity    int
-		indexExists bool
-		triggerUsed bool
-		expected    int
+		name                string
+		capacity            int
+		indexExists         bool
+		triggerUsed         bool
+		eventsFreshDuration time.Duration
+		expected            int
 	}{
 		{
-			name:        "capacity=100, indexExists, triggerUsed",
-			capacity:    100,
-			indexExists: true,
-			triggerUsed: true,
-			expected:    10,
+			name:                "capacity=100, indexExists, triggerUsed",
+			capacity:            100,
+			indexExists:         true,
+			triggerUsed:         true,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            10,
 		},
 		{
-			name:        "capacity=100, indexExists, !triggerUsed",
-			capacity:    100,
-			indexExists: true,
-			triggerUsed: false,
-			expected:    10,
+			name:                "capacity=100, indexExists, !triggerUsed",
+			capacity:            100,
+			indexExists:         true,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            10,
 		},
 		{
-			name:        "capacity=100, !indexExists",
-			capacity:    100,
-			indexExists: false,
-			triggerUsed: false,
-			expected:    10,
+			name:                "capacity=100, !indexExists",
+			capacity:            100,
+			indexExists:         false,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            10,
 		},
 		{
-			name:        "capacity=750, indexExists, triggerUsed",
-			capacity:    750,
-			indexExists: true,
-			triggerUsed: true,
-			expected:    10,
+			name:                "capacity=750, indexExists, triggerUsed",
+			capacity:            750,
+			indexExists:         true,
+			triggerUsed:         true,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            10,
 		},
 		{
-			name:        "capacity=750, indexExists, !triggerUsed",
-			capacity:    750,
-			indexExists: true,
-			triggerUsed: false,
-			expected:    10,
+			name:                "capacity=750, indexExists, !triggerUsed",
+			capacity:            750,
+			indexExists:         true,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            10,
 		},
 		{
-			name:        "capacity=750, !indexExists",
-			capacity:    750,
-			indexExists: false,
-			triggerUsed: false,
-			expected:    10,
+			name:                "capacity=750, !indexExists",
+			capacity:            750,
+			indexExists:         false,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            10,
 		},
 		{
-			name:        "capacity=7500, indexExists, triggerUsed",
-			capacity:    7500,
-			indexExists: true,
-			triggerUsed: true,
-			expected:    10,
+			name:                "capacity=7500, indexExists, triggerUsed",
+			capacity:            7500,
+			indexExists:         true,
+			triggerUsed:         true,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            10,
 		},
 		{
-			name:        "capacity=7500, indexExists, !triggerUsed",
-			capacity:    7500,
-			indexExists: true,
-			triggerUsed: false,
-			expected:    100,
+			name:                "capacity=7500, indexExists, !triggerUsed",
+			capacity:            7500,
+			indexExists:         true,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            100,
 		},
 		{
-			name:        "capacity=7500, !indexExists",
-			capacity:    7500,
-			indexExists: false,
-			triggerUsed: false,
-			expected:    100,
+			name:                "capacity=7500, indexExists, !triggerUsed, eventsFreshDuration=2m30s",
+			capacity:            7500,
+			indexExists:         true,
+			triggerUsed:         false,
+			eventsFreshDuration: 2 * DefaultEventFreshDuration,
+			expected:            50,
 		},
 		{
-			name:        "capacity=75000, indexExists, triggerUsed",
-			capacity:    75000,
-			indexExists: true,
-			triggerUsed: true,
-			expected:    10,
+			name:                "capacity=7500, !indexExists",
+			capacity:            7500,
+			indexExists:         false,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            100,
 		},
 		{
-			name:        "capacity=75000, indexExists, !triggerUsed",
-			capacity:    75000,
-			indexExists: true,
-			triggerUsed: false,
-			expected:    1000,
+			name:                "capacity=7500, !indexExists, eventsFreshDuration=2m30s",
+			capacity:            7500,
+			indexExists:         false,
+			triggerUsed:         false,
+			eventsFreshDuration: 2 * DefaultEventFreshDuration,
+			expected:            50,
 		},
 		{
-			name:        "capacity=75000, !indexExists",
-			capacity:    75000,
-			indexExists: false,
-			triggerUsed: false,
-			expected:    100,
+			name:                "capacity=75000, indexExists, triggerUsed",
+			capacity:            75000,
+			indexExists:         true,
+			triggerUsed:         true,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            10,
 		},
 		{
-			name:        "capacity=750000, indexExists, triggerUsed",
-			capacity:    750000,
-			indexExists: true,
-			triggerUsed: true,
-			expected:    10,
+			name:                "capacity=75000, indexExists, !triggerUsed",
+			capacity:            75000,
+			indexExists:         true,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            1000,
 		},
 		{
-			name:        "capacity=750000, indexExists, !triggerUsed",
-			capacity:    750000,
-			indexExists: true,
-			triggerUsed: false,
-			expected:    1000,
+			name:                "capacity=75000, indexExists, !triggerUsed, eventsFreshDuration=2m30s",
+			capacity:            75000,
+			indexExists:         true,
+			triggerUsed:         false,
+			eventsFreshDuration: 2 * DefaultEventFreshDuration,
+			expected:            500,
 		},
 		{
-			name:        "capacity=750000, !indexExists",
-			capacity:    750000,
-			indexExists: false,
-			triggerUsed: false,
-			expected:    100,
+			name:                "capacity=75000, !indexExists",
+			capacity:            75000,
+			indexExists:         false,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            100,
+		},
+		{
+			name:                "capacity=750000, indexExists, triggerUsed",
+			capacity:            750000,
+			indexExists:         true,
+			triggerUsed:         true,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            10,
+		},
+		{
+			name:                "capacity=750000, indexExists, !triggerUsed",
+			capacity:            750000,
+			indexExists:         true,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            1000,
+		},
+		{
+			name:                "capacity=750000, !indexExists",
+			capacity:            750000,
+			indexExists:         false,
+			triggerUsed:         false,
+			eventsFreshDuration: DefaultEventFreshDuration,
+			expected:            100,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			store := newTestWatchCache(test.capacity, &cache.Indexers{})
+			store := newTestWatchCache(test.capacity, test.eventsFreshDuration, &cache.Indexers{})
 			defer store.Stop()
 			got := store.suggestedWatchChannelSize(test.indexExists, test.triggerUsed)
 			if got != test.expected {
@@ -1123,8 +1186,51 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 	}
 }
 
+func TestCapacityUpperBound(t *testing.T) {
+	testCases := []struct {
+		name               string
+		eventFreshDuration time.Duration
+		expected           int
+	}{
+		{
+			name:               "default eventFreshDuration",
+			eventFreshDuration: DefaultEventFreshDuration, // 75s
+			expected:           defaultUpperBoundCapacity, // 100 * 1024
+		},
+		{
+			name:               "lower eventFreshDuration, capacity limit unchanged",
+			eventFreshDuration: 45 * time.Second,          // 45s
+			expected:           defaultUpperBoundCapacity, // 100 * 1024
+		},
+		{
+			name:               "higher eventFreshDuration, capacity limit scaled up",
+			eventFreshDuration: 4 * DefaultEventFreshDuration, // 4 * 75s
+			expected:           4 * defaultUpperBoundCapacity, // 4 * 100 * 1024
+		},
+		{
+			name:               "higher eventFreshDuration, capacity limit scaled and rounded up",
+			eventFreshDuration: 3 * DefaultEventFreshDuration, // 3 * 75s
+			expected:           4 * defaultUpperBoundCapacity, // 4 * 100 * 1024
+		},
+		{
+			name:               "higher eventFreshDuration, capacity limit scaled up and capped",
+			eventFreshDuration: DefaultEventFreshDuration << 20, // 2^20 * 75s
+			expected:           defaultUpperBoundCapacity << 14, // 2^14 * 100 * 1024
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			capacity := capacityUpperBound(test.eventFreshDuration)
+			if test.expected != capacity {
+				t.Errorf("expected %v, got %v", test.expected, capacity)
+			}
+		})
+	}
+}
+
 func BenchmarkWatchCache_updateCache(b *testing.B) {
-	store := newTestWatchCache(defaultUpperBoundCapacity, &cache.Indexers{})
+	store := newTestWatchCache(defaultUpperBoundCapacity, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 	store.cache = store.cache[:0]
 	store.upperBoundCapacity = defaultUpperBoundCapacity
@@ -1146,7 +1252,7 @@ func TestHistogramCacheReadWait(t *testing.T) {
 	}
 	ctx := context.Background()
 	testedMetrics := "apiserver_watch_cache_read_wait_seconds"
-	store := newTestWatchCache(2, &cache.Indexers{})
+	store := newTestWatchCache(2, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 
 	// In background, update the store.
@@ -1170,22 +1276,22 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			want: `
 		# HELP apiserver_watch_cache_read_wait_seconds [ALPHA] Histogram of time spent waiting for a watch cache to become fresh.
     # TYPE apiserver_watch_cache_read_wait_seconds histogram
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.005"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.025"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.05"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.1"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.2"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.4"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.6"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.8"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="1"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="1.25"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="1.5"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="2"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="3"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="+Inf"} 1
-      apiserver_watch_cache_read_wait_seconds_sum{resource="pods"} 0
-      apiserver_watch_cache_read_wait_seconds_count{resource="pods"} 1
+	    apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.005"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.025"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.05"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.1"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.2"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.4"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.6"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.8"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.25"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.5"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="2"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="3"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="+Inf"} 1
+        apiserver_watch_cache_read_wait_seconds_sum{group="",resource="pods"} 0
+        apiserver_watch_cache_read_wait_seconds_count{group="",resource="pods"} 1
 `,
 		},
 		{
@@ -1206,4 +1312,102 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCacheSnapshots(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+	s := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+	defer s.Stop()
+	s.upperBoundCapacity = 3
+	s.lowerBoundCapacity = 1
+	clock := s.clock.(*testingclock.FakeClock)
+
+	_, found := s.snapshots.GetLessOrEqual(100)
+	assert.False(t, found, "Expected empty cache to not include any snapshots")
+
+	t.Log("Test cache on rev 100")
+	require.NoError(t, s.Add(makeTestPod("foo", 100)))
+	require.NoError(t, s.Update(makeTestPod("foo", 200)))
+	clock.Step(time.Second)
+	require.NoError(t, s.Delete(makeTestPod("foo", 300)))
+
+	t.Log("Test cache on rev 100")
+	_, found = s.snapshots.GetLessOrEqual(99)
+	assert.False(t, found, "Expected store to not include rev 99")
+	lister, found := s.snapshots.GetLessOrEqual(100)
+	assert.True(t, found, "Expected store to not include rev 100")
+	elements := lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 100), elements[0].(*store.Element).Object)
+
+	t.Log("Overflow cache to remove rev 100")
+	require.NoError(t, s.Add(makeTestPod("foo", 400)))
+	_, found = s.snapshots.GetLessOrEqual(100)
+	assert.False(t, found, "Expected overfilled cache to delete oldest rev 100")
+
+	t.Log("Test cache on rev 200")
+	lister, found = s.snapshots.GetLessOrEqual(200)
+	assert.True(t, found, "Expected store to still keep rev 200")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 200), elements[0].(*store.Element).Object)
+
+	t.Log("Test cache on rev 300")
+	lister, found = s.snapshots.GetLessOrEqual(300)
+	assert.True(t, found, "Expected store to still keep rev 300")
+	elements = lister.ListPrefix("", "")
+	assert.Empty(t, elements)
+
+	t.Log("Test cache on rev 400")
+	lister, found = s.snapshots.GetLessOrEqual(400)
+	assert.True(t, found, "Expected store to still keep rev 400")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 400), elements[0].(*store.Element).Object)
+
+	t.Log("Add event outside the event fresh window to force cache capacity downsize")
+	assert.Equal(t, 3, s.capacity)
+	clock.Step(DefaultEventFreshDuration + 1)
+	require.NoError(t, s.Update(makeTestPod("foo", 500)))
+	assert.Equal(t, 1, s.capacity)
+	assert.Equal(t, 1, s.snapshots.Len())
+	_, found = s.snapshots.GetLessOrEqual(499)
+	assert.False(t, found, "Expected overfilled cache to delete events below 500")
+
+	t.Log("Test cache on rev 500")
+	lister, found = s.snapshots.GetLessOrEqual(500)
+	assert.True(t, found, "Expected store to still keep rev 500")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 500), elements[0].(*store.Element).Object)
+
+	t.Log("Add event to force capacity upsize")
+	require.NoError(t, s.Update(makeTestPod("foo", 600)))
+	assert.Equal(t, 2, s.capacity)
+	assert.Equal(t, 2, s.snapshots.Len())
+
+	t.Log("Test cache on rev 600")
+	lister, found = s.snapshots.GetLessOrEqual(600)
+	assert.True(t, found, "Expected replace to be snapshotted")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
+
+	t.Log("Replace cache to remove history")
+	_, found = s.snapshots.GetLessOrEqual(500)
+	assert.True(t, found, "Confirm that cache stores history before replace")
+	err := s.Replace([]interface{}{makeTestPod("foo", 600)}, "700")
+	require.NoError(t, err)
+	_, found = s.snapshots.GetLessOrEqual(500)
+	assert.False(t, found, "Expected replace to remove history")
+	_, found = s.snapshots.GetLessOrEqual(600)
+	assert.False(t, found, "Expected replace to remove history")
+
+	t.Log("Test cache on rev 700")
+	lister, found = s.snapshots.GetLessOrEqual(700)
+	assert.True(t, found, "Expected replace to be snapshotted")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
 }

@@ -37,7 +37,7 @@ API_KNOWN_VIOLATIONS_DIR="${API_KNOWN_VIOLATIONS_DIR:-"${KUBE_ROOT}/api/api-rule
 OUT_DIR="_output"
 BOILERPLATE_FILENAME="hack/boilerplate/boilerplate.generatego.txt"
 APPLYCONFIG_PKG="k8s.io/client-go/applyconfigurations"
-PLURAL_EXCEPTIONS="Endpoints:Endpoints,ResourceClaimParameters:ResourceClaimParameters,ResourceClassParameters:ResourceClassParameters"
+PLURAL_EXCEPTIONS="Endpoints:Endpoints"
 
 # Any time we call sort, we want it in the same locale.
 export LC_ALL="C"
@@ -49,10 +49,19 @@ if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: starting generated_files"
 fi
 
+echo "installing goimports from hack/tools"
+go -C "${KUBE_ROOT}/hack/tools" install golang.org/x/tools/cmd/goimports
+
+kube::protoc::install
+
 # Generate a list of directories we don't want to play in.
 DIRS_TO_AVOID=()
 kube::util::read-array DIRS_TO_AVOID < <(
-    git ls-files -cmo --exclude-standard -- ':!:vendor/*' ':(glob)*/**/go.work' \
+    git ls-files -cmo --exclude-standard \
+        -- \
+        ':!:vendor/*' \
+        ':(glob)*/**/go.work' \
+        ':(glob)**/_codegenignore/**' \
         | while read -r F; do \
             echo ':!:'"$(dirname "${F}")"; \
         done
@@ -62,7 +71,10 @@ function git_find() {
     # Similar to find but faster and easier to understand.  We want to include
     # modified and untracked files because this might be running against code
     # which is not tracked by git yet.
-    git ls-files -cmo --exclude-standard ':!:vendor/*' "${DIRS_TO_AVOID[@]}" "$@"
+    git ls-files -cmo --exclude-standard \
+        ':!:vendor/*' \
+        "${DIRS_TO_AVOID[@]}" \
+        "$@"
 }
 
 function git_grep() {
@@ -70,7 +82,9 @@ function git_grep() {
     # running against code which is not tracked by git yet.
     # We need vendor exclusion added at the end since it has to be part of
     # the pathspecs which are specified last.
-    git grep --untracked "$@" ':!:vendor/*' "${DIRS_TO_AVOID[@]}"
+    git grep --untracked "$@" \
+        ':!:vendor/*' \
+        "${DIRS_TO_AVOID[@]}"
 }
 
 # Generate a list of all files that have a `+k8s:` comment-tag.  This will be
@@ -99,9 +113,12 @@ fi
 # Some of the later codegens depend on the results of this, so it needs to come
 # first in the case of regenerating everything.
 function codegen::protobuf() {
-    # NOTE: All output from this script needs to be copied back to the calling
-    # source tree.  This is managed in kube::build::copy_output in build/common.sh.
-    # If the output set is changed update that function.
+    if [[ -n "${LINT:-}" ]]; then
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for protobuf codegen"
+        fi
+        return
+    fi
 
     local apis=()
     kube::util::read-array apis < <(
@@ -124,6 +141,7 @@ function codegen::protobuf() {
     git_find -z \
         ':(glob)**/generated.proto' \
         ':(glob)**/generated.pb.go' \
+        ':(glob)**/generated.protomessage.pb.go' \
         | xargs -0 rm -f
 
     if kube::protoc::check_protoc >/dev/null; then
@@ -380,6 +398,83 @@ function codegen::defaults() {
     fi
 }
 
+# Validation generation
+#
+# Any package that wants validation functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:validation-gen=<VALUE>
+#
+# The <VALUE> depends on context:
+#     on packages:
+#       *: all exported types are candidates for having validation generated
+#       FIELDNAME: any type with a field of this name is a candidate for
+#                  having validation generated
+#     on types:
+#       true:  always generate validation for this type
+#       false: never generate validation for this type
+function codegen::validation() {
+    # Build the tool.
+    GOPROXY=off go install \
+        k8s.io/code-generator/cmd/validation-gen
+
+    # TODO: Where do we want these output?  It should be somewhere internal..
+    # The result file, in each pkg, of validation generation.
+    local output_file="${GENERATED_FILE_PREFIX}validations.go"
+
+    # All directories that request any form of validation generation.
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: finding all +k8s:validation-gen tags"
+    fi
+    local tag_dirs=()
+    kube::util::read-array tag_dirs < <( \
+        grep -l --null '+k8s:validation-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
+            | sort -u)
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:validation-gen tagged dirs"
+    fi
+
+    local tag_pkgs=()
+    for dir in "${tag_dirs[@]}"; do
+        tag_pkgs+=("./$dir")
+    done
+
+    # This list needs to cover all of the types used transitively from the
+    # main API types. Validations defined on types in these packages will be
+    # used, but not regenerated, unless they are also listed as a "regular"
+    # input on the command-line.
+    local readonly_pkgs=(
+        k8s.io/apimachinery/pkg/apis/meta/v1
+        k8s.io/apimachinery/pkg/api/resource
+        k8s.io/apimachinery/pkg/runtime
+        k8s.io/apimachinery/pkg/types
+        k8s.io/apimachinery/pkg/util/intstr
+        time
+    )
+
+    kube::log::status "Generating validation code for ${#tag_pkgs[@]} targets"
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: running validation-gen for:"
+        for dir in "${tag_dirs[@]}"; do
+            kube::log::status "DBG:     $dir"
+        done
+    fi
+
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
+
+    validation-gen \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        $(printf -- " --readonly-pkg %s" "${readonly_pkgs[@]}") \
+        "${tag_pkgs[@]}" \
+        "$@"
+
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "Generated validation code"
+    fi
+}
+
 # Conversion generation
 
 # Any package that wants conversion functions generated into it must
@@ -456,6 +551,60 @@ function codegen::conversions() {
     fi
 }
 
+# Register generation
+#
+# Any package that wants register functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:register-gen=package
+#
+function codegen::register() {
+    # Build the tool.
+    GOPROXY=off go install \
+        k8s.io/code-generator/cmd/register-gen
+
+    # The result file, in each pkg, of register generation.
+    local output_file="${GENERATED_FILE_PREFIX}register.go"
+
+    # All directories that request any form of register generation.
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: finding all +k8s:register-gen tags"
+    fi
+    local tag_dirs=()
+    kube::util::read-array tag_dirs < <( \
+        grep -l --null '+k8s:register-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
+            | sort -u)
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:register-gen tagged dirs"
+    fi
+
+    local tag_pkgs=()
+    for dir in "${tag_dirs[@]}"; do
+        tag_pkgs+=("./$dir")
+    done
+
+    kube::log::status "Generating register code for ${#tag_pkgs[@]} targets"
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: running register-gen for:"
+        for dir in "${tag_dirs[@]}"; do
+            kube::log::status "DBG:     $dir"
+        done
+    fi
+
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
+
+    register-gen \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        "${tag_pkgs[@]}" \
+        "$@"
+
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "Generated register code"
+    fi
+}
+
 # $@: directories to exclude
 # example:
 #    k8s_tag_files_except foo bat/qux
@@ -487,6 +636,8 @@ function codegen::openapi() {
     # The result file, in each pkg, of open-api generation.
     local output_file="${GENERATED_FILE_PREFIX}openapi.go"
 
+    local output_model_name_file="${GENERATED_FILE_PREFIX}model_name.go"
+
     local output_dir="pkg/generated/openapi"
     local output_pkg="k8s.io/kubernetes/${output_dir}"
     local known_violations_file="${API_KNOWN_VIOLATIONS_DIR}/violation_exceptions.list"
@@ -506,12 +657,13 @@ function codegen::openapi() {
     kube::util::read-array tag_files < <(
         k8s_tag_files_except \
             staging/src/k8s.io/code-generator \
-            staging/src/k8s.io/sample-apiserver
+            staging/src/k8s.io/sample-apiserver \
+            staging/src/k8s.io/sample-controller
         )
 
     local tag_dirs=()
     kube::util::read-array tag_dirs < <(
-        grep -l --null '+k8s:openapi-gen=' "${tag_files[@]}" \
+        grep -l --null '+k8s:openapi' "${tag_files[@]}" \
             | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
 
@@ -533,6 +685,7 @@ function codegen::openapi() {
     fi
 
     git_find -z ':(glob)pkg/generated/**'/"${output_file}" | xargs -0 rm -f
+    git_find -z ':(glob)pkg/generated/**'/"${output_model_name_file}" | xargs -0 rm -f
 
     openapi-gen \
         -v "${KUBE_VERBOSE}" \
@@ -541,6 +694,7 @@ function codegen::openapi() {
         --output-dir "${output_dir}" \
         --output-pkg "${output_pkg}" \
         --report-filename "${report_file}" \
+        --output-model-name-file "${output_model_name_file}" \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -645,6 +799,7 @@ function codegen::clients() {
         --input-base="k8s.io/api" \
         --plural-exceptions "${PLURAL_EXCEPTIONS}" \
         --apply-configuration-package "${APPLYCONFIG_PKG}" \
+        --prefers-protobuf \
         $(printf -- " --input %s" "${gv_dirs[@]}") \
         "$@"
 
@@ -771,19 +926,16 @@ function codegen::protobindings() {
     # Each element of this array is a directory containing subdirectories which
     # eventually contain a file named "api.proto".
     local apis=(
-        "staging/src/k8s.io/cri-api/pkg/apis/runtime"
-
-        "staging/src/k8s.io/kubelet/pkg/apis/podresources"
-
+        "staging/src/k8s.io/kubelet/pkg/apis/dra"
         "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
-
+        "staging/src/k8s.io/kubelet/pkg/apis/podresources"
         "staging/src/k8s.io/kms/apis"
         "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
-
-        "staging/src/k8s.io/kubelet/pkg/apis/dra"
-
         "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"
         "pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis"
+        "staging/src/k8s.io/cri-api/pkg/apis/runtime"
+        "staging/src/k8s.io/externaljwt/apis"
+        "staging/src/k8s.io/kubelet/pkg/apis/dra-health"
     )
 
     kube::log::status "Generating protobuf bindings for ${#apis[@]} targets"
@@ -795,7 +947,7 @@ function codegen::protobindings() {
     fi
 
     for api in "${apis[@]}"; do
-        git_find -z ":(glob)${api}"/'**/api.pb.go' \
+        git_find -z ":(glob)${api}"/'**/api*.pb.go' \
             | xargs -0 rm -f
     done
 
@@ -803,9 +955,7 @@ function codegen::protobindings() {
       hack/_update-generated-proto-bindings-dockerized.sh "${apis[@]}"
     else
       kube::log::status "protoc ${PROTOC_VERSION} not found (can install with hack/install-protoc.sh); generating containerized..."
-      # NOTE: All output from this script needs to be copied back to the calling
-      # source tree.  This is managed in kube::build::copy_output in build/common.sh.
-      # If the output set is changed update that function.
+
       build/run.sh hack/_update-generated-proto-bindings-dockerized.sh "${apis[@]}"
     fi
 }

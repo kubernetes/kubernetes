@@ -79,13 +79,21 @@ type TraceEvent struct {
 	Parent   *TraceEvent
 }
 
+// ChannelTrace provides tracing information for a channel.
+// It tracks various events and metadata related to the channel's lifecycle
+// and operations.
 type ChannelTrace struct {
-	cm           *channelMap
-	clearCalled  bool
+	cm          *channelMap
+	clearCalled bool
+	// The time when the trace was created.
 	CreationTime time.Time
-	EventNum     int64
-	mu           sync.Mutex
-	Events       []*traceEvent
+	// A counter for the number of events recorded in the
+	// trace.
+	EventNum int64
+	mu       sync.Mutex
+	// A slice of traceEvent pointers representing the events recorded for
+	// this channel.
+	Events []*traceEvent
 }
 
 func (c *ChannelTrace) copy() *ChannelTrace {
@@ -175,6 +183,7 @@ var refChannelTypeToString = map[RefChannelType]string{
 	RefNormalSocket: "NormalSocket",
 }
 
+// String returns a string representation of the RefChannelType
 func (r RefChannelType) String() string {
 	return refChannelTypeToString[r]
 }
@@ -185,7 +194,7 @@ func (r RefChannelType) String() string {
 // If channelz is not turned ON, this will simply log the event descriptions.
 func AddTraceEvent(l grpclog.DepthLoggerV2, e Entity, depth int, desc *TraceEvent) {
 	// Log only the trace description associated with the bottom most entity.
-	d := fmt.Sprintf("[%s]%s", e, desc.Desc)
+	d := fmt.Sprintf("[%s] %s", e, desc.Desc)
 	switch desc.Severity {
 	case CtUnknown, CtInfo:
 		l.InfoDepth(depth+1, d)

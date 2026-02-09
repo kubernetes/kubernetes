@@ -29,10 +29,24 @@ import (
 
 // ValidatingAdmissionPolicyBindingApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicyBinding type for use
 // with apply.
+//
+// ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources.
+// ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
+//
+// For a given admission request, each binding will cause its policy to be
+// evaluated N times, where N is 1 for policies/bindings that don't use
+// params, otherwise N is the number of parameters selected by the binding.
+//
+// The CEL expressions of a policy must have a computed CEL cost below the maximum
+// CEL budget. Each evaluation of the policy is given an independent CEL cost budget.
+// Adding/removing policies, bindings, or params can not affect whether a
+// given (policy, binding, param) combination is within its own CEL budget.
 type ValidatingAdmissionPolicyBindingApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ValidatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec defines the desired behavior of the ValidatingAdmissionPolicyBinding.
+	Spec *ValidatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ValidatingAdmissionPolicyBinding constructs a declarative configuration of the ValidatingAdmissionPolicyBinding type for use with
@@ -45,29 +59,14 @@ func ValidatingAdmissionPolicyBinding(name string) *ValidatingAdmissionPolicyBin
 	return b
 }
 
-// ExtractValidatingAdmissionPolicyBinding extracts the applied configuration owned by fieldManager from
-// validatingAdmissionPolicyBinding. If no managedFields are found in validatingAdmissionPolicyBinding for fieldManager, a
-// ValidatingAdmissionPolicyBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractValidatingAdmissionPolicyBindingFrom extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicyBinding for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // validatingAdmissionPolicyBinding must be a unmodified ValidatingAdmissionPolicyBinding API object that was retrieved from the Kubernetes API.
-// ExtractValidatingAdmissionPolicyBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractValidatingAdmissionPolicyBindingFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding, fieldManager, "")
-}
-
-// ExtractValidatingAdmissionPolicyBindingStatus is the same as ExtractValidatingAdmissionPolicyBinding except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractValidatingAdmissionPolicyBindingStatus(validatingAdmissionPolicyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding, fieldManager, "status")
-}
-
-func extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, fieldManager string, subresource string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicyBindingFrom(validatingAdmissionPolicyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, fieldManager string, subresource string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
 	b := &ValidatingAdmissionPolicyBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingAdmissionPolicyBinding, internal.Parser().Type("io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,11 +79,27 @@ func extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *a
 	return b, nil
 }
 
+// ExtractValidatingAdmissionPolicyBinding extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicyBinding. If no managedFields are found in validatingAdmissionPolicyBinding for fieldManager, a
+// ValidatingAdmissionPolicyBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// validatingAdmissionPolicyBinding must be a unmodified ValidatingAdmissionPolicyBinding API object that was retrieved from the Kubernetes API.
+// ExtractValidatingAdmissionPolicyBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
+	return ExtractValidatingAdmissionPolicyBindingFrom(validatingAdmissionPolicyBinding, fieldManager, "")
+}
+
+func (b ValidatingAdmissionPolicyBindingApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithKind(value string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -92,7 +107,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithKind(value stri
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithAPIVersion(value string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -101,7 +116,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithAPIVersion(valu
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithName(value string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -110,7 +125,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithName(value stri
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithGenerateName(value string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -119,7 +134,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithGenerateName(va
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithNamespace(value string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -128,7 +143,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithNamespace(value
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithUID(value types.UID) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -137,7 +152,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithUID(value types
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithResourceVersion(value string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -146,7 +161,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithResourceVersion
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithGeneration(value int64) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -155,7 +170,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithGeneration(valu
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -164,7 +179,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithCreationTimesta
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -173,7 +188,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithDeletionTimesta
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -183,11 +198,11 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithDeletionGracePe
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithLabels(entries map[string]string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -198,11 +213,11 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithLabels(entries 
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithAnnotations(entries map[string]string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -216,7 +231,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithOwnerReferences
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -227,7 +242,7 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithOwnerReferences
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithFinalizers(values ...string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -246,8 +261,24 @@ func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) WithSpec(value *Val
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ValidatingAdmissionPolicyBindingApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

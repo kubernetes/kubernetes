@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -278,9 +277,9 @@ type runner struct {
 }
 
 // New returns a new Interface which will exec ipset.
-func New(exec utilexec.Interface) Interface {
+func New() Interface {
 	return &runner{
-		exec: exec,
+		exec: utilexec.New(),
 	}
 }
 

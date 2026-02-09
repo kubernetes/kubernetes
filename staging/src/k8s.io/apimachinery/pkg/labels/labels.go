@@ -31,6 +31,9 @@ type Labels interface {
 
 	// Get returns the value for the provided label.
 	Get(label string) (value string)
+
+	// Lookup returns the value for the provided label if it exists and whether the provided label exist
+	Lookup(label string) (value string, exists bool)
 }
 
 // Set is a map of label:value. It implements Labels.
@@ -57,6 +60,12 @@ func (ls Set) Has(label string) bool {
 // Get returns the value in the map for the provided label.
 func (ls Set) Get(label string) string {
 	return ls[label]
+}
+
+// Lookup returns the value for the provided label if it exists and whether the provided label exist
+func (ls Set) Lookup(label string) (string, bool) {
+	val, exists := ls[label]
+	return val, exists
 }
 
 // AsSelector converts labels into a selectors. It does not

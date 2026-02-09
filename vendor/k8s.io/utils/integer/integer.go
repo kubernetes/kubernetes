@@ -18,7 +18,8 @@ package integer
 
 import "math"
 
-// IntMax returns the maximum of the params
+// IntMax returns the maximum of the params.
+// Deprecated: for new code, use the max() builtin instead.
 func IntMax(a, b int) int {
 	if b > a {
 		return b
@@ -26,7 +27,8 @@ func IntMax(a, b int) int {
 	return a
 }
 
-// IntMin returns the minimum of the params
+// IntMin returns the minimum of the params.
+// Deprecated: for new code, use the min() builtin instead.
 func IntMin(a, b int) int {
 	if b < a {
 		return b
@@ -34,7 +36,8 @@ func IntMin(a, b int) int {
 	return a
 }
 
-// Int32Max returns the maximum of the params
+// Int32Max returns the maximum of the params.
+// Deprecated: for new code, use the max() builtin instead.
 func Int32Max(a, b int32) int32 {
 	if b > a {
 		return b
@@ -42,7 +45,8 @@ func Int32Max(a, b int32) int32 {
 	return a
 }
 
-// Int32Min returns the minimum of the params
+// Int32Min returns the minimum of the params.
+// Deprecated: for new code, use the min() builtin instead.
 func Int32Min(a, b int32) int32 {
 	if b < a {
 		return b
@@ -50,7 +54,8 @@ func Int32Min(a, b int32) int32 {
 	return a
 }
 
-// Int64Max returns the maximum of the params
+// Int64Max returns the maximum of the params.
+// Deprecated: for new code, use the max() builtin instead.
 func Int64Max(a, b int64) int64 {
 	if b > a {
 		return b
@@ -58,7 +63,8 @@ func Int64Max(a, b int64) int64 {
 	return a
 }
 
-// Int64Min returns the minimum of the params
+// Int64Min returns the minimum of the params.
+// Deprecated: for new code, use the min() builtin instead.
 func Int64Min(a, b int64) int64 {
 	if b < a {
 		return b

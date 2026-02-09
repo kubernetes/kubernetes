@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -20,6 +19,7 @@ limitations under the License.
 package cadvisor
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
@@ -32,14 +32,24 @@ import (
 	_ "github.com/google/cadvisor/container/crio/install"
 	_ "github.com/google/cadvisor/container/systemd/install"
 
+	// Register filesystem plugins needed for container stats.
+	_ "github.com/google/cadvisor/fs/btrfs/install"
+	_ "github.com/google/cadvisor/fs/devicemapper/install"
+	_ "github.com/google/cadvisor/fs/nfs/install"
+	_ "github.com/google/cadvisor/fs/overlay/install"
+	_ "github.com/google/cadvisor/fs/tmpfs/install"
+	_ "github.com/google/cadvisor/fs/vfs/install"
+
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 type cadvisorClient struct {
@@ -71,7 +81,8 @@ func init() {
 			f.DefValue = defaultValue
 			f.Value.Set(defaultValue)
 		} else {
-			klog.ErrorS(nil, "Expected cAdvisor flag not found", "flag", name)
+			ctx := context.Background()
+			klog.FromContext(ctx).Error(nil, "Expected cAdvisor flag not found", "flag", name)
 		}
 	}
 }
@@ -91,6 +102,10 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		cadvisormetrics.OOMMetrics:          struct{}{},
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+	}
+
 	if usingLegacyStats || localStorageCapacityIsolation {
 		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
 	}
@@ -98,7 +113,7 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	duration := maxHousekeepingInterval
 	housekeepingConfig := manager.HousekeepingConfig{
 		Interval:     &duration,
-		AllowDynamic: pointer.Bool(allowDynamicHousekeeping),
+		AllowDynamic: ptr.To(allowDynamicHousekeeping),
 	}
 
 	// Create the cAdvisor container manager.
@@ -140,19 +155,19 @@ func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return cc.GetMachineInfo()
 }
 
-func (cc *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (cc *cadvisorClient) ImagesFsInfo(ctx context.Context) (cadvisorapiv2.FsInfo, error) {
 	label, err := cc.imageFsInfoProvider.ImageFsInfoLabel()
 	if err != nil {
 		return cadvisorapiv2.FsInfo{}, err
 	}
-	return cc.getFsInfo(label)
+	return cc.getFsInfo(ctx, label)
 }
 
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cc.GetDirFsInfo(cc.rootPath)
 }
 
-func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) {
+func (cc *cadvisorClient) getFsInfo(ctx context.Context, label string) (cadvisorapiv2.FsInfo, error) {
 	res, err := cc.GetFsInfo(label)
 	if err != nil {
 		return cadvisorapiv2.FsInfo{}, err
@@ -162,16 +177,16 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 	}
 	// TODO(vmarmol): Handle this better when a label has more than one image filesystem.
 	if len(res) > 1 {
-		klog.InfoS("More than one filesystem labeled. Only using the first one", "label", label, "fileSystem", res)
+		klog.FromContext(ctx).Info("More than one filesystem labeled. Only using the first one", "label", label, "fileSystem", res)
 	}
 
 	return res[0], nil
 }
 
-func (cc *cadvisorClient) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (cc *cadvisorClient) ContainerFsInfo(ctx context.Context) (cadvisorapiv2.FsInfo, error) {
 	label, err := cc.imageFsInfoProvider.ContainerFsInfoLabel()
 	if err != nil {
 		return cadvisorapiv2.FsInfo{}, err
 	}
-	return cc.getFsInfo(label)
+	return cc.getFsInfo(ctx, label)
 }

@@ -21,6 +21,7 @@ package certificates
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -114,20 +115,26 @@ func NewCertificateController(
 // Run the main goroutine responsible for watching and syncing jobs.
 func (cc *CertificateController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer cc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting certificate controller", "name", cc.name)
-	defer logger.Info("Shutting down certificate controller", "name", cc.name)
 
-	if !cache.WaitForNamedCacheSync(fmt.Sprintf("certificate-%s", cc.name), ctx.Done(), cc.csrsSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down certificate controller", "name", cc.name)
+		cc.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, cc.csrsSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, cc.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, cc.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

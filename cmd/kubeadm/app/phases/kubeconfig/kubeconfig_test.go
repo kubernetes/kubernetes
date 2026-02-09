@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,6 +47,7 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
@@ -55,8 +55,7 @@ import (
 
 func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
 	// Create temp folder for the test case (without a CA)
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Creates an InitConfiguration pointing to the pkidir folder
 	cfg := &kubeadmapi.InitConfiguration{
@@ -73,8 +72,7 @@ func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
 
 func TestGetKubeConfigSpecs(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Adds a pki folder with a ca certs to the temp folder
 	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
@@ -86,6 +84,14 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 				CertificatesDir:     pkidir,
 				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
+			},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
+		},
+		{
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				CertificatesDir:     pkidir,
+				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP384,
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
@@ -299,8 +305,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create temp folder for the test case
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			// Writes the existing kubeconfig file to disk
 			if test.existingKubeConfig != nil {
@@ -352,8 +357,7 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create temp folder for the test case
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			// Adds a pki folder with a ca certs to the temp folder
 			pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
@@ -385,8 +389,7 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 
 func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 	// Temporary folders for the test case (without a CA)
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Creates an InitConfiguration pointing to the tmpdir folder
 	cfg := &kubeadmapi.InitConfiguration{
@@ -429,8 +432,7 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 
 func TestWriteKubeConfig(t *testing.T) {
 	// Temporary folders for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Adds a pki folder with a ca cert to the temp folder
 	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
@@ -583,8 +585,7 @@ func TestValidateKubeConfig(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			if test.existingKubeConfig != nil {
 				if err := createKubeConfigFileIfNotExists(tmpdir, "test.conf", test.existingKubeConfig); err != nil {
@@ -607,12 +608,7 @@ func TestValidateKubeConfig(t *testing.T) {
 }
 
 func TestValidateKubeconfigsForExternalCA(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Error(err)
-		}
-	}()
+	tmpDir := t.TempDir()
 	pkiDir := filepath.Join(tmpDir, "pki")
 
 	initConfig := &kubeadmapi.InitConfiguration{
@@ -698,12 +694,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
-			defer func() {
-				if err := os.RemoveAll(tmpdir); err != nil {
-					t.Error(err)
-				}
-			}()
+			tmpdir := t.TempDir()
 
 			for name, config := range test.filesToWrite {
 				if err := createKubeConfigFileIfNotExists(tmpdir, name, config); err != nil {
@@ -726,12 +717,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 }
 
 func TestValidateKubeconfigsForExternalCAMissingRoot(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Error(err)
-		}
-	}()
+	tmpDir := t.TempDir()
 	pkiDir := filepath.Join(tmpDir, "pki")
 
 	initConfig := &kubeadmapi.InitConfiguration{
@@ -859,12 +845,7 @@ func TestValidateKubeconfigsForExternalCAMissingRoot(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
-			defer func() {
-				if err := os.RemoveAll(tmpdir); err != nil {
-					t.Error(err)
-				}
-			}()
+			tmpdir := t.TempDir()
 
 			for name, config := range test.filesToWrite {
 				if err := createKubeConfigFileIfNotExists(tmpdir, name, config); err != nil {
@@ -926,8 +907,7 @@ func setupKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, apiSer
 }
 
 func TestEnsureAdminClusterRoleBinding(t *testing.T) {
-	dir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	cfg := testutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = dir
@@ -1117,12 +1097,12 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			adminClient := clientsetfake.NewSimpleClientset()
+			adminClient := clientsetfake.NewClientset()
 			tc.setupAdminClient(adminClient)
 
 			var superAdminClient clientset.Interface // ensure superAdminClient is nil by default
 			if tc.setupSuperAdminClient != nil {
-				fakeSuperAdminClient := clientsetfake.NewSimpleClientset()
+				fakeSuperAdminClient := clientsetfake.NewClientset()
 				tc.setupSuperAdminClient(fakeSuperAdminClient)
 				superAdminClient = fakeSuperAdminClient
 			}
@@ -1141,13 +1121,8 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 }
 
 func TestCreateKubeConfigAndCSR(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
+	tmpDir := t.TempDir()
 	testutil.SetupEmptyFiles(t, tmpDir, "testfile", "bar.csr", "bar.key")
-	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Error(err)
-		}
-	}()
 	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 
 	type args struct {
@@ -1278,12 +1253,7 @@ func TestCreateKubeConfigAndCSR(t *testing.T) {
 }
 
 func TestCreateDefaultKubeConfigsAndCSRFiles(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Error(err)
-		}
-	}()
+	tmpDir := t.TempDir()
 	type args struct {
 		kubeConfigDir string
 		kubeadmConfig *kubeadmapi.InitConfiguration

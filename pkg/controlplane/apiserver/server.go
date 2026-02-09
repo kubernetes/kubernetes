@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -26,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
@@ -42,9 +42,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/leaderelection"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -59,6 +59,10 @@ var (
 	// IdentityLeaseRenewIntervalPeriod is the interval of kube-apiserver renewing its lease in seconds
 	// IdentityLeaseRenewIntervalPeriod is exposed so integration tests can tune this value.
 	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+
+	// LeaseCandidateGCPeriod is the interval which the leasecandidate GC controller checks for expired leases
+	// This is exposed so integration tests can tune this value.
+	LeaseCandidateGCPeriod = 30 * time.Minute
 )
 
 const (
@@ -66,6 +70,8 @@ const (
 	//   1. the lease is an identity lease (different from leader election leases)
 	//   2. which component owns this lease
 	IdentityLeaseComponentLabelKey = "apiserver.kubernetes.io/identity"
+	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
+	KubeAPIServer = "kube-apiserver"
 )
 
 // Server is a struct that contains a generic control plane apiserver instance
@@ -136,7 +142,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	}
 	if len(c.SystemNamespaces) > 0 {
 		s.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			go systemnamespaces.NewController(c.SystemNamespaces, client, s.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
+			go systemnamespaces.NewController(c.SystemNamespaces, client, s.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.Done())
 			return nil
 		})
 	}
@@ -146,7 +152,40 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
+		leaseInformer := s.VersionedInformers.Coordination().V1().Leases()
+		lcInformer := s.VersionedInformers.Coordination().V1beta1().LeaseCandidates()
+		// Ensure that informers are registered before starting. Coordinated Leader Election leader-elected
+		// and may register informer handlers after they are started.
+		_ = leaseInformer.Informer()
+		_ = lcInformer.Informer()
+		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-coordinated-leader-election-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			go leaderelection.RunWithLeaderElection(hookContext, s.GenericAPIServer.LoopbackClientConfig, func() (func(ctx context.Context, workers int), error) {
+				controller, err := leaderelection.NewController(
+					leaseInformer,
+					lcInformer,
+					client.CoordinationV1(),
+					client.CoordinationV1beta1(),
+				)
+				gccontroller := leaderelection.NewLeaseCandidateGC(
+					client,
+					LeaseCandidateGCPeriod,
+					lcInformer,
+				)
+				return func(ctx context.Context, workers int) {
+					go controller.Run(ctx, workers)
+					go gccontroller.Run(ctx)
+				}, err
+			}, leaderelection.LeaderElectionTimers{
+				LeaseDuration: c.CoordinatedLeadershipLeaseDuration,
+				RenewDeadline: c.CoordinatedLeadershipRenewDeadline,
+				RetryPeriod:   c.CoordinatedLeadershipRetryPeriod,
+			})
+			return nil
+		})
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.UnknownVersionInteroperabilityProxy) {
 		peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.Generic.PublicAddress, publicServicePort)
 		peerEndpointCtrl := peerreconcilers.New(
 			c.Generic.APIServerID,
@@ -156,7 +195,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 			client)
 		s.GenericAPIServer.AddPostStartHookOrDie("peer-endpoint-reconciler-controller",
 			func(hookContext genericapiserver.PostStartHookContext) error {
-				peerEndpointCtrl.Start(hookContext.StopCh)
+				peerEndpointCtrl.Start(hookContext.Done())
 				return nil
 			})
 		s.GenericAPIServer.AddPreShutdownHookOrDie("peer-endpoint-reconciler-controller",
@@ -165,71 +204,94 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				return nil
 			})
 		if c.Extra.PeerProxy != nil {
-			s.GenericAPIServer.AddPostStartHookOrDie("unknown-version-proxy-filter", func(context genericapiserver.PostStartHookContext) error {
-				err := c.Extra.PeerProxy.WaitForCacheSync(context.StopCh)
+			// Wait for handler to be ready
+			s.GenericAPIServer.AddPostStartHookOrDie("mixed-version-proxy-handler", func(context genericapiserver.PostStartHookContext) error {
+				err := c.Extra.PeerProxy.WaitForCacheSync(context.Done())
 				return err
+			})
+
+			// Run local-discovery sync loop
+			s.GenericAPIServer.AddPostStartHookOrDie("local-discovery-cache-sync", func(context genericapiserver.PostStartHookContext) error {
+				err := c.Extra.PeerProxy.RunLocalDiscoveryCacheSync(context.Done())
+				return err
+			})
+
+			// Run peer-discovery sync loop
+			s.GenericAPIServer.AddPostStartHookOrDie("peer-discovery-cache-sync", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunPeerDiscoveryCacheSync(context, 1)
+				return nil
+			})
+
+			// RunGVDeletionWorkers processes GVs from deleted CRDs/APIServices. If a GV is no longer in use,
+			// it is marked for removal from peer-discovery (with a deletion timestamp), triggering a grace period before cleanup.
+			s.GenericAPIServer.AddPostStartHookOrDie("gv-deletion-workers", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunGVDeletionWorkers(context, 1)
+				return nil
+			})
+
+			// RunExcludedGVsReaper removes GVs from the peer-discovery exclusion list after their grace period expires.
+			// This ensures we don't include stale CRDs/aggregated APIs from peer discovery in the aggregated discovery.
+			s.GenericAPIServer.AddPostStartHookOrDie("excluded-groups-reaper", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunExcludedGVsReaper(context.Done())
+				return nil
 			})
 		}
 	}
 
 	s.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(s.ClusterAuthenticationInfo, client)
-
-		// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
-		// TODO: See if we can pass ctx to the current method
-		ctx := wait.ContextForChannel(hookContext.StopCh)
-
 		// prime values and start listeners
 		if s.ClusterAuthenticationInfo.ClientCA != nil {
 			s.ClusterAuthenticationInfo.ClientCA.AddListener(controller)
 			if controller, ok := s.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(ctx); err != nil {
+				if err := controller.RunOnce(hookContext); err != nil {
 					runtime.HandleError(err)
 				}
-				go controller.Run(ctx, 1)
+				go controller.Run(hookContext, 1)
 			}
 		}
 		if s.ClusterAuthenticationInfo.RequestHeaderCA != nil {
 			s.ClusterAuthenticationInfo.RequestHeaderCA.AddListener(controller)
 			if controller, ok := s.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(ctx); err != nil {
+				if err := controller.RunOnce(hookContext); err != nil {
 					runtime.HandleError(err)
 				}
-				go controller.Run(ctx, 1)
+				go controller.Run(hookContext, 1)
 			}
 		}
 
-		go controller.Run(ctx, 1)
+		go controller.Run(hookContext, 1)
 		return nil
 	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
+		leaseName := s.GenericAPIServer.APIServerID
+		holderIdentity := s.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
+		peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.Generic.PublicAddress, publicServicePort)
+
+		// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
+		controller := lease.NewController(
+			clock.RealClock{},
+			client,
+			holderIdentity,
+			int32(IdentityLeaseDurationSeconds),
+			nil,
+			IdentityLeaseRenewIntervalPeriod,
+			leaseName,
+			metav1.NamespaceSystem,
+			// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
+			labelAPIServerHeartbeatFunc(name, peeraddress),
+		)
 		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
-			// TODO: See if we can pass ctx to the current method
-			ctx := wait.ContextForChannel(hookContext.StopCh)
-
-			leaseName := s.GenericAPIServer.APIServerID
-			holderIdentity := s.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
-
-			peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.Generic.PublicAddress, publicServicePort)
-			// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
-			controller := lease.NewController(
-				clock.RealClock{},
-				client,
-				holderIdentity,
-				int32(IdentityLeaseDurationSeconds),
-				nil,
-				IdentityLeaseRenewIntervalPeriod,
-				leaseName,
-				metav1.NamespaceSystem,
-				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
-				labelAPIServerHeartbeatFunc(name, peeraddress))
-			go controller.Run(ctx)
+			return controller.Start(hookContext.Done())
+		})
+		s.GenericAPIServer.AddPreShutdownHookOrDie("stop-kube-apiserver-identity-lease-controller", func() error {
+			controller.Stop()
 			return nil
 		})
+
 		// TODO: move this into generic apiserver and make the lease identity value configurable
 		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
 			go apiserverleasegc.NewAPIServerLeaseGC(
@@ -237,7 +299,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				IdentityLeaseGCPeriod,
 				metav1.NamespaceSystem,
 				IdentityLeaseComponentLabelKey+"="+name,
-			).Run(hookContext.StopCh)
+			).RunWithContext(hookContext)
 			return nil
 		})
 	}
@@ -247,7 +309,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	}
 
 	s.GenericAPIServer.AddPostStartHookOrDie("start-legacy-token-tracking-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		go legacytokentracking.NewController(client).Run(hookContext.StopCh)
+		go legacytokentracking.NewController(client).RunWithContext(hookContext)
 		return nil
 	})
 
@@ -276,7 +338,7 @@ func labelAPIServerHeartbeatFunc(identity string, peeraddress string) lease.Proc
 		lease.Labels[apiv1.LabelHostname] = hostname
 
 		// Include apiserver network location <ip_port> used by peers to proxy requests between kube-apiservers
-		if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.UnknownVersionInteroperabilityProxy) {
 			if peeraddress != "" {
 				lease.Annotations[apiv1.AnnotationPeerAdvertiseAddress] = peeraddress
 			}

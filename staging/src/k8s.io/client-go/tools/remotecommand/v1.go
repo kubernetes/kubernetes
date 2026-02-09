@@ -21,7 +21,7 @@ import (
 	"io"
 	"net/http"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/klog/v2"
 )
@@ -47,15 +47,15 @@ func newStreamProtocolV1(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV1) stream(conn streamCreator) error {
+func (p *streamProtocolV1) stream(logger klog.Logger, conn streamCreator, ready chan<- struct{}) error {
 	doneChan := make(chan struct{}, 2)
 	errorChan := make(chan error)
 
 	cp := func(s string, dst io.Writer, src io.Reader) {
-		klog.V(6).Infof("Copying %s", s)
-		defer klog.V(6).Infof("Done copying %s", s)
+		logger.V(6).Info("Copying", "data", s)
+		defer logger.V(6).Info("Done copying", "data", s)
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
-			klog.Errorf("Error copying %s: %v", s, err)
+			logger.Error(err, "Error copying", "data", s)
 		}
 		if s == v1.StreamTypeStdout || s == v1.StreamTypeStderr {
 			doneChan <- struct{}{}
@@ -104,6 +104,11 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 			return err
 		}
 		defer p.remoteStderr.Reset()
+	}
+
+	// Signal that all streams have been created.
+	if ready != nil {
+		close(ready)
 	}
 
 	// now that all the streams have been created, proceed with reading & copying

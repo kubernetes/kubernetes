@@ -25,13 +25,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	golangproto "google.golang.org/protobuf/proto"
+
 	apidiscovery "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,7 +60,9 @@ func TestGetServerVersion(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(output)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
@@ -107,7 +109,9 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(output)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
@@ -148,7 +152,9 @@ func TestDiscoveryToleratesMissingCoreGroup(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(output)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
@@ -185,7 +191,9 @@ func TestDiscoveryFailsWhenNonCoreGroupsMissing(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(output)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
@@ -386,7 +394,9 @@ func TestGetServerResourcesForGroupVersion(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(output)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}))
 	defer server.Close()
 	for _, test := range tests {
@@ -523,7 +533,7 @@ func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 			return
 		}
 
-		output, err := proto.Marshal(returnedOpenAPI())
+		output, err := golangproto.Marshal(returnedOpenAPI())
 		if err != nil {
 			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -1313,13 +1323,19 @@ func TestAggregatedServerGroups(t *testing.T) {
 				return
 			}
 			output, err = json.Marshal(agg)
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 			// Content-Type is "aggregated" discovery format. Add extra parameter
 			// to ensure we are resilient to these extra parameters.
 			w.Header().Set("Content-Type", AcceptV2+"; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			_, err = w.Write(output)
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 		}))
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
@@ -2383,7 +2399,10 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 						return
 					}
 					output, err = json.Marshal(agg)
-					require.NoError(t, err)
+					if err != nil {
+						t.Errorf("unexpected error %v", err)
+						return
+					}
 				} else {
 					var agg *apidiscoveryv2beta1.APIGroupDiscoveryList
 					switch req.URL.Path {
@@ -2396,14 +2415,19 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 						return
 					}
 					output, err = json.Marshal(&agg)
-					require.NoError(t, err)
+					if err != nil {
+						t.Errorf("unexpected error %v", err)
+						return
+					}
 				}
 				// Content-Type is "aggregated" discovery format. Add extra parameter
 				// to ensure we are resilient to these extra parameters.
 				w.Header().Set("Content-Type", accept+"; charset=utf-8")
 				w.WriteHeader(http.StatusOK)
 				_, err = w.Write(output)
-				require.NoError(t, err)
+				if err != nil {
+					t.Errorf("unexpected error %v", err)
+				}
 
 			}))
 			defer server.Close()
@@ -2425,9 +2449,9 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 				"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
 			// If the core V1 group is returned from /api, it should be the first group.
 			if expectedGroupNames.Has("") {
-				assert.True(t, len(apiGroups) > 0)
+				assert.NotEmpty(t, apiGroups)
 				actualFirstGroup := apiGroups[0]
-				assert.True(t, len(actualFirstGroup.Versions) > 0)
+				assert.NotEmpty(t, actualFirstGroup.Versions)
 				actualFirstGroupVersion := actualFirstGroup.Versions[0].GroupVersion
 				assert.Equal(t, "v1", actualFirstGroupVersion)
 			}
@@ -2543,13 +2567,18 @@ func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
 				return
 			}
 			output, err = json.Marshal(agg)
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 			// Content-Type is "aggregated" discovery format. Add extra parameter
 			// to ensure we are resilient to these extra parameters.
 			w.Header().Set("Content-Type", AcceptV2+"; charset=utf-8")
 			w.WriteHeader(status)
 			_, err = w.Write(output)
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+			}
 		}))
 		defer server.Close()
 
@@ -3156,13 +3185,18 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 				return
 			}
 			output, err = json.Marshal(agg)
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 			// Content-Type is "aggregated" discovery format. Add extra parameter
 			// to ensure we are resilient to these extra parameters.
 			w.Header().Set("Content-Type", AcceptV2+"; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			_, err = w.Write(output)
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+			}
 		}))
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})

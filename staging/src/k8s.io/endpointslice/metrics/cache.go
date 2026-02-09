@@ -20,7 +20,6 @@ import (
 	"math"
 	"sync"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	endpointsliceutil "k8s.io/endpointslice/util"
 )
@@ -59,12 +58,6 @@ type Cache struct {
 	// The type should be read as map[trafficDistribution]setOfServices
 	servicesByTrafficDistribution map[string]map[types.NamespacedName]bool
 }
-
-const (
-	// Label value for cases when service.spec.trafficDistribution is set to an
-	// unknown value.
-	trafficDistributionImplementationSpecific = "ImplementationSpecific"
-)
 
 // ServicePortCache tracks values for total numbers of desired endpoints as well
 // as the efficiency of EndpointSlice endpoints distribution for each unique
@@ -151,13 +144,6 @@ func (c *Cache) UpdateTrafficDistributionForService(serviceNN types.NamespacedNa
 	}
 
 	trafficDistribution := *trafficDistributionPtr
-	// If we don't explicitly recognize a value for trafficDistribution, it should
-	// be treated as an implementation specific value. All such implementation
-	// specific values should use the label value "ImplementationSpecific" to not
-	// explode the metric labels cardinality.
-	if trafficDistribution != corev1.ServiceTrafficDistributionPreferClose {
-		trafficDistribution = trafficDistributionImplementationSpecific
-	}
 	serviceSet, ok := c.servicesByTrafficDistribution[trafficDistribution]
 	if !ok {
 		serviceSet = make(map[types.NamespacedName]bool)

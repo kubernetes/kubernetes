@@ -22,16 +22,15 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
@@ -40,9 +39,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/version"
 	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var scheme = runtime.NewScheme()
@@ -59,16 +63,16 @@ func init() {
 }
 
 func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv2.APIGroupDiscoveryList {
-	fuzzer := fuzz.NewWithSeed(seed)
+	fuzzer := randfill.NewWithSeed(seed)
 	fuzzer.NumElements(atLeastNumGroups, maxNumGroups)
 	fuzzer.NilChance(0)
-	fuzzer.Funcs(func(o *apidiscoveryv2.APIGroupDiscovery, c fuzz.Continue) {
-		c.FuzzNoCustom(o)
+	fuzzer.Funcs(func(o *apidiscoveryv2.APIGroupDiscovery, c randfill.Continue) {
+		c.FillNoCustom(o)
 
 		// The ResourceManager will just not serve the group if its versions
 		// list is empty
 		atLeastOne := apidiscoveryv2.APIVersionDiscovery{}
-		c.Fuzz(&atLeastOne)
+		c.Fill(&atLeastOne)
 		o.Versions = append(o.Versions, atLeastOne)
 		sort.Slice(o.Versions[:], func(i, j int) bool {
 			return version.CompareKubeAwareVersionStrings(o.Versions[i].Version, o.Versions[j].Version) > 0
@@ -76,14 +80,14 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv
 
 		o.TypeMeta = metav1.TypeMeta{}
 		var name string
-		c.Fuzz(&name)
+		c.Fill(&name)
 		o.ObjectMeta = metav1.ObjectMeta{
 			Name: name,
 		}
 	})
 
 	var apis []apidiscoveryv2.APIGroupDiscovery
-	fuzzer.Fuzz(&apis)
+	fuzzer.Fill(&apis)
 	sort.Slice(apis[:], func(i, j int) bool {
 		return apis[i].Name < apis[j].Name
 	})
@@ -130,7 +134,7 @@ func fetchPath(handler http.Handler, acceptPrefix string, path string, etag stri
 func fetchPathHelper(handler http.Handler, accept string, path string, etag string) (*http.Response, []byte) {
 	// Expect json-formatted apis group list
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", discoveryPath, nil)
+	req := httptest.NewRequest(request.MethodGet, path, nil)
 
 	// Ask for JSON response
 	req.Header.Set("Accept", accept)
@@ -187,6 +191,8 @@ func TestBasicResponseProtobuf(t *testing.T) {
 
 // V2Beta1 should still be served
 func TestV2Beta1SkewSupport(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.34"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryRemoveBetaType, false)
 	manager := discoveryendpoint.NewResourceManager("apis")
 
 	apis := fuzzAPIGroups(1, 3, 10)
@@ -470,7 +476,7 @@ func TestMultipleSources(t *testing.T) {
 	_, _, initialDocument := fetchPath(defaultManager, "application/json", discoveryPath, "")
 
 	require.Len(t, initialDocument.Items, len(expectedResult))
-	require.Equal(t, initialDocument.Items, expectedResult)
+	require.Equal(t, expectedResult, initialDocument.Items)
 }
 
 // Shows that if you have multiple sources including Default source using
@@ -674,11 +680,11 @@ func TestVersionSortingNoPriority(t *testing.T) {
 	versions := decoded.Items[0].Versions
 
 	// Ensure that v1 is sorted before v1alpha1
-	assert.Equal(t, versions[0].Version, "v2")
-	assert.Equal(t, versions[1].Version, "v1")
-	assert.Equal(t, versions[2].Version, "v2beta1")
-	assert.Equal(t, versions[3].Version, "v1beta1")
-	assert.Equal(t, versions[4].Version, "v1alpha1")
+	assert.Equal(t, "v2", versions[0].Version)
+	assert.Equal(t, "v1", versions[1].Version)
+	assert.Equal(t, "v2beta1", versions[2].Version)
+	assert.Equal(t, "v1beta1", versions[3].Version)
+	assert.Equal(t, "v1alpha1", versions[4].Version)
 }
 
 func TestVersionSortingWithPriority(t *testing.T) {
@@ -699,8 +705,8 @@ func TestVersionSortingWithPriority(t *testing.T) {
 	versions := decoded.Items[0].Versions
 
 	// Ensure that reverse alpha sort order can be overridden by setting group version priorities.
-	assert.Equal(t, versions[0].Version, "v1alpha1")
-	assert.Equal(t, versions[1].Version, "v1")
+	assert.Equal(t, "v1alpha1", versions[0].Version)
+	assert.Equal(t, "v1", versions[1].Version)
 }
 
 // if two apiservices declare conflicting priorities for their group priority, take the higher one.
@@ -726,8 +732,8 @@ func TestGroupVersionSortingConflictingPriority(t *testing.T) {
 	groups := decoded.Items
 
 	// Ensure that reverse alpha sort order can be overridden by setting group version priorities.
-	assert.Equal(t, groups[0].Name, "test")
-	assert.Equal(t, groups[1].Name, "default")
+	assert.Equal(t, "test", groups[0].Name)
+	assert.Equal(t, "default", groups[1].Name)
 }
 
 // Show that the GroupPriorityMinimum is not sticky if a higher group version is removed
@@ -756,8 +762,8 @@ func TestStatelessGroupPriorityMinimum(t *testing.T) {
 	// Expect v1alpha1's group priority to be used and sort it first in the list
 	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
 	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
-	assert.Equal(t, decoded.Items[0].Name, "experimental.example.com")
-	assert.Equal(t, decoded.Items[1].Name, "stable.example.com")
+	assert.Equal(t, "experimental.example.com", decoded.Items[0].Name)
+	assert.Equal(t, "stable.example.com", decoded.Items[1].Name)
 
 	// Remove v1alpha1 and expect the new lower priority to take hold
 	manager.RemoveGroupVersion(metav1.GroupVersion{Group: experimentalGroup, Version: "v1alpha1"})
@@ -765,6 +771,6 @@ func TestStatelessGroupPriorityMinimum(t *testing.T) {
 	response, _, decoded = fetchPath(manager, "application/json", discoveryPath, "")
 	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
 
-	assert.Equal(t, decoded.Items[0].Name, "stable.example.com")
-	assert.Equal(t, decoded.Items[1].Name, "experimental.example.com")
+	assert.Equal(t, "stable.example.com", decoded.Items[0].Name)
+	assert.Equal(t, "experimental.example.com", decoded.Items[1].Name)
 }

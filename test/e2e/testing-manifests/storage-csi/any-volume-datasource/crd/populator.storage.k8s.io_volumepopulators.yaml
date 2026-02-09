@@ -4,7 +4,6 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.5.0
     api-approved.kubernetes.io: https://github.com/kubernetes/enhancements/pull/2934
-  creationTimestamp: null
   name: volumepopulators.populator.storage.k8s.io
 spec:
   group: populator.storage.k8s.io

@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	smdschema "sigs.k8s.io/structured-merge-diff/v4/schema"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
+	smdschema "sigs.k8s.io/structured-merge-diff/v6/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -287,7 +287,7 @@ func TestIndexModels(t *testing.T) {
 		resultNames[k] = *v.TypeRef.NamedType
 	}
 
-	require.Equal(t, resultNames, map[schema.GroupVersionKind]string{
+	require.Equal(t, map[schema.GroupVersionKind]string{
 		{
 			Group:   "mygroup",
 			Version: "v1",
@@ -313,5 +313,5 @@ func TestIndexModels(t *testing.T) {
 			Version: "v3",
 			Kind:    "MyOtherKind",
 		}: "def3",
-	})
+	}, resultNames)
 }

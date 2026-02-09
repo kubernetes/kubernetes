@@ -155,6 +155,25 @@ type KubeletConfiguration struct {
 	// pulls to burst to this number, while still not exceeding registryPullQPS.
 	// Only used if registryPullQPS > 0.
 	RegistryBurst int32
+	// imagePullCredentialsVerificationPolicy determines how credentials should be
+	// verified when pod requests an image that is already present on the node:
+	//   - NeverVerify
+	//       - anyone on a node can use any image present on the node
+	//   - NeverVerifyPreloadedImages
+	//       - images that were pulled to the node by something else than the kubelet
+	//         can be used without reverifying pull credentials
+	//   - NeverVerifyAllowlistedImages
+	//       - like "NeverVerifyPreloadedImages" but only node images from
+	//         `preloadedImagesVerificationAllowlist` don't require reverification
+	//   - AlwaysVerify
+	//       - all images require credential reverification
+	ImagePullCredentialsVerificationPolicy string
+	// preloadedImagesVerificationAllowlist specifies a list of images that are
+	// exempted from credential reverification for the "NeverVerifyAllowlistedImages"
+	// `imagePullCredentialsVerificationPolicy`.
+	// The list accepts a full path segment wildcard suffix "/*".
+	// Only use image specs without an image tag or digest.
+	PreloadedImagesVerificationAllowlist []string
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.
 	EventRecordQPS int32
@@ -184,6 +203,7 @@ type KubeletConfiguration struct {
 	ClusterDNS []string
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
+	// Deprecated: no longer has any effect.
 	StreamingConnectionIdleTimeout metav1.Duration
 	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
 	// status. If node lease feature is not enabled, it is also the frequency that
@@ -199,6 +219,8 @@ type KubeletConfiguration struct {
 	NodeLeaseDurationSeconds int32
 	// ImageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
+	// The field value must be greater than 0.
+	// If unset or 0, defaults to 2m.
 	ImageMinimumGCAge metav1.Duration
 	// ImageMaximumGCAge is the maximum age an image can be unused before it is garbage collected.
 	// The default of this field is "0s", which disables this field--meaning images won't be garbage
@@ -229,15 +251,16 @@ type KubeletConfiguration struct {
 	CgroupsPerQOS bool
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	CgroupDriver string
+	// SingleProcessOOMKill, if true, will prevent the `memory.oom.group` flag from being set for container
+	// cgroups in cgroups v2. This causes processes in the container to be OOM killed individually instead of as
+	// a group. It means that if true, the behavior aligns with the behavior of cgroups v1.
+	SingleProcessOOMKill *bool
 	// CPUManagerPolicy is the name of the policy to use.
-	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerPolicy string
 	// CPUManagerPolicyOptions is a set of key=value which 	allows to set extra options
 	// to fine tune the behaviour of the cpu manager policies.
-	// Requires  both the "CPUManager" and "CPUManagerPolicyOptions" feature gates to be enabled.
 	CPUManagerPolicyOptions map[string]string
 	// CPU Manager reconciliation period.
-	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
 	// MemoryManagerPolicy is the name of the policy to use.
 	// Requires the MemoryManager feature gate to be enabled.
@@ -281,11 +304,13 @@ type KubeletConfiguration struct {
 	ResolverConfig string
 	// RunOnce causes the Kubelet to check the API server once for pods,
 	// run those in addition to the pods specified by static pod files, and exit.
+	// Deprecated: no longer has any effect.
 	RunOnce bool
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits
 	CPUCFSQuota bool
 	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100ms
+	// Default: "100ms". Changing this value requires enabling the CustomCPUCFSQuotaPeriod feature gate.
 	CPUCFSQuotaPeriod metav1.Duration
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
@@ -317,6 +342,14 @@ type KubeletConfiguration struct {
 	// amount of a given resource the kubelet will reclaim when performing a pod eviction while
 	// that resource is under pressure. For example: {"imagefs.available": "2Gi"}
 	EvictionMinimumReclaim map[string]string
+	// mergeDefaultEvictionSettings indicates that defaults for the evictionHard, evictionSoft, evictionSoftGracePeriod, and evictionMinimumReclaim
+	// fields should be merged into values specified for those fields in this configuration.
+	// Signals specified in this configuration take precedence.
+	// Signals not specified in this configuration inherit their defaults.
+	// If false, and if any signal is specified in this configuration then other signals that
+	// are not specified in this configuration will be set to 0.
+	// It applies to merging the fields for which the default exists, and currently only evictionHard has default values.
+	MergeDefaultEvictionSettings bool
 	// podsPerCore is the maximum number of pods per core. Cannot exceed MaxPods.
 	// If 0, this field is ignored.
 	PodsPerCore int32
@@ -374,12 +407,12 @@ type KubeletConfiguration struct {
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
-	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
+	// See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources for more detail.
 	SystemReserved map[string]string
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
-	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
+	// See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources for more detail.
 	KubeReserved map[string]string
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information.
@@ -388,7 +421,7 @@ type KubeletConfiguration struct {
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information.
 	KubeReservedCgroup string
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
-	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
+	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved`, `system-reserved-compressible`, `kube-reserved`, and `kube-reserved-compressible`.
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information.
 	EnforceNodeAllocatable []string
 	// This option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
@@ -408,6 +441,8 @@ type KubeletConfiguration struct {
 	EnableSystemLogHandler bool
 	// EnableSystemLogQuery enables the node log query feature on the /logs endpoint.
 	// EnableSystemLogHandler has to be enabled in addition for this feature to work.
+	// Enabling this feature has security implications. The recommendation is to enable it on a need basis for debugging
+	// purposes and disabling otherwise.
 	// +featureGate=NodeLogQuery
 	// +optional
 	EnableSystemLogQuery bool
@@ -471,7 +506,6 @@ type KubeletConfiguration struct {
 
 	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
 	// See https://kep.k8s.io/2832 for more details.
-	// +featureGate=KubeletTracing
 	// +optional
 	Tracing *tracingapi.TracingConfiguration
 
@@ -494,6 +528,24 @@ type KubeletConfiguration struct {
 	// If not specified the default value is ContainerRuntimeEndpoint
 	// +optional
 	ImageServiceEndpoint string
+
+	// FailCgroupV1 prevents the kubelet from starting on hosts
+	// that use cgroup v1. By default, this is set to 'false', meaning
+	// the kubelet is allowed to start on cgroup v1 hosts unless this
+	// option is explicitly enabled.
+	// +optional
+	FailCgroupV1 bool
+
+	// CrashLoopBackOff contains config to modify node-level parameters for
+	// container restart behavior
+	// +featureGate=KubeletCrashLoopBackoffMax
+	// +optional
+	CrashLoopBackOff CrashLoopBackOffConfig
+
+	// UserNamespaces contains User Namespace configurations.
+	// +featureGate=UserNamespacesSupport
+	// +optional
+	UserNamespaces *UserNamespaces
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -572,6 +624,23 @@ type SerializedNodeConfigSource struct {
 	Source v1.NodeConfigSource
 }
 
+// ServiceAccountTokenCacheType is the type of cache key used for caching credentials returned by the plugin
+// when the service account token is used.
+type ServiceAccountTokenCacheType string
+
+const (
+	// TokenServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-token basis. This should be set if the returned credential's lifetime is limited
+	// to the input service account token's lifetime.
+	// For example, this must be used when returning the input service account token directly as a pull credential.
+	TokenServiceAccountTokenCacheType ServiceAccountTokenCacheType = "Token"
+	// ServiceAccountServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-serviceaccount basis. This should be set if the plugin's credential retrieval logic
+	// depends only on the service account and not on pod-specific claims.
+	// Use this when the returned credential is valid for all pods using the same service account.
+	ServiceAccountServiceAccountTokenCacheType ServiceAccountTokenCacheType = "ServiceAccount"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CredentialProviderConfig is the configuration containing information about
@@ -584,7 +653,7 @@ type CredentialProviderConfig struct {
 	// Multiple providers may match against a single image, in which case credentials
 	// from all providers will be returned to the kubelet. If multiple providers are called
 	// for a single image, the results are combined. If providers return overlapping
-	// auth keys, the value from the provider earlier in this list is used.
+	// auth keys, the value from the provider earlier in this list is attempted first.
 	Providers []CredentialProvider
 }
 
@@ -594,6 +663,7 @@ type CredentialProvider struct {
 	// name is the required name of the credential provider. It must match the name of the
 	// provider executable as seen by the kubelet. The executable must be in the kubelet's
 	// bin directory (set by the --credential-provider-bin-dir flag).
+	// Required to be unique across all providers.
 	Name string
 
 	// matchImages is a required list of strings used to match against images in order to
@@ -641,6 +711,78 @@ type CredentialProvider struct {
 	// to pass argument to the plugin.
 	// +optional
 	Env []ExecEnvVar
+
+	// tokenAttributes is the configuration for the service account token that will be passed to the plugin.
+	// The credential provider opts in to using service account tokens for image pull by setting this field.
+	// When this field is set, kubelet will generate a service account token bound to the pod for which the
+	// image is being pulled and pass to the plugin as part of CredentialProviderRequest along with other
+	// attributes required by the plugin.
+	//
+	// The service account metadata and token attributes will be used as a dimension to cache
+	// the credentials in kubelet. The cache key is generated by combining the service account metadata
+	// (namespace, name, UID, and annotations key+value for the keys defined in
+	// serviceAccountTokenAttribute.requiredServiceAccountAnnotationKeys and serviceAccountTokenAttribute.optionalServiceAccountAnnotationKeys).
+	// The pod metadata (namespace, name, UID) that are in the service account token are not used as a dimension
+	// to cache the credentials in kubelet. This means workloads that are using the same service account
+	// could end up using the same credentials for image pull. For plugins that don't want this behavior, or
+	// plugins that operate in pass-through mode; i.e., they return the service account token as-is, they
+	// can set the credentialProviderResponse.cacheDuration to 0. This will disable the caching of
+	// credentials in kubelet and the plugin will be invoked for every image pull. This does result in
+	// token generation overhead for every image pull, but it is the only way to ensure that the
+	// credentials are not shared across pods (even if they are using the same service account).
+	// +optional
+	TokenAttributes *ServiceAccountTokenAttributes
+}
+
+// ServiceAccountTokenAttributes is the configuration for the service account token that will be passed to the plugin.
+type ServiceAccountTokenAttributes struct {
+	// serviceAccountTokenAudience is the intended audience for the projected service account token.
+	// +required
+	ServiceAccountTokenAudience string
+
+	// cacheType indicates the type of cache key use for caching the credentials returned by the plugin
+	// when the service account token is used.
+	// The most conservative option is to set this to "Token", which means the kubelet will cache returned credentials
+	// on a per-token basis. This should be set if the returned credential's lifetime is limited to the service account
+	// token's lifetime.
+	// If the plugin's credential retrieval logic depends only on the service account and not on pod-specific claims,
+	// then the plugin can set this to "ServiceAccount". In this case, the kubelet will cache returned credentials
+	// on a per-serviceaccount basis. Use this when the returned credential is valid for all pods using the same service account.
+	// +required
+	CacheType ServiceAccountTokenCacheType
+
+	// requireServiceAccount indicates whether the plugin requires the pod to have a service account.
+	// If set to true, kubelet will only invoke the plugin if the pod has a service account.
+	// If set to false, kubelet will invoke the plugin even if the pod does not have a service account
+	// and will not include a token in the CredentialProviderRequest in that scenario. This is useful for plugins that
+	// are used to pull images for pods without service accounts (e.g., static pods).
+	// +required
+	RequireServiceAccount *bool
+
+	// requiredServiceAccountAnnotationKeys is the list of annotation keys that the plugin is interested in
+	// and that are required to be present in the service account.
+	// The keys defined in this list will be extracted from the corresponding service account and passed
+	// to the plugin as part of the CredentialProviderRequest. If any of the keys defined in this list
+	// are not present in the service account, kubelet will not invoke the plugin and will return an error.
+	// This field is optional and may be empty. Plugins may use this field to extract
+	// additional information required to fetch credentials or allow workloads to opt in to
+	// using service account tokens for image pull.
+	// If non-empty, requireServiceAccount must be set to true.
+	// Keys in this list must be unique.
+	// This list needs to be mutually exclusive with optionalServiceAccountAnnotationKeys.
+	// +optional
+	RequiredServiceAccountAnnotationKeys []string
+
+	// optionalServiceAccountAnnotationKeys is the list of annotation keys that the plugin is interested in
+	// and that are optional to be present in the service account.
+	// The keys defined in this list will be extracted from the corresponding service account and passed
+	// to the plugin as part of the CredentialProviderRequest. The plugin is responsible for validating
+	// the existence of annotations and their values.
+	// This field is optional and may be empty. Plugins may use this field to extract
+	// additional information required to fetch credentials.
+	// Keys in this list must be unique.
+	// +optional
+	OptionalServiceAccountAnnotationKeys []string
 }
 
 // ExecEnvVar is used for setting environment variables when executing an exec-based
@@ -671,4 +813,131 @@ type MemorySwapConfiguration struct {
 	// +featureGate=NodeSwap
 	// +optional
 	SwapBehavior string
+}
+
+// CrashLoopBackOffConfig is used for setting configuration for this kubelet's
+// container restart behavior
+type CrashLoopBackOffConfig struct {
+	// MaxContainerRestartPeriod is the maximum duration the backoff delay can accrue
+	// to for container restarts, minimum 1 second, maximum 300 seconds.
+	// +featureGate=KubeletCrashLoopBackOffMax
+	// +optional
+	MaxContainerRestartPeriod *metav1.Duration
+}
+
+// ImagePullCredentialsVerificationPolicy is an enum for the policy that is enforced
+// when pod is requesting an image that appears on the system
+type ImagePullCredentialsVerificationPolicy string
+
+const (
+	// NeverVerify will never require credential verification for images that
+	// already exist on the node
+	NeverVerify ImagePullCredentialsVerificationPolicy = "NeverVerify"
+	// NeverVerifyPreloadedImages does not require credential verification for images
+	// pulled outside the kubelet process
+	NeverVerifyPreloadedImages ImagePullCredentialsVerificationPolicy = "NeverVerifyPreloadedImages"
+	// NeverVerifyAllowlistedImages does not require credential verification for
+	// a list of images that were pulled outside the kubelet process
+	NeverVerifyAllowlistedImages ImagePullCredentialsVerificationPolicy = "NeverVerifyAllowlistedImages"
+	// AlwaysVerify requires credential verification for accessing any image on the
+	// node irregardless how it was pulled
+	AlwaysVerify ImagePullCredentialsVerificationPolicy = "AlwaysVerify"
+)
+
+// ImagePullIntent is a record of the kubelet attempting to pull an image.
+//
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type ImagePullIntent struct {
+	metav1.TypeMeta
+
+	// Image is the image spec from a Container's `image` field.
+	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
+	// characters like ':' and '/'.
+	Image string
+}
+
+// ImagePullRecord is a record of an image that was pulled by the kubelet.
+//
+// If there are no records in the `kubernetesSecrets` field and both `nodeWideCredentials`
+// and `anonymous` are `false`, credentials must be re-checked the next time an
+// image represented by this record is being requested.
+//
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type ImagePulledRecord struct {
+	metav1.TypeMeta
+
+	// LastUpdatedTime is the time of the last update to this record
+	LastUpdatedTime metav1.Time
+
+	// ImageRef is a reference to the image represented by this file as received
+	// from the CRI.
+	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
+	// characters like ':' and '/'.
+	ImageRef string
+
+	// CredentialMapping maps `image` to the set of credentials that it was
+	// previously pulled with.
+	// `image` in this case is the content of a pod's container `image` field that's
+	// got its tag/digest removed.
+	//
+	// Example:
+	//   Container requests the `hello-world:latest@sha256:91fb4b041da273d5a3273b6d587d62d518300a6ad268b28628f74997b93171b2` image:
+	//     "credentialMapping": {
+	//       "hello-world": { "nodePodsAccessible": true }
+	//     }
+	CredentialMapping map[string]ImagePullCredentials
+}
+
+// ImagePullCredentials describe credentials that can be used to pull an image.
+type ImagePullCredentials struct {
+	// KubernetesSecretCoordinates is an index of coordinates of all the kubernetes
+	// secrets that were used to pull the image.
+	// +optional
+	KubernetesSecrets []ImagePullSecret
+
+	// KubernetesServiceAccounts is an index of coordinates of all the kubernetes
+	// service accounts that were used to pull the image.
+	// +optional
+	KubernetesServiceAccounts []ImagePullServiceAccount
+
+	// NodePodsAccessible is a flag denoting the pull credentials are accessible
+	// by all the pods on the node, or that no credentials are needed for the pull.
+	//
+	// If true, it is mutually exclusive with the `kubernetesSecrets` and `kubernetesServiceAccounts` fields.
+	// +optional
+	NodePodsAccessible bool
+}
+
+// ImagePullSecret is a representation of a Kubernetes secret object coordinates along
+// with a credential hash of the pull secret credentials this object contains.
+type ImagePullSecret struct {
+	UID       string
+	Namespace string
+	Name      string
+
+	// CredentialHash is a SHA-256 retrieved by hashing the image pull credentials
+	// content of the secret specified by the UID/Namespace/Name coordinates.
+	CredentialHash string
+}
+
+// ImagePullServiceAccount is a representation of a Kubernetes service account object coordinates
+// for which the kubelet sent service account token to the credential provider plugin for image pull credentials.
+type ImagePullServiceAccount struct {
+	UID       string
+	Namespace string
+	Name      string
+}
+
+// UserNamespaces contains User Namespace configurations.
+type UserNamespaces struct {
+	// IDsPerPod is the mapping length of UIDs and GIDs.
+	// The length must be a multiple of 65536, and must be less than 1<<32.
+	// On non-linux such as windows, only null / absent is allowed.
+	//
+	// Changing the value may require recreating all containers on the node.
+	//
+	// Default: 65536
+	// +featureGate=UserNamespacesSupport
+	// +optional
+	IDsPerPod *int64
 }

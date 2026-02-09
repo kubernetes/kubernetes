@@ -19,19 +19,29 @@ limitations under the License.
 package v2
 
 import (
-	v2 "k8s.io/api/autoscaling/v2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // HorizontalPodAutoscalerConditionApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerCondition type for use
 // with apply.
+//
+// HorizontalPodAutoscalerCondition describes the state of
+// a HorizontalPodAutoscaler at a certain point.
 type HorizontalPodAutoscalerConditionApplyConfiguration struct {
-	Type               *v2.HorizontalPodAutoscalerConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus                      `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                             `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                  `json:"reason,omitempty"`
-	Message            *string                                  `json:"message,omitempty"`
+	// type describes the current condition
+	Type *autoscalingv2.HorizontalPodAutoscalerConditionType `json:"type,omitempty"`
+	// status is the status of the condition (True, False, Unknown)
+	Status *v1.ConditionStatus `json:"status,omitempty"`
+	// lastTransitionTime is the last time the condition transitioned from
+	// one status to another
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// reason is the reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// message is a human-readable explanation containing details about
+	// the transition
+	Message *string `json:"message,omitempty"`
 }
 
 // HorizontalPodAutoscalerConditionApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerCondition type for use with
@@ -43,7 +53,7 @@ func HorizontalPodAutoscalerCondition() *HorizontalPodAutoscalerConditionApplyCo
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithType(value v2.HorizontalPodAutoscalerConditionType) *HorizontalPodAutoscalerConditionApplyConfiguration {
+func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithType(value autoscalingv2.HorizontalPodAutoscalerConditionType) *HorizontalPodAutoscalerConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

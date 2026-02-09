@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
+
+	"k8s.io/utils/clock"
 )
 
 type status int
@@ -38,18 +41,26 @@ const (
 //	|                           ^
 //	└---------------------------┘
 type ready struct {
-	state       status        // represent the state of the variable
+	state       status // represent the state of the variable
+	lastErr     error
 	generation  int           // represent the number of times we have transtioned to ready
 	lock        sync.RWMutex  // protect the state and generation variables
 	restartLock sync.Mutex    // protect the transition from ready to pending where the channel is recreated
 	waitCh      chan struct{} // blocks until is ready or stopped
+
+	clock               clock.Clock
+	lastStateChangeTime time.Time
 }
 
-func newReady() *ready {
-	return &ready{
+func newReady(c clock.Clock) *ready {
+	r := &ready{
 		waitCh: make(chan struct{}),
 		state:  Pending,
+		clock:  c,
 	}
+	r.updateLastStateChangeTimeLocked()
+
+	return r
 }
 
 // done close the channel once the state is Ready or Stopped
@@ -77,8 +88,7 @@ func (r *ready) waitAndReadGeneration(ctx context.Context) (int, error) {
 		}
 
 		r.lock.RLock()
-		switch r.state {
-		case Pending:
+		if r.state == Pending {
 			// since we allow to switch between the states Pending and Ready
 			// if there is a quick transition from Pending -> Ready -> Pending
 			// a process that was waiting can get unblocked and see a Pending
@@ -86,43 +96,65 @@ func (r *ready) waitAndReadGeneration(ctx context.Context) (int, error) {
 			// avoid an inconsistent state on the system, with some processes not
 			// waiting despite the state moved back to Pending.
 			r.lock.RUnlock()
-		case Ready:
-			generation := r.generation
-			r.lock.RUnlock()
-			return generation, nil
-		case Stopped:
-			r.lock.RUnlock()
-			return 0, fmt.Errorf("apiserver cacher is stopped")
-		default:
-			r.lock.RUnlock()
-			return 0, fmt.Errorf("unexpected apiserver cache state: %v", r.state)
+			continue
 		}
+		generation, err := r.readGenerationLocked()
+		r.lock.RUnlock()
+		return generation, err
 	}
 }
 
-// check returns true only if it is Ready.
-func (r *ready) check() bool {
-	_, ok := r.checkAndReadGeneration()
-	return ok
+// check returns the time elapsed since the state was last changed and the current value.
+func (r *ready) check() (time.Duration, error) {
+	_, elapsed, err := r.checkAndReadGeneration()
+	return elapsed, err
 }
 
-// checkAndReadGeneration returns the current generation and whether it is Ready.
-func (r *ready) checkAndReadGeneration() (int, bool) {
+// checkAndReadGeneration returns the current generation, the time elapsed since the state was last changed and the current value.
+func (r *ready) checkAndReadGeneration() (int, time.Duration, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
-	return r.generation, r.state == Ready
+	generation, err := r.readGenerationLocked()
+	return generation, r.clock.Since(r.lastStateChangeTime), err
+}
+
+func (r *ready) readGenerationLocked() (int, error) {
+	switch r.state {
+	case Pending:
+		if r.lastErr == nil {
+			return 0, fmt.Errorf("storage is (re)initializing")
+		} else {
+			return 0, fmt.Errorf("storage is (re)initializing: %w", r.lastErr)
+		}
+	case Ready:
+		return r.generation, nil
+	case Stopped:
+		return 0, fmt.Errorf("apiserver cacher is stopped")
+	default:
+		return 0, fmt.Errorf("unexpected apiserver cache state: %v", r.state)
+	}
+}
+
+func (r *ready) setReady() {
+	r.set(true, nil)
+}
+
+func (r *ready) setError(err error) {
+	r.set(false, err)
 }
 
 // set the state to Pending (false) or Ready (true), it does not have effect if the state is Stopped.
-func (r *ready) set(ok bool) {
+func (r *ready) set(ok bool, err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	if r.state == Stopped {
 		return
 	}
+	r.lastErr = err
 	if ok && r.state == Pending {
 		r.state = Ready
 		r.generation++
+		r.updateLastStateChangeTimeLocked()
 		select {
 		case <-r.waitCh:
 		default:
@@ -139,6 +171,7 @@ func (r *ready) set(ok bool) {
 		default:
 		}
 		r.state = Pending
+		r.updateLastStateChangeTimeLocked()
 	}
 }
 
@@ -148,10 +181,15 @@ func (r *ready) stop() {
 	defer r.lock.Unlock()
 	if r.state != Stopped {
 		r.state = Stopped
+		r.updateLastStateChangeTimeLocked()
 	}
 	select {
 	case <-r.waitCh:
 	default:
 		close(r.waitCh)
 	}
+}
+
+func (r *ready) updateLastStateChangeTimeLocked() {
+	r.lastStateChangeTime = r.clock.Now()
 }

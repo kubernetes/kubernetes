@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2022 The Kubernetes Authors.
@@ -28,7 +27,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	"k8s.io/kubernetes/pkg/util/iptables"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestParseRule(t *testing.T) {
@@ -139,8 +138,8 @@ func TestParseRule(t *testing.T) {
 				Comment:         &IPTablesValue{Value: "ns1/svc1:p80"},
 				AffinityName:    &IPTablesValue{Value: "KUBE-SEP-SXIVWICOYRO3J4NJ"},
 				AffinitySeconds: &IPTablesValue{Value: "10800"},
-				AffinityCheck:   utilpointer.Bool(true),
-				AffinityReap:    utilpointer.Bool(true),
+				AffinityCheck:   ptr.To(true),
+				AffinityReap:    ptr.To(true),
 				Jump:            &IPTablesValue{Value: "KUBE-SEP-SXIVWICOYRO3J4NJ"},
 			},
 		},
@@ -200,7 +199,7 @@ func TestParseRule(t *testing.T) {
 			parsed: &Rule{
 				Raw:           `-A TEST -m recent ! --rcheck -j KUBE-SEP-SXIVWICOYRO3J4NJ`,
 				Chain:         iptables.Chain("TEST"),
-				AffinityCheck: utilpointer.Bool(false),
+				AffinityCheck: ptr.To(false),
 				Jump:          &IPTablesValue{Value: "KUBE-SEP-SXIVWICOYRO3J4NJ"},
 			},
 		},

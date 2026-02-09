@@ -19,17 +19,28 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // HTTPGetActionApplyConfiguration represents a declarative configuration of the HTTPGetAction type for use
 // with apply.
+//
+// HTTPGetAction describes an action based on HTTP Get requests.
 type HTTPGetActionApplyConfiguration struct {
-	Path        *string                        `json:"path,omitempty"`
-	Port        *intstr.IntOrString            `json:"port,omitempty"`
-	Host        *string                        `json:"host,omitempty"`
-	Scheme      *v1.URIScheme                  `json:"scheme,omitempty"`
+	// Path to access on the HTTP server.
+	Path *string `json:"path,omitempty"`
+	// Name or number of the port to access on the container.
+	// Number must be in the range 1 to 65535.
+	// Name must be an IANA_SVC_NAME.
+	Port *intstr.IntOrString `json:"port,omitempty"`
+	// Host name to connect to, defaults to the pod IP. You probably want to set
+	// "Host" in httpHeaders instead.
+	Host *string `json:"host,omitempty"`
+	// Scheme to use for connecting to the host.
+	// Defaults to HTTP.
+	Scheme *corev1.URIScheme `json:"scheme,omitempty"`
+	// Custom headers to set in the request. HTTP allows repeated headers.
 	HTTPHeaders []HTTPHeaderApplyConfiguration `json:"httpHeaders,omitempty"`
 }
 
@@ -66,7 +77,7 @@ func (b *HTTPGetActionApplyConfiguration) WithHost(value string) *HTTPGetActionA
 // WithScheme sets the Scheme field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Scheme field is set to the value of the last call.
-func (b *HTTPGetActionApplyConfiguration) WithScheme(value v1.URIScheme) *HTTPGetActionApplyConfiguration {
+func (b *HTTPGetActionApplyConfiguration) WithScheme(value corev1.URIScheme) *HTTPGetActionApplyConfiguration {
 	b.Scheme = &value
 	return b
 }

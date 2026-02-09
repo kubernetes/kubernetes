@@ -35,7 +35,8 @@ func Run() error {
 	// only add the flags that are still supported for kubeadm
 	allFlags.VisitAll(func(f *flag.Flag) {
 		switch f.Name {
-		case "v", "add_dir_header", "skip_headers":
+		// kubeadm only exposes the klog flags covered in https://features.k8s.io/2845
+		case "v", "vmodule":
 			flag.CommandLine.Var(f.Value, f.Name, f.Usage)
 		}
 	})

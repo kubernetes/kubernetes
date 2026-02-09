@@ -19,15 +19,22 @@ limitations under the License.
 package v2
 
 import (
-	v2 "k8s.io/api/autoscaling/v2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 )
 
 // HPAScalingPolicyApplyConfiguration represents a declarative configuration of the HPAScalingPolicy type for use
 // with apply.
+//
+// HPAScalingPolicy is a single policy which must hold true for a specified past interval.
 type HPAScalingPolicyApplyConfiguration struct {
-	Type          *v2.HPAScalingPolicyType `json:"type,omitempty"`
-	Value         *int32                   `json:"value,omitempty"`
-	PeriodSeconds *int32                   `json:"periodSeconds,omitempty"`
+	// type is used to specify the scaling policy.
+	Type *autoscalingv2.HPAScalingPolicyType `json:"type,omitempty"`
+	// value contains the amount of change which is permitted by the policy.
+	// It must be greater than zero
+	Value *int32 `json:"value,omitempty"`
+	// periodSeconds specifies the window of time for which the policy should hold true.
+	// PeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).
+	PeriodSeconds *int32 `json:"periodSeconds,omitempty"`
 }
 
 // HPAScalingPolicyApplyConfiguration constructs a declarative configuration of the HPAScalingPolicy type for use with
@@ -39,7 +46,7 @@ func HPAScalingPolicy() *HPAScalingPolicyApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *HPAScalingPolicyApplyConfiguration) WithType(value v2.HPAScalingPolicyType) *HPAScalingPolicyApplyConfiguration {
+func (b *HPAScalingPolicyApplyConfiguration) WithType(value autoscalingv2.HPAScalingPolicyType) *HPAScalingPolicyApplyConfiguration {
 	b.Type = &value
 	return b
 }

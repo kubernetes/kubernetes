@@ -22,7 +22,7 @@ limitations under the License.
 package marker
 
 import (
-	"encoding/json"
+	json "encoding/json"
 
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	external "k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external"

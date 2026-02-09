@@ -31,9 +31,11 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver/load"
 	"k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
-	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
+	certinformersv1beta1 "k8s.io/client-go/informers/certificates/v1beta1"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -67,11 +69,16 @@ type Config struct {
 	// AuthorizationConfiguration stores the configuration for the Authorizer chain
 	// It will deprecate most of the above flags when GA
 	AuthorizationConfiguration *authzconfig.AuthorizationConfiguration
+	// InitialAuthorizationConfigurationData holds the initial authorization configuration data
+	// that was read from the authorization configuration file.
+	InitialAuthorizationConfigurationData string
 }
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
 // based on the authorizationMode or an error.
 // stopCh is used to shut down config reload goroutines when the server is shutting down.
+//
+// Note: the cel compiler construction depends on feature gates and the compatibility version to be initialized.
 func (config Config) New(ctx context.Context, serverID string) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	if len(config.AuthorizationConfiguration.Authorizers) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
@@ -81,7 +88,9 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		initialConfig:    config,
 		apiServerID:      serverID,
 		lastLoadedConfig: config.AuthorizationConfiguration,
+		lastReadData:     []byte(config.InitialAuthorizationConfigurationData),
 		reloadInterval:   time.Minute,
+		compiler:         authorizationcel.NewDefaultCompiler(),
 	}
 
 	seenTypes := sets.New[authzconfig.AuthorizerType]()
@@ -93,9 +102,13 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch configuredAuthorizer.Type {
 		case authzconfig.AuthorizerType(modes.ModeNode):
-			var slices resourcev1alpha2informers.ResourceSliceInformer
+			var slices resourceinformers.ResourceSliceInformer
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				slices = config.VersionedInformerFactory.Resource().V1alpha2().ResourceSlices()
+				slices = config.VersionedInformerFactory.Resource().V1().ResourceSlices()
+			}
+			var podCertificateRequestInformer certinformersv1beta1.PodCertificateRequestInformer
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+				podCertificateRequestInformer = config.VersionedInformerFactory.Certificates().V1beta1().PodCertificateRequests()
 			}
 			node.RegisterMetrics()
 			graph := node.NewGraph()
@@ -106,6 +119,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 				slices, // Nil check in AddGraphEventHandlers can be removed when always creating this.
+				podCertificateRequestInformer,
 			)
 			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 
@@ -156,15 +170,19 @@ func GetNameForAuthorizerMode(mode string) string {
 	return strings.ToLower(mode)
 }
 
-func LoadAndValidateFile(configFile string, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
+func LoadAndValidateFile(configFile string, compiler authorizationcel.Compiler, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, string, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return LoadAndValidateData(data, requireNonWebhookTypes)
+	config, err := LoadAndValidateData(data, compiler, requireNonWebhookTypes)
+	if err != nil {
+		return nil, "", err
+	}
+	return config, string(data), nil
 }
 
-func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
+func LoadAndValidateData(data []byte, compiler authorizationcel.Compiler, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
 	// load the file and check for errors
 	authorizationConfiguration, err := load.LoadFromData(data)
 	if err != nil {
@@ -172,11 +190,11 @@ func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfi
 	}
 
 	// validate the file and return any error
-	if errors := validation.ValidateAuthorizationConfiguration(nil, authorizationConfiguration,
-		sets.NewString(modes.AuthorizationModeChoices...),
-		sets.NewString(repeatableAuthorizerTypes...),
+	if errors := validation.ValidateAuthorizationConfiguration(compiler, nil, authorizationConfiguration,
+		sets.New(modes.AuthorizationModeChoices...),
+		sets.New(repeatableAuthorizerTypes...),
 	); len(errors) != 0 {
-		return nil, fmt.Errorf(errors.ToAggregate().Error())
+		return nil, errors.ToAggregate()
 	}
 
 	// test to check if the authorizer names passed conform to the authorizers for type!=Webhook
@@ -194,7 +212,6 @@ func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfi
 		if expectedName != authorizer.Name {
 			allErrors = append(allErrors, fmt.Errorf("expected name %s for authorizer %s instead of %s", expectedName, authorizer.Type, authorizer.Name))
 		}
-
 	}
 
 	if missingTypes := requireNonWebhookTypes.Difference(seenModes); missingTypes.Len() > 0 {

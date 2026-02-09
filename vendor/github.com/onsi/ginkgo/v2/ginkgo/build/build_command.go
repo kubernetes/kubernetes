@@ -2,6 +2,8 @@ package build
 
 import (
 	"fmt"
+	"os"
+	"path"
 
 	"github.com/onsi/ginkgo/v2/ginkgo/command"
 	"github.com/onsi/ginkgo/v2/ginkgo/internal"
@@ -27,7 +29,6 @@ func BuildBuildCommand() command.Command {
 			var errors []error
 			cliConfig, goFlagsConfig, errors = types.VetAndInitializeCLIAndGoConfig(cliConfig, goFlagsConfig)
 			command.AbortIfErrors("Ginkgo detected configuration issues:", errors)
-
 			buildSpecs(args, cliConfig, goFlagsConfig)
 		},
 	}
@@ -42,7 +43,7 @@ func buildSpecs(args []string, cliConfig types.CLIConfig, goFlagsConfig types.Go
 	internal.VerifyCLIAndFrameworkVersion(suites)
 
 	opc := internal.NewOrderedParallelCompiler(cliConfig.ComputedNumCompilers())
-	opc.StartCompiling(suites, goFlagsConfig)
+	opc.StartCompiling(suites, goFlagsConfig, true)
 
 	for {
 		suiteIdx, suite := opc.Next()
@@ -53,7 +54,22 @@ func buildSpecs(args []string, cliConfig types.CLIConfig, goFlagsConfig types.Go
 		if suite.State.Is(internal.TestSuiteStateFailedToCompile) {
 			fmt.Println(suite.CompilationError.Error())
 		} else {
-			fmt.Printf("Compiled %s.test\n", suite.PackageName)
+			var testBinPath string
+			if len(goFlagsConfig.O) != 0 {
+				stat, err := os.Stat(goFlagsConfig.O)
+				if err != nil {
+					panic(err)
+				}
+				if stat.IsDir() {
+					testBinPath = goFlagsConfig.O + "/" + suite.PackageName + ".test"
+				} else {
+					testBinPath = goFlagsConfig.O
+				}
+			}
+			if len(testBinPath) == 0 {
+				testBinPath = path.Join(suite.Path, suite.PackageName+".test")
+			}
+			fmt.Printf("Compiled %s\n", testBinPath)
 		}
 	}
 

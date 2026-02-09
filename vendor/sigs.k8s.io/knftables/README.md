@@ -7,9 +7,11 @@ specifically focuses on supporting Kubernetes components which are
 using nftables in the way that nftables is supposed to be used (as
 opposed to using nftables in a naively-translated-from-iptables way,
 or using nftables to do totally valid things that aren't the sorts of
-things Kubernetes components are likely to need to do).
+things Kubernetes components are likely to need to do; see the
+"[iptables porting](./docs/iptables-porting.md)" doc for more thoughts
+on porting old iptables-based components to nftables.)
 
-It is still under development and is not yet API stable. (See the
+knftables is still under development and is not yet API stable. (See the
 section on "Possible future changes" below.)
 
 The library is implemented as a wrapper around the `nft` CLI, because

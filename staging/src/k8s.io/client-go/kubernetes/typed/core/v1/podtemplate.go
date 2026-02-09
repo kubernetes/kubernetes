@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type PodTemplatesGetter interface {
 
 // PodTemplateInterface has methods to work with PodTemplate resources.
 type PodTemplateInterface interface {
-	Create(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.CreateOptions) (*v1.PodTemplate, error)
-	Update(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.UpdateOptions) (*v1.PodTemplate, error)
+	Create(ctx context.Context, podTemplate *corev1.PodTemplate, opts metav1.CreateOptions) (*corev1.PodTemplate, error)
+	Update(ctx context.Context, podTemplate *corev1.PodTemplate, opts metav1.UpdateOptions) (*corev1.PodTemplate, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PodTemplate, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodTemplateList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.PodTemplate, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*corev1.PodTemplateList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodTemplate, err error)
-	Apply(ctx context.Context, podTemplate *corev1.PodTemplateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodTemplate, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *corev1.PodTemplate, err error)
+	Apply(ctx context.Context, podTemplate *applyconfigurationscorev1.PodTemplateApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.PodTemplate, err error)
 	PodTemplateExpansion
 }
 
 // podTemplates implements PodTemplateInterface
 type podTemplates struct {
-	*gentype.ClientWithListAndApply[*v1.PodTemplate, *v1.PodTemplateList, *corev1.PodTemplateApplyConfiguration]
+	*gentype.ClientWithListAndApply[*corev1.PodTemplate, *corev1.PodTemplateList, *applyconfigurationscorev1.PodTemplateApplyConfiguration]
 }
 
 // newPodTemplates returns a PodTemplates
 func newPodTemplates(c *CoreV1Client, namespace string) *podTemplates {
 	return &podTemplates{
-		gentype.NewClientWithListAndApply[*v1.PodTemplate, *v1.PodTemplateList, *corev1.PodTemplateApplyConfiguration](
+		gentype.NewClientWithListAndApply[*corev1.PodTemplate, *corev1.PodTemplateList, *applyconfigurationscorev1.PodTemplateApplyConfiguration](
 			"podtemplates",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.PodTemplate { return &v1.PodTemplate{} },
-			func() *v1.PodTemplateList { return &v1.PodTemplateList{} }),
+			func() *corev1.PodTemplate { return &corev1.PodTemplate{} },
+			func() *corev1.PodTemplateList { return &corev1.PodTemplateList{} },
+			gentype.PrefersProtobuf[*corev1.PodTemplate](),
+		),
 	}
 }

@@ -42,8 +42,8 @@ func requireSRIOVDevices() {
 
 	msg := "this test is meant to run on a system with at least one configured VF from SRIOV device"
 	if framework.TestContext.RequireDevices {
-		framework.Failf(msg)
+		framework.Fail(msg)
 	} else {
-		e2eskipper.Skipf(msg)
+		e2eskipper.Skip(msg)
 	}
 }

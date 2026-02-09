@@ -1,12 +1,14 @@
 ---
 dir: .
-filename: mock_{{.InterfaceName | snakecase}}.go
-outpkg: driver
-boilerplate-file: ../../../../../../hack/boilerplate/boilerplate.generatego.txt
-with-expecter: True
+filename: mocks.go
+pkgname: driver
+template: testify
+template-data:
+  boilerplate-file: ../../../../../../hack/boilerplate/boilerplate.generatego.txt
+  unroll-variadic: true
 packages:
   github.com/container-storage-interface/spec/lib/go/csi:
     interfaces:
-      ControllerServer:
-      IdentityServer:
-      NodeServer:
+      ControllerServer: {}
+      IdentityServer: {}
+      NodeServer: {}

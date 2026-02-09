@@ -35,7 +35,6 @@ import (
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -306,7 +305,7 @@ func TestCachedAuditAnnotations(t *testing.T) {
 				ctx := withAudit(context.Background())
 				_, _, _ = a.AuthenticateToken(ctx, "token")
 
-				allAnnotations <- audit.AuditEventFrom(ctx).Annotations
+				allAnnotations <- audit.AuditContextFrom(ctx).GetEventAnnotations()
 			}()
 		}
 
@@ -343,7 +342,7 @@ func TestCachedAuditAnnotations(t *testing.T) {
 		for i := 0; i < cap(allAnnotations); i++ {
 			ctx := withAudit(context.Background())
 			_, _, _ = a.AuthenticateToken(ctx, "token")
-			allAnnotations = append(allAnnotations, audit.AuditEventFrom(ctx).Annotations)
+			allAnnotations = append(allAnnotations, audit.AuditContextFrom(ctx).GetEventAnnotations())
 		}
 
 		if len(allAnnotations) != cap(allAnnotations) {
@@ -370,14 +369,14 @@ func TestCachedAuditAnnotations(t *testing.T) {
 
 		ctx1 := withAudit(context.Background())
 		_, _, _ = a.AuthenticateToken(ctx1, "token1")
-		annotations1 := audit.AuditEventFrom(ctx1).Annotations
+		annotations1 := audit.AuditContextFrom(ctx1).GetEventAnnotations()
 
 		// guarantee different now times
 		time.Sleep(time.Second)
 
 		ctx2 := withAudit(context.Background())
 		_, _, _ = a.AuthenticateToken(ctx2, "token2")
-		annotations2 := audit.AuditEventFrom(ctx2).Annotations
+		annotations2 := audit.AuditContextFrom(ctx2).GetEventAnnotations()
 
 		if ok := len(annotations1) == 1 && len(annotations1["timestamp"]) > 0; !ok {
 			t.Errorf("invalid annotations 1: %v", annotations1)
@@ -546,13 +545,10 @@ func (s *singleBenchmark) bench(b *testing.B) {
 // extraction.
 func withAudit(ctx context.Context) context.Context {
 	ctx = audit.WithAuditContext(ctx)
-	ac := audit.AuditContextFrom(ctx)
-	ac.Event.Level = auditinternal.LevelMetadata
 	return ctx
 }
 
 func TestUnsafeConversions(t *testing.T) {
-	t.Parallel()
 
 	// needs to be large to force allocations so we pick a random value between [1024, 2048]
 	size := utilrand.IntnRange(1024, 2048+1)
@@ -574,7 +570,6 @@ func TestUnsafeConversions(t *testing.T) {
 	})
 
 	t.Run("toBytes allocations", func(t *testing.T) {
-		t.Parallel()
 
 		s := utilrand.String(size)
 		f := func() {
@@ -606,7 +601,6 @@ func TestUnsafeConversions(t *testing.T) {
 	})
 
 	t.Run("toString allocations", func(t *testing.T) {
-		t.Parallel()
 
 		b := make([]byte, size)
 		if _, err := rand.Read(b); err != nil {

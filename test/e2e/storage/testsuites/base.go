@@ -68,21 +68,27 @@ var BaseSuites = []func() storageframework.TestSuite{
 	InitTopologyTestSuite,
 	InitVolumeStressTestSuite,
 	InitFsGroupChangePolicyTestSuite,
+	InitVolumeGroupSnapshottableTestSuite,
 	func() storageframework.TestSuite {
 		return InitCustomEphemeralTestSuite(GenericEphemeralTestPatterns())
 	},
 }
 
-// CSISuites is a list of storage test suites that work only for CSI drivers
+// CSISuites is a list of storage test suites that work only for CSI drivers.
 var CSISuites = append(BaseSuites,
+	// The following tests suites must not be already in BaseSuites,
+	// otherwise the same configuration gets tested multiple times.
 	func() storageframework.TestSuite {
 		return InitCustomEphemeralTestSuite(CSIEphemeralTestPatterns())
 	},
 	InitSnapshottableTestSuite,
 	InitSnapshottableStressTestSuite,
 	InitVolumePerformanceTestSuite,
+	InitPvcDeletionPerformanceTestSuite,
 	InitReadWriteOncePodTestSuite,
 	InitVolumeModifyTestSuite,
+	InitVolumeModifyStressTestSuite,
+	InitSELinuxMountTestSuite,
 )
 
 func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) opCounts {
@@ -110,7 +116,7 @@ func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) op
 }
 
 func getVolumeOpCounts(ctx context.Context, c clientset.Interface, config *rest.Config, pluginName string) opCounts {
-	if !framework.ProviderIs("gce", "gke", "aws") {
+	if !framework.ProviderIs("gce", "aws") {
 		return opCounts{}
 	}
 

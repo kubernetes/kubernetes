@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/util/responsewriter"
 	"k8s.io/kube-openapi/pkg/handler3"
 )
 
@@ -58,58 +59,18 @@ func (s *Downloader) OpenAPIV3Root(handler http.Handler) (*handler3.OpenAPIV3Dis
 	if err != nil {
 		return nil, 0, err
 	}
-	writer := newInMemoryResponseWriter()
+	writer := responsewriter.NewInMemoryResponseWriter()
 	handler.ServeHTTP(writer, req)
 
-	switch writer.respCode {
+	switch writer.RespCode() {
 	case http.StatusNotFound:
-		return nil, writer.respCode, nil
+		return nil, writer.RespCode(), nil
 	case http.StatusOK:
 		groups := handler3.OpenAPIV3Discovery{}
-		if err := json.Unmarshal(writer.data, &groups); err != nil {
-			return nil, writer.respCode, err
+		if err := json.Unmarshal(writer.Data(), &groups); err != nil {
+			return nil, writer.RespCode(), err
 		}
-		return &groups, writer.respCode, nil
+		return &groups, writer.RespCode(), nil
 	}
-	return nil, writer.respCode, fmt.Errorf("Error, could not get list of group versions for APIService")
-}
-
-// inMemoryResponseWriter is a http.Writer that keep the response in memory.
-type inMemoryResponseWriter struct {
-	writeHeaderCalled bool
-	header            http.Header
-	respCode          int
-	data              []byte
-}
-
-func newInMemoryResponseWriter() *inMemoryResponseWriter {
-	return &inMemoryResponseWriter{header: http.Header{}}
-}
-
-func (r *inMemoryResponseWriter) Header() http.Header {
-	return r.header
-}
-
-func (r *inMemoryResponseWriter) WriteHeader(code int) {
-	r.writeHeaderCalled = true
-	r.respCode = code
-}
-
-func (r *inMemoryResponseWriter) Write(in []byte) (int, error) {
-	if !r.writeHeaderCalled {
-		r.WriteHeader(http.StatusOK)
-	}
-	r.data = append(r.data, in...)
-	return len(in), nil
-}
-
-func (r *inMemoryResponseWriter) String() string {
-	s := fmt.Sprintf("ResponseCode: %d", r.respCode)
-	if r.data != nil {
-		s += fmt.Sprintf(", Body: %s", string(r.data))
-	}
-	if r.header != nil {
-		s += fmt.Sprintf(", Header: %s", r.header)
-	}
-	return s
+	return nil, writer.RespCode(), fmt.Errorf("Error, could not get list of group versions for APIService")
 }

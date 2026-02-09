@@ -22,9 +22,9 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	dto "github.com/prometheus/client_model/go"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/prometheus/common/model"
@@ -48,8 +48,10 @@ func (e ParseError) Error() string {
 	return fmt.Sprintf("text format parsing error in line %d: %s", e.Line, e.Msg)
 }
 
-// TextParser is used to parse the simple and flat text-based exchange format. Its
-// zero value is ready to use.
+// TextParser is used to parse the simple and flat text-based exchange format.
+//
+// TextParser instances must be created with NewTextParser, the zero value of
+// TextParser is invalid.
 type TextParser struct {
 	metricFamiliesByName map[string]*dto.MetricFamily
 	buf                  *bufio.Reader // Where the parsed input is read through.
@@ -60,6 +62,7 @@ type TextParser struct {
 	currentMF            *dto.MetricFamily
 	currentMetric        *dto.Metric
 	currentLabelPair     *dto.LabelPair
+	currentLabelPairs    []*dto.LabelPair // Temporarily stores label pairs while parsing a metric line.
 
 	// The remaining member variables are only used for summaries/histograms.
 	currentLabels map[string]string // All labels including '__name__' but excluding 'quantile'/'le'
@@ -74,6 +77,17 @@ type TextParser struct {
 	// count and sum of that summary/histogram.
 	currentIsSummaryCount, currentIsSummarySum     bool
 	currentIsHistogramCount, currentIsHistogramSum bool
+	// These indicate if the metric name from the current line being parsed is inside
+	// braces and if that metric name was found respectively.
+	currentMetricIsInsideBraces, currentMetricInsideBracesIsPresent bool
+	// scheme sets the desired ValidationScheme for names. Defaults to the invalid
+	// UnsetValidation.
+	scheme model.ValidationScheme
+}
+
+// NewTextParser returns a new TextParser with the provided nameValidationScheme.
+func NewTextParser(nameValidationScheme model.ValidationScheme) TextParser {
+	return TextParser{scheme: nameValidationScheme}
 }
 
 // TextToMetricFamilies reads 'in' as the simple and flat text-based exchange
@@ -117,11 +131,47 @@ func (p *TextParser) TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricF
 	if p.err != nil && errors.Is(p.err, io.EOF) {
 		p.parseError("unexpected end of input stream")
 	}
+	for _, histogramMetric := range p.histograms {
+		normalizeHistogram(histogramMetric.GetHistogram())
+	}
 	return p.metricFamiliesByName, p.err
+}
+
+// normalizeHistogram makes sure that all the buckets and the count in each
+// histogram is either completely float or completely integer.
+func normalizeHistogram(histogram *dto.Histogram) {
+	if histogram == nil {
+		return
+	}
+	anyFloats := false
+	if histogram.GetSampleCountFloat() != 0 {
+		anyFloats = true
+	} else {
+		for _, b := range histogram.GetBucket() {
+			if b.GetCumulativeCountFloat() != 0 {
+				anyFloats = true
+				break
+			}
+		}
+	}
+	if !anyFloats {
+		return
+	}
+	if histogram.GetSampleCountFloat() == 0 {
+		histogram.SampleCountFloat = proto.Float64(float64(histogram.GetSampleCount()))
+		histogram.SampleCount = nil
+	}
+	for _, b := range histogram.GetBucket() {
+		if b.GetCumulativeCountFloat() == 0 {
+			b.CumulativeCountFloat = proto.Float64(float64(b.GetCumulativeCount()))
+			b.CumulativeCount = nil
+		}
+	}
 }
 
 func (p *TextParser) reset(in io.Reader) {
 	p.metricFamiliesByName = map[string]*dto.MetricFamily{}
+	p.currentLabelPairs = nil
 	if p.buf == nil {
 		p.buf = bufio.NewReader(in)
 	} else {
@@ -137,12 +187,15 @@ func (p *TextParser) reset(in io.Reader) {
 	}
 	p.currentQuantile = math.NaN()
 	p.currentBucket = math.NaN()
+	p.currentMF = nil
 }
 
 // startOfLine represents the state where the next byte read from p.buf is the
 // start of a line (or whitespace leading up to it).
 func (p *TextParser) startOfLine() stateFn {
 	p.lineCount++
+	p.currentMetricIsInsideBraces = false
+	p.currentMetricInsideBracesIsPresent = false
 	if p.skipBlankTab(); p.err != nil {
 		// This is the only place that we expect to see io.EOF,
 		// which is not an error but the signal that we are done.
@@ -158,6 +211,9 @@ func (p *TextParser) startOfLine() stateFn {
 		return p.startComment
 	case '\n':
 		return p.startOfLine // Empty line, start the next one.
+	case '{':
+		p.currentMetricIsInsideBraces = true
+		return p.readingLabels
 	}
 	return p.readingMetricName
 }
@@ -206,6 +262,9 @@ func (p *TextParser) startComment() stateFn {
 		return nil
 	}
 	p.setOrCreateCurrentMF()
+	if p.err != nil {
+		return nil
+	}
 	if p.skipBlankTab(); p.err != nil {
 		return nil // Unexpected end of input.
 	}
@@ -234,6 +293,9 @@ func (p *TextParser) readingMetricName() stateFn {
 		return nil
 	}
 	p.setOrCreateCurrentMF()
+	if p.err != nil {
+		return nil
+	}
 	// Now is the time to fix the type if it hasn't happened yet.
 	if p.currentMF.Type == nil {
 		p.currentMF.Type = dto.MetricType_UNTYPED.Enum()
@@ -256,7 +318,9 @@ func (p *TextParser) readingLabels() stateFn {
 	// Summaries/histograms are special. We have to reset the
 	// currentLabels map, currentQuantile and currentBucket before starting to
 	// read labels.
-	if p.currentMF.GetType() == dto.MetricType_SUMMARY || p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+	if p.currentMF.GetType() == dto.MetricType_SUMMARY ||
+		p.currentMF.GetType() == dto.MetricType_HISTOGRAM ||
+		p.currentMF.GetType() == dto.MetricType_GAUGE_HISTOGRAM {
 		p.currentLabels = map[string]string{}
 		p.currentLabels[string(model.MetricNameLabel)] = p.currentMF.GetName()
 		p.currentQuantile = math.NaN()
@@ -275,6 +339,8 @@ func (p *TextParser) startLabelName() stateFn {
 		return nil // Unexpected end of input.
 	}
 	if p.currentByte == '}' {
+		p.currentMetric.Label = append(p.currentMetric.Label, p.currentLabelPairs...)
+		p.currentLabelPairs = nil
 		if p.skipBlankTab(); p.err != nil {
 			return nil // Unexpected end of input.
 		}
@@ -287,34 +353,81 @@ func (p *TextParser) startLabelName() stateFn {
 		p.parseError(fmt.Sprintf("invalid label name for metric %q", p.currentMF.GetName()))
 		return nil
 	}
-	p.currentLabelPair = &dto.LabelPair{Name: proto.String(p.currentToken.String())}
-	if p.currentLabelPair.GetName() == string(model.MetricNameLabel) {
-		p.parseError(fmt.Sprintf("label name %q is reserved", model.MetricNameLabel))
-		return nil
-	}
-	// Special summary/histogram treatment. Don't add 'quantile' and 'le'
-	// labels to 'real' labels.
-	if !(p.currentMF.GetType() == dto.MetricType_SUMMARY && p.currentLabelPair.GetName() == model.QuantileLabel) &&
-		!(p.currentMF.GetType() == dto.MetricType_HISTOGRAM && p.currentLabelPair.GetName() == model.BucketLabel) {
-		p.currentMetric.Label = append(p.currentMetric.Label, p.currentLabelPair)
-	}
 	if p.skipBlankTabIfCurrentBlankTab(); p.err != nil {
 		return nil // Unexpected end of input.
 	}
 	if p.currentByte != '=' {
+		if p.currentMetricIsInsideBraces {
+			if p.currentMetricInsideBracesIsPresent {
+				p.parseError(fmt.Sprintf("multiple metric names for metric %q", p.currentMF.GetName()))
+				return nil
+			}
+			switch p.currentByte {
+			case ',':
+				p.setOrCreateCurrentMF()
+				if p.err != nil {
+					return nil
+				}
+				if p.currentMF.Type == nil {
+					p.currentMF.Type = dto.MetricType_UNTYPED.Enum()
+				}
+				p.currentMetric = &dto.Metric{}
+				p.currentMetricInsideBracesIsPresent = true
+				return p.startLabelName
+			case '}':
+				p.setOrCreateCurrentMF()
+				if p.err != nil {
+					p.currentLabelPairs = nil
+					return nil
+				}
+				if p.currentMF.Type == nil {
+					p.currentMF.Type = dto.MetricType_UNTYPED.Enum()
+				}
+				p.currentMetric = &dto.Metric{}
+				p.currentMetric.Label = append(p.currentMetric.Label, p.currentLabelPairs...)
+				p.currentLabelPairs = nil
+				if p.skipBlankTab(); p.err != nil {
+					return nil // Unexpected end of input.
+				}
+				return p.readingValue
+			default:
+				p.parseError(fmt.Sprintf("unexpected end of metric name %q", p.currentByte))
+				return nil
+			}
+		}
 		p.parseError(fmt.Sprintf("expected '=' after label name, found %q", p.currentByte))
+		p.currentLabelPairs = nil
 		return nil
+	}
+	p.currentLabelPair = &dto.LabelPair{Name: proto.String(p.currentToken.String())}
+	if p.currentLabelPair.GetName() == string(model.MetricNameLabel) {
+		p.parseError(fmt.Sprintf("label name %q is reserved", model.MetricNameLabel))
+		p.currentLabelPairs = nil
+		return nil
+	}
+	if !p.scheme.IsValidLabelName(p.currentLabelPair.GetName()) {
+		p.parseError(fmt.Sprintf("invalid label name %q", p.currentLabelPair.GetName()))
+		p.currentLabelPairs = nil
+		return nil
+	}
+	// Special summary/histogram treatment. Don't add 'quantile' and 'le'
+	// labels to 'real' labels.
+	if (p.currentMF.GetType() != dto.MetricType_SUMMARY || p.currentLabelPair.GetName() != model.QuantileLabel) &&
+		((p.currentMF.GetType() != dto.MetricType_HISTOGRAM &&
+			p.currentMF.GetType() != dto.MetricType_GAUGE_HISTOGRAM) ||
+			p.currentLabelPair.GetName() != model.BucketLabel) {
+		p.currentLabelPairs = append(p.currentLabelPairs, p.currentLabelPair)
 	}
 	// Check for duplicate label names.
 	labels := make(map[string]struct{})
-	for _, l := range p.currentMetric.Label {
+	for _, l := range p.currentLabelPairs {
 		lName := l.GetName()
-		if _, exists := labels[lName]; !exists {
-			labels[lName] = struct{}{}
-		} else {
+		if _, exists := labels[lName]; exists {
 			p.parseError(fmt.Sprintf("duplicate label names for metric %q", p.currentMF.GetName()))
+			p.currentLabelPairs = nil
 			return nil
 		}
+		labels[lName] = struct{}{}
 	}
 	return p.startLabelValue
 }
@@ -345,6 +458,7 @@ func (p *TextParser) startLabelValue() stateFn {
 			if p.currentQuantile, p.err = parseFloat(p.currentLabelPair.GetValue()); p.err != nil {
 				// Create a more helpful error message.
 				p.parseError(fmt.Sprintf("expected float as value for 'quantile' label, got %q", p.currentLabelPair.GetValue()))
+				p.currentLabelPairs = nil
 				return nil
 			}
 		} else {
@@ -352,7 +466,7 @@ func (p *TextParser) startLabelValue() stateFn {
 		}
 	}
 	// Similar special treatment of histograms.
-	if p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+	if p.currentMF.GetType() == dto.MetricType_HISTOGRAM || p.currentMF.GetType() == dto.MetricType_GAUGE_HISTOGRAM {
 		if p.currentLabelPair.GetName() == model.BucketLabel {
 			if p.currentBucket, p.err = parseFloat(p.currentLabelPair.GetValue()); p.err != nil {
 				// Create a more helpful error message.
@@ -371,12 +485,19 @@ func (p *TextParser) startLabelValue() stateFn {
 		return p.startLabelName
 
 	case '}':
+		if p.currentMF == nil {
+			p.parseError("invalid metric name")
+			return nil
+		}
+		p.currentMetric.Label = append(p.currentMetric.Label, p.currentLabelPairs...)
+		p.currentLabelPairs = nil
 		if p.skipBlankTab(); p.err != nil {
 			return nil // Unexpected end of input.
 		}
 		return p.readingValue
 	default:
 		p.parseError(fmt.Sprintf("unexpected end of label value %q", p.currentLabelPair.GetValue()))
+		p.currentLabelPairs = nil
 		return nil
 	}
 }
@@ -387,7 +508,8 @@ func (p *TextParser) readingValue() stateFn {
 	// When we are here, we have read all the labels, so for the
 	// special case of a summary/histogram, we can finally find out
 	// if the metric already exists.
-	if p.currentMF.GetType() == dto.MetricType_SUMMARY {
+	switch p.currentMF.GetType() {
+	case dto.MetricType_SUMMARY:
 		signature := model.LabelsToSignature(p.currentLabels)
 		if summary := p.summaries[signature]; summary != nil {
 			p.currentMetric = summary
@@ -395,7 +517,7 @@ func (p *TextParser) readingValue() stateFn {
 			p.summaries[signature] = p.currentMetric
 			p.currentMF.Metric = append(p.currentMF.Metric, p.currentMetric)
 		}
-	} else if p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+	case dto.MetricType_HISTOGRAM, dto.MetricType_GAUGE_HISTOGRAM:
 		signature := model.LabelsToSignature(p.currentLabels)
 		if histogram := p.histograms[signature]; histogram != nil {
 			p.currentMetric = histogram
@@ -403,7 +525,7 @@ func (p *TextParser) readingValue() stateFn {
 			p.histograms[signature] = p.currentMetric
 			p.currentMF.Metric = append(p.currentMF.Metric, p.currentMetric)
 		}
-	} else {
+	default:
 		p.currentMF.Metric = append(p.currentMF.Metric, p.currentMetric)
 	}
 	if p.readTokenUntilWhitespace(); p.err != nil {
@@ -441,24 +563,38 @@ func (p *TextParser) readingValue() stateFn {
 				},
 			)
 		}
-	case dto.MetricType_HISTOGRAM:
+	case dto.MetricType_HISTOGRAM, dto.MetricType_GAUGE_HISTOGRAM:
 		// *sigh*
 		if p.currentMetric.Histogram == nil {
 			p.currentMetric.Histogram = &dto.Histogram{}
 		}
 		switch {
 		case p.currentIsHistogramCount:
-			p.currentMetric.Histogram.SampleCount = proto.Uint64(uint64(value))
+			if uintValue := uint64(value); value == float64(uintValue) {
+				p.currentMetric.Histogram.SampleCount = proto.Uint64(uintValue)
+			} else {
+				if value < 0 {
+					p.parseError(fmt.Sprintf("negative count for histogram %q", p.currentMF.GetName()))
+					return nil
+				}
+				p.currentMetric.Histogram.SampleCountFloat = proto.Float64(value)
+			}
 		case p.currentIsHistogramSum:
 			p.currentMetric.Histogram.SampleSum = proto.Float64(value)
 		case !math.IsNaN(p.currentBucket):
-			p.currentMetric.Histogram.Bucket = append(
-				p.currentMetric.Histogram.Bucket,
-				&dto.Bucket{
-					UpperBound:      proto.Float64(p.currentBucket),
-					CumulativeCount: proto.Uint64(uint64(value)),
-				},
-			)
+			b := &dto.Bucket{
+				UpperBound: proto.Float64(p.currentBucket),
+			}
+			if uintValue := uint64(value); value == float64(uintValue) {
+				b.CumulativeCount = proto.Uint64(uintValue)
+			} else {
+				if value < 0 {
+					p.parseError(fmt.Sprintf("negative bucket population for histogram %q", p.currentMF.GetName()))
+					return nil
+				}
+				b.CumulativeCountFloat = proto.Float64(value)
+			}
+			p.currentMetric.Histogram.Bucket = append(p.currentMetric.Histogram.Bucket, b)
 		}
 	default:
 		p.err = fmt.Errorf("unexpected type for metric name %q", p.currentMF.GetName())
@@ -521,10 +657,18 @@ func (p *TextParser) readingType() stateFn {
 	if p.readTokenUntilNewline(false); p.err != nil {
 		return nil // Unexpected end of input.
 	}
-	metricType, ok := dto.MetricType_value[strings.ToUpper(p.currentToken.String())]
+	typ := strings.ToUpper(p.currentToken.String()) // Tolerate any combination of upper and lower case.
+	metricType, ok := dto.MetricType_value[typ]     // Tolerate "gauge_histogram" (not originally part of the text format).
 	if !ok {
-		p.parseError(fmt.Sprintf("unknown metric type %q", p.currentToken.String()))
-		return nil
+		// We also want to tolerate "gaugehistogram" to mark a gauge
+		// histogram, because that string is used in OpenMetrics. Note,
+		// however, that gauge histograms do not officially exist in the
+		// classic text format.
+		if typ != "GAUGEHISTOGRAM" {
+			p.parseError(fmt.Sprintf("unknown metric type %q", p.currentToken.String()))
+			return nil
+		}
+		metricType = int32(dto.MetricType_GAUGE_HISTOGRAM)
 	}
 	p.currentMF.Type = dto.MetricType(metricType).Enum()
 	return p.startOfLine
@@ -585,6 +729,8 @@ func (p *TextParser) readTokenUntilNewline(recognizeEscapeSequence bool) {
 				p.currentToken.WriteByte(p.currentByte)
 			case 'n':
 				p.currentToken.WriteByte('\n')
+			case '"':
+				p.currentToken.WriteByte('"')
 			default:
 				p.parseError(fmt.Sprintf("invalid escape sequence '\\%c'", p.currentByte))
 				return
@@ -610,13 +756,45 @@ func (p *TextParser) readTokenUntilNewline(recognizeEscapeSequence bool) {
 // but not into p.currentToken.
 func (p *TextParser) readTokenAsMetricName() {
 	p.currentToken.Reset()
+	// A UTF-8 metric name must be quoted and may have escaped characters.
+	quoted := false
+	escaped := false
 	if !isValidMetricNameStart(p.currentByte) {
 		return
 	}
-	for {
-		p.currentToken.WriteByte(p.currentByte)
+	for p.err == nil {
+		if escaped {
+			switch p.currentByte {
+			case '\\':
+				p.currentToken.WriteByte(p.currentByte)
+			case 'n':
+				p.currentToken.WriteByte('\n')
+			case '"':
+				p.currentToken.WriteByte('"')
+			default:
+				p.parseError(fmt.Sprintf("invalid escape sequence '\\%c'", p.currentByte))
+				return
+			}
+			escaped = false
+		} else {
+			switch p.currentByte {
+			case '"':
+				quoted = !quoted
+				if !quoted {
+					p.currentByte, p.err = p.buf.ReadByte()
+					return
+				}
+			case '\n':
+				p.parseError(fmt.Sprintf("metric name %q contains unescaped new-line", p.currentToken.String()))
+				return
+			case '\\':
+				escaped = true
+			default:
+				p.currentToken.WriteByte(p.currentByte)
+			}
+		}
 		p.currentByte, p.err = p.buf.ReadByte()
-		if p.err != nil || !isValidMetricNameContinuation(p.currentByte) {
+		if !isValidMetricNameContinuation(p.currentByte, quoted) || (!quoted && p.currentByte == ' ') {
 			return
 		}
 	}
@@ -628,13 +806,45 @@ func (p *TextParser) readTokenAsMetricName() {
 // but not into p.currentToken.
 func (p *TextParser) readTokenAsLabelName() {
 	p.currentToken.Reset()
+	// A UTF-8 label name must be quoted and may have escaped characters.
+	quoted := false
+	escaped := false
 	if !isValidLabelNameStart(p.currentByte) {
 		return
 	}
-	for {
-		p.currentToken.WriteByte(p.currentByte)
+	for p.err == nil {
+		if escaped {
+			switch p.currentByte {
+			case '\\':
+				p.currentToken.WriteByte(p.currentByte)
+			case 'n':
+				p.currentToken.WriteByte('\n')
+			case '"':
+				p.currentToken.WriteByte('"')
+			default:
+				p.parseError(fmt.Sprintf("invalid escape sequence '\\%c'", p.currentByte))
+				return
+			}
+			escaped = false
+		} else {
+			switch p.currentByte {
+			case '"':
+				quoted = !quoted
+				if !quoted {
+					p.currentByte, p.err = p.buf.ReadByte()
+					return
+				}
+			case '\n':
+				p.parseError(fmt.Sprintf("label name %q contains unescaped new-line", p.currentToken.String()))
+				return
+			case '\\':
+				escaped = true
+			default:
+				p.currentToken.WriteByte(p.currentByte)
+			}
+		}
 		p.currentByte, p.err = p.buf.ReadByte()
-		if p.err != nil || !isValidLabelNameContinuation(p.currentByte) {
+		if !isValidLabelNameContinuation(p.currentByte, quoted) || (!quoted && p.currentByte == '=') {
 			return
 		}
 	}
@@ -660,6 +870,7 @@ func (p *TextParser) readTokenAsLabelValue() {
 				p.currentToken.WriteByte('\n')
 			default:
 				p.parseError(fmt.Sprintf("invalid escape sequence '\\%c'", p.currentByte))
+				p.currentLabelPairs = nil
 				return
 			}
 			escaped = false
@@ -685,6 +896,10 @@ func (p *TextParser) setOrCreateCurrentMF() {
 	p.currentIsHistogramCount = false
 	p.currentIsHistogramSum = false
 	name := p.currentToken.String()
+	if !p.scheme.IsValidMetricName(name) {
+		p.parseError(fmt.Sprintf("invalid metric name %q", name))
+		return
+	}
 	if p.currentMF = p.metricFamiliesByName[name]; p.currentMF != nil {
 		return
 	}
@@ -703,7 +918,8 @@ func (p *TextParser) setOrCreateCurrentMF() {
 	}
 	histogramName := histogramMetricName(name)
 	if p.currentMF = p.metricFamiliesByName[histogramName]; p.currentMF != nil {
-		if p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+		if p.currentMF.GetType() == dto.MetricType_HISTOGRAM ||
+			p.currentMF.GetType() == dto.MetricType_GAUGE_HISTOGRAM {
 			if isCount(name) {
 				p.currentIsHistogramCount = true
 			}
@@ -718,19 +934,19 @@ func (p *TextParser) setOrCreateCurrentMF() {
 }
 
 func isValidLabelNameStart(b byte) bool {
-	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_'
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_' || b == '"'
 }
 
-func isValidLabelNameContinuation(b byte) bool {
-	return isValidLabelNameStart(b) || (b >= '0' && b <= '9')
+func isValidLabelNameContinuation(b byte, quoted bool) bool {
+	return isValidLabelNameStart(b) || (b >= '0' && b <= '9') || (quoted && utf8.ValidString(string(b)))
 }
 
 func isValidMetricNameStart(b byte) bool {
 	return isValidLabelNameStart(b) || b == ':'
 }
 
-func isValidMetricNameContinuation(b byte) bool {
-	return isValidLabelNameContinuation(b) || b == ':'
+func isValidMetricNameContinuation(b byte, quoted bool) bool {
+	return isValidLabelNameContinuation(b, quoted) || b == ':'
 }
 
 func isBlankOrTab(b byte) bool {
@@ -775,7 +991,7 @@ func histogramMetricName(name string) string {
 
 func parseFloat(s string) (float64, error) {
 	if strings.ContainsAny(s, "pP_") {
-		return 0, fmt.Errorf("unsupported character in float")
+		return 0, errors.New("unsupported character in float")
 	}
 	return strconv.ParseFloat(s, 64)
 }

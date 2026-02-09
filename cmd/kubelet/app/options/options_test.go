@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/pflag"
 
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 )
 
 func newKubeletServerOrDie() *KubeletServer {
@@ -100,8 +100,8 @@ func TestRoundTrip(t *testing.T) {
 			}
 			continue
 		}
-		if !reflect.DeepEqual(modifiedFlags, outputFlags) {
-			t.Errorf("%s: flags did not round trip: %s", testCase.name, cmp.Diff(modifiedFlags, outputFlags))
+		if !reflect.DeepEqual(modifiedFlags.KubeletFlags, outputFlags.KubeletFlags) {
+			t.Errorf("%s: flags did not round trip: %s", testCase.name, cmp.Diff(modifiedFlags.KubeletFlags, outputFlags.KubeletFlags))
 			continue
 		}
 	}
@@ -179,7 +179,7 @@ func TestValidateKubeletFlags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateKubeletFlags(&KubeletFlags{
-				ContainerRuntimeOptions: config.ContainerRuntimeOptions{},
+				ContainerRuntimeOptions: kubeletconfig.ContainerRuntimeOptions{},
 				NodeLabels:              tt.labels,
 			})
 

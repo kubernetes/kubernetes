@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-package=io.k8s.apimachinery.pkg.version
+//
 
-// Package version supplies the type for version information collected at build time.
-package version // import "k8s.io/apimachinery/pkg/version"
+// Package version supplies the type for version information.
+package version

@@ -76,7 +76,7 @@ type fakeWebhookAccessor struct {
 	matchResult bool
 }
 
-func (f *fakeWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler) matchconditions.Matcher {
+func (f *fakeWebhookAccessor) GetCompiledMatcher(compiler cel.ConditionCompiler) matchconditions.Matcher {
 	return &fakeMatcher{
 		throwError:  f.throwError,
 		matchResult: f.matchResult,

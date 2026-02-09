@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // StorageVersionLister helps list StorageVersions.
@@ -30,19 +30,19 @@ import (
 type StorageVersionLister interface {
 	// List lists all StorageVersions in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.StorageVersion, err error)
+	List(selector labels.Selector) (ret []*apiserverinternalv1alpha1.StorageVersion, err error)
 	// Get retrieves the StorageVersion from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.StorageVersion, error)
+	Get(name string) (*apiserverinternalv1alpha1.StorageVersion, error)
 	StorageVersionListerExpansion
 }
 
 // storageVersionLister implements the StorageVersionLister interface.
 type storageVersionLister struct {
-	listers.ResourceIndexer[*v1alpha1.StorageVersion]
+	listers.ResourceIndexer[*apiserverinternalv1alpha1.StorageVersion]
 }
 
 // NewStorageVersionLister returns a new StorageVersionLister.
 func NewStorageVersionLister(indexer cache.Indexer) StorageVersionLister {
-	return &storageVersionLister{listers.New[*v1alpha1.StorageVersion](indexer, v1alpha1.Resource("storageversion"))}
+	return &storageVersionLister{listers.New[*apiserverinternalv1alpha1.StorageVersion](indexer, apiserverinternalv1alpha1.Resource("storageversion"))}
 }

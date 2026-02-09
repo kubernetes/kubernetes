@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package storagemigration provides Registry interface and its RESTStorage
 // implementation for storing StorageVersionMigration objects.
-package storagemigration // import "k8s.io/kubernetes/pkg/registry/storagemigration/storagemigration"
+package storagemigration
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storagemigration"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	svmvalidation "k8s.io/kubernetes/pkg/apis/storagemigration/validation"
@@ -54,7 +54,7 @@ func (strategy) NamespaceScoped() bool {
 // and should not be modified by the user.
 func (strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"storagemigration.k8s.io/v1alpha1": fieldpath.NewSet(
+		"storagemigration.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -113,7 +113,7 @@ var StatusStrategy = statusStrategy{Strategy}
 // and should not be modified by the user.
 func (statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"storagemigration.k8s.io/v1alpha1": fieldpath.NewSet(
+		"storagemigration.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),

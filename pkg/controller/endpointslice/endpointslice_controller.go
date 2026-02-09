@@ -19,6 +19,7 @@ package endpointslice
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -72,9 +73,9 @@ const (
 	// maxSyncBackOff is the max backoff period for syncService calls.
 	maxSyncBackOff = 1000 * time.Second
 
-	// controllerName is a unique value used with LabelManagedBy to indicated
+	// ControllerName is a unique value used with LabelManagedBy to indicated
 	// the component managing an EndpointSlice.
-	controllerName = "endpointslice-controller.k8s.io"
+	ControllerName = "endpointslice-controller.k8s.io"
 
 	// topologyQueueItemKey is the key for all items in the topologyQueue.
 	topologyQueueItemKey = "topologyQueueItemKey"
@@ -113,9 +114,8 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 				Name: "endpoint_slice",
 			},
 		),
-		topologyQueue: workqueue.NewTypedRateLimitingQueue[string](
-			workqueue.DefaultTypedControllerRateLimiter[string](),
-		),
+		podQueue:         workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*endpointsliceutil.PodProjectionKey]()),
+		topologyQueue:    workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 		workerLoopPeriod: time.Second,
 	}
 
@@ -130,9 +130,9 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 	c.servicesSynced = serviceInformer.Informer().HasSynced
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.addPod,
-		UpdateFunc: c.updatePod,
-		DeleteFunc: c.deletePod,
+		AddFunc:    func(obj interface{}) { c.onPodUpdate(nil, obj) },
+		UpdateFunc: c.onPodUpdate,
+		DeleteFunc: func(obj interface{}) { c.onPodUpdate(obj, nil) },
 	})
 	c.podLister = podInformer.Lister()
 	c.podsSynced = podInformer.Informer().HasSynced
@@ -162,21 +162,18 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
-		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: func(_ interface{}) {
-				c.addNode()
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				c.updateNode(oldObj, newObj)
-			},
-			DeleteFunc: func(_ interface{}) {
-				c.deleteNode()
-			},
-		})
-
-		c.topologyCache = topologycache.NewTopologyCache()
-	}
+	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(_ interface{}) {
+			c.addNode()
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			c.updateNode(oldObj, newObj)
+		},
+		DeleteFunc: func(_ interface{}) {
+			c.deleteNode()
+		},
+	})
+	c.topologyCache = topologycache.NewTopologyCache()
 
 	c.reconciler = endpointslicerec.NewReconciler(
 		c.client,
@@ -185,8 +182,8 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.endpointSliceTracker,
 		c.topologyCache,
 		c.eventRecorder,
-		controllerName,
-		endpointslicerec.WithTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution)),
+		ControllerName,
+		endpointslicerec.WithPreferSameTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)),
 	)
 
 	return c
@@ -244,6 +241,11 @@ type Controller struct {
 	// necessary.
 	serviceQueue workqueue.TypedRateLimitingInterface[string]
 
+	// podQueue is used to compute pod->services mapping and drive matching services into serviceQueue.
+	// This operation can be expensive when large number of services exist in the pod's namespace and
+	// label selection logic has to be evaluated against each service.
+	podQueue workqueue.TypedRateLimitingInterface[*endpointsliceutil.PodProjectionKey]
+
 	// topologyQueue is used to trigger a topology cache update and checking node
 	// topology distribution.
 	topologyQueue workqueue.TypedRateLimitingInterface[string]
@@ -274,24 +276,36 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 
-	defer c.serviceQueue.ShutDown()
-	defer c.topologyQueue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting endpoint slice controller")
-	defer logger.Info("Shutting down endpoint slice controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice", ctx.Done(), c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down endpoint slice controller")
+		c.serviceQueue.ShutDown()
+		c.podQueue.ShutDown()
+		c.topologyQueue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
 		return
 	}
 
 	logger.V(2).Info("Starting service queue worker threads", "total", workers)
 	for i := 0; i < workers; i++ {
-		go wait.Until(func() { c.serviceQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
+		wg.Go(func() {
+			wait.Until(func() { c.serviceQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
+		})
+		wg.Go(func() {
+			wait.Until(func() { c.podQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
+		})
 	}
-	logger.V(2).Info("Starting topology queue worker threads", "total", 1)
-	go wait.Until(func() { c.topologyQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
 
+	logger.V(2).Info("Starting topology queue worker threads", "total", 1)
+	wg.Go(func() {
+		wait.Until(func() { c.topologyQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
+	})
 	<-ctx.Done()
 }
 
@@ -436,6 +450,59 @@ func (c *Controller) syncService(logger klog.Logger, key string) error {
 	return nil
 }
 
+func (c *Controller) podQueueWorker(logger klog.Logger) {
+	for c.processNextPodWorkItem(logger) {
+	}
+}
+
+func (c *Controller) processNextPodWorkItem(logger klog.Logger) bool {
+	cKey, quit := c.podQueue.Get()
+	if quit {
+		return false
+	}
+	defer c.podQueue.Done(cKey)
+
+	err := c.syncPod(logger, cKey)
+	c.handlePodErr(logger, err, cKey)
+
+	return true
+}
+
+func (c *Controller) handlePodErr(logger klog.Logger, err error, key *endpointsliceutil.PodProjectionKey) {
+	if err == nil {
+		c.podQueue.Forget(key)
+		return
+	}
+
+	if c.podQueue.NumRequeues(key) < maxRetries {
+		logger.V(2).Info("Error syncing pod, retrying", "PodProjectionKey", *key)
+		c.podQueue.AddRateLimited(key)
+		return
+	}
+
+	logger.Info("Dropping pod out of the queue", "PodProjectionKey", *key)
+	c.podQueue.Forget(key)
+	utilruntime.HandleError(err)
+}
+
+func (c *Controller) syncPod(logger klog.Logger, key *endpointsliceutil.PodProjectionKey) error {
+	startTime := time.Now()
+	defer func() {
+		logger.V(4).Info("Finished syncing pod", "PodProjectionKey", *key, "elapsedTime", time.Since(startTime))
+	}()
+
+	servicesToUpdate, err := endpointsliceutil.GetServicesToUpdate(c.serviceLister, key)
+	if err != nil {
+		return err
+	}
+
+	for service := range servicesToUpdate {
+		c.serviceQueue.AddAfter(service, c.endpointUpdatesBatchPeriod)
+	}
+
+	return nil
+}
+
 // onServiceUpdate updates the Service Selector in the cache and queues the Service for processing.
 func (c *Controller) onServiceUpdate(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
@@ -456,6 +523,14 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 	}
 
 	c.serviceQueue.Add(key)
+}
+
+// onPodUpdate enqueues the pod's projection key on Add/Update/Delete events, to find matching services later.
+func (c *Controller) onPodUpdate(old, cur interface{}) {
+	key := endpointsliceutil.GetPodUpdateProjectionKey(old, cur)
+	if key != nil {
+		c.podQueue.Add(key)
+	}
 }
 
 // onEndpointSliceAdd queues a sync for the relevant Service for a sync if the
@@ -529,34 +604,6 @@ func (c *Controller) queueServiceForEndpointSlice(endpointSlice *discovery.Endpo
 		delay = c.endpointUpdatesBatchPeriod
 	}
 	c.serviceQueue.AddAfter(key, delay)
-}
-
-func (c *Controller) addPod(obj interface{}) {
-	pod := obj.(*v1.Pod)
-	services, err := endpointsliceutil.GetPodServiceMemberships(c.serviceLister, pod)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
-		return
-	}
-	for key := range services {
-		c.serviceQueue.AddAfter(key, c.endpointUpdatesBatchPeriod)
-	}
-}
-
-func (c *Controller) updatePod(old, cur interface{}) {
-	services := endpointsliceutil.GetServicesToUpdateOnPodChange(c.serviceLister, old, cur)
-	for key := range services {
-		c.serviceQueue.AddAfter(key, c.endpointUpdatesBatchPeriod)
-	}
-}
-
-// When a pod is deleted, enqueue the services the pod used to be a member of
-// obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
-func (c *Controller) deletePod(obj interface{}) {
-	pod := endpointsliceutil.GetPodFromDeleteAction(obj)
-	if pod != nil {
-		c.addPod(pod)
-	}
 }
 
 func (c *Controller) addNode() {

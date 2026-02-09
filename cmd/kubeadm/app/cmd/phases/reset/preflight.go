@@ -19,14 +19,13 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewPreflightPhase creates a kubeadm workflow phase implements preflight checks for reset
@@ -39,7 +38,7 @@ func NewPreflightPhase() workflow.Phase {
 		Run:     runPreflight,
 		InheritFlags: []string{
 			options.IgnorePreflightErrors,
-			options.ForceReset,
+			options.Force,
 			options.DryRun,
 		},
 	}

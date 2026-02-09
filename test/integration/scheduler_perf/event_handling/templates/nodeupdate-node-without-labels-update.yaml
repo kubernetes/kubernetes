@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-without-labels-{{ .Index }}
+  labels:
+    topology.kubernetes.io/zone: zone1
+    affinity: allow
+    topology: allow
+spec:
+  taints:
+    - key: allow
+      effect: NoSchedule
+status:
+  capacity:
+    pods: "3000"
+    cpu: "4"
+    memory: 32Gi
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running

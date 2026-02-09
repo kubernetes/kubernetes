@@ -29,16 +29,9 @@ import (
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/utils/ptr"
 )
-
-func ptr[T any](v T) *T { return &v }
-
-func strPtr(s string) *string { return &s }
-
-func int32Ptr(i int32) *int32 { return &i }
 
 func newValidatingWebhookConfiguration(hooks []admissionregistration.ValidatingWebhook, defaultAdmissionReviewVersions bool) *admissionregistration.ValidatingWebhookConfiguration {
 	// If the test case did not specify an AdmissionReviewVersions, default it so the test passes as
@@ -60,7 +53,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 	noSideEffect := admissionregistration.SideEffectClassNone
 	unknownSideEffect := admissionregistration.SideEffectClassUnknown
 	validClientConfig := admissionregistration.WebhookClientConfig{
-		URL: strPtr("https://example.com"),
+		URL: ptr.To("https://example.com"),
 	}
 	tests := []struct {
 		name          string
@@ -112,7 +105,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			AdmissionReviewVersions: []string{"invalidVersion"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalidVersion"}`,
+		expectedError: `Invalid value: ["invalidVersion"]`,
 	}, {
 		name: "should fail on duplicate AdmissionReviewVersion",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -318,7 +311,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			}},
 		},
 		}, true),
-		expectedError: `webhooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `webhooks[0].rules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -380,7 +373,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					Name:      "n",
 					Port:      443,
 				},
-				URL: strPtr("example.com/k8s/webhook"),
+				URL: ptr.To("example.com/k8s/webhook"),
 			},
 		},
 		}, true),
@@ -390,7 +383,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr(""),
+				URL: ptr.To(""),
 			},
 		},
 		}, true),
@@ -400,7 +393,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("http://example.com"),
+				URL: ptr.To("http://example.com"),
 			},
 		},
 		}, true),
@@ -410,7 +403,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("https:///fancy/webhook"),
+				URL: ptr.To("https:///fancy/webhook"),
 			},
 		},
 		}, true),
@@ -420,7 +413,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("https://example.com/#bookmark"),
+				URL: ptr.To("https://example.com/#bookmark"),
 			},
 		},
 		}, true),
@@ -430,7 +423,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("https://example.com?arg=value"),
+				URL: ptr.To("https://example.com?arg=value"),
 			},
 		},
 		}, true),
@@ -440,7 +433,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("https://harry.potter@example.com/"),
+				URL: ptr.To("https://harry.potter@example.com/"),
 			},
 		},
 		}, true),
@@ -450,7 +443,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("arg#backwards=thisis?html.index/port:host//:https"),
+				URL: ptr.To("arg#backwards=thisis?html.index/port:host//:https"),
 			},
 		},
 		}, true),
@@ -463,7 +456,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("foo/"),
+					Path:      ptr.To("foo/"),
 					Port:      443,
 				},
 			},
@@ -478,7 +471,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/"),
+					Path:      ptr.To("/"),
 					Port:      443,
 				},
 			},
@@ -494,7 +487,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/foo"),
+					Path:      ptr.To("/foo"),
 					Port:      443,
 				},
 			},
@@ -510,7 +503,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("//"),
+					Path:      ptr.To("//"),
 					Port:      443,
 				},
 			},
@@ -526,7 +519,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/foo//bar/"),
+					Path:      ptr.To("/foo//bar/"),
 					Port:      443,
 				},
 			},
@@ -542,7 +535,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/foo/bar//"),
+					Path:      ptr.To("/foo/bar//"),
 					Port:      443,
 				},
 			},
@@ -558,7 +551,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/apis/foo.bar/v1alpha1/--bad"),
+					Path:      ptr.To("/apis/foo.bar/v1alpha1/--bad"),
 					Port:      443,
 				},
 			},
@@ -575,7 +568,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					Service: &admissionregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("https://apis/foo.bar"),
+						Path:      ptr.To("https://apis/foo.bar"),
 						Port:      0,
 					},
 				},
@@ -592,7 +585,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					Service: &admissionregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("https://apis/foo.bar"),
+						Path:      ptr.To("https://apis/foo.bar"),
 						Port:      65536,
 					},
 				},
@@ -606,7 +599,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			Name:           "webhook.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &unknownSideEffect,
-			TimeoutSeconds: int32Ptr(31),
+			TimeoutSeconds: ptr.To[int32](31),
 		},
 		}, true),
 		expectedError: `webhooks[0].timeoutSeconds: Invalid value: 31: the timeout value must be between 1 and 30 seconds`,
@@ -616,7 +609,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			Name:           "webhook.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &unknownSideEffect,
-			TimeoutSeconds: int32Ptr(0),
+			TimeoutSeconds: ptr.To[int32](0),
 		},
 		}, true),
 		expectedError: `webhooks[0].timeoutSeconds: Invalid value: 0: the timeout value must be between 1 and 30 seconds`,
@@ -626,7 +619,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			Name:           "webhook.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &unknownSideEffect,
-			TimeoutSeconds: int32Ptr(-1),
+			TimeoutSeconds: ptr.To[int32](-1),
 		},
 		}, true),
 		expectedError: `webhooks[0].timeoutSeconds: Invalid value: -1: the timeout value must be between 1 and 30 seconds`,
@@ -636,17 +629,17 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			Name:           "webhook.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &noSideEffect,
-			TimeoutSeconds: int32Ptr(1),
+			TimeoutSeconds: ptr.To[int32](1),
 		}, {
 			Name:           "webhook2.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &noSideEffect,
-			TimeoutSeconds: int32Ptr(15),
+			TimeoutSeconds: ptr.To[int32](15),
 		}, {
 			Name:           "webhook3.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &noSideEffect,
-			TimeoutSeconds: int32Ptr(30),
+			TimeoutSeconds: ptr.To[int32](30),
 		},
 		}, true),
 	}, {
@@ -841,7 +834,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 	noSideEffect := admissionregistration.SideEffectClassNone
 	unknownSideEffect := admissionregistration.SideEffectClassUnknown
 	validClientConfig := admissionregistration.WebhookClientConfig{
-		URL: strPtr("https://example.com"),
+		URL: ptr.To("https://example.com"),
 	}
 	tests := []struct {
 		name          string
@@ -897,7 +890,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 			AdmissionReviewVersions: []string{"v1beta1", "invalid-v1"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "should fail on invalid AdmissionReviewVersion with missing previous versions",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -913,7 +906,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 			SideEffects:  &unknownSideEffect,
 		},
 		}, false),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "Webhooks must have unique names when old config has unique names",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -1037,7 +1030,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 	noSideEffect := admissionregistration.SideEffectClassNone
 	unknownSideEffect := admissionregistration.SideEffectClassUnknown
 	validClientConfig := admissionregistration.WebhookClientConfig{
-		URL: strPtr("https://example.com"),
+		URL: ptr.To("https://example.com"),
 	}
 	tests := []struct {
 		name          string
@@ -1089,7 +1082,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			AdmissionReviewVersions: []string{"invalidVersion"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalidVersion"}`,
+		expectedError: `Invalid value: ["invalidVersion"]`,
 	}, {
 		name: "should fail on duplicate AdmissionReviewVersion",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -1295,7 +1288,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			}},
 		},
 		}, true),
-		expectedError: `webhooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `webhooks[0].rules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -1357,7 +1350,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					Name:      "n",
 					Port:      443,
 				},
-				URL: strPtr("example.com/k8s/webhook"),
+				URL: ptr.To("example.com/k8s/webhook"),
 			},
 		},
 		}, true),
@@ -1367,7 +1360,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr(""),
+				URL: ptr.To(""),
 			},
 		},
 		}, true),
@@ -1377,7 +1370,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("http://example.com"),
+				URL: ptr.To("http://example.com"),
 			},
 		},
 		}, true),
@@ -1387,7 +1380,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("https:///fancy/webhook"),
+				URL: ptr.To("https:///fancy/webhook"),
 			},
 		},
 		}, true),
@@ -1397,7 +1390,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("https://example.com/#bookmark"),
+				URL: ptr.To("https://example.com/#bookmark"),
 			},
 		},
 		}, true),
@@ -1407,7 +1400,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("https://example.com?arg=value"),
+				URL: ptr.To("https://example.com?arg=value"),
 			},
 		},
 		}, true),
@@ -1417,7 +1410,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("https://harry.potter@example.com/"),
+				URL: ptr.To("https://harry.potter@example.com/"),
 			},
 		},
 		}, true),
@@ -1427,7 +1420,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
 			Name: "webhook.k8s.io",
 			ClientConfig: admissionregistration.WebhookClientConfig{
-				URL: strPtr("arg#backwards=thisis?html.index/port:host//:https"),
+				URL: ptr.To("arg#backwards=thisis?html.index/port:host//:https"),
 			},
 		},
 		}, true),
@@ -1440,7 +1433,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("foo/"),
+					Path:      ptr.To("foo/"),
 					Port:      443,
 				},
 			},
@@ -1455,7 +1448,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/"),
+					Path:      ptr.To("/"),
 					Port:      443,
 				},
 			},
@@ -1471,7 +1464,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/foo"),
+					Path:      ptr.To("/foo"),
 					Port:      443,
 				},
 			},
@@ -1487,7 +1480,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("//"),
+					Path:      ptr.To("//"),
 					Port:      443,
 				},
 			},
@@ -1503,7 +1496,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/foo//bar/"),
+					Path:      ptr.To("/foo//bar/"),
 					Port:      443,
 				},
 			},
@@ -1519,7 +1512,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/foo/bar//"),
+					Path:      ptr.To("/foo/bar//"),
 					Port:      443,
 				},
 			},
@@ -1535,7 +1528,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				Service: &admissionregistration.ServiceReference{
 					Namespace: "ns",
 					Name:      "n",
-					Path:      strPtr("/apis/foo.bar/v1alpha1/--bad"),
+					Path:      ptr.To("/apis/foo.bar/v1alpha1/--bad"),
 					Port:      443,
 				},
 			},
@@ -1552,7 +1545,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					Service: &admissionregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("https://apis/foo.bar"),
+						Path:      ptr.To("https://apis/foo.bar"),
 						Port:      0,
 					},
 				},
@@ -1569,7 +1562,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					Service: &admissionregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("https://apis/foo.bar"),
+						Path:      ptr.To("https://apis/foo.bar"),
 						Port:      65536,
 					},
 				},
@@ -1583,7 +1576,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			Name:           "webhook.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &unknownSideEffect,
-			TimeoutSeconds: int32Ptr(31),
+			TimeoutSeconds: ptr.To[int32](31),
 		},
 		}, true),
 		expectedError: `webhooks[0].timeoutSeconds: Invalid value: 31: the timeout value must be between 1 and 30 seconds`,
@@ -1593,7 +1586,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			Name:           "webhook.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &unknownSideEffect,
-			TimeoutSeconds: int32Ptr(0),
+			TimeoutSeconds: ptr.To[int32](0),
 		},
 		}, true),
 		expectedError: `webhooks[0].timeoutSeconds: Invalid value: 0: the timeout value must be between 1 and 30 seconds`,
@@ -1603,7 +1596,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			Name:           "webhook.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &unknownSideEffect,
-			TimeoutSeconds: int32Ptr(-1),
+			TimeoutSeconds: ptr.To[int32](-1),
 		},
 		}, true),
 		expectedError: `webhooks[0].timeoutSeconds: Invalid value: -1: the timeout value must be between 1 and 30 seconds`,
@@ -1613,17 +1606,17 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			Name:           "webhook.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &noSideEffect,
-			TimeoutSeconds: int32Ptr(1),
+			TimeoutSeconds: ptr.To[int32](1),
 		}, {
 			Name:           "webhook2.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &noSideEffect,
-			TimeoutSeconds: int32Ptr(15),
+			TimeoutSeconds: ptr.To[int32](15),
 		}, {
 			Name:           "webhook3.k8s.io",
 			ClientConfig:   validClientConfig,
 			SideEffects:    &noSideEffect,
-			TimeoutSeconds: int32Ptr(30),
+			TimeoutSeconds: ptr.To[int32](30),
 		},
 		}, true),
 	}, {
@@ -1818,7 +1811,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 	unknownSideEffect := admissionregistration.SideEffectClassUnknown
 	noSideEffect := admissionregistration.SideEffectClassNone
 	validClientConfig := admissionregistration.WebhookClientConfig{
-		URL: strPtr("https://example.com"),
+		URL: ptr.To("https://example.com"),
 	}
 	tests := []struct {
 		name          string
@@ -1890,7 +1883,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 			AdmissionReviewVersions: []string{"v1beta1", "invalid-v1"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "should fail on invalid AdmissionReviewVersion with missing previous versions",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -1906,7 +1899,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 			SideEffects:  &unknownSideEffect,
 		},
 		}, false),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "Webhooks can have duplicate names when old config has duplicate names",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -2373,7 +2366,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 		},
 		expectedError: `Unsupported value: ""`,
 	}, {
-		name: "operation must be either create/update/delete/connect",
+		name: "operation must be either create/update",
 		config: &admissionregistration.ValidatingAdmissionPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "config",
@@ -2597,7 +2590,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "invalid expression",
 		config: &admissionregistration.ValidatingAdmissionPolicy{
@@ -2909,7 +2902,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.variables[0].name: Invalid value: "4ever": name is not a valid CEL identifier`,
+		expectedError: `spec.variables[0].name: Invalid value: "4ever": must be a valid CEL identifier`,
 	}, {
 		name: "variable composition cannot compile",
 		config: &admissionregistration.ValidatingAdmissionPolicy{
@@ -3214,7 +3207,7 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 				MatchConstraints: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
-							Operations: []admissionregistration.OperationType{"*"},
+							Operations: []admissionregistration.OperationType{"CREATE", "UPDATE"},
 							Rule: admissionregistration.Rule{
 								APIGroups:   []string{"a"},
 								APIVersions: []string{"a"},
@@ -3414,9 +3407,8 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 		},
 		// TODO: CustomAuditAnnotations: string valueExpression with {oldObject} is allowed
 	}
-	strictCost := utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP)
 	// Include the test library, which includes the test() function in the storage environment during test
-	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost)
+	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	extended, err := base.Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MustParseGeneric("1.999"),
 		EnvOptions:        []cel.EnvOption{library.Test()},
@@ -3424,17 +3416,11 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strictCost {
-		strictStatelessCELCompiler = plugincel.NewCompiler(extended)
-		defer func() {
-			strictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost))
-		}()
-	} else {
-		nonStrictStatelessCELCompiler = plugincel.NewCompiler(extended)
-		defer func() {
-			nonStrictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost))
-		}()
-	}
+	originalCompiler := getStrictStatelessCELCompiler()
+	lazyStrictStatelessCELCompiler = plugincel.NewCompiler(extended)
+	defer func() {
+		lazyStrictStatelessCELCompiler = originalCompiler
+	}()
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -3498,6 +3484,48 @@ func validatingAdmissionPolicyWithExpressions(
 	}
 }
 
+func mutatingAdmissionPolicyWithExpressions(
+	matchConditions []admissionregistration.MatchCondition,
+	mutations []admissionregistration.Mutation) *admissionregistration.MutatingAdmissionPolicy {
+	return &admissionregistration.MutatingAdmissionPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "config",
+		},
+		Spec: admissionregistration.MutatingAdmissionPolicySpec{
+			MatchConstraints: &admissionregistration.MatchResources{
+				ResourceRules: []admissionregistration.NamedRuleWithOperations{
+					{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"*"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					},
+				},
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				ObjectSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				MatchPolicy: func() *admissionregistration.MatchPolicyType {
+					r := admissionregistration.MatchPolicyType("Exact")
+					return &r
+				}(),
+			},
+			FailurePolicy: func() *admissionregistration.FailurePolicyType {
+				r := admissionregistration.FailurePolicyType("Ignore")
+				return &r
+			}(),
+			MatchConditions: matchConditions,
+			Mutations:       mutations,
+		},
+	}
+}
+
 func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -3530,7 +3558,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
@@ -3540,7 +3568,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.matchPolicy: Unsupported value: "other": supported values: "Equivalent", "Exact"`,
+		expectedError: `spec.matchResources.matchPolicy: Unsupported value: "other": supported values: "Equivalent", "Exact"`,
 	}, {
 		name: "Operations must not be empty or nil",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -3551,7 +3579,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -3595,7 +3623,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.resourceRules[0].operations: Required value, spec.matchResouces.resourceRules[1].operations: Required value, spec.matchResouces.excludeResourceRules[0].operations: Required value, spec.matchResouces.excludeResourceRules[1].operations: Required value`,
+		expectedError: `spec.matchResources.resourceRules[0].operations: Required value, spec.matchResources.resourceRules[1].operations: Required value, spec.matchResources.excludeResourceRules[0].operations: Required value, spec.matchResources.excludeResourceRules[1].operations: Required value`,
 	}, {
 		name: "\"\" is NOT a valid operation",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -3606,7 +3634,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				}, MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -3632,7 +3660,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				}, MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -3658,7 +3686,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3686,7 +3714,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3723,7 +3751,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3751,7 +3779,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3768,7 +3796,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.resourceRules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
+		expectedError: `spec.matchResources.resourceRules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
 	}, {
 		name: "resource a/* can mix with a",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -3779,7 +3807,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3816,7 +3844,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3833,7 +3861,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.resourceRules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
+		expectedError: `spec.matchResources.resourceRules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
 	}, {
 		name: "resource */* cannot mix with other resources",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -3844,7 +3872,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3861,7 +3889,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "validationActions must be unique",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -3872,7 +3900,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny, admissionregistration.Deny},
 			},
@@ -3888,7 +3916,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.ValidationAction("illegal")},
 			},
@@ -3910,7 +3938,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 							"label": "value",
 						},
 					},
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 			},
 		},
@@ -3941,7 +3969,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.ParameterNotFoundActionType("invalid")),
+					ParameterNotFoundAction: ptr.To(admissionregistration.ParameterNotFoundActionType("invalid")),
 				},
 			},
 		},
@@ -3956,7 +3984,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				PolicyName:        "xyzlimit-scale.example.com",
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				ParamRef: &admissionregistration.ParamRef{
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 			},
 		},
@@ -3996,7 +4024,7 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -4031,7 +4059,7 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -4068,7 +4096,7 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
 					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -4196,4 +4224,1933 @@ func get65MatchConditions() []admissionregistration.MatchCondition {
 		})
 	}
 	return result
+}
+
+func TestValidateMutatingAdmissionPolicy(t *testing.T) {
+	applyConfigurationPatchType := admissionregistration.PatchTypeApplyConfiguration
+	tests := []struct {
+		name          string
+		config        *admissionregistration.MutatingAdmissionPolicy
+		expectedError string
+	}{{
+		name: "metadata.name validation",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "!!!!",
+			},
+		},
+		expectedError: `metadata.name: Invalid value: "!!!!":`,
+	}, {
+		name: "failure policy validation",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("other")
+					return &r
+				}(),
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: `Object{
+							spec: Object.spec{
+								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
+							}
+						}`,
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+			},
+		},
+		expectedError: `spec.failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
+	}, {
+		name: "unsupported expression type validation",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{
+					{
+						ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+							Expression: "1 < 2",
+						},
+						PatchType: applyConfigurationPatchType,
+					},
+				},
+			},
+		},
+		expectedError: `spec.mutations[0].applyConfiguration.expression: Invalid value: "1 < 2": must evaluate to Object`,
+	}, {
+		name: "patchType validation",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{
+					{
+						ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+							Expression: `Object{
+								spec: Object.spec{
+									replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
+								}
+							}`,
+						},
+						PatchType: "other",
+					},
+				},
+			},
+		},
+		expectedError: `spec.mutations[0].patchType: Unsupported value: "other": supported values: "ApplyConfiguration", "JSONPatch"`,
+	}, {
+		name: "PatchType is JSONPatch but union member is ApplyConfiguration",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{
+					{
+						ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+							Expression: `Object{
+								spec: Object.spec{
+									replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
+								}
+							}`,
+						},
+						PatchType: "JSONPatch",
+					},
+				},
+			},
+		},
+		expectedError: `spec.mutations[0].applyConfiguration: Invalid value: "{applyConfiguration}": must not be specified when patchType is JSONPatch`,
+	}, {
+		name: "PatchType is ApplyConfiguration but union member is JSONPatch",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{
+					{
+						JSONPatch: &admissionregistration.JSONPatch{
+							Expression: `[
+								JSONPatch{op: "replace", path: "/spec/repliacs", value: 1}
+							]`,
+						},
+						PatchType: "ApplyConfiguration",
+					},
+				},
+			},
+		},
+		expectedError: `spec.mutations[0].jsonPatch: Invalid value: "{jsonPatch}": must not be specified when patchType is ApplyConfiguration`,
+	}, {
+		name: "JSONPatch is empty",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{
+					{
+						PatchType: "JSONPatch",
+					},
+				},
+			},
+		},
+		expectedError: `spec.mutations[0].jsonPatch: Required value: must be specified when patchType is JSONPatch`,
+	}, {
+		name: "JSONPatch has an empty value expression",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{
+					{
+						JSONPatch: &admissionregistration.JSONPatch{
+							Expression: `   `,
+						},
+						PatchType: "JSONPatch",
+					},
+				},
+			},
+		},
+		expectedError: `spec.mutations[0].jsonPatch.expression: Required value`,
+	}, {
+		name: "invalid variable",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Variables: []admissionregistration.Variable{
+					{
+						Name:       "x",
+						Expression: "///",
+					},
+				},
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{
+					{
+						JSONPatch: &admissionregistration.JSONPatch{
+							Expression: `[
+								JSONPatch{op: "add", path: "/spec/repliacs", value: variables.x}
+							]`,
+						},
+						PatchType: "JSONPatch",
+					},
+				},
+			},
+		},
+		expectedError: `spec.variables[0].expression: Invalid value: "///": compilation failed`,
+	}, {
+		name: "Reference to missing variable",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Variables: []admissionregistration.Variable{
+					{
+						Name:       "x",
+						Expression: "10 + 10",
+					},
+				},
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{
+					{
+						JSONPatch: &admissionregistration.JSONPatch{
+							Expression: `[
+								JSONPatch{op: "add", path: "/spec/repliacs", value: variables.x + variables.y}
+							]`,
+						},
+						PatchType: "JSONPatch",
+					},
+				},
+			},
+		},
+		expectedError: `undefined field 'y'`,
+	}, {
+		name: "API version is required in ParamKind",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				ParamKind: &admissionregistration.ParamKind{
+					Kind:       "Example",
+					APIVersion: "test.example.com",
+				},
+			},
+		},
+		expectedError: `spec.paramKind.apiVersion: Invalid value: "test.example.com"`,
+	}, {
+		name: "API kind is required in ParamKind",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				ParamKind: &admissionregistration.ParamKind{
+					APIVersion: "test.example.com/v1",
+				},
+			},
+		},
+		expectedError: `spec.paramKind.kind: Required value`,
+	}, {
+		name: "API version format in ParamKind",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				ParamKind: &admissionregistration.ParamKind{
+					Kind:       "Example",
+					APIVersion: "test.example.com/!!!",
+				},
+			},
+		},
+		expectedError: `pec.paramKind.apiVersion: Invalid value: "!!!":`,
+	}, {
+		name: "API group format in ParamKind",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				ParamKind: &admissionregistration.ParamKind{
+					APIVersion: "!!!/v1",
+					Kind:       "ReplicaLimit",
+				},
+			},
+		},
+		expectedError: `pec.paramKind.apiVersion: Invalid value: "!!!":`,
+	}, {
+		name: "Validations is required",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{},
+		},
+
+		expectedError: `spec.failurePolicy: Required value, spec.matchConstraints: Required value, spec.mutations: Required value: mutations must contain at least one item`,
+	}, {
+		name: "MatchConstraints is required",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+			},
+		},
+		expectedError: `spec.matchConstraints: Required value`,
+	}, {
+		name: "matchConstraints.resourceRules is required",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{},
+			},
+		},
+		expectedError: `spec.matchConstraints.resourceRules: Required value`,
+	}, {
+		name: "matchConstraints.resourceRules has at least one explicit rule",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Rule: admissionregistration.Rule{},
+						},
+						ResourceNames: []string{"/./."},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchConstraints.resourceRules[0].apiVersions: Required value`,
+	}, {
+		name: "expression is required",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{
+					{
+						PatchType:          admissionregistration.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &admissionregistration.ApplyConfiguration{},
+					},
+				},
+			},
+		},
+
+		expectedError: `spec.mutations[0].applyConfiguration.expression: Required value`,
+	}, {
+		name: "matchResources resourceNames check",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						ResourceNames: []string{"/./."},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchConstraints.resourceRules[0].resourceNames[0]: Invalid value: "/./."`,
+	}, {
+		name: "matchResources resourceNames cannot duplicate",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						ResourceNames: []string{"test", "test"},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchConstraints.resourceRules[0].resourceNames[1]: Duplicate value: "test"`,
+	}, {
+		name: "matchResources validation: matchPolicy",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("other")
+						return &r
+					}(),
+				},
+			},
+		},
+		expectedError: `spec.matchConstraints.matchPolicy: Unsupported value: "other": supported values: "Equivalent", "Exact"`,
+	}, {
+		name: "Operations must not be empty or nil",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				MatchConstraints: &admissionregistration.MatchResources{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}, {
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: nil,
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+					ExcludeResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}, {
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: nil,
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchConstraints.resourceRules[0].operations: Required value, spec.matchConstraints.resourceRules[1].operations: Required value, spec.matchConstraints.excludeResourceRules[0].operations: Required value, spec.matchConstraints.excludeResourceRules[1].operations: Required value`,
+	}, {
+		name: "\"\" is NOT a valid operation",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE", ""},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `Unsupported value: ""`,
+	}, {
+		name: "operation must be either create/update",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"PATCH"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `Unsupported value: "PATCH"`,
+	}, {
+		name: "operation must not be delete",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"DELETE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `Unsupported value: "DELETE"`,
+	}, {
+		name: "wildcard operation cannot be mixed with other strings",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE", "*"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `if '*' is present, must not specify other operations`,
+	}, {
+		name: `resource "*" can co-exist with resources that have subresources`,
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*", "a/b", "a/*", "*/b"},
+							},
+						},
+					}},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+				},
+			},
+		},
+	}, {
+		name: `resource "*" cannot mix with resources that don't have subresources`,
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*", "a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `if '*' is present, must not specify other resources without subresources`,
+	}, {
+		name: "resource a/* cannot mix with a/x",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a/*", "a/x"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchConstraints.resourceRules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
+	}, {
+		name: "resource a/* can mix with a",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a/*", "a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+	}, {
+		name: "resource */a cannot mix with x/a",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*/a", "x/a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchConstraints.resourceRules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
+	}, {
+		name: "resource */* cannot mix with other resources",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*/*", "a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
+	}, {
+		name: "patchType required",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*/*"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.mutations[0].patchType: Required value`,
+	}, {
+		name: "single match condition must have a name",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				MatchConditions: []admissionregistration.MatchCondition{{
+					Expression: "true",
+				}},
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+			},
+		},
+		expectedError: `spec.matchConditions[0].name: Required value`,
+	}, {
+		name: "match condition with parameters allowed",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				ParamKind: &admissionregistration.ParamKind{
+					Kind:       "Foo",
+					APIVersion: "foobar/v1alpha1",
+				},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE", "UPDATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+				},
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				MatchConditions: []admissionregistration.MatchCondition{{
+					Name:       "hasParams",
+					Expression: `params.foo == "okay"`,
+				}},
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+			},
+		},
+		expectedError: "",
+	}, {
+		name: "match condition with parameters not allowed if no param kind",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"*"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+				},
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				MatchConditions: []admissionregistration.MatchCondition{{
+					Name:       "hasParams",
+					Expression: `params.foo == "okay"`,
+				}},
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+			},
+		},
+		expectedError: `undeclared reference to 'params'`,
+	},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errs := ValidateMutatingAdmissionPolicy(test.config)
+			err := errs.ToAggregate()
+			if err != nil {
+				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
+					t.Errorf("expected to contain %s, got %s", e, a)
+				}
+			} else {
+				if test.expectedError != "" {
+					t.Errorf("unexpected no error, expected to contain %s", test.expectedError)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateMutatingAdmissionPolicyUpdate(t *testing.T) {
+	applyConfigurationPatchType := admissionregistration.PatchTypeApplyConfiguration
+	tests := []struct {
+		name          string
+		oldconfig     *admissionregistration.MutatingAdmissionPolicy
+		config        *admissionregistration.MutatingAdmissionPolicy
+		expectedError string
+	}{{
+		name: "should pass on valid new MutatingAdmissionPolicy",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		oldconfig: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+	}, {
+		name: "should pass on valid new MutatingAdmissionPolicy with invalid old MutatingAdmissionPolicy",
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		oldconfig: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "!!!",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{},
+		},
+	}, {
+		name: "match conditions re-checked if paramKind changes",
+		oldconfig: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				ParamKind: &admissionregistration.ParamKind{
+					Kind:       "Foo",
+					APIVersion: "foobar/v1alpha1",
+				},
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"*"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+				},
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				MatchConditions: []admissionregistration.MatchCondition{{
+					Name:       "hasParams",
+					Expression: `params.foo == "okay"`,
+				}},
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+			},
+		},
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"*"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+				},
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				MatchConditions: []admissionregistration.MatchCondition{{
+					Name:       "hasParams",
+					Expression: `params.foo == "okay"`,
+				}},
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+			},
+		},
+		expectedError: `undeclared reference to 'params'`,
+	}, {
+		name: "match conditions not re-checked if no change to paramKind or matchConditions",
+		oldconfig: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE", "UPDATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+				},
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				MatchConditions: []admissionregistration.MatchCondition{{
+					Name:       "hasParams",
+					Expression: `params.foo == "okay"`,
+				}},
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+			},
+		},
+		config: &admissionregistration.MutatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicySpec{
+				MatchConstraints: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE", "UPDATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+				},
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Ignore")
+					return &r
+				}(),
+				MatchConditions: []admissionregistration.MatchCondition{{
+					Name:       "hasParams",
+					Expression: `params.foo == "okay"`,
+				}},
+				ReinvocationPolicy: admissionregistration.IfNeededReinvocationPolicy,
+				Mutations: []admissionregistration.Mutation{{
+					ApplyConfiguration: &admissionregistration.ApplyConfiguration{
+						Expression: "Object{ spec: Object.spec{ replicas: 1 } }",
+					},
+					PatchType: applyConfigurationPatchType,
+				}},
+			},
+		},
+		expectedError: "",
+	},
+		{
+			name: "matchCondition expressions that are changed must be compiled using the NewExpression environment",
+			oldconfig: mutatingAdmissionPolicyWithExpressions(
+				[]admissionregistration.MatchCondition{
+					{
+						Name:       "checkEnvironmentMode",
+						Expression: `true`,
+					},
+				},
+				nil),
+			config: mutatingAdmissionPolicyWithExpressions(
+				[]admissionregistration.MatchCondition{
+					{
+						Name:       "checkEnvironmentMode",
+						Expression: `test() == true`,
+					},
+				},
+				nil),
+			expectedError: `undeclared reference to 'test'`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errs := ValidateMutatingAdmissionPolicyUpdate(test.config, test.oldconfig)
+			err := errs.ToAggregate()
+			if err != nil {
+				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
+					t.Errorf("expected to contain %s, got %s", e, a)
+				}
+			} else {
+				if test.expectedError != "" {
+					t.Errorf("unexpected no error, expected to contain %s", test.expectedError)
+				}
+			}
+		})
+
+	}
+}
+
+func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        *admissionregistration.MutatingAdmissionPolicyBinding
+		expectedError string
+	}{{
+		name: "metadata.name validation",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "!!!!",
+			},
+		},
+		expectedError: `metadata.name: Invalid value: "!!!!":`,
+	}, {
+		name: "PolicyName is required",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{},
+		},
+		expectedError: `spec.policyName: Required value`,
+	}, {
+		name: "matchResources validation: matchPolicy",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("other")
+						return &r
+					}(),
+				},
+			},
+		},
+		expectedError: `spec.matchResources.matchPolicy: Unsupported value: "other": supported values: "Equivalent", "Exact"`,
+	}, {
+		name: "Operations must not be empty or nil",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}, {
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: nil,
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+					ExcludeResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}, {
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: nil,
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchResources.resourceRules[0].operations: Required value, spec.matchResources.resourceRules[1].operations: Required value, spec.matchResources.excludeResourceRules[0].operations: Required value, spec.matchResources.excludeResourceRules[1].operations: Required value`,
+	}, {
+		name: "\"\" is NOT a valid operation",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				}, MatchResources: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE", ""},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `Unsupported value: ""`,
+	}, {
+		name: "operation must be either create/update",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				}, MatchResources: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"PATCH"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `Unsupported value: "PATCH"`,
+	}, {
+		name: "operation must not be DELETE",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				}, MatchResources: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"DELETE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `Unsupported value: "DELETE"`,
+	}, {
+		name: "wildcard operation cannot be mixed with other strings",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE", "*"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `if '*' is present, must not specify other operations`,
+	}, {
+		name: `resource "*" can co-exist with resources that have subresources`,
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*", "a/b", "a/*", "*/b"},
+							},
+						},
+					}},
+				},
+			},
+		},
+	}, {
+		name: `resource "*" cannot mix with resources that don't have subresources`,
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*", "a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `if '*' is present, must not specify other resources without subresources`,
+	}, {
+		name: "resource a/* cannot mix with a/x",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a/*", "a/x"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchResources.resourceRules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
+	}, {
+		name: "resource a/* can mix with a",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a/*", "a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+	}, {
+		name: "resource */a cannot mix with x/a",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*/a", "x/a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchResources.resourceRules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
+	}, {
+		name: "resource */* cannot mix with other resources",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"*/*", "a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
+	}, {
+		name: "paramRef selector must not be set when name is set",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name: "xyzlimit-scale-setting.example.com",
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"label": "value",
+						},
+					},
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+			},
+		},
+		expectedError: `spec.paramRef.name: Forbidden: name and selector are mutually exclusive, spec.paramRef.selector: Forbidden: name and selector are mutually exclusive`,
+	}, {
+		name: "paramRef parameterNotFoundAction must be set",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name: "xyzlimit-scale-setting.example.com",
+				},
+			},
+		},
+		expectedError: "spec.paramRef.parameterNotFoundAction: Required value",
+	}, {
+		name: "paramRef parameterNotFoundAction must be an valid value",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.ParameterNotFoundActionType("invalid")),
+				},
+			},
+		},
+		expectedError: `spec.paramRef.parameterNotFoundAction: Unsupported value: "invalid": supported values: "Deny", "Allow"`,
+	}, {
+		name: "paramRef one of name or selector",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+			},
+		},
+		expectedError: `one of name or selector must be specified`,
+	}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errs := ValidateMutatingAdmissionPolicyBinding(test.config)
+			err := errs.ToAggregate()
+			if err != nil {
+				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
+					t.Errorf("expected to contain %s, got %s", e, a)
+				}
+			} else {
+				if test.expectedError != "" {
+					t.Errorf("unexpected no error, expected to contain %s", test.expectedError)
+				}
+			}
+		})
+
+	}
+}
+
+func TestValidateMutatingAdmissionPolicyBindingUpdate(t *testing.T) {
+	tests := []struct {
+		name          string
+		oldconfig     *admissionregistration.MutatingAdmissionPolicyBinding
+		config        *admissionregistration.MutatingAdmissionPolicyBinding
+		expectedError string
+	}{{
+		name: "should pass on valid new MutatingAdmissionPolicyBinding",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		oldconfig: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+	}, {
+		name: "should pass on valid new MutatingAdmissionPolicyBinding with invalid old ValidatingAdmissionPolicyBinding",
+		config: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "xyzlimit-scale.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+				},
+				MatchResources: &admissionregistration.MatchResources{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		oldconfig: &admissionregistration.MutatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "!!!",
+			},
+			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{},
+		},
+	}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errs := ValidateMutatingAdmissionPolicyBindingUpdate(test.config, test.oldconfig)
+			err := errs.ToAggregate()
+			if err != nil {
+				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
+					t.Errorf("expected to contain %s, got %s", e, a)
+				}
+			} else {
+				if test.expectedError != "" {
+					t.Errorf("unexpected no error, expected to contain %s", test.expectedError)
+				}
+			}
+		})
+
+	}
 }

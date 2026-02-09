@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +33,9 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestGetPodFullName(t *testing.T) {
@@ -153,62 +156,6 @@ func TestMoreImportantPod(t *testing.T) {
 			got := MoreImportantPod(v.p1, v.p2)
 			if got != v.expected {
 				t.Errorf("expected %t but got %t", v.expected, got)
-			}
-		})
-	}
-}
-
-func TestRemoveNominatedNodeName(t *testing.T) {
-	tests := []struct {
-		name                     string
-		currentNominatedNodeName string
-		newNominatedNodeName     string
-		expectedPatchRequests    int
-		expectedPatchData        string
-	}{
-		{
-			name:                     "Should make patch request to clear node name",
-			currentNominatedNodeName: "node1",
-			expectedPatchRequests:    1,
-			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
-		},
-		{
-			name:                     "Should not make patch request if nominated node is already cleared",
-			currentNominatedNodeName: "",
-			expectedPatchRequests:    0,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			actualPatchRequests := 0
-			var actualPatchData string
-			cs := &clientsetfake.Clientset{}
-			cs.AddReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-				actualPatchRequests++
-				patch := action.(clienttesting.PatchAction)
-				actualPatchData = string(patch.GetPatch())
-				// For this test, we don't care about the result of the patched pod, just that we got the expected
-				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
-				return true, &v1.Pod{}, nil
-			})
-
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     v1.PodStatus{NominatedNodeName: test.currentNominatedNodeName},
-			}
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			if err := ClearNominatedNodeName(ctx, cs, pod); err != nil {
-				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
-			}
-
-			if actualPatchRequests != test.expectedPatchRequests {
-				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
-			}
-
-			if test.expectedPatchRequests > 0 && actualPatchData != test.expectedPatchData {
-				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
 			}
 		})
 	}
@@ -359,9 +306,10 @@ func TestPatchPodStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			err = PatchPodStatus(ctx, client, &tc.pod, &tc.statusToUpdate)
+			err = PatchPodStatus(ctx, client, tc.pod.Name, tc.pod.Namespace, &tc.pod.Status, &tc.statusToUpdate)
 			if err != nil && tc.validateErr == nil {
 				// shouldn't be error
 				t.Fatal(err)
@@ -538,6 +486,235 @@ func Test_As_KMetadata(t *testing.T) {
 					t.Fatalf("expected error, but got nil")
 				}
 				return
+			}
+		})
+	}
+}
+
+func TestGetHostPorts(t *testing.T) {
+	tests := []struct {
+		pod  *v1.Pod
+		want []v1.ContainerPort
+	}{
+		{
+			pod:  nil,
+			want: nil,
+		},
+		{
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: nil,
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: nil,
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: nil,
+		},
+		{
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: []v1.ContainerPort{{
+				ContainerPort: 8001,
+				HostPort:      8001,
+				Protocol:      v1.ProtocolTCP,
+			}},
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: []v1.ContainerPort{{
+				ContainerPort: 8001,
+				HostPort:      8001,
+				Protocol:      v1.ProtocolTCP,
+			}},
+		},
+		{
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8003,
+						HostPort:      8003,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8004,
+						HostPort:      8004,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8005,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			want: []v1.ContainerPort{
+				{
+					ContainerPort: 8001,
+					HostPort:      8001,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8002,
+					HostPort:      8002,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8003,
+					HostPort:      8003,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8004,
+					HostPort:      8004,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8003,
+						HostPort:      8003,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8004,
+						HostPort:      8004,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8005,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8006,
+						HostPort:      8006,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8007,
+						HostPort:      8007,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8008,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			want: []v1.ContainerPort{
+				{
+					ContainerPort: 8004,
+					HostPort:      8004,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8006,
+					HostPort:      8006,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8007,
+					HostPort:      8007,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      9001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      9002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			want: []v1.ContainerPort{
+				{
+					ContainerPort: 8001,
+					HostPort:      9001,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8002,
+					HostPort:      9002,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			result := GetHostPorts(test.pod)
+			if diff := cmp.Diff(test.want, result); diff != "" {
+				t.Errorf("GetHostPorts() unexpected diff (-want,+got): %s", diff)
 			}
 		})
 	}

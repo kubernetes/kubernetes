@@ -24,7 +24,11 @@ import (
 
 // ServiceCIDRStatusApplyConfiguration represents a declarative configuration of the ServiceCIDRStatus type for use
 // with apply.
+//
+// ServiceCIDRStatus describes the current state of the ServiceCIDR.
 type ServiceCIDRStatusApplyConfiguration struct {
+	// conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR.
+	// Current service state
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 

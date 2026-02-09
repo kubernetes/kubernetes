@@ -235,7 +235,7 @@ func TestAssociations(t *testing.T) {
 					// Run consistency check after every operation.
 					err := consistencyCheck(multimap)
 					if err != nil {
-						t.Fatalf(err.Error())
+						t.Fatal(err.Error())
 					}
 				}
 				for _, expect := range tc.want {
@@ -261,7 +261,7 @@ func TestEfficientAssociation(t *testing.T) {
 
 	err := forwardSelect(key("hpa-1"), key("pod-1"), key("pod-2"))(m)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 	}
 }
 

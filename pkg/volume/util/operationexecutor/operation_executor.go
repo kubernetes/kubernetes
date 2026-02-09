@@ -169,8 +169,7 @@ type MarkVolumeOpts struct {
 	VolumeName          v1.UniqueVolumeName
 	Mounter             volume.Mounter
 	BlockVolumeMapper   volume.BlockVolumeMapper
-	OuterVolumeSpecName string
-	VolumeGidVolume     string
+	VolumeGIDVolume     string
 	VolumeSpec          *volume.Spec
 	VolumeMountState    VolumeMountState
 	SELinuxMountContext string
@@ -198,7 +197,7 @@ type ActualStateOfWorldMounterUpdater interface {
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume's file system resize request is finished.
-	MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) bool
+	MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize resource.Quantity) bool
 
 	// GetDeviceMountState returns mount state of the device in global path
 	GetDeviceMountState(volumeName v1.UniqueVolumeName) DeviceMountState
@@ -233,6 +232,18 @@ type ActualStateOfWorldMounterUpdater interface {
 	// IsVolumeDeviceReconstructed returns true if volume device identified by volumeName has been
 	// found during reconstruction.
 	IsVolumeDeviceReconstructed(volumeName v1.UniqueVolumeName) bool
+
+	// MarkVolumeExpansionFailedWithFinalError marks volume as failed with a final error, so as
+	// this state doesn't have to be recorded in the API server
+	MarkVolumeExpansionFailedWithFinalError(volumeName v1.UniqueVolumeName)
+
+	// RemoveVolumeFromFailedWithFinalErrors removes volume from list that indicates that volume
+	// has failed expansion with a final error
+	RemoveVolumeFromFailedWithFinalErrors(volumeName v1.UniqueVolumeName)
+
+	// CheckVolumeInFailedExpansionWithFinalErrors verifies if volume expansion has failed with a final
+	// error
+	CheckVolumeInFailedExpansionWithFinalErrors(volumeName v1.UniqueVolumeName) bool
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
@@ -265,9 +276,9 @@ type ActualStateOfWorldAttacherUpdater interface {
 	AddVolumeToReportAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 
 	// InitializeClaimSize sets pvc claim size by reading pvc.Status.Capacity
-	InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize *resource.Quantity)
+	InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize resource.Quantity)
 
-	GetClaimSize(volumeName v1.UniqueVolumeName) *resource.Quantity
+	GetClaimSize(volumeName v1.UniqueVolumeName) resource.Quantity
 }
 
 // VolumeLogger defines a set of operations for generating volume-related logging and error msgs
@@ -291,7 +302,7 @@ type VolumeLogger interface {
 	GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error)
 }
 
-// Generates an error string with the format ": <err>" if err exists
+// errSuffix generates an error string with the format ": <err>" if err exists
 func errSuffix(err error) string {
 	errStr := ""
 	if err != nil {
@@ -300,12 +311,12 @@ func errSuffix(err error) string {
 	return errStr
 }
 
-// Generate a detailed error msg for logs
+// generateVolumeMsgDetailed generates a detailed error msg for logs
 func generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeName, details string) (detailedMsg string) {
 	return fmt.Sprintf("%v for volume %q %v %v", prefixMsg, volumeName, details, suffixMsg)
 }
 
-// Generate a simplified error msg for events and a detailed error msg for logs
+// generateVolumeMsg generates a simplified error msg for events and a detailed error msg for logs
 func generateVolumeMsg(prefixMsg, suffixMsg, volumeName, details string) (simpleMsg, detailedMsg string) {
 	simpleMsg = fmt.Sprintf("%v for volume %q %v", prefixMsg, volumeName, suffixMsg)
 	return simpleMsg, generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeName, details)
@@ -358,13 +369,13 @@ func (volume *VolumeToAttach) GenerateMsg(prefixMsg, suffixMsg string) (simpleMs
 
 // GenerateErrorDetailed returns detailed errors for volumes to attach
 func (volume *VolumeToAttach) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for volumes to attach
 func (volume *VolumeToAttach) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 // String combines key fields of the volume for logging in text format.
@@ -410,10 +421,8 @@ type VolumeToMount struct {
 	// InnerVolumeSpecName.
 	VolumeSpec *volume.Spec
 
-	// outerVolumeSpecName is the podSpec.Volume[x].Name of the volume. If the
-	// volume was referenced through a persistent volume claim, this contains
-	// the podSpec.Volume[x].Name of the persistent volume claim.
-	OuterVolumeSpecName string
+	// outerVolumeSpecNames are the podSpec.Volume[x].Name of the volume.
+	OuterVolumeSpecNames []string
 
 	// Pod to mount the volume to. Used to create NewMounter.
 	Pod *v1.Pod
@@ -426,8 +435,8 @@ type VolumeToMount struct {
 	// the volume.DeviceMounter interface
 	PluginIsDeviceMountable bool
 
-	// VolumeGidValue contains the value of the GID annotation, if present.
-	VolumeGidValue string
+	// VolumeGIDValue contains the value of the GID annotation, if present.
+	VolumeGIDValue string
 
 	// DevicePath contains the path on the node where the volume is attached.
 	// For non-attachable volumes this is empty.
@@ -523,13 +532,13 @@ func (volume *VolumeToMount) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg
 
 // GenerateErrorDetailed returns detailed errors for volumes to mount
 func (volume *VolumeToMount) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for volumes to mount
 func (volume *VolumeToMount) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 // AttachedVolume represents a volume that is attached to a node.
@@ -585,13 +594,13 @@ func (volume *AttachedVolume) GenerateMsg(prefixMsg, suffixMsg string) (simpleMs
 
 // GenerateErrorDetailed returns detailed errors for attached volumes
 func (volume *AttachedVolume) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for attached volumes
 func (volume *AttachedVolume) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 // String combines key fields of the volume for logging in text format.
@@ -667,44 +676,6 @@ type MountedVolume struct {
 	//     	   fsType: ext4
 	InnerVolumeSpecName string
 
-	// outerVolumeSpecName is the podSpec.Volume[x].Name of the volume. If the
-	// volume was referenced through a persistent volume claim, this contains
-	// the podSpec.Volume[x].Name of the persistent volume claim.
-	// PVC example:
-	//   kind: Pod
-	//   apiVersion: v1
-	//   metadata:
-	//     name: mypod
-	//   spec:
-	//     containers:
-	//       - name: myfrontend
-	//         image: dockerfile/nginx
-	//         volumeMounts:
-	//         - mountPath: "/var/www/html"
-	//           name: mypd
-	//     volumes:
-	//       - name: mypd				<- OuterVolumeSpecName
-	//         persistentVolumeClaim:
-	//           claimName: myclaim
-	// Non-PVC example:
-	//   apiVersion: v1
-	//   kind: Pod
-	//   metadata:
-	//     name: test-pd
-	//   spec:
-	//     containers:
-	//     - image: registry.k8s.io/test-webserver
-	//     	 name: test-container
-	//     	 volumeMounts:
-	//     	 - mountPath: /test-pd
-	//     	   name: test-volume
-	//     volumes:
-	//     - name: test-volume			<- OuterVolumeSpecName
-	//     	 gcePersistentDisk:
-	//     	   pdName: my-data-disk
-	//     	   fsType: ext4
-	OuterVolumeSpecName string
-
 	// PluginName is the "Unescaped Qualified" name of the volume plugin used to
 	// mount and unmount this volume. It can be used to fetch the volume plugin
 	// to unmount with, on demand. It is also the name that plugins use, though
@@ -727,8 +698,8 @@ type MountedVolume struct {
 	// BlockVolumeMapper is only required for block volumes and not required for file system volumes.
 	BlockVolumeMapper volume.BlockVolumeMapper
 
-	// VolumeGidValue contains the value of the GID annotation, if present.
-	VolumeGidValue string
+	// VolumeGIDValue contains the value of the GID annotation, if present.
+	VolumeGIDValue string
 
 	// VolumeSpec is a volume spec containing the specification for the volume
 	// that should be mounted.
@@ -746,24 +717,24 @@ type MountedVolume struct {
 // GenerateMsgDetailed returns detailed msgs for mounted volumes
 func (volume *MountedVolume) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q)", volume.VolumeName, volume.PodName, volume.PodUID)
-	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volume.OuterVolumeSpecName, detailedStr)
+	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, string(volume.VolumeName), detailedStr)
 }
 
 // GenerateMsg returns simple and detailed msgs for mounted volumes
 func (volume *MountedVolume) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, detailedMsg string) {
 	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q)", volume.VolumeName, volume.PodName, volume.PodUID)
-	return generateVolumeMsg(prefixMsg, suffixMsg, volume.OuterVolumeSpecName, detailedStr)
+	return generateVolumeMsg(prefixMsg, suffixMsg, string(volume.VolumeName), detailedStr)
 }
 
 // GenerateErrorDetailed returns simple and detailed errors for mounted volumes
 func (volume *MountedVolume) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for mounted volumes
 func (volume *MountedVolume) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 type operationExecutor struct {

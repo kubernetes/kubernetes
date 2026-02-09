@@ -12,8 +12,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/google/shlex"
-
 	"sigs.k8s.io/kustomize/api/internal/plugins/utils"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/errors"
@@ -95,7 +93,11 @@ func (p *ExecPlugin) processOptionalArgsFields() error {
 		return err
 	}
 	if c.ArgsOneLiner != "" {
-		p.args, _ = shlex.Split(c.ArgsOneLiner)
+		argsTolenSlice, err := ShlexSplit(c.ArgsOneLiner)
+		if err != nil {
+			return fmt.Errorf("failed to parse argsOneLiner: %w", err)
+		}
+		p.args = argsTolenSlice
 	}
 	if c.ArgsFromFile != "" {
 		content, err := p.h.Loader().Load(c.ArgsFromFile)
@@ -178,6 +180,7 @@ func (p *ExecPlugin) invokePlugin(input []byte) ([]byte, error) {
 	}
 	result, err := cmd.Output()
 	if err != nil {
+		//nolint:govet
 		return nil, errors.WrapPrefixf(
 			fmt.Errorf("failure in plugin configured via %s; %w",
 				f.Name(), err), stdErr.String())

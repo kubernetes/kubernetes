@@ -32,15 +32,43 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/certificate"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	netutils "k8s.io/utils/net"
 )
+
+func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddress) func() *x509.CertificateRequest {
+	return func() *x509.CertificateRequest {
+		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
+		// by default, require at least one IP before requesting a serving certificate
+		hasRequiredAddresses := len(ips) > 0
+
+		// optionally allow requesting a serving certificate with just a DNS name
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowDNSOnlyNodeCSR) {
+			hasRequiredAddresses = hasRequiredAddresses || len(hostnames) > 0
+		}
+
+		// don't return a template if we have no addresses to request for
+		if !hasRequiredAddresses {
+			return nil
+		}
+		return &x509.CertificateRequest{
+			Subject: pkix.Name{
+				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
+				Organization: []string{"system:nodes"},
+			},
+			DNSNames:    hostnames,
+			IPAddresses: ips,
+		}
+	}
+}
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
@@ -92,21 +120,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	)
 	legacyregistry.MustRegister(certificateRotationAge)
 
-	getTemplate := func() *x509.CertificateRequest {
-		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
-		// don't return a template if we have no addresses to request for
-		if len(hostnames) == 0 && len(ips) == 0 {
-			return nil
-		}
-		return &x509.CertificateRequest{
-			Subject: pkix.Name{
-				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-				Organization: []string{"system:nodes"},
-			},
-			DNSNames:    hostnames,
-			IPAddresses: ips,
-		}
-	}
+	getTemplate := newGetTemplateFn(nodeName, getAddresses)
 
 	m, err := certificate.NewManager(&certificate.Config{
 		ClientsetFn:             clientsetFn,
@@ -268,14 +282,17 @@ type kubeletServerCertificateDynamicFileManager struct {
 
 // Enqueue implements the functions to be notified when the serving cert content changes.
 func (m *kubeletServerCertificateDynamicFileManager) Enqueue() {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
 	certContent, keyContent := m.dynamicCertificateContent.CurrentCertKeyContent()
 	cert, err := tls.X509KeyPair(certContent, keyContent)
 	if err != nil {
-		klog.ErrorS(err, "invalid certificate and key pair from file", "certFile", m.certFile, "keyFile", m.keyFile)
+		logger.Error(err, "invalid certificate and key pair from file", "certFile", m.certFile, "keyFile", m.keyFile)
 		return
 	}
 	m.currentTLSCertificate.Store(&cert)
-	klog.V(4).InfoS("loaded certificate and key pair in kubelet server certificate manager", "certFile", m.certFile, "keyFile", m.keyFile)
+	logger.V(4).Info("loaded certificate and key pair in kubelet server certificate manager", "certFile", m.certFile, "keyFile", m.keyFile)
 }
 
 // Current returns the last valid certificate key pair loaded from files.
@@ -286,7 +303,9 @@ func (m *kubeletServerCertificateDynamicFileManager) Current() *tls.Certificate 
 // Start starts watching the certificate and key files
 func (m *kubeletServerCertificateDynamicFileManager) Start() {
 	var ctx context.Context
-	ctx, m.cancelFn = context.WithCancel(context.Background())
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// This should be replaced with an appropriate context when refactoring this function to accept a context parameter.
+	ctx, m.cancelFn = context.WithCancel(context.TODO())
 	go m.dynamicCertificateContent.Run(ctx, 1)
 }
 

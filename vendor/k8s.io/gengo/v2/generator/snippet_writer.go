@@ -123,25 +123,28 @@ func (s *SnippetWriter) Do(format string, args interface{}) *SnippetWriter {
 // SnippetWriter.Do.
 type Args map[interface{}]interface{}
 
-// With makes a copy of a and adds the given key, value pair.
+// With makes a copy of a and adds the given key, value pair. If key overlaps,
+// the new value wins.
 func (a Args) With(key, value interface{}) Args {
-	a2 := Args{key: value}
+	result := Args{}
 	for k, v := range a {
-		a2[k] = v
+		result[k] = v
 	}
-	return a2
+	result[key] = value
+	return result
 }
 
-// WithArgs makes a copy of a and adds the given arguments.
+// WithArgs makes a copy of a and adds the given arguments. If any keys
+// overlap, the values from rhs win.
 func (a Args) WithArgs(rhs Args) Args {
-	a2 := Args{}
-	for k, v := range rhs {
-		a2[k] = v
-	}
+	result := Args{}
 	for k, v := range a {
-		a2[k] = v
+		result[k] = v
 	}
-	return a2
+	for k, v := range rhs {
+		result[k] = v
+	}
+	return result
 }
 
 func (s *SnippetWriter) Out() io.Writer {
@@ -151,4 +154,35 @@ func (s *SnippetWriter) Out() io.Writer {
 // Error returns any encountered error.
 func (s *SnippetWriter) Error() error {
 	return s.err
+}
+
+// Dup creates an exact duplicate SnippetWriter with a different io.Writer.
+func (s *SnippetWriter) Dup(w io.Writer) *SnippetWriter {
+	ret := *s
+	ret.w = w
+	return &ret
+}
+
+// Append adds the contents of the io.Reader to this SnippetWriter's buffer.
+func (s *SnippetWriter) Append(r io.Reader) error {
+	// The behavior of Do() is to ignore all future calls if there's an error,
+	// assuming the top-level caller will check Error().  This method is
+	// effectively a fancy Do(), so keep the same semantic.
+	if s.err != nil {
+		return nil
+	}
+	_, err := io.Copy(s.w, r)
+	return err
+}
+
+// Merge adds the contents of the io.Reader to this SnippetWriter's buffer and
+// sets this SnippetWriter's error to the other's, if needed.
+func (s *SnippetWriter) Merge(r io.Reader, other *SnippetWriter) error {
+	if s.err != nil {
+		return nil
+	}
+	if other.err != nil {
+		s.err = other.err
+	}
+	return s.Append(r)
 }

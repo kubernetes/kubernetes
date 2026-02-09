@@ -19,14 +19,22 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // PodFailurePolicyOnPodConditionsPatternApplyConfiguration represents a declarative configuration of the PodFailurePolicyOnPodConditionsPattern type for use
 // with apply.
+//
+// PodFailurePolicyOnPodConditionsPattern describes a pattern for matching
+// an actual pod condition type.
 type PodFailurePolicyOnPodConditionsPatternApplyConfiguration struct {
-	Type   *v1.PodConditionType `json:"type,omitempty"`
-	Status *v1.ConditionStatus  `json:"status,omitempty"`
+	// Specifies the required Pod condition type. To match a pod condition
+	// it is required that specified type equals the pod condition type.
+	Type *corev1.PodConditionType `json:"type,omitempty"`
+	// Specifies the required Pod condition status. To match a pod condition
+	// it is required that the specified status equals the pod condition status.
+	// Defaults to True.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
 }
 
 // PodFailurePolicyOnPodConditionsPatternApplyConfiguration constructs a declarative configuration of the PodFailurePolicyOnPodConditionsPattern type for use with
@@ -38,7 +46,7 @@ func PodFailurePolicyOnPodConditionsPattern() *PodFailurePolicyOnPodConditionsPa
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *PodFailurePolicyOnPodConditionsPatternApplyConfiguration) WithType(value v1.PodConditionType) *PodFailurePolicyOnPodConditionsPatternApplyConfiguration {
+func (b *PodFailurePolicyOnPodConditionsPatternApplyConfiguration) WithType(value corev1.PodConditionType) *PodFailurePolicyOnPodConditionsPatternApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -46,7 +54,7 @@ func (b *PodFailurePolicyOnPodConditionsPatternApplyConfiguration) WithType(valu
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *PodFailurePolicyOnPodConditionsPatternApplyConfiguration) WithStatus(value v1.ConditionStatus) *PodFailurePolicyOnPodConditionsPatternApplyConfiguration {
+func (b *PodFailurePolicyOnPodConditionsPatternApplyConfiguration) WithStatus(value corev1.ConditionStatus) *PodFailurePolicyOnPodConditionsPatternApplyConfiguration {
 	b.Status = &value
 	return b
 }

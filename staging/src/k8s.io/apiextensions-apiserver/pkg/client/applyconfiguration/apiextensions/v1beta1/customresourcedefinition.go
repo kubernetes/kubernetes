@@ -26,11 +26,19 @@ import (
 
 // CustomResourceDefinitionApplyConfiguration represents a declarative configuration of the CustomResourceDefinition type for use
 // with apply.
+//
+// CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
+// <.spec.name>.<.spec.group>.
+// Deprecated in v1.16, planned for removal in v1.22. Use apiextensions.k8s.io/v1 CustomResourceDefinition instead.
 type CustomResourceDefinitionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CustomResourceDefinitionSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *CustomResourceDefinitionStatusApplyConfiguration `json:"status,omitempty"`
+	// spec describes how the user wants the resources to appear
+	Spec *CustomResourceDefinitionSpecApplyConfiguration `json:"spec,omitempty"`
+	// status indicates the actual state of the CustomResourceDefinition
+	Status *CustomResourceDefinitionStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // CustomResourceDefinition constructs a declarative configuration of the CustomResourceDefinition type for use with
@@ -43,11 +51,13 @@ func CustomResourceDefinition(name string) *CustomResourceDefinitionApplyConfigu
 	return b
 }
 
+func (b CustomResourceDefinitionApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithKind(value string) *CustomResourceDefinitionApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -55,7 +65,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithKind(value string) *Cus
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithAPIVersion(value string) *CustomResourceDefinitionApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -64,7 +74,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithAPIVersion(value string
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithName(value string) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -73,7 +83,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithName(value string) *Cus
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithGenerateName(value string) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -82,7 +92,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithGenerateName(value stri
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithNamespace(value string) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -91,7 +101,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithNamespace(value string)
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithUID(value types.UID) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -100,7 +110,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithUID(value types.UID) *C
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithResourceVersion(value string) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -109,7 +119,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithResourceVersion(value s
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithGeneration(value int64) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -118,7 +128,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithGeneration(value int64)
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithCreationTimestamp(value metav1.Time) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -127,7 +137,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithCreationTimestamp(value
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -136,7 +146,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithDeletionTimestamp(value
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *CustomResourceDefinitionApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -146,11 +156,11 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithDeletionGracePeriodSeco
 // overwriting an existing map entries in Labels field with the same key.
 func (b *CustomResourceDefinitionApplyConfiguration) WithLabels(entries map[string]string) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -161,11 +171,11 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithLabels(entries map[stri
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *CustomResourceDefinitionApplyConfiguration) WithAnnotations(entries map[string]string) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -179,7 +189,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithOwnerReferences(values 
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -190,7 +200,7 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithOwnerReferences(values 
 func (b *CustomResourceDefinitionApplyConfiguration) WithFinalizers(values ...string) *CustomResourceDefinitionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -217,8 +227,24 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithStatus(value *CustomRes
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *CustomResourceDefinitionApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *CustomResourceDefinitionApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *CustomResourceDefinitionApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *CustomResourceDefinitionApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

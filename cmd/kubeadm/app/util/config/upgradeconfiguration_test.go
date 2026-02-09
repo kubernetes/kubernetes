@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,19 +29,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/yaml"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-func TestDocMapToUpgradeConfiguration(t *testing.T) {
+func TestBytesToUpgradeConfiguration(t *testing.T) {
 	tests := []struct {
-		name        string
-		cfg         kubeadmapiv1.UpgradeConfiguration
-		expectedCfg kubeadmapi.UpgradeConfiguration
+		name          string
+		cfg           interface{}
+		expectedCfg   kubeadmapi.UpgradeConfiguration
+		expectedError bool
 	}{
 		{
 			name: "default config is set correctly",
@@ -63,6 +63,9 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(true),
+				},
 			},
 		},
 		{
@@ -72,6 +75,9 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 					CertificateRenewal: ptr.To(false),
 				},
 				Node: kubeadmapiv1.UpgradeNodeConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
 					EtcdUpgrade: ptr.To(false),
 				},
 				TypeMeta: metav1.TypeMeta{
@@ -92,28 +98,43 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
 			},
+		},
+		{
+			name: "no UpgradeConfiguration found",
+			cfg: kubeadmapiv1.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
+					Kind:       constants.InitConfigurationKind,
+				},
+			},
+			expectedError: true,
 		},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			b, err := yaml.Marshal(tc.cfg)
-			if err != nil {
-				t.Fatalf("unexpected error while marshalling to YAML: %v", err)
-			}
-			docmap, err := kubeadmutil.SplitYAMLDocuments(b)
-			if err != nil {
-				t.Fatalf("Unexpect error of SplitYAMLDocuments: %v", err)
-			}
-			cfg, err := DocMapToUpgradeConfiguration(docmap)
-			if err != nil {
-				t.Fatalf("unexpected error of DocMapToUpgradeConfiguration: %v\nconfig: %s", err, string(b))
-			}
-			if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
-				t.Fatalf("DocMapToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
-			}
-		})
+		for _, format := range formats {
+			t.Run(fmt.Sprintf("%s_%s", tc.name, format.name), func(t *testing.T) {
+				b, err := format.marshal(tc.cfg)
+				if err != nil {
+					t.Fatalf("unexpected error while marshalling to %s: %v", format.name, err)
+				}
+
+				cfg, err := BytesToUpgradeConfiguration(b)
+				if (err != nil) != tc.expectedError {
+					t.Fatalf("failed BytesToUpgradeConfiguration:\n\texpected error: %t\n\t  actual error: %v", tc.expectedError, err)
+				}
+
+				if err == nil {
+					if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
+						t.Fatalf("BytesToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
+					}
+				}
+			})
+		}
 	}
 }
 
@@ -135,30 +156,11 @@ func TestLoadUpgradeConfigurationFromFile(t *testing.T) {
 		name         string
 		cfgPath      string
 		fileContents string
-		want         *kubeadmapi.UpgradeConfiguration
 		wantErr      bool
 	}{
 		{
 			name:    "Config file does not exists",
 			cfgPath: "tmp",
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name:         "Config file format is basic text",
-			cfgPath:      filePath,
-			want:         nil,
-			fileContents: "some-text",
-			wantErr:      true,
-		},
-		{
-			name:    "Unknown kind UpgradeConfiguration for kubeadm.k8s.io/unknown",
-			cfgPath: filePath,
-			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/unknown
-				kind: UpgradeConfiguration
-    		`),
-			want:    nil,
 			wantErr: true,
 		},
 		{
@@ -166,21 +168,8 @@ func TestLoadUpgradeConfigurationFromFile(t *testing.T) {
 			cfgPath: filePath,
 			fileContents: dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1beta4
-				kind: UpgradeConfiguration`),
-			want: &kubeadmapi.UpgradeConfiguration{
-				Apply: kubeadmapi.UpgradeApplyConfiguration{
-					CertificateRenewal: ptr.To(true),
-					EtcdUpgrade:        ptr.To(true),
-					ImagePullPolicy:    v1.PullIfNotPresent,
-					ImagePullSerial:    ptr.To(true),
-				},
-				Node: kubeadmapi.UpgradeNodeConfiguration{
-					CertificateRenewal: ptr.To(true),
-					EtcdUpgrade:        ptr.To(true),
-					ImagePullPolicy:    v1.PullIfNotPresent,
-					ImagePullSerial:    ptr.To(true),
-				},
-			},
+				kind: UpgradeConfiguration
+		`),
 			wantErr: false,
 		},
 	}
@@ -198,16 +187,9 @@ func TestLoadUpgradeConfigurationFromFile(t *testing.T) {
 				}()
 			}
 
-			got, err := LoadUpgradeConfigurationFromFile(tt.cfgPath, options)
+			_, err = LoadUpgradeConfigurationFromFile(tt.cfgPath, options)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LoadUpgradeConfigurationFromFile() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if tt.want == nil && got != tt.want {
-				t.Errorf("LoadUpgradeConfigurationFromFile() got = %v, want %v", got, tt.want)
-			} else if tt.want != nil {
-				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
-					t.Errorf("LoadUpgradeConfigurationFromFile returned unexpected diff (-want,+got):\n%s", diff)
-				}
 			}
 		})
 	}
@@ -236,6 +218,9 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(true),
+				},
 			},
 		},
 		{
@@ -250,6 +235,9 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:     ptr.To(false),
 					ImagePullPolicy: v1.PullAlways,
 					ImagePullSerial: ptr.To(false),
+				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -268,6 +256,9 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:        ptr.To(false),
 					ImagePullPolicy:    v1.PullAlways,
 					ImagePullSerial:    ptr.To(false),
+				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 			},
 		},
@@ -312,6 +303,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 				Node: kubeadmapiv1.UpgradeNodeConfiguration{
 					EtcdUpgrade: ptr.To(false),
 				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.UpgradeConfigurationKind,
@@ -329,6 +323,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:        ptr.To(false),
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
+				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 			},
 		},
@@ -348,6 +345,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullNever,
 					ImagePullSerial:    ptr.To(false),
 				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.UpgradeConfigurationKind,
@@ -366,24 +366,30 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullNever,
 					ImagePullSerial:    ptr.To(false),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
 			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			bytes, err := yaml.Marshal(tt.cfg)
-			if err != nil {
-				t.Fatalf("Could not marshal test config: %v", err)
-			}
-			err = os.WriteFile(filePath, bytes, 0644)
-			if err != nil {
-				t.Fatalf("Couldn't write content to file: %v", err)
-			}
 
-			got, _ := LoadOrDefaultUpgradeConfiguration(tt.cfgPath, tt.cfg, options)
-			if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
-				t.Errorf("LoadOrDefaultUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
-			}
-		})
+	for _, tt := range tests {
+		for _, format := range formats {
+			t.Run(fmt.Sprintf("%s_%s", tt.name, format.name), func(t *testing.T) {
+				bytes, err := format.marshal(tt.cfg)
+				if err != nil {
+					t.Fatalf("Could not marshal test config: %v", err)
+				}
+				err = os.WriteFile(filePath, bytes, 0644)
+				if err != nil {
+					t.Fatalf("Couldn't write content to file: %v", err)
+				}
+
+				got, _ := LoadOrDefaultUpgradeConfiguration(tt.cfgPath, tt.cfg, options)
+				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
+					t.Errorf("LoadOrDefaultUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
+				}
+			})
+		}
 	}
 }

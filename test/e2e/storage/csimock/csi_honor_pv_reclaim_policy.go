@@ -24,10 +24,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -35,17 +35,50 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVReclaimPolicy, framework.WithFeatureGate(features.HonorPVReclaimPolicy), func() {
+var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 	f := framework.NewDefaultFramework("csi-mock-honor-pv-reclaim-policy")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSI honor pv reclaim policy using mock driver", func() {
-		ginkgo.It("Dynamic provisioning should honor pv delete reclaim policy", func(ctx context.Context) {
+		ginkgo.It("Dynamic provisioning should honor pv delete reclaim policy when deleting pvc", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimDelete),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimDelete),
+			})
+			ginkgo.DeferCleanup(m.cleanup)
+
+			_, pvc := m.createPVC(ctx)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PVC %s to be bound", pvc.Name))
+			pvs, err := e2epv.WaitForPVClaimBoundPhase(ctx, f.ClientSet, []*v1.PersistentVolumeClaim{pvc}, framework.ClaimProvisionTimeout)
+			framework.ExpectNoError(err, "failed to wait for PVC to be bound")
+			gomega.Expect(pvs).To(gomega.HaveLen(1), "expected 1 PV to be bound to PVC, got %d", len(pvs))
+
+			pv := pvs[0]
+			ginkgo.By(fmt.Sprintf("PVC %s is bound to PV %s", pvc.Name, pv.Name))
+			gomega.Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(gomega.Equal(v1.PersistentVolumeReclaimDelete),
+				"expected PV %s to have reclaim policy %s, got %s", pv.Name, v1.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
+			// For dynamic provisioning, the PV should be created with the deletion protection finalizer.
+			gomega.Expect(pv.Finalizers).To(gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer),
+				"expected PV %s to have finalizer %s", pv.Name, storagehelpers.PVDeletionProtectionFinalizer)
+
+			ginkgo.By(fmt.Sprintf("Deleting PVC %s", pvc.Name))
+			err = f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
+
+			ginkgo.By(fmt.Sprintf("Verifying that the driver received DeleteVolume call for PV %s", pv.Name))
+			gomega.Expect(m.driver.GetCalls(ctx)).To(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("DeleteVolume"))))
+		})
+
+		ginkgo.It("Dynamic provisioning should honor pv delete reclaim policy when deleting pv then pvc", func(ctx context.Context) {
+			m.init(ctx, testParameters{
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimDelete),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
@@ -80,11 +113,10 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 			gomega.Expect(m.driver.GetCalls(ctx)).To(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("DeleteVolume"))))
 		})
 
-		ginkgo.It("Dynamic provisioning should honor pv retain reclaim policy", func(ctx context.Context) {
+		ginkgo.It("Dynamic provisioning should honor pv retain reclaim policy when deleting pvc then pv", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimRetain),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimRetain),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
@@ -102,7 +134,53 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 
 			ginkgo.By(fmt.Sprintf("Verifying that the PV %s does not have finalizer %s after creation", pv.Name, storagehelpers.PVDeletionProtectionFinalizer))
 			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().PersistentVolumes().Get, pv.Name, metav1.GetOptions{})).
-				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionTimeout).ShouldNot(gomega.HaveField("Finalizers",
+				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionShortTimeout).ShouldNot(gomega.HaveField("Finalizers",
+				gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer)), "pv unexpectedly has the finalizer %s", storagehelpers.PVDeletionProtectionFinalizer)
+
+			ginkgo.By(fmt.Sprintf("Deleting PVC %s", pvc.Name))
+			err = f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PVC %s to be deleted", pvc.Name))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				_, err := f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
+				return err
+			}).WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionTimeout).Should(gomega.MatchError(apierrors.IsNotFound, "pvc unexpectedly exists"))
+
+			ginkgo.By(fmt.Sprintf("Deleting PV %s", pv.Name))
+			err = f.ClientSet.CoreV1().PersistentVolumes().Delete(ctx, pv.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PV %s", pv.Name)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
+
+			ginkgo.By(fmt.Sprintf("Verifying that the driver did not receive DeleteVolume call for PV %s", pv.Name))
+			gomega.Expect(m.driver.GetCalls(ctx)).NotTo(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("DeleteVolume"))))
+		})
+
+		ginkgo.It("Dynamic provisioning should honor pv retain reclaim policy when deleting pv then pvc", func(ctx context.Context) {
+			m.init(ctx, testParameters{
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimRetain),
+			})
+			ginkgo.DeferCleanup(m.cleanup)
+
+			_, pvc := m.createPVC(ctx)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PVC %s to be bound", pvc.Name))
+			pvs, err := e2epv.WaitForPVClaimBoundPhase(ctx, f.ClientSet, []*v1.PersistentVolumeClaim{pvc}, framework.ClaimProvisionTimeout)
+			framework.ExpectNoError(err, "failed to wait for PVC to be bound")
+			gomega.Expect(pvs).To(gomega.HaveLen(1), "expected 1 PV to be bound to PVC, got %d", len(pvs))
+
+			pv := pvs[0]
+			ginkgo.By(fmt.Sprintf("PVC %s is bound to PV %s", pvc.Name, pv.Name))
+			gomega.Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(gomega.Equal(v1.PersistentVolumeReclaimRetain),
+				"expected PV %s to have reclaim policy %s, got %s", pv.Name, v1.PersistentVolumeReclaimRetain, pv.Spec.PersistentVolumeReclaimPolicy)
+
+			ginkgo.By(fmt.Sprintf("Verifying that the PV %s does not have finalizer %s after creation", pv.Name, storagehelpers.PVDeletionProtectionFinalizer))
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().PersistentVolumes().Get, pv.Name, metav1.GetOptions{})).
+				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionShortTimeout).ShouldNot(gomega.HaveField("Finalizers",
 				gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer)), "pv unexpectedly has the finalizer %s", storagehelpers.PVDeletionProtectionFinalizer)
 
 			ginkgo.By(fmt.Sprintf("Deleting PV %s", pv.Name))
@@ -121,11 +199,39 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 			gomega.Expect(m.driver.GetCalls(ctx)).NotTo(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("DeleteVolume"))))
 		})
 
-		ginkgo.It("Static provisioning should honor pv delete reclaim policy", func(ctx context.Context) {
+		ginkgo.It("Static provisioning should honor pv delete reclaim policy when deleting pvc", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimDelete),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimDelete),
+			})
+			ginkgo.DeferCleanup(m.cleanup)
+
+			sc, pv, pvc := m.createPVPVC(ctx)
+			gomega.Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(gomega.Equal(v1.PersistentVolumeReclaimDelete),
+				"expected PV %s to have reclaim policy %s, got %s", pv.Name, v1.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
+			gomega.Expect(pv.Annotations).NotTo(gomega.HaveKeyWithValue(storagehelpers.AnnDynamicallyProvisioned, sc.Provisioner), "expected PV %s to not have annotation %s", pv.Name, storagehelpers.AnnDynamicallyProvisioned)
+
+			ginkgo.By(fmt.Sprintf("Verifying that the PV %s has finalizer %s after creation", pv.Name, storagehelpers.PVDeletionProtectionFinalizer))
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().PersistentVolumes().Get, pv.Name, metav1.GetOptions{})).
+				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionTimeout).Should(gomega.HaveField("Finalizers",
+				gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer)), "failed to wait for PV to have finalizer %s", storagehelpers.PVDeletionProtectionFinalizer)
+
+			ginkgo.By(fmt.Sprintf("Deleting PVC %s", pvc.Name))
+			err := f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
+
+			ginkgo.By(fmt.Sprintf("Verifying that the driver received DeleteVolume call for PV %s", pv.Name))
+			gomega.Expect(m.driver.GetCalls(ctx)).To(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("DeleteVolume"))))
+		})
+
+		ginkgo.It("Static provisioning should honor pv delete reclaim policy when deleting pv then pvc", func(ctx context.Context) {
+			m.init(ctx, testParameters{
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimDelete),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
@@ -155,11 +261,10 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 			gomega.Expect(m.driver.GetCalls(ctx)).To(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("DeleteVolume"))))
 		})
 
-		ginkgo.It("Static provisioning should honor pv retain reclaim policy", func(ctx context.Context) {
+		ginkgo.It("Static provisioning should honor pv retain reclaim policy when deleting pvc then pv", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimRetain),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimRetain),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
@@ -170,11 +275,164 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 
 			ginkgo.By(fmt.Sprintf("Verifying that the PV %s does not have finalizer %s after creation", pv.Name, storagehelpers.PVDeletionProtectionFinalizer))
 			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().PersistentVolumes().Get, pv.Name, metav1.GetOptions{})).
-				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionTimeout).ShouldNot(gomega.HaveField("Finalizers",
+				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionShortTimeout).ShouldNot(gomega.HaveField("Finalizers",
+				gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer)), "pv unexpectedly has the finalizer %s", storagehelpers.PVDeletionProtectionFinalizer)
+
+			ginkgo.By(fmt.Sprintf("Deleting PVC %s", pvc.Name))
+			err := f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PVC %s to be deleted", pvc.Name))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				_, err := f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
+				return err
+			}).WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionTimeout).Should(gomega.MatchError(apierrors.IsNotFound, "pvc unexpectedly exists"))
+
+			ginkgo.By(fmt.Sprintf("Deleting PV %s", pv.Name))
+			err = f.ClientSet.CoreV1().PersistentVolumes().Delete(ctx, pv.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PV %s", pv.Name)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
+
+			ginkgo.By(fmt.Sprintf("Verifying that the driver did not receive DeleteVolume call for PV %s", pv.Name))
+			gomega.Expect(m.driver.GetCalls(ctx)).NotTo(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("DeleteVolume"))))
+		})
+
+		ginkgo.It("Static provisioning should honor pv retain reclaim policy when deleting pv then pvc", func(ctx context.Context) {
+			m.init(ctx, testParameters{
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimRetain),
+			})
+			ginkgo.DeferCleanup(m.cleanup)
+
+			sc, pv, pvc := m.createPVPVC(ctx)
+			gomega.Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(gomega.Equal(v1.PersistentVolumeReclaimRetain),
+				"expected PV %s to have reclaim policy %s, got %s", pv.Name, v1.PersistentVolumeReclaimRetain, pv.Spec.PersistentVolumeReclaimPolicy)
+			gomega.Expect(pv.Annotations).NotTo(gomega.HaveKeyWithValue(storagehelpers.AnnDynamicallyProvisioned, sc.Provisioner), "expected PV %s to not have annotation %s", pv.Name, storagehelpers.AnnDynamicallyProvisioned)
+
+			ginkgo.By(fmt.Sprintf("Verifying that the PV %s does not have finalizer %s after creation", pv.Name, storagehelpers.PVDeletionProtectionFinalizer))
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().PersistentVolumes().Get, pv.Name, metav1.GetOptions{})).
+				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionShortTimeout).ShouldNot(gomega.HaveField("Finalizers",
 				gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer)), "pv unexpectedly has the finalizer %s", storagehelpers.PVDeletionProtectionFinalizer)
 
 			ginkgo.By(fmt.Sprintf("Deleting PV %s", pv.Name))
 			err := f.ClientSet.CoreV1().PersistentVolumes().Delete(ctx, pv.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PV %s", pv.Name)
+
+			ginkgo.By(fmt.Sprintf("Deleting PVC %s", pvc.Name))
+			err = f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
+
+			ginkgo.By(fmt.Sprintf("Verifying that the driver did not receive DeleteVolume call for PV %s", pv.Name))
+			gomega.Expect(m.driver.GetCalls(ctx)).NotTo(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("DeleteVolume"))))
+		})
+	})
+
+	ginkgo.Context("CSI honor pv reclaim policy changes using mock driver", func() {
+		ginkgo.It("should honor pv reclaim policy after it is changed from retain to deleted", func(ctx context.Context) {
+			m.init(ctx, testParameters{
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimRetain),
+			})
+			ginkgo.DeferCleanup(m.cleanup)
+
+			_, pvc := m.createPVC(ctx)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PVC %s to be bound", pvc.Name))
+			pvs, err := e2epv.WaitForPVClaimBoundPhase(ctx, f.ClientSet, []*v1.PersistentVolumeClaim{pvc}, framework.ClaimProvisionTimeout)
+			framework.ExpectNoError(err, "failed to wait for PVC to be bound")
+			gomega.Expect(pvs).To(gomega.HaveLen(1), "expected 1 PV to be bound to PVC, got %d", len(pvs))
+
+			pv := pvs[0]
+			ginkgo.By(fmt.Sprintf("PVC %s is bound to PV %s", pvc.Name, pv.Name))
+			gomega.Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(gomega.Equal(v1.PersistentVolumeReclaimRetain),
+				"expected PV %s to have reclaim policy %s, got %s", pv.Name, v1.PersistentVolumeReclaimRetain, pv.Spec.PersistentVolumeReclaimPolicy)
+
+			ginkgo.By(fmt.Sprintf("Verifying that the PV %s does not have finalizer %s after creation", pv.Name, storagehelpers.PVDeletionProtectionFinalizer))
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().PersistentVolumes().Get, pv.Name, metav1.GetOptions{})).
+				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionShortTimeout).ShouldNot(gomega.HaveField("Finalizers",
+				gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer)), "pv unexpectedly has the finalizer %s", storagehelpers.PVDeletionProtectionFinalizer)
+
+			ginkgo.By(fmt.Sprintf("Changing the reclaim policy of PV %s to %s", pv.Name, v1.PersistentVolumeReclaimDelete))
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				pv, err := f.ClientSet.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimDelete
+				_, err = f.ClientSet.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+				return err
+			})
+			framework.ExpectNoError(err, "failed to update PV %s", pv.Name)
+
+			ginkgo.By(fmt.Sprintf("Verifying that the PV %s has finalizer %s after reclaim policy is changed", pv.Name, storagehelpers.PVDeletionProtectionFinalizer))
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().PersistentVolumes().Get, pv.Name, metav1.GetOptions{})).
+				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionTimeout).Should(gomega.HaveField("Finalizers",
+				gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer)), "failed to wait for PV to have finalizer %s", storagehelpers.PVDeletionProtectionFinalizer)
+
+			ginkgo.By(fmt.Sprintf("Deleting PV %s", pv.Name))
+			err = f.ClientSet.CoreV1().PersistentVolumes().Delete(ctx, pv.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PV %s", pv.Name)
+
+			ginkgo.By(fmt.Sprintf("Deleting PVC %s", pvc.Name))
+			err = f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PV %s to be deleted", pv.Name))
+			err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, framework.Poll, 2*time.Minute)
+			framework.ExpectNoError(err, "failed to wait for PV to be deleted")
+
+			ginkgo.By(fmt.Sprintf("Verifying that the driver received DeleteVolume call for PV %s", pv.Name))
+			gomega.Expect(m.driver.GetCalls(ctx)).To(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("DeleteVolume"))))
+		})
+
+		ginkgo.It("should honor pv reclaim policy after it is changed from deleted to retain", func(ctx context.Context) {
+			m.init(ctx, testParameters{
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimDelete),
+			})
+			ginkgo.DeferCleanup(m.cleanup)
+
+			_, pvc := m.createPVC(ctx)
+
+			ginkgo.By(fmt.Sprintf("Waiting for PVC %s to be bound", pvc.Name))
+			pvs, err := e2epv.WaitForPVClaimBoundPhase(ctx, f.ClientSet, []*v1.PersistentVolumeClaim{pvc}, framework.ClaimProvisionTimeout)
+			framework.ExpectNoError(err, "failed to wait for PVC to be bound")
+			gomega.Expect(pvs).To(gomega.HaveLen(1), "expected 1 PV to be bound to PVC, got %d", len(pvs))
+
+			pv := pvs[0]
+			ginkgo.By(fmt.Sprintf("PVC %s is bound to PV %s", pvc.Name, pv.Name))
+			gomega.Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(gomega.Equal(v1.PersistentVolumeReclaimDelete),
+				"expected PV %s to have reclaim policy %s, got %s", pv.Name, v1.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
+			// For dynamic provisioning, the PV should be created with the deletion protection finalizer.
+			gomega.Expect(pv.Finalizers).To(gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer),
+				"expected PV %s to have finalizer %s", pv.Name, storagehelpers.PVDeletionProtectionFinalizer)
+
+			ginkgo.By(fmt.Sprintf("Changing the reclaim policy of PV %s to %s", pv.Name, v1.PersistentVolumeReclaimRetain))
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				pv, err := f.ClientSet.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
+				_, err = f.ClientSet.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+				return err
+			})
+			framework.ExpectNoError(err, "failed to update PV %s", pv.Name)
+
+			ginkgo.By(fmt.Sprintf("Verifying that the PV %s drops finalizer %s after reclaim policy is changed", pv.Name, storagehelpers.PVDeletionProtectionFinalizer))
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().PersistentVolumes().Get, pv.Name, metav1.GetOptions{})).
+				WithPolling(framework.Poll).WithTimeout(framework.ClaimProvisionTimeout).ShouldNot(gomega.HaveField("Finalizers",
+				gomega.ContainElement(storagehelpers.PVDeletionProtectionFinalizer)), "pv unexpectedly has the finalizer %s", storagehelpers.PVDeletionProtectionFinalizer)
+
+			ginkgo.By(fmt.Sprintf("Deleting PV %s", pv.Name))
+			err = f.ClientSet.CoreV1().PersistentVolumes().Delete(ctx, pv.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete PV %s", pv.Name)
 
 			ginkgo.By(fmt.Sprintf("Deleting PVC %s", pvc.Name))

@@ -24,6 +24,7 @@ package v1
 import (
 	unsafe "unsafe"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	example "k8s.io/code-generator/examples/apiserver/apis/example"
@@ -36,6 +37,46 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*Conversion)(nil), (*example.Conversion)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Conversion_To_example_Conversion(a.(*Conversion), b.(*example.Conversion), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example.Conversion)(nil), (*Conversion)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_Conversion_To_v1_Conversion(a.(*example.Conversion), b.(*Conversion), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ConversionCustomContainer)(nil), (*example.ConversionCustomContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ConversionCustomContainer_To_example_ConversionCustomContainer(a.(*ConversionCustomContainer), b.(*example.ConversionCustomContainer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example.ConversionCustomContainer)(nil), (*ConversionCustomContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_ConversionCustomContainer_To_v1_ConversionCustomContainer(a.(*example.ConversionCustomContainer), b.(*ConversionCustomContainer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*MemoryDifferent)(nil), (*example.MemoryDifferent)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_MemoryDifferent_To_example_MemoryDifferent(a.(*MemoryDifferent), b.(*example.MemoryDifferent), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example.MemoryDifferent)(nil), (*MemoryDifferent)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_MemoryDifferent_To_v1_MemoryDifferent(a.(*example.MemoryDifferent), b.(*MemoryDifferent), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*MemoryIdentical)(nil), (*example.MemoryIdentical)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_MemoryIdentical_To_example_MemoryIdentical(a.(*MemoryIdentical), b.(*example.MemoryIdentical), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example.MemoryIdentical)(nil), (*MemoryIdentical)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_MemoryIdentical_To_v1_MemoryIdentical(a.(*example.MemoryIdentical), b.(*MemoryIdentical), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*TestType)(nil), (*example.TestType)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_TestType_To_example_TestType(a.(*TestType), b.(*example.TestType), scope)
 	}); err != nil {
@@ -66,7 +107,347 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*example.ConversionCustom)(nil), (*ConversionCustom)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_ConversionCustom_To_v1_ConversionCustom(a.(*example.ConversionCustom), b.(*ConversionCustom), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*example.ConversionPrivate)(nil), (*ConversionPrivate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_ConversionPrivate_To_v1_ConversionPrivate(a.(*example.ConversionPrivate), b.(*ConversionPrivate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ConversionCustom)(nil), (*example.ConversionCustom)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ConversionCustom_To_example_ConversionCustom(a.(*ConversionCustom), b.(*example.ConversionCustom), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ConversionPrivate)(nil), (*example.ConversionPrivate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ConversionPrivate_To_example_ConversionPrivate(a.(*ConversionPrivate), b.(*example.ConversionPrivate), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
+}
+
+func autoConvert_v1_Conversion_To_example_Conversion(in *Conversion, out *example.Conversion, s conversion.Scope) error {
+	if err := Convert_v1_MemoryIdentical_To_example_MemoryIdentical(&in.Identical, &out.Identical, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_MemoryDifferent_To_example_MemoryDifferent(&in.Different, &out.Different, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1_Conversion_To_example_Conversion is an autogenerated conversion function.
+func Convert_v1_Conversion_To_example_Conversion(in *Conversion, out *example.Conversion, s conversion.Scope) error {
+	return autoConvert_v1_Conversion_To_example_Conversion(in, out, s)
+}
+
+func autoConvert_example_Conversion_To_v1_Conversion(in *example.Conversion, out *Conversion, s conversion.Scope) error {
+	if err := Convert_example_MemoryIdentical_To_v1_MemoryIdentical(&in.Identical, &out.Identical, s); err != nil {
+		return err
+	}
+	if err := Convert_example_MemoryDifferent_To_v1_MemoryDifferent(&in.Different, &out.Different, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_example_Conversion_To_v1_Conversion is an autogenerated conversion function.
+func Convert_example_Conversion_To_v1_Conversion(in *example.Conversion, out *Conversion, s conversion.Scope) error {
+	return autoConvert_example_Conversion_To_v1_Conversion(in, out, s)
+}
+
+func autoConvert_v1_ConversionCustom_To_example_ConversionCustom(in *ConversionCustom, out *example.ConversionCustom, s conversion.Scope) error {
+	out.PublicField = in.PublicField
+	// WARNING: out.privateField is not exported and cannot be set
+	return nil
+}
+
+func autoConvert_example_ConversionCustom_To_v1_ConversionCustom(in *example.ConversionCustom, out *ConversionCustom, s conversion.Scope) error {
+	out.PublicField = in.PublicField
+	// WARNING: in.privateField is not exported and cannot be read
+	return nil
+}
+
+func autoConvert_v1_ConversionCustomContainer_To_example_ConversionCustomContainer(in *ConversionCustomContainer, out *example.ConversionCustomContainer, s conversion.Scope) error {
+	if in.Slice != nil {
+		in, out := &in.Slice, &out.Slice
+		*out = make([]example.ConversionCustom, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ConversionCustom_To_example_ConversionCustom(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Slice = nil
+	}
+	if in.SliceP != nil {
+		in, out := &in.SliceP, &out.SliceP
+		*out = make([]*example.ConversionCustom, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				(*out)[i] = new(example.ConversionCustom)
+				if err := Convert_v1_ConversionCustom_To_example_ConversionCustom((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		out.SliceP = nil
+	}
+	if in.Map != nil {
+		in, out := &in.Map, &out.Map
+		*out = make(map[string]example.ConversionCustom, len(*in))
+		for key, val := range *in {
+			newVal := new(example.ConversionCustom)
+			if err := Convert_v1_ConversionCustom_To_example_ConversionCustom(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Map = nil
+	}
+	if in.MapP != nil {
+		in, out := &in.MapP, &out.MapP
+		*out = make(map[string]*example.ConversionCustom, len(*in))
+		for key, val := range *in {
+			newVal := new(*example.ConversionCustom)
+			if val != nil {
+				*newVal = new(example.ConversionCustom)
+				if err := Convert_v1_ConversionCustom_To_example_ConversionCustom(val, *newVal, s); err != nil {
+					return err
+				}
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.MapP = nil
+	}
+	if err := Convert_v1_ConversionCustom_To_example_ConversionCustom(&in.Struct, &out.Struct, s); err != nil {
+		return err
+	}
+	if in.StructP != nil {
+		in, out := &in.StructP, &out.StructP
+		*out = new(example.ConversionCustom)
+		if err := Convert_v1_ConversionCustom_To_example_ConversionCustom(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.StructP = nil
+	}
+	return nil
+}
+
+// Convert_v1_ConversionCustomContainer_To_example_ConversionCustomContainer is an autogenerated conversion function.
+func Convert_v1_ConversionCustomContainer_To_example_ConversionCustomContainer(in *ConversionCustomContainer, out *example.ConversionCustomContainer, s conversion.Scope) error {
+	return autoConvert_v1_ConversionCustomContainer_To_example_ConversionCustomContainer(in, out, s)
+}
+
+func autoConvert_example_ConversionCustomContainer_To_v1_ConversionCustomContainer(in *example.ConversionCustomContainer, out *ConversionCustomContainer, s conversion.Scope) error {
+	if in.Slice != nil {
+		in, out := &in.Slice, &out.Slice
+		*out = make([]ConversionCustom, len(*in))
+		for i := range *in {
+			if err := Convert_example_ConversionCustom_To_v1_ConversionCustom(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Slice = nil
+	}
+	if in.SliceP != nil {
+		in, out := &in.SliceP, &out.SliceP
+		*out = make([]*ConversionCustom, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				(*out)[i] = new(ConversionCustom)
+				if err := Convert_example_ConversionCustom_To_v1_ConversionCustom((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		out.SliceP = nil
+	}
+	if in.Map != nil {
+		in, out := &in.Map, &out.Map
+		*out = make(map[string]ConversionCustom, len(*in))
+		for key, val := range *in {
+			newVal := new(ConversionCustom)
+			if err := Convert_example_ConversionCustom_To_v1_ConversionCustom(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Map = nil
+	}
+	if in.MapP != nil {
+		in, out := &in.MapP, &out.MapP
+		*out = make(map[string]*ConversionCustom, len(*in))
+		for key, val := range *in {
+			newVal := new(*ConversionCustom)
+			if val != nil {
+				*newVal = new(ConversionCustom)
+				if err := Convert_example_ConversionCustom_To_v1_ConversionCustom(val, *newVal, s); err != nil {
+					return err
+				}
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.MapP = nil
+	}
+	if err := Convert_example_ConversionCustom_To_v1_ConversionCustom(&in.Struct, &out.Struct, s); err != nil {
+		return err
+	}
+	if in.StructP != nil {
+		in, out := &in.StructP, &out.StructP
+		*out = new(ConversionCustom)
+		if err := Convert_example_ConversionCustom_To_v1_ConversionCustom(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.StructP = nil
+	}
+	return nil
+}
+
+// Convert_example_ConversionCustomContainer_To_v1_ConversionCustomContainer is an autogenerated conversion function.
+func Convert_example_ConversionCustomContainer_To_v1_ConversionCustomContainer(in *example.ConversionCustomContainer, out *ConversionCustomContainer, s conversion.Scope) error {
+	return autoConvert_example_ConversionCustomContainer_To_v1_ConversionCustomContainer(in, out, s)
+}
+
+func autoConvert_v1_ConversionPrivate_To_example_ConversionPrivate(in *ConversionPrivate, out *example.ConversionPrivate, s conversion.Scope) error {
+	out.PublicField = in.PublicField
+	// WARNING: out.privateField is not exported and cannot be set
+	return nil
+}
+
+func autoConvert_example_ConversionPrivate_To_v1_ConversionPrivate(in *example.ConversionPrivate, out *ConversionPrivate, s conversion.Scope) error {
+	out.PublicField = in.PublicField
+	// WARNING: in.privateField is not exported and cannot be read
+	return nil
+}
+
+func autoConvert_v1_MemoryDifferent_To_example_MemoryDifferent(in *MemoryDifferent, out *example.MemoryDifferent, s conversion.Scope) error {
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = new(example.MemoryDifferent)
+		if err := Convert_v1_MemoryDifferent_To_example_MemoryDifferent(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Items = nil
+	}
+	if in.Properties != nil {
+		in, out := &in.Properties, &out.Properties
+		*out = make(map[string]example.MemoryDifferent, len(*in))
+		for key, val := range *in {
+			newVal := new(example.MemoryDifferent)
+			if err := Convert_v1_MemoryDifferent_To_example_MemoryDifferent(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Properties = nil
+	}
+	if in.AllOf != nil {
+		in, out := &in.AllOf, &out.AllOf
+		*out = make([]example.MemoryDifferent, len(*in))
+		for i := range *in {
+			if err := Convert_v1_MemoryDifferent_To_example_MemoryDifferent(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.AllOf = nil
+	}
+	if err := metav1.Convert_Pointer_bool_To_bool(&in.Bool, &out.Bool, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1_MemoryDifferent_To_example_MemoryDifferent is an autogenerated conversion function.
+func Convert_v1_MemoryDifferent_To_example_MemoryDifferent(in *MemoryDifferent, out *example.MemoryDifferent, s conversion.Scope) error {
+	return autoConvert_v1_MemoryDifferent_To_example_MemoryDifferent(in, out, s)
+}
+
+func autoConvert_example_MemoryDifferent_To_v1_MemoryDifferent(in *example.MemoryDifferent, out *MemoryDifferent, s conversion.Scope) error {
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = new(MemoryDifferent)
+		if err := Convert_example_MemoryDifferent_To_v1_MemoryDifferent(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Items = nil
+	}
+	if in.Properties != nil {
+		in, out := &in.Properties, &out.Properties
+		*out = make(map[string]MemoryDifferent, len(*in))
+		for key, val := range *in {
+			newVal := new(MemoryDifferent)
+			if err := Convert_example_MemoryDifferent_To_v1_MemoryDifferent(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Properties = nil
+	}
+	if in.AllOf != nil {
+		in, out := &in.AllOf, &out.AllOf
+		*out = make([]MemoryDifferent, len(*in))
+		for i := range *in {
+			if err := Convert_example_MemoryDifferent_To_v1_MemoryDifferent(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.AllOf = nil
+	}
+	if err := metav1.Convert_bool_To_Pointer_bool(&in.Bool, &out.Bool, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_example_MemoryDifferent_To_v1_MemoryDifferent is an autogenerated conversion function.
+func Convert_example_MemoryDifferent_To_v1_MemoryDifferent(in *example.MemoryDifferent, out *MemoryDifferent, s conversion.Scope) error {
+	return autoConvert_example_MemoryDifferent_To_v1_MemoryDifferent(in, out, s)
+}
+
+func autoConvert_v1_MemoryIdentical_To_example_MemoryIdentical(in *MemoryIdentical, out *example.MemoryIdentical, s conversion.Scope) error {
+	out.Items = (*example.MemoryIdentical)(unsafe.Pointer(in.Items))
+	out.Properties = *(*map[string]example.MemoryIdentical)(unsafe.Pointer(&in.Properties))
+	out.AllOf = *(*[]example.MemoryIdentical)(unsafe.Pointer(&in.AllOf))
+	out.Bool = in.Bool
+	return nil
+}
+
+// Convert_v1_MemoryIdentical_To_example_MemoryIdentical is an autogenerated conversion function.
+func Convert_v1_MemoryIdentical_To_example_MemoryIdentical(in *MemoryIdentical, out *example.MemoryIdentical, s conversion.Scope) error {
+	return autoConvert_v1_MemoryIdentical_To_example_MemoryIdentical(in, out, s)
+}
+
+func autoConvert_example_MemoryIdentical_To_v1_MemoryIdentical(in *example.MemoryIdentical, out *MemoryIdentical, s conversion.Scope) error {
+	out.Items = (*MemoryIdentical)(unsafe.Pointer(in.Items))
+	out.Properties = *(*map[string]MemoryIdentical)(unsafe.Pointer(&in.Properties))
+	out.AllOf = *(*[]MemoryIdentical)(unsafe.Pointer(&in.AllOf))
+	out.Bool = in.Bool
+	return nil
+}
+
+// Convert_example_MemoryIdentical_To_v1_MemoryIdentical is an autogenerated conversion function.
+func Convert_example_MemoryIdentical_To_v1_MemoryIdentical(in *example.MemoryIdentical, out *MemoryIdentical, s conversion.Scope) error {
+	return autoConvert_example_MemoryIdentical_To_v1_MemoryIdentical(in, out, s)
 }
 
 func autoConvert_v1_TestType_To_example_TestType(in *TestType, out *example.TestType, s conversion.Scope) error {

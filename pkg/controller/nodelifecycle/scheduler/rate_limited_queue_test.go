@@ -35,8 +35,58 @@ func CheckQueueEq(lhs []string, rhs TimedQueue) bool {
 	return true
 }
 
-func CheckSetEq(lhs, rhs sets.String) bool {
+func CheckSetEq(lhs, rhs sets.Set[string]) bool {
 	return lhs.IsSuperset(rhs) && rhs.IsSuperset(lhs)
+}
+
+func TestUniqueQueueGet(t *testing.T) {
+	var tick int64
+	now = func() time.Time {
+		t := time.Unix(tick, 0)
+		tick++
+		return t
+	}
+
+	queue := UniqueQueue{
+		queue: TimedQueue{},
+		set:   sets.New[string](),
+	}
+	queue.Add(TimedValue{Value: "first", UID: "11111", AddedAt: now(), ProcessAt: now()})
+	queue.Add(TimedValue{Value: "second", UID: "22222", AddedAt: now(), ProcessAt: now()})
+	queue.Add(TimedValue{Value: "third", UID: "33333", AddedAt: now(), ProcessAt: now()})
+
+	queuePattern := []string{"first", "second", "third"}
+	if len(queue.queue) != len(queuePattern) {
+		t.Fatalf("Queue %v should have length %d", queue.queue, len(queuePattern))
+	}
+	if !CheckQueueEq(queuePattern, queue.queue) {
+		t.Errorf("Invalid queue. Got %v, expected %v", queue.queue, queuePattern)
+	}
+
+	setPattern := sets.New[string]("first", "second", "third")
+	if len(queue.set) != len(setPattern) {
+		t.Fatalf("Map %v should have length %d", queue.set, len(setPattern))
+	}
+	if !CheckSetEq(setPattern, queue.set) {
+		t.Errorf("Invalid map. Got %v, expected %v", queue.set, setPattern)
+	}
+
+	queue.Get()
+	queuePattern = []string{"second", "third"}
+	if len(queue.queue) != len(queuePattern) {
+		t.Fatalf("Queue %v should have length %d", queue.queue, len(queuePattern))
+	}
+	if !CheckQueueEq(queuePattern, queue.queue) {
+		t.Errorf("Invalid queue. Got %v, expected %v", queue.queue, queuePattern)
+	}
+
+	setPattern = sets.New[string]("second", "third")
+	if len(queue.set) != len(setPattern) {
+		t.Fatalf("Map %v should have length %d", queue.set, len(setPattern))
+	}
+	if !CheckSetEq(setPattern, queue.set) {
+		t.Errorf("Invalid map. Got %v, expected %v", queue.set, setPattern)
+	}
 }
 
 func TestAddNode(t *testing.T) {
@@ -53,7 +103,7 @@ func TestAddNode(t *testing.T) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
 	}
 
-	setPattern := sets.NewString("first", "second", "third")
+	setPattern := sets.New[string]("first", "second", "third")
 	if len(evictor.queue.set) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}
@@ -84,7 +134,7 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
 	}
 
-	setPattern := sets.NewString("second", "third")
+	setPattern := sets.New[string]("second", "third")
 	if len(evictor.queue.set) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}
@@ -106,7 +156,7 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
 	}
 
-	setPattern = sets.NewString("first", "third")
+	setPattern = sets.New[string]("first", "third")
 	if len(evictor.queue.set) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}
@@ -128,7 +178,7 @@ func TestDelNode(t *testing.T) {
 		t.Errorf("Invalid queue. Got %v, expected %v", evictor.queue.queue, queuePattern)
 	}
 
-	setPattern = sets.NewString("first", "second")
+	setPattern = sets.New[string]("first", "second")
 	if len(evictor.queue.set) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}
@@ -144,14 +194,14 @@ func TestTry(t *testing.T) {
 	evictor.Add("third", "33333")
 	evictor.Remove("second")
 
-	deletedMap := sets.NewString()
+	deletedMap := sets.New[string]()
 	logger, _ := ktesting.NewTestContext(t)
 	evictor.Try(logger, func(value TimedValue) (bool, time.Duration) {
 		deletedMap.Insert(value.Value)
 		return true, 0
 	})
 
-	setPattern := sets.NewString("first", "third")
+	setPattern := sets.New[string]("first", "third")
 	if len(deletedMap) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}
@@ -306,6 +356,12 @@ func TestSwapLimiter(t *testing.T) {
 	if qps != createdQPS {
 		t.Fatalf("QPS does not match create one: %v instead of %v", qps, createdQPS)
 	}
+
+	prev := evictor.limiter
+	evictor.SwapLimiter(createdQPS)
+	if prev != evictor.limiter {
+		t.Fatalf("Limiter should not be swapped if the QPS is the same.")
+	}
 }
 
 func TestAddAfterTry(t *testing.T) {
@@ -315,14 +371,14 @@ func TestAddAfterTry(t *testing.T) {
 	evictor.Add("third", "33333")
 	evictor.Remove("second")
 
-	deletedMap := sets.NewString()
+	deletedMap := sets.New[string]()
 	logger, _ := ktesting.NewTestContext(t)
 	evictor.Try(logger, func(value TimedValue) (bool, time.Duration) {
 		deletedMap.Insert(value.Value)
 		return true, 0
 	})
 
-	setPattern := sets.NewString("first", "third")
+	setPattern := sets.New[string]("first", "third")
 	if len(deletedMap) != len(setPattern) {
 		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
 	}

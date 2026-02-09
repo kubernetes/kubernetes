@@ -25,6 +25,8 @@ cpuCFSQuota: true
 cpuCFSQuotaPeriod: 100ms
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
+crashLoopBackOff:
+  maxContainerRestartPeriod: 5m0s
 enableControllerAttachDetach: true
 enableDebugFlagsHandler: true
 enableDebuggingHandlers: true
@@ -37,6 +39,7 @@ enforceNodeAllocatable:
 eventBurst: 10
 eventRecordQPS: 5
 evictionPressureTransitionPeriod: 5m0s
+failCgroupV1: true
 failSwapOn: true
 fileCheckFrequency: 20s
 hairpinMode: promiscuous-bridge
@@ -47,6 +50,7 @@ imageGCHighThresholdPercent: 85
 imageGCLowThresholdPercent: 80
 imageMaximumGCAge: 0s
 imageMinimumGCAge: 2m0s
+imagePullCredentialsVerificationPolicy: NeverVerifyPreloadedImages
 iptablesDropBit: 15
 iptablesMasqueradeBit: 14
 kind: KubeletConfiguration
@@ -68,6 +72,7 @@ maxPods: 110
 memoryManagerPolicy: None
 memorySwap: {}
 memoryThrottlingFactor: 0.9
+mergeDefaultEvictionSettings: false
 nodeLeaseDurationSeconds: 40
 nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s

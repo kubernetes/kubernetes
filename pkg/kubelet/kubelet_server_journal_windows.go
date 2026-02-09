@@ -27,43 +27,107 @@ import (
 
 const powershellExe = "PowerShell.exe"
 
-// getLoggingCmd returns the powershell cmd and arguments for the given nodeLogQuery and boot
-func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error) {
-	args := []string{
+// getLoggingCmd returns the powershell cmd, arguments, and environment variables for the given nodeLogQuery and boot.
+// All string inputs are environment variables to stop subcommands expressions from being executed.
+// The return values are:
+// - cmd: the command to be executed
+// - args: arguments to the command
+// - cmdEnv: environment variables when the command will be executed
+func getLoggingCmd(n *nodeLogQuery, services []string) (cmd string, args []string, cmdEnv []string, err error) {
+	cmdEnv = getLoggingCmdEnv(n, services)
+
+	var includeSinceTime, includeUntilTime, includeTailLines, includePattern bool
+	if n.SinceTime != nil {
+		includeSinceTime = true
+	}
+	if n.UntilTime != nil {
+		includeUntilTime = true
+	}
+	if n.TailLines != nil {
+		includeTailLines = true
+	}
+	if len(n.Pattern) > 0 {
+		includePattern = true
+	}
+
+	var includeServices []bool
+	for _, service := range services {
+		includeServices = append(includeServices, len(service) > 0)
+	}
+
+	args = getLoggingCmdArgs(includeSinceTime, includeUntilTime, includeTailLines, includePattern, includeServices)
+
+	return powershellExe, args, cmdEnv, nil
+}
+
+// getLoggingCmdArgs returns arguments that need to be passed to powershellExe
+func getLoggingCmdArgs(includeSinceTime, includeUntilTime, includeTailLines, includePattern bool, services []bool) (args []string) {
+	args = []string{
 		"-NonInteractive",
 		"-ExecutionPolicy", "Bypass",
 		"-Command",
 	}
 
-	psCmd := "Get-WinEvent -FilterHashtable @{LogName='Application'"
-	if n.SinceTime != nil {
-		psCmd += fmt.Sprintf("; StartTime='%s'", n.SinceTime.Format(dateLayout))
+	psCmd := `Get-WinEvent -FilterHashtable @{LogName='Application'`
+
+	if includeSinceTime {
+		psCmd += fmt.Sprintf(`; StartTime="$Env:kubelet_sinceTime"`)
 	}
-	if n.UntilTime != nil {
-		psCmd += fmt.Sprintf("; EndTime='%s'", n.UntilTime.Format(dateLayout))
+	if includeUntilTime {
+		psCmd += fmt.Sprintf(`; EndTime="$Env:kubelet_untilTime"`)
 	}
+
 	var providers []string
-	for _, service := range services {
-		if len(service) > 0 {
-			providers = append(providers, "'"+service+"'")
+	for i := range services {
+		if services[i] {
+			providers = append(providers, fmt.Sprintf("$Env:kubelet_provider%d", i))
 		}
 	}
+
 	if len(providers) > 0 {
 		psCmd += fmt.Sprintf("; ProviderName=%s", strings.Join(providers, ","))
 	}
-	psCmd += "}"
-	if n.TailLines != nil {
-		psCmd += fmt.Sprintf(" -MaxEvents %d", *n.TailLines)
+
+	psCmd += `}`
+	if includeTailLines {
+		psCmd += fmt.Sprint(` -MaxEvents $Env:kubelet_tailLines`)
 	}
-	psCmd += " | Sort-Object TimeCreated"
-	if len(n.Pattern) > 0 {
-		psCmd += fmt.Sprintf(" | Where-Object -Property Message -Match '%s'", n.Pattern)
+	psCmd += ` | Sort-Object TimeCreated`
+
+	if includePattern {
+		psCmd += fmt.Sprintf(` | Where-Object -Property Message -Match "$Env:kubelet_pattern"`)
 	}
-	psCmd += " | Format-Table -AutoSize -Wrap"
+	psCmd += ` | Format-Table -AutoSize -Wrap`
 
 	args = append(args, psCmd)
 
-	return powershellExe, args, nil
+	return args
+}
+
+// getLoggingCmdEnv returns the environment variables that will be present when powershellExe is executed
+func getLoggingCmdEnv(n *nodeLogQuery, services []string) (cmdEnv []string) {
+	if n.SinceTime != nil {
+		cmdEnv = append(cmdEnv, fmt.Sprintf("kubelet_sinceTime=%s", n.SinceTime.Format(dateLayout)))
+	}
+	if n.UntilTime != nil {
+		cmdEnv = append(cmdEnv, fmt.Sprintf("kubelet_untilTime=%s", n.UntilTime.Format(dateLayout)))
+	}
+
+	for i, service := range services {
+		if len(service) > 0 {
+			cmdEnv = append(cmdEnv, fmt.Sprintf("kubelet_provider%d=%s", i, service))
+		}
+	}
+
+	if n.TailLines != nil {
+		cmdEnv = append(cmdEnv, fmt.Sprintf("kubelet_tailLines=%d", *n.TailLines))
+	}
+
+	if len(n.Pattern) > 0 {
+		cmdEnv = append(cmdEnv, fmt.Sprintf("kubelet_pattern=%s", n.Pattern))
+	}
+
+	return cmdEnv
 }
 
 // checkForNativeLogger always returns true for Windows

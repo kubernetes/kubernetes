@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 package manager
 
 import (
@@ -64,6 +66,18 @@ type containerInfo struct {
 	Spec          info.ContainerSpec
 }
 
+// atomicTime is a lock-free wrapper for storing and retrieving time values.
+// It stores time as Unix nanoseconds in an atomic.Int64, enabling concurrent
+// reads and writes without mutex contention.
+type atomicTime struct {
+	atomic.Int64
+}
+
+// Time returns the stored time value as a time.Time.
+func (t *atomicTime) Time() time.Time {
+	return time.Unix(0, t.Load())
+}
+
 type containerData struct {
 	oomEvents                uint64
 	handler                  container.ContainerHandler
@@ -73,11 +87,12 @@ type containerData struct {
 	loadReader               cpuload.CpuLoadReader
 	summaryReader            *summary.StatsSummary
 	loadAvg                  float64 // smoothed load average seen so far.
+	loadDAvg                 float64 // smoothed load.d average seen so far.
 	housekeepingInterval     time.Duration
 	maxHousekeepingInterval  time.Duration
 	allowDynamicHousekeeping bool
-	infoLastUpdatedTime      time.Time
-	statsLastUpdatedTime     time.Time
+	infoLastUpdatedTime      atomicTime // Unix nano
+	statsLastUpdatedTime     atomicTime // Unix nano
 	lastErrorTime            time.Time
 	//  used to track time
 	clock clock.Clock
@@ -89,7 +104,8 @@ type containerData struct {
 	logUsage bool
 
 	// Tells the container to stop.
-	stop chan struct{}
+	stop     chan struct{}
+	stopOnce sync.Once
 
 	// Tells the container to immediately collect stats
 	onDemandChan chan chan struct{}
@@ -125,7 +141,12 @@ func (cd *containerData) Stop() error {
 	if err != nil {
 		return err
 	}
-	close(cd.stop)
+	// Use sync.Once to ensure the channel is only closed once, preventing
+	// panic from concurrent calls to Stop() when multiple goroutines try
+	// to destroy the same container simultaneously.
+	cd.stopOnce.Do(func() {
+		close(cd.stop)
+	})
 	cd.perfCollector.Destroy()
 	cd.resctrlCollector.Destroy()
 	return nil
@@ -144,9 +165,7 @@ func (cd *containerData) allowErrorLogging() bool {
 // periodic housekeeping to reset.  This should be used sparingly, as calling OnDemandHousekeeping frequently
 // can have serious performance costs.
 func (cd *containerData) OnDemandHousekeeping(maxAge time.Duration) {
-	cd.lock.Lock()
-	timeSinceStatsLastUpdate := cd.clock.Since(cd.statsLastUpdatedTime)
-	cd.lock.Unlock()
+	timeSinceStatsLastUpdate := cd.clock.Since(cd.statsLastUpdatedTime.Time())
 	if timeSinceStatsLastUpdate > maxAge {
 		housekeepingFinishedChan := make(chan struct{})
 		cd.onDemandChan <- housekeepingFinishedChan
@@ -171,7 +190,7 @@ func (cd *containerData) notifyOnDemand() {
 
 func (cd *containerData) GetInfo(shouldUpdateSubcontainers bool) (*containerInfo, error) {
 	// Get spec and subcontainers.
-	if cd.clock.Since(cd.infoLastUpdatedTime) > 5*time.Second || shouldUpdateSubcontainers {
+	if cd.clock.Since(cd.infoLastUpdatedTime.Time()) > 5*time.Second || shouldUpdateSubcontainers {
 		err := cd.updateSpec()
 		if err != nil {
 			return nil, err
@@ -182,7 +201,7 @@ func (cd *containerData) GetInfo(shouldUpdateSubcontainers bool) (*containerInfo
 				return nil, err
 			}
 		}
-		cd.infoLastUpdatedTime = cd.clock.Now()
+		cd.infoLastUpdatedTime.Store(cd.clock.Now().UnixNano())
 	}
 	cd.lock.Lock()
 	defer cd.lock.Unlock()
@@ -441,6 +460,7 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 		allowDynamicHousekeeping: allowDynamicHousekeeping,
 		logUsage:                 logUsage,
 		loadAvg:                  -1.0, // negative value indicates uninitialized.
+		loadDAvg:                 -1.0, // negative value indicates uninitialized.
 		stop:                     make(chan struct{}),
 		collectorManager:         collectorManager,
 		onDemandChan:             make(chan chan struct{}, 100),
@@ -592,9 +612,7 @@ func (cd *containerData) housekeepingTick(timer <-chan time.Time, longHousekeepi
 		klog.V(3).Infof("[%s] Housekeeping took %s", cd.info.Name, duration)
 	}
 	cd.notifyOnDemand()
-	cd.lock.Lock()
-	defer cd.lock.Unlock()
-	cd.statsLastUpdatedTime = cd.clock.Now()
+	cd.statsLastUpdatedTime.Store(cd.clock.Now().UnixNano())
 	return true
 }
 
@@ -633,6 +651,14 @@ func (cd *containerData) updateLoad(newLoad uint64) {
 	}
 }
 
+func (cd *containerData) updateLoadD(newLoad uint64) {
+	if cd.loadDAvg < 0 {
+		cd.loadDAvg = float64(newLoad) // initialize to the first seen sample for faster stabilization.
+	} else {
+		cd.loadDAvg = cd.loadDAvg*cd.loadDecay + float64(newLoad)*(1.0-cd.loadDecay)
+	}
+}
+
 func (cd *containerData) updateStats() error {
 	stats, statsErr := cd.handler.GetStats()
 	if statsErr != nil {
@@ -659,6 +685,10 @@ func (cd *containerData) updateStats() error {
 			cd.updateLoad(loadStats.NrRunning)
 			// convert to 'milliLoad' to avoid floats and preserve precision.
 			stats.Cpu.LoadAverage = int32(cd.loadAvg * 1000)
+
+			cd.updateLoadD(loadStats.NrUninterruptible)
+			// convert to 'milliLoad' to avoid floats and preserve precision.
+			stats.Cpu.LoadDAverage = int32(cd.loadDAvg * 1000)
 		}
 	}
 	if cd.summaryReader != nil {
@@ -710,7 +740,7 @@ func (cd *containerData) updateStats() error {
 		return statsErr
 	}
 	if perfStatsErr != nil {
-		klog.Errorf("error occurred while collecting perf stats for container %s: %s", cInfo.Name, err)
+		klog.Errorf("error occurred while collecting perf stats for container %s: %s", cInfo.Name, perfStatsErr)
 		return perfStatsErr
 	}
 	if resctrlStatsErr != nil {

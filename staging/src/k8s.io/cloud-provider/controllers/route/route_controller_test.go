@@ -22,12 +22,19 @@ import (
 	"testing"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/controller-manager/pkg/features"
+	_ "k8s.io/controller-manager/pkg/features/register"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	nodeutil "k8s.io/component-helpers/node/util"
@@ -35,6 +42,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func alwaysReady() bool { return true }
@@ -70,7 +78,8 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		}
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
-		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
+		rc, err := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
+		require.NoError(t, err)
 		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
@@ -92,6 +101,7 @@ func TestReconcile(t *testing.T) {
 
 	node3 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-3", UID: "03"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24", "a00:100::/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}}}
 	node4 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-4", UID: "04"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24", PodCIDRs: []string{"10.120.1.0/24", "a00:200::/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}}}
+	nodeDuplicateCIDR := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-4", UID: "04"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24", PodCIDRs: []string{"10.120.1.0/24", "10.120.1.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}}}
 
 	testCases := []struct {
 		description                string
@@ -101,6 +111,7 @@ func TestReconcile(t *testing.T) {
 		expectedNetworkUnavailable []bool
 		clientset                  *fake.Clientset
 		dualStack                  bool
+		expectError                bool
 	}{
 		{
 			description: "routes have no TargetNodeAddresses at the beginning",
@@ -413,6 +424,17 @@ func TestReconcile(t *testing.T) {
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
 		},
+		{
+			description: "duplicate pod cidr",
+			nodes: []*v1.Node{
+				&nodeDuplicateCIDR,
+			},
+			initialRoutes:              []*cloudprovider.Route{},
+			expectedRoutes:             []*cloudprovider.Route{},
+			expectedNetworkUnavailable: []bool{true, false},
+			expectError:                true,
+			clientset:                  fake.NewClientset(&v1.NodeList{Items: []v1.Node{nodeDuplicateCIDR}}),
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
@@ -437,9 +459,21 @@ func TestReconcile(t *testing.T) {
 			}
 
 			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
-			rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+
+			rc, err := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			require.NoError(t, err)
+
+			recorder := record.NewBroadcaster(record.WithContext(ctx))
+			rc.recorder = recorder.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
+			e := recorder.StartEventWatcher(func(e *v1.Event) {
+				if e.InvolvedObject.APIVersion == "" {
+					t.Fatalf("event involvedObject.apiVersion is empty")
+				}
+			})
+			defer e.Stop()
+
 			rc.nodeListerSynced = alwaysReady
-			assert.NoError(t, rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes), "failed to reconcile")
+			require.NoError(t, rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes), "failed to reconcile")
 			for _, action := range testCase.clientset.Actions() {
 				if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
 					node := action.(core.UpdateAction).GetObject().(*v1.Node)
@@ -463,7 +497,6 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 			var finalRoutes []*cloudprovider.Route
-			var err error
 			timeoutChan := time.After(200 * time.Millisecond)
 			tick := time.NewTicker(10 * time.Millisecond)
 			defer tick.Stop()
@@ -475,13 +508,101 @@ func TestReconcile(t *testing.T) {
 						break poll
 					}
 				case <-timeoutChan:
-					t.Errorf("rc.reconcile() err is %v,\nfound routes:\n%v\nexpected routes:\n%v\n",
-						err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
+					if !testCase.expectError {
+						t.Errorf("rc.reconcile() err is %v,\nfound routes:\n%v\nexpected routes:\n%v\n",
+							err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
+					}
 					break poll
 				}
 			}
 		})
 
+	}
+}
+
+func TestHandleNodeUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CloudControllerManagerWatchBasedRoutesReconciliation, true)
+
+	cluster := "my-k8s"
+	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}}
+
+	testCases := []struct {
+		description           string
+		clientset             *fake.Clientset
+		updatedNode           v1.Node
+		expectedWorkqueueItem string
+	}{
+		{
+			description:           "internal IP updated",
+			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.2"}}}},
+			expectedWorkqueueItem: "routes",
+		},
+		{
+			description:           "pod CIDR updated",
+			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.121.0.0/24", PodCIDRs: []string{"10.121.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}},
+			expectedWorkqueueItem: "routes",
+		},
+		{
+			description: "node object not updated",
+			clientset:   fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode: node,
+		},
+		{
+			description: "unrelated node update",
+			clientset:   fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-1",
+					UID:  "01",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR:  "10.120.0.0/24",
+					PodCIDRs: []string{"10.120.0.0/24"},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.1.1",
+						},
+					},
+					Images: []v1.ContainerImage{
+						{
+							Names: []string{
+								"registry.k8s.io/pause:latest",
+							},
+							SizeBytes: 239840,
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			cloud := &fakecloud.Cloud{RouteMap: make(map[string]*fakecloud.Route)}
+			routes, ok := cloud.Routes()
+			assert.True(t, ok, "fakecloud failed to run Routes()")
+
+			cidrs := make([]*net.IPNet, 0)
+			_, cidr, _ := netutils.ParseCIDRSloppy("10.120.0.0/16")
+			cidrs = append(cidrs, cidr)
+
+			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
+			rc, err := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			require.NoError(t, err)
+			require.NotNil(t, rc.workqueue)
+
+			rc.handleNodeUpdate(&node, &testCase.updatedNode)
+
+			if testCase.expectedWorkqueueItem != "" {
+				item, shutdown := rc.workqueue.Get()
+				require.False(t, shutdown, "workqueue is shutdown")
+				assert.Equal(t, testCase.expectedWorkqueueItem, item, "unexpected item from workqueue")
+			}
+		})
 	}
 }
 
@@ -514,4 +635,242 @@ func flatten(list []*cloudprovider.Route) []cloudprovider.Route {
 		structList = append(structList, *route)
 	}
 	return structList
+}
+
+func TestUpdateNetworkingCondition(t *testing.T) {
+	cluster := "test-cluster"
+	_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.244.0.0/16")
+
+	testCases := []struct {
+		description           string
+		existingCondition     *v1.NodeCondition
+		routesCreated         bool
+		expectedUpdate        bool
+		expectedConditionType v1.ConditionStatus
+		expectedReason        string
+		expectedMessage       string
+	}{
+		{
+			description:           "No existing condition, routes created - should update",
+			existingCondition:     nil,
+			routesCreated:         true,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionFalse,
+			expectedReason:        "RouteCreated",
+			expectedMessage:       "RouteController created a route",
+		},
+		{
+			description:           "No existing condition, routes not created - should update",
+			existingCondition:     nil,
+			routesCreated:         false,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionTrue,
+			expectedReason:        "NoRouteCreated",
+			expectedMessage:       "RouteController failed to create a route",
+		},
+		{
+			description: "Existing condition with same status and reason (RouteCreated) - should not update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "RouteCreated",
+				Message: "RouteController created a route",
+			},
+			routesCreated:  true,
+			expectedUpdate: false,
+		},
+		{
+			description: "Existing condition with same status but different reason (CalicoIsUp) - should update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "CalicoIsUp",
+				Message: "Calico is running on this node",
+			},
+			routesCreated:         true,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionFalse,
+			expectedReason:        "RouteCreated",
+			expectedMessage:       "RouteController created a route",
+		},
+		{
+			description: "Existing condition with Status=False but different reason - should update when routes created",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "ExternalCNI",
+				Message: "External CNI configured",
+			},
+			routesCreated:         true,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionFalse,
+			expectedReason:        "RouteCreated",
+			expectedMessage:       "RouteController created a route",
+		},
+		{
+			description: "Existing condition with Status=True and different reason - should update when routes not created",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionTrue,
+				Reason:  "SomeOtherReason",
+				Message: "Some other message",
+			},
+			routesCreated:         false,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionTrue,
+			expectedReason:        "NoRouteCreated",
+			expectedMessage:       "RouteController failed to create a route",
+		},
+		{
+			description: "Existing condition with Status=False, transitioning to routes not created - should update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "RouteCreated",
+				Message: "RouteController created a route",
+			},
+			routesCreated:         false,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionTrue,
+			expectedReason:        "NoRouteCreated",
+			expectedMessage:       "RouteController failed to create a route",
+		},
+		{
+			description: "Existing condition with Status=True and NoRouteCreated reason - should not update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionTrue,
+				Reason:  "NoRouteCreated",
+				Message: "RouteController failed to create a route",
+			},
+			routesCreated:  false,
+			expectedUpdate: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					UID:  "test-uid",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR:  "10.244.0.0/24",
+					PodCIDRs: []string{"10.244.0.0/24"},
+				},
+			}
+
+			// Set existing condition if specified
+			if tc.existingCondition != nil {
+				node.Status.Conditions = []v1.NodeCondition{*tc.existingCondition}
+			}
+
+			client := fake.NewClientset(node)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			rc, err := New(nil, client, informerFactory.Core().V1().Nodes(), cluster, []*net.IPNet{clusterCIDR})
+			require.NoError(t, err)
+			rc.nodeListerSynced = alwaysReady
+
+			// Call updateNetworkingCondition
+			err = rc.updateNetworkingCondition(node, tc.routesCreated)
+			require.NoError(t, err)
+
+			if tc.expectedUpdate {
+				// Verify that a patch was called
+				actions := client.Actions()
+				patchFound := false
+				for _, action := range actions {
+					if action.GetVerb() == "patch" {
+						patchFound = true
+						break
+					}
+				}
+				assert.True(t, patchFound, "Expected a patch action but none found")
+
+				// Get the updated node
+				updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+				require.NoError(t, err)
+
+				// Verify the condition was updated correctly
+				_, condition := nodeutil.GetNodeCondition(&updatedNode.Status, v1.NodeNetworkUnavailable)
+				require.NotNil(t, condition, "Expected NodeNetworkUnavailable condition to exist")
+				assert.Equal(t, tc.expectedConditionType, condition.Status, "Unexpected condition status")
+				assert.Equal(t, tc.expectedReason, condition.Reason, "Unexpected condition reason")
+				assert.Equal(t, tc.expectedMessage, condition.Message, "Unexpected condition message")
+			} else {
+				// Verify that no patch was called (or only initial operations)
+				actions := client.Actions()
+				patchCount := 0
+				for _, action := range actions {
+					if action.GetVerb() == "patch" {
+						patchCount++
+					}
+				}
+				assert.Equal(t, 0, patchCount, "Expected no patch action but found %d", patchCount)
+			}
+		})
+	}
+}
+
+func TestUpdateNetworkingConditionWithCalicoScenario(t *testing.T) {
+	// This test specifically covers the bug where Calico sets NetworkUnavailable=False
+	// and RouteController should still be able to update it with its own reason
+	cluster := "test-cluster"
+	_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.244.0.0/16")
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			UID:  "test-uid",
+		},
+		Spec: v1.NodeSpec{
+			PodCIDR:  "10.244.0.0/24",
+			PodCIDRs: []string{"10.244.0.0/24"},
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:    v1.NodeNetworkUnavailable,
+					Status:  v1.ConditionFalse,
+					Reason:  "CalicoIsUp",
+					Message: "Calico is running on this node",
+				},
+			},
+		},
+	}
+
+	client := fake.NewClientset(node)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	rc, err := New(nil, client, informerFactory.Core().V1().Nodes(), cluster, []*net.IPNet{clusterCIDR})
+	require.NoError(t, err)
+	rc.nodeListerSynced = alwaysReady
+
+	// Call updateNetworkingCondition with routes created
+	err = rc.updateNetworkingCondition(node, true)
+	require.NoError(t, err)
+
+	// Verify that a patch was called
+	actions := client.Actions()
+	patchFound := false
+	for _, action := range actions {
+		if action.GetVerb() == "patch" {
+			patchFound = true
+			break
+		}
+	}
+	assert.True(t, patchFound, "Expected a patch action to update the condition")
+
+	// Get the updated node
+	updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	// Verify the condition was updated with RouteCreated reason
+	_, condition := nodeutil.GetNodeCondition(&updatedNode.Status, v1.NodeNetworkUnavailable)
+	require.NotNil(t, condition, "Expected NodeNetworkUnavailable condition to exist")
+	assert.Equal(t, v1.ConditionFalse, condition.Status, "Expected Status to remain False")
+	assert.Equal(t, "RouteCreated", condition.Reason, "Expected Reason to be updated to RouteCreated")
+	assert.Equal(t, "RouteController created a route", condition.Message, "Expected Message to be updated")
 }

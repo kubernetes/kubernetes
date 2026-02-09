@@ -29,10 +29,28 @@ import (
 
 // ClusterTrustBundleApplyConfiguration represents a declarative configuration of the ClusterTrustBundle type for use
 // with apply.
+//
+// ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors
+// (root certificates).
+//
+// ClusterTrustBundle objects are considered to be readable by any authenticated
+// user in the cluster, because they can be mounted by pods using the
+// `clusterTrustBundle` projection.  All service accounts have read access to
+// ClusterTrustBundles by default.  Users who only have namespace-level access
+// to a cluster can read ClusterTrustBundles by impersonating a serviceaccount
+// that they have access to.
+//
+// It can be optionally associated with a particular assigner, in which case it
+// contains one valid set of trust anchors for that signer. Signers may have
+// multiple associated ClusterTrustBundles; each is an independent set of trust
+// anchors for that signer. Admission control is used to enforce that only users
+// with permissions on the signer can create or modify the corresponding bundle.
 type ClusterTrustBundleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata contains the object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ClusterTrustBundleSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec contains the signer (if any) and trust anchors.
+	Spec *ClusterTrustBundleSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ClusterTrustBundle constructs a declarative configuration of the ClusterTrustBundle type for use with
@@ -45,29 +63,14 @@ func ClusterTrustBundle(name string) *ClusterTrustBundleApplyConfiguration {
 	return b
 }
 
-// ExtractClusterTrustBundle extracts the applied configuration owned by fieldManager from
-// clusterTrustBundle. If no managedFields are found in clusterTrustBundle for fieldManager, a
-// ClusterTrustBundleApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractClusterTrustBundleFrom extracts the applied configuration owned by fieldManager from
+// clusterTrustBundle for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // clusterTrustBundle must be a unmodified ClusterTrustBundle API object that was retrieved from the Kubernetes API.
-// ExtractClusterTrustBundle provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractClusterTrustBundleFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractClusterTrustBundle(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string) (*ClusterTrustBundleApplyConfiguration, error) {
-	return extractClusterTrustBundle(clusterTrustBundle, fieldManager, "")
-}
-
-// ExtractClusterTrustBundleStatus is the same as ExtractClusterTrustBundle except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractClusterTrustBundleStatus(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string) (*ClusterTrustBundleApplyConfiguration, error) {
-	return extractClusterTrustBundle(clusterTrustBundle, fieldManager, "status")
-}
-
-func extractClusterTrustBundle(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string, subresource string) (*ClusterTrustBundleApplyConfiguration, error) {
+func ExtractClusterTrustBundleFrom(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string, subresource string) (*ClusterTrustBundleApplyConfiguration, error) {
 	b := &ClusterTrustBundleApplyConfiguration{}
 	err := managedfields.ExtractInto(clusterTrustBundle, internal.Parser().Type("io.k8s.api.certificates.v1alpha1.ClusterTrustBundle"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,11 +83,27 @@ func extractClusterTrustBundle(clusterTrustBundle *certificatesv1alpha1.ClusterT
 	return b, nil
 }
 
+// ExtractClusterTrustBundle extracts the applied configuration owned by fieldManager from
+// clusterTrustBundle. If no managedFields are found in clusterTrustBundle for fieldManager, a
+// ClusterTrustBundleApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// clusterTrustBundle must be a unmodified ClusterTrustBundle API object that was retrieved from the Kubernetes API.
+// ExtractClusterTrustBundle provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractClusterTrustBundle(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string) (*ClusterTrustBundleApplyConfiguration, error) {
+	return ExtractClusterTrustBundleFrom(clusterTrustBundle, fieldManager, "")
+}
+
+func (b ClusterTrustBundleApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithKind(value string) *ClusterTrustBundleApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -92,7 +111,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithKind(value string) *ClusterTr
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithAPIVersion(value string) *ClusterTrustBundleApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -101,7 +120,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithAPIVersion(value string) *Clu
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithName(value string) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -110,7 +129,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithName(value string) *ClusterTr
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithGenerateName(value string) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -119,7 +138,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithGenerateName(value string) *C
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithNamespace(value string) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -128,7 +147,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithNamespace(value string) *Clus
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithUID(value types.UID) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -137,7 +156,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithUID(value types.UID) *Cluster
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithResourceVersion(value string) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -146,7 +165,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithResourceVersion(value string)
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithGeneration(value int64) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -155,7 +174,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithGeneration(value int64) *Clus
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -164,7 +183,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithCreationTimestamp(value metav
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -173,7 +192,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithDeletionTimestamp(value metav
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ClusterTrustBundleApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -183,11 +202,11 @@ func (b *ClusterTrustBundleApplyConfiguration) WithDeletionGracePeriodSeconds(va
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ClusterTrustBundleApplyConfiguration) WithLabels(entries map[string]string) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -198,11 +217,11 @@ func (b *ClusterTrustBundleApplyConfiguration) WithLabels(entries map[string]str
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ClusterTrustBundleApplyConfiguration) WithAnnotations(entries map[string]string) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -216,7 +235,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithOwnerReferences(values ...*v1
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -227,7 +246,7 @@ func (b *ClusterTrustBundleApplyConfiguration) WithOwnerReferences(values ...*v1
 func (b *ClusterTrustBundleApplyConfiguration) WithFinalizers(values ...string) *ClusterTrustBundleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -246,8 +265,24 @@ func (b *ClusterTrustBundleApplyConfiguration) WithSpec(value *ClusterTrustBundl
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ClusterTrustBundleApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ClusterTrustBundleApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ClusterTrustBundleApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ClusterTrustBundleApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

@@ -19,6 +19,7 @@ package statefulset
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -31,17 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/pkg/controlplane"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -470,8 +468,6 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 		},
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
-
 	tCtx, closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -655,24 +651,24 @@ func TestDeletingPodForRollingUpdatePartition(t *testing.T) {
 
 func TestStatefulSetStartOrdinal(t *testing.T) {
 	tests := []struct {
-		ordinals         *appsv1.StatefulSetOrdinals
-		name             string
-		namespace        string
-		replicas         int
-		expectedPodNames []string
+		ordinals           *appsv1.StatefulSetOrdinals
+		name               string
+		namespace          string
+		replicas           int
+		expectedPodIndexes []int
 	}{
 		{
-			name:             "default start ordinal, no ordinals set",
-			namespace:        "no-ordinals",
-			replicas:         3,
-			expectedPodNames: []string{"sts-0", "sts-1", "sts-2"},
+			name:               "default start ordinal, no ordinals set",
+			namespace:          "no-ordinals",
+			replicas:           3,
+			expectedPodIndexes: []int{0, 1, 2},
 		},
 		{
-			name:             "default start ordinal",
-			namespace:        "no-start-ordinals",
-			ordinals:         &appsv1.StatefulSetOrdinals{},
-			replicas:         3,
-			expectedPodNames: []string{"sts-0", "sts-1", "sts-2"},
+			name:               "default start ordinal",
+			namespace:          "no-start-ordinals",
+			ordinals:           &appsv1.StatefulSetOrdinals{},
+			replicas:           3,
+			expectedPodIndexes: []int{0, 1, 2},
 		},
 		{
 			name:      "start ordinal 4",
@@ -680,8 +676,8 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 			ordinals: &appsv1.StatefulSetOrdinals{
 				Start: 4,
 			},
-			replicas:         4,
-			expectedPodNames: []string{"sts-4", "sts-5", "sts-6", "sts-7"},
+			replicas:           4,
+			expectedPodIndexes: []int{4, 5, 6, 7},
 		},
 		{
 			name:      "start ordinal 5",
@@ -689,12 +685,11 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 			ordinals: &appsv1.StatefulSetOrdinals{
 				Start: 2,
 			},
-			replicas:         7,
-			expectedPodNames: []string{"sts-2", "sts-3", "sts-4", "sts-5", "sts-6", "sts-7", "sts-8"},
+			replicas:           7,
+			expectedPodIndexes: []int{2, 3, 4, 5, 6, 7, 8},
 		},
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)
 	tCtx, closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -720,16 +715,38 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 			}
 
 			var podNames []string
+			var podLabelIndexes []int
 			for _, pod := range pods.Items {
 				podNames = append(podNames, pod.Name)
+				if idx, ok := pod.Labels[appsv1.PodIndexLabel]; !ok {
+					t.Errorf("Expected pod index label with key: %s", appsv1.PodIndexLabel)
+				} else {
+					idxInt, err := strconv.Atoi(idx)
+					if err != nil {
+						t.Errorf("Unable to convert pod index to int, unexpected pod index: %s", idx)
+					}
+					podLabelIndexes = append(podLabelIndexes, idxInt)
+				}
 			}
 			ignoreOrder := cmpopts.SortSlices(func(a, b string) bool {
 				return a < b
 			})
+			ignoreOrderForOrdinals := cmpopts.SortSlices(func(a, b int) bool {
+				return a < b
+			})
+
+			expectedNames := []string{}
+			for _, ord := range test.expectedPodIndexes {
+				expectedNames = append(expectedNames, fmt.Sprintf("sts-%d", ord))
+			}
 
 			// Validate all the expected pods were created.
-			if diff := cmp.Diff(test.expectedPodNames, podNames, ignoreOrder); diff != "" {
+			if diff := cmp.Diff(expectedNames, podNames, ignoreOrder); diff != "" {
 				t.Errorf("Unexpected pod names: (-want +got): %v", diff)
+			}
+			// Validate all the expected index labels were added.
+			if diff := cmp.Diff(test.expectedPodIndexes, podLabelIndexes, ignoreOrderForOrdinals); diff != "" {
+				t.Errorf("Unexpected pod indices: (-want +got): %v", diff)
 			}
 
 			// Scale down to 1 pod and verify it matches the first pod.
@@ -740,9 +757,41 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 			if len(pods.Items) != 1 {
 				t.Errorf("len(pods) = %v, want %v", len(pods.Items), 1)
 			}
-			if pods.Items[0].Name != test.expectedPodNames[0] {
-				t.Errorf("Unexpected singleton pod name: got = %v, want %v", pods.Items[0].Name, test.expectedPodNames[0])
+			if pods.Items[0].Name != expectedNames[0] {
+				t.Errorf("Unexpected singleton pod name: got = %v, want %v", pods.Items[0].Name, expectedNames[0])
 			}
 		})
+	}
+}
+func TestStatefulSetPodSubdomain(t *testing.T) {
+	tCtx, closeFn, rm, informers, c := scSetup(t)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(c, "test-pod-subdomain", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	cancel := runControllerAndInformers(tCtx, rm, informers)
+	defer cancel()
+
+	// create a headless service
+	serviceName := "test-service"
+	service := newHeadlessService(ns.Name)
+	service.Name = serviceName
+	createHeadlessService(t, c, service)
+
+	// create StatefulSet with the service name
+	sts := newSTS("sts", ns.Name, 3)
+	sts.Spec.ServiceName = serviceName
+	stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+	sts = stss[0]
+	waitSTSStable(t, c, sts)
+
+	// get pods and verify subdomain
+	labelMap := labelMap()
+	podClient := c.CoreV1().Pods(ns.Name)
+	pods := getPods(t, podClient, labelMap)
+
+	for _, pod := range pods.Items {
+		if pod.Spec.Subdomain != serviceName {
+			t.Errorf("Pod %s has incorrect subdomain: got %s, want %s", pod.Name, pod.Spec.Subdomain, serviceName)
+		}
 	}
 }

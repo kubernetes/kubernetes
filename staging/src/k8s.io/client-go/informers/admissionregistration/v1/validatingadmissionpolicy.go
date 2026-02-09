@@ -19,16 +19,17 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/client-go/listers/admissionregistration/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +37,7 @@ import (
 // ValidatingAdmissionPolicies.
 type ValidatingAdmissionPolicyInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ValidatingAdmissionPolicyLister
+	Lister() admissionregistrationv1.ValidatingAdmissionPolicyLister
 }
 
 type validatingAdmissionPolicyInformer struct {
@@ -48,42 +49,67 @@ type validatingAdmissionPolicyInformer struct {
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewValidatingAdmissionPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredValidatingAdmissionPolicyInformer(client, resyncPeriod, indexers, nil)
+	return NewValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredValidatingAdmissionPolicyInformer constructs a new informer for ValidatingAdmissionPolicy type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredValidatingAdmissionPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+	return NewValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewValidatingAdmissionPolicyInformerWithOptions constructs a new informer for ValidatingAdmissionPolicy type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewValidatingAdmissionPolicyInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1", Resource: "validatingadmissionpolicys"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(context.TODO(), options)
+				return client.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(context.Background(), opts)
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Watch(context.TODO(), options)
+				return client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Watch(ctx, opts)
+			},
+		}, client),
+		&apiadmissionregistrationv1.ValidatingAdmissionPolicy{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&admissionregistrationv1.ValidatingAdmissionPolicy{},
-		resyncPeriod,
-		indexers,
 	)
 }
 
 func (f *validatingAdmissionPolicyInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredValidatingAdmissionPolicyInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewValidatingAdmissionPolicyInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *validatingAdmissionPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistrationv1.ValidatingAdmissionPolicy{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiadmissionregistrationv1.ValidatingAdmissionPolicy{}, f.defaultInformer)
 }
 
-func (f *validatingAdmissionPolicyInformer) Lister() v1.ValidatingAdmissionPolicyLister {
-	return v1.NewValidatingAdmissionPolicyLister(f.Informer().GetIndexer())
+func (f *validatingAdmissionPolicyInformer) Lister() admissionregistrationv1.ValidatingAdmissionPolicyLister {
+	return admissionregistrationv1.NewValidatingAdmissionPolicyLister(f.Informer().GetIndexer())
 }

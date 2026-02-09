@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -29,11 +29,32 @@ import (
 
 // VolumeAttributesClassApplyConfiguration represents a declarative configuration of the VolumeAttributesClass type for use
 // with apply.
+//
+// VolumeAttributesClass represents a specification of mutable volume attributes
+// defined by the CSI driver. The class can be specified during dynamic provisioning
+// of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
 type VolumeAttributesClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DriverName                       *string           `json:"driverName,omitempty"`
-	Parameters                       map[string]string `json:"parameters,omitempty"`
+	// Name of the CSI driver
+	// This field is immutable.
+	DriverName *string `json:"driverName,omitempty"`
+	// parameters hold volume attributes defined by the CSI driver. These values
+	// are opaque to the Kubernetes and are passed directly to the CSI driver.
+	// The underlying storage provider supports changing these attributes on an
+	// existing volume, however the parameters field itself is immutable. To
+	// invoke a volume update, a new VolumeAttributesClass should be created with
+	// new parameters, and the PersistentVolumeClaim should be updated to reference
+	// the new VolumeAttributesClass.
+	//
+	// This field is required and must contain at least one key/value pair.
+	// The keys cannot be empty, and the maximum number of parameters is 512, with
+	// a cumulative max size of 256K. If the CSI driver rejects invalid parameters,
+	// the target PersistentVolumeClaim will be set to an "Infeasible" state in the
+	// modifyVolumeStatus field.
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // VolumeAttributesClass constructs a declarative configuration of the VolumeAttributesClass type for use with
@@ -46,29 +67,14 @@ func VolumeAttributesClass(name string) *VolumeAttributesClassApplyConfiguration
 	return b
 }
 
-// ExtractVolumeAttributesClass extracts the applied configuration owned by fieldManager from
-// volumeAttributesClass. If no managedFields are found in volumeAttributesClass for fieldManager, a
-// VolumeAttributesClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractVolumeAttributesClassFrom extracts the applied configuration owned by fieldManager from
+// volumeAttributesClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // volumeAttributesClass must be a unmodified VolumeAttributesClass API object that was retrieved from the Kubernetes API.
-// ExtractVolumeAttributesClass provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractVolumeAttributesClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractVolumeAttributesClass(volumeAttributesClass *v1alpha1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
-	return extractVolumeAttributesClass(volumeAttributesClass, fieldManager, "")
-}
-
-// ExtractVolumeAttributesClassStatus is the same as ExtractVolumeAttributesClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractVolumeAttributesClassStatus(volumeAttributesClass *v1alpha1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
-	return extractVolumeAttributesClass(volumeAttributesClass, fieldManager, "status")
-}
-
-func extractVolumeAttributesClass(volumeAttributesClass *v1alpha1.VolumeAttributesClass, fieldManager string, subresource string) (*VolumeAttributesClassApplyConfiguration, error) {
+func ExtractVolumeAttributesClassFrom(volumeAttributesClass *storagev1alpha1.VolumeAttributesClass, fieldManager string, subresource string) (*VolumeAttributesClassApplyConfiguration, error) {
 	b := &VolumeAttributesClassApplyConfiguration{}
 	err := managedfields.ExtractInto(volumeAttributesClass, internal.Parser().Type("io.k8s.api.storage.v1alpha1.VolumeAttributesClass"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,11 +87,27 @@ func extractVolumeAttributesClass(volumeAttributesClass *v1alpha1.VolumeAttribut
 	return b, nil
 }
 
+// ExtractVolumeAttributesClass extracts the applied configuration owned by fieldManager from
+// volumeAttributesClass. If no managedFields are found in volumeAttributesClass for fieldManager, a
+// VolumeAttributesClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// volumeAttributesClass must be a unmodified VolumeAttributesClass API object that was retrieved from the Kubernetes API.
+// ExtractVolumeAttributesClass provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractVolumeAttributesClass(volumeAttributesClass *storagev1alpha1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
+	return ExtractVolumeAttributesClassFrom(volumeAttributesClass, fieldManager, "")
+}
+
+func (b VolumeAttributesClassApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithKind(value string) *VolumeAttributesClassApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -93,7 +115,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithKind(value string) *Volume
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithAPIVersion(value string) *VolumeAttributesClassApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -102,7 +124,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithAPIVersion(value string) *
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithName(value string) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -111,7 +133,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithName(value string) *Volume
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithGenerateName(value string) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -120,7 +142,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithGenerateName(value string)
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithNamespace(value string) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -129,7 +151,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithNamespace(value string) *V
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithUID(value types.UID) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -138,7 +160,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithUID(value types.UID) *Volu
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithResourceVersion(value string) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -147,7 +169,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithResourceVersion(value stri
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithGeneration(value int64) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -156,7 +178,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithGeneration(value int64) *V
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithCreationTimestamp(value metav1.Time) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -165,7 +187,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithCreationTimestamp(value me
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -174,7 +196,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithDeletionTimestamp(value me
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *VolumeAttributesClassApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -184,11 +206,11 @@ func (b *VolumeAttributesClassApplyConfiguration) WithDeletionGracePeriodSeconds
 // overwriting an existing map entries in Labels field with the same key.
 func (b *VolumeAttributesClassApplyConfiguration) WithLabels(entries map[string]string) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -199,11 +221,11 @@ func (b *VolumeAttributesClassApplyConfiguration) WithLabels(entries map[string]
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *VolumeAttributesClassApplyConfiguration) WithAnnotations(entries map[string]string) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -217,7 +239,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithOwnerReferences(values ...
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -228,7 +250,7 @@ func (b *VolumeAttributesClassApplyConfiguration) WithOwnerReferences(values ...
 func (b *VolumeAttributesClassApplyConfiguration) WithFinalizers(values ...string) *VolumeAttributesClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -261,8 +283,24 @@ func (b *VolumeAttributesClassApplyConfiguration) WithParameters(entries map[str
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *VolumeAttributesClassApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *VolumeAttributesClassApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *VolumeAttributesClassApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *VolumeAttributesClassApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

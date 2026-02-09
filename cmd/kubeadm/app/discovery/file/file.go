@@ -20,8 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
@@ -53,9 +52,9 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 	if len(config.Clusters) < 1 {
 		return nil, errors.New("the provided kubeconfig file must have at least one Cluster defined")
 	}
-	currentClusterName, currentCluster := kubeconfigutil.GetClusterFromKubeConfig(config)
-	if currentCluster == nil {
-		return nil, errors.New("the provided kubeconfig file must have a unnamed Cluster or a CurrentContext that specifies a non-nil Cluster")
+	currentClusterName, currentCluster, err := kubeconfigutil.GetClusterFromKubeConfig(config)
+	if err != nil {
+		return nil, errors.Wrap(err, "the provided kubeconfig file is malformed")
 	}
 	if err := clientcmd.Validate(*config); err != nil {
 		return nil, err
@@ -95,15 +94,15 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 	err = wait.PollUntilContextTimeout(context.Background(),
 		constants.DiscoveryRetryInterval, discoveryTimeout,
 		true, func(_ context.Context) (bool, error) {
-			clusterinfoCM, lastError = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+			clusterinfoCM, lastError = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.Background(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 			if lastError != nil {
 				if apierrors.IsForbidden(lastError) {
-					// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
+					// If the request fails with a forbidden error, the cluster admin has not granted access to the cluster info configmap for anonymous clients.
 					// In that case, trust the cluster admin and do not refresh the cluster-info data
 					klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 					return true, nil
 				}
-				klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
+				klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, lastError)
 				return false, nil
 			}
 			return true, nil
@@ -125,7 +124,10 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 		return config, nil
 	}
 
-	_, refreshedCluster := kubeconfigutil.GetClusterFromKubeConfig(refreshedBaseKubeConfig)
+	_, refreshedCluster, err := kubeconfigutil.GetClusterFromKubeConfig(refreshedBaseKubeConfig)
+	if err != nil {
+		return nil, errors.Wrapf(err, "malformed kubeconfig in the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
+	}
 	if currentCluster.Server != refreshedCluster.Server {
 		klog.Warningf("[discovery] the API Server endpoint %q in use is different from the endpoint %q which defined in the %s ConfigMap", currentCluster.Server, refreshedCluster.Server, bootstrapapi.ConfigMapClusterInfo)
 	}

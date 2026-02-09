@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -48,11 +49,11 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/klog/v2/ktesting"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -118,11 +119,11 @@ func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 
 func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeopenapi.OpenAPIDefinition {
 	return map[string]kubeopenapi.OpenAPIDefinition{
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":          {},
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":     {},
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":    {},
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":        buildTestOpenAPIDefinition(),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList": {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.Status":          {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions":     {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList":    {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup":        buildTestOpenAPIDefinition(),
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList": {},
 	}
 }
 
@@ -138,7 +139,7 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 	if clientset == nil {
 		t.Fatal("unable to create fake client set")
 	}
-	config.EffectiveVersion = utilversion.NewEffectiveVersion("")
+	config.EffectiveVersion = basecompatibility.NewEffectiveVersionFromString("", "", "")
 	config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
 	config.OpenAPIConfig.Info.Version = "unversioned"
 	config.OpenAPIV3Config = DefaultOpenAPIV3Config(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
@@ -460,8 +461,8 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableProfiling = true
 
 	kubeVersion := fakeVersion()
-	effectiveVersion := utilversion.NewEffectiveVersion(kubeVersion.String())
-	effectiveVersion.Set(effectiveVersion.BinaryVersion().WithInfo(kubeVersion), effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
+	binaryVersion := utilversion.MustParse(kubeVersion.String())
+	effectiveVersion := basecompatibility.NewEffectiveVersion(binaryVersion, false, binaryVersion, binaryVersion.SubtractMinor(1))
 	config.EffectiveVersion = effectiveVersion
 
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())

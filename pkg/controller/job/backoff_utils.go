@@ -92,10 +92,10 @@ var backoffRecordKeyFunc = func(obj interface{}) (string, error) {
 	return "", fmt.Errorf("could not find key for obj %#v", obj)
 }
 
-func (backoffRecordStore *backoffStore) newBackoffRecord(key string, newSucceededPods []*v1.Pod, newFailedPods []*v1.Pod) backoffRecord {
+func (s *backoffStore) newBackoffRecord(key string, newSucceededPods []*v1.Pod, newFailedPods []*v1.Pod) backoffRecord {
 	var backoff *backoffRecord
 
-	if b, exists, _ := backoffRecordStore.store.GetByKey(key); exists {
+	if b, exists, _ := s.store.GetByKey(key); exists {
 		old := b.(*backoffRecord)
 		backoff = &backoffRecord{
 			key:                      old.key,

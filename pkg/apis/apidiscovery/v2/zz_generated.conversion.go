@@ -24,7 +24,7 @@ package v2
 import (
 	unsafe "unsafe"
 
-	v2 "k8s.io/api/apidiscovery/v2"
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -38,104 +38,104 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v2.APIGroupDiscovery)(nil), (*apidiscovery.APIGroupDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2_APIGroupDiscovery_To_apidiscovery_APIGroupDiscovery(a.(*v2.APIGroupDiscovery), b.(*apidiscovery.APIGroupDiscovery), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscoveryv2.APIGroupDiscovery)(nil), (*apidiscovery.APIGroupDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2_APIGroupDiscovery_To_apidiscovery_APIGroupDiscovery(a.(*apidiscoveryv2.APIGroupDiscovery), b.(*apidiscovery.APIGroupDiscovery), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apidiscovery.APIGroupDiscovery)(nil), (*v2.APIGroupDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apidiscovery_APIGroupDiscovery_To_v2_APIGroupDiscovery(a.(*apidiscovery.APIGroupDiscovery), b.(*v2.APIGroupDiscovery), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscovery.APIGroupDiscovery)(nil), (*apidiscoveryv2.APIGroupDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apidiscovery_APIGroupDiscovery_To_v2_APIGroupDiscovery(a.(*apidiscovery.APIGroupDiscovery), b.(*apidiscoveryv2.APIGroupDiscovery), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2.APIGroupDiscoveryList)(nil), (*apidiscovery.APIGroupDiscoveryList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2_APIGroupDiscoveryList_To_apidiscovery_APIGroupDiscoveryList(a.(*v2.APIGroupDiscoveryList), b.(*apidiscovery.APIGroupDiscoveryList), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscoveryv2.APIGroupDiscoveryList)(nil), (*apidiscovery.APIGroupDiscoveryList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2_APIGroupDiscoveryList_To_apidiscovery_APIGroupDiscoveryList(a.(*apidiscoveryv2.APIGroupDiscoveryList), b.(*apidiscovery.APIGroupDiscoveryList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apidiscovery.APIGroupDiscoveryList)(nil), (*v2.APIGroupDiscoveryList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apidiscovery_APIGroupDiscoveryList_To_v2_APIGroupDiscoveryList(a.(*apidiscovery.APIGroupDiscoveryList), b.(*v2.APIGroupDiscoveryList), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscovery.APIGroupDiscoveryList)(nil), (*apidiscoveryv2.APIGroupDiscoveryList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apidiscovery_APIGroupDiscoveryList_To_v2_APIGroupDiscoveryList(a.(*apidiscovery.APIGroupDiscoveryList), b.(*apidiscoveryv2.APIGroupDiscoveryList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2.APIResourceDiscovery)(nil), (*apidiscovery.APIResourceDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(a.(*v2.APIResourceDiscovery), b.(*apidiscovery.APIResourceDiscovery), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscoveryv2.APIResourceDiscovery)(nil), (*apidiscovery.APIResourceDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(a.(*apidiscoveryv2.APIResourceDiscovery), b.(*apidiscovery.APIResourceDiscovery), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apidiscovery.APIResourceDiscovery)(nil), (*v2.APIResourceDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(a.(*apidiscovery.APIResourceDiscovery), b.(*v2.APIResourceDiscovery), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscovery.APIResourceDiscovery)(nil), (*apidiscoveryv2.APIResourceDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(a.(*apidiscovery.APIResourceDiscovery), b.(*apidiscoveryv2.APIResourceDiscovery), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2.APISubresourceDiscovery)(nil), (*apidiscovery.APISubresourceDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery(a.(*v2.APISubresourceDiscovery), b.(*apidiscovery.APISubresourceDiscovery), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscoveryv2.APISubresourceDiscovery)(nil), (*apidiscovery.APISubresourceDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery(a.(*apidiscoveryv2.APISubresourceDiscovery), b.(*apidiscovery.APISubresourceDiscovery), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apidiscovery.APISubresourceDiscovery)(nil), (*v2.APISubresourceDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery(a.(*apidiscovery.APISubresourceDiscovery), b.(*v2.APISubresourceDiscovery), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscovery.APISubresourceDiscovery)(nil), (*apidiscoveryv2.APISubresourceDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery(a.(*apidiscovery.APISubresourceDiscovery), b.(*apidiscoveryv2.APISubresourceDiscovery), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2.APIVersionDiscovery)(nil), (*apidiscovery.APIVersionDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(a.(*v2.APIVersionDiscovery), b.(*apidiscovery.APIVersionDiscovery), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscoveryv2.APIVersionDiscovery)(nil), (*apidiscovery.APIVersionDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(a.(*apidiscoveryv2.APIVersionDiscovery), b.(*apidiscovery.APIVersionDiscovery), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apidiscovery.APIVersionDiscovery)(nil), (*v2.APIVersionDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apidiscovery_APIVersionDiscovery_To_v2_APIVersionDiscovery(a.(*apidiscovery.APIVersionDiscovery), b.(*v2.APIVersionDiscovery), scope)
+	if err := s.AddGeneratedConversionFunc((*apidiscovery.APIVersionDiscovery)(nil), (*apidiscoveryv2.APIVersionDiscovery)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apidiscovery_APIVersionDiscovery_To_v2_APIVersionDiscovery(a.(*apidiscovery.APIVersionDiscovery), b.(*apidiscoveryv2.APIVersionDiscovery), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v2_APIGroupDiscovery_To_apidiscovery_APIGroupDiscovery(in *v2.APIGroupDiscovery, out *apidiscovery.APIGroupDiscovery, s conversion.Scope) error {
+func autoConvert_v2_APIGroupDiscovery_To_apidiscovery_APIGroupDiscovery(in *apidiscoveryv2.APIGroupDiscovery, out *apidiscovery.APIGroupDiscovery, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Versions = *(*[]apidiscovery.APIVersionDiscovery)(unsafe.Pointer(&in.Versions))
 	return nil
 }
 
 // Convert_v2_APIGroupDiscovery_To_apidiscovery_APIGroupDiscovery is an autogenerated conversion function.
-func Convert_v2_APIGroupDiscovery_To_apidiscovery_APIGroupDiscovery(in *v2.APIGroupDiscovery, out *apidiscovery.APIGroupDiscovery, s conversion.Scope) error {
+func Convert_v2_APIGroupDiscovery_To_apidiscovery_APIGroupDiscovery(in *apidiscoveryv2.APIGroupDiscovery, out *apidiscovery.APIGroupDiscovery, s conversion.Scope) error {
 	return autoConvert_v2_APIGroupDiscovery_To_apidiscovery_APIGroupDiscovery(in, out, s)
 }
 
-func autoConvert_apidiscovery_APIGroupDiscovery_To_v2_APIGroupDiscovery(in *apidiscovery.APIGroupDiscovery, out *v2.APIGroupDiscovery, s conversion.Scope) error {
+func autoConvert_apidiscovery_APIGroupDiscovery_To_v2_APIGroupDiscovery(in *apidiscovery.APIGroupDiscovery, out *apidiscoveryv2.APIGroupDiscovery, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Versions = *(*[]v2.APIVersionDiscovery)(unsafe.Pointer(&in.Versions))
+	out.Versions = *(*[]apidiscoveryv2.APIVersionDiscovery)(unsafe.Pointer(&in.Versions))
 	return nil
 }
 
 // Convert_apidiscovery_APIGroupDiscovery_To_v2_APIGroupDiscovery is an autogenerated conversion function.
-func Convert_apidiscovery_APIGroupDiscovery_To_v2_APIGroupDiscovery(in *apidiscovery.APIGroupDiscovery, out *v2.APIGroupDiscovery, s conversion.Scope) error {
+func Convert_apidiscovery_APIGroupDiscovery_To_v2_APIGroupDiscovery(in *apidiscovery.APIGroupDiscovery, out *apidiscoveryv2.APIGroupDiscovery, s conversion.Scope) error {
 	return autoConvert_apidiscovery_APIGroupDiscovery_To_v2_APIGroupDiscovery(in, out, s)
 }
 
-func autoConvert_v2_APIGroupDiscoveryList_To_apidiscovery_APIGroupDiscoveryList(in *v2.APIGroupDiscoveryList, out *apidiscovery.APIGroupDiscoveryList, s conversion.Scope) error {
+func autoConvert_v2_APIGroupDiscoveryList_To_apidiscovery_APIGroupDiscoveryList(in *apidiscoveryv2.APIGroupDiscoveryList, out *apidiscovery.APIGroupDiscoveryList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]apidiscovery.APIGroupDiscovery)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v2_APIGroupDiscoveryList_To_apidiscovery_APIGroupDiscoveryList is an autogenerated conversion function.
-func Convert_v2_APIGroupDiscoveryList_To_apidiscovery_APIGroupDiscoveryList(in *v2.APIGroupDiscoveryList, out *apidiscovery.APIGroupDiscoveryList, s conversion.Scope) error {
+func Convert_v2_APIGroupDiscoveryList_To_apidiscovery_APIGroupDiscoveryList(in *apidiscoveryv2.APIGroupDiscoveryList, out *apidiscovery.APIGroupDiscoveryList, s conversion.Scope) error {
 	return autoConvert_v2_APIGroupDiscoveryList_To_apidiscovery_APIGroupDiscoveryList(in, out, s)
 }
 
-func autoConvert_apidiscovery_APIGroupDiscoveryList_To_v2_APIGroupDiscoveryList(in *apidiscovery.APIGroupDiscoveryList, out *v2.APIGroupDiscoveryList, s conversion.Scope) error {
+func autoConvert_apidiscovery_APIGroupDiscoveryList_To_v2_APIGroupDiscoveryList(in *apidiscovery.APIGroupDiscoveryList, out *apidiscoveryv2.APIGroupDiscoveryList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v2.APIGroupDiscovery)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]apidiscoveryv2.APIGroupDiscovery)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_apidiscovery_APIGroupDiscoveryList_To_v2_APIGroupDiscoveryList is an autogenerated conversion function.
-func Convert_apidiscovery_APIGroupDiscoveryList_To_v2_APIGroupDiscoveryList(in *apidiscovery.APIGroupDiscoveryList, out *v2.APIGroupDiscoveryList, s conversion.Scope) error {
+func Convert_apidiscovery_APIGroupDiscoveryList_To_v2_APIGroupDiscoveryList(in *apidiscovery.APIGroupDiscoveryList, out *apidiscoveryv2.APIGroupDiscoveryList, s conversion.Scope) error {
 	return autoConvert_apidiscovery_APIGroupDiscoveryList_To_v2_APIGroupDiscoveryList(in, out, s)
 }
 
-func autoConvert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(in *v2.APIResourceDiscovery, out *apidiscovery.APIResourceDiscovery, s conversion.Scope) error {
+func autoConvert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(in *apidiscoveryv2.APIResourceDiscovery, out *apidiscovery.APIResourceDiscovery, s conversion.Scope) error {
 	out.Resource = in.Resource
 	out.ResponseKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.ResponseKind))
 	out.Scope = apidiscovery.ResourceScope(in.Scope)
@@ -148,28 +148,28 @@ func autoConvert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(in
 }
 
 // Convert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery is an autogenerated conversion function.
-func Convert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(in *v2.APIResourceDiscovery, out *apidiscovery.APIResourceDiscovery, s conversion.Scope) error {
+func Convert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(in *apidiscoveryv2.APIResourceDiscovery, out *apidiscovery.APIResourceDiscovery, s conversion.Scope) error {
 	return autoConvert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(in, out, s)
 }
 
-func autoConvert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(in *apidiscovery.APIResourceDiscovery, out *v2.APIResourceDiscovery, s conversion.Scope) error {
+func autoConvert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(in *apidiscovery.APIResourceDiscovery, out *apidiscoveryv2.APIResourceDiscovery, s conversion.Scope) error {
 	out.Resource = in.Resource
 	out.ResponseKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.ResponseKind))
-	out.Scope = v2.ResourceScope(in.Scope)
+	out.Scope = apidiscoveryv2.ResourceScope(in.Scope)
 	out.SingularResource = in.SingularResource
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
 	out.Categories = *(*[]string)(unsafe.Pointer(&in.Categories))
-	out.Subresources = *(*[]v2.APISubresourceDiscovery)(unsafe.Pointer(&in.Subresources))
+	out.Subresources = *(*[]apidiscoveryv2.APISubresourceDiscovery)(unsafe.Pointer(&in.Subresources))
 	return nil
 }
 
 // Convert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery is an autogenerated conversion function.
-func Convert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(in *apidiscovery.APIResourceDiscovery, out *v2.APIResourceDiscovery, s conversion.Scope) error {
+func Convert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(in *apidiscovery.APIResourceDiscovery, out *apidiscoveryv2.APIResourceDiscovery, s conversion.Scope) error {
 	return autoConvert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(in, out, s)
 }
 
-func autoConvert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery(in *v2.APISubresourceDiscovery, out *apidiscovery.APISubresourceDiscovery, s conversion.Scope) error {
+func autoConvert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery(in *apidiscoveryv2.APISubresourceDiscovery, out *apidiscovery.APISubresourceDiscovery, s conversion.Scope) error {
 	out.Subresource = in.Subresource
 	out.ResponseKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.ResponseKind))
 	out.AcceptedTypes = *(*[]v1.GroupVersionKind)(unsafe.Pointer(&in.AcceptedTypes))
@@ -178,11 +178,11 @@ func autoConvert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscov
 }
 
 // Convert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery is an autogenerated conversion function.
-func Convert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery(in *v2.APISubresourceDiscovery, out *apidiscovery.APISubresourceDiscovery, s conversion.Scope) error {
+func Convert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery(in *apidiscoveryv2.APISubresourceDiscovery, out *apidiscovery.APISubresourceDiscovery, s conversion.Scope) error {
 	return autoConvert_v2_APISubresourceDiscovery_To_apidiscovery_APISubresourceDiscovery(in, out, s)
 }
 
-func autoConvert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery(in *apidiscovery.APISubresourceDiscovery, out *v2.APISubresourceDiscovery, s conversion.Scope) error {
+func autoConvert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery(in *apidiscovery.APISubresourceDiscovery, out *apidiscoveryv2.APISubresourceDiscovery, s conversion.Scope) error {
 	out.Subresource = in.Subresource
 	out.ResponseKind = (*v1.GroupVersionKind)(unsafe.Pointer(in.ResponseKind))
 	out.AcceptedTypes = *(*[]v1.GroupVersionKind)(unsafe.Pointer(&in.AcceptedTypes))
@@ -191,11 +191,11 @@ func autoConvert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscov
 }
 
 // Convert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery is an autogenerated conversion function.
-func Convert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery(in *apidiscovery.APISubresourceDiscovery, out *v2.APISubresourceDiscovery, s conversion.Scope) error {
+func Convert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery(in *apidiscovery.APISubresourceDiscovery, out *apidiscoveryv2.APISubresourceDiscovery, s conversion.Scope) error {
 	return autoConvert_apidiscovery_APISubresourceDiscovery_To_v2_APISubresourceDiscovery(in, out, s)
 }
 
-func autoConvert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(in *v2.APIVersionDiscovery, out *apidiscovery.APIVersionDiscovery, s conversion.Scope) error {
+func autoConvert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(in *apidiscoveryv2.APIVersionDiscovery, out *apidiscovery.APIVersionDiscovery, s conversion.Scope) error {
 	out.Version = in.Version
 	out.Resources = *(*[]apidiscovery.APIResourceDiscovery)(unsafe.Pointer(&in.Resources))
 	out.Freshness = apidiscovery.DiscoveryFreshness(in.Freshness)
@@ -203,18 +203,18 @@ func autoConvert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(in *
 }
 
 // Convert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery is an autogenerated conversion function.
-func Convert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(in *v2.APIVersionDiscovery, out *apidiscovery.APIVersionDiscovery, s conversion.Scope) error {
+func Convert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(in *apidiscoveryv2.APIVersionDiscovery, out *apidiscovery.APIVersionDiscovery, s conversion.Scope) error {
 	return autoConvert_v2_APIVersionDiscovery_To_apidiscovery_APIVersionDiscovery(in, out, s)
 }
 
-func autoConvert_apidiscovery_APIVersionDiscovery_To_v2_APIVersionDiscovery(in *apidiscovery.APIVersionDiscovery, out *v2.APIVersionDiscovery, s conversion.Scope) error {
+func autoConvert_apidiscovery_APIVersionDiscovery_To_v2_APIVersionDiscovery(in *apidiscovery.APIVersionDiscovery, out *apidiscoveryv2.APIVersionDiscovery, s conversion.Scope) error {
 	out.Version = in.Version
-	out.Resources = *(*[]v2.APIResourceDiscovery)(unsafe.Pointer(&in.Resources))
-	out.Freshness = v2.DiscoveryFreshness(in.Freshness)
+	out.Resources = *(*[]apidiscoveryv2.APIResourceDiscovery)(unsafe.Pointer(&in.Resources))
+	out.Freshness = apidiscoveryv2.DiscoveryFreshness(in.Freshness)
 	return nil
 }
 
 // Convert_apidiscovery_APIVersionDiscovery_To_v2_APIVersionDiscovery is an autogenerated conversion function.
-func Convert_apidiscovery_APIVersionDiscovery_To_v2_APIVersionDiscovery(in *apidiscovery.APIVersionDiscovery, out *v2.APIVersionDiscovery, s conversion.Scope) error {
+func Convert_apidiscovery_APIVersionDiscovery_To_v2_APIVersionDiscovery(in *apidiscovery.APIVersionDiscovery, out *apidiscoveryv2.APIVersionDiscovery, s conversion.Scope) error {
 	return autoConvert_apidiscovery_APIVersionDiscovery_To_v2_APIVersionDiscovery(in, out, s)
 }

@@ -8,7 +8,6 @@ reviewers:
   - dchen1107
   - johnSchnake
   - liggitt
-  - neolit123
   - SataQiu
   - smarterclayton
   - thockin
@@ -29,7 +28,6 @@ approvers:
   - mikedanese
   - MrHohn
   - msau42
-  - neolit123
   - oomichi
   - pohly
   - pwittrock # for test/e2e/kubectl.go
@@ -37,7 +35,6 @@ approvers:
   - SataQiu
   - smarterclayton
   - soltysh
-  - spiffxp
   - sttts
   - thockin
   - wojtek-t
@@ -58,9 +55,11 @@ emeritus_approvers:
   - ncdc
   - vishh
   - shyamjvs
+  - spiffxp
   - enisoc
   - alejandrox1
   - timothysc
+  - neolit123
 labels:
   - area/test
   - sig/testing

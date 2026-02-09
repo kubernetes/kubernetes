@@ -17,7 +17,7 @@ func (e missingFieldError) Error() string {
 	return string(e)
 }
 
-func extractField(actual interface{}, field string, matchername string) (interface{}, error) {
+func extractField(actual any, field string, matchername string) (any, error) {
 	fields := strings.SplitN(field, ".", 2)
 	actualValue := reflect.ValueOf(actual)
 
@@ -40,7 +40,12 @@ func extractField(actual interface{}, field string, matchername string) (interfa
 			extractedValue = actualValue.Addr().MethodByName(strings.TrimSuffix(fields[0], "()"))
 		}
 		if extractedValue == (reflect.Value{}) {
-			return nil, missingFieldError(fmt.Sprintf("%s could not find method named '%s' in struct of type %T.", matchername, fields[0], actual))
+			ptr := reflect.New(actualValue.Type())
+			ptr.Elem().Set(actualValue)
+			extractedValue = ptr.MethodByName(strings.TrimSuffix(fields[0], "()"))
+			if extractedValue == (reflect.Value{}) {
+				return nil, missingFieldError(fmt.Sprintf("%s could not find method named '%s' in struct of type %T.", matchername, fields[0], actual))
+			}
 		}
 		t := extractedValue.Type()
 		if t.NumIn() != 0 || t.NumOut() != 1 {
@@ -63,37 +68,47 @@ func extractField(actual interface{}, field string, matchername string) (interfa
 
 type HaveFieldMatcher struct {
 	Field    string
-	Expected interface{}
-
-	extractedField  interface{}
-	expectedMatcher omegaMatcher
+	Expected any
 }
 
-func (matcher *HaveFieldMatcher) Match(actual interface{}) (success bool, err error) {
-	matcher.extractedField, err = extractField(actual, matcher.Field, "HaveField")
+func (matcher *HaveFieldMatcher) expectedMatcher() omegaMatcher {
+	var isMatcher bool
+	expectedMatcher, isMatcher := matcher.Expected.(omegaMatcher)
+	if !isMatcher {
+		expectedMatcher = &EqualMatcher{Expected: matcher.Expected}
+	}
+	return expectedMatcher
+}
+
+func (matcher *HaveFieldMatcher) Match(actual any) (success bool, err error) {
+	extractedField, err := extractField(actual, matcher.Field, "HaveField")
 	if err != nil {
 		return false, err
 	}
 
-	var isMatcher bool
-	matcher.expectedMatcher, isMatcher = matcher.Expected.(omegaMatcher)
-	if !isMatcher {
-		matcher.expectedMatcher = &EqualMatcher{Expected: matcher.Expected}
-	}
-
-	return matcher.expectedMatcher.Match(matcher.extractedField)
+	return matcher.expectedMatcher().Match(extractedField)
 }
 
-func (matcher *HaveFieldMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *HaveFieldMatcher) FailureMessage(actual any) (message string) {
+	extractedField, err := extractField(actual, matcher.Field, "HaveField")
+	if err != nil {
+		// this really shouldn't happen
+		return fmt.Sprintf("Failed to extract field '%s': %s", matcher.Field, err)
+	}
 	message = fmt.Sprintf("Value for field '%s' failed to satisfy matcher.\n", matcher.Field)
-	message += matcher.expectedMatcher.FailureMessage(matcher.extractedField)
+	message += matcher.expectedMatcher().FailureMessage(extractedField)
 
 	return message
 }
 
-func (matcher *HaveFieldMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *HaveFieldMatcher) NegatedFailureMessage(actual any) (message string) {
+	extractedField, err := extractField(actual, matcher.Field, "HaveField")
+	if err != nil {
+		// this really shouldn't happen
+		return fmt.Sprintf("Failed to extract field '%s': %s", matcher.Field, err)
+	}
 	message = fmt.Sprintf("Value for field '%s' satisfied matcher, but should not have.\n", matcher.Field)
-	message += matcher.expectedMatcher.NegatedFailureMessage(matcher.extractedField)
+	message += matcher.expectedMatcher().NegatedFailureMessage(extractedField)
 
 	return message
 }

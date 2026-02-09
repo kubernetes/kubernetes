@@ -19,13 +19,24 @@ limitations under the License.
 package v1beta3
 
 import (
-	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 )
 
 // LimitResponseApplyConfiguration represents a declarative configuration of the LimitResponse type for use
 // with apply.
+//
+// LimitResponse defines how to handle requests that can not be executed right now.
 type LimitResponseApplyConfiguration struct {
-	Type    *v1beta3.LimitResponseType              `json:"type,omitempty"`
+	// `type` is "Queue" or "Reject".
+	// "Queue" means that requests that can not be executed upon arrival
+	// are held in a queue until they can be executed or a queuing limit
+	// is reached.
+	// "Reject" means that requests that can not be executed upon arrival
+	// are rejected.
+	// Required.
+	Type *flowcontrolv1beta3.LimitResponseType `json:"type,omitempty"`
+	// `queuing` holds the configuration parameters for queuing.
+	// This field may be non-empty only if `type` is `"Queue"`.
 	Queuing *QueuingConfigurationApplyConfiguration `json:"queuing,omitempty"`
 }
 
@@ -38,7 +49,7 @@ func LimitResponse() *LimitResponseApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *LimitResponseApplyConfiguration) WithType(value v1beta3.LimitResponseType) *LimitResponseApplyConfiguration {
+func (b *LimitResponseApplyConfiguration) WithType(value flowcontrolv1beta3.LimitResponseType) *LimitResponseApplyConfiguration {
 	b.Type = &value
 	return b
 }

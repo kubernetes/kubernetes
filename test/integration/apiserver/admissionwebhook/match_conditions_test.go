@@ -37,10 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -111,7 +108,6 @@ func newMatchConditionHandler(recorder *admissionRecorder) http.Handler {
 
 // TestMatchConditions tests ValidatingWebhookConfigurations and MutatingWebhookConfigurations that validates different cases of matchCondition fields
 func TestMatchConditions(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForWebhooks, false)
 	fail := admissionregistrationv1.Fail
 	ignore := admissionregistrationv1.Ignore
 
@@ -289,35 +285,6 @@ func TestMatchConditions(t *testing.T) {
 				matchConditionsTestPod("test2", "default"),
 			},
 		},
-		{
-			name: "without strict cost enforcement: Authz check does not exceed per call limit",
-			matchConditions: []admissionregistrationv1.MatchCondition{
-				{
-					Name:       "test1",
-					Expression: "authorizer.group('').resource('pods').name('test1').check('create').allowed() && authorizer.group('').resource('pods').name('test1').check('create').allowed() && authorizer.group('').resource('pods').name('test1').check('create').allowed()",
-				},
-			},
-			pods: []*corev1.Pod{
-				matchConditionsTestPod("test1", "kube-system"),
-			},
-			matchedPods: []*corev1.Pod{
-				matchConditionsTestPod("test1", "kube-system"),
-			},
-			failPolicy:     &fail,
-			expectErrorPod: false,
-		},
-		{
-			name:            "without strict cost enforcement: Authz check does not exceed overall cost limit",
-			matchConditions: generateMatchConditionsWithAuthzCheck(8, "authorizer.group('').resource('pods').name('test1').check('create').allowed() && authorizer.group('').resource('pods').name('test1').check('create').allowed()"),
-			pods: []*corev1.Pod{
-				matchConditionsTestPod("test1", "kube-system"),
-			},
-			matchedPods: []*corev1.Pod{
-				matchConditionsTestPod("test1", "kube-system"),
-			},
-			failPolicy:     &fail,
-			expectErrorPod: false,
-		},
 	}
 
 	roots := x509.NewCertPool()
@@ -447,7 +414,7 @@ func TestMatchConditions(t *testing.T) {
 			}()
 
 			// wait until new webhook is called the first time
-			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
 				_, err = client.CoreV1().Pods(markerNs).Patch(context.TODO(), marker.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 				select {
 				case <-upCh:
@@ -599,8 +566,6 @@ func TestMatchConditions(t *testing.T) {
 }
 
 func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForWebhooks, true)
-
 	testcases := []struct {
 		name            string
 		matchConditions []admissionregistrationv1.MatchCondition
@@ -876,7 +841,7 @@ func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
 			}()
 
 			// wait until new webhook is called the first time
-			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
 				_, err = client.CoreV1().Pods(markerNs).Patch(context.TODO(), marker.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 				select {
 				case <-upCh:
@@ -1121,7 +1086,7 @@ func newMarkerPod(namespace string) *corev1.Pod {
 
 func repeatedMatchConditions(size int) []admissionregistrationv1.MatchCondition {
 	matchConditions := make([]admissionregistrationv1.MatchCondition, 0, size)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		matchConditions = append(matchConditions, admissionregistrationv1.MatchCondition{
 			Name:       "repeated-" + strconv.Itoa(i),
 			Expression: "true",
@@ -1133,7 +1098,7 @@ func repeatedMatchConditions(size int) []admissionregistrationv1.MatchCondition 
 // generate n matchConditions with provided expression
 func generateMatchConditionsWithAuthzCheck(num int, exp string) []admissionregistrationv1.MatchCondition {
 	var conditions = make([]admissionregistrationv1.MatchCondition, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		conditions[i].Name = "test" + strconv.Itoa(i)
 		conditions[i].Expression = exp
 	}

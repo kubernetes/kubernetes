@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,8 +34,15 @@ type WarningHandler interface {
 	HandleWarningHeader(code int, agent string, text string)
 }
 
+// WarningHandlerWithContext is an interface for handling warning headers with
+// support for contextual logging.
+type WarningHandlerWithContext interface {
+	// HandleWarningHeaderWithContext is called with the warn code, agent, and text when a warning header is countered.
+	HandleWarningHeaderWithContext(ctx context.Context, code int, agent string, text string)
+}
+
 var (
-	defaultWarningHandler     WarningHandler = WarningLogger{}
+	defaultWarningHandler     WarningHandlerWithContext = WarningLogger{}
 	defaultWarningHandlerLock sync.RWMutex
 )
 
@@ -43,32 +51,64 @@ var (
 //   - NoWarnings suppresses warnings.
 //   - WarningLogger logs warnings.
 //   - NewWarningWriter() outputs warnings to the provided writer.
+//
+// logcheck:context // SetDefaultWarningHandlerWithContext should be used instead of SetDefaultWarningHandler in code which supports contextual logging.
 func SetDefaultWarningHandler(l WarningHandler) {
+	if l == nil {
+		SetDefaultWarningHandlerWithContext(nil)
+		return
+	}
+	SetDefaultWarningHandlerWithContext(warningLoggerNopContext{l: l})
+}
+
+// SetDefaultWarningHandlerWithContext is a variant of [SetDefaultWarningHandler] which supports contextual logging.
+func SetDefaultWarningHandlerWithContext(l WarningHandlerWithContext) {
 	defaultWarningHandlerLock.Lock()
 	defer defaultWarningHandlerLock.Unlock()
 	defaultWarningHandler = l
 }
-func getDefaultWarningHandler() WarningHandler {
+
+func getDefaultWarningHandler() WarningHandlerWithContext {
 	defaultWarningHandlerLock.RLock()
 	defer defaultWarningHandlerLock.RUnlock()
 	l := defaultWarningHandler
 	return l
 }
 
-// NoWarnings is an implementation of WarningHandler that suppresses warnings.
+type warningLoggerNopContext struct {
+	l WarningHandler
+}
+
+func (w warningLoggerNopContext) HandleWarningHeaderWithContext(_ context.Context, code int, agent string, message string) {
+	w.l.HandleWarningHeader(code, agent, message)
+}
+
+// NoWarnings is an implementation of [WarningHandler] and [WarningHandlerWithContext] that suppresses warnings.
 type NoWarnings struct{}
 
 func (NoWarnings) HandleWarningHeader(code int, agent string, message string) {}
+func (NoWarnings) HandleWarningHeaderWithContext(ctx context.Context, code int, agent string, message string) {
+}
 
-// WarningLogger is an implementation of WarningHandler that logs code 299 warnings
+var _ WarningHandler = NoWarnings{}
+var _ WarningHandlerWithContext = NoWarnings{}
+
+// WarningLogger is an implementation of [WarningHandler] and [WarningHandlerWithContext] that logs code 299 warnings
 type WarningLogger struct{}
 
-func (WarningLogger) HandleWarningHeader(code int, agent string, message string) {
+func (w WarningLogger) HandleWarningHeader(code int, agent string, message string) {
+	w.HandleWarningHeaderWithContext(context.Background(), code, agent, message)
+}
+
+func (WarningLogger) HandleWarningHeaderWithContext(ctx context.Context, code int, agent string, message string) {
 	if code != 299 || len(message) == 0 {
 		return
 	}
-	klog.Warning(message)
+	klog.FromContext(ctx).Info("Warning: " + message)
 }
+
+var _ WarningHandler = WarningLogger{}
+var _ WarningHandlerWithContext = WarningLogger{}
 
 type warningWriter struct {
 	// out is the writer to output warnings to
@@ -134,14 +174,14 @@ func (w *warningWriter) WarningCount() int {
 	return w.writtenCount
 }
 
-func handleWarnings(headers http.Header, handler WarningHandler) []net.WarningHeader {
+func handleWarnings(ctx context.Context, headers http.Header, handler WarningHandlerWithContext) []net.WarningHeader {
 	if handler == nil {
 		handler = getDefaultWarningHandler()
 	}
 
 	warnings, _ := net.ParseWarningHeaders(headers["Warning"])
 	for _, warning := range warnings {
-		handler.HandleWarningHeader(warning.Code, warning.Agent, warning.Text)
+		handler.HandleWarningHeaderWithContext(ctx, warning.Code, warning.Agent, warning.Text)
 	}
 	return warnings
 }

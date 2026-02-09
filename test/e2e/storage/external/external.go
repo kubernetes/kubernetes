@@ -25,7 +25,6 @@ import (
 	"time"
 
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,13 +82,8 @@ type driverDefinition struct {
 	// VolumeAttributesClass must be set to enable volume modification tests.
 	// The default is to not run those tests.
 	VolumeAttributesClass struct {
-		// FromName set to true enables the usage of a
-		// VolumeAttributesClass with DriverInfo.Name as
-		// provisioner and no parameters.
-		FromName bool
-
 		// FromFile is used only when FromName is false.  It
-		// loads a storage class from the given .yaml or .json
+		// loads a VolumeAttributesClass from the given .yaml or .json
 		// file. File names are resolved by the
 		// framework.testfiles package, which typically means
 		// that they can be absolute or relative to the test
@@ -127,6 +121,29 @@ type driverDefinition struct {
 		FromExistingClassName string
 	}
 
+	// GroupSnapshotClass must be set to enable groupsnapshotting tests.
+	// The default is to not run those tests.
+	GroupSnapshotClass struct {
+		// FromName set to true enables the usage of a
+		// groupsnapshotter class with DriverInfo.Name as provisioner.
+		FromName bool
+
+		// FromFile is used only when FromName is false.  It
+		// loads a groupsnapshot class from the given .yaml or .json
+		// file. File names are resolved by the
+		// framework.testfiles package, which typically means
+		// that they can be absolute or relative to the test
+		// suite's --repo-root parameter.
+		//
+		// This can be used when the groupsnapshot class is meant to have
+		// additional parameters.
+		FromFile string
+
+		// FromExistingClassName specifies the name of a pre-installed
+		// GroupSnapshotClass that will be copied and used for the tests.
+		FromExistingClassName string
+	}
+
 	// InlineVolumes defines one or more volumes for use as inline
 	// ephemeral volumes. At least one such volume has to be
 	// defined to enable testing of inline ephemeral volumes.  If
@@ -151,6 +168,12 @@ type driverDefinition struct {
 	// Can be left empty. Most drivers should not need this and instead
 	// use topology to ensure that pods land on the right node(s).
 	ClientNodeName string
+
+	// NodeSelectors is used to specify nodeSelector information for pod deployment
+	// during the tests.  This is beneficial when needing to control placement
+	// for specialized environments.  Most drivers should not need this and
+	// instead can use topolgy to ensure that pods land on the right node(s).
+	NodeSelectors map[string]string
 
 	// Timeouts contains the custom timeouts used during the test execution.
 	// The values specified here will override the default values specified in
@@ -387,6 +410,20 @@ func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
 	return snapshotClass, nil
 }
 
+func loadGroupSnapshotClass(filename string) (*unstructured.Unstructured, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	groupSnapshotClass := &unstructured.Unstructured{}
+
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, groupSnapshotClass); err != nil {
+		return nil, fmt.Errorf("%s: %w", filename, err)
+	}
+
+	return groupSnapshotClass, nil
+}
+
 func (d *driverDefinition) GetSnapshotClass(ctx context.Context, e2econfig *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
 	if !d.SnapshotClass.FromName && d.SnapshotClass.FromFile == "" && d.SnapshotClass.FromExistingClassName == "" {
 		e2eskipper.Skipf("Driver %q does not support snapshotting - skipping", d.DriverInfo.Name)
@@ -430,23 +467,64 @@ func (d *driverDefinition) GetSnapshotClass(ctx context.Context, e2econfig *stor
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econfig *storageframework.PerTestConfig) *storagev1alpha1.VolumeAttributesClass {
-	if !d.VolumeAttributesClass.FromName && d.VolumeAttributesClass.FromFile == "" && d.VolumeAttributesClass.FromExistingClassName == "" {
+func (d *driverDefinition) GetVolumeGroupSnapshotClass(ctx context.Context, e2econfig *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
+	if !d.GroupSnapshotClass.FromName && d.GroupSnapshotClass.FromFile == "" && d.GroupSnapshotClass.FromExistingClassName == "" {
+		e2eskipper.Skipf("Driver %q does not support groupsnapshotting - skipping", d.DriverInfo.Name)
+	}
+
+	f := e2econfig.Framework
+	snapshotter := d.DriverInfo.Name
+	ns := e2econfig.Framework.Namespace.Name
+
+	switch {
+	case d.GroupSnapshotClass.FromName:
+		// Do nothing (just use empty parameters)
+	case d.GroupSnapshotClass.FromExistingClassName != "":
+		groupSnapshotClass, err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotClassGVR).Get(ctx, d.GroupSnapshotClass.FromExistingClassName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "getting snapshot class %s", d.SnapshotClass.FromExistingClassName)
+
+		if params, ok := groupSnapshotClass.Object["parameters"].(map[string]interface{}); ok {
+			for k, v := range params {
+				parameters[k] = v.(string)
+			}
+		}
+
+		if snapshotProvider, ok := groupSnapshotClass.Object["driver"]; ok {
+			snapshotter = snapshotProvider.(string)
+		}
+	case d.GroupSnapshotClass.FromFile != "":
+		groupSnapshotClass, err := loadGroupSnapshotClass(d.GroupSnapshotClass.FromFile)
+		framework.ExpectNoError(err, "load groupsnapshot class from %s", d.GroupSnapshotClass.FromFile)
+
+		if params, ok := groupSnapshotClass.Object["parameters"].(map[string]interface{}); ok {
+			for k, v := range params {
+				parameters[k] = v.(string)
+			}
+		}
+
+		if snapshotProvider, ok := groupSnapshotClass.Object["driver"]; ok {
+			snapshotter = snapshotProvider.(string)
+		}
+	}
+
+	return utils.GenerateVolumeGroupSnapshotClassSpec(snapshotter, parameters, ns)
+}
+
+func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econfig *storageframework.PerTestConfig) *storagev1.VolumeAttributesClass {
+	if d.VolumeAttributesClass.FromFile == "" && d.VolumeAttributesClass.FromExistingClassName == "" {
 		e2eskipper.Skipf("Driver %q has no configured VolumeAttributesClass - skipping", d.DriverInfo.Name)
 		return nil
 	}
 
 	var (
-		vac *storagev1alpha1.VolumeAttributesClass
+		vac *storagev1.VolumeAttributesClass
 		err error
 	)
 
 	f := e2econfig.Framework
 	switch {
-	case d.VolumeAttributesClass.FromName:
-		vac = &storagev1alpha1.VolumeAttributesClass{DriverName: d.DriverInfo.Name}
 	case d.VolumeAttributesClass.FromExistingClassName != "":
-		vac, err = f.ClientSet.StorageV1alpha1().VolumeAttributesClasses().Get(ctx, d.VolumeAttributesClass.FromExistingClassName, metav1.GetOptions{})
+		vac, err = f.ClientSet.StorageV1().VolumeAttributesClasses().Get(ctx, d.VolumeAttributesClass.FromExistingClassName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "getting VolumeAttributesClass %s", d.VolumeAttributesClass.FromExistingClassName)
 	case d.VolumeAttributesClass.FromFile != "":
 		var ok bool
@@ -456,7 +534,7 @@ func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econf
 		err = utils.PatchItems(f, f.Namespace, items...)
 		framework.ExpectNoError(err, "patch VolumeAttributesClass from %s", d.VolumeAttributesClass.FromFile)
 
-		vac, ok = items[0].(*storagev1alpha1.VolumeAttributesClass)
+		vac, ok = items[0].(*storagev1.VolumeAttributesClass)
 		if !ok {
 			framework.Failf("cast VolumeAttributesClass from %s", d.VolumeAttributesClass.FromFile)
 		}
@@ -491,6 +569,11 @@ func (d *driverDefinition) PrepareTest(ctx context.Context, f *framework.Framewo
 		e2econfig.ClientNodeSelection.Selector = map[string]string{"kubernetes.io/os": "windows"}
 	} else {
 		e2econfig.ClientNodeSelection.Selector = map[string]string{"kubernetes.io/os": "linux"}
+	}
+
+	// Add all provided nodeSelector settings
+	for key, value := range d.NodeSelectors {
+		e2econfig.ClientNodeSelection.Selector[key] = value
 	}
 
 	return e2econfig

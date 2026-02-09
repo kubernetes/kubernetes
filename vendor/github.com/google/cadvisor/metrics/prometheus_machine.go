@@ -104,6 +104,22 @@ func NewPrometheusMachineCollector(i infoProvider, includedMetrics container.Met
 				},
 			},
 			{
+				name:      "machine_cpu_books",
+				help:      "Number of CPU books.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(machineInfo *info.MachineInfo) metricValues {
+					return metricValues{{value: float64(machineInfo.NumBooks), timestamp: machineInfo.Timestamp}}
+				},
+			},
+			{
+				name:      "machine_cpu_drawers",
+				help:      "Number of CPU drawers.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(machineInfo *info.MachineInfo) metricValues {
+					return metricValues{{value: float64(machineInfo.NumDrawers), timestamp: machineInfo.Timestamp}}
+				},
+			},
+			{
 				name:      "machine_memory_bytes",
 				help:      "Amount of memory installed on the machine.",
 				valueType: prometheus.GaugeValue,

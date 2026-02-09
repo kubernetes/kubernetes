@@ -47,6 +47,7 @@ type ClassStatistics struct {
 	Basic   *GnetStatsBasic
 	Queue   *GnetStatsQueue
 	RateEst *GnetStatsRateEst
+	BasicHw *GnetStatsBasic // Hardward statistics added in kernel 4.20
 }
 
 // NewClassStatistics Construct a ClassStatistics struct which fields are all initialized by 0.
@@ -55,6 +56,7 @@ func NewClassStatistics() *ClassStatistics {
 		Basic:   &GnetStatsBasic{},
 		Queue:   &GnetStatsQueue{},
 		RateEst: &GnetStatsRateEst{},
+		BasicHw: &GnetStatsBasic{},
 	}
 }
 
@@ -132,7 +134,10 @@ func (class *GenericClass) Type() string {
 	return class.ClassType
 }
 
-// ServiceCurve is the way the HFSC curve are represented
+// ServiceCurve is a nondecreasing function of some time unit, returning the amount of service
+// (an allowed or allocated amount of bandwidth) at some specific point in time. The purpose of it
+// should be subconsciously obvious: if a class was allowed to transfer not less than the amount
+// specified by its service curve, then the service curve is not violated.
 type ServiceCurve struct {
 	m1 uint32
 	d  uint32
@@ -144,6 +149,21 @@ func (c *ServiceCurve) Attrs() (uint32, uint32, uint32) {
 	return c.m1, c.d, c.m2
 }
 
+// Burst returns the burst rate (m1) of the curve
+func (c *ServiceCurve) Burst() uint32 {
+	return c.m1
+}
+
+// Delay return the delay (d) of the curve
+func (c *ServiceCurve) Delay() uint32 {
+	return c.d
+}
+
+// Rate returns the rate (m2) of the curve
+func (c *ServiceCurve) Rate() uint32 {
+	return c.m2
+}
+
 // HfscClass is a representation of the HFSC class
 type HfscClass struct {
 	ClassAttrs
@@ -152,35 +172,44 @@ type HfscClass struct {
 	Usc ServiceCurve
 }
 
-// SetUsc sets the Usc curve
+// SetUsc sets the USC curve. The bandwidth (m1 and m2) is specified in bits and the delay in
+// seconds.
 func (hfsc *HfscClass) SetUsc(m1 uint32, d uint32, m2 uint32) {
-	hfsc.Usc = ServiceCurve{m1: m1 / 8, d: d, m2: m2 / 8}
+	hfsc.Usc = ServiceCurve{m1: m1, d: d, m2: m2}
 }
 
-// SetFsc sets the Fsc curve
+// SetFsc sets the Fsc curve. The bandwidth (m1 and m2) is specified in bits and the delay in
+// seconds.
 func (hfsc *HfscClass) SetFsc(m1 uint32, d uint32, m2 uint32) {
-	hfsc.Fsc = ServiceCurve{m1: m1 / 8, d: d, m2: m2 / 8}
+	hfsc.Fsc = ServiceCurve{m1: m1, d: d, m2: m2}
 }
 
-// SetRsc sets the Rsc curve
+// SetRsc sets the Rsc curve. The bandwidth (m1 and m2) is specified in bits and the delay in
+// seconds.
 func (hfsc *HfscClass) SetRsc(m1 uint32, d uint32, m2 uint32) {
-	hfsc.Rsc = ServiceCurve{m1: m1 / 8, d: d, m2: m2 / 8}
+	hfsc.Rsc = ServiceCurve{m1: m1, d: d, m2: m2}
 }
 
-// SetSC implements the SC from the tc CLI
+// SetSC implements the SC from the `tc` CLI. This function behaves the same as if one would set the
+// USC through the `tc` command-line tool. This means bandwidth (m1 and m2) is specified in bits and
+// the delay in ms.
 func (hfsc *HfscClass) SetSC(m1 uint32, d uint32, m2 uint32) {
-	hfsc.Rsc = ServiceCurve{m1: m1 / 8, d: d, m2: m2 / 8}
-	hfsc.Fsc = ServiceCurve{m1: m1 / 8, d: d, m2: m2 / 8}
+	hfsc.SetRsc(m1, d, m2)
+	hfsc.SetFsc(m1, d, m2)
 }
 
-// SetUL implements the UL from the tc CLI
+// SetUL implements the UL from the `tc` CLI. This function behaves the same as if one would set the
+// USC through the `tc` command-line tool. This means bandwidth (m1 and m2) is specified in bits and
+// the delay in ms.
 func (hfsc *HfscClass) SetUL(m1 uint32, d uint32, m2 uint32) {
-	hfsc.Usc = ServiceCurve{m1: m1 / 8, d: d, m2: m2 / 8}
+	hfsc.SetUsc(m1, d, m2)
 }
 
-// SetLS implements the LS from the tc CLI
+// SetLS implements the LS from the `tc` CLI. This function behaves the same as if one would set the
+// USC through the `tc` command-line tool. This means bandwidth (m1 and m2) is specified in bits and
+// the delay in ms.
 func (hfsc *HfscClass) SetLS(m1 uint32, d uint32, m2 uint32) {
-	hfsc.Fsc = ServiceCurve{m1: m1 / 8, d: d, m2: m2 / 8}
+	hfsc.SetFsc(m1, d, m2)
 }
 
 // NewHfscClass returns a new HFSC struct with the set parameters
@@ -193,6 +222,7 @@ func NewHfscClass(attrs ClassAttrs) *HfscClass {
 	}
 }
 
+// String() returns a string that contains the information and attributes of the HFSC class
 func (hfsc *HfscClass) String() string {
 	return fmt.Sprintf(
 		"{%s -- {RSC: {m1=%d d=%d m2=%d}} {FSC: {m1=%d d=%d m2=%d}} {USC: {m1=%d d=%d m2=%d}}}",

@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
+	applyconfigurationsrbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type RolesGetter interface {
 
 // RoleInterface has methods to work with Role resources.
 type RoleInterface interface {
-	Create(ctx context.Context, role *v1.Role, opts metav1.CreateOptions) (*v1.Role, error)
-	Update(ctx context.Context, role *v1.Role, opts metav1.UpdateOptions) (*v1.Role, error)
+	Create(ctx context.Context, role *rbacv1.Role, opts metav1.CreateOptions) (*rbacv1.Role, error)
+	Update(ctx context.Context, role *rbacv1.Role, opts metav1.UpdateOptions) (*rbacv1.Role, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Role, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.RoleList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*rbacv1.Role, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*rbacv1.RoleList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Role, err error)
-	Apply(ctx context.Context, role *rbacv1.RoleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Role, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rbacv1.Role, err error)
+	Apply(ctx context.Context, role *applyconfigurationsrbacv1.RoleApplyConfiguration, opts metav1.ApplyOptions) (result *rbacv1.Role, err error)
 	RoleExpansion
 }
 
 // roles implements RoleInterface
 type roles struct {
-	*gentype.ClientWithListAndApply[*v1.Role, *v1.RoleList, *rbacv1.RoleApplyConfiguration]
+	*gentype.ClientWithListAndApply[*rbacv1.Role, *rbacv1.RoleList, *applyconfigurationsrbacv1.RoleApplyConfiguration]
 }
 
 // newRoles returns a Roles
 func newRoles(c *RbacV1Client, namespace string) *roles {
 	return &roles{
-		gentype.NewClientWithListAndApply[*v1.Role, *v1.RoleList, *rbacv1.RoleApplyConfiguration](
+		gentype.NewClientWithListAndApply[*rbacv1.Role, *rbacv1.RoleList, *applyconfigurationsrbacv1.RoleApplyConfiguration](
 			"roles",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Role { return &v1.Role{} },
-			func() *v1.RoleList { return &v1.RoleList{} }),
+			func() *rbacv1.Role { return &rbacv1.Role{} },
+			func() *rbacv1.RoleList { return &rbacv1.RoleList{} },
+			gentype.PrefersProtobuf[*rbacv1.Role](),
+		),
 	}
 }

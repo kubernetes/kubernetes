@@ -13,6 +13,8 @@
 package protodesc
 
 import (
+	"strings"
+
 	"google.golang.org/protobuf/internal/editionssupport"
 	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/internal/filedesc"
@@ -102,12 +104,18 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 	default:
 		return nil, errors.New("invalid syntax: %q", fd.GetSyntax())
 	}
-	if f.L1.Syntax == protoreflect.Editions && (fd.GetEdition() < editionssupport.Minimum || fd.GetEdition() > editionssupport.Maximum) {
-		return nil, errors.New("use of edition %v not yet supported by the Go Protobuf runtime", fd.GetEdition())
-	}
 	f.L1.Path = fd.GetName()
 	if f.L1.Path == "" {
 		return nil, errors.New("file path must be populated")
+	}
+	if f.L1.Syntax == protoreflect.Editions &&
+		(fd.GetEdition() < editionssupport.Minimum || fd.GetEdition() > editionssupport.Maximum) &&
+		fd.GetEdition() != descriptorpb.Edition_EDITION_UNSTABLE {
+		// Allow cmd/protoc-gen-go/testdata to use any edition for easier
+		// testing of upcoming edition features.
+		if !strings.HasPrefix(fd.GetName(), "cmd/protoc-gen-go/testdata/") {
+			return nil, errors.New("use of edition %v not yet supported by the Go Protobuf runtime", fd.GetEdition())
+		}
 	}
 	f.L1.Package = protoreflect.FullName(fd.GetPackage())
 	if !f.L1.Package.IsValid() && f.L1.Package != "" {
@@ -126,17 +134,11 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 		}
 		f.L2.Imports[i].IsPublic = true
 	}
-	for _, i := range fd.GetWeakDependency() {
-		if !(0 <= i && int(i) < len(f.L2.Imports)) || f.L2.Imports[i].IsWeak {
-			return nil, errors.New("invalid or duplicate weak import index: %d", i)
-		}
-		f.L2.Imports[i].IsWeak = true
-	}
 	imps := importSet{f.Path(): true}
 	for i, path := range fd.GetDependency() {
 		imp := &f.L2.Imports[i]
 		f, err := r.FindFileByPath(path)
-		if err == protoregistry.NotFound && (o.AllowUnresolvable || imp.IsWeak) {
+		if err == protoregistry.NotFound && o.AllowUnresolvable {
 			f = filedesc.PlaceholderFile(path)
 		} else if err != nil {
 			return nil, errors.New("could not resolve import %q: %v", path, err)
@@ -151,6 +153,31 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 	for i := range fd.GetDependency() {
 		imp := &f.L2.Imports[i]
 		imps.importPublic(imp.Imports())
+	}
+	optionImps := importSet{f.Path(): true}
+	if len(fd.GetOptionDependency()) > 0 {
+		optionImports := make(filedesc.FileImports, len(fd.GetOptionDependency()))
+		for i, path := range fd.GetOptionDependency() {
+			imp := &optionImports[i]
+			f, err := r.FindFileByPath(path)
+			if err == protoregistry.NotFound {
+				// We always allow option imports to be unresolvable.
+				f = filedesc.PlaceholderFile(path)
+			} else if err != nil {
+				return nil, errors.New("could not resolve import %q: %v", path, err)
+			}
+			imp.FileDescriptor = f
+
+			if imps[imp.Path()] || optionImps[imp.Path()] {
+				return nil, errors.New("already imported %q", path)
+			}
+			// This needs to be a separate map so that we don't recognize non-options
+			// symbols coming from option imports.
+			optionImps[imp.Path()] = true
+		}
+		f.L2.OptionImports = func() protoreflect.FileImports {
+			return &optionImports
+		}
 	}
 
 	// Handle source locations.

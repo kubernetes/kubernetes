@@ -28,13 +28,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	networkingv1beta1client "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
+	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -99,11 +100,12 @@ type legacyProvider struct {
 	primaryServiceClusterIPAllocator ipallocator.Interface
 	serviceClusterIPAllocators       map[api.IPFamily]ipallocator.Interface
 	serviceNodePortAllocator         *portallocator.PortAllocator
+	authorizer                       authorizer.Authorizer
 
 	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
 }
 
-func New(c Config) (*legacyProvider, error) {
+func New(c Config, authorizer authorizer.Authorizer) (*legacyProvider, error) {
 	rangeRegistries, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
 	if err != nil {
 		return nil, err
@@ -115,6 +117,7 @@ func New(c Config) (*legacyProvider, error) {
 		primaryServiceClusterIPAllocator: serviceClusterIPAllocator,
 		serviceClusterIPAllocators:       serviceIPAllocators,
 		serviceNodePortAllocator:         serviceNodePortAllocator,
+		authorizer:                       authorizer,
 	}
 
 	// create service node port repair controller
@@ -140,8 +143,8 @@ func New(c Config) (*legacyProvider, error) {
 			c.Services.IPRepairInterval,
 			client,
 			c.Informers.Core().V1().Services(),
-			c.Informers.Networking().V1beta1().ServiceCIDRs(),
-			c.Informers.Networking().V1beta1().IPAddresses(),
+			c.Informers.Networking().V1().ServiceCIDRs(),
+			c.Informers.Networking().V1().IPAddresses(),
 		).RunUntil
 	}
 
@@ -193,6 +196,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		nodeStorage.KubeletConnectionInfo,
 		p.Proxy.Transport,
 		podDisruptionClient,
+		p.authorizer,
 	)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
@@ -223,7 +227,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 			utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 			nodeGetter = nodeStorage.Node.Store
 		}
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration)
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration, p.MaxExtendedExpiration)
 		if err != nil {
 			return genericapiserver.APIGroupInfo{}, err
 		}
@@ -242,6 +246,9 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 			storage[resource+"/eviction"] = podStorage.Eviction
 		}
 		storage[resource+"/ephemeralcontainers"] = podStorage.EphemeralContainers
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			storage[resource+"/resize"] = podStorage.Resize
+		}
 	}
 	if resource := "bindings"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		storage[resource] = podStorage.LegacyBinding
@@ -348,7 +355,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 			return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 		}
 	} else {
-		networkingv1beta1Client, err := networkingv1beta1client.NewForConfig(c.LoopbackClientConfig)
+		networkingv1Client, err := networkingv1client.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
 			return rangeRegistries{}, nil, nil, nil, err
 		}
@@ -388,9 +395,9 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 		// sets the default IPFamily that may not be coherent with the
 		// existing default ServiceCIDR
 		primaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
-			networkingv1beta1Client,
-			c.Informers.Networking().V1beta1().ServiceCIDRs(),
-			c.Informers.Networking().V1beta1().IPAddresses(),
+			networkingv1Client,
+			c.Informers.Networking().V1().ServiceCIDRs(),
+			c.Informers.Networking().V1().IPAddresses(),
 			netutils.IsIPv6CIDR(&serviceClusterIPRange),
 			bitmapAllocator,
 		)
@@ -420,7 +427,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 			}
 		} else {
-			networkingv1beta1Client, err := networkingv1beta1client.NewForConfig(c.LoopbackClientConfig)
+			networkingv1Client, err := networkingv1client.NewForConfig(c.LoopbackClientConfig)
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, err
 			}
@@ -440,7 +447,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 					if err != nil {
 						return nil, err
 					}
-					rangeRegistry.Range = serviceClusterIPRange.String()
+					rangeRegistry.Range = c.Services.SecondaryClusterIPRange.String()
 					if len(rangeRegistry.ResourceVersion) == 0 {
 						klog.Infof("kube-apiserver started with IP allocator and dual write enabled but bitmap allocator does not exist, recreating it ...")
 						err := etcd.CreateOrUpdate(rangeRegistry)
@@ -460,9 +467,9 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 			// sets the default IPFamily that may not be coherent with the
 			// existing default ServiceCIDR
 			secondaryClusterIPAllocator, err = ipallocator.NewMetaAllocator(
-				networkingv1beta1Client,
-				c.Informers.Networking().V1beta1().ServiceCIDRs(),
-				c.Informers.Networking().V1beta1().IPAddresses(),
+				networkingv1Client,
+				c.Informers.Networking().V1().ServiceCIDRs(),
+				c.Informers.Networking().V1().IPAddresses(),
 				netutils.IsIPv6CIDR(&c.Services.SecondaryClusterIPRange),
 				bitmapAllocator,
 			)
@@ -514,7 +521,7 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		runner.Start()
 		go func() {
 			defer runner.Stop()
-			<-context.StopCh
+			<-context.Done()
 		}()
 
 		// For backward compatibility, we ensure that if we never are able

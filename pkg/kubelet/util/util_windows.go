@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -72,4 +71,9 @@ func NormalizePath(path string) string {
 		path = "c:" + path
 	}
 	return path
+}
+
+// IsCgroup2UnifiedMode is a no-op for Windows for now
+func IsCgroup2UnifiedMode() bool {
+	return false
 }

@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	goruntime "runtime"
 	"sort"
@@ -31,16 +32,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cloudprovider "k8s.io/cloud-provider"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
-	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -91,7 +93,16 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		return true
 	}
 
-	if !apierrors.IsAlreadyExists(err) {
+	switch {
+	case apierrors.IsAlreadyExists(err):
+		// Node already exists, proceed to reconcile node.
+	case apierrors.IsForbidden(err):
+		// Creating nodes is forbidden, but node may still exist, attempt to get the node.
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRegistrationGetOnExistsOnly) {
+			klog.ErrorS(err, "Unable to register node with API server, reason is forbidden", "node", klog.KObj(node))
+			return false
+		}
+	default:
 		klog.ErrorS(err, "Unable to register node with API server", "node", klog.KObj(node))
 		return false
 	}
@@ -101,6 +112,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		klog.ErrorS(err, "Unable to register node with API server, error getting existing node", "node", klog.KObj(node))
 		return false
 	}
+
 	if existingNode == nil {
 		klog.InfoS("Unable to register node with API server, no node instance returned", "node", klog.KObj(node))
 		return false
@@ -298,9 +310,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 				kubeletapis.LabelArch: goruntime.GOARCH,
 			},
 		},
-		Spec: v1.NodeSpec{
-			Unschedulable: !kl.registerSchedulable,
-		},
 	}
 	osLabels, err := getOSSpecificLabels()
 	if err != nil {
@@ -312,17 +321,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 
 	nodeTaints := make([]v1.Taint, len(kl.registerWithTaints))
 	copy(nodeTaints, kl.registerWithTaints)
-	unschedulableTaint := v1.Taint{
-		Key:    v1.TaintNodeUnschedulable,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
-	// Taint node with TaintNodeUnschedulable when initializing
-	// node to avoid race condition; refer to #63897 for more detail.
-	if node.Spec.Unschedulable &&
-		!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
-		nodeTaints = append(nodeTaints, unschedulableTaint)
-	}
 
 	if kl.externalCloudProvider {
 		taint := v1.Taint{
@@ -335,16 +333,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	}
 	if len(nodeTaints) > 0 {
 		node.Spec.Taints = nodeTaints
-	}
-	// Initially, set NodeNetworkUnavailable to true.
-	if kl.providerRequiresNetworkingConfiguration() {
-		node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
-			Type:               v1.NodeNetworkUnavailable,
-			Status:             v1.ConditionTrue,
-			Reason:             "NoRouteCreated",
-			Message:            "Node created without a route",
-			LastTransitionTime: metav1.NewTime(kl.clock.Now()),
-		})
 	}
 
 	if kl.enableControllerAttachDetach {
@@ -370,55 +358,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		node.Spec.ProviderID = kl.providerID
 	}
 
-	if kl.cloud != nil {
-		instances, ok := kl.cloud.Instances()
-		if !ok {
-			return nil, fmt.Errorf("failed to get instances from cloud provider")
-		}
-
-		// TODO: We can't assume that the node has credentials to talk to the
-		// cloudprovider from arbitrary nodes. At most, we should talk to a
-		// local metadata server here.
-		var err error
-		if node.Spec.ProviderID == "" {
-			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(ctx, kl.cloud, kl.nodeName)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		instanceType, err := instances.InstanceType(ctx, kl.nodeName)
-		if err != nil {
-			return nil, err
-		}
-		if instanceType != "" {
-			klog.InfoS("Adding label from cloud provider", "labelKey", v1.LabelInstanceType, "labelValue", instanceType)
-			node.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
-			klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelInstanceTypeStable, "labelValue", instanceType)
-			node.ObjectMeta.Labels[v1.LabelInstanceTypeStable] = instanceType
-		}
-		// If the cloud has zone information, label the node with the zone information
-		zones, ok := kl.cloud.Zones()
-		if ok {
-			zone, err := zones.GetZone(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
-			}
-			if zone.FailureDomain != "" {
-				klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelFailureDomainBetaZone, "labelValue", zone.FailureDomain)
-				node.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone] = zone.FailureDomain
-				klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelTopologyZone, "labelValue", zone.FailureDomain)
-				node.ObjectMeta.Labels[v1.LabelTopologyZone] = zone.FailureDomain
-			}
-			if zone.Region != "" {
-				klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelFailureDomainBetaRegion, "labelValue", zone.Region)
-				node.ObjectMeta.Labels[v1.LabelFailureDomainBetaRegion] = zone.Region
-				klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelTopologyRegion, "labelValue", zone.Region)
-				node.ObjectMeta.Labels[v1.LabelTopologyRegion] = zone.Region
-			}
-		}
-	}
-
 	kl.setNodeStatus(ctx, node)
 
 	return node, nil
@@ -430,6 +369,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 // syncNodeStatus. Its return value indicates whether the loop running it should exit
 // (final run), and it also sets kl.containerRuntimeReadyExpected.
 func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (completed bool) {
+	logger := klog.FromContext(ctx)
 	kl.syncNodeStatusMux.Lock()
 	defer func() {
 		kl.syncNodeStatusMux.Unlock()
@@ -444,19 +384,19 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 	}()
 
 	if timeout {
-		klog.ErrorS(nil, "Node not becoming ready in time after startup")
+		logger.Error(nil, "Node not becoming ready in time after startup")
 		return true
 	}
 
-	originalNode, err := kl.GetNode()
+	originalNode, err := kl.GetNode(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Error getting the current node from lister")
+		logger.Error(err, "Error getting the current node from lister")
 		return false
 	}
 
 	readyIdx, originalNodeReady := nodeutil.GetNodeCondition(&originalNode.Status, v1.NodeReady)
 	if readyIdx == -1 {
-		klog.ErrorS(nil, "Node does not have NodeReady condition", "originalNode", originalNode)
+		logger.Error(nil, "Node does not have NodeReady condition", "originalNode", originalNode)
 		return false
 	}
 
@@ -466,7 +406,7 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 
 	// This is in addition to the regular syncNodeStatus logic so we can get the container runtime status earlier.
 	// This function itself has a mutex and it doesn't recursively call fastNodeStatusUpdate or syncNodeStatus.
-	kl.updateRuntimeUp()
+	kl.updateRuntimeUp(ctx)
 
 	node, changed := kl.updateNode(ctx, originalNode)
 
@@ -477,7 +417,7 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 
 	readyIdx, nodeReady := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 	if readyIdx == -1 {
-		klog.ErrorS(nil, "Node does not have NodeReady condition", "node", node)
+		logger.Error(nil, "Node does not have NodeReady condition", "node", node)
 		return false
 	}
 
@@ -489,7 +429,7 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 	if _, err := kl.patchNodeStatus(originalNode, node); err != nil {
 		// The originalNode is probably stale, but we know that the current state of kubelet would turn
 		// the node to be ready. Retry using syncNodeStatus() which fetches from the apiserver.
-		klog.ErrorS(err, "Error updating node status, will retry with syncNodeStatus")
+		logger.Error(err, "Error updating node status, will retry with syncNodeStatus")
 
 		// The reversed kl.syncNodeStatusMux.Unlock/Lock() below to allow kl.syncNodeStatus() execution.
 		kl.syncNodeStatusMux.Unlock()
@@ -566,18 +506,39 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 	}
 
 	node, changed := kl.updateNode(ctx, originalNode)
-	shouldPatchNodeStatus := changed || kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency
+	shouldPatchNodeStatus := changed || kl.isUpdateStatusPeriodExpired()
 
 	if !shouldPatchNodeStatus {
 		kl.markVolumesFromNode(node)
 		return nil
 	}
 
+	// There are 3 possible conditions that make shouldPatchNodeStatus to be true:
+	// 1. node is changed
+	// 2. isUpdateStatusPeriodExpired returns true due to lastStatusReportTime has Zero value. This will happen when kubelet restarts.
+	// 3. isUpdateStatusPeriodExpired returns true due to lastStatusReportTime expires with non-zero value.
+	// We want to calculate a new random delay for condition 1 and 2, so that we can avoid all the periodic node status
+	// updates to reach the apiserver at the same time.
+	// When condition 3 happens, random interval has already been used, and we want to reset the random delay, so that
+	// the node updates its status with fixed interval going forward.
+	if changed || kl.lastStatusReportTime.IsZero() {
+		kl.delayAfterNodeStatusChange = kl.calculateDelay()
+	} else {
+		kl.delayAfterNodeStatusChange = 0
+	}
 	updatedNode, err := kl.patchNodeStatus(originalNode, node)
 	if err == nil {
 		kl.markVolumesFromNode(updatedNode)
 	}
 	return err
+}
+
+func (kl *Kubelet) isUpdateStatusPeriodExpired() bool {
+	return kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency+kl.delayAfterNodeStatusChange
+}
+
+func (kl *Kubelet) calculateDelay() time.Duration {
+	return time.Duration(float64(kl.nodeStatusReportFrequency) * (-0.5 + rand.Float64()))
 }
 
 // updateNode creates a copy of originalNode and runs update logic on it.
@@ -631,7 +592,6 @@ func (kl *Kubelet) patchNodeStatus(originalNode, node *v1.Node) (*v1.Node, error
 		return nil, err
 	}
 	kl.lastStatusReportTime = kl.clock.Now()
-	kl.setLastObservedNodeAddresses(updatedNode.Status.Addresses)
 
 	readyIdx, readyCondition := nodeutil.GetNodeCondition(&updatedNode.Status, v1.NodeReady)
 	if readyIdx >= 0 && readyCondition.Status == v1.ConditionTrue {
@@ -706,30 +666,17 @@ func (kl *Kubelet) setNodeStatus(ctx context.Context, node *v1.Node) {
 			klog.ErrorS(err, "Failed to set some node status fields", "node", klog.KObj(node))
 		}
 	}
-}
-
-func (kl *Kubelet) setLastObservedNodeAddresses(addresses []v1.NodeAddress) {
-	kl.lastObservedNodeAddressesMux.Lock()
-	defer kl.lastObservedNodeAddressesMux.Unlock()
-	kl.lastObservedNodeAddresses = addresses
-}
-func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
-	kl.lastObservedNodeAddressesMux.RLock()
-	defer kl.lastObservedNodeAddressesMux.RUnlock()
-	return kl.lastObservedNodeAddresses
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && kl.nodeDeclaredFeatures != nil {
+		node.Status.DeclaredFeatures = kl.nodeDeclaredFeatures
+	}
 }
 
 // defaultNodeStatusFuncs is a factory that generates the default set of
 // setNodeStatus funcs
 func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) error {
-	// if cloud is not nil, we expect the cloud resource sync manager to exist
-	var nodeAddressesFunc func() ([]v1.NodeAddress, error)
-	if kl.cloud != nil {
-		nodeAddressesFunc = kl.cloudResourceSyncManager.NodeAddresses
-	}
 	var setters []func(ctx context.Context, n *v1.Node) error
 	setters = append(setters,
-		nodestatus.NodeAddress(kl.nodeIPs, kl.nodeIPValidator, kl.hostname, kl.hostnameOverridden, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
+		nodestatus.NodeAddress(kl.nodeIPs, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, utilnet.ResolveBindAddress),
 		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,
 			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent, kl.supportLocalStorageCapacityIsolation()),
 		nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),
@@ -737,6 +684,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),
 		nodestatus.GoRuntime(),
 		nodestatus.RuntimeHandlers(kl.runtimeState.runtimeHandlers),
+		nodestatus.NodeFeatures(kl.runtimeState.runtimeFeatures),
 	)
 
 	setters = append(setters,

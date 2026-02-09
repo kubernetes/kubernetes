@@ -23,10 +23,10 @@ import (
 )
 
 // CreateWithEventNamespace creats a new event. Returns the copy of the event the server returns, or an error.
-func (c *FakeEvents) CreateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event, error) {
-	action := core.NewRootCreateAction(eventsResource, event)
-	if c.ns != "" {
-		action = core.NewCreateAction(eventsResource, c.ns, event)
+func (c *fakeEvents) CreateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event, error) {
+	action := core.NewRootCreateAction(c.Resource(), event)
+	if c.Namespace() != "" {
+		action = core.NewCreateAction(c.Resource(), c.Namespace(), event)
 	}
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
@@ -37,10 +37,10 @@ func (c *FakeEvents) CreateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Ev
 }
 
 // UpdateWithEventNamespace replaces an existing event. Returns the copy of the event the server returns, or an error.
-func (c *FakeEvents) UpdateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event, error) {
-	action := core.NewRootUpdateAction(eventsResource, event)
-	if c.ns != "" {
-		action = core.NewUpdateAction(eventsResource, c.ns, event)
+func (c *fakeEvents) UpdateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event, error) {
+	action := core.NewRootUpdateAction(c.Resource(), event)
+	if c.Namespace() != "" {
+		action = core.NewUpdateAction(c.Resource(), c.Namespace(), event)
 	}
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
@@ -51,11 +51,11 @@ func (c *FakeEvents) UpdateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Ev
 }
 
 // PatchWithEventNamespace patches an existing event. Returns the copy of the event the server returns, or an error.
-func (c *FakeEvents) PatchWithEventNamespace(event *v1beta1.Event, data []byte) (*v1beta1.Event, error) {
+func (c *fakeEvents) PatchWithEventNamespace(event *v1beta1.Event, data []byte) (*v1beta1.Event, error) {
 	pt := types.StrategicMergePatchType
-	action := core.NewRootPatchAction(eventsResource, event.Name, pt, data)
-	if c.ns != "" {
-		action = core.NewPatchAction(eventsResource, c.ns, event.Name, pt, data)
+	action := core.NewRootPatchAction(c.Resource(), event.Name, pt, data)
+	if c.Namespace() != "" {
+		action = core.NewPatchAction(c.Resource(), c.Namespace(), event.Name, pt, data)
 	}
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {

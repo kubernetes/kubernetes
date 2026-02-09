@@ -19,7 +19,6 @@
         },
         "template": {
             "metadata": {
-                "creationTimestamp": null,
                 "labels": {
                     "kubernetes.io/cluster-service": "true",
                     "name": "elasticsearch-logging"

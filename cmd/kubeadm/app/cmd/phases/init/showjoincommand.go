@@ -21,10 +21,10 @@ import (
 	"text/template"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var (
@@ -47,7 +47,7 @@ var (
 
 		{{if .ControlPlaneEndpoint -}}
 		{{if .UploadCerts -}}
-		You can now join any number of the control-plane node running the following command on each as root:
+		You can now join any number of control-plane nodes running the following command on each as root:
 
 		  {{.joinControlPlaneCommand}}
 

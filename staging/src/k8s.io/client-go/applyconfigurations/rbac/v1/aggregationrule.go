@@ -19,13 +19,17 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // AggregationRuleApplyConfiguration represents a declarative configuration of the AggregationRule type for use
 // with apply.
+//
+// AggregationRule describes how to locate ClusterRoles to aggregate into the ClusterRole
 type AggregationRuleApplyConfiguration struct {
-	ClusterRoleSelectors []v1.LabelSelectorApplyConfiguration `json:"clusterRoleSelectors,omitempty"`
+	// ClusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules.
+	// If any of the selectors match, then the ClusterRole's permissions will be added
+	ClusterRoleSelectors []metav1.LabelSelectorApplyConfiguration `json:"clusterRoleSelectors,omitempty"`
 }
 
 // AggregationRuleApplyConfiguration constructs a declarative configuration of the AggregationRule type for use with
@@ -37,7 +41,7 @@ func AggregationRule() *AggregationRuleApplyConfiguration {
 // WithClusterRoleSelectors adds the given value to the ClusterRoleSelectors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ClusterRoleSelectors field.
-func (b *AggregationRuleApplyConfiguration) WithClusterRoleSelectors(values ...*v1.LabelSelectorApplyConfiguration) *AggregationRuleApplyConfiguration {
+func (b *AggregationRuleApplyConfiguration) WithClusterRoleSelectors(values ...*metav1.LabelSelectorApplyConfiguration) *AggregationRuleApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithClusterRoleSelectors")

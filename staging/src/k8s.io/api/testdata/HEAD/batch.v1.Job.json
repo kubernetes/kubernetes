@@ -395,6 +395,17 @@
                     },
                     "optional": true,
                     "path": "pathValue"
+                  },
+                  "podCertificate": {
+                    "signerName": "signerNameValue",
+                    "keyType": "keyTypeValue",
+                    "maxExpirationSeconds": 3,
+                    "credentialBundlePath": "credentialBundlePathValue",
+                    "keyPath": "keyPathValue",
+                    "certificateChainPath": "certificateChainPathValue",
+                    "userAnnotations": {
+                      "userAnnotationsKey": "userAnnotationsValue"
+                    }
                   }
                 }
               ],
@@ -526,6 +537,10 @@
                   "volumeAttributesClassName": "volumeAttributesClassNameValue"
                 }
               }
+            },
+            "image": {
+              "reference": "referenceValue",
+              "pullPolicy": "pullPolicyValue"
             }
           }
         ],
@@ -585,6 +600,12 @@
                     "name": "nameValue",
                     "key": "keyValue",
                     "optional": true
+                  },
+                  "fileKeyRef": {
+                    "volumeName": "volumeNameValue",
+                    "path": "pathValue",
+                    "key": "keyValue",
+                    "optional": true
                   }
                 }
               }
@@ -598,7 +619,8 @@
               },
               "claims": [
                 {
-                  "name": "nameValue"
+                  "name": "nameValue",
+                  "request": "requestValue"
                 }
               ]
             },
@@ -609,6 +631,17 @@
               }
             ],
             "restartPolicy": "restartPolicyValue",
+            "restartPolicyRules": [
+              {
+                "action": "actionValue",
+                "exitCodes": {
+                  "operator": "operatorValue",
+                  "values": [
+                    2
+                  ]
+                }
+              }
+            ],
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -777,7 +810,8 @@
                 "sleep": {
                   "seconds": 1
                 }
-              }
+              },
+              "stopSignal": "stopSignalValue"
             },
             "terminationMessagePath": "terminationMessagePathValue",
             "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -880,6 +914,12 @@
                     "name": "nameValue",
                     "key": "keyValue",
                     "optional": true
+                  },
+                  "fileKeyRef": {
+                    "volumeName": "volumeNameValue",
+                    "path": "pathValue",
+                    "key": "keyValue",
+                    "optional": true
                   }
                 }
               }
@@ -893,7 +933,8 @@
               },
               "claims": [
                 {
-                  "name": "nameValue"
+                  "name": "nameValue",
+                  "request": "requestValue"
                 }
               ]
             },
@@ -904,6 +945,17 @@
               }
             ],
             "restartPolicy": "restartPolicyValue",
+            "restartPolicyRules": [
+              {
+                "action": "actionValue",
+                "exitCodes": {
+                  "operator": "operatorValue",
+                  "values": [
+                    2
+                  ]
+                }
+              }
+            ],
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -1072,7 +1124,8 @@
                 "sleep": {
                   "seconds": 1
                 }
-              }
+              },
+              "stopSignal": "stopSignalValue"
             },
             "terminationMessagePath": "terminationMessagePathValue",
             "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1175,6 +1228,12 @@
                     "name": "nameValue",
                     "key": "keyValue",
                     "optional": true
+                  },
+                  "fileKeyRef": {
+                    "volumeName": "volumeNameValue",
+                    "path": "pathValue",
+                    "key": "keyValue",
+                    "optional": true
                   }
                 }
               }
@@ -1188,7 +1247,8 @@
               },
               "claims": [
                 {
-                  "name": "nameValue"
+                  "name": "nameValue",
+                  "request": "requestValue"
                 }
               ]
             },
@@ -1199,6 +1259,17 @@
               }
             ],
             "restartPolicy": "restartPolicyValue",
+            "restartPolicyRules": [
+              {
+                "action": "actionValue",
+                "exitCodes": {
+                  "operator": "operatorValue",
+                  "values": [
+                    2
+                  ]
+                }
+              }
+            ],
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -1367,7 +1438,8 @@
                 "sleep": {
                   "seconds": 1
                 }
-              }
+              },
+              "stopSignal": "stopSignalValue"
             },
             "terminationMessagePath": "terminationMessagePathValue",
             "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1465,7 +1537,8 @@
           "appArmorProfile": {
             "type": "typeValue",
             "localhostProfile": "localhostProfileValue"
-          }
+          },
+          "seLinuxChangePolicy": "seLinuxChangePolicyValue"
         },
         "imagePullSecrets": [
           {
@@ -1793,7 +1866,27 @@
             "resourceClaimName": "resourceClaimNameValue",
             "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
           }
-        ]
+        ],
+        "resources": {
+          "limits": {
+            "limitsKey": "0"
+          },
+          "requests": {
+            "requestsKey": "0"
+          },
+          "claims": [
+            {
+              "name": "nameValue",
+              "request": "requestValue"
+            }
+          ]
+        },
+        "hostnameOverride": "hostnameOverrideValue",
+        "workloadRef": {
+          "name": "nameValue",
+          "podGroup": "podGroupValue",
+          "podGroupReplicaKey": "podGroupReplicaKeyValue"
+        }
       }
     },
     "ttlSecondsAfterFinished": 8,

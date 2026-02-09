@@ -1,5 +1,4 @@
 //go:build !linux && !windows
-// +build !linux,!windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -20,6 +19,7 @@ limitations under the License.
 package cadvisor
 
 import (
+	"context"
 	"errors"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -58,7 +58,7 @@ func (cu *cadvisorUnsupported) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return nil, errUnsupported
 }
 
-func (cu *cadvisorUnsupported) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (cu *cadvisorUnsupported) ImagesFsInfo(context.Context) (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, errUnsupported
 }
 
@@ -66,7 +66,7 @@ func (cu *cadvisorUnsupported) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, errUnsupported
 }
 
-func (cu *cadvisorUnsupported) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (cu *cadvisorUnsupported) ContainerFsInfo(context.Context) (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, errUnsupported
 }
 

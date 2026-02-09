@@ -181,7 +181,6 @@ message AzureFileVolumeSource {
 }
 
 // Binding ties one object to another; for example, a pod is bound to a node by a scheduler.
-// Deprecated in 1.7, please use the bindings subresource of pods instead.
 message Binding {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -192,7 +191,7 @@ message Binding {
   optional ObjectReference target = 2;
 }
 
-// Represents storage that is managed by an external CSI volume driver (Beta feature)
+// Represents storage that is managed by an external CSI volume driver
 message CSIPersistentVolumeSource {
   // driver is the name of the driver to use for this volume.
   // Required.
@@ -738,8 +737,8 @@ message Container {
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
-  // The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-  // will be reported as an event when the container is starting. When a key exists in multiple
+  // The keys defined within a source may consist of any printable ASCII characters except '='.
+  // When a key exists in multiple
   // sources, the value associated with the last source will take precedence.
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
@@ -763,16 +762,17 @@ message Container {
   optional ResourceRequirements resources = 8;
 
   // Resources resize policy for the container.
+  // This field cannot be set on ephemeral containers.
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   // +listType=atomic
   repeated ContainerResizePolicy resizePolicy = 23;
 
   // RestartPolicy defines the restart behavior of individual containers in a pod.
-  // This field may only be set for init containers, and the only allowed value is "Always".
-  // For non-init containers or when this field is not specified,
+  // This overrides the pod-level restart policy. When this field is not specified,
   // the restart behavior is defined by the Pod's restart policy and the container type.
-  // Setting the RestartPolicy as "Always" for the init container will have the following effect:
+  // Additionally, setting the RestartPolicy as "Always" for the init container will
+  // have the following effect:
   // this init container will be continually restarted on
   // exit until all regular containers have terminated. Once all regular
   // containers have completed, all init containers with restartPolicy "Always"
@@ -783,9 +783,24 @@ message Container {
   // container. Instead, the next init container starts immediately after this
   // init container is started, or after any startupProbe has successfully
   // completed.
-  // +featureGate=SidecarContainers
   // +optional
   optional string restartPolicy = 24;
+
+  // Represents a list of rules to be checked to determine if the
+  // container should be restarted on exit. The rules are evaluated in
+  // order. Once a rule matches a container exit condition, the remaining
+  // rules are ignored. If no rule matches the container exit condition,
+  // the Container-level restart policy determines the whether the container
+  // is restarted or not. Constraints on the rules:
+  // - At most 20 rules are allowed.
+  // - Rules can have the same action.
+  // - Identical rules are not forbidden in validations.
+  // When rules are specified, container MUST set RestartPolicy explicitly
+  // even it if matches the Pod's RestartPolicy.
+  // +featureGate=ContainerRestartRules
+  // +optional
+  // +listType=atomic
+  repeated ContainerRestartRule restartPolicyRules = 25;
 
   // Pod volumes to mount into the container's filesystem.
   // Cannot be updated.
@@ -889,6 +904,19 @@ message Container {
   optional bool tty = 18;
 }
 
+// ContainerExtendedResourceRequest has the mapping of container name,
+// extended resource name to the device request name.
+message ContainerExtendedResourceRequest {
+  // The name of the container requesting resources.
+  optional string containerName = 1;
+
+  // The name of the extended resource in that container which gets backed by DRA.
+  optional string resourceName = 2;
+
+  // The name of the request in the special ResourceClaim which corresponds to the extended resource.
+  optional string requestName = 3;
+}
+
 // Describe a container image
 message ContainerImage {
   // Names by which this image is known.
@@ -941,6 +969,39 @@ message ContainerResizePolicy {
   // Restart policy to apply when specified resource is resized.
   // If not specified, it defaults to NotRequired.
   optional string restartPolicy = 2;
+}
+
+// ContainerRestartRule describes how a container exit is handled.
+message ContainerRestartRule {
+  // Specifies the action taken on a container exit if the requirements
+  // are satisfied. The only possible value is "Restart" to restart the
+  // container.
+  // +required
+  optional string action = 1;
+
+  // Represents the exit codes to check on container exits.
+  // +optional
+  // +oneOf=when
+  optional ContainerRestartRuleOnExitCodes exitCodes = 2;
+}
+
+// ContainerRestartRuleOnExitCodes describes the condition
+// for handling an exited container based on its exit codes.
+message ContainerRestartRuleOnExitCodes {
+  // Represents the relationship between the container exit code(s) and the
+  // specified values. Possible values are:
+  // - In: the requirement is satisfied if the container exit code is in the
+  //   set of specified values.
+  // - NotIn: the requirement is satisfied if the container exit code is
+  //   not in the set of specified values.
+  // +required
+  optional string operator = 1;
+
+  // Specifies the set of values to check for container exit codes.
+  // At most 255 elements are allowed.
+  // +optional
+  // +listType=set
+  repeated int32 values = 2;
 }
 
 // ContainerState holds a possible state of container.
@@ -1071,7 +1132,7 @@ message ContainerStatus {
   // AllocatedResources represents the compute resources allocated for this container by the
   // node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
   // and after successfully admitting desired pod resize.
-  // +featureGate=InPlacePodVerticalScaling
+  // +featureGate=InPlacePodVerticalScalingAllocatedStatus
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 10;
 
@@ -1087,13 +1148,27 @@ message ContainerStatus {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=mountPath
-  // +featureGate=RecursiveReadOnlyMounts
   repeated VolumeMountStatus volumeMounts = 12;
 
   // User represents user identity information initially attached to the first process of the container
   // +featureGate=SupplementalGroupsPolicy
   // +optional
   optional ContainerUser user = 13;
+
+  // AllocatedResourcesStatus represents the status of various resources
+  // allocated for this Pod.
+  // +featureGate=ResourceHealthStatus
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  repeated ResourceStatus allocatedResourcesStatus = 14;
+
+  // StopSignal reports the effective stop signal for this container
+  // +featureGate=ContainerStopSignals
+  // +optional
+  optional string stopSignal = 15;
 }
 
 // ContainerUser represents user identity information
@@ -1185,6 +1260,7 @@ message EmptyDirVolumeSource {
 }
 
 // EndpointAddress is a tuple that describes single IP address.
+// Deprecated: This API is deprecated in v1.33+.
 // +structType=atomic
 message EndpointAddress {
   // The IP of this endpoint.
@@ -1206,6 +1282,7 @@ message EndpointAddress {
 }
 
 // EndpointPort is a tuple that describes a single port.
+// Deprecated: This API is deprecated in v1.33+.
 // +structType=atomic
 message EndpointPort {
   // The name of this port.  This must match the 'name' field in the
@@ -1256,6 +1333,8 @@ message EndpointPort {
 //
 // 	a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
 // 	b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+//
+// Deprecated: This API is deprecated in v1.33+.
 message EndpointSubset {
   // IP addresses which offer the related ports that are marked as ready. These endpoints
   // should be considered safe for load balancers and clients to utilize.
@@ -1289,6 +1368,11 @@ message EndpointSubset {
 // 	     Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
 // 	   },
 // 	]
+//
+// Endpoints is a legacy API and does not contain information about all Service features.
+// Use discoveryv1.EndpointSlice for complete information about Service endpoints.
+//
+// Deprecated: This API is deprecated in v1.33+. Use discoveryv1.EndpointSlice.
 message Endpoints {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -1308,6 +1392,7 @@ message Endpoints {
 }
 
 // EndpointsList is a list of endpoints.
+// Deprecated: This API is deprecated in v1.33+.
 message EndpointsList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
@@ -1318,9 +1403,10 @@ message EndpointsList {
   repeated Endpoints items = 2;
 }
 
-// EnvFromSource represents the source of a set of ConfigMaps
+// EnvFromSource represents the source of a set of ConfigMaps or Secrets
 message EnvFromSource {
-  // An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+  // Optional text to prepend to the name of each environment variable.
+  // May consist of any printable ASCII characters except '='.
   // +optional
   optional string prefix = 1;
 
@@ -1335,7 +1421,8 @@ message EnvFromSource {
 
 // EnvVar represents an environment variable present in a Container.
 message EnvVar {
-  // Name of the environment variable. Must be a C_IDENTIFIER.
+  // Name of the environment variable.
+  // May consist of any printable ASCII characters except '='.
   optional string name = 1;
 
   // Variable references $(VAR_NAME) are expanded
@@ -1374,6 +1461,13 @@ message EnvVarSource {
   // Selects a key of a secret in the pod's namespace
   // +optional
   optional SecretKeySelector secretKeyRef = 4;
+
+  // FileKeyRef selects a key of the env file.
+  // Requires the EnvFiles feature gate to be enabled.
+  //
+  // +featureGate=EnvFiles
+  // +optional
+  optional FileKeySelector fileKeyRef = 5;
 }
 
 // An EphemeralContainer is a temporary container that you may add to an existing Pod for
@@ -1455,8 +1549,8 @@ message EphemeralContainerCommon {
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
-  // The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-  // will be reported as an event when the container is starting. When a key exists in multiple
+  // The keys defined within a source may consist of any printable ASCII characters except '='.
+  // When a key exists in multiple
   // sources, the value associated with the last source will take precedence.
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
@@ -1486,11 +1580,17 @@ message EphemeralContainerCommon {
 
   // Restart policy for the container to manage the restart behavior of each
   // container within a pod.
-  // This may only be set for init containers. You cannot set this field on
-  // ephemeral containers.
-  // +featureGate=SidecarContainers
+  // You cannot set this field on ephemeral containers.
   // +optional
   optional string restartPolicy = 24;
+
+  // Represents a list of rules to be checked to determine if the
+  // container should be restarted on exit. You cannot set this field on
+  // ephemeral containers.
+  // +featureGate=ContainerRestartRules
+  // +optional
+  // +listType=atomic
+  repeated ContainerRestartRule restartPolicyRules = 25;
 
   // Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
   // Cannot be updated.
@@ -1752,6 +1852,36 @@ message FCVolumeSource {
   repeated string wwids = 5;
 }
 
+// FileKeySelector selects a key of the env file.
+// +structType=atomic
+message FileKeySelector {
+  // The name of the volume mount containing the env file.
+  // +required
+  optional string volumeName = 1;
+
+  // The path within the volume from which to select the file.
+  // Must be relative and may not contain the '..' path or start with '..'.
+  // +required
+  optional string path = 2;
+
+  // The key within the env file. An invalid key will prevent the pod from starting.
+  // The keys defined within a source may consist of any printable ASCII characters except '='.
+  // During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+  // +required
+  optional string key = 3;
+
+  // Specify whether the file or its key must be defined. If the file or key
+  // does not exist, then the env var is not published.
+  // If optional is set to true and the specified key does not exist,
+  // the environment variable will not be set in the Pod's containers.
+  //
+  // If optional is set to false and the specified key does not exist,
+  // an error will be returned during Pod creation.
+  // +optional
+  // +default=false
+  optional bool optional = 4;
+}
+
 // FlexPersistentVolumeSource represents a generic persistent volume resource that is
 // provisioned/attached using an exec based plugin.
 message FlexPersistentVolumeSource {
@@ -1860,6 +1990,7 @@ message GCEPersistentDiskVolumeSource {
   optional bool readOnly = 4;
 }
 
+// GRPCAction specifies an action involving a GRPC service.
 message GRPCAction {
   // Port number of the gRPC service. Number must be in the range 1 to 65535.
   optional int32 port = 1;
@@ -1924,7 +2055,6 @@ message GlusterfsPersistentVolumeSource {
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 message GlusterfsVolumeSource {
   // endpoints is the endpoint name that details Glusterfs topology.
-  // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string endpoints = 1;
 
   // path is the Glusterfs volume path.
@@ -2125,6 +2255,36 @@ message ISCSIVolumeSource {
   optional string initiatorName = 12;
 }
 
+// ImageVolumeSource represents a image volume resource.
+message ImageVolumeSource {
+  // Required: Image or artifact reference to be used.
+  // Behaves in the same way as pod.spec.containers[*].image.
+  // Pull secrets will be assembled in the same way as for the container image by looking up node credentials, SA image pull secrets, and pod spec image pull secrets.
+  // More info: https://kubernetes.io/docs/concepts/containers/images
+  // This field is optional to allow higher level config management to default or override
+  // container images in workload controllers like Deployments and StatefulSets.
+  // +optional
+  optional string reference = 1;
+
+  // Policy for pulling OCI objects. Possible values are:
+  // Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
+  // Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
+  // IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
+  // Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+  // +optional
+  optional string pullPolicy = 2;
+}
+
+// ImageVolumeStatus represents the image-based volume status.
+message ImageVolumeStatus {
+  // ImageRef is the digest of the image used for this volume.
+  // It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+  // The ImageRef length should not exceed 256 characters.
+  // +kubebuilder:validation:MaxLength=256
+  // +required
+  optional string imageRef = 1;
+}
+
 // Maps a string key to a path within a volume.
 message KeyToPath {
   // key is the key to project.
@@ -2168,27 +2328,32 @@ message Lifecycle {
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
   optional LifecycleHandler preStop = 2;
+
+  // StopSignal defines which signal will be sent to a container when it is being stopped.
+  // If not specified, the default is defined by the container runtime in use.
+  // StopSignal can only be set for Pods with a non-empty .spec.os.name
+  // +optional
+  optional string stopSignal = 3;
 }
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle
 // hook. One and only one of the fields, except TCPSocket must be specified.
 message LifecycleHandler {
-  // Exec specifies the action to take.
+  // Exec specifies a command to execute in the container.
   // +optional
   optional ExecAction exec = 1;
 
-  // HTTPGet specifies the http request to perform.
+  // HTTPGet specifies an HTTP GET request to perform.
   // +optional
   optional HTTPGetAction httpGet = 2;
 
   // Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
-  // for the backward compatibility. There are no validation of this field and
-  // lifecycle hooks will fail in runtime when tcp handler is specified.
+  // for backward compatibility. There is no validation of this field and
+  // lifecycle hooks will fail at runtime when it is specified.
   // +optional
   optional TCPSocketAction tcpSocket = 3;
 
-  // Sleep represents the duration that the container should sleep before being terminated.
-  // +featureGate=PodLifecycleSleepAction
+  // Sleep represents a duration that the container should sleep.
   // +optional
   optional SleepAction sleep = 4;
 }
@@ -2316,13 +2481,23 @@ message LoadBalancerStatus {
 
 // LocalObjectReference contains enough information to let you locate the
 // referenced object inside the same namespace.
+// ---
+// New uses of this type are discouraged because of difficulty describing its usage when embedded in APIs.
+//  1. Invalid usage help.  It is impossible to add specific help for individual usage.  In most embedded usages, there are particular
+//     restrictions like, "must refer only to types A and B" or "UID not honored" or "name must be restricted".
+//     Those cannot be well described when embedded.
+//  2. Inconsistent validation.  Because the usages are different, the validation rules are different by usage, which makes it hard for users to predict what will happen.
+//  3. We cannot easily change it.  Because this type is embedded in many locations, updates to this type
+//     will affect numerous schemas.  Don't make new APIs embed an underspecified API type they do not control.
+//
+// Instead of using this type, create a locally provided and used type that is well-focused on your reference.
+// For example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .
 // +structType=atomic
 message LocalObjectReference {
   // Name of the referent.
   // This field is effectively required, but due to backwards compatibility is
   // allowed to be empty. Instances of this type with an empty value here are
   // almost certainly wrong.
-  // TODO: Add other useful fields. apiVersion, kind, uid?
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
   // +optional
   // +default=""
@@ -2331,7 +2506,7 @@ message LocalObjectReference {
   optional string name = 1;
 }
 
-// Local represents directly-attached storage with node affinity (Beta feature)
+// Local represents directly-attached storage with node affinity
 message LocalVolumeSource {
   // path of the full path to the volume on the node.
   // It can be either a directory or block device (disk, partition, ...).
@@ -2408,12 +2583,15 @@ message NamespaceCondition {
   // Status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
+  // Last time the condition transitioned from one status to another.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
+  // Unique, one-word, CamelCase reason for the condition's last transition.
   // +optional
   optional string reason = 5;
 
+  // Human-readable message indicating details about last transition.
   // +optional
   optional string message = 6;
 }
@@ -2598,6 +2776,15 @@ message NodeDaemonEndpoints {
   optional DaemonEndpoint kubeletEndpoint = 1;
 }
 
+// NodeFeatures describes the set of features implemented by the CRI implementation.
+// The features contained in the NodeFeatures should depend only on the cri implementation
+// independent of runtime handlers.
+message NodeFeatures {
+  // SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
+  // +optional
+  optional bool supplementalGroupsPolicy = 1;
+}
+
 // NodeList is the whole list of all Nodes which have been registered with master.
 message NodeList {
   // Standard list metadata.
@@ -2628,12 +2815,16 @@ message NodeRuntimeHandler {
   optional NodeRuntimeHandlerFeatures features = 2;
 }
 
-// NodeRuntimeHandlerFeatures is a set of runtime features.
+// NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 message NodeRuntimeHandlerFeatures {
   // RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
-  // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional bool recursiveReadOnlyMounts = 1;
+
+  // UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
+  // +featureGate=UserNamespacesSupport
+  // +optional
+  optional bool userNamespaces = 2;
 }
 
 // A node selector represents the union of the results of one or more label queries
@@ -2739,7 +2930,7 @@ message NodeStatus {
   optional string phase = 3;
 
   // Conditions is an array of current observed node conditions.
-  // More info: https://kubernetes.io/docs/concepts/nodes/node/#condition
+  // More info: https://kubernetes.io/docs/reference/node/node-status/#condition
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
@@ -2749,7 +2940,7 @@ message NodeStatus {
 
   // List of addresses reachable to the node.
   // Queried from cloud provider, if available.
-  // More info: https://kubernetes.io/docs/concepts/nodes/node/#addresses
+  // More info: https://kubernetes.io/docs/reference/node/node-status/#addresses
   // Note: This field is declared as mergeable, but the merge key is not sufficiently
   // unique, which can cause data corruption when it is merged. Callers should instead
   // use a full-replacement patch. See https://pr.k8s.io/79391 for an example.
@@ -2769,7 +2960,7 @@ message NodeStatus {
   optional NodeDaemonEndpoints daemonEndpoints = 6;
 
   // Set of ids/uuids to uniquely identify the node.
-  // More info: https://kubernetes.io/docs/concepts/nodes/node/#info
+  // More info: https://kubernetes.io/docs/reference/node/node-status/#info
   // +optional
   optional NodeSystemInfo nodeInfo = 7;
 
@@ -2793,10 +2984,28 @@ message NodeStatus {
   optional NodeConfigStatus config = 11;
 
   // The available runtime handlers.
-  // +featureGate=RecursiveReadOnlyMounts
+  // +featureGate=UserNamespacesSupport
   // +optional
   // +listType=atomic
   repeated NodeRuntimeHandler runtimeHandlers = 12;
+
+  // Features describes the set of features implemented by the CRI implementation.
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional NodeFeatures features = 13;
+
+  // DeclaredFeatures represents the features related to feature gates that are declared by the node.
+  // +featureGate=NodeDeclaredFeatures
+  // +optional
+  // +listType=atomic
+  repeated string declaredFeatures = 14;
+}
+
+// NodeSwapStatus represents swap memory information.
+message NodeSwapStatus {
+  // Total amount of swap memory in bytes.
+  // +optional
+  optional int64 capacity = 1;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -2834,6 +3043,9 @@ message NodeSystemInfo {
 
   // The Architecture reported by the node
   optional string architecture = 10;
+
+  // Swap Info reported by the node.
+  optional NodeSwapStatus swap = 11;
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -2951,8 +3163,13 @@ message PersistentVolumeClaim {
 
 // PersistentVolumeClaimCondition contains details about state of pvc
 message PersistentVolumeClaimCondition {
+  // Type is the type of the condition.
+  // More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about
   optional string type = 1;
 
+  // Status is the status of the condition.
+  // Can be True, False, Unknown.
+  // More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required
   optional string status = 2;
 
   // lastProbeTime is the time we probed the condition.
@@ -3000,7 +3217,7 @@ message PersistentVolumeClaimSpec {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 4;
 
   // resources represents the minimum resources the volume should have.
-  // If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
+  // Users are allowed to specify resource requirements
   // that are lower than previous value but must still be higher than capacity recorded in the
   // status field of the claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
@@ -3061,15 +3278,13 @@ message PersistentVolumeClaimSpec {
   // volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
   // If specified, the CSI driver will create or update the volume with the attributes defined
   // in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,
-  // it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass
-  // will be applied to the claim but it's not allowed to reset this field to empty string once it is set.
-  // If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass
-  // will be set by the persistentvolume controller if it exists.
+  // it can be changed after the claim is created. An empty string or nil value indicates that no
+  // VolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state,
+  // this field can be reset to its previous value (including nil) to cancel the modification.
   // If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
   // set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
   // exists.
   // More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
-  // (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
   // +featureGate=VolumeAttributesClass
   // +optional
   optional string volumeAttributesClassName = 9;
@@ -3120,9 +3335,6 @@ message PersistentVolumeClaimStatus {
   // should ignore the update for the purpose it was designed. For example - a controller that
   // only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
   // resources associated with PVC.
-  //
-  // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
-  // +featureGate=RecoverVolumeExpansionFailure
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 5;
 
@@ -3159,23 +3371,18 @@ message PersistentVolumeClaimStatus {
   // should ignore the update for the purpose it was designed. For example - a controller that
   // only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
   // resources associated with PVC.
-  //
-  // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
-  // +featureGate=RecoverVolumeExpansionFailure
   // +mapType=granular
   // +optional
   map<string, string> allocatedResourceStatuses = 7;
 
   // currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
   // When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
-  // This is an alpha field and requires enabling VolumeAttributesClass feature.
   // +featureGate=VolumeAttributesClass
   // +optional
   optional string currentVolumeAttributesClassName = 8;
 
   // ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
   // When this is unset, there is no ModifyVolume operation being attempted.
-  // This is an alpha field and requires enabling VolumeAttributesClass feature.
   // +featureGate=VolumeAttributesClass
   // +optional
   optional ModifyVolumeStatus modifyVolumeStatus = 9;
@@ -3230,12 +3437,16 @@ message PersistentVolumeList {
 message PersistentVolumeSource {
   // gcePersistentDisk represents a GCE Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod. Provisioned by an admin.
+  // Deprecated: GCEPersistentDisk is deprecated. All operations for the in-tree
+  // gcePersistentDisk type are redirected to the pd.csi.storage.gke.io CSI driver.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
   // +optional
   optional GCEPersistentDiskVolumeSource gcePersistentDisk = 1;
 
   // awsElasticBlockStore represents an AWS Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod.
+  // Deprecated: AWSElasticBlockStore is deprecated. All operations for the in-tree
+  // awsElasticBlockStore type are redirected to the ebs.csi.aws.com CSI driver.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
   // +optional
   optional AWSElasticBlockStoreVolumeSource awsElasticBlockStore = 2;
@@ -3250,6 +3461,7 @@ message PersistentVolumeSource {
 
   // glusterfs represents a Glusterfs volume that is attached to a host and
   // exposed to the pod. Provisioned by an admin.
+  // Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md
   // +optional
   optional GlusterfsPersistentVolumeSource glusterfs = 4;
@@ -3260,6 +3472,7 @@ message PersistentVolumeSource {
   optional NFSVolumeSource nfs = 5;
 
   // rbd represents a Rados Block Device mount on the host that shares a pod's lifetime.
+  // Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.
   // More info: https://examples.k8s.io/volumes/rbd/README.md
   // +optional
   optional RBDPersistentVolumeSource rbd = 6;
@@ -3270,11 +3483,14 @@ message PersistentVolumeSource {
   optional ISCSIPersistentVolumeSource iscsi = 7;
 
   // cinder represents a cinder volume attached and mounted on kubelets host machine.
+  // Deprecated: Cinder is deprecated. All operations for the in-tree cinder type
+  // are redirected to the cinder.csi.openstack.org CSI driver.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional CinderPersistentVolumeSource cinder = 8;
 
-  // cephFS represents a Ceph FS mount on the host that shares a pod's lifetime
+  // cephFS represents a Ceph FS mount on the host that shares a pod's lifetime.
+  // Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported.
   // +optional
   optional CephFSPersistentVolumeSource cephfs = 9;
 
@@ -3282,39 +3498,52 @@ message PersistentVolumeSource {
   // +optional
   optional FCVolumeSource fc = 10;
 
-  // flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running
+  // flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running.
+  // Deprecated: Flocker is deprecated and the in-tree flocker type is no longer supported.
   // +optional
   optional FlockerVolumeSource flocker = 11;
 
   // flexVolume represents a generic volume resource that is
   // provisioned/attached using an exec based plugin.
+  // Deprecated: FlexVolume is deprecated. Consider using a CSIDriver instead.
   // +optional
   optional FlexPersistentVolumeSource flexVolume = 12;
 
   // azureFile represents an Azure File Service mount on the host and bind mount to the pod.
+  // Deprecated: AzureFile is deprecated. All operations for the in-tree azureFile type
+  // are redirected to the file.csi.azure.com CSI driver.
   // +optional
   optional AzureFilePersistentVolumeSource azureFile = 13;
 
-  // vsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+  // vsphereVolume represents a vSphere volume attached and mounted on kubelets host machine.
+  // Deprecated: VsphereVolume is deprecated. All operations for the in-tree vsphereVolume type
+  // are redirected to the csi.vsphere.vmware.com CSI driver.
   // +optional
   optional VsphereVirtualDiskVolumeSource vsphereVolume = 14;
 
-  // quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+  // quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
+  // Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
   // +optional
   optional QuobyteVolumeSource quobyte = 15;
 
   // azureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+  // Deprecated: AzureDisk is deprecated. All operations for the in-tree azureDisk type
+  // are redirected to the disk.csi.azure.com CSI driver.
   // +optional
   optional AzureDiskVolumeSource azureDisk = 16;
 
-  // photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+  // photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
+  // Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 17;
 
-  // portworxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
+  // Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
+  // are redirected to the pxd.portworx.com CSI driver.
   // +optional
   optional PortworxVolumeSource portworxVolume = 18;
 
   // scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+  // Deprecated: ScaleIO is deprecated and the in-tree scaleIO type is no longer supported.
   // +optional
   optional ScaleIOPersistentVolumeSource scaleIO = 19;
 
@@ -3322,12 +3551,13 @@ message PersistentVolumeSource {
   // +optional
   optional LocalVolumeSource local = 20;
 
-  // storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+  // storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod.
+  // Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported.
   // More info: https://examples.k8s.io/volumes/storageos/README.md
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
 
-  // csi represents storage that is handled by an external CSI driver (Beta feature).
+  // csi represents storage that is handled by an external CSI driver.
   // +optional
   optional CSIPersistentVolumeSource csi = 22;
 }
@@ -3383,6 +3613,7 @@ message PersistentVolumeSpec {
 
   // nodeAffinity defines constraints that limit what nodes this volume can be accessed from.
   // This field influences the scheduling of pods that use this volume.
+  // This field is mutable if MutablePVNodeAffinity feature gate is enabled.
   // +optional
   optional VolumeNodeAffinity nodeAffinity = 9;
 
@@ -3392,7 +3623,6 @@ message PersistentVolumeSpec {
   // after a volume has been updated successfully to a new class.
   // For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
   // PersistentVolumeClaims during the binding process.
-  // This is an alpha field and requires enabling VolumeAttributesClass feature.
   // +featureGate=VolumeAttributesClass
   // +optional
   optional string volumeAttributesClassName = 10;
@@ -3523,7 +3753,6 @@ message PodAffinityTerm {
   // pod labels will be ignored. The default value is empty.
   // The same key is forbidden to exist in both matchLabelKeys and labelSelector.
   // Also, matchLabelKeys cannot be set when labelSelector isn't set.
-  // This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
   //
   // +listType=atomic
   // +optional
@@ -3537,7 +3766,6 @@ message PodAffinityTerm {
   // pod labels will be ignored. The default value is empty.
   // The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
   // Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-  // This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
   //
   // +listType=atomic
   // +optional
@@ -3563,8 +3791,8 @@ message PodAntiAffinity {
   // most preferred is the one with the greatest sum of weights, i.e.
   // for each node that meets all of the scheduling requirements (resource
   // request, requiredDuringScheduling anti-affinity expressions, etc.),
-  // compute a sum by iterating through the elements of this field and adding
-  // "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+  // compute a sum by iterating through the elements of this field and subtracting
+  // "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
   // node(s) with the highest sum are the most preferred.
   // +optional
   // +listType=atomic
@@ -3604,11 +3832,105 @@ message PodAttachOptions {
   optional string container = 5;
 }
 
+// PodCertificateProjection provides a private key and X.509 certificate in the
+// pod filesystem.
+message PodCertificateProjection {
+  // Kubelet's generated CSRs will be addressed to this signer.
+  //
+  // +required
+  optional string signerName = 1;
+
+  // The type of keypair Kubelet will generate for the pod.
+  //
+  // Valid values are "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384",
+  // "ECDSAP521", and "ED25519".
+  //
+  // +required
+  optional string keyType = 2;
+
+  // maxExpirationSeconds is the maximum lifetime permitted for the
+  // certificate.
+  //
+  // Kubelet copies this value verbatim into the PodCertificateRequests it
+  // generates for this projection.
+  //
+  // If omitted, kube-apiserver will set it to 86400(24 hours). kube-apiserver
+  // will reject values shorter than 3600 (1 hour).  The maximum allowable
+  // value is 7862400 (91 days).
+  //
+  // The signer implementation is then free to issue a certificate with any
+  // lifetime *shorter* than MaxExpirationSeconds, but no shorter than 3600
+  // seconds (1 hour).  This constraint is enforced by kube-apiserver.
+  // `kubernetes.io` signers will never issue certificates with a lifetime
+  // longer than 24 hours.
+  //
+  // +optional
+  optional int32 maxExpirationSeconds = 3;
+
+  // Write the credential bundle at this path in the projected volume.
+  //
+  // The credential bundle is a single file that contains multiple PEM blocks.
+  // The first PEM block is a PRIVATE KEY block, containing a PKCS#8 private
+  // key.
+  //
+  // The remaining blocks are CERTIFICATE blocks, containing the issued
+  // certificate chain from the signer (leaf and any intermediates).
+  //
+  // Using credentialBundlePath lets your Pod's application code make a single
+  // atomic read that retrieves a consistent key and certificate chain.  If you
+  // project them to separate files, your application code will need to
+  // additionally check that the leaf certificate was issued to the key.
+  //
+  // +optional
+  optional string credentialBundlePath = 4;
+
+  // Write the key at this path in the projected volume.
+  //
+  // Most applications should use credentialBundlePath.  When using keyPath
+  // and certificateChainPath, your application needs to check that the key
+  // and leaf certificate are consistent, because it is possible to read the
+  // files mid-rotation.
+  //
+  // +optional
+  optional string keyPath = 5;
+
+  // Write the certificate chain at this path in the projected volume.
+  //
+  // Most applications should use credentialBundlePath.  When using keyPath
+  // and certificateChainPath, your application needs to check that the key
+  // and leaf certificate are consistent, because it is possible to read the
+  // files mid-rotation.
+  //
+  // +optional
+  optional string certificateChainPath = 6;
+
+  // userAnnotations allow pod authors to pass additional information to
+  // the signer implementation.  Kubernetes does not restrict or validate this
+  // metadata in any way.
+  //
+  // These values are copied verbatim into the `spec.unverifiedUserAnnotations` field of
+  // the PodCertificateRequest objects that Kubelet creates.
+  //
+  // Entries are subject to the same validation as object metadata annotations,
+  // with the addition that all keys must be domain-prefixed. No restrictions
+  // are placed on values, except an overall size limitation on the entire field.
+  //
+  // Signers should document the keys and values they support. Signers should
+  // deny requests that contain keys they do not recognize.
+  map<string, string> userAnnotations = 7;
+}
+
 // PodCondition contains details for the current condition of this pod.
 message PodCondition {
   // Type is the type of the condition.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
   optional string type = 1;
+
+  // If set, this represents the .metadata.generation that the pod condition was set based upon.
+  // The PodObservedGenerationTracking feature gate must be enabled to use this field.
+  // +featureGate=PodObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 7;
 
   // Status is the status of the condition.
   // Can be True, False, Unknown.
@@ -3660,9 +3982,11 @@ message PodDNSConfig {
 
 // PodDNSConfigOption defines DNS resolver options of a pod.
 message PodDNSConfigOption {
+  // Name is this DNS resolver option's name.
   // Required.
   optional string name = 1;
 
+  // Value is this DNS resolver option's value.
   // +optional
   optional string value = 2;
 }
@@ -3698,6 +4022,20 @@ message PodExecOptions {
   // Command is the remote command to execute. argv array. Not executed within a shell.
   // +listType=atomic
   repeated string command = 6;
+}
+
+// PodExtendedResourceClaimStatus is stored in the PodStatus for the extended
+// resource requests backed by DRA. It stores the generated name for
+// the corresponding special ResourceClaim created by the scheduler.
+message PodExtendedResourceClaimStatus {
+  // RequestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request
+  // in the generated ResourceClaim.
+  // +listType=atomic
+  repeated ContainerExtendedResourceRequest requestMappings = 1;
+
+  // ResourceClaimName is the name of the ResourceClaim that was
+  // generated for the Pod in the namespace of the Pod.
+  optional string resourceClaimName = 2;
 }
 
 // PodIP represents a single IP address allocated to the pod.
@@ -3753,7 +4091,8 @@ message PodLogOptions {
   optional bool timestamps = 6;
 
   // If set, the number of lines from the end of the logs to show. If not specified,
-  // logs are shown from the creation of the container or sinceSeconds or sinceTime
+  // logs are shown from the creation of the container or sinceSeconds or sinceTime.
+  // Note that when "TailLines" is specified, "Stream" can only be set to nil or "All".
   // +optional
   optional int64 tailLines = 7;
 
@@ -3771,6 +4110,14 @@ message PodLogOptions {
   // the actual log data coming from the real kubelet).
   // +optional
   optional bool insecureSkipTLSVerifyBackend = 9;
+
+  // Specify which container log stream to return to the client.
+  // Acceptable values are "All", "Stdout" and "Stderr". If not specified, "All" is used, and both stdout and stderr
+  // are returned interleaved.
+  // Note that when "TailLines" is specified, "Stream" can only be set to nil or "All".
+  // +featureGate=PodLogsQuerySplitStreams
+  // +optional
+  optional string stream = 10;
 }
 
 // PodOS defines the OS parameters of a pod.
@@ -3979,6 +4326,33 @@ message PodSecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional AppArmorProfile appArmorProfile = 11;
+
+  // seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.
+  // It has no effect on nodes that do not support SELinux or to volumes does not support SELinux.
+  // Valid values are "MountOption" and "Recursive".
+  //
+  // "Recursive" means relabeling of all files on all Pod volumes by the container runtime.
+  // This may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.
+  //
+  // "MountOption" mounts all eligible Pod volumes with `-o context` mount option.
+  // This requires all Pods that share the same volume to use the same SELinux label.
+  // It is not possible to share the same volume among privileged and unprivileged Pods.
+  // Eligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes
+  // whose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their
+  // CSIDriver instance. Other volumes are always re-labelled recursively.
+  // "MountOption" value is allowed only when SELinuxMount feature gate is enabled.
+  //
+  // If not specified and SELinuxMount feature gate is enabled, "MountOption" is used.
+  // If not specified and SELinuxMount feature gate is disabled, "MountOption" is used for ReadWriteOncePod volumes
+  // and "Recursive" for all other volumes.
+  //
+  // This field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.
+  //
+  // All Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +featureGate=SELinuxChangePolicy
+  // +optional
+  optional string seLinuxChangePolicy = 13;
 }
 
 // Describes the class of pods that should avoid this node.
@@ -4008,7 +4382,7 @@ message PodSpec {
   // Init containers may not have Lifecycle actions, Readiness probes, Liveness probes, or Startup probes.
   // The resourceRequirements of an init container are taken into account during scheduling
   // by finding the highest request/limit for each resource type, and then using the max of
-  // of that value or the sum of the normal containers. Limits are applied to init containers
+  // that value or the sum of the normal containers. Limits are applied to init containers
   // in a similar fashion.
   // Init containers cannot currently be added or removed.
   // Cannot be updated.
@@ -4104,7 +4478,9 @@ message PodSpec {
   optional string nodeName = 10;
 
   // Host networking requested for this pod. Use the host's network namespace.
-  // If this option is set, the ports that will be used must be specified.
+  // When using HostNetwork you should specify ports so the scheduler is aware.
+  // When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
+  // and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
   // Default to false.
   // +k8s:conversion-gen=false
   // +optional
@@ -4269,6 +4645,7 @@ message PodSpec {
   // - spec.hostPID
   // - spec.hostIPC
   // - spec.hostUsers
+  // - spec.resources
   // - spec.securityContext.appArmorProfile
   // - spec.securityContext.seLinuxOptions
   // - spec.securityContext.seccompProfile
@@ -4324,8 +4701,8 @@ message PodSpec {
   // will be made available to those containers which consume them
   // by name.
   //
-  // This is an alpha field and requires enabling the
-  // DynamicResourceAllocation feature gate.
+  // This is a stable field but requires that the
+  // DynamicResourceAllocation feature gate is enabled.
   //
   // This field is immutable.
   //
@@ -4336,12 +4713,60 @@ message PodSpec {
   // +featureGate=DynamicResourceAllocation
   // +optional
   repeated PodResourceClaim resourceClaims = 39;
+
+  // Resources is the total amount of CPU and Memory resources required by all
+  // containers in the pod. It supports specifying Requests and Limits for
+  // "cpu", "memory" and "hugepages-" resource names only. ResourceClaims are not supported.
+  //
+  // This field enables fine-grained control over resource allocation for the
+  // entire pod, allowing resource sharing among containers in a pod.
+  // TODO: For beta graduation, expand this comment with a detailed explanation.
+  //
+  // This is an alpha field and requires enabling the PodLevelResources feature
+  // gate.
+  //
+  // +featureGate=PodLevelResources
+  // +optional
+  optional ResourceRequirements resources = 40;
+
+  // HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod.
+  // This field only specifies the pod's hostname and does not affect its DNS records.
+  // When this field is set to a non-empty string:
+  // - It takes precedence over the values set in `hostname` and `subdomain`.
+  // - The Pod's hostname will be set to this value.
+  // - `setHostnameAsFQDN` must be nil or set to false.
+  // - `hostNetwork` must be set to false.
+  //
+  // This field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.
+  // Requires the HostnameOverride feature gate to be enabled.
+  //
+  // +featureGate=HostnameOverride
+  // +optional
+  optional string hostnameOverride = 41;
+
+  // WorkloadRef provides a reference to the Workload object that this Pod belongs to.
+  // This field is used by the scheduler to identify the PodGroup and apply the
+  // correct group scheduling policies. The Workload object referenced
+  // by this field may not exist at the time the Pod is created.
+  // This field is immutable, but a Workload object with the same name
+  // may be recreated with different policies. Doing this during pod scheduling
+  // may result in the placement not conforming to the expected policies.
+  //
+  // +featureGate=GenericWorkload
+  // +optional
+  optional WorkloadReference workloadRef = 42;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system, especially if the node that hosts the pod cannot contact the control
 // plane.
 message PodStatus {
+  // If set, this represents the .metadata.generation that the pod status was set based upon.
+  // The PodObservedGenerationTracking feature gate must be enabled to use this field.
+  // +featureGate=PodObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 17;
+
   // The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.
   // The conditions array, the reason and message fields, and the individual container status
   // arrays contain more detail about the pod's status.
@@ -4427,14 +4852,26 @@ message PodStatus {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 7;
 
-  // The list has one entry per init container in the manifest. The most recent successful
+  // Statuses of init containers in this pod. The most recent successful non-restartable
   // init container will have ready = true, the most recently started container will have
   // startTime set.
-  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
+  // Each init container in the pod should have at most one status in this list,
+  // and all statuses should be for containers in the pod.
+  // However this is not enforced.
+  // If a status for a non-existent container is present in the list, or the list has duplicate names,
+  // the behavior of various Kubernetes components is not defined and those statuses might be
+  // ignored.
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
   // +listType=atomic
   repeated ContainerStatus initContainerStatuses = 10;
 
-  // The list has one entry per container in the manifest.
+  // Statuses of containers in this pod.
+  // Each container in the pod should have at most one status in this list,
+  // and all statuses should be for containers in the pod.
+  // However this is not enforced.
+  // If a status for a non-existent container is present in the list, or the list has duplicate names,
+  // the behavior of various Kubernetes components is not defined and those statuses might be
+  // ignored.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
   // +optional
   // +listType=atomic
@@ -4446,7 +4883,14 @@ message PodStatus {
   // +optional
   optional string qosClass = 9;
 
-  // Status for any ephemeral containers that have run in this pod.
+  // Statuses for any ephemeral containers that have run in this pod.
+  // Each ephemeral container in the pod should have at most one status in this list,
+  // and all statuses should be for containers in the pod.
+  // However this is not enforced.
+  // If a status for a non-existent container is present in the list, or the list has duplicate names,
+  // the behavior of various Kubernetes components is not defined and those statuses might be
+  // ignored.
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
   // +optional
   // +listType=atomic
   repeated ContainerStatus ephemeralContainerStatuses = 13;
@@ -4454,6 +4898,9 @@ message PodStatus {
   // Status of resources resize desired for pod's containers.
   // It is empty if no resources resize is pending.
   // Any changes to container resources will automatically set this to "Proposed"
+  // Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
+  // PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
+  // PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional string resize = 14;
@@ -4466,6 +4913,25 @@ message PodStatus {
   // +featureGate=DynamicResourceAllocation
   // +optional
   repeated PodResourceClaimStatus resourceClaimStatuses = 15;
+
+  // Status of extended resource claim backed by DRA.
+  // +featureGate=DRAExtendedResource
+  // +optional
+  optional PodExtendedResourceClaimStatus extendedResourceClaimStatus = 18;
+
+  // AllocatedResources is the total requests allocated for this pod by the node.
+  // If pod-level requests are not set, this will be the total requests aggregated
+  // across containers in the pod.
+  // +featureGate=InPlacePodLevelResourcesVerticalScaling
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 19;
+
+  // Resources represents the compute resource requests and limits that have been
+  // applied at the pod level if pod-level requests or limits are set in
+  // PodSpec.Resources
+  // +featureGate=InPlacePodLevelResourcesVerticalScaling
+  // +optional
+  optional ResourceRequirements resources = 20;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
@@ -4521,6 +4987,7 @@ message PodTemplateSpec {
   optional PodSpec spec = 2;
 }
 
+// PortStatus represents the error condition of a service port
 message PortStatus {
   // Port is the port number of the service port of which status is recorded here
   optional int32 port = 1;
@@ -4645,26 +5112,27 @@ message Probe {
 // ProbeHandler defines a specific action that should be taken in a probe.
 // One and only one of the fields must be specified.
 message ProbeHandler {
-  // Exec specifies the action to take.
+  // Exec specifies a command to execute in the container.
   // +optional
   optional ExecAction exec = 1;
 
-  // HTTPGet specifies the http request to perform.
+  // HTTPGet specifies an HTTP GET request to perform.
   // +optional
   optional HTTPGetAction httpGet = 2;
 
-  // TCPSocket specifies an action involving a TCP port.
+  // TCPSocket specifies a connection to a TCP port.
   // +optional
   optional TCPSocketAction tcpSocket = 3;
 
-  // GRPC specifies an action involving a GRPC port.
+  // GRPC specifies a GRPC HealthCheckRequest.
   // +optional
   optional GRPCAction grpc = 4;
 }
 
 // Represents a projected volume source
 message ProjectedVolumeSource {
-  // sources is the list of volume projections
+  // sources is the list of volume projections. Each entry in this list
+  // handles one source.
   // +optional
   // +listType=atomic
   repeated VolumeProjection sources = 1;
@@ -4841,6 +5309,8 @@ message ReplicationController {
   // be the same as the Pod(s) that the replication controller manages.
   // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:subfield(name)=+k8s:optional
+  // +k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the replication controller.
@@ -4897,12 +5367,18 @@ message ReplicationControllerSpec {
   // Defaults to 1.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
   // +optional
+  // +k8s:optional
+  // +default=1
+  // +k8s:minimum=0
   optional int32 replicas = 1;
 
   // Minimum number of seconds for which a newly created pod should be ready
   // without any of its container crashing, for it to be considered available.
   // Defaults to 0 (pod will be considered available as soon as it is ready)
   // +optional
+  // +k8s:optional
+  // +default=0
+  // +k8s:minimum=0
   optional int32 minReadySeconds = 4;
 
   // Selector is a label query over pods that should match the Replicas count.
@@ -4960,6 +5436,13 @@ message ResourceClaim {
   // the Pod where this field is used. It makes that resource available
   // inside a container.
   optional string name = 1;
+
+  // Request is the name chosen for a request in the referenced claim.
+  // If empty, everything from the claim is made available, otherwise
+  // only the result of this request.
+  //
+  // +optional
+  optional string request = 2;
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format
@@ -4975,6 +5458,25 @@ message ResourceFieldSelector {
   // Specifies the output format of the exposed resources, defaults to "1"
   // +optional
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity divisor = 3;
+}
+
+// ResourceHealth represents the health of a resource. It has the latest device health information.
+// This is a part of KEP https://kep.k8s.io/4680.
+message ResourceHealth {
+  // ResourceID is the unique identifier of the resource. See the ResourceID type for more information.
+  optional string resourceID = 1;
+
+  // Health of the resource.
+  // can be one of:
+  //  - Healthy: operates as normal
+  //  - Unhealthy: reported unhealthy. We consider this a temporary health issue
+  //               since we do not have a mechanism today to distinguish
+  //               temporary and permanent issues.
+  //  - Unknown: The status cannot be determined.
+  //             For example, Device Plugin got unregistered and hasn't been re-registered since.
+  //
+  // In future we may want to introduce the PermanentlyUnhealthy Status.
+  optional string health = 2;
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -5056,7 +5558,7 @@ message ResourceRequirements {
   // Claims lists the names of resources, defined in spec.resourceClaims,
   // that are used by this container.
   //
-  // This is an alpha field and requires enabling the
+  // This field depends on the
   // DynamicResourceAllocation feature gate.
   //
   // This field is immutable. It can only be set for containers.
@@ -5066,6 +5568,23 @@ message ResourceRequirements {
   // +featureGate=DynamicResourceAllocation
   // +optional
   repeated ResourceClaim claims = 3;
+}
+
+// ResourceStatus represents the status of a single resource allocated to a Pod.
+message ResourceStatus {
+  // Name of the resource. Must be unique within the pod and in case of non-DRA resource, match one of the resources from the pod spec.
+  // For DRA resources, the value must be "claim:<claim_name>/<request>".
+  // When this status is reported about a container, the "claim_name" and "request" must match one of the claims of this container.
+  // +required
+  optional string name = 1;
+
+  // List of unique resources health. Each element in the list contains an unique resource ID and its health.
+  // At a minimum, for the lifetime of a Pod, resource ID must uniquely identify the resource allocated to the Pod on the Node.
+  // If other Pod on the same Node reports the status with the same resource ID, it must be the same resource they share.
+  // See ResourceID type definition for a specific format it has in various use cases.
+  // +listType=map
+  // +listMapKey=resourceID
+  repeated ResourceHealth resources = 2;
 }
 
 // SELinuxOptions are the labels to be applied to the container
@@ -5458,7 +5977,7 @@ message SecurityContext {
   optional bool allowPrivilegeEscalation = 7;
 
   // procMount denotes the type of proc mount to use for the containers.
-  // The default is DefaultProcMount which uses the container runtime defaults for
+  // The default value is Default which uses the container runtime defaults for
   // readonly paths and masked paths.
   // This requires the ProcMountType feature flag to be enabled.
   // Note that this field cannot be set when spec.os.name is windows.
@@ -5520,6 +6039,8 @@ message ServiceAccount {
 
   // Secrets is a list of the secrets in the same namespace that pods running using this ServiceAccount are allowed to use.
   // Pods are only limited to this list if this service account has a "kubernetes.io/enforce-mountable-secrets" annotation set to "true".
+  // The "kubernetes.io/enforce-mountable-secrets" annotation is deprecated since v1.32.
+  // Prefer separate namespaces to isolate access to mounted secrets.
   // This field should not be used to find auto-generated service account token secrets for use outside of pods.
   // Instead, tokens can be requested directly using the TokenRequest API, or service account token secrets can be manually created.
   // More info: https://kubernetes.io/docs/concepts/configuration/secret
@@ -5899,14 +6420,12 @@ message ServiceSpec {
   // +optional
   optional string internalTrafficPolicy = 22;
 
-  // TrafficDistribution offers a way to express preferences for how traffic is
-  // distributed to Service endpoints. Implementations can use this field as a
-  // hint, but are not required to guarantee strict adherence. If the field is
-  // not set, the implementation will apply its default routing strategy. If set
-  // to "PreferClose", implementations should prioritize endpoints that are
-  // topologically close (e.g., same zone).
-  // This is an alpha field and requires enabling ServiceTrafficDistribution feature.
-  // +featureGate=ServiceTrafficDistribution
+  // TrafficDistribution offers a way to express preferences for how traffic
+  // is distributed to Service endpoints. Implementations can use this field
+  // as a hint, but are not required to guarantee strict adherence. If the
+  // field is not set, the implementation will apply its default routing
+  // strategy. If set to "PreferClose", implementations should prioritize
+  // endpoints that are in the same zone.
   // +optional
   optional string trafficDistribution = 23;
 }
@@ -6041,7 +6560,6 @@ message Taint {
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
-  // It is only written for NoExecute taints.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
 }
@@ -6055,9 +6573,10 @@ message Toleration {
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.
-  // Valid operators are Exists and Equal. Defaults to Equal.
+  // Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
   // Exists is equivalent to wildcard for value, so that a pod can
   // tolerate all taints of a particular category.
+  // Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
   // +optional
   optional string operator = 2;
 
@@ -6200,7 +6719,6 @@ message TopologySpreadConstraint {
   // - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
   //
   // If this value is nil, the behavior is equivalent to the Honor policy.
-  // This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
   // +optional
   optional string nodeAffinityPolicy = 6;
 
@@ -6211,7 +6729,6 @@ message TopologySpreadConstraint {
   // - Ignore: node taints are ignored. All nodes are included.
   //
   // If this value is nil, the behavior is equivalent to the Ignore policy.
-  // This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
   // +optional
   optional string nodeTaintsPolicy = 7;
 
@@ -6232,6 +6749,20 @@ message TopologySpreadConstraint {
 
 // TypedLocalObjectReference contains enough information to let you locate the
 // typed referenced object inside the same namespace.
+// ---
+// New uses of this type are discouraged because of difficulty describing its usage when embedded in APIs.
+//  1. Invalid usage help.  It is impossible to add specific help for individual usage.  In most embedded usages, there are particular
+//     restrictions like, "must refer only to types A and B" or "UID not honored" or "name must be restricted".
+//     Those cannot be well described when embedded.
+//  2. Inconsistent validation.  Because the usages are different, the validation rules are different by usage, which makes it hard for users to predict what will happen.
+//  3. The fields are both imprecise and overly precise.  Kind is not a precise mapping to a URL. This can produce ambiguity
+//     during interpretation and require a REST mapping.  In most cases, the dependency is on the group,resource tuple
+//     and the version of the actual struct is irrelevant.
+//  4. We cannot easily change it.  Because this type is embedded in many locations, updates to this type
+//     will affect numerous schemas.  Don't make new APIs embed an underspecified API type they do not control.
+//
+// Instead of using this type, create a locally provided and used type that is well-focused on your reference.
+// For example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .
 // +structType=atomic
 message TypedLocalObjectReference {
   // APIGroup is the group for the resource being referenced.
@@ -6247,6 +6778,7 @@ message TypedLocalObjectReference {
   optional string name = 3;
 }
 
+// TypedObjectReference contains enough information to let you locate the typed referenced object
 message TypedObjectReference {
   // APIGroup is the group for the resource being referenced.
   // If APIGroup is not specified, the specified Kind must be in the core API group.
@@ -6316,8 +6848,6 @@ message VolumeMount {
   // None (or be unspecified, which defaults to None).
   //
   // If this field is not specified, it is treated as an equivalent of Disabled.
-  //
-  // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional string recursiveReadOnly = 7;
 
@@ -6362,9 +6892,13 @@ message VolumeMountStatus {
   // RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
   // An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
   // depending on the mount result.
-  // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional string recursiveReadOnly = 4;
+
+  // volumeStatus represents volume-type-specific status about the mounted
+  // volume.
+  // +optional
+  optional VolumeStatus volumeStatus = 5;
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -6373,7 +6907,8 @@ message VolumeNodeAffinity {
   optional NodeSelector required = 1;
 }
 
-// Projection that may be projected along with other supported volume types
+// Projection that may be projected along with other supported volume types.
+// Exactly one of these fields must be set.
 message VolumeProjection {
   // secret information about the secret data to project
   // +optional
@@ -6408,6 +6943,45 @@ message VolumeProjection {
   // +featureGate=ClusterTrustBundleProjection
   // +optional
   optional ClusterTrustBundleProjection clusterTrustBundle = 5;
+
+  // Projects an auto-rotating credential bundle (private key and certificate
+  // chain) that the pod can use either as a TLS client or server.
+  //
+  // Kubelet generates a private key and uses it to send a
+  // PodCertificateRequest to the named signer.  Once the signer approves the
+  // request and issues a certificate chain, Kubelet writes the key and
+  // certificate chain to the pod filesystem.  The pod does not start until
+  // certificates have been issued for each podCertificate projected volume
+  // source in its spec.
+  //
+  // Kubelet will begin trying to rotate the certificate at the time indicated
+  // by the signer using the PodCertificateRequest.Status.BeginRefreshAt
+  // timestamp.
+  //
+  // Kubelet can write a single file, indicated by the credentialBundlePath
+  // field, or separate files, indicated by the keyPath and
+  // certificateChainPath fields.
+  //
+  // The credential bundle is a single file in PEM format.  The first PEM
+  // entry is the private key (in PKCS#8 format), and the remaining PEM
+  // entries are the certificate chain issued by the signer (typically,
+  // signers will return their certificate chain in leaf-to-root order).
+  //
+  // Prefer using the credential bundle format, since your application code
+  // can read it atomically.  If you use keyPath and certificateChainPath,
+  // your application must make two separate file reads. If these coincide
+  // with a certificate rotation, it is possible that the private key and leaf
+  // certificate you read may not correspond to each other.  Your application
+  // will need to check for this condition, and re-read until they are
+  // consistent.
+  //
+  // The named signer controls chooses the format of the certificate it
+  // issues; consult the signer implementation's documentation to learn how to
+  // use the certificates it issues.
+  //
+  // +featureGate=PodCertificateProjection
+  // +optional
+  optional PodCertificateProjection podCertificate = 6;
 }
 
 // VolumeResourceRequirements describes the storage resource requirements for a volume.
@@ -6446,18 +7020,22 @@ message VolumeSource {
 
   // gcePersistentDisk represents a GCE Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod.
+  // Deprecated: GCEPersistentDisk is deprecated. All operations for the in-tree
+  // gcePersistentDisk type are redirected to the pd.csi.storage.gke.io CSI driver.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
   // +optional
   optional GCEPersistentDiskVolumeSource gcePersistentDisk = 3;
 
   // awsElasticBlockStore represents an AWS Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod.
+  // Deprecated: AWSElasticBlockStore is deprecated. All operations for the in-tree
+  // awsElasticBlockStore type are redirected to the ebs.csi.aws.com CSI driver.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
   // +optional
   optional AWSElasticBlockStoreVolumeSource awsElasticBlockStore = 4;
 
   // gitRepo represents a git repository at a particular revision.
-  // DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+  // Deprecated: GitRepo is deprecated. To provision a container with a git repo, mount an
   // EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
   // into the Pod's container.
   // +optional
@@ -6475,12 +7053,12 @@ message VolumeSource {
 
   // iscsi represents an ISCSI Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod.
-  // More info: https://examples.k8s.io/volumes/iscsi/README.md
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes/#iscsi
   // +optional
   optional ISCSIVolumeSource iscsi = 8;
 
   // glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime.
-  // More info: https://examples.k8s.io/volumes/glusterfs/README.md
+  // Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.
   // +optional
   optional GlusterfsVolumeSource glusterfs = 9;
 
@@ -6491,25 +7069,30 @@ message VolumeSource {
   optional PersistentVolumeClaimVolumeSource persistentVolumeClaim = 10;
 
   // rbd represents a Rados Block Device mount on the host that shares a pod's lifetime.
-  // More info: https://examples.k8s.io/volumes/rbd/README.md
+  // Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.
   // +optional
   optional RBDVolumeSource rbd = 11;
 
   // flexVolume represents a generic volume resource that is
   // provisioned/attached using an exec based plugin.
+  // Deprecated: FlexVolume is deprecated. Consider using a CSIDriver instead.
   // +optional
   optional FlexVolumeSource flexVolume = 12;
 
   // cinder represents a cinder volume attached and mounted on kubelets host machine.
+  // Deprecated: Cinder is deprecated. All operations for the in-tree cinder type
+  // are redirected to the cinder.csi.openstack.org CSI driver.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional CinderVolumeSource cinder = 13;
 
-  // cephFS represents a Ceph FS mount on the host that shares a pod's lifetime
+  // cephFS represents a Ceph FS mount on the host that shares a pod's lifetime.
+  // Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported.
   // +optional
   optional CephFSVolumeSource cephfs = 14;
 
-  // flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running
+  // flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running.
+  // Deprecated: Flocker is deprecated and the in-tree flocker type is no longer supported.
   // +optional
   optional FlockerVolumeSource flocker = 15;
 
@@ -6522,6 +7105,8 @@ message VolumeSource {
   optional FCVolumeSource fc = 17;
 
   // azureFile represents an Azure File Service mount on the host and bind mount to the pod.
+  // Deprecated: AzureFile is deprecated. All operations for the in-tree azureFile type
+  // are redirected to the file.csi.azure.com CSI driver.
   // +optional
   optional AzureFileVolumeSource azureFile = 18;
 
@@ -6529,37 +7114,47 @@ message VolumeSource {
   // +optional
   optional ConfigMapVolumeSource configMap = 19;
 
-  // vsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+  // vsphereVolume represents a vSphere volume attached and mounted on kubelets host machine.
+  // Deprecated: VsphereVolume is deprecated. All operations for the in-tree vsphereVolume type
+  // are redirected to the csi.vsphere.vmware.com CSI driver.
   // +optional
   optional VsphereVirtualDiskVolumeSource vsphereVolume = 20;
 
-  // quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+  // quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
+  // Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
   // +optional
   optional QuobyteVolumeSource quobyte = 21;
 
   // azureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+  // Deprecated: AzureDisk is deprecated. All operations for the in-tree azureDisk type
+  // are redirected to the disk.csi.azure.com CSI driver.
   // +optional
   optional AzureDiskVolumeSource azureDisk = 22;
 
-  // photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+  // photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
+  // Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
 
   // projected items for all in one resources secrets, configmaps, and downward API
   optional ProjectedVolumeSource projected = 26;
 
-  // portworxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
+  // Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
+  // are redirected to the pxd.portworx.com CSI driver.
   // +optional
   optional PortworxVolumeSource portworxVolume = 24;
 
   // scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+  // Deprecated: ScaleIO is deprecated and the in-tree scaleIO type is no longer supported.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 25;
 
   // storageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
+  // Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported.
   // +optional
   optional StorageOSVolumeSource storageos = 27;
 
-  // csi (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers (Beta feature).
+  // csi (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers.
   // +optional
   optional CSIVolumeSource csi = 28;
 
@@ -6590,6 +7185,33 @@ message VolumeSource {
   //
   // +optional
   optional EphemeralVolumeSource ephemeral = 29;
+
+  // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+  // The volume is resolved at pod startup depending on which PullPolicy value is provided:
+  //
+  // - Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
+  // - Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
+  // - IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
+  //
+  // The volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation.
+  // A failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.
+  // The types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.
+  // The OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.
+  // The volume will be mounted read-only (ro) and non-executable files (noexec).
+  // Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.
+  // The field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.
+  // +featureGate=ImageVolume
+  // +optional
+  optional ImageVolumeSource image = 30;
+}
+
+// VolumeStatus represents the status of a mounted volume.
+// At most one of its members must be specified.
+message VolumeStatus {
+  // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+  // +featureGate=ImageVolumeWithDigest
+  // +optional
+  optional ImageVolumeStatus image = 1;
 }
 
 // Represents a vSphere volume resource.
@@ -6647,5 +7269,35 @@ message WindowsSecurityContextOptions {
   // In addition, if HostProcess is true then HostNetwork must also be set to true.
   // +optional
   optional bool hostProcess = 4;
+}
+
+// WorkloadReference identifies the Workload object and PodGroup membership
+// that a Pod belongs to. The scheduler uses this information to apply
+// workload-aware scheduling semantics.
+message WorkloadReference {
+  // Name defines the name of the Workload object this Pod belongs to.
+  // Workload must be in the same namespace as the Pod.
+  // If it doesn't match any existing Workload, the Pod will remain unschedulable
+  // until a Workload object is created and observed by the kube-scheduler.
+  // It must be a DNS subdomain.
+  //
+  // +required
+  optional string name = 1;
+
+  // PodGroup is the name of the PodGroup within the Workload that this Pod
+  // belongs to. If it doesn't match any existing PodGroup within the Workload,
+  // the Pod will remain unschedulable until the Workload object is recreated
+  // and observed by the kube-scheduler. It must be a DNS label.
+  //
+  // +required
+  optional string podGroup = 2;
+
+  // PodGroupReplicaKey specifies the replica key of the PodGroup to which this
+  // Pod belongs. It is used to distinguish pods belonging to different replicas
+  // of the same pod group. The pod group policy is applied separately to each replica.
+  // When set, it must be a DNS label.
+  //
+  // +optional
+  optional string podGroupReplicaKey = 3;
 }
 

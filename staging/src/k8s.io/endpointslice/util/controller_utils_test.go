@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestDetermineNeededServiceUpdates(t *testing.T) {
@@ -330,7 +330,7 @@ func genSimpleSvc(namespace, name string) *v1.Service {
 	}
 }
 
-func TestGetPodServiceMemberships(t *testing.T) {
+func TestGetPodServicesToUpdate(t *testing.T) {
 	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
 	for i := 0; i < 3; i++ {
 		service := &v1.Service{
@@ -394,9 +394,9 @@ func TestGetPodServiceMemberships(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			services, err := GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), test.pod)
+			services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(test.pod, nil))
 			if err != nil {
-				t.Errorf("Error from cache.GetPodServiceMemberships: %v", err)
+				t.Errorf("Error from cache.GetServicesToUpdate: %v", err)
 			} else if !services.Equal(test.expect) {
 				t.Errorf("Expect service %v, but got %v", test.expect, services)
 			}
@@ -404,7 +404,7 @@ func TestGetPodServiceMemberships(t *testing.T) {
 	}
 }
 
-func BenchmarkGetPodServiceMemberships(b *testing.B) {
+func BenchmarkGetPodServicesToUpdate(b *testing.B) {
 	// init fake service informer.
 	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
 	for i := 0; i < 1000; i++ {
@@ -435,9 +435,9 @@ func BenchmarkGetPodServiceMemberships(b *testing.B) {
 	expect := sets.NewString("test/service-0")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		services, err := GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), pod)
+		services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(pod, nil))
 		if err != nil {
-			b.Fatalf("Error from GetPodServiceMemberships(): %v", err)
+			b.Fatalf("Error from GetServicesToUpdate(): %v", err)
 		}
 		if len(services) != len(expect) {
 			b.Errorf("Expect services size %d, but got: %v", len(expect), len(services))
@@ -621,19 +621,19 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			name: "No change",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				NodeName:  pointer.String("node-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			ep2: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				NodeName:  pointer.String("node-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			expected: true,
 		},
@@ -641,19 +641,19 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			name: "NodeName changed",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				NodeName:  pointer.String("node-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			ep2: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				NodeName:  pointer.String("node-2"),
+				NodeName:  ptr.To("node-2"),
 			},
 			expected: false,
 		},
@@ -661,19 +661,19 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			name: "Zone changed",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				Zone:      pointer.String("zone-1"),
+				Zone:      ptr.To("zone-1"),
 			},
 			ep2: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				Zone:      pointer.String("zone-2"),
+				Zone:      ptr.To("zone-2"),
 			},
 			expected: false,
 		},
@@ -681,21 +681,21 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			name: "Ready condition changed",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			ep2: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(false),
+					Ready: ptr.To(false),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			expected: false,
 		},
@@ -703,25 +703,25 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			name: "Serving condition changed from nil to true",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
+					Ready:       ptr.To(true),
 					Serving:     nil,
 					Terminating: nil,
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			ep2: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			expected: false,
 		},
@@ -729,25 +729,25 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			name: "Serving condition changed from false to true",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(false),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(false),
+					Terminating: ptr.To(false),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			ep2: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			expected: false,
 		},
@@ -755,21 +755,21 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			name: "Pod name changed",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			ep2: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			expected: false,
 		},
@@ -777,21 +777,21 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			name: "Pod resourceVersion changed",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0", ResourceVersion: "1"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			ep2: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0", ResourceVersion: "2"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			expected: true,
 		},
@@ -799,21 +799,21 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			name: "Pod resourceVersion removed",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0", ResourceVersion: "1"},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			ep2: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Ready: ptr.To(true),
 				},
 				Addresses: []string{"10.0.0.1"},
 				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0", ResourceVersion: ""},
-				Zone:      pointer.String("zone-1"),
-				NodeName:  pointer.String("node-1"),
+				Zone:      ptr.To("zone-1"),
+				NodeName:  ptr.To("node-1"),
 			},
 			expected: true,
 		},
@@ -946,5 +946,17 @@ func TestDeepObjectPointer(t *testing.T) {
 		if hash1 != hash3 {
 			t.Errorf("hash1 (%d) and hash3(%d) must be the same because although they point to different objects, they have the same values for wheel size", hash1, hash3)
 		}
+	}
+}
+
+func TestNewPortMapKey_NilVsEmptySlice(t *testing.T) {
+	var nilPorts []discovery.EndpointPort
+	emptyPorts := []discovery.EndpointPort{}
+
+	nilKey := NewPortMapKey(nilPorts)
+	emptyKey := NewPortMapKey(emptyPorts)
+
+	if nilKey != emptyKey {
+		t.Errorf("NewPortMapKey should return the same key for nil and empty slice, got nil=%q empty=%q", nilKey, emptyKey)
 	}
 }

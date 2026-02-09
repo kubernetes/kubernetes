@@ -26,21 +26,23 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	pkgfeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
 type testCase struct {
-	name          string
-	pod           v1.Pod
-	container     v1.Container
-	assignments   state.ContainerCPUAssignments
-	defaultCPUSet cpuset.CPUSet
-	expectedHints []topologymanager.TopologyHint
+	name                     string
+	pod                      v1.Pod
+	container                v1.Container
+	assignments              state.ContainerCPUAssignments
+	defaultCPUSet            cpuset.CPUSet
+	expectedHints            []topologymanager.TopologyHint
+	podLevelResourcesEnabled bool
 }
 
 func returnMachineInfo() cadvisorapi.MachineInfo {
@@ -49,16 +51,16 @@ func returnMachineInfo() cadvisorapi.MachineInfo {
 		Topology: []cadvisorapi.Node{
 			{Id: 0,
 				Cores: []cadvisorapi.Core{
-					{SocketID: 0, Id: 0, Threads: []int{0, 6}},
-					{SocketID: 0, Id: 1, Threads: []int{1, 7}},
-					{SocketID: 0, Id: 2, Threads: []int{2, 8}},
+					{SocketID: 0, Id: 0, Threads: []int{0, 6}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 0, Id: 1, Threads: []int{1, 7}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 0, Id: 2, Threads: []int{2, 8}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
 				},
 			},
 			{Id: 1,
 				Cores: []cadvisorapi.Core{
-					{SocketID: 1, Id: 0, Threads: []int{3, 9}},
-					{SocketID: 1, Id: 1, Threads: []int{4, 10}},
-					{SocketID: 1, Id: 2, Threads: []int{5, 11}},
+					{SocketID: 1, Id: 0, Threads: []int{3, 9}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 1, Id: 1, Threads: []int{4, 10}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 1, Id: 2, Threads: []int{5, 11}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
 				},
 			},
 		},
@@ -72,6 +74,7 @@ type containerOptions struct {
 }
 
 func TestPodGuaranteedCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	options := [][]*containerOptions{
 		{
 			{request: "0", limit: "0"},
@@ -199,7 +202,7 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			requestedCPU := p.podGuaranteedCPUs(tc.pod)
+			requestedCPU := p.podGuaranteedCPUs(logger, tc.pod)
 
 			if requestedCPU != tc.expectedCPU {
 				t.Errorf("Expected in result to be %v , got %v", tc.expectedCPU, requestedCPU)
@@ -209,11 +212,13 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 }
 
 func TestGetTopologyHints(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
-	tcases := returnTestCases()
 
-	for _, tc := range tcases {
-		topology, _ := topology.Discover(&machineInfo)
+	for _, tc := range returnTestCases() {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+
+		topology, _ := topology.Discover(logger, &machineInfo)
 
 		var activePods []*v1.Pod
 		for p := range tc.assignments {
@@ -245,11 +250,6 @@ func TestGetTopologyHints(t *testing.T) {
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}
-
-		if m.pendingAdmissionPod == nil {
-			t.Errorf("The pendingAdmissionPod should point to the current pod after the call to GetTopologyHints()")
-		}
-
 		sort.SliceStable(hints, func(i, j int) bool {
 			return hints[i].LessThan(hints[j])
 		})
@@ -263,10 +263,13 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestGetPodTopologyHints(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		topology, _ := topology.Discover(&machineInfo)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+
+		topology, _ := topology.Discover(logger, &machineInfo)
 
 		var activePods []*v1.Pod
 		for p := range tc.assignments {
@@ -298,7 +301,6 @@ func TestGetPodTopologyHints(t *testing.T) {
 		if len(tc.expectedHints) == 0 && len(podHints) == 0 {
 			continue
 		}
-
 		sort.SliceStable(podHints, func(i, j int) bool {
 			return podHints[i].LessThan(podHints[j])
 		})
@@ -448,7 +450,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerPolicyAlphaOptions, true)
 
 			var activePods []*v1.Pod
 			for p := range testCase.assignments {
@@ -500,6 +502,9 @@ func returnTestCases() []testCase {
 	testContainer3 := &testPod3.Spec.Containers[0]
 	testPod4 := makePod("fakePod", "fakeContainer", "11", "11")
 	testContainer4 := &testPod4.Spec.Containers[0]
+
+	testPod5 := makePodWithPodLevelResources("fakePod", "5", "5", "fakeContainer", "4", "4")
+	testContainer5 := &testPod5.Spec.Containers[0]
 
 	firstSocketMask, _ := bitmask.NewBitMask(0)
 	secondSocketMask, _ := bitmask.NewBitMask(1)
@@ -662,6 +667,14 @@ func returnTestCases() []testCase {
 			},
 			defaultCPUSet: cpuset.New(),
 			expectedHints: []topologymanager.TopologyHint{},
+		},
+		{
+			name:                     "Pod has pod level resources, no hint generation",
+			pod:                      *testPod5,
+			container:                *testContainer5,
+			defaultCPUSet:            cpuset.New(0, 1, 2, 3),
+			expectedHints:            nil,
+			podLevelResourcesEnabled: true,
 		},
 	}
 }

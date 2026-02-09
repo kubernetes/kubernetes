@@ -20,8 +20,12 @@ package v1
 
 // SysctlApplyConfiguration represents a declarative configuration of the Sysctl type for use
 // with apply.
+//
+// Sysctl defines a kernel parameter to be set
 type SysctlApplyConfiguration struct {
-	Name  *string `json:"name,omitempty"`
+	// Name of a property to set
+	Name *string `json:"name,omitempty"`
+	// Value of a property to set
 	Value *string `json:"value,omitempty"`
 }
 

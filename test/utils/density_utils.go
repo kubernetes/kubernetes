@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -42,7 +43,7 @@ func AddLabelsToNode(c clientset.Interface, nodeName string, labels map[string]s
 	labelString := "{" + strings.Join(tokens, ",") + "}"
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
 	var err error
-	for attempt := 0; attempt < retries; attempt++ {
+	for range retries {
 		_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
 			if !apierrors.IsConflict(err) {
@@ -61,7 +62,7 @@ func AddLabelsToNode(c clientset.Interface, nodeName string, labels map[string]s
 func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []string) error {
 	var node *v1.Node
 	var err error
-	for attempt := 0; attempt < retries; attempt++ {
+	for range retries {
 		node, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -99,7 +100,7 @@ func VerifyLabelsRemoved(c clientset.Interface, nodeName string, labelKeys []str
 	}
 	for _, labelKey := range labelKeys {
 		if node.Labels != nil && len(node.Labels[labelKey]) != 0 {
-			return fmt.Errorf("Failed removing label " + labelKey + " of the node " + nodeName)
+			return errors.New("Failed removing label " + labelKey + " of the node " + nodeName)
 		}
 	}
 	return nil

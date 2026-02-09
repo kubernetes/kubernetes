@@ -19,13 +19,21 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 )
 
 // DeploymentStrategyApplyConfiguration represents a declarative configuration of the DeploymentStrategy type for use
 // with apply.
+//
+// DeploymentStrategy describes how to replace existing pods with new ones.
 type DeploymentStrategyApplyConfiguration struct {
-	Type          *v1beta2.DeploymentStrategyType            `json:"type,omitempty"`
+	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
+	Type *appsv1beta2.DeploymentStrategyType `json:"type,omitempty"`
+	// Rolling update config params. Present only if DeploymentStrategyType =
+	// RollingUpdate.
+	// ---
+	// TODO: Update this to follow our convention for oneOf, whatever we decide it
+	// to be.
 	RollingUpdate *RollingUpdateDeploymentApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
@@ -38,7 +46,7 @@ func DeploymentStrategy() *DeploymentStrategyApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *DeploymentStrategyApplyConfiguration) WithType(value v1beta2.DeploymentStrategyType) *DeploymentStrategyApplyConfiguration {
+func (b *DeploymentStrategyApplyConfiguration) WithType(value appsv1beta2.DeploymentStrategyType) *DeploymentStrategyApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 )
 
 type namedString string
@@ -161,20 +162,20 @@ func TestConvert(t *testing.T) {
 		},
 		{
 			input: &baz{
-				Ptr:  intp(5),
-				Bptr: boolp(true),
+				Ptr:  ptr.To(5),
+				Bptr: ptr.To(true),
 			},
 			expected: url.Values{"ptr": {"5"}, "bptr": {"true"}},
 		},
 		{
 			input: &baz{
-				Bptr: boolp(true),
+				Bptr: ptr.To(true),
 			},
 			expected: url.Values{"ptr": {""}, "bptr": {"true"}},
 		},
 		{
 			input: &baz{
-				Ptr: intp(5),
+				Ptr: ptr.To(5),
 			},
 			expected: url.Values{"ptr": {"5"}},
 		},
@@ -213,7 +214,3 @@ func TestConvert(t *testing.T) {
 		validateResult(t, test.input, result, test.expected)
 	}
 }
-
-func intp(n int) *int { return &n }
-
-func boolp(b bool) *bool { return &b }

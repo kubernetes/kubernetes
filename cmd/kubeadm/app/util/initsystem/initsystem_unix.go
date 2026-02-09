@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -24,7 +23,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // OpenRCInitSystem defines openrc
@@ -160,6 +159,13 @@ func GetInitSystem() (InitSystem, error) {
 	}
 	_, err = exec.LookPath("openrc")
 	if err == nil {
+		binaries := []string{"rc-service", "rc-update"}
+		for _, binary := range binaries {
+			_, err = exec.LookPath(binary)
+			if err != nil {
+				return nil, errors.Wrapf(err, "openrc detected, but missing required binary: %s", binary)
+			}
+		}
 		return &OpenRCInitSystem{}, nil
 	}
 

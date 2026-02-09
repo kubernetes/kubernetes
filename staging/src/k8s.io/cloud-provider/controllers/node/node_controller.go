@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloud
+package node
 
 import (
 	"context"
@@ -550,7 +550,7 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 				n.Labels = map[string]string{}
 			}
 
-			k8sNamespaceRegex := regexp.MustCompile("(kubernetes|k8s).io/")
+			k8sNamespaceRegex := regexp.MustCompile(`(^|\.)(kubernetes|k8s)\.io/`)
 			for k, v := range instanceMeta.AdditionalLabels {
 				// Cloud provider should not be using kubernetes namespaces in labels
 				if isK8sNamespace := k8sNamespaceRegex.MatchString(k); isK8sNamespace {

@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/fc"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -217,7 +216,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 			},
 		},
 		{
-			desc:           "CSINode not found for a volume type that supports csi migration",
+			desc:           "CSINode not found for a volume type that completes csi migration",
 			createNodeName: kubetypes.NodeName("another-node"),
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -238,13 +237,12 @@ func Test_CreateVolumeSpec(t *testing.T) {
 					},
 				},
 			},
-			wantErrorMessage: "csiNode \"another-node\" not found",
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			plugMgr, intreeToCSITranslator, csiTranslator, pvLister, pvcLister := setup(testNodeName, t)
-			actualSpec, err := CreateVolumeSpec(logger, test.pod.Spec.Volumes[0], test.pod, test.createNodeName, plugMgr, pvcLister, pvLister, intreeToCSITranslator, csiTranslator)
+			actualSpec, err := CreateVolumeSpecWithNodeMigration(logger, test.pod.Spec.Volumes[0], test.pod, test.createNodeName, plugMgr, pvcLister, pvLister, intreeToCSITranslator, csiTranslator)
 
 			if actualSpec == nil && (test.wantPersistentVolume != nil || test.wantVolume != nil) {
 				t.Errorf("got volume spec is nil")
@@ -292,7 +290,7 @@ func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration
 	*fsVolumeMode = v1.PersistentVolumeFilesystem
 
 	csiTranslator := csitrans.New()
-	intreeToCSITranslator := csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
+	intreeToCSITranslator := csimigration.NewPluginManager(csiTranslator)
 	kubeClient := fake.NewSimpleClientset()
 
 	factory := informers.NewSharedInformerFactory(kubeClient, time.Minute)

@@ -80,7 +80,13 @@ func (s *status) record(rtt time.Duration, when time.Time) {
 
 	s.total += 1
 	s.health = true
-	s.srtt = time.Duration((1-α)*float64(s.srtt) + α*float64(rtt))
+
+	lastSRTT := s.srtt
+	if lastSRTT == time.Duration(0) {
+		lastSRTT = rtt
+	}
+
+	s.srtt = time.Duration((1-α)*float64(lastSRTT) + α*float64(rtt))
 	s.clockdiff = time.Now().Sub(when) - s.srtt/2
 	s.err = nil
 }

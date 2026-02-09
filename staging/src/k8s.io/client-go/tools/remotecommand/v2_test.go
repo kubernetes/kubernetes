@@ -19,14 +19,16 @@ package remotecommand
 import (
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type fakeReader struct {
@@ -178,20 +180,38 @@ func TestV2CreateStreams(t *testing.T) {
 }
 
 func TestV2ErrorStreamReading(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name          string
 		stream        io.Reader
-		expectedError error
+		expectedError func(*testing.T, error)
 	}{
 		{
-			name:          "error reading from stream",
-			stream:        &fakeReader{errors.New("foo")},
-			expectedError: errors.New("error reading from error stream: foo"),
+			name:   "error reading from stream",
+			stream: &fakeReader{errors.New("foo")},
+			expectedError: func(t *testing.T, err error) {
+				if e, a := "error reading from error stream: foo", err.Error(); e != a {
+					t.Errorf("expected '%s', got '%s'", e, a)
+				}
+			},
 		},
 		{
-			name:          "stream returns an error",
-			stream:        strings.NewReader("some error"),
-			expectedError: errors.New("error executing remote command: some error"),
+			name:   "stream returns an error",
+			stream: strings.NewReader("some error"),
+			expectedError: func(t *testing.T, err error) {
+				if e, a := "error executing remote command: some error", err.Error(); e != a {
+					t.Errorf("expected '%s', got '%s'", e, a)
+				}
+			},
+		},
+		{
+			name:   "typed error",
+			stream: &fakeReader{net.ErrClosed},
+			expectedError: func(t *testing.T, err error) {
+				if !errors.Is(err, net.ErrClosed) {
+					t.Errorf("expected errors.Is(err, net.ErrClosed), failed on %#v", err)
+				}
+			},
 		},
 	}
 
@@ -199,7 +219,7 @@ func TestV2ErrorStreamReading(t *testing.T) {
 		h := newStreamProtocolV2(StreamOptions{}).(*streamProtocolV2)
 		h.errorStream = test.stream
 
-		ch := watchErrorStream(h.errorStream, &errorDecoderV2{})
+		ch := watchErrorStream(logger, h.errorStream, &errorDecoderV2{})
 		if ch == nil {
 			t.Fatalf("%s: unexpected nil channel", test.name)
 		}
@@ -214,8 +234,8 @@ func TestV2ErrorStreamReading(t *testing.T) {
 		if test.expectedError != nil {
 			if err == nil {
 				t.Errorf("%s: expected an error", test.name)
-			} else if e, a := test.expectedError, err; e.Error() != a.Error() {
-				t.Errorf("%s: expected %q, got %q", test.name, e, a)
+			} else {
+				test.expectedError(t, err)
 			}
 			continue
 		}

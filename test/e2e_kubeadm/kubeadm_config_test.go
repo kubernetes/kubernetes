@@ -19,7 +19,7 @@ package kubeadm
 import (
 	"context"
 
-	"gopkg.in/yaml.v2"
+	yaml "go.yaml.in/yaml/v2"
 	authv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	clientset "k8s.io/client-go/kubernetes"

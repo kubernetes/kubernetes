@@ -20,7 +20,10 @@ package v1
 
 // HostIPApplyConfiguration represents a declarative configuration of the HostIP type for use
 // with apply.
+//
+// HostIP represents a single IP address allocated to the host.
 type HostIPApplyConfiguration struct {
+	// IP is the IP address assigned to the host
 	IP *string `json:"ip,omitempty"`
 }
 

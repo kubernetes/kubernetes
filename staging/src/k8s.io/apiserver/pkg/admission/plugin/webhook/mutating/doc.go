@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package mutating makes calls to mutating webhooks during the admission
 // process.
-package mutating // import "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
+package mutating

@@ -54,6 +54,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 	}
 	standardRequestHeaderConfig := &authenticatorfactory.RequestHeaderConfig{
 		UsernameHeaders:     headerrequest.StaticStringSlice{"X-Remote-User"},
+		UIDHeaders:          headerrequest.StaticStringSlice{"X-Remote-Uid"},
 		GroupHeaders:        headerrequest.StaticStringSlice{"X-Remote-Group"},
 		ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"X-Remote-Extra-"},
 	}
@@ -65,6 +66,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		}
 		resp, ok, err := auth.AuthenticateRequest(req)
 		authenticationFinish := time.Now()
+		genericapirequest.TrackAuthenticationLatency(req.Context(), authenticationFinish.Sub(authenticationStart))
 		defer func() {
 			metrics(req.Context(), resp, ok, err, apiAuds, authenticationStart, authenticationFinish)
 		}()
@@ -90,6 +92,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		headerrequest.ClearAuthenticationHeaders(
 			req.Header,
 			standardRequestHeaderConfig.UsernameHeaders,
+			standardRequestHeaderConfig.UIDHeaders,
 			standardRequestHeaderConfig.GroupHeaders,
 			standardRequestHeaderConfig.ExtraHeaderPrefixes,
 		)
@@ -99,6 +102,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 			headerrequest.ClearAuthenticationHeaders(
 				req.Header,
 				requestHeaderConfig.UsernameHeaders,
+				requestHeaderConfig.UIDHeaders,
 				requestHeaderConfig.GroupHeaders,
 				requestHeaderConfig.ExtraHeaderPrefixes,
 			)
@@ -115,7 +119,6 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 			// https://github.com/golang/net/commit/97aa3a539ec716117a9d15a4659a911f50d13c3c
 			w.Header().Set("Connection", "close")
 		}
-
 		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))
 		handler.ServeHTTP(w, req)
 	})

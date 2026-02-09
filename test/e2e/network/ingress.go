@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -176,6 +178,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		gottenIngress, err := ingClient.Get(ctx, createdIngress.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(gottenIngress.UID).To(gomega.Equal(createdIngress.UID))
+		gomega.Expect(gottenIngress).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		ings, err := ingClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
@@ -202,6 +205,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("patching")
 		patchedIngress, err := ingClient.Patch(ctx, createdIngress.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
+		gomega.Expect(resourceversion.CompareResourceVersion(createdIngress.ResourceVersion, patchedIngress.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 		gomega.Expect(patchedIngress.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")

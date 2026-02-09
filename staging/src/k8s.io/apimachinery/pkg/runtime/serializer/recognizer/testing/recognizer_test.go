@@ -36,8 +36,8 @@ func TestRecognizer(t *testing.T) {
 	s := runtime.NewScheme()
 	s.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &A{})
 	d := recognizer.NewDecoder(
-		json.NewSerializer(json.DefaultMetaFactory, s, s, false),
-		json.NewYAMLSerializer(json.DefaultMetaFactory, s, s),
+		json.NewSerializerWithOptions(json.DefaultMetaFactory, s, s, json.SerializerOptions{}),
+		json.NewSerializerWithOptions(json.DefaultMetaFactory, s, s, json.SerializerOptions{Yaml: true}),
 	)
 	out, _, err := d.Decode([]byte(`
 kind: A

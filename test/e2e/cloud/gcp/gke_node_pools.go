@@ -36,7 +36,7 @@ var _ = SIGDescribe("GKE node pools", feature.GKENodePool, func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 	})
 
 	f.It("should create a cluster with multiple node pools", feature.GKENodePool, func(ctx context.Context) {

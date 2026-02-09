@@ -60,7 +60,7 @@ func TestSimpleQueue(t *testing.T) {
 
 		return false, nil
 	})
-	if err != wait.ErrWaitTimeout {
+	if !wait.Interrupted(err) {
 		t.Errorf("expected timeout, got: %v", err)
 	}
 
@@ -214,7 +214,7 @@ func TestCopyShifting(t *testing.T) {
 
 func BenchmarkDelayingQueue_AddAfter(b *testing.B) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	q := NewTypedDelayingQueueWithConfig(TypedDelayingQueueConfig[string]{Clock: fakeClock})
 
 	// Add items
 	for n := 0; n < b.N; n++ {

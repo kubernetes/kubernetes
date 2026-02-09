@@ -77,11 +77,28 @@ import (
 //	sets.intersects([1], []) // false
 //	sets.intersects([1], [1, 2]) // true
 //	sets.intersects([[1], [2, 3]], [[1, 2], [2, 3.0]]) // true
-func Sets() cel.EnvOption {
-	return cel.Lib(setsLib{})
+func Sets(options ...SetsOption) cel.EnvOption {
+	l := &setsLib{}
+	for _, o := range options {
+		l = o(l)
+	}
+	return cel.Lib(l)
 }
 
-type setsLib struct{}
+// SetsOption declares a functional operator for configuring set extensions.
+type SetsOption func(*setsLib) *setsLib
+
+// SetsVersion sets the library version for set extensions.
+func SetsVersion(version uint32) SetsOption {
+	return func(lib *setsLib) *setsLib {
+		lib.version = version
+		return lib
+	}
+}
+
+type setsLib struct {
+	version uint32
+}
 
 // LibraryName implements the SingletonLibrary interface method.
 func (setsLib) LibraryName() string {
@@ -219,13 +236,13 @@ func setsEquivalent(listA, listB ref.Val) ref.Val {
 
 func estimateSetsCost(costFactor float64) checker.FunctionEstimator {
 	return func(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
-		if len(args) == 2 {
-			arg0Size := estimateSize(estimator, args[0])
-			arg1Size := estimateSize(estimator, args[1])
-			costEstimate := arg0Size.Multiply(arg1Size).MultiplyByCostFactor(costFactor).Add(callCostEstimate)
-			return &checker.CallEstimate{CostEstimate: costEstimate}
+		if len(args) != 2 {
+			return nil
 		}
-		return nil
+		arg0Size := estimateSize(estimator, args[0])
+		arg1Size := estimateSize(estimator, args[1])
+		costEstimate := arg0Size.Multiply(arg1Size).MultiplyByCostFactor(costFactor).Add(callCostEstimate)
+		return &checker.CallEstimate{CostEstimate: costEstimate}
 	}
 }
 
@@ -256,6 +273,6 @@ func actualSize(value ref.Val) uint64 {
 }
 
 var (
-	callCostEstimate = checker.CostEstimate{Min: 1, Max: 1}
+	callCostEstimate = checker.FixedCostEstimate(1)
 	callCost         = uint64(1)
 )

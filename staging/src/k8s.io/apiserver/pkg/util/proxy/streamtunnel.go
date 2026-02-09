@@ -19,10 +19,12 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	constants "k8s.io/apimachinery/pkg/util/portforward"
+	"k8s.io/apiserver/pkg/util/proxy/metrics"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/klog/v2"
 )
@@ -61,6 +64,7 @@ func (h *TunnelingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	spdyProtocols := spdyProtocolsFromWebsocketProtocols(req)
 	if len(spdyProtocols) == 0 {
+		metrics.IncStreamTunnelRequest(req.Context(), strconv.Itoa(http.StatusBadRequest))
 		http.Error(w, "unable to upgrade: no tunneling spdy protocols provided", http.StatusBadRequest)
 		return
 	}
@@ -326,6 +330,7 @@ func (u *tunnelingWebsocketUpgraderConn) InitializeWrite(backendResponse *http.R
 		if !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(spdy.HeaderSpdy31)) {
 			klog.Errorf("unable to upgrade: missing upgrade headers in response: %#v", backendResponse.Header)
 			u.err = fmt.Errorf("unable to upgrade: missing upgrade headers in response")
+			metrics.IncStreamTunnelRequest(context.Background(), strconv.Itoa(http.StatusInternalServerError))
 			http.Error(u.w, u.err.Error(), http.StatusInternalServerError)
 			return u.err
 		}
@@ -347,16 +352,20 @@ func (u *tunnelingWebsocketUpgraderConn) InitializeWrite(backendResponse *http.R
 		conn, err := upgrader.Upgrade(u.w, u.req, nil)
 		if err != nil {
 			klog.Errorf("error upgrading websocket connection: %v", err)
+			metrics.IncStreamTunnelRequest(context.Background(), strconv.Itoa(http.StatusInternalServerError))
 			u.err = err
 			return u.err
 		}
 
 		klog.V(4).Infof("websocket connection created: %s", conn.Subprotocol())
+		metrics.IncStreamTunnelRequest(context.Background(), strconv.Itoa(http.StatusSwitchingProtocols))
 		u.conn = portforward.NewTunnelingConnection("server", conn)
 		return nil
 	}
 
 	// anything other than an upgrade should pass through the backend response
+	klog.Errorf("SPDY upgrade failed: %s", backendResponse.Status)
+	metrics.IncStreamTunnelRequest(context.Background(), strconv.Itoa(backendResponse.StatusCode))
 
 	// try to hijack
 	conn, _, err = u.w.(http.Hijacker).Hijack()

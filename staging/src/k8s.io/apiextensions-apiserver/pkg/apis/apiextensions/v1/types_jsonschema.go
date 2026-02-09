@@ -189,7 +189,6 @@ type JSONSchemaProps struct {
 	XMapType *string `json:"x-kubernetes-map-type,omitempty" protobuf:"bytes,43,opt,name=xKubernetesMapType"`
 
 	// x-kubernetes-validations describes a list of validation rules written in the CEL expression language.
-	// This field is an alpha-level. Using this field requires the feature gate `CustomResourceValidationExpressions` to be enabled.
 	// +patchMergeKey=rule
 	// +patchStrategy=merge
 	// +listType=map

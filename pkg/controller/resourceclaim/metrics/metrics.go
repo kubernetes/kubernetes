@@ -26,33 +26,57 @@ import (
 // ResourceClaimSubsystem - subsystem name used for ResourceClaim creation
 const ResourceClaimSubsystem = "resourceclaim_controller"
 
+type NumResourceClaimLabels struct {
+	Allocated   string
+	AdminAccess string
+	Source      string
+}
+
 var (
-	// ResourceClaimCreateAttempts tracks the number of
-	// ResourceClaims().Create calls (both successful and unsuccessful)
-	ResourceClaimCreateAttempts = metrics.NewCounter(
+	// ResourceClaimCreate tracks the total number of
+	// ResourceClaims creation requests
+	// categorized by their creation status and admin access.
+	ResourceClaimCreate = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      ResourceClaimSubsystem,
-			Name:           "create_attempts_total",
-			Help:           "Number of ResourceClaims creation requests",
+			Name:           "creates_total",
+			Help:           "Number of ResourceClaims creation requests, categorized by creation status and admin access",
 			StabilityLevel: metrics.ALPHA,
-		})
-	// ResourceClaimCreateFailures tracks the number of unsuccessful
-	// ResourceClaims().Create calls
-	ResourceClaimCreateFailures = metrics.NewCounter(
-		&metrics.CounterOpts{
-			Subsystem:      ResourceClaimSubsystem,
-			Name:           "create_failures_total",
-			Help:           "Number of ResourceClaims creation request failures",
-			StabilityLevel: metrics.ALPHA,
-		})
+		},
+		[]string{"status", "admin_access"},
+	)
+
+	// NumResourceClaimsDesc tracks the number of ResourceClaims,
+	// categorized by their allocation status, admin access, and source.
+	// Source can be 'resource_claim_template' (created from a template),
+	// 'extended_resource' (extended resources), or empty (manually created by a user).
+	NumResourceClaimsDesc = metrics.NewDesc(
+		metrics.BuildFQName("", ResourceClaimSubsystem, "resource_claims"),
+		"Number of ResourceClaims, categorized by allocation status, admin access, and source. "+
+			"Source can be 'resource_claim_template' (created from a template), "+
+			"'extended_resource' (extended resources), or empty (manually created by a user).",
+		[]string{"allocated", "admin_access", "source"}, nil,
+		metrics.ALPHA, "")
 )
 
 var registerMetrics sync.Once
 
+// testMode indicates whether we're running in test mode
+// In test mode, we don't register the custom collector in the global registry
+var testMode bool
+
+// SetTestMode enables or disables test mode
+func SetTestMode(enabled bool) {
+	testMode = enabled
+}
+
 // RegisterMetrics registers ResourceClaim metrics.
-func RegisterMetrics() {
+func RegisterMetrics(collector metrics.StableCollector) {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(ResourceClaimCreateAttempts)
-		legacyregistry.MustRegister(ResourceClaimCreateFailures)
+		legacyregistry.MustRegister(ResourceClaimCreate)
+		if !testMode && collector != nil {
+			// Only register custom collector in non-test mode
+			legacyregistry.CustomMustRegister(collector)
+		}
 	})
 }

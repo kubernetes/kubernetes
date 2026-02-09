@@ -29,11 +29,17 @@ import (
 
 // ImageReviewApplyConfiguration represents a declarative configuration of the ImageReview type for use
 // with apply.
+//
+// ImageReview checks if the set of images in a pod are allowed.
 type ImageReviewApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ImageReviewSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec holds information about the pod being evaluated
+	Spec *ImageReviewSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is filled in by the backend and indicates whether the pod should be allowed.
+	Status *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ImageReview constructs a declarative configuration of the ImageReview type for use with
@@ -46,29 +52,14 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 	return b
 }
 
-// ExtractImageReview extracts the applied configuration owned by fieldManager from
-// imageReview. If no managedFields are found in imageReview for fieldManager, a
-// ImageReviewApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractImageReviewFrom extracts the applied configuration owned by fieldManager from
+// imageReview for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // imageReview must be a unmodified ImageReview API object that was retrieved from the Kubernetes API.
-// ExtractImageReview provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractImageReviewFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
-	return extractImageReview(imageReview, fieldManager, "")
-}
-
-// ExtractImageReviewStatus is the same as ExtractImageReview except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractImageReviewStatus(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
-	return extractImageReview(imageReview, fieldManager, "status")
-}
-
-func extractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
+func ExtractImageReviewFrom(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
 	b := &ImageReviewApplyConfiguration{}
 	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,11 +72,33 @@ func extractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManag
 	return b, nil
 }
 
+// ExtractImageReview extracts the applied configuration owned by fieldManager from
+// imageReview. If no managedFields are found in imageReview for fieldManager, a
+// ImageReviewApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// imageReview must be a unmodified ImageReview API object that was retrieved from the Kubernetes API.
+// ExtractImageReview provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+	return ExtractImageReviewFrom(imageReview, fieldManager, "")
+}
+
+// ExtractImageReviewStatus extracts the applied configuration owned by fieldManager from
+// imageReview for the status subresource.
+func ExtractImageReviewStatus(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+	return ExtractImageReviewFrom(imageReview, fieldManager, "status")
+}
+
+func (b ImageReviewApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithKind(value string) *ImageReviewApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -93,7 +106,7 @@ func (b *ImageReviewApplyConfiguration) WithKind(value string) *ImageReviewApply
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithAPIVersion(value string) *ImageReviewApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -102,7 +115,7 @@ func (b *ImageReviewApplyConfiguration) WithAPIVersion(value string) *ImageRevie
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithName(value string) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -111,7 +124,7 @@ func (b *ImageReviewApplyConfiguration) WithName(value string) *ImageReviewApply
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithGenerateName(value string) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -120,7 +133,7 @@ func (b *ImageReviewApplyConfiguration) WithGenerateName(value string) *ImageRev
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithNamespace(value string) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -129,7 +142,7 @@ func (b *ImageReviewApplyConfiguration) WithNamespace(value string) *ImageReview
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithUID(value types.UID) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -138,7 +151,7 @@ func (b *ImageReviewApplyConfiguration) WithUID(value types.UID) *ImageReviewApp
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithResourceVersion(value string) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -147,7 +160,7 @@ func (b *ImageReviewApplyConfiguration) WithResourceVersion(value string) *Image
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithGeneration(value int64) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -156,7 +169,7 @@ func (b *ImageReviewApplyConfiguration) WithGeneration(value int64) *ImageReview
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -165,7 +178,7 @@ func (b *ImageReviewApplyConfiguration) WithCreationTimestamp(value metav1.Time)
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -174,7 +187,7 @@ func (b *ImageReviewApplyConfiguration) WithDeletionTimestamp(value metav1.Time)
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ImageReviewApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -184,11 +197,11 @@ func (b *ImageReviewApplyConfiguration) WithDeletionGracePeriodSeconds(value int
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ImageReviewApplyConfiguration) WithLabels(entries map[string]string) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -199,11 +212,11 @@ func (b *ImageReviewApplyConfiguration) WithLabels(entries map[string]string) *I
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ImageReviewApplyConfiguration) WithAnnotations(entries map[string]string) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -217,7 +230,7 @@ func (b *ImageReviewApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerR
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -228,7 +241,7 @@ func (b *ImageReviewApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerR
 func (b *ImageReviewApplyConfiguration) WithFinalizers(values ...string) *ImageReviewApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -255,8 +268,24 @@ func (b *ImageReviewApplyConfiguration) WithStatus(value *ImageReviewStatusApply
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ImageReviewApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ImageReviewApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ImageReviewApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ImageReviewApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

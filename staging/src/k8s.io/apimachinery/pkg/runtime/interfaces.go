@@ -69,6 +69,19 @@ type Encoder interface {
 	Identifier() Identifier
 }
 
+// NondeterministicEncoder is implemented by Encoders that can serialize objects more efficiently in
+// cases where the output does not need to be deterministic.
+type NondeterministicEncoder interface {
+	Encoder
+
+	// EncodeNondeterministic writes an object to the stream. Unlike the Encode method of
+	// Encoder, EncodeNondeterministic does not guarantee that any two invocations will write
+	// the same sequence of bytes to the io.Writer. Any differences will not be significant to a
+	// generic decoder. For example, map entries and struct fields might be encoded in any
+	// order.
+	EncodeNondeterministic(Object, io.Writer) error
+}
+
 // MemoryAllocator is responsible for allocating memory.
 // By encapsulating memory allocation into its own interface, we can reuse the memory
 // across many operations in places we know it can significantly improve the performance.
@@ -246,6 +259,7 @@ type ObjectDefaulter interface {
 
 type ObjectVersioner interface {
 	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
+	PrioritizedVersionsForGroup(group string) []schema.GroupVersion
 }
 
 // ObjectConvertor converts an object to a different version.
@@ -370,4 +384,10 @@ type Unstructured interface {
 	//
 	// If the items passed to fn are not retained, or are retained for the same duration, use EachListItem instead for memory efficiency.
 	EachListItemWithAlloc(func(Object) error) error
+}
+
+// ApplyConfiguration is an interface that root apply configuration types implement.
+type ApplyConfiguration interface {
+	// IsApplyConfiguration is implemented if the object is the root of an apply configuration.
+	IsApplyConfiguration()
 }

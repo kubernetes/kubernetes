@@ -21,9 +21,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -31,10 +34,12 @@ import (
 // NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
 // the pod tolerates {key=node.kubernetes.io/unschedulable, effect:NoSchedule} taint.
 type NodeUnschedulable struct {
+	enableSchedulingQueueHint bool
 }
 
-var _ framework.FilterPlugin = &NodeUnschedulable{}
-var _ framework.EnqueueExtensions = &NodeUnschedulable{}
+var _ fwk.FilterPlugin = &NodeUnschedulable{}
+var _ fwk.EnqueueExtensions = &NodeUnschedulable{}
+var _ fwk.SignPlugin = &NodeUnschedulable{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.NodeUnschedulable
@@ -48,31 +53,77 @@ const (
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodeUnschedulable) EventsToRegister() []framework.ClusterEventWithHint {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+func (pl *NodeUnschedulable) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	if !pl.enableSchedulingQueueHint {
+		return []fwk.ClusterEventWithHint{
+			// A note about UpdateNodeLabel event:
+			// Ideally, it's supposed to register only Add | UpdateNodeTaint because UpdateNodeLabel will never change the result from this plugin.
+			// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+			// See: https://github.com/kubernetes/kubernetes/issues/109437
+			{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		}, nil
 	}
+
+	return []fwk.ClusterEventWithHint{
+		// When QueueingHint is enabled, we don't use preCheck and we don't need to register UpdateNodeLabel event.
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		// When the QueueingHint feature is enabled,
+		// the scheduling queue uses Pod/Update Queueing Hint
+		// to determine whether a Pod's update makes the Pod schedulable or not.
+		// https://github.com/kubernetes/kubernetes/pull/122234
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+	}, nil
+}
+
+// isSchedulableAfterPodTolerationChange is invoked whenever a pod's toleration changed.
+func (pl *NodeUnschedulable) isSchedulableAfterPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	_, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+
+	if pod.UID == modifiedPod.UID {
+		// Note: we don't need to check oldPod tolerations the taint because:
+		// - Taint can be added, but can't be modified nor removed.
+		// - If the Pod already has the toleration, it shouldn't have rejected by this plugin in the first place.
+		//   Meaning, here this Pod has been rejected by this plugin, and hence it shouldn't have the toleration yet.
+		if v1helper.TolerationsTolerateTaint(logger, modifiedPod.Spec.Tolerations, &v1.Taint{
+			Key:    v1.TaintNodeUnschedulable,
+			Effect: v1.TaintEffectNoSchedule,
+		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)) {
+			// This update makes the pod tolerate the unschedulable taint.
+			logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
+			return fwk.Queue, nil
+		}
+		logger.V(5).Info("a new toleration is added for the unschedulable Pod, but it's an unrelated toleration", "pod", klog.KObj(modifiedPod))
+		return fwk.QueueSkip, nil
+	}
+
+	logger.V(5).Info("a new toleration is added for a Pod, but it's an unrelated Pod and wouldn't change the TaintToleration plugin's decision", "pod", klog.KObj(modifiedPod))
+
+	return fwk.QueueSkip, nil
 }
 
 // isSchedulableAfterNodeChange is invoked for all node events reported by
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable.
-func (pl *NodeUnschedulable) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	_, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+func (pl *NodeUnschedulable) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
-	if !modifiedNode.Spec.Unschedulable {
+	// We queue this Pod when -
+	// 1. the node is updated from unschedulable to schedulable.
+	// 2. the node is added and is schedulable.
+	if (originalNode != nil && originalNode.Spec.Unschedulable && !modifiedNode.Spec.Unschedulable) ||
+		(originalNode == nil && !modifiedNode.Spec.Unschedulable) {
 		logger.V(5).Info("node was created or updated, pod may be schedulable now", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
-
-	// TODO: also check if the original node meets the pod's requestments once preCheck is completely removed.
-	// See: https://github.com/kubernetes/kubernetes/issues/110175
 
 	logger.V(5).Info("node was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -80,27 +131,35 @@ func (pl *NodeUnschedulable) Name() string {
 	return Name
 }
 
+// Feasibility and scoring based on the pod's tolerations.
+func (pl *NodeUnschedulable) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return []fwk.SignFragment{
+		{Key: fwk.TolerationsSignerName, Value: fwk.TolerationsSigner(pod)},
+	}, nil
+}
+
 // Filter invoked at the filter extension point.
-func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	node := nodeInfo.Node()
 
 	if !node.Spec.Unschedulable {
 		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
-	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
+	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
-	})
+	}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
 	if !podToleratesUnschedulable {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
 	}
 
 	return nil
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-	return &NodeUnschedulable{}, nil
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+	return &NodeUnschedulable{enableSchedulingQueueHint: fts.EnableSchedulingQueueHint}, nil
 }

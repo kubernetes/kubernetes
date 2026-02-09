@@ -20,20 +20,42 @@ package v1
 
 import (
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // DeploymentSpecApplyConfiguration represents a declarative configuration of the DeploymentSpec type for use
 // with apply.
+//
+// DeploymentSpec is the specification of the desired behavior of the Deployment.
 type DeploymentSpecApplyConfiguration struct {
-	Replicas                *int32                                    `json:"replicas,omitempty"`
-	Selector                *v1.LabelSelectorApplyConfiguration       `json:"selector,omitempty"`
-	Template                *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
-	Strategy                *DeploymentStrategyApplyConfiguration     `json:"strategy,omitempty"`
-	MinReadySeconds         *int32                                    `json:"minReadySeconds,omitempty"`
-	RevisionHistoryLimit    *int32                                    `json:"revisionHistoryLimit,omitempty"`
-	Paused                  *bool                                     `json:"paused,omitempty"`
-	ProgressDeadlineSeconds *int32                                    `json:"progressDeadlineSeconds,omitempty"`
+	// Number of desired pods. This is a pointer to distinguish between explicit
+	// zero and not specified. Defaults to 1.
+	Replicas *int32 `json:"replicas,omitempty"`
+	// Label selector for pods. Existing ReplicaSets whose pods are
+	// selected by this will be the ones affected by this deployment.
+	// It must match the pod template's labels.
+	Selector *metav1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
+	// Template describes the pods that will be created.
+	// The only allowed template.spec.restartPolicy value is "Always".
+	Template *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
+	// The deployment strategy to use to replace existing pods with new ones.
+	Strategy *DeploymentStrategyApplyConfiguration `json:"strategy,omitempty"`
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
+	// The number of old ReplicaSets to retain to allow rollback.
+	// This is a pointer to distinguish between explicit zero and not specified.
+	// Defaults to 10.
+	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+	// Indicates that the deployment is paused.
+	Paused *bool `json:"paused,omitempty"`
+	// The maximum time in seconds for a deployment to make progress before it
+	// is considered to be failed. The deployment controller will continue to
+	// process failed deployments and a condition with a ProgressDeadlineExceeded
+	// reason will be surfaced in the deployment status. Note that progress will
+	// not be estimated during the time a deployment is paused. Defaults to 600s.
+	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
 }
 
 // DeploymentSpecApplyConfiguration constructs a declarative configuration of the DeploymentSpec type for use with
@@ -53,7 +75,7 @@ func (b *DeploymentSpecApplyConfiguration) WithReplicas(value int32) *Deployment
 // WithSelector sets the Selector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Selector field is set to the value of the last call.
-func (b *DeploymentSpecApplyConfiguration) WithSelector(value *v1.LabelSelectorApplyConfiguration) *DeploymentSpecApplyConfiguration {
+func (b *DeploymentSpecApplyConfiguration) WithSelector(value *metav1.LabelSelectorApplyConfiguration) *DeploymentSpecApplyConfiguration {
 	b.Selector = value
 	return b
 }

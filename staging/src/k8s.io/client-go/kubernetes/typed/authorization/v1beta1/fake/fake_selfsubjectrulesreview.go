@@ -19,29 +19,26 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1beta1 "k8s.io/api/authorization/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	authorizationv1beta1 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 )
 
-// FakeSelfSubjectRulesReviews implements SelfSubjectRulesReviewInterface
-type FakeSelfSubjectRulesReviews struct {
+// fakeSelfSubjectRulesReviews implements SelfSubjectRulesReviewInterface
+type fakeSelfSubjectRulesReviews struct {
+	*gentype.FakeClient[*v1beta1.SelfSubjectRulesReview]
 	Fake *FakeAuthorizationV1beta1
 }
 
-var selfsubjectrulesreviewsResource = v1beta1.SchemeGroupVersion.WithResource("selfsubjectrulesreviews")
-
-var selfsubjectrulesreviewsKind = v1beta1.SchemeGroupVersion.WithKind("SelfSubjectRulesReview")
-
-// Create takes the representation of a selfSubjectRulesReview and creates it.  Returns the server's representation of the selfSubjectRulesReview, and an error, if there is any.
-func (c *FakeSelfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *v1beta1.SelfSubjectRulesReview, opts v1.CreateOptions) (result *v1beta1.SelfSubjectRulesReview, err error) {
-	emptyResult := &v1beta1.SelfSubjectRulesReview{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(selfsubjectrulesreviewsResource, selfSubjectRulesReview, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeSelfSubjectRulesReviews(fake *FakeAuthorizationV1beta1) authorizationv1beta1.SelfSubjectRulesReviewInterface {
+	return &fakeSelfSubjectRulesReviews{
+		gentype.NewFakeClient[*v1beta1.SelfSubjectRulesReview](
+			fake.Fake,
+			"",
+			v1beta1.SchemeGroupVersion.WithResource("selfsubjectrulesreviews"),
+			v1beta1.SchemeGroupVersion.WithKind("SelfSubjectRulesReview"),
+			func() *v1beta1.SelfSubjectRulesReview { return &v1beta1.SelfSubjectRulesReview{} },
+		),
+		fake,
 	}
-	return obj.(*v1beta1.SelfSubjectRulesReview), err
 }

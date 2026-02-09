@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -23,39 +22,40 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hnslib"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/utils/ptr"
 )
 
 // windowsNetworkStatsProvider creates an interface that allows for testing the logic without needing to create a container
 type windowsNetworkStatsProvider interface {
-	HNSListEndpointRequest() ([]hcsshim.HNSEndpoint, error)
-	GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error)
+	HNSListEndpointRequest() ([]hnslib.HNSEndpoint, error)
+	GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpointStats, error)
 }
 
-// networkStats exposes the required functionality for hcsshim in this scenario
+// networkStats exposes the required functionality for hnslib in this scenario
 type networkStats struct{}
 
-func (s networkStats) HNSListEndpointRequest() ([]hcsshim.HNSEndpoint, error) {
-	return hcsshim.HNSListEndpointRequest()
+func (s networkStats) HNSListEndpointRequest() ([]hnslib.HNSEndpoint, error) {
+	return hnslib.HNSListEndpointRequest()
 }
 
-func (s networkStats) GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error) {
-	return hcsshim.GetHNSEndpointStats(endpointName)
+func (s networkStats) GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpointStats, error) {
+	return hnslib.GetHNSEndpointStats(endpointName)
 }
 
 // listContainerNetworkStats returns the network stats of all the running containers.
-func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.NetworkStats, error) {
+func (p *criStatsProvider) listContainerNetworkStats(logger klog.Logger) (map[string]*statsapi.NetworkStats, error) {
 	networkStatsProvider := newNetworkStatsProvider(p)
-
 	endpoints, err := networkStatsProvider.HNSListEndpointRequest()
 	if err != nil {
-		klog.ErrorS(err, "Failed to fetch current HNS endpoints")
+		logger.Error(err, "Failed to fetch current HNS endpoints")
 		return nil, err
 	}
 
@@ -63,7 +63,7 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 	for _, endpoint := range endpoints {
 		endpointStats, err := networkStatsProvider.GetHNSEndpointStats(endpoint.Id)
 		if err != nil {
-			klog.V(2).InfoS("Failed to fetch statistics for endpoint, continue to get stats for other endpoints", "endpointId", endpoint.Id, "containers", endpoint.SharedContainers)
+			logger.V(2).Info("Failed to fetch statistics for endpoint, continue to get stats for other endpoints", "endpointId", endpoint.Id, "containers", endpoint.SharedContainers)
 			continue
 		}
 
@@ -82,8 +82,8 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 	return networkStats, nil
 }
 
-func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.PodSandboxStats,
-	ps *statsapi.PodStats, fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
+func (p *criStatsProvider) addCRIPodContainerStats(logger klog.Logger, criSandboxStat *runtimeapi.PodSandboxStats,
+	ps *statsapi.PodStats, fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
 	rootFsInfo *cadvisorapiv2.FsInfo,
@@ -94,7 +94,7 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 			continue
 		}
 		// Fill available stats for full set of required pod stats
-		cs, err := p.makeWinContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata())
+		cs, err := p.makeWinContainerStats(logger, criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata())
 		if err != nil {
 			return fmt.Errorf("make container stats: %w", err)
 
@@ -106,10 +106,11 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 }
 
 func (p *criStatsProvider) makeWinContainerStats(
+	logger klog.Logger,
 	stats *runtimeapi.WindowsContainerStats,
 	container *runtimeapi.Container,
 	rootFsInfo *cadvisorapiv2.FsInfo,
-	fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
+	fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
 	meta *runtimeapi.PodSandboxMetadata) (*statsapi.ContainerStats, error) {
 	result := &statsapi.ContainerStats{
 		Name: stats.Attributes.Metadata.Name,
@@ -130,8 +131,8 @@ func (p *criStatsProvider) makeWinContainerStats(
 		}
 	} else {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.CPU.UsageCoreNanoSeconds = uint64Ptr(0)
-		result.CPU.UsageNanoCores = uint64Ptr(0)
+		result.CPU.UsageCoreNanoSeconds = ptr.To[uint64](0)
+		result.CPU.UsageNanoCores = ptr.To[uint64](0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
@@ -144,11 +145,15 @@ func (p *criStatsProvider) makeWinContainerStats(
 		if stats.Memory.PageFaults != nil {
 			result.Memory.PageFaults = &stats.Memory.PageFaults.Value
 		}
+		if stats.Memory.CommitMemoryBytes != nil {
+			result.Memory.UsageBytes = &stats.Memory.CommitMemoryBytes.Value
+		}
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.Memory.WorkingSetBytes = uint64Ptr(0)
-		result.Memory.AvailableBytes = uint64Ptr(0)
-		result.Memory.PageFaults = uint64Ptr(0)
+		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
+		result.Memory.AvailableBytes = ptr.To[uint64](0)
+		result.Memory.PageFaults = ptr.To[uint64](0)
+		result.Memory.UsageBytes = ptr.To[uint64](0)
 	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))
@@ -159,13 +164,13 @@ func (p *criStatsProvider) makeWinContainerStats(
 	var err error
 	fsID := stats.GetWritableLayer().GetFsId()
 	if fsID != nil {
-		imageFsInfo, found := fsIDtoInfo[*fsID]
+		imageFsInfo, found := fsIDtoInfo[fsID.Mountpoint]
 		if !found {
-			imageFsInfo, err = p.getFsInfo(fsID)
+			imageFsInfo, err = p.getFsInfo(logger, fsID)
 			if err != nil {
 				return nil, fmt.Errorf("get filesystem info: %w", err)
 			}
-			fsIDtoInfo[*fsID] = imageFsInfo
+			fsIDtoInfo[fsID.Mountpoint] = imageFsInfo
 		}
 		if imageFsInfo != nil {
 			// The image filesystem id is unknown to the local node or there's
@@ -181,13 +186,13 @@ func (p *criStatsProvider) makeWinContainerStats(
 	// officially support in-place upgrade anyway.
 	result.Logs, err = p.hostStatsProvider.getPodContainerLogStats(meta.GetNamespace(), meta.GetName(), types.UID(meta.GetUid()), container.GetMetadata().GetName(), rootFsInfo)
 	if err != nil {
-		klog.ErrorS(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
+		logger.Error(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
 	}
 	return result, nil
 }
 
-// hcsStatsToNetworkStats converts hcsshim.Statistics.Network to statsapi.NetworkStats
-func hcsStatsToNetworkStats(timestamp time.Time, hcsStats *hcsshim.HNSEndpointStats, endpointName string) *statsapi.NetworkStats {
+// hcsStatsToNetworkStats converts hnslib.Statistics.Network to statsapi.NetworkStats
+func hcsStatsToNetworkStats(timestamp time.Time, hcsStats *hnslib.HNSEndpointStats, endpointName string) *statsapi.NetworkStats {
 	result := &statsapi.NetworkStats{
 		Time:       metav1.NewTime(timestamp),
 		Interfaces: make([]statsapi.InterfaceStats, 0),
@@ -202,7 +207,7 @@ func hcsStatsToNetworkStats(timestamp time.Time, hcsStats *hcsshim.HNSEndpointSt
 	return result
 }
 
-func hcsStatToInterfaceStat(hcsStats *hcsshim.HNSEndpointStats, endpointName string) statsapi.InterfaceStats {
+func hcsStatToInterfaceStat(hcsStats *hnslib.HNSEndpointStats, endpointName string) statsapi.InterfaceStats {
 	iStat := statsapi.InterfaceStats{
 		Name:    endpointName,
 		RxBytes: &hcsStats.BytesReceived,
@@ -231,9 +236,13 @@ func addCRIPodMemoryStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandb
 	ps.Memory = &statsapi.MemoryStats{
 		Time:            metav1.NewTime(time.Unix(0, criMemory.Timestamp)),
 		AvailableBytes:  valueOfUInt64Value(criMemory.AvailableBytes),
+		UsageBytes:      valueOfUInt64Value(criMemory.CommitMemoryBytes),
 		WorkingSetBytes: valueOfUInt64Value(criMemory.WorkingSetBytes),
 		PageFaults:      valueOfUInt64Value(criMemory.PageFaults),
 	}
+}
+
+func addCRIPodIOStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
 }
 
 func addCRIPodProcessStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
@@ -269,7 +278,67 @@ func criInterfaceToWinSummary(criIface *runtimeapi.WindowsNetworkInterfaceUsage)
 	}
 }
 
-// newNetworkStatsProvider uses the real windows hcsshim if not provided otherwise if the interface is provided
+// addCRIPodContainerCPUAndMemoryStats adds container CPU and memory stats from CRI to the PodStats.
+func (p *criStatsProvider) addCRIPodContainerCPUAndMemoryStats(
+	criSandboxStat *runtimeapi.PodSandboxStats,
+	ps *statsapi.PodStats,
+	containerMap map[string]*runtimeapi.Container) {
+	if criSandboxStat == nil || criSandboxStat.Windows == nil {
+		return
+	}
+	for _, criContainerStat := range criSandboxStat.Windows.Containers {
+		container, found := containerMap[criContainerStat.Attributes.Id]
+		if !found {
+			continue
+		}
+		// Fill available CPU and memory stats for resource metrics
+		cs := p.makeWinContainerCPUAndMemoryStats(criContainerStat, time.Unix(0, container.CreatedAt))
+		ps.Containers = append(ps.Containers, *cs)
+	}
+}
+
+// makeWinContainerCPUAndMemoryStats creates container stats with only CPU and memory populated.
+// This is a lighter-weight version for the resource metrics endpoint.
+func (p *criStatsProvider) makeWinContainerCPUAndMemoryStats(
+	stats *runtimeapi.WindowsContainerStats,
+	startTime time.Time,
+) *statsapi.ContainerStats {
+	result := &statsapi.ContainerStats{
+		Name:      stats.Attributes.Metadata.Name,
+		StartTime: metav1.NewTime(startTime),
+	}
+	if stats.Cpu != nil {
+		result.CPU = &statsapi.CPUStats{
+			Time:                 metav1.NewTime(time.Unix(0, stats.Cpu.Timestamp)),
+			UsageCoreNanoSeconds: ptr.To(stats.Cpu.UsageCoreNanoSeconds.GetValue()),
+			UsageNanoCores:       ptr.To(stats.Cpu.UsageNanoCores.GetValue()),
+		}
+	} else {
+		result.CPU = &statsapi.CPUStats{
+			Time:                 metav1.NewTime(time.Unix(0, time.Now().UnixNano())),
+			UsageCoreNanoSeconds: ptr.To[uint64](0),
+			UsageNanoCores:       ptr.To[uint64](0),
+		}
+	}
+	if stats.Memory != nil {
+		result.Memory = &statsapi.MemoryStats{
+			Time:            metav1.NewTime(time.Unix(0, stats.Memory.Timestamp)),
+			WorkingSetBytes: ptr.To(stats.Memory.WorkingSetBytes.GetValue()),
+			AvailableBytes:  ptr.To(stats.Memory.AvailableBytes.GetValue()),
+			PageFaults:      ptr.To(stats.Memory.PageFaults.GetValue()),
+		}
+	} else {
+		result.Memory = &statsapi.MemoryStats{
+			Time:            metav1.NewTime(time.Unix(0, time.Now().UnixNano())),
+			WorkingSetBytes: ptr.To[uint64](0),
+			AvailableBytes:  ptr.To[uint64](0),
+			PageFaults:      ptr.To[uint64](0),
+		}
+	}
+	return result
+}
+
+// newNetworkStatsProvider uses the real windows hnslib if not provided otherwise if the interface is provided
 // by the cristatsprovider in testing scenarios it uses that one
 func newNetworkStatsProvider(p *criStatsProvider) windowsNetworkStatsProvider {
 	var statsProvider windowsNetworkStatsProvider

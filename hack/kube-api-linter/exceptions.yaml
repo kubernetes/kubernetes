@@ -1,0 +1,101 @@
+# Exceptions for kube-api-linter.
+# Exceptions are used for kube-api-linter to ignore existing issues that cannot be fixed without breaking changes.
+
+# Pre-existing issues from the conditions linter
+
+# Conditions generally should be a metav1.Condition, and should not use custom condition types.
+- text: "Conditions field in StorageVersionStatus|StatefulSetStatus|DeploymentStatus|DaemonSetStatus|ReplicaSetStatus|HorizontalPodAutoscalerStatus|JobStatus|CertificateSigningRequestStatus|PersistentVolumeClaimStatus|ReplicationControllerStatus|ServiceStatus|NodeStatus|NamespaceStatus|ComponentStatus|PodStatus|FlowSchemaStatus|PriorityLevelConfigurationStatus|FlowSchemaStatus|PriorityLevelConfigurationStatus|PodDisruptionBudgetStatus|AllocatedDeviceStatus|Endpoint|StatefulSetStatus|DeploymentStatus|DaemonSetStatus|ReplicaSetStatus|HorizontalPodAutoscalerStatus|JobStatus|CertificateSigningRequestStatus|PersistentVolumeClaimStatus|ReplicationControllerStatus|ServiceStatus|NodeStatus|NamespaceStatus|ComponentStatus|PodStatus|FlowSchemaStatus|PriorityLevelConfigurationStatus|FlowSchemaStatus|PriorityLevelConfigurationStatus|PodDisruptionBudgetStatus|AllocatedDeviceStatus|Endpoint|StorageVersionMigrationStatus must be a slice of metav1.Condition"
+  path: "staging/src/k8s.io/api/"
+
+# Conditions should have patch strategy markers, but changing these after shipping a client is a breaking change.
+# Clients would treat these as atomic, when the patch strategy should be merge.
+- text: "Conditions field in ValidatingAdmissionPolicyStatus is missing the following markers: patchStrategy=merge, patchMergeKey=type"
+  path: "staging/src/k8s.io/api/admissionregistration/"
+- text: "Conditions field in ValidatingAdmissionPolicyStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,3,rep,name=conditions\"`"
+  path: "staging/src/k8s.io/api/admissionregistration/"
+- text: "Conditions field in PodDisruptionBudgetStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`"
+  path: "staging/src/k8s.io/api/policy/"
+- text: "Conditions field in AllocatedDeviceStatus is missing the following markers: patchStrategy=merge, patchMergeKey=type"
+  path: "staging/src/k8s.io/api/resource/"
+- text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
+  path: "staging/src/k8s.io/api/resource/"
+
+# Commentstart - Ignore commentstart issues for existing API group
+# TODO: For each existing API group, we aim to remove it over time.
+- text: "godoc for field .* should start with '.* ...'"
+  path: "staging/src/k8s.io/api/(apiserverinternal|apps|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+- text: "field .* is missing godoc comment"
+  path: "staging/src/k8s.io/api/autoscaling/"
+
+
+# notimestamp: Legacy 'Timestamp' fields retained for backward compatibility
+- text: 'notimestamp: naming convention "notimestamp": field TokenRequestStatus.ExpirationTimestamp: prefer use of the term ''time'' over ''timestamp'''
+  path: "staging/src/k8s.io/api/authentication/v1/types.go"
+- text: 'notimestamp: naming convention "notimestamp": field (PodLogOptions.Timestamps|Event.FirstTimestamp|Event.LastTimestamp): prefer use of the term ''time'' over ''timestamp'''
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+- text: 'notimestamp: naming convention "notimestamp": field Event.Deprecated(FirstTimestamp|LastTimestamp): prefer use of the term ''time'' over ''timestamp'''
+  path: "staging/src/k8s.io/api/events/(v1|v1beta1)/types.go"
+- text: 'notimestamp: naming convention "notimestamp": field AllocationResult.AllocationTimestamp: prefer use of the term ''time'' over ''timestamp'''
+  path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+
+# Pre-existing issues from the conflictmarkers linter
+# The Error field in some older API types is marked as both optional and required.
+# This is incorrect, but cannot be changed without breaking changes.
+- text: "field PortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+- text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+  path: "staging/src/k8s.io/api/extensions/v1beta1/types.go"
+- text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+  path: "staging/src/k8s.io/api/networking/v1/types.go"
+- text: "field IngressPortStatus.Error has conflicting markers: optional_vs_required: {\\[optional\\], \\[kubebuilder:validation:Required\\]}. fields cannot be both optional and required"
+  path: "staging/src/k8s.io/api/networking/v1beta1/types.go"
+
+# The following exceptions are for fields in stable or deprecated APIs that cannot be
+# changed due to backward compatibility constraints. Each rule is scoped to the
+# specific field to avoid hiding new violations.
+
+## For the "Extra" field, which is common across several auth-related APIs.
+- text: "field UserInfo.Extra should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/authentication/(v1|v1beta1)/types.go"
+- text: "field SubjectAccessReviewSpec.Extra should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/authorization/(v1|v1beta1)/types.go"
+- text: "field CertificateSigningRequestSpec.Extra should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/certificates/(v1|v1beta1)/types.go"
+
+## For ResourceList fields in the core API.
+- text: "field (PersistentVolumeSpec.Capacity|ContainerStatus.AllocatedResources|PodSpec.Overhead|ResourceQuotaSpec.Hard) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+- text: "field (ResourceRequirements|VolumeResourceRequirements).(Limits|Requests) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+- text: "field LimitRangeItem.(Max|Min|Default|DefaultRequest|MaxLimitRequestRatio) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+- text: "field ResourceQuotaStatus.(Hard|Used) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+- text: "type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+
+## For the Secret.Data and ConfigMap.BinaryData fields in the core API.
+- text: "field (Secret.Data|ConfigMap.BinaryData) should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+
+## For map fields in the resource API (across all versions).
+- text: "field (CounterSet|DeviceCounterConsumption).Counters should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+- text: "field BasicDevice.(Attributes|Capacity) should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/resource/v1beta1/types.go"
+- text: "field Device.(Attributes|Capacity) should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
+- text: "field (CapacityRequirements.Requests|DeviceRequestAllocationResult.ConsumedCapacity) should not use a map type, use a list type with a unique name/identifier instead"
+  path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+
+# OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
+- text: "must be marked as optional or required"
+  path: "staging/src/k8s.io/api/(admission|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|networking|rbac|resource|storage|storagemigration)"
+
+# OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
+- text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
+  path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
+
+# jsontags: 'Port' must be capitalized for backward compatibility
+- text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
+  path: "staging/src/k8s.io/api/core/v1/types.go"

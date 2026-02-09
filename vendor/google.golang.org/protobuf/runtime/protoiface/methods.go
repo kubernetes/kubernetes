@@ -39,6 +39,9 @@ type Methods = struct {
 
 	// CheckInitialized returns an error if any required fields in the message are not set.
 	CheckInitialized func(CheckInitializedInput) (CheckInitializedOutput, error)
+
+	// Equal compares two messages and returns EqualOutput.Equal == true if they are equal.
+	Equal func(EqualInput) EqualOutput
 }
 
 // SupportFlags indicate support for optional features.
@@ -119,6 +122,22 @@ type UnmarshalInputFlags = uint8
 
 const (
 	UnmarshalDiscardUnknown UnmarshalInputFlags = 1 << iota
+
+	// UnmarshalAliasBuffer permits unmarshal operations to alias the input buffer.
+	// The unmarshaller must not modify the contents of the buffer.
+	UnmarshalAliasBuffer
+
+	// UnmarshalValidated indicates that validation has already been
+	// performed on the input buffer.
+	UnmarshalValidated
+
+	// UnmarshalCheckRequired is set if this unmarshal operation ultimately will care if required fields are
+	// initialized.
+	UnmarshalCheckRequired
+
+	// UnmarshalNoLazyDecoding is set if this unmarshal operation should not use
+	// lazy decoding, even when otherwise available.
+	UnmarshalNoLazyDecoding
 )
 
 // UnmarshalOutputFlags are output from the Unmarshal method.
@@ -165,4 +184,19 @@ type CheckInitializedInput = struct {
 // CheckInitializedOutput is output from the CheckInitialized method.
 type CheckInitializedOutput = struct {
 	pragma.NoUnkeyedLiterals
+}
+
+// EqualInput is input to the Equal method.
+type EqualInput = struct {
+	pragma.NoUnkeyedLiterals
+
+	MessageA protoreflect.Message
+	MessageB protoreflect.Message
+}
+
+// EqualOutput is output from the Equal method.
+type EqualOutput = struct {
+	pragma.NoUnkeyedLiterals
+
+	Equal bool
 }

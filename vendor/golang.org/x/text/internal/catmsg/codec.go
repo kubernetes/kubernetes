@@ -257,7 +257,7 @@ func (d *Decoder) setError(err error) {
 // Language returns the language in which the message is being rendered.
 //
 // The destination language may be a child language of the language used for
-// encoding. For instance, a decoding language of "pt-PT"" is consistent with an
+// encoding. For instance, a decoding language of "pt-PT" is consistent with an
 // encoding language of "pt".
 func (d *Decoder) Language() language.Tag { return d.tag }
 

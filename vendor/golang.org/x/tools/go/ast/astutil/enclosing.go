@@ -106,8 +106,21 @@ func PathEnclosingInterval(root *ast.File, start, end token.Pos) (path []ast.Nod
 
 			// Does augmented child strictly contain [start, end)?
 			if augPos <= start && end <= augEnd {
-				_, isToken := child.(tokenNode)
-				return isToken || visit(child)
+				if is[tokenNode](child) {
+					return true
+				}
+
+				// childrenOf elides the FuncType node beneath FuncDecl.
+				// Add it back here for TypeParams, Params, Results,
+				// all FieldLists). But we don't add it back for the "func" token
+				// even though it is the tree at FuncDecl.Type.Func.
+				if decl, ok := node.(*ast.FuncDecl); ok {
+					if fields, ok := child.(*ast.FieldList); ok && fields != decl.Recv {
+						path = append(path, decl.Type)
+					}
+				}
+
+				return visit(child)
 			}
 
 			// Does [start, end) overlap multiple children?
@@ -194,6 +207,9 @@ func childrenOf(n ast.Node) []ast.Node {
 		return false // no recursion
 	})
 
+	// TODO(adonovan): be more careful about missing (!Pos.Valid)
+	// tokens in trees produced from invalid input.
+
 	// Then add fake Nodes for bare tokens.
 	switch n := n.(type) {
 	case *ast.ArrayType:
@@ -213,9 +229,12 @@ func childrenOf(n ast.Node) []ast.Node {
 		children = append(children, tok(n.OpPos, len(n.Op.String())))
 
 	case *ast.BlockStmt:
-		children = append(children,
-			tok(n.Lbrace, len("{")),
-			tok(n.Rbrace, len("}")))
+		if n.Lbrace.IsValid() {
+			children = append(children, tok(n.Lbrace, len("{")))
+		}
+		if n.Rbrace.IsValid() {
+			children = append(children, tok(n.Rbrace, len("}")))
+		}
 
 	case *ast.BranchStmt:
 		children = append(children,
@@ -291,9 +310,12 @@ func childrenOf(n ast.Node) []ast.Node {
 		// TODO(adonovan): Field.{Doc,Comment,Tag}?
 
 	case *ast.FieldList:
-		children = append(children,
-			tok(n.Opening, len("(")), // or len("[")
-			tok(n.Closing, len(")"))) // or len("]")
+		if n.Opening.IsValid() {
+			children = append(children, tok(n.Opening, len("(")))
+		}
+		if n.Closing.IsValid() {
+			children = append(children, tok(n.Closing, len(")")))
+		}
 
 	case *ast.File:
 		// TODO test: Doc
@@ -313,6 +335,8 @@ func childrenOf(n ast.Node) []ast.Node {
 		//
 		// As a workaround, we inline the case for FuncType
 		// here and order things correctly.
+		// We also need to insert the elided FuncType just
+		// before the 'visit' recursion.
 		//
 		children = nil // discard ast.Walk(FuncDecl) info subtrees
 		children = append(children, tok(n.Type.Func, len("func")))
@@ -631,4 +655,9 @@ func NodeDescription(n ast.Node) string {
 
 	}
 	panic(fmt.Sprintf("unexpected node type: %T", n))
+}
+
+func is[T any](x any) bool {
+	_, ok := x.(T)
+	return ok
 }

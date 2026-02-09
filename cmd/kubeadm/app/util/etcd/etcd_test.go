@@ -24,10 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
@@ -35,6 +34,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
 )
 
@@ -57,7 +57,7 @@ func (f *fakeEtcdClient) Endpoints() []string {
 }
 
 // MemberList lists the current cluster membership.
-func (f *fakeEtcdClient) MemberList(_ context.Context) (*clientv3.MemberListResponse, error) {
+func (f *fakeEtcdClient) MemberList(_ context.Context, _ ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
 	return &clientv3.MemberListResponse{
 		Members: f.members,
 	}, nil
@@ -202,7 +202,7 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			for _, pod := range rt.pods {
 				if err := pod.Create(client); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
@@ -284,7 +284,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			for i, pod := range rt.pods {
 				if err := pod.CreateWithPodSuffix(client, strconv.Itoa(i)); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
@@ -383,7 +383,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			for _, pod := range rt.pods {
 				if err := pod.Create(client); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
@@ -637,18 +637,19 @@ func TestListMembers(t *testing.T) {
 	}
 }
 
-func TestIsLearner(t *testing.T) {
+func TestGetMemberStatus(t *testing.T) {
 	type fields struct {
 		Endpoints       []string
 		newEtcdClient   func(endpoints []string) (etcdClient, error)
 		listMembersFunc func(timeout time.Duration) (*clientv3.MemberListResponse, error)
 	}
 	tests := []struct {
-		name      string
-		fields    fields
-		memberID  uint64
-		want      bool
-		wantError bool
+		name        string
+		fields      fields
+		memberID    uint64
+		wantLearner bool
+		wantStarted bool
+		wantError   bool
 	}{
 		{
 			name: "The specified member is not a learner",
@@ -670,8 +671,9 @@ func TestIsLearner(t *testing.T) {
 					return f, nil
 				},
 			},
-			memberID: 1,
-			want:     false,
+			memberID:    1,
+			wantLearner: false,
+			wantStarted: true,
 		},
 		{
 			name: "The specified member is a learner",
@@ -700,8 +702,9 @@ func TestIsLearner(t *testing.T) {
 					return f, nil
 				},
 			},
-			memberID: 1,
-			want:     true,
+			memberID:    1,
+			wantLearner: true,
+			wantStarted: true,
 		},
 		{
 			name: "The specified member does not exist",
@@ -714,8 +717,10 @@ func TestIsLearner(t *testing.T) {
 					return f, nil
 				},
 			},
-			memberID: 3,
-			want:     false,
+			memberID:    3,
+			wantLearner: false,
+			wantStarted: false,
+			wantError:   true,
 		},
 		{
 			name: "Learner ID is empty",
@@ -736,7 +741,32 @@ func TestIsLearner(t *testing.T) {
 					return f, nil
 				},
 			},
-			want: true,
+			wantLearner: true,
+			wantStarted: true,
+		},
+		{
+			name: "Learner member is not started (no name)",
+			fields: fields{
+				Endpoints: []string{},
+				newEtcdClient: func(endpoints []string) (etcdClient, error) {
+					f := &fakeEtcdClient{
+						members: []*pb.Member{
+							{
+								ID:   1,
+								Name: "",
+								PeerURLs: []string{
+									"https://member2:2380",
+								},
+								IsLearner: true,
+							},
+						},
+					}
+					return f, nil
+				},
+			},
+			memberID:    1,
+			wantLearner: true,
+			wantStarted: false,
 		},
 		{
 			name: "ListMembers returns an error",
@@ -760,8 +790,10 @@ func TestIsLearner(t *testing.T) {
 					return nil, errNotImplemented
 				},
 			},
-			want:      false,
-			wantError: true,
+			memberID:    1,
+			wantLearner: false,
+			wantStarted: false,
+			wantError:   true,
 		},
 	}
 	for _, tt := range tests {
@@ -778,12 +810,15 @@ func TestIsLearner(t *testing.T) {
 					return resp, nil
 				}
 			}
-			got, err := c.isLearner(tt.memberID)
-			if got != tt.want {
-				t.Errorf("isLearner() = %v, want %v", got, tt.want)
+			gotLearner, gotStarted, err := c.getMemberStatus(tt.memberID)
+			if gotLearner != tt.wantLearner {
+				t.Errorf("getMemberStatus() isLearner = %v, want %v", gotLearner, tt.wantLearner)
 			}
-			if (err != nil) != (tt.wantError) {
-				t.Errorf("isLearner() error = %v, wantError %v", err, tt.wantError)
+			if gotStarted != tt.wantStarted {
+				t.Errorf("getMemberStatus() started = %v, want %v", gotStarted, tt.wantStarted)
+			}
+			if (err != nil) != tt.wantError {
+				t.Errorf("getMemberStatus() error = %v, wantError %v", err, tt.wantError)
 			}
 		})
 	}

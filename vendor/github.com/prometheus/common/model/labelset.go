@@ -114,10 +114,10 @@ func (ls LabelSet) Clone() LabelSet {
 }
 
 // Merge is a helper function to non-destructively merge two label sets.
-func (l LabelSet) Merge(other LabelSet) LabelSet {
-	result := make(LabelSet, len(l))
+func (ls LabelSet) Merge(other LabelSet) LabelSet {
+	result := make(LabelSet, len(ls))
 
-	for k, v := range l {
+	for k, v := range ls {
 		result[k] = v
 	}
 
@@ -140,7 +140,7 @@ func (ls LabelSet) FastFingerprint() Fingerprint {
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
-func (l *LabelSet) UnmarshalJSON(b []byte) error {
+func (ls *LabelSet) UnmarshalJSON(b []byte) error {
 	var m map[LabelName]LabelValue
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err
@@ -153,6 +153,6 @@ func (l *LabelSet) UnmarshalJSON(b []byte) error {
 			return fmt.Errorf("%q is not a valid label name", ln)
 		}
 	}
-	*l = LabelSet(m)
+	*ls = LabelSet(m)
 	return nil
 }

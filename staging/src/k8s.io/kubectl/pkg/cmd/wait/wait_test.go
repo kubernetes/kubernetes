@@ -180,6 +180,20 @@ func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Uns
 	}
 }
 
+func newUnstructuredWithNewID(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": apiVersion,
+			"kind":       kind,
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+				"name":      name,
+				"uid":       "some-UID-value-new",
+			},
+		},
+	}
+}
+
 func newUnstructuredWithGeneration(apiVersion, kind, namespace, name string, generation int64) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -232,7 +246,7 @@ func createUnstructured(t *testing.T, config string) *unstructured.Unstructured 
 	t.Helper()
 	result := map[string]interface{}{}
 
-	require.False(t, strings.Contains(config, "\t"), "Yaml %s cannot contain tabs", config)
+	require.NotContains(t, config, "\t", "Yaml %s cannot contain tabs", config)
 	require.NoError(t, yaml.Unmarshal([]byte(config), &result), "Could not parse config:\n\n%s\n", config)
 
 	return &unstructured.Unstructured{
@@ -544,6 +558,32 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			timeout: 10 * time.Second,
 		},
+		{
+			name: "when list watch, receives a new pod",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
+				})
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(newUnstructuredWithNewID("group/version", "TheKind", "ns-foo", "name-foo")), nil
+				})
+				return fakeClient
+			},
+			timeout: 10 * time.Second,
+			uidMap: UIDMap{
+				ResourceLocation{GroupResource: schema.GroupResource{Group: "group", Resource: "theresource"}, Namespace: "ns-foo", Name: "name-foo"}: types.UID("some-UID-value"),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -559,7 +599,7 @@ func TestWaitForDeletion(t *testing.T) {
 				ConditionFn: IsDeleted,
 				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
 			}
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
 			case err != nil && len(test.expectedErr) == 0:
@@ -969,7 +1009,7 @@ func TestWaitForCondition(t *testing.T) {
 				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
 				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
 			}
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
 			case err != nil && len(test.expectedErr) == 0:
@@ -1040,7 +1080,7 @@ func TestWaitForCreate(t *testing.T) {
 				ForCondition: "create",
 				IOStreams:    genericiooptions.NewTestIOStreamsDiscard(),
 			}
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
 			case err != nil && len(test.expectedErr) == 0:
@@ -1072,7 +1112,7 @@ func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
 		IOStreams:      genericiooptions.NewTestIOStreamsDiscard(),
 		ForCondition:   "delete",
 	}
-	err := o.RunWait()
+	err := o.RunWaitContext(t.Context())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1327,7 +1367,7 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
@@ -1590,7 +1630,7 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
-			err := o.RunWait()
+			err := o.RunWaitContext(t.Context())
 
 			switch {
 			case err == nil && len(test.expectedErr) == 0:

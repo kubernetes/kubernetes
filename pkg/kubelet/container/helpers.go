@@ -29,9 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
@@ -46,31 +49,37 @@ type HandlerRunner interface {
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (contOpts *RunContainerOptions, cleanupAction func(), err error)
-	GetPodDNS(pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
+	GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes ImageVolumes) (contOpts *RunContainerOptions, cleanupAction func(), err error)
+	GetPodDNS(ctx context.Context, pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
 	// GetPodCgroupParent returns the CgroupName identifier, and its literal cgroupfs form on the host
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
-	GeneratePodHostNameAndDomain(pod *v1.Pod) (hostname string, hostDomain string, err error)
+	GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 
 	// GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-	GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
+	GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
 
 	// PrepareDynamicResources prepares resources for a pod.
-	PrepareDynamicResources(pod *v1.Pod) error
+	PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error
 
 	// UnprepareDynamicResources unprepares resources for a a pod.
-	UnprepareDynamicResources(pod *v1.Pod) error
+	UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error
+
+	// SetPodWatchCondition flags a pod to be inspected until the condition is met.
+	SetPodWatchCondition(types.UID, string, func(*PodStatus) bool)
+
+	// PodCPUAndMemoryStats reads the latest CPU & memory usage stats.
+	PodCPUAndMemoryStats(context.Context, *v1.Pod, *PodStatus) (*statsapi.PodStats, error)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
+func ShouldContainerBeRestarted(logger klog.Logger, container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
 	// Once a pod has been marked deleted, it should not be restarted
 	if pod.DeletionTimestamp != nil {
 		return false
@@ -91,14 +100,82 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 		return true
 	}
 	// Check RestartPolicy for dead container
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+		return podutil.ContainerShouldRestart(*container, pod.Spec, int32(status.ExitCode))
+	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		klog.V(4).InfoS("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
+		logger.V(4).Info("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
 		return false
 	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
 		// Check the exit code.
 		if status.ExitCode == 0 {
-			klog.V(4).InfoS("Already successfully ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
+			logger.V(4).Info("Already successfully ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
+			return false
+		}
+	}
+	return true
+}
+
+// ShouldAllContainersRestart checks if the pod should be restarted.
+// First checks whether the apiPodStatus has the AllContainersRestarting condition.
+// Then checks if any container from podStatus are exited with matching rules,
+// or any containers from apiPodStatus are exited with matching rules.
+func ShouldAllContainersRestart(pod *v1.Pod, podStatus *PodStatus, apiPodStatus *v1.PodStatus) bool {
+	if apiPodStatus != nil {
+		for _, cond := range apiPodStatus.Conditions {
+			if cond.Type == v1.AllContainersRestarting && cond.Status == v1.ConditionTrue {
+				return true
+			}
+		}
+	}
+
+	nameToAPIStatus := make(map[string]*v1.ContainerStatus)
+	if apiPodStatus != nil {
+		for i := range apiPodStatus.InitContainerStatuses {
+			nameToAPIStatus[apiPodStatus.InitContainerStatuses[i].Name] = &apiPodStatus.InitContainerStatuses[i]
+		}
+		for i := range apiPodStatus.ContainerStatuses {
+			nameToAPIStatus[apiPodStatus.ContainerStatuses[i].Name] = &apiPodStatus.ContainerStatuses[i]
+		}
+	}
+
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if c == nil {
+			continue
+		}
+		if podStatus != nil {
+			status := podStatus.FindContainerStatusByName(c.Name)
+			if status == nil || status.State != ContainerStateExited {
+				continue
+			}
+			exitCode := int32(status.ExitCode)
+			rule, ok := podutil.FindMatchingContainerRestartRule(*c, exitCode)
+			if ok && rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+		if apiPodStatus != nil {
+			apiStatus, ok := nameToAPIStatus[c.Name]
+			if !ok || apiStatus.State.Terminated == nil {
+				continue
+			}
+			exitCode := apiStatus.State.Terminated.ExitCode
+			rule, ok := podutil.FindMatchingContainerRestartRule(*c, exitCode)
+			if ok && rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// AllContainersRestartCleanedUp returns true if all containers are removed
+// from the runtime and podStatus.
+func AllContainersRestartCleanedUp(pod *v1.Pod, podStatus *PodStatus) bool {
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.Containers|podutil.InitContainers) {
+		if podStatus.FindContainerStatusByName(c.Name) != nil {
 			return false
 		}
 	}
@@ -148,7 +225,8 @@ func v1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
 }
 
 // ExpandContainerCommandOnlyStatic substitutes only static environment variable values from the
-// container environment definitions. This does *not* include valueFrom substitutions.
+// container environment definitions. This does *not* include valueFrom substitutions. Note any unbound
+// variables will not be expanded or empty substituted, i.e. "echo $(MISSING) => echo $(MISSING)".
 // TODO: callers should use ExpandContainerCommandAndArgs with a fully resolved list of environment.
 func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVar) (command []string) {
 	mapping := expansion.MappingFuncFor(v1EnvVarsToMap(envs))
@@ -353,7 +431,7 @@ func AllContainersAreWindowsHostProcess(pod *v1.Pod) bool {
 }
 
 // MakePortMappings creates internal port mapping from api port mapping.
-func MakePortMappings(container *v1.Container) (ports []PortMapping) {
+func MakePortMappings(logger klog.Logger, container *v1.Container) (ports []PortMapping) {
 	names := make(map[string]struct{})
 	for _, p := range container.Ports {
 		pm := PortMapping{
@@ -382,7 +460,7 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 
 		// Protect against a port name being used more than once in a container.
 		if _, ok := names[name]; ok {
-			klog.InfoS("Port name conflicted, it is defined more than once", "portName", name)
+			logger.Info("Port name conflicted, it is defined more than once", "portName", name)
 			continue
 		}
 		ports = append(ports, pm)
@@ -393,6 +471,8 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 
 // HasAnyRegularContainerStarted returns true if any regular container has
 // started, which indicates all init containers have been initialized.
+// Deprecated: This function is not accurate when its pod sandbox is recreated.
+// Use HasAnyActiveRegularContainerStarted instead.
 func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStatus) bool {
 	if len(statuses) == 0 {
 		return false
@@ -410,6 +490,29 @@ func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStat
 		if status.State.Running != nil || status.State.Terminated != nil {
 			return true
 		}
+	}
+
+	return false
+}
+
+// HasAnyActiveRegularContainerStarted returns true if any regular container of
+// the current pod sandbox has started, which indicates all init containers
+// have been initialized.
+func HasAnyActiveRegularContainerStarted(spec *v1.PodSpec, podStatus *PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+
+	containerNames := sets.New[string]()
+	for _, c := range spec.Containers {
+		containerNames.Insert(c.Name)
+	}
+
+	for _, status := range podStatus.ActiveContainerStatuses {
+		if !containerNames.Has(status.Name) {
+			continue
+		}
+		return true
 	}
 
 	return false

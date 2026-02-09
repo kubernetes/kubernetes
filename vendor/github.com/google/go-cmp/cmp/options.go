@@ -232,7 +232,15 @@ func (validator) apply(s *state, vx, vy reflect.Value) {
 		if t := s.curPath.Index(-2).Type(); t.Name() != "" {
 			// Named type with unexported fields.
 			name = fmt.Sprintf("%q.%v", t.PkgPath(), t.Name()) // e.g., "path/to/package".MyType
-			if _, ok := reflect.New(t).Interface().(error); ok {
+			isProtoMessage := func(t reflect.Type) bool {
+				m, ok := reflect.PointerTo(t).MethodByName("ProtoReflect")
+				return ok && m.Type.NumIn() == 1 && m.Type.NumOut() == 1 &&
+					m.Type.Out(0).PkgPath() == "google.golang.org/protobuf/reflect/protoreflect" &&
+					m.Type.Out(0).Name() == "Message"
+			}
+			if isProtoMessage(t) {
+				help = `consider using "google.golang.org/protobuf/testing/protocmp".Transform to compare proto.Message types`
+			} else if _, ok := reflect.New(t).Interface().(error); ok {
 				help = "consider using cmpopts.EquateErrors to compare error values"
 			} else if t.Comparable() {
 				help = "consider using cmpopts.EquateComparable to compare comparable Go types"

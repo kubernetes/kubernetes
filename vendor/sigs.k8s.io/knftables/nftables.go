@@ -17,11 +17,13 @@ limitations under the License.
 package knftables
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 )
 
 // Interface is an interface for running nftables commands against a given family and table.
@@ -43,7 +45,8 @@ type Interface interface {
 	// list and no error.
 	List(ctx context.Context, objectType string) ([]string, error)
 
-	// ListRules returns a list of the rules in a chain, in order. Note that at the
+	// ListRules returns a list of the rules in a chain, in order. If no chain name is
+	// specified, then all rules within the table will be returned. Note that at the
 	// present time, the Rule objects will have their `Comment` and `Handle` fields
 	// filled in, but *not* the actual `Rule` field. So this can only be used to find
 	// the handles of rules if they have unique comments to recognize them by, or if
@@ -70,6 +73,9 @@ type nftContext struct {
 type realNFTables struct {
 	nftContext
 
+	bufferMutex sync.Mutex
+	buffer      *bytes.Buffer
+
 	exec execer
 	path string
 }
@@ -84,8 +90,8 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 			family: family,
 			table:  table,
 		},
-
-		exec: execer,
+		buffer: &bytes.Buffer{},
+		exec:   execer,
 	}
 
 	nft.path, err = nft.exec.LookPath("nft")
@@ -135,34 +141,42 @@ func (nft *realNFTables) NewTransaction() *Transaction {
 
 // Run is part of Interface
 func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
+	nft.bufferMutex.Lock()
+	defer nft.bufferMutex.Unlock()
+
 	if tx.err != nil {
 		return tx.err
 	}
 
-	buf, err := tx.asCommandBuf()
+	nft.buffer.Reset()
+	err := tx.populateCommandBuf(nft.buffer)
 	if err != nil {
 		return err
 	}
 
 	cmd := exec.CommandContext(ctx, nft.path, "-f", "-")
-	cmd.Stdin = buf
+	cmd.Stdin = nft.buffer
 	_, err = nft.exec.Run(cmd)
 	return err
 }
 
 // Check is part of Interface
 func (nft *realNFTables) Check(ctx context.Context, tx *Transaction) error {
+	nft.bufferMutex.Lock()
+	defer nft.bufferMutex.Unlock()
+
 	if tx.err != nil {
 		return tx.err
 	}
 
-	buf, err := tx.asCommandBuf()
+	nft.buffer.Reset()
+	err := tx.populateCommandBuf(nft.buffer)
 	if err != nil {
 		return err
 	}
 
 	cmd := exec.CommandContext(ctx, nft.path, "--check", "-f", "-")
-	cmd.Stdin = buf
+	cmd.Stdin = nft.buffer
 	_, err = nft.exec.Run(cmd)
 	return err
 }
@@ -298,7 +312,13 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 
 // ListRules is part of Interface
 func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "chain", string(nft.family), nft.table, chain)
+	// If no chain is given, return all rules from within the table.
+	var cmd *exec.Cmd
+	if chain == "" {
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+	} else {
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "chain", string(nft.family), nft.table, chain)
+	}
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -311,8 +331,12 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 
 	rules := make([]*Rule, 0, len(jsonRules))
 	for _, jsonRule := range jsonRules {
+		parentChain, ok := jsonVal[string](jsonRule, "chain")
+		if !ok {
+			return nil, fmt.Errorf("unexpected JSON output from nft (rule with no chain)")
+		}
 		rule := &Rule{
-			Chain: chain,
+			Chain: parentChain,
 		}
 
 		// handle is written as an integer in nft's output, but json.Unmarshal
@@ -404,7 +428,7 @@ func (nft *realNFTables) ListElements(ctx context.Context, objectType, name stri
 	return elements, nil
 }
 
-// parseElementValue parses a JSON element key/value, handling concatenations, and
+// parseElementValue parses a JSON element key/value, handling concatenations, prefixes, and
 // converting numeric or "verdict" values to strings.
 func parseElementValue(json interface{}) ([]string, error) {
 	// json can be:
@@ -412,6 +436,14 @@ func parseElementValue(json interface{}) ([]string, error) {
 	//   - a single string, e.g. "192.168.1.3"
 	//
 	//   - a single number, e.g. 80
+	//
+	//   - a prefix, expressed as an object:
+	//     {
+	//       "prefix": {
+	//         "addr": "192.168.0.0",
+	//         "len": 16,
+	//       }
+	//     }
 	//
 	//   - a concatenation, expressed as an object containing an array of simple
 	//     values:
@@ -452,6 +484,17 @@ func parseElementValue(json interface{}) ([]string, error) {
 				}
 			}
 			return vals, nil
+		} else if prefix, _ := jsonVal[map[string]interface{}](val, "prefix"); prefix != nil {
+			// For prefix-type elements, return the element in CIDR representation.
+			addr, ok := jsonVal[string](prefix, "addr")
+			if !ok {
+				return nil, fmt.Errorf("could not parse 'addr' value as string: %q", prefix)
+			}
+			length, ok := jsonVal[float64](prefix, "len")
+			if !ok {
+				return nil, fmt.Errorf("could not parse 'len' value as number: %q", prefix)
+			}
+			return []string{fmt.Sprintf("%s/%d", addr, int(length))}, nil
 		} else if len(val) == 1 {
 			var verdict string
 			// We just checked that len(val) == 1, so this loop body will only

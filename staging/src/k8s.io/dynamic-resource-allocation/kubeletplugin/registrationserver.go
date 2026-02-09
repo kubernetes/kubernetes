@@ -19,6 +19,7 @@ package kubeletplugin
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
@@ -26,29 +27,79 @@ import (
 // registrationServer implements the kubelet plugin registration gRPC interface.
 type registrationServer struct {
 	driverName        string
-	endpoint          string
+	draEndpointPath   string
 	supportedVersions []string
 	status            *registerapi.RegistrationStatus
+
+	getInfoError                  atomic.Pointer[error]
+	notifyRegistrationStatusError atomic.Pointer[error]
+
+	registerapi.UnsafeRegistrationServer
 }
 
 var _ registerapi.RegistrationServer = &registrationServer{}
 
 // GetInfo is the RPC invoked by plugin watcher.
 func (e *registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
+	if err := e.getGetInfoError(); err != nil {
+		return nil, err
+	}
 	return &registerapi.PluginInfo{
 		Type:              registerapi.DRAPlugin,
 		Name:              e.driverName,
-		Endpoint:          e.endpoint,
+		Endpoint:          e.draEndpointPath,
 		SupportedVersions: e.supportedVersions,
 	}, nil
 }
 
 // NotifyRegistrationStatus is the RPC invoked by plugin watcher.
 func (e *registrationServer) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
+	if err := e.getNotifyRegistrationStatusError(); err != nil {
+		return nil, err
+	}
 	e.status = status
 	if !status.PluginRegistered {
 		return nil, fmt.Errorf("failed registration process: %+v", status.Error)
 	}
 
 	return &registerapi.RegistrationStatusResponse{}, nil
+}
+
+func (e *registrationServer) getGetInfoError() error {
+	errPtr := e.getInfoError.Load()
+	if errPtr == nil {
+		return nil
+	}
+	return *errPtr
+}
+
+func (e *registrationServer) getNotifyRegistrationStatusError() error {
+	errPtr := e.notifyRegistrationStatusError.Load()
+	if errPtr == nil {
+		return nil
+	}
+	return *errPtr
+}
+
+// setGetInfoError sets the error to be returned by the GetInfo handler of the registration server.
+// If a non-nil error is provided, subsequent GetInfo calls will return this error.
+// Passing nil as the err argument will clear any previously set error, effectively disabling erroring.
+func (e *registrationServer) setGetInfoError(err error) {
+	if err == nil {
+		e.getInfoError.Store(nil)
+		return
+	}
+	e.getInfoError.Store(&err)
+}
+
+// setNotifyRegistrationStatusError sets the error to be returned by the NotifyRegistrationStatus handler
+// of the registration server.
+// If a non-nil error is provided, subsequent NotifyRegistrationStatus calls will return this error.
+// Passing nil as the err argument will clear any previously set error, effectively disabling erroring.
+func (e *registrationServer) setNotifyRegistrationStatusError(err error) {
+	if err == nil {
+		e.notifyRegistrationStatusError.Store(nil)
+		return
+	}
+	e.notifyRegistrationStatusError.Store(&err)
 }

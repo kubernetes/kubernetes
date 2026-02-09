@@ -318,6 +318,11 @@ func (in *ExternalEtcd) DeepCopyInto(out *ExternalEtcd) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.HTTPEndpoints != nil {
+		in, out := &in.HTTPEndpoints, &out.HTTPEndpoints
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
@@ -901,6 +906,11 @@ func (in *UpgradePlanConfiguration) DeepCopyInto(out *UpgradePlanConfiguration) 
 	}
 	if in.DryRun != nil {
 		in, out := &in.DryRun, &out.DryRun
+		*out = new(bool)
+		**out = **in
+	}
+	if in.EtcdUpgrade != nil {
+		in, out := &in.EtcdUpgrade, &out.EtcdUpgrade
 		*out = new(bool)
 		**out = **in
 	}

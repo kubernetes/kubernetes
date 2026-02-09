@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: csi-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.5.1
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -48,7 +48,7 @@ spec:
         - name: gce-pd-driver
           securityContext:
             privileged: true
-          image: registry.k8s.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver:v1.2.2
+          image: registry.k8s.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver:v1.4.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"

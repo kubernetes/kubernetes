@@ -19,5 +19,7 @@ limitations under the License.
 // +groupName=scheduling.k8s.io
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/scheduling/v1alpha1
+// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen-input=k8s.io/api/scheduling/v1alpha1
 
-package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
+package v1alpha1

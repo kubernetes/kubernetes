@@ -78,10 +78,14 @@ const (
 	XFRMA_PROTO          /* __u8 */
 	XFRMA_ADDRESS_FILTER /* struct xfrm_address_filter */
 	XFRMA_PAD
-	XFRMA_OFFLOAD_DEV   /* struct xfrm_state_offload */
-	XFRMA_SET_MARK      /* __u32 */
-	XFRMA_SET_MARK_MASK /* __u32 */
-	XFRMA_IF_ID         /* __u32 */
+	XFRMA_OFFLOAD_DEV            /* struct xfrm_state_offload */
+	XFRMA_SET_MARK               /* __u32 */
+	XFRMA_SET_MARK_MASK          /* __u32 */
+	XFRMA_IF_ID                  /* __u32 */
+	XFRMA_MTIMER_THRESH          /* __u32 in seconds for input SA */
+	XFRMA_SA_DIR                 /* __u8 */
+	XFRMA_NAT_KEEPALIVE_INTERVAL /* __u32 in seconds for NAT keepalive */
+	XFRMA_SA_PCPU                /* __u32 */
 
 	XFRMA_MAX = iota - 1
 )
@@ -131,7 +135,15 @@ func (x *XfrmAddress) ToIP() net.IP {
 	return ip
 }
 
-func (x *XfrmAddress) ToIPNet(prefixlen uint8) *net.IPNet {
+// family is only used when x and prefixlen are both 0
+func (x *XfrmAddress) ToIPNet(prefixlen uint8, family uint16) *net.IPNet {
+	empty := [SizeofXfrmAddress]byte{}
+	if bytes.Equal(x[:], empty[:]) && prefixlen == 0 {
+		if family == FAMILY_V6 {
+			return &net.IPNet{IP: net.ParseIP("::"), Mask: net.CIDRMask(int(prefixlen), 128)}
+		}
+		return &net.IPNet{IP: net.ParseIP("0.0.0.0"), Mask: net.CIDRMask(int(prefixlen), 32)}
+	}
 	ip := x.ToIP()
 	if GetIPFamily(ip) == FAMILY_V4 {
 		return &net.IPNet{IP: ip, Mask: net.CIDRMask(int(prefixlen), 32)}

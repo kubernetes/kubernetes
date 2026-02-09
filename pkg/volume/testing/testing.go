@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -64,7 +63,7 @@ const (
 	TimeoutOnSetupVolumeName = "timeout-setup-volume"
 	// FailOnSetupVolumeName will cause setup call to fail
 	FailOnSetupVolumeName = "fail-setup-volume"
-	//TimeoutAndFailOnSetupVolumeName will first timeout and then fail the setup
+	// TimeoutAndFailOnSetupVolumeName will first timeout and then fail the setup
 	TimeoutAndFailOnSetupVolumeName = "timeout-and-fail-setup-volume"
 	// SuccessAndTimeoutSetupVolumeName will cause first mount operation to succeed but subsequent attempts to timeout
 	SuccessAndTimeoutSetupVolumeName = "success-and-timeout-setup-volume-name"
@@ -88,7 +87,8 @@ const (
 
 	FailVolumeExpansion = "fail-expansion-test"
 
-	AlwaysFailNodeExpansion = "always-fail-node-expansion"
+	InfeasibleNodeExpansion      = "infeasible-fail-node-expansion"
+	OtherFinalNodeExpansionError = "other-final-node-expansion-error"
 
 	deviceNotMounted     = "deviceNotMounted"
 	deviceMountUncertain = "deviceMountUncertain"
@@ -179,6 +179,7 @@ type FakeVolumePlugin struct {
 	Host                   volume.VolumeHost
 	Config                 volume.VolumeConfig
 	LastProvisionerOptions volume.VolumeOptions
+	LastResizeOptions      volume.NodeResizeOptions
 	NewAttacherCallCount   int
 	NewDetacherCallCount   int
 	NodeExpandCallCount    int
@@ -190,6 +191,7 @@ type FakeVolumePlugin struct {
 	SupportsSELinux        bool
 	DisableNodeExpansion   bool
 	CanSupportFn           func(*volume.Spec) bool
+	VerifyExhaustedEnabled bool
 
 	// default to false which means it is attachable by default
 	NonAttachable bool
@@ -197,6 +199,10 @@ type FakeVolumePlugin struct {
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *volume.Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
 	UnmountDeviceHook func(globalMountPath string) error
+	SetUpHook         func(plugin volume.VolumePlugin, mounterArgs volume.MounterArgs) error
+
+	// Inject error to NewUnmounterError
+	NewUnmounterError error
 
 	Mounters             []*FakeVolume
 	Unmounters           []*FakeVolume
@@ -224,12 +230,14 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 			defer volume.Unlock()
 			volume.WaitForAttachHook = plugin.WaitForAttachHook
 			volume.UnmountDeviceHook = plugin.UnmountDeviceHook
+			volume.SetUpHook = plugin.SetUpHook
 			return volume
 		}
 	}
 	volume := &FakeVolume{
 		WaitForAttachHook: plugin.WaitForAttachHook,
 		UnmountDeviceHook: plugin.UnmountDeviceHook,
+		SetUpHook:         plugin.SetUpHook,
 	}
 	volume.VolumesAttached = make(map[string]sets.Set[string])
 	volume.DeviceMountState = make(map[string]string)
@@ -294,7 +302,7 @@ func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (
 	return plugin.SupportsSELinux, nil
 }
 
-func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	if spec.Name() == FailNewMounter {
@@ -319,6 +327,9 @@ func (plugin *FakeVolumePlugin) GetMounters() (Mounters []*FakeVolume) {
 func (plugin *FakeVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
+	if plugin.NewUnmounterError != nil {
+		return nil, plugin.NewUnmounterError
+	}
 	fakeVolume := plugin.getFakeVolume(&plugin.Unmounters)
 	fakeVolume.Lock()
 	defer fakeVolume.Unlock()
@@ -336,7 +347,7 @@ func (plugin *FakeVolumePlugin) GetUnmounters() (Unmounters []*FakeVolume) {
 }
 
 // Block volume support
-func (plugin *FakeVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+func (plugin *FakeVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod) (volume.BlockVolumeMapper, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	volume := plugin.getFakeVolume(&plugin.BlockVolumeMappers)
@@ -436,6 +447,10 @@ func (plugin *FakeVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
 	return !plugin.NonAttachable, nil
 }
 
+func (plugin *FakeVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return plugin.VerifyExhaustedEnabled
+}
+
 func (plugin *FakeVolumePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
 	return true, nil
 }
@@ -493,6 +508,7 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
 	plugin.NodeExpandCallCount++
+	plugin.LastResizeOptions = resizeOptions
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
 	}
@@ -500,8 +516,12 @@ func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOption
 		return false, volumetypes.NewOperationNotSupportedError("volume-unsupported")
 	}
 
-	if resizeOptions.VolumeSpec.Name() == AlwaysFailNodeExpansion {
-		return false, fmt.Errorf("test failure: NodeExpand")
+	if resizeOptions.VolumeSpec.Name() == InfeasibleNodeExpansion {
+		return false, volumetypes.NewInfeasibleError("infeasible-expansion")
+	}
+
+	if resizeOptions.VolumeSpec.Name() == OtherFinalNodeExpansionError {
+		return false, fmt.Errorf("other-final-node-expansion-error")
 	}
 
 	if resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
@@ -548,8 +568,8 @@ func (f *FakeBasicVolumePlugin) Init(ost volume.VolumeHost) error {
 	return f.Plugin.Init(ost)
 }
 
-func (f *FakeBasicVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
-	return f.Plugin.NewMounter(spec, pod, opts)
+func (f *FakeBasicVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+	return f.Plugin.NewMounter(spec, pod)
 }
 
 func (f *FakeBasicVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -611,6 +631,10 @@ func (f *FakeAttachableVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) 
 	return true, nil
 }
 
+func (f *FakeAttachableVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return false
+}
+
 var _ volume.VolumePlugin = &FakeAttachableVolumePlugin{}
 var _ volume.AttachableVolumePlugin = &FakeAttachableVolumePlugin{}
 
@@ -645,7 +669,7 @@ func (plugin *FakeFileVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spe
 	return false, nil
 }
 
-func (plugin *FakeFileVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *FakeFileVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
 	return nil, nil
 }
 
@@ -674,6 +698,7 @@ type FakeVolume struct {
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *volume.Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
 	UnmountDeviceHook func(globalMountPath string) error
+	SetUpHook         func(plugin volume.VolumePlugin, mounterArgs volume.MounterArgs) error
 
 	SetUpCallCount              int
 	TearDownCallCount           int
@@ -723,6 +748,9 @@ func (fv *FakeVolume) SetUp(mounterArgs volume.MounterArgs) error {
 	defer fv.Unlock()
 	err := fv.setupInternal(mounterArgs)
 	fv.SetUpCallCount++
+	if fv.SetUpHook != nil {
+		return fv.SetUpHook(fv.Plugin, mounterArgs)
+	}
 	return err
 }
 
@@ -1181,7 +1209,7 @@ func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fc.Options.PVName,
 			Annotations: map[string]string{
-				util.VolumeDynamicallyCreatedByKey: "fakeplugin-provisioner",
+				"kubernetes.io/createdby": "fakeplugin-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -1646,9 +1674,9 @@ func GetTestVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *FakeVolumeP
 	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeVolumeHost(
 		t,
-		"",      /* rootDir */
-		nil,     /* kubeClient */
-		plugins, /* plugins */
+		t.TempDir(), /* rootDir */
+		nil,         /* kubeClient */
+		plugins,     /* plugins */
 	)
 	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
@@ -1657,9 +1685,9 @@ func GetTestKubeletVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *Fake
 	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
-		"",      /* rootDir */
-		nil,     /* kubeClient */
-		plugins, /* plugins */
+		t.TempDir(), /* rootDir */
+		nil,         /* kubeClient */
+		plugins,     /* plugins */
 	)
 	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
@@ -1668,9 +1696,9 @@ func GetTestKubeletVolumePluginMgrWithNode(t *testing.T, node *v1.Node) (*volume
 	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
-		"",      /* rootDir */
-		nil,     /* kubeClient */
-		plugins, /* plugins */
+		t.TempDir(), /* rootDir */
+		nil,         /* kubeClient */
+		plugins,     /* plugins */
 	)
 	v.WithNode(node)
 

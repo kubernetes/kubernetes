@@ -215,7 +215,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			config: resourceNameNotSet,
 			wantErrs: field.ErrorList{
 				&field.Error{
-					Type:  field.ErrorTypeInvalid,
+					Type:  field.ErrorTypeRequired,
 					Field: "leaderElection.resourceName",
 				},
 			},
@@ -224,7 +224,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			config: resourceNamespaceNotSet,
 			wantErrs: field.ErrorList{
 				&field.Error{
-					Type:  field.ErrorTypeInvalid,
+					Type:  field.ErrorTypeRequired,
 					Field: "leaderElection.resourceNamespace",
 				},
 			},

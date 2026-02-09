@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -37,13 +38,15 @@ import (
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodConstraintsFunc(t *testing.T) {
 	testCases := map[string]struct {
-		pod      *api.Pod
-		required []corev1.ResourceName
-		err      string
+		pod                      *api.Pod
+		required                 []corev1.ResourceName
+		err                      string
+		podLevelResourcesEnabled bool
 	}{
 		"init container resource missing": {
 			pod: &api.Pod{
@@ -132,9 +135,30 @@ func TestPodConstraintsFunc(t *testing.T) {
 			required: []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceCPU},
 			err:      `must specify cpu for: bar,foo; memory for: bar,foo`,
 		},
+		"pod-level resource set, container-level required resources missing": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+					},
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}, {
+						Name:      "bar",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required:                 []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceCPU},
+			podLevelResourcesEnabled: true,
+			err:                      ``,
+		},
 	}
 	evaluator := NewPodEvaluator(nil, clock.RealClock{})
 	for testName, test := range testCases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+
 		err := evaluator.Constraints(test.required, test.pod)
 		switch {
 		case err != nil && len(test.err) == 0,
@@ -157,8 +181,9 @@ func TestPodEvaluatorUsage(t *testing.T) {
 	deletionTimestampNotPastGracePeriod := metav1.NewTime(fakeClock.Now())
 
 	testCases := map[string]struct {
-		pod   *api.Pod
-		usage corev1.ResourceList
+		pod                      *api.Pod
+		usage                    corev1.ResourceList
+		podLevelResourcesEnabled bool
 	}{
 		"init container CPU": {
 			pod: &api.Pod{
@@ -251,6 +276,23 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
+		"init container implicit extended resources": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceName("deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3")},
+							Limits:   api.ResourceList{api.ResourceName("deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3")},
+						},
+					}},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceName("requests.deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3"),
+				corev1.ResourcePods: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
 		"container CPU": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
@@ -338,6 +380,23 @@ func TestPodEvaluatorUsage(t *testing.T) {
 			},
 			usage: corev1.ResourceList{
 				corev1.ResourceName("requests.example.com/dongle"): resource.MustParse("3"),
+				corev1.ResourcePods: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
+		"container implicit extended resources": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceName("deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3")},
+							Limits:   api.ResourceList{api.ResourceName("deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3")},
+						},
+					}},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceName("requests.deviceclass.resource.kubernetes.io/dongle"): resource.MustParse("3"),
 				corev1.ResourcePods: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
@@ -528,10 +587,74 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
+		"pod-level CPU": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+						Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
+					},
+				},
+			},
+			podLevelResourcesEnabled: true,
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("1m"),
+				corev1.ResourceLimitsCPU:   resource.MustParse("2m"),
+				corev1.ResourcePods:        resource.MustParse("1"),
+				corev1.ResourceCPU:         resource.MustParse("1m"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
+		"pod-level Memory": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("1Mi")},
+						Limits:   api.ResourceList{api.ResourceMemory: resource.MustParse("2Mi")},
+					},
+				},
+			},
+			podLevelResourcesEnabled: true,
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsMemory: resource.MustParse("1Mi"),
+				corev1.ResourceLimitsMemory:   resource.MustParse("2Mi"),
+				corev1.ResourcePods:           resource.MustParse("1"),
+				corev1.ResourceMemory:         resource.MustParse("1Mi"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
+		"pod-level memory with container-level ephemeral storage": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("1Mi")},
+						Limits:   api.ResourceList{api.ResourceMemory: resource.MustParse("2Mi")},
+					},
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("32Mi")},
+							Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("64Mi")},
+						},
+					}},
+				},
+			},
+			podLevelResourcesEnabled: true,
+			usage: corev1.ResourceList{
+				corev1.ResourceEphemeralStorage:         resource.MustParse("32Mi"),
+				corev1.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
+				corev1.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
+				corev1.ResourcePods:                     resource.MustParse("1"),
+				corev1.ResourceRequestsMemory:           resource.MustParse("1Mi"),
+				corev1.ResourceLimitsMemory:             resource.MustParse("2Mi"),
+				corev1.ResourceMemory:                   resource.MustParse("1Mi"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
 	}
 	t.Parallel()
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
 			actual, err := evaluator.Usage(testCase.pod)
 			if err != nil {
 				t.Error(err)
@@ -902,11 +1025,10 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 	evaluator := NewPodEvaluator(nil, fakeClock)
 
 	testCases := map[string]struct {
-		pod             *api.Pod
-		usageFgEnabled  corev1.ResourceList
-		usageFgDisabled corev1.ResourceList
+		pod   *api.Pod
+		usage corev1.ResourceList
 	}{
-		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources) for memory resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.Resources) for memory resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -925,21 +1047,16 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							AllocatedResources: api.ResourceList{
-								api.ResourceMemory: resource.MustParse("150Mi"),
+							Resources: &api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceMemory: resource.MustParse("150Mi"),
+								},
 							},
 						},
 					},
 				},
 			},
-			usageFgEnabled: corev1.ResourceList{
-				corev1.ResourceRequestsMemory: resource.MustParse("200Mi"),
-				corev1.ResourceLimitsMemory:   resource.MustParse("400Mi"),
-				corev1.ResourcePods:           resource.MustParse("1"),
-				corev1.ResourceMemory:         resource.MustParse("200Mi"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
-			},
-			usageFgDisabled: corev1.ResourceList{
+			usage: corev1.ResourceList{
 				corev1.ResourceRequestsMemory: resource.MustParse("200Mi"),
 				corev1.ResourceLimitsMemory:   resource.MustParse("400Mi"),
 				corev1.ResourcePods:           resource.MustParse("1"),
@@ -947,7 +1064,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
-		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources) for CPU resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.Resources) for CPU resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -966,29 +1083,24 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							AllocatedResources: api.ResourceList{
-								api.ResourceCPU: resource.MustParse("150m"),
+							Resources: &api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("150m"),
+								},
 							},
 						},
 					},
 				},
 			},
-			usageFgEnabled: corev1.ResourceList{
+			usage: corev1.ResourceList{
 				corev1.ResourceRequestsCPU: resource.MustParse("150m"),
 				corev1.ResourceLimitsCPU:   resource.MustParse("200m"),
 				corev1.ResourcePods:        resource.MustParse("1"),
 				corev1.ResourceCPU:         resource.MustParse("150m"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
-			usageFgDisabled: corev1.ResourceList{
-				corev1.ResourceRequestsCPU: resource.MustParse("100m"),
-				corev1.ResourceLimitsCPU:   resource.MustParse("200m"),
-				corev1.ResourcePods:        resource.MustParse("1"),
-				corev1.ResourceCPU:         resource.MustParse("100m"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
-			},
 		},
-		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources) for CPU and memory resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.Resources) for CPU and memory resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -1009,15 +1121,17 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							AllocatedResources: api.ResourceList{
-								api.ResourceCPU:    resource.MustParse("150m"),
-								api.ResourceMemory: resource.MustParse("250Mi"),
+							Resources: &api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("150m"),
+									api.ResourceMemory: resource.MustParse("250Mi"),
+								},
 							},
 						},
 					},
 				},
 			},
-			usageFgEnabled: corev1.ResourceList{
+			usage: corev1.ResourceList{
 				corev1.ResourceRequestsCPU:    resource.MustParse("150m"),
 				corev1.ResourceLimitsCPU:      resource.MustParse("200m"),
 				corev1.ResourceRequestsMemory: resource.MustParse("250Mi"),
@@ -1027,18 +1141,8 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				corev1.ResourceMemory:         resource.MustParse("250Mi"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
-			usageFgDisabled: corev1.ResourceList{
-				corev1.ResourceRequestsCPU:    resource.MustParse("100m"),
-				corev1.ResourceLimitsCPU:      resource.MustParse("200m"),
-				corev1.ResourceRequestsMemory: resource.MustParse("200Mi"),
-				corev1.ResourceLimitsMemory:   resource.MustParse("400Mi"),
-				corev1.ResourcePods:           resource.MustParse("1"),
-				corev1.ResourceCPU:            resource.MustParse("100m"),
-				corev1.ResourceMemory:         resource.MustParse("200Mi"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
-			},
 		},
-		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources==nil) for CPU and memory resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.Resources==nil) for CPU and memory resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -1062,17 +1166,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 					},
 				},
 			},
-			usageFgEnabled: corev1.ResourceList{
-				corev1.ResourceRequestsCPU:    resource.MustParse("100m"),
-				corev1.ResourceLimitsCPU:      resource.MustParse("200m"),
-				corev1.ResourceRequestsMemory: resource.MustParse("200Mi"),
-				corev1.ResourceLimitsMemory:   resource.MustParse("400Mi"),
-				corev1.ResourcePods:           resource.MustParse("1"),
-				corev1.ResourceCPU:            resource.MustParse("100m"),
-				corev1.ResourceMemory:         resource.MustParse("200Mi"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
-			},
-			usageFgDisabled: corev1.ResourceList{
+			usage: corev1.ResourceList{
 				corev1.ResourceRequestsCPU:    resource.MustParse("100m"),
 				corev1.ResourceLimitsCPU:      resource.MustParse("200m"),
 				corev1.ResourceRequestsMemory: resource.MustParse("200Mi"),
@@ -1085,23 +1179,18 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 		},
 	}
 	t.Parallel()
-	for _, enabled := range []bool{true, false} {
-		for testName, testCase := range testCases {
-			t.Run(testName, func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)
-				actual, err := evaluator.Usage(testCase.pod)
-				if err != nil {
-					t.Error(err)
-				}
-				usage := testCase.usageFgEnabled
-				if !enabled {
-					usage = testCase.usageFgDisabled
-				}
-				if !quota.Equals(usage, actual) {
-					t.Errorf("FG enabled: %v, expected: %v, actual: %v", enabled, usage, actual)
-				}
-			})
-		}
+	for testName, testCase := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			actual, err := evaluator.Usage(testCase.pod)
+			if err != nil {
+				t.Error(err)
+			}
+			usage := testCase.usage
+			if !quota.Equals(usage, actual) {
+				t.Errorf("expected: %v, actual: %v", usage, actual)
+			}
+		})
+
 	}
 }
 
@@ -1187,5 +1276,75 @@ func makePod(name, pcName string, resList api.ResourceList, phase api.PodPhase) 
 		Status: api.PodStatus{
 			Phase: phase,
 		},
+	}
+}
+
+func TestPodEvaluatorHandles(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	evaluator := NewPodEvaluator(nil, fakeClock)
+	testCases := []struct {
+		name  string
+		attrs admission.Attributes
+		want  bool
+	}{
+		{
+			name:  "create",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Create, nil, false, nil),
+			want:  true,
+		},
+		{
+			name:  "update-activeDeadlineSeconds-to-nil",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{}, &corev1.Pod{Spec: corev1.PodSpec{ActiveDeadlineSeconds: ptr.To[int64](1)}}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Update, nil, false, nil),
+			want:  true,
+		},
+		{
+			name:  "update-activeDeadlineSeconds-from-nil",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{ActiveDeadlineSeconds: ptr.To[int64](1)}}, &corev1.Pod{}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Update, nil, false, nil),
+			want:  true,
+		},
+		{
+			name:  "update-activeDeadlineSeconds-with-different-values",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{ActiveDeadlineSeconds: ptr.To[int64](1)}}, &corev1.Pod{Spec: corev1.PodSpec{ActiveDeadlineSeconds: ptr.To[int64](2)}}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "update",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "delete",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Delete, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "connect",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Connect, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "create-subresource",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "subresource", admission.Create, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "update-subresource",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "subresource", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "update-resize",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "resize", admission.Update, nil, false, nil),
+			want:  true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := evaluator.Handles(tc.attrs)
+
+			if tc.want != actual {
+				t.Errorf("%s expected:\n%v\n, actual:\n%v", tc.name, tc.want, actual)
+			}
+		})
 	}
 }

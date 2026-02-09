@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	networkingv1 "k8s.io/api/networking/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // IngressClassLister helps list IngressClasses.
@@ -30,19 +30,19 @@ import (
 type IngressClassLister interface {
 	// List lists all IngressClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.IngressClass, err error)
+	List(selector labels.Selector) (ret []*networkingv1.IngressClass, err error)
 	// Get retrieves the IngressClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.IngressClass, error)
+	Get(name string) (*networkingv1.IngressClass, error)
 	IngressClassListerExpansion
 }
 
 // ingressClassLister implements the IngressClassLister interface.
 type ingressClassLister struct {
-	listers.ResourceIndexer[*v1.IngressClass]
+	listers.ResourceIndexer[*networkingv1.IngressClass]
 }
 
 // NewIngressClassLister returns a new IngressClassLister.
 func NewIngressClassLister(indexer cache.Indexer) IngressClassLister {
-	return &ingressClassLister{listers.New[*v1.IngressClass](indexer, v1.Resource("ingressclass"))}
+	return &ingressClassLister{listers.New[*networkingv1.IngressClass](indexer, networkingv1.Resource("ingressclass"))}
 }

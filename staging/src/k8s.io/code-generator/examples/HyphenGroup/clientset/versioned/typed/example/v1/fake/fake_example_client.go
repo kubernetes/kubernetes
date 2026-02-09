@@ -29,11 +29,11 @@ type FakeExampleGroupV1 struct {
 }
 
 func (c *FakeExampleGroupV1) ClusterTestTypes() v1.ClusterTestTypeInterface {
-	return &FakeClusterTestTypes{c}
+	return newFakeClusterTestTypes(c)
 }
 
 func (c *FakeExampleGroupV1) TestTypes(namespace string) v1.TestTypeInterface {
-	return &FakeTestTypes{c, namespace}
+	return newFakeTestTypes(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

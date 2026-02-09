@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -20,14 +19,19 @@ limitations under the License.
 package stats
 
 import (
+	"context"
+	"errors"
+
 	"k8s.io/klog/v2"
 
+	cadvisormemory "github.com/google/cadvisor/cache/memory"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
-func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+func (sp *summaryProviderImpl) GetSystemContainersStats(ctx context.Context, nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+	logger := klog.FromContext(ctx)
 	systemContainers := map[string]struct {
 		name             string
 		forceStatsUpdate bool
@@ -45,7 +49,7 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig
 		}
 		s, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			klog.ErrorS(err, "Failed to get system container stats", "containerName", cont.name)
+			logger.Error(err, "Failed to get system container stats", "containerName", cont.name)
 			continue
 		}
 		// System containers don't have a filesystem associated with them.
@@ -62,7 +66,8 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig
 	return stats
 }
 
-func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(ctx context.Context, nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+	logger := klog.FromContext(ctx)
 	systemContainers := map[string]struct {
 		name             string
 		forceStatsUpdate bool
@@ -80,7 +85,11 @@ func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig c
 		}
 		s, err := sp.provider.GetCgroupCPUAndMemoryStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			klog.ErrorS(err, "Failed to get system container stats", "containerName", cont.name)
+			if errors.Is(err, cadvisormemory.ErrDataNotFound) {
+				logger.V(4).Info("cgroup stats not found in memory cache", "containerName", cont.name)
+			} else {
+				logger.Error(err, "Failed to get system container stats", "containerName", cont.name)
+			}
 			continue
 		}
 		s.Name = sys

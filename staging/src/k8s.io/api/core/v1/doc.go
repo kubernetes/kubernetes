@@ -18,7 +18,9 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:protobuf-gen=package
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-package=io.k8s.api.core.v1
+
 // +groupName=
 
 // Package v1 is the v1 version of the core API.
-package v1 // import "k8s.io/api/core/v1"
+package v1

@@ -15,21 +15,32 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+	"sync/atomic"
 )
 
 var DebugGoroutines = os.Getenv("DEBUG_HTTP2_GOROUTINES") == "1"
 
+// Setting DebugGoroutines to false during a test to disable goroutine debugging
+// results in race detector complaints when a test leaves goroutines running before
+// returning. Tests shouldn't do this, of course, but when they do it generally shows
+// up as infrequent, hard-to-debug flakes. (See #66519.)
+//
+// Disable goroutine debugging during individual tests with an atomic bool.
+// (Note that it's safe to enable/disable debugging mid-test, so the actual race condition
+// here is harmless.)
+var disableDebugGoroutines atomic.Bool
+
 type goroutineLock uint64
 
 func newGoroutineLock() goroutineLock {
-	if !DebugGoroutines {
+	if !DebugGoroutines || disableDebugGoroutines.Load() {
 		return 0
 	}
 	return goroutineLock(curGoroutineID())
 }
 
 func (g goroutineLock) check() {
-	if !DebugGoroutines {
+	if !DebugGoroutines || disableDebugGoroutines.Load() {
 		return
 	}
 	if curGoroutineID() != uint64(g) {
@@ -38,7 +49,7 @@ func (g goroutineLock) check() {
 }
 
 func (g goroutineLock) checkNotOn() {
-	if !DebugGoroutines {
+	if !DebugGoroutines || disableDebugGoroutines.Load() {
 		return
 	}
 	if curGoroutineID() == uint64(g) {

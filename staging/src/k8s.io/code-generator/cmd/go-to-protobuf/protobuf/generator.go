@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -80,17 +81,20 @@ func (g *genProtoIDL) Namers(c *generator.Context) namer.NameSystems {
 
 // Filter ignores types that are identified as not exportable.
 func (g *genProtoIDL) Filter(c *generator.Context, t *types.Type) bool {
-	tagVals := gengo.ExtractCommentTags("+", t.CommentLines)["protobuf"]
-	if tagVals != nil {
-		if tagVals[0] == "false" {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"protobuf"}, t.CommentLines)
+	if err != nil {
+		klog.Fatalf(`Error extracting tag "protobuf": %v`, err)
+	}
+	if tags["protobuf"] != nil {
+		if tags["protobuf"][0] == "false" {
 			// Type specified "false".
 			return false
 		}
-		if tagVals[0] == "true" {
+		if tags["protobuf"][0] == "true" {
 			// Type specified "true".
 			return true
 		}
-		klog.Fatalf(`Comment tag "protobuf" must be true or false, found: %q`, tagVals[0])
+		klog.Fatalf(`Comment tag "protobuf" must be true or false, found: %q`, tags["protobuf"][0])
 	}
 	if !g.generateAll {
 		// We're not generating everything.
@@ -145,10 +149,7 @@ func isOptionalAlias(t *types.Type) bool {
 	if t.Underlying == nil || (t.Underlying.Kind != types.Map && t.Underlying.Kind != types.Slice) {
 		return false
 	}
-	if extractBoolTagOrDie("protobuf.nullable", t.CommentLines) == false {
-		return false
-	}
-	return true
+	return extractBoolTagOrDie("protobuf.nullable", t.CommentLines)
 }
 
 func (g *genProtoIDL) Imports(c *generator.Context) (imports []string) {
@@ -187,7 +188,7 @@ func (g *genProtoIDL) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	case types.Struct:
 		return b.doStruct(sw)
 	default:
-		return b.unknown(sw)
+		return b.unknown()
 	}
 }
 
@@ -262,7 +263,7 @@ type bodyGen struct {
 	t *types.Type
 }
 
-func (b bodyGen) unknown(sw *generator.SnippetWriter) error {
+func (b bodyGen) unknown() error {
 	return fmt.Errorf("not sure how to generate: %#v", b.t)
 }
 

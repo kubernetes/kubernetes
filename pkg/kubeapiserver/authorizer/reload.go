@@ -32,7 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
-	"k8s.io/apiserver/pkg/authorization/cel"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
@@ -61,6 +61,7 @@ type reloadableAuthorizerResolver struct {
 	nodeAuthorizer *node.NodeAuthorizer
 	rbacAuthorizer *rbac.RBACAuthorizer
 	abacAuthorizer abac.PolicyList
+	compiler       authorizationcel.Compiler // non-nil and shared across reloads.
 
 	lastLoadedLock   sync.Mutex
 	lastLoadedConfig *authzconfig.AuthorizationConfiguration
@@ -78,8 +79,8 @@ func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authoriz
 	return r.current.Load().authorizer.Authorize(ctx, a)
 }
 
-func (r *reloadableAuthorizerResolver) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
-	return r.current.Load().ruleResolver.RulesFor(user, namespace)
+func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	return r.current.Load().ruleResolver.RulesFor(ctx, user, namespace)
 }
 
 // newForConfig constructs
@@ -140,15 +141,24 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			default:
 				return nil, nil, fmt.Errorf("unknown failurePolicy %q", configuredAuthorizer.Webhook.FailurePolicy)
 			}
+
+			authorizedTTL, unauthorizedTTL := configuredAuthorizer.Webhook.AuthorizedTTL.Duration, configuredAuthorizer.Webhook.UnauthorizedTTL.Duration
+			if !configuredAuthorizer.Webhook.CacheAuthorizedRequests {
+				authorizedTTL = 0
+			}
+			if !configuredAuthorizer.Webhook.CacheUnauthorizedRequests {
+				unauthorizedTTL = 0
+			}
 			webhookAuthorizer, err := webhook.New(clientConfig,
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
-				configuredAuthorizer.Webhook.AuthorizedTTL.Duration,
-				configuredAuthorizer.Webhook.UnauthorizedTTL.Duration,
+				authorizedTTL,
+				unauthorizedTTL,
 				*r.initialConfig.WebhookRetryBackoff,
 				decisionOnError,
 				configuredAuthorizer.Webhook.MatchConditions,
 				configuredAuthorizer.Name,
-				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: cel.NewMatcherMetrics()},
+				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: authorizationcel.NewMatcherMetrics()},
+				r.compiler,
 			)
 			if err != nil {
 				return nil, nil, err
@@ -175,14 +185,14 @@ type kubeapiserverWebhookMetrics struct {
 	// kube-apiserver does report webhook metrics
 	webhookmetrics.WebhookMetrics
 	// kube-apiserver does report matchCondition metrics
-	cel.MatcherMetrics
+	authorizationcel.MatcherMetrics
 }
 
 // runReload starts checking the config file for changes and reloads the authorizer when it changes.
 // Blocks until ctx is complete.
 func (r *reloadableAuthorizerResolver) runReload(ctx context.Context) {
 	metrics.RegisterMetrics()
-	metrics.RecordAuthorizationConfigAutomaticReloadSuccess(r.apiServerID)
+	metrics.RecordAuthorizationConfigLastConfigInfo(r.apiServerID, string(r.lastReadData))
 
 	filesystem.WatchUntil(
 		ctx,
@@ -214,7 +224,7 @@ func (r *reloadableAuthorizerResolver) checkFile(ctx context.Context) {
 	klog.InfoS("found new authorization config data")
 	r.lastReadData = data
 
-	config, err := LoadAndValidateData(data, r.requireNonWebhookTypes)
+	config, err := LoadAndValidateData(data, r.compiler, r.requireNonWebhookTypes)
 	if err != nil {
 		klog.ErrorS(err, "reloading authorization config")
 		metrics.RecordAuthorizationConfigAutomaticReloadFailure(r.apiServerID)
@@ -240,5 +250,5 @@ func (r *reloadableAuthorizerResolver) checkFile(ctx context.Context) {
 		ruleResolver: ruleResolver,
 	})
 	klog.InfoS("reloaded authz config")
-	metrics.RecordAuthorizationConfigAutomaticReloadSuccess(r.apiServerID)
+	metrics.RecordAuthorizationConfigAutomaticReloadSuccess(r.apiServerID, string(data))
 }

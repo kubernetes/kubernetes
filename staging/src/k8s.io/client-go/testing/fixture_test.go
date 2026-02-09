@@ -19,12 +19,14 @@ package testing
 import (
 	"fmt"
 	"math/rand"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"strconv"
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/util/watchlist"
 	"k8s.io/utils/ptr"
 )
 
@@ -294,10 +297,31 @@ func TestApplyCreate(t *testing.T) {
 	handled, configMap, err := reaction(action)
 	assert.True(t, handled)
 	if err != nil {
-		t.Errorf("Failed to create a resource with apply: %v", err)
+		t.Fatalf("Failed to create a resource with apply: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
-	assert.Equal(t, cm.Data, map[string]string{"k": "v"})
+	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
+}
+
+func TestApplyNoMeta(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+
+	reaction := ObjectReaction(o)
+	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "data": {"k": "v"}}`)
+	action := NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager"})
+	handled, configMap, err := reaction(action)
+	assert.True(t, handled)
+	if err != nil {
+		t.Fatalf("Failed to create a resource with apply: %v", err)
+	}
+	cm := configMap.(*v1.ConfigMap)
+	assert.Equal(t, "cm-1", cm.Name)
+	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
 }
 
 func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
@@ -429,7 +453,7 @@ func TestGetWithExactMatch(t *testing.T) {
 	nodeResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "node"}
 	node, gvr := constructObject(nodeResource, "node", "")
 
-	assert.Nil(t, o.Add(node))
+	assert.NoError(t, o.Add(node))
 
 	// Exact match
 	_, err = o.Get(gvr, "", "node")
@@ -445,7 +469,7 @@ func TestGetWithExactMatch(t *testing.T) {
 	o = NewObjectTracker(scheme, codecs.UniversalDecoder())
 	podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pod"}
 	pod, gvr := constructObject(podResource, "pod", "default")
-	assert.Nil(t, o.Add(pod))
+	assert.NoError(t, o.Add(pod))
 
 	// Exact match
 	_, err = o.Get(gvr, "default", "pod")
@@ -551,7 +575,7 @@ func configMapTypeConverter(scheme *runtime.Scheme) managedfields.TypeConverter 
 		panic(fmt.Sprintf("Failed to parse schema: %v", err))
 	}
 
-	return TypeConverter{Scheme: scheme, TypeResolver: parser}
+	return managedfields.NewSchemeTypeConverter(scheme, parser)
 }
 
 var configMapTypedSchema = typed.YAMLObject(`types:
@@ -640,3 +664,91 @@ var configMapTypedSchema = typed.YAMLObject(`types:
       namedType: __untyped_deduced_
     elementRelationship: separable
 `)
+
+func TestManagedFieldsObjectTrackerReloadsScheme(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	// Create tracker without registered ConfigMap type
+	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-cm",
+		},
+		Data: map[string]string{"key": "value"},
+	}
+
+	// Register the type in scheme
+	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
+
+	err := tracker.Create(cmResource, cm, "default", metav1.CreateOptions{FieldManager: "test-manager"})
+	assert.NoError(t, err, "Create should succeed after registering type")
+}
+
+func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	cmGVK := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypeWithName(cmGVK, &unstructured.Unstructured{})
+	codecs := serializer.NewCodecFactory(scheme)
+
+	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), managedfields.NewDeducedTypeConverter())
+
+	cm := &unstructured.Unstructured{}
+	cm.SetAPIVersion("v1")
+	cm.SetKind("ConfigMap")
+	cm.SetName("test-cm")
+	cm.SetNamespace("default")
+	require.NoError(t, unstructured.SetNestedMap(cm.Object,
+		map[string]any{
+			"key": "value",
+		},
+		"data"),
+	)
+
+	// Validate creating through apply works
+	cmOriginal := cm.DeepCopy()
+
+	require.NoError(t, tracker.Apply(cmResource, cm, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
+	cmActualUntyped, err := tracker.Get(cmResource, "default", cm.GetName())
+	require.NoError(t, err)
+
+	cmActual, ok := cmActualUntyped.(*unstructured.Unstructured)
+	require.True(t, ok)
+
+	unstructured.RemoveNestedField(cmActual.Object, "metadata", "managedFields")
+	require.Empty(t, cmp.Diff(cmOriginal, cmActual))
+
+	// Validate updating through apply works
+	require.NoError(t, unstructured.SetNestedMap(cmActual.Object,
+		map[string]any{
+			"key":         "value",
+			"another-key": "another-value",
+		},
+		"data"),
+	)
+
+	cmOriginal = cmActual.DeepCopy()
+	require.NoError(t, tracker.Apply(cmResource, cmActual, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
+	cmActualUntyped, err = tracker.Get(cmResource, "default", cm.GetName())
+	require.NoError(t, err)
+
+	cmActual, ok = cmActualUntyped.(*unstructured.Unstructured)
+	require.True(t, ok)
+
+	unstructured.RemoveNestedField(cmActual.Object, "metadata", "managedFields")
+	require.Empty(t, cmp.Diff(cmOriginal, cmActual))
+}
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	target := NewObjectTracker(scheme, codecs.UniversalDecoder())
+
+	if !watchlist.DoesClientNotSupportWatchListSemantics(target) {
+		t.Fatalf("ObjectTracker should NOT support WatchList semantics")
+	}
+}

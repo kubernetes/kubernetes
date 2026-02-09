@@ -18,6 +18,7 @@ package create
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -399,12 +400,12 @@ func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 	var targetPort intstr.IntOrString
 	if portNum, err := strconv.Atoi(portStringSlice[1]); err != nil {
 		if errs := validation.IsValidPortName(portStringSlice[1]); len(errs) != 0 {
-			return 0, intstr.FromInt32(0), fmt.Errorf(strings.Join(errs, ","))
+			return 0, intstr.FromInt32(0), errors.New(strings.Join(errs, ","))
 		}
 		targetPort = intstr.FromString(portStringSlice[1])
 	} else {
 		if errs := validation.IsValidPortNum(portNum); len(errs) != 0 {
-			return 0, intstr.FromInt32(0), fmt.Errorf(strings.Join(errs, ","))
+			return 0, intstr.FromInt32(0), errors.New(strings.Join(errs, ","))
 		}
 		targetPort = intstr.FromInt32(int32(portNum))
 	}

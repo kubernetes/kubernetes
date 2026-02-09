@@ -38,8 +38,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/component-base/featuregate"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
 	"k8s.io/kubernetes/pkg/controller/certificates/authority"
 )
@@ -73,12 +77,14 @@ func Test_buildClientCertificateManager(t *testing.T) {
 	defer s.Close()
 
 	config1 := &restclient.Config{
-		UserAgent: "FirstClient",
-		Host:      s.URL,
+		UserAgent:     "FirstClient",
+		Host:          s.URL,
+		ContentConfig: restclient.ContentConfig{ContentType: runtime.ContentTypeJSON},
 	}
 	config2 := &restclient.Config{
-		UserAgent: "SecondClient",
-		Host:      s.URL,
+		UserAgent:     "SecondClient",
+		Host:          s.URL,
+		ContentConfig: restclient.ContentConfig{ContentType: runtime.ContentTypeJSON},
 	}
 
 	nodeName := types.NodeName("test")
@@ -347,6 +353,49 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		})
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
+
+	case utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientfeatures.WatchListClient)) && req.Method == http.MethodGet && req.URL.Path == "/apis/certificates.k8s.io/v1/certificatesigningrequests" && req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr&resourceVersionMatch=NotOlderThan&sendInitialEvents=true&watch=true":
+		// TODO(#115478): remove the list & watch cases above when WatchListClient FG is removed
+		if s.csr == nil {
+			t.Fatalf("no csr")
+		}
+		csr := &metav1.WatchEvent{
+			Type: string(watch.Added),
+			Object: runtime.RawExtension{
+				Raw: mustMarshal(s.csr.DeepCopy()),
+			},
+		}
+
+		bookmark := &metav1.WatchEvent{
+			Type: string(watch.Bookmark),
+			Object: runtime.RawExtension{
+				Raw: mustMarshal(&certapi.CertificateSigningRequest{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "CertificateSigningRequest",
+						APIVersion: "certificates.k8s.io/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							metav1.InitialEventsAnnotationKey: "true",
+						},
+					},
+				}),
+			},
+		}
+
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("http.ResponseWriter doesn't support http.Flusher")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write(mustMarshal(csr)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(mustMarshal(bookmark)); err != nil {
+			t.Fatal(err)
+		}
+		flusher.Flush()
 
 	default:
 		t.Fatalf("unexpected request: %s %s", req.Method, req.URL)

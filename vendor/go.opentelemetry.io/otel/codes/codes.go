@@ -5,6 +5,7 @@ package codes // import "go.opentelemetry.io/otel/codes"
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 )
@@ -63,10 +64,10 @@ func (c *Code) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	if c == nil {
-		return fmt.Errorf("nil receiver passed to UnmarshalJSON")
+		return errors.New("nil receiver passed to UnmarshalJSON")
 	}
 
-	var x interface{}
+	var x any
 	if err := json.Unmarshal(b, &x); err != nil {
 		return err
 	}
@@ -83,7 +84,7 @@ func (c *Code) UnmarshalJSON(b []byte) error {
 				return fmt.Errorf("invalid code: %q", ci)
 			}
 
-			*c = Code(ci)
+			*c = Code(ci) // nolint: gosec  // Bit size of 32 check above.
 			return nil
 		}
 		return fmt.Errorf("invalid code: %q", string(b))
@@ -101,5 +102,5 @@ func (c *Code) MarshalJSON() ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid code: %d", *c)
 	}
-	return []byte(fmt.Sprintf("%q", str)), nil
+	return fmt.Appendf(nil, "%q", str), nil
 }

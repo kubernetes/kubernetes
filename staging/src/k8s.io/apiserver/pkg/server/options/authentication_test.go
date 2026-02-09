@@ -17,7 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
@@ -39,6 +38,7 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 			name: "test when ClientCAFile is nil",
 			testOptions: &RequestHeaderAuthenticationOptions{
 				UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+				UIDHeaders:          headerrequest.StaticStringSlice{"x-remote-uid"},
 				GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
 				ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
 				AllowedNames:        headerrequest.StaticStringSlice{"kube-aggregator"},
@@ -49,12 +49,14 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 			testOptions: &RequestHeaderAuthenticationOptions{
 				ClientCAFile:        "testdata/root.pem",
 				UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+				UIDHeaders:          headerrequest.StaticStringSlice{"x-remote-uid"},
 				GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
 				ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
 				AllowedNames:        headerrequest.StaticStringSlice{"kube-aggregator"},
 			},
 			expectConfig: &authenticatorfactory.RequestHeaderConfig{
 				UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+				UIDHeaders:          headerrequest.StaticStringSlice{"x-remote-uid"},
 				GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
 				ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
 				CAContentProvider:   nil, // this is nil because you can't compare functions
@@ -85,13 +87,13 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 
 func TestApplyToFallback(t *testing.T) {
 
-	f, err := ioutil.TempFile("", "authkubeconfig")
+	f, err := os.CreateTemp("", "authkubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(f.Name())
 
-	if err := ioutil.WriteFile(f.Name(), []byte(`
+	if err := os.WriteFile(f.Name(), []byte(`
 apiVersion: v1
 kind: Config
 clusters:

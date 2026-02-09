@@ -33,11 +33,11 @@ import (
 	"k8s.io/klog/v2"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo/v2"
@@ -51,7 +51,7 @@ const (
 )
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.DeviceManager, func() {
+var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceManager, func() {
 	f := framework.NewDefaultFramework("devicemanager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -194,7 +194,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 			framework.Logf("pod %s/%s running", testPod.Namespace, testPod.Name)
 
 			ginkgo.By("stopping the kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By("stopping all the local containers - using CRI")
 			rs, _, err := getCRIClient()
@@ -210,7 +210,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 			}
 
 			ginkgo.By("restarting the kubelet")
-			startKubelet()
+			restartKubelet(ctx)
 
 			ginkgo.By("waiting for the kubelet to be ready again")
 			// Wait for the Kubelet to be ready.
@@ -255,12 +255,12 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 					"the pod succeeded to start, when it should fail with the admission error")
 
 			ginkgo.By("removing application pods")
-			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("Deleting the device plugin pod")
-			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("Deleting the directory and file setup for controlling registration")
 			err := os.RemoveAll(triggerPathDir)
@@ -275,7 +275,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 				}
 
 				framework.Logf("Deleting pod: %s", p.Name)
-				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, 2*time.Minute)
+				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			}
 
 			ginkgo.By("Waiting for devices to become unavailable on the local node")

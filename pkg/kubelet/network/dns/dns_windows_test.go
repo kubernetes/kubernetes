@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -21,13 +20,14 @@ package dns
 
 import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 )
 
 var (
 	defaultResolvConf = hostResolvConf
 )
 
-func fakeGetHostDNSConfigCustom(resolverConfig string) (*runtimeapi.DNSConfig, error) {
+func fakeGetHostDNSConfigCustom(logger klog.Logger, resolverConfig string) (*runtimeapi.DNSConfig, error) {
 	return &runtimeapi.DNSConfig{
 		Servers:  []string{testHostNameserver},
 		Searches: []string{testHostDomain},

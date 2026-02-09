@@ -14,11 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +k8s:openapi-gen=true
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/apimachinery/pkg/apis/testapigroup
 // +k8s:openapi-gen=false
 // +k8s:defaulter-gen=TypeMeta
+// +k8s:openapi-model-package=io.k8s.apimachinery.pkg.apis.testapigroup.v1
 
+// +k8s:prerelease-lifecycle-gen=true
 // +groupName=testapigroup.apimachinery.k8s.io
 
-package v1 // import "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
+package v1

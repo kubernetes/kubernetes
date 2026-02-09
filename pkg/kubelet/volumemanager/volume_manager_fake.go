@@ -18,6 +18,7 @@ package volumemanager
 
 import (
 	"context"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -27,28 +28,39 @@ import (
 
 // FakeVolumeManager is a test implementation that just tracks calls
 type FakeVolumeManager struct {
-	volumes       map[v1.UniqueVolumeName]bool
-	reportedInUse map[v1.UniqueVolumeName]bool
+	volumes                   map[v1.UniqueVolumeName]bool
+	reportedInUse             map[v1.UniqueVolumeName]bool
+	unmountDelay              time.Duration
+	unmountError              error
+	volumeAttachLimitExceeded bool
 }
 
+var _ VolumeManager = &FakeVolumeManager{}
+
 // NewFakeVolumeManager creates a new VolumeManager test instance
-func NewFakeVolumeManager(initialVolumes []v1.UniqueVolumeName) *FakeVolumeManager {
+func NewFakeVolumeManager(initialVolumes []v1.UniqueVolumeName, unmountDelay time.Duration, unmountError error, volumeAttachLimitExceeded bool) *FakeVolumeManager {
 	volumes := map[v1.UniqueVolumeName]bool{}
 	for _, v := range initialVolumes {
 		volumes[v] = true
 	}
 	return &FakeVolumeManager{
-		volumes:       volumes,
-		reportedInUse: map[v1.UniqueVolumeName]bool{},
+		volumes:                   volumes,
+		reportedInUse:             map[v1.UniqueVolumeName]bool{},
+		unmountDelay:              unmountDelay,
+		unmountError:              unmountError,
+		volumeAttachLimitExceeded: volumeAttachLimitExceeded,
 	}
 }
 
 // Run is not implemented
-func (f *FakeVolumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (f *FakeVolumeManager) Run(ctx context.Context, sourcesReady config.SourcesReady) {
 }
 
 // WaitForAttachAndMount is not implemented
 func (f *FakeVolumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error {
+	if f.volumeAttachLimitExceeded {
+		return &VolumeAttachLimitExceededError{}
+	}
 	return nil
 }
 
@@ -57,14 +69,23 @@ func (f *FakeVolumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) err
 	return nil
 }
 
+func (f *FakeVolumeManager) WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(f.unmountDelay):
+		return f.unmountError
+	}
+}
+
 // GetMountedVolumesForPod is not implemented
 func (f *FakeVolumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
 	return nil
 }
 
-// GetPossiblyMountedVolumesForPod is not implemented
-func (f *FakeVolumeManager) GetPossiblyMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
-	return nil
+// HasPossiblyMountedVolumesForPod is not implemented
+func (f *FakeVolumeManager) HasPossiblyMountedVolumesForPod(podName types.UniquePodName) bool {
+	return false
 }
 
 // GetExtraSupplementalGroupsForPod is not implemented

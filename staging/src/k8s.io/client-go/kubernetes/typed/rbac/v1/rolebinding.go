@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
+	applyconfigurationsrbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type RoleBindingsGetter interface {
 
 // RoleBindingInterface has methods to work with RoleBinding resources.
 type RoleBindingInterface interface {
-	Create(ctx context.Context, roleBinding *v1.RoleBinding, opts metav1.CreateOptions) (*v1.RoleBinding, error)
-	Update(ctx context.Context, roleBinding *v1.RoleBinding, opts metav1.UpdateOptions) (*v1.RoleBinding, error)
+	Create(ctx context.Context, roleBinding *rbacv1.RoleBinding, opts metav1.CreateOptions) (*rbacv1.RoleBinding, error)
+	Update(ctx context.Context, roleBinding *rbacv1.RoleBinding, opts metav1.UpdateOptions) (*rbacv1.RoleBinding, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.RoleBinding, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.RoleBindingList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*rbacv1.RoleBinding, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*rbacv1.RoleBindingList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RoleBinding, err error)
-	Apply(ctx context.Context, roleBinding *rbacv1.RoleBindingApplyConfiguration, opts metav1.ApplyOptions) (result *v1.RoleBinding, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rbacv1.RoleBinding, err error)
+	Apply(ctx context.Context, roleBinding *applyconfigurationsrbacv1.RoleBindingApplyConfiguration, opts metav1.ApplyOptions) (result *rbacv1.RoleBinding, err error)
 	RoleBindingExpansion
 }
 
 // roleBindings implements RoleBindingInterface
 type roleBindings struct {
-	*gentype.ClientWithListAndApply[*v1.RoleBinding, *v1.RoleBindingList, *rbacv1.RoleBindingApplyConfiguration]
+	*gentype.ClientWithListAndApply[*rbacv1.RoleBinding, *rbacv1.RoleBindingList, *applyconfigurationsrbacv1.RoleBindingApplyConfiguration]
 }
 
 // newRoleBindings returns a RoleBindings
 func newRoleBindings(c *RbacV1Client, namespace string) *roleBindings {
 	return &roleBindings{
-		gentype.NewClientWithListAndApply[*v1.RoleBinding, *v1.RoleBindingList, *rbacv1.RoleBindingApplyConfiguration](
+		gentype.NewClientWithListAndApply[*rbacv1.RoleBinding, *rbacv1.RoleBindingList, *applyconfigurationsrbacv1.RoleBindingApplyConfiguration](
 			"rolebindings",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.RoleBinding { return &v1.RoleBinding{} },
-			func() *v1.RoleBindingList { return &v1.RoleBindingList{} }),
+			func() *rbacv1.RoleBinding { return &rbacv1.RoleBinding{} },
+			func() *rbacv1.RoleBindingList { return &rbacv1.RoleBindingList{} },
+			gentype.PrefersProtobuf[*rbacv1.RoleBinding](),
+		),
 	}
 }

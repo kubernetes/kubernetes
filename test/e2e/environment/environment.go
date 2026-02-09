@@ -22,13 +22,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+// Please keep the list in alphabetical, case-sensitive
+// (upper before any lower case character) order.
 var (
-	// Please keep the list in alphabetical order.
-
 	// The test does not work in UserNS (for example, `open /proc/sys/kernel/shm_rmid_forced: permission denied`).
 	NotInUserNS = framework.WithEnvironment(framework.ValidEnvironments.Add("NotInUserNS"))
-
-	// Please keep the list in alphabetical order.
 )
 
 func init() {

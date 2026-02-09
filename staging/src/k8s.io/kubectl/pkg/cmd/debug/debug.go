@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -75,6 +74,9 @@ var (
 		            debugging utilities without restarting the pod.
 		* Node: Create a new pod that runs in the node's host namespaces and can access
 		        the node's filesystem.
+
+		Note: When a non-root user is configured for the entire target Pod, some capabilities granted
+		by debug profile may not work.
 `))
 
 	debugExample = templates.Examples(i18n.T(`
@@ -211,10 +213,8 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.ShareProcesses, "share-processes", o.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
 	cmd.Flags().StringVar(&o.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
-	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Options are "legacy", "general", "baseline", "netadmin", "restricted" or "sysadmin".`))
-	if !cmdutil.DebugCustomProfile.IsDisabled() {
-		cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON or YAML file containing a partial container spec to customize built-in debug profiles."))
-	}
+	cmd.Flags().StringVar(&o.Profile, "profile", ProfileGeneral, i18n.T(`Options are "general", "baseline", "restricted", "netadmin" or "sysadmin". Defaults to "general"`))
+	cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON or YAML file containing a partial container spec to customize built-in debug profiles."))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -267,7 +267,7 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 
 	// Set default WarningPrinter
 	if o.WarningPrinter == nil {
-		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(o.ErrOut)})
 	}
 
 	if o.Applier == nil {
@@ -399,6 +399,11 @@ func (o *DebugOptions) Validate() error {
 		}
 	}
 
+	// Warning for legacy profile
+	if o.Profile == ProfileLegacy {
+		fmt.Fprintln(o.ErrOut, `--profile=legacy is deprecated and planned to be removed in v1.39. It is recommended to specify other profile, for example "--profile=general".`) //nolint:errcheck
+	}
+
 	return nil
 }
 
@@ -491,6 +496,8 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 		return nil, "", err
 	}
 	klog.V(2).Infof("new ephemeral container: %#v", debugContainer)
+
+	o.displayWarning((*corev1.Container)(&debugContainer.EphemeralContainerCommon), pod)
 
 	debugJS, err := json.Marshal(debugPod)
 	if err != nil {
@@ -608,6 +615,16 @@ func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev
 	if err != nil {
 		return nil, "", err
 	}
+
+	var debugContainer *corev1.Container
+	for i := range copied.Spec.Containers {
+		if copied.Spec.Containers[i].Name == dc {
+			debugContainer = &copied.Spec.Containers[i]
+			break
+		}
+	}
+	o.displayWarning(debugContainer, copied)
+
 	created, err := o.podClient.Pods(copied.Namespace).Create(ctx, copied, metav1.CreateOptions{})
 	if err != nil {
 		return nil, "", err
@@ -619,6 +636,32 @@ func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev
 		}
 	}
 	return created, dc, nil
+}
+
+// Display warning message if some capabilities are set by profile and non-root user is specified in .Spec.SecurityContext.RunAsUser.(#1650)
+func (o *DebugOptions) displayWarning(container *corev1.Container, pod *corev1.Pod) {
+	if container == nil {
+		return
+	}
+
+	if pod.Spec.SecurityContext.RunAsUser == nil || *pod.Spec.SecurityContext.RunAsUser == 0 {
+		return
+	}
+
+	if container.SecurityContext == nil {
+		return
+	}
+
+	if container.SecurityContext.RunAsUser != nil && *container.SecurityContext.RunAsUser == 0 {
+		return
+	}
+
+	if (container.SecurityContext.Privileged == nil || !*container.SecurityContext.Privileged) &&
+		(container.SecurityContext.Capabilities == nil || len(container.SecurityContext.Capabilities.Add) == 0) {
+		return
+	}
+
+	_, _ = fmt.Fprintln(o.ErrOut, `Warning: Non-root user is configured for the entire target Pod, and some capabilities granted by debug profile may not work. Please consider using "--custom" with a custom profile that specifies "securityContext.runAsUser: 0".`)
 }
 
 // generateDebugContainer returns a debugging pod and an EphemeralContainer suitable for use as a debug container
@@ -683,6 +726,9 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 	p := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pn,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "kubectl-debug",
+			},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -942,12 +988,12 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter gen
 	}
 	if status.State.Terminated != nil {
 		klog.V(1).Info("Ephemeral container terminated, falling back to logs")
-		return logOpts(restClientGetter, pod, opts)
+		return logOpts(ctx, restClientGetter, pod, opts)
 	}
 
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(opts.ErrOut, "warning: couldn't attach to pod/%s, falling back to streaming logs: %v\n", podName, err)
-		return logOpts(restClientGetter, pod, opts)
+		return logOpts(ctx, restClientGetter, pod, opts)
 	}
 	return nil
 }
@@ -965,7 +1011,7 @@ func getContainerStatusByName(pod *corev1.Pod, containerName string) *corev1.Con
 }
 
 // logOpts logs output from opts to the pods log.
-func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Pod, opts *attach.AttachOptions) error {
+func logOpts(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Pod, opts *attach.AttachOptions) error {
 	ctrName, err := opts.GetContainerName(pod)
 	if err != nil {
 		return err
@@ -976,7 +1022,7 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Po
 		return err
 	}
 	for _, request := range requests {
-		if err := logs.DefaultConsumeRequest(request, opts.Out); err != nil {
+		if err := logs.DefaultConsumeRequest(ctx, request, opts.Out); err != nil {
 			return err
 		}
 	}

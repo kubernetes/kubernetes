@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
-	v1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
+	example2v1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
 )
 
 // TestTypeLister helps list TestTypes.
@@ -30,7 +30,7 @@ import (
 type TestTypeLister interface {
 	// List lists all TestTypes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.TestType, err error)
+	List(selector labels.Selector) (ret []*example2v1.TestType, err error)
 	// TestTypes returns an object that can list and get TestTypes.
 	TestTypes(namespace string) TestTypeNamespaceLister
 	TestTypeListerExpansion
@@ -38,17 +38,17 @@ type TestTypeLister interface {
 
 // testTypeLister implements the TestTypeLister interface.
 type testTypeLister struct {
-	listers.ResourceIndexer[*v1.TestType]
+	listers.ResourceIndexer[*example2v1.TestType]
 }
 
 // NewTestTypeLister returns a new TestTypeLister.
 func NewTestTypeLister(indexer cache.Indexer) TestTypeLister {
-	return &testTypeLister{listers.New[*v1.TestType](indexer, v1.Resource("testtype"))}
+	return &testTypeLister{listers.New[*example2v1.TestType](indexer, example2v1.Resource("testtype"))}
 }
 
 // TestTypes returns an object that can list and get TestTypes.
 func (s *testTypeLister) TestTypes(namespace string) TestTypeNamespaceLister {
-	return testTypeNamespaceLister{listers.NewNamespaced[*v1.TestType](s.ResourceIndexer, namespace)}
+	return testTypeNamespaceLister{listers.NewNamespaced[*example2v1.TestType](s.ResourceIndexer, namespace)}
 }
 
 // TestTypeNamespaceLister helps list and get TestTypes.
@@ -56,15 +56,15 @@ func (s *testTypeLister) TestTypes(namespace string) TestTypeNamespaceLister {
 type TestTypeNamespaceLister interface {
 	// List lists all TestTypes in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.TestType, err error)
+	List(selector labels.Selector) (ret []*example2v1.TestType, err error)
 	// Get retrieves the TestType from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.TestType, error)
+	Get(name string) (*example2v1.TestType, error)
 	TestTypeNamespaceListerExpansion
 }
 
 // testTypeNamespaceLister implements the TestTypeNamespaceLister
 // interface.
 type testTypeNamespaceLister struct {
-	listers.ResourceIndexer[*v1.TestType]
+	listers.ResourceIndexer[*example2v1.TestType]
 }

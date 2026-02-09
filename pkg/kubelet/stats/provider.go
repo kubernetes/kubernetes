@@ -18,13 +18,18 @@ package stats
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	cadvisormemory "github.com/google/cadvisor/cache/memory"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
@@ -45,14 +50,14 @@ func NewCRIStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	podManager PodManager,
-	runtimeCache kubecontainer.RuntimeCache,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
 	podAndContainerStatsFromCRI bool,
+	fallbackStatsProvider containerStatsProvider,
 ) *Provider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
-		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI))
+	return newStatsProvider(cadvisor, podManager, newCRIStatsProvider(cadvisor, resourceAnalyzer,
+		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI, fallbackStatsProvider))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
@@ -61,12 +66,12 @@ func NewCadvisorStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	podManager PodManager,
-	runtimeCache kubecontainer.RuntimeCache,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
 	hostStatsProvider HostStatsProvider,
+	containerManager cm.ContainerManager,
 ) *Provider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider, hostStatsProvider))
+	return newStatsProvider(cadvisor, podManager, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider, hostStatsProvider, containerManager))
 }
 
 // newStatsProvider returns a new Provider that provides node stats from
@@ -74,28 +79,27 @@ func NewCadvisorStatsProvider(
 func newStatsProvider(
 	cadvisor cadvisor.Interface,
 	podManager PodManager,
-	runtimeCache kubecontainer.RuntimeCache,
 	containerStatsProvider containerStatsProvider,
 ) *Provider {
 	return &Provider{
 		cadvisor:               cadvisor,
 		podManager:             podManager,
-		runtimeCache:           runtimeCache,
 		containerStatsProvider: containerStatsProvider,
 	}
 }
 
 // Provider provides the stats of the node and the pod-managed containers.
 type Provider struct {
-	cadvisor     cadvisor.Interface
-	podManager   PodManager
-	runtimeCache kubecontainer.RuntimeCache
+	cadvisor   cadvisor.Interface
+	podManager PodManager
 	containerStatsProvider
 }
 
 // containerStatsProvider is an interface that provides the stats of the
 // containers managed by pods.
 type containerStatsProvider interface {
+	// PodCPUAndMemoryStats gets the latest CPU & Memory stats for the pod and all its running containers.
+	PodCPUAndMemoryStats(context.Context, *v1.Pod, *kubecontainer.PodStatus) (*statsapi.PodStats, error)
 	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
@@ -113,10 +117,16 @@ func (p *Provider) RlimitStats() (*statsapi.RlimitStats, error) {
 func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
+		if errors.Is(err, cadvisormemory.ErrDataNotFound) {
+			return nil, nil, fmt.Errorf("cgroup stats not found for %q: %w", cgroupName, cadvisormemory.ErrDataNotFound)
+		}
 		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a context parameter.
+	logger := klog.TODO()
 	// Rootfs and imagefs doesn't make sense for raw cgroup.
-	s := cadvisorInfoToContainerStats(cgroupName, info, nil, nil)
+	s := cadvisorInfoToContainerStats(logger, cgroupName, info, nil, nil)
 	n := cadvisorInfoToNetworkStats(info)
 	return s, n, nil
 }
@@ -126,6 +136,9 @@ func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsap
 func (p *Provider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
+		if errors.Is(err, cadvisormemory.ErrDataNotFound) {
+			return nil, fmt.Errorf("cgroup stats not found for %q: %w", cgroupName, cadvisormemory.ErrDataNotFound)
+		}
 		return nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
 	// Rootfs and imagefs doesn't make sense for raw cgroup.
@@ -187,6 +200,20 @@ func (p *Provider) HasDedicatedImageFs(ctx context.Context) (bool, error) {
 		}
 	}
 	return device != rootFsInfo.Device, nil
+}
+
+// HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
+// KEP Issue Number 4191: Enhanced this to allow for the containers to be separate from images.
+func (p *Provider) HasDedicatedContainerFs(ctx context.Context) (bool, error) {
+	imageFs, err := p.cadvisor.ImagesFsInfo(ctx)
+	if err != nil {
+		return false, err
+	}
+	containerFs, err := p.cadvisor.ContainerFsInfo(ctx)
+	if err != nil {
+		return false, err
+	}
+	return imageFs.Device != containerFs.Device, nil
 }
 
 func equalFileSystems(a, b *statsapi.FsStats) bool {

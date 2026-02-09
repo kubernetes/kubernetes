@@ -1,5 +1,4 @@
 //go:build !linux
-// +build !linux
 
 /*
 Copyright 2022 The Kubernetes Authors.
@@ -21,12 +20,11 @@ package preflight
 
 import (
 	system "k8s.io/system-validators/validators"
-	utilsexec "k8s.io/utils/exec"
 )
 
 // addOSValidator adds a new OSValidator
 // No-op for Darwin (MacOS), Windows.
-func addOSValidator(validators []system.Validator, _ *system.StreamReporter) []system.Validator {
+func addOSValidator(validators []system.Validator, _ *system.StreamReporter, _ string) []system.Validator {
 	return validators
 }
 
@@ -45,11 +43,5 @@ func addIPv4Checks(checks []Checker) []Checker {
 // addSwapCheck adds a swap check
 // No-op for Darwin (MacOS), Windows.
 func addSwapCheck(checks []Checker) []Checker {
-	return checks
-}
-
-// addExecChecks adds checks that verify if certain binaries are in PATH
-// No-op for Darwin (MacOS), Windows.
-func addExecChecks(checks []Checker, _ utilsexec.Interface) []Checker {
 	return checks
 }

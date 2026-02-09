@@ -102,11 +102,13 @@ type Manager struct {
 // * If refresh fails and the old token is still valid, log an error and return the old token.
 // * If refresh fails and the old token is no longer valid, return an error
 func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	// TODO: pass ctx to GetServiceAccountToken after switching pkg/volume to contextual logging
+	ctx := context.TODO()
 	key := keyFunc(name, namespace, tr)
 
 	ctr, ok := m.get(key)
 
-	if ok && !m.requiresRefresh(ctr) {
+	if ok && !m.requiresRefresh(ctx, ctr) {
 		return ctr, nil
 	}
 
@@ -118,7 +120,8 @@ func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticat
 		case m.expired(ctr):
 			return nil, fmt.Errorf("token %s expired and refresh failed: %v", key, err)
 		default:
-			klog.ErrorS(err, "Couldn't update token", "cacheKey", key)
+			logger := klog.FromContext(ctx)
+			logger.Error(err, "Couldn't update token", "cacheKey", key)
 			return ctr, nil
 		}
 	}
@@ -168,11 +171,12 @@ func (m *Manager) expired(t *authenticationv1.TokenRequest) bool {
 
 // requiresRefresh returns true if the token is older than 80% of its total
 // ttl, or if the token is older than 24 hours.
-func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
+func (m *Manager) requiresRefresh(ctx context.Context, tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
 		cpy := tr.DeepCopy()
 		cpy.Status.Token = ""
-		klog.ErrorS(nil, "Expiration seconds was nil for token request", "tokenRequest", cpy)
+		logger := klog.FromContext(ctx)
+		logger.Error(nil, "Expiration seconds was nil for token request", "tokenRequest", cpy)
 		return false
 	}
 	now := m.clock.Now()
@@ -202,5 +206,14 @@ func keyFunc(name, namespace string, tr *authenticationv1.TokenRequest) string {
 		ref = *tr.Spec.BoundObjectRef
 	}
 
-	return fmt.Sprintf("%q/%q/%#v/%#v/%#v", name, namespace, tr.Spec.Audiences, exp, ref)
+	var uid types.UID
+	if len(tr.UID) > 0 {
+		// If UID is set in the token request it is used as a precondition
+		// to ensure that the token request is for the same service account.
+		// This is useful to prevent stale tokens from being returned after a service account
+		// is deleted and recreated with the same name.
+		uid = tr.UID
+	}
+
+	return fmt.Sprintf("%q/%q/%#v/%#v/%#v/%q", name, namespace, tr.Spec.Audiences, exp, ref, uid)
 }

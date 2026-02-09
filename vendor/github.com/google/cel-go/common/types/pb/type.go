@@ -427,22 +427,49 @@ func unwrap(desc description, msg proto.Message) (any, bool, error) {
 			return structpb.NullValue_NULL_VALUE, true, nil
 		}
 	case *wrapperspb.BoolValue:
+		if v == nil {
+			return nil, true, nil
+		}
 		return v.GetValue(), true, nil
 	case *wrapperspb.BytesValue:
+		if v == nil {
+			return nil, true, nil
+		}
 		return v.GetValue(), true, nil
 	case *wrapperspb.DoubleValue:
+		if v == nil {
+			return nil, true, nil
+		}
 		return v.GetValue(), true, nil
 	case *wrapperspb.FloatValue:
+		if v == nil {
+			return nil, true, nil
+		}
 		return float64(v.GetValue()), true, nil
 	case *wrapperspb.Int32Value:
+		if v == nil {
+			return nil, true, nil
+		}
 		return int64(v.GetValue()), true, nil
 	case *wrapperspb.Int64Value:
+		if v == nil {
+			return nil, true, nil
+		}
 		return v.GetValue(), true, nil
 	case *wrapperspb.StringValue:
+		if v == nil {
+			return nil, true, nil
+		}
 		return v.GetValue(), true, nil
 	case *wrapperspb.UInt32Value:
+		if v == nil {
+			return nil, true, nil
+		}
 		return uint64(v.GetValue()), true, nil
 	case *wrapperspb.UInt64Value:
+		if v == nil {
+			return nil, true, nil
+		}
 		return v.GetValue(), true, nil
 	}
 	return msg, false, nil

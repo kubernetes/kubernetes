@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -40,7 +39,7 @@ func makeLink(link, target string) error {
 func TestDoSafeMakeDir(t *testing.T) {
 	base, err := ioutil.TempDir("", "TestDoSafeMakeDir")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatalf("failed to create temporary directory: %v", err)
 	}
 
 	defer os.RemoveAll(base)
@@ -136,7 +135,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 func TestLockAndCheckSubPath(t *testing.T) {
 	base, err := ioutil.TempDir("", "TestLockAndCheckSubPath")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatalf("failed to create temporary directory: %v", err)
 	}
 
 	defer os.RemoveAll(base)
@@ -240,7 +239,7 @@ func TestLockAndCheckSubPath(t *testing.T) {
 func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
 	base, err := ioutil.TempDir("", "TestLockAndCheckSubPathWithoutSymlink")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatalf("failed to create temporary directory: %v", err)
 	}
 
 	defer os.RemoveAll(base)
@@ -344,7 +343,7 @@ func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
 func TestFindExistingPrefix(t *testing.T) {
 	base, err := ioutil.TempDir("", "TestFindExistingPrefix")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatalf("failed to create temporary directory: %v", err)
 	}
 
 	defer os.RemoveAll(base)

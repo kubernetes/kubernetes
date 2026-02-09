@@ -18,23 +18,32 @@
     {
     "name": "etcd-container",
     {{security_context}}
-    "image": "{{ pillar.get('etcd_docker_repository', 'registry.k8s.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.5.14-0') }}",
+    "image": "{{ pillar.get('etcd_docker_repository', 'registry.k8s.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.6.7-0') }}",
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}
       }
     },
     "command": [
-              "/bin/sh",
-              "-c",
-              "if [ -e /usr/local/bin/migrate-if-needed.sh ]; then /usr/local/bin/migrate-if-needed.sh 1>>/var/log/etcd{{ suffix }}.log 2>&1; fi; exec /usr/local/bin/etcd --name etcd-{{ hostname }} --listen-peer-urls {{ etcd_protocol }}://{{ host_ip }}:{{ server_port }} --initial-advertise-peer-urls {{ etcd_protocol }}://{{ hostname }}:{{ server_port }} --advertise-client-urls {{ etcd_apiserver_protocol }}://127.0.0.1:{{ port }} --listen-client-urls {{ etcd_apiserver_protocol }}://{{ listen_client_ip }}:{{ port }} {{ quota_bytes }} --data-dir /var/etcd/data{{ suffix }} --initial-cluster-state {{ cluster_state }} --initial-cluster {{ etcd_cluster }} {{ etcd_creds }} {{ etcd_apiserver_creds }} {{ etcd_extra_args }} 1>>/var/log/etcd{{ suffix }}.log 2>&1"
-            ],
+      "/usr/local/bin/etcd",
+      "--name=etcd-{{ hostname }}",
+      "--listen-peer-urls={{ etcd_protocol }}://{{ host_ip }}:{{ server_port }}",
+      "--initial-advertise-peer-urls={{ etcd_protocol }}://{{ hostname }}:{{ server_port }}",
+      "--advertise-client-urls={{ etcd_apiserver_protocol }}://127.0.0.1:{{ port }}",
+      "--listen-client-urls={{ etcd_apiserver_protocol }}://{{ listen_client_ip }}:{{ port }}",
+      "{{ quota_bytes }}",
+      "--data-dir=/var/etcd/data{{ suffix }}",
+      "--initial-cluster-state={{ cluster_state }}",
+      "--initial-cluster={{ etcd_cluster }}",
+      "--log-outputs=/var/log/etcd{{ suffix }}.log",
+      {{ etcd_creds_and_extra_args }}
+    ],
     "env": [
       { "name": "TARGET_STORAGE",
         "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
       },
       { "name": "TARGET_VERSION",
-        "value": "{{ pillar.get('etcd_version', '3.5.12') }}"
+        "value": "{{ pillar.get('etcd_version', '3.6.7') }}"
       },
       {
         "name": "DO_NOT_MOVE_BINARIES",
@@ -52,12 +61,6 @@
       { "name": "INITIAL_ADVERTISE_PEER_URLS",
         "value": "{{ etcd_protocol }}://{{ hostname }}:{{ server_port }}"
       },
-      { "name": "ETCD_CREDS",
-        "value": "{{ etcd_creds }}"
-      },
-      { "name": "ETCD_APISERVER_CREDS",
-        "value": "{{ etcd_apiserver_creds }}"
-      },
       { "name": "ETCD_SNAPSHOT_COUNT",
         "value": "10000"
       },
@@ -72,9 +75,12 @@
     "livenessProbe": {
       "exec": {
         "command": [
-          "/bin/sh",
-          "-c",
-          "set -x; exec /usr/local/bin/etcdctl --endpoints=127.0.0.1:{{ port }} {{ etcdctl_certs }} --command-timeout=15s endpoint health"
+          "/usr/local/bin/etcdctl",
+          "--endpoints=127.0.0.1:{{ port }}",
+          "--command-timeout=15s",
+          {{ etcdctl_certs }}
+          "endpoint",
+          "health"
         ]
       },
       "initialDelaySeconds": {{ liveness_probe_initial_delay }},

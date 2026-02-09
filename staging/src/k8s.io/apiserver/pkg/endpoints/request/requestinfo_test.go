@@ -44,55 +44,56 @@ func TestGetAPIRequestInfo(t *testing.T) {
 	}{
 
 		// resource paths
-		{"GET", "/api/v1/namespaces", "list", "api", "", "v1", "", "namespaces", "", "", []string{"namespaces"}},
-		{"GET", "/api/v1/namespaces/other", "get", "api", "", "v1", "other", "namespaces", "", "other", []string{"namespaces", "other"}},
+		{MethodGet, "/api/v1/namespaces", "list", "api", "", "v1", "", "namespaces", "", "", []string{"namespaces"}},
+		{MethodGet, "/api/v1/namespaces/other", "get", "api", "", "v1", "other", "namespaces", "", "other", []string{"namespaces", "other"}},
 
-		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
-		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
-		{"HEAD", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1/pods", "list", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
-		{"HEAD", "/api/v1/pods", "list", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
-		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{MethodGet, "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{MethodGet, "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{MethodHead, "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{MethodGet, "/api/v1/pods", "list", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
+		{MethodHead, "/api/v1/pods", "list", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
+		{MethodGet, "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{MethodGet, "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// special verbs
-		{"GET", "/api/v1/proxy/namespaces/other/pods/foo", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1/proxy/namespaces/other/pods/foo/subpath/not/a/subresource", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo", "subpath", "not", "a", "subresource"}},
-		{"GET", "/api/v1/watch/pods", "watch", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
-		{"GET", "/api/v1/pods?watch=true", "watch", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
-		{"GET", "/api/v1/pods?watch=false", "list", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
-		{"GET", "/api/v1/watch/namespaces/other/pods", "watch", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
-		{"GET", "/api/v1/namespaces/other/pods?watch=1", "watch", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
-		{"GET", "/api/v1/namespaces/other/pods?watch=0", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{MethodGet, "/api/v1/proxy/namespaces/other/pods/foo", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{MethodGet, "/api/v1/proxy/namespaces/other/pods/foo/subpath/not/a/subresource", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo", "subpath", "not", "a", "subresource"}},
+		{MethodGet, "/api/v1/watch/pods", "watch", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
+		{MethodGet, "/api/v1/pods?watch=true", "watch", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
+		{MethodGet, "/api/v1/pods?watch=false", "list", "api", "", "v1", namespaceAll, "pods", "", "", []string{"pods"}},
+		{MethodGet, "/api/v1/watch/namespaces/other/pods", "watch", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{MethodGet, "/api/v1/namespaces/other/pods?watch=1", "watch", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{MethodGet, "/api/v1/namespaces/other/pods?watch=0", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// subresource identification
-		{"GET", "/api/v1/namespaces/other/pods/foo/status", "get", "api", "", "v1", "other", "pods", "status", "foo", []string{"pods", "foo", "status"}},
-		{"GET", "/api/v1/namespaces/other/pods/foo/proxy/subpath", "get", "api", "", "v1", "other", "pods", "proxy", "foo", []string{"pods", "foo", "proxy", "subpath"}},
-		{"PUT", "/api/v1/namespaces/other/finalize", "update", "api", "", "v1", "other", "namespaces", "finalize", "other", []string{"namespaces", "other", "finalize"}},
-		{"PUT", "/api/v1/namespaces/other/status", "update", "api", "", "v1", "other", "namespaces", "status", "other", []string{"namespaces", "other", "status"}},
+		{MethodGet, "/api/v1/namespaces/other/pods/foo/status", "get", "api", "", "v1", "other", "pods", "status", "foo", []string{"pods", "foo", "status"}},
+		{MethodGet, "/api/v1/namespaces/other/pods/foo/proxy/subpath", "get", "api", "", "v1", "other", "pods", "proxy", "foo", []string{"pods", "foo", "proxy", "subpath"}},
+		{MethodPut, "/api/v1/namespaces/other/finalize", "update", "api", "", "v1", "other", "namespaces", "finalize", "other", []string{"namespaces", "other", "finalize"}},
+		{MethodPut, "/api/v1/namespaces/other/status", "update", "api", "", "v1", "other", "namespaces", "status", "other", []string{"namespaces", "other", "status"}},
 
 		// verb identification
-		{"PATCH", "/api/v1/namespaces/other/pods/foo", "patch", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
-		{"DELETE", "/api/v1/namespaces/other/pods/foo", "delete", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
-		{"POST", "/api/v1/namespaces/other/pods", "create", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{MethodPatch, "/api/v1/namespaces/other/pods/foo", "patch", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{MethodDelete, "/api/v1/namespaces/other/pods/foo", "delete", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
+		{MethodPost, "/api/v1/namespaces/other/pods", "create", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// deletecollection verb identification
-		{"DELETE", "/api/v1/nodes", "deletecollection", "api", "", "v1", "", "nodes", "", "", []string{"nodes"}},
-		{"DELETE", "/api/v1/namespaces", "deletecollection", "api", "", "v1", "", "namespaces", "", "", []string{"namespaces"}},
-		{"DELETE", "/api/v1/namespaces/other/pods", "deletecollection", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
-		{"DELETE", "/apis/extensions/v1/namespaces/other/pods", "deletecollection", "api", "extensions", "v1", "other", "pods", "", "", []string{"pods"}},
+		{MethodDelete, "/api/v1/nodes", "deletecollection", "api", "", "v1", "", "nodes", "", "", []string{"nodes"}},
+		{MethodDelete, "/api/v1/namespaces", "deletecollection", "api", "", "v1", "", "namespaces", "", "", []string{"namespaces"}},
+		{MethodDelete, "/api/v1/namespaces/other/pods", "deletecollection", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{MethodDelete, "/apis/extensions/v1/namespaces/other/pods", "deletecollection", "api", "extensions", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// api group identification
-		{"POST", "/apis/extensions/v1/namespaces/other/pods", "create", "api", "extensions", "v1", "other", "pods", "", "", []string{"pods"}},
+		{MethodPost, "/apis/extensions/v1/namespaces/other/pods", "create", "api", "extensions", "v1", "other", "pods", "", "", []string{"pods"}},
 
 		// api version identification
-		{"POST", "/apis/extensions/v1beta3/namespaces/other/pods", "create", "api", "extensions", "v1beta3", "other", "pods", "", "", []string{"pods"}},
+		{MethodPost, "/apis/extensions/v1beta3/namespaces/other/pods", "create", "api", "extensions", "v1beta3", "other", "pods", "", "", []string{"pods"}},
 	}
 
 	resolver := newTestRequestInfoResolver()
 
 	for _, successCase := range successCases {
-		req, _ := http.NewRequest(successCase.method, successCase.url, nil)
+		ctx := t.Context()
+		req, _ := http.NewRequestWithContext(ctx, successCase.method, successCase.url, nil)
 
 		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {
@@ -133,7 +134,8 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		"missing api group":           "/apis/version/resource",
 	}
 	for k, v := range errorCases {
-		req, err := http.NewRequest("GET", v, nil)
+		ctx := t.Context()
+		req, err := http.NewRequestWithContext(ctx, MethodGet, v, nil)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
@@ -171,7 +173,8 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 	resolver := newTestRequestInfoResolver()
 
 	for testName, tc := range tests {
-		req, _ := http.NewRequest("GET", tc.url, nil)
+		ctx := t.Context()
+		req, _ := http.NewRequestWithContext(ctx, MethodGet, tc.url, nil)
 
 		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {
@@ -190,64 +193,128 @@ func newTestRequestInfoResolver() *RequestInfoFactory {
 	}
 }
 
-func TestFieldSelectorParsing(t *testing.T) {
+func TestSelectorParsing(t *testing.T) {
 	tests := []struct {
-		name         string
-		url          string
-		expectedName string
-		expectedErr  error
-		expectedVerb string
+		name                  string
+		method                string
+		url                   string
+		expectedName          string
+		expectedErr           error
+		expectedVerb          string
+		expectedFieldSelector string
+		expectedLabelSelector string
 	}{
 		{
-			name:         "no selector",
-			url:          "/apis/group/version/resource",
-			expectedVerb: "list",
+			name:                  "no selector",
+			method:                MethodGet,
+			url:                   "/apis/group/version/resource",
+			expectedVerb:          "list",
+			expectedFieldSelector: "",
 		},
 		{
-			name:         "metadata.name selector",
-			url:          "/apis/group/version/resource?fieldSelector=metadata.name=name1",
-			expectedName: "name1",
-			expectedVerb: "list",
+			name:                  "metadata.name selector",
+			method:                MethodGet,
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=name1",
+			expectedName:          "name1",
+			expectedVerb:          "list",
+			expectedFieldSelector: "metadata.name=name1",
 		},
 		{
-			name:         "metadata.name selector with watch",
-			url:          "/apis/group/version/resource?watch=true&fieldSelector=metadata.name=name1",
-			expectedName: "name1",
-			expectedVerb: "watch",
+			name:                  "metadata.name selector with watch",
+			method:                MethodGet,
+			url:                   "/apis/group/version/resource?watch=true&fieldSelector=metadata.name=name1",
+			expectedName:          "name1",
+			expectedVerb:          "watch",
+			expectedFieldSelector: "metadata.name=name1",
 		},
 		{
-			name:         "random selector",
-			url:          "/apis/group/version/resource?fieldSelector=foo=bar",
-			expectedName: "",
-			expectedVerb: "list",
+			name:                  "random selector",
+			method:                MethodGet,
+			url:                   "/apis/group/version/resource?fieldSelector=foo=bar&labelSelector=baz=qux",
+			expectedName:          "",
+			expectedVerb:          "list",
+			expectedFieldSelector: "foo=bar",
+			expectedLabelSelector: "baz=qux",
 		},
 		{
-			name:         "invalid selector with metadata.name",
-			url:          "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo",
-			expectedName: "",
-			expectedErr:  fmt.Errorf("invalid selector"),
-			expectedVerb: "list",
+			name:                  "invalid selector with metadata.name",
+			method:                MethodGet,
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo",
+			expectedName:          "",
+			expectedErr:           fmt.Errorf("invalid selector"),
+			expectedVerb:          "list",
+			expectedFieldSelector: "metadata.name=name1,foo",
 		},
 		{
-			name:         "invalid selector with metadata.name with watch",
-			url:          "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo&watch=true",
-			expectedName: "",
-			expectedErr:  fmt.Errorf("invalid selector"),
-			expectedVerb: "watch",
+			name:                  "invalid selector with metadata.name with watch",
+			method:                MethodGet,
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo&watch=true",
+			expectedName:          "",
+			expectedErr:           fmt.Errorf("invalid selector"),
+			expectedVerb:          "watch",
+			expectedFieldSelector: "metadata.name=name1,foo",
 		},
 		{
-			name:         "invalid selector with metadata.name with watch false",
-			url:          "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo&watch=false",
-			expectedName: "",
-			expectedErr:  fmt.Errorf("invalid selector"),
-			expectedVerb: "list",
+			name:                  "invalid selector with metadata.name with watch false",
+			method:                MethodGet,
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=name1,foo&watch=false",
+			expectedName:          "",
+			expectedErr:           fmt.Errorf("invalid selector"),
+			expectedVerb:          "list",
+			expectedFieldSelector: "metadata.name=name1,foo",
+		},
+		{
+			name:                  "selector on deletecollection is honored",
+			method:                MethodDelete,
+			url:                   "/apis/group/version/resource?fieldSelector=foo=bar&labelSelector=baz=qux",
+			expectedName:          "",
+			expectedVerb:          "deletecollection",
+			expectedFieldSelector: "foo=bar",
+			expectedLabelSelector: "baz=qux",
+		},
+		{
+			name:                  "selector on repeated param matches parsed param",
+			method:                MethodGet,
+			url:                   "/apis/group/version/resource?fieldSelector=metadata.name=foo&fieldSelector=metadata.name=bar&labelSelector=foo=bar&labelSelector=foo=baz",
+			expectedName:          "foo",
+			expectedVerb:          "list",
+			expectedFieldSelector: "metadata.name=foo",
+			expectedLabelSelector: "foo=bar",
+		},
+		{
+			name:                  "selector on other verb is ignored",
+			method:                MethodGet,
+			url:                   "/apis/group/version/resource/name?fieldSelector=foo=bar&labelSelector=foo=bar",
+			expectedName:          "name",
+			expectedVerb:          "get",
+			expectedFieldSelector: "",
+			expectedLabelSelector: "",
+		},
+		{
+			name:                  "selector on deprecated root type watch is not parsed",
+			method:                MethodGet,
+			url:                   "/apis/group/version/watch/resource?fieldSelector=metadata.name=foo&labelSelector=foo=bar",
+			expectedName:          "",
+			expectedVerb:          "watch",
+			expectedFieldSelector: "",
+			expectedLabelSelector: "",
+		},
+		{
+			name:                  "selector on deprecated root item watch is not parsed",
+			method:                MethodGet,
+			url:                   "/apis/group/version/watch/resource/name?fieldSelector=metadata.name=foo&labelSelector=foo=bar",
+			expectedName:          "name",
+			expectedVerb:          "watch",
+			expectedFieldSelector: "",
+			expectedLabelSelector: "",
 		},
 	}
 
 	resolver := newTestRequestInfoResolver()
 
 	for _, tc := range tests {
-		req, _ := http.NewRequest("GET", tc.url, nil)
+		ctx := t.Context()
+		req, _ := http.NewRequestWithContext(ctx, tc.method, tc.url, nil)
 
 		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {
@@ -260,6 +327,12 @@ func TestFieldSelectorParsing(t *testing.T) {
 		}
 		if e, a := tc.expectedVerb, apiRequestInfo.Verb; e != a {
 			t.Errorf("%s: expected verb %v, actual %v", tc.name, e, a)
+		}
+		if e, a := tc.expectedFieldSelector, apiRequestInfo.FieldSelector; e != a {
+			t.Errorf("%s: expected fieldSelector %v, actual %v", tc.name, e, a)
+		}
+		if e, a := tc.expectedLabelSelector, apiRequestInfo.LabelSelector; e != a {
+			t.Errorf("%s: expected labelSelector %v, actual %v", tc.name, e, a)
 		}
 	}
 }

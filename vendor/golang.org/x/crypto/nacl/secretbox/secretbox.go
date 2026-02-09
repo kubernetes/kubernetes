@@ -32,7 +32,7 @@ chunk size.
 
 This package is interoperable with NaCl: https://nacl.cr.yp.to/secretbox.html.
 */
-package secretbox // import "golang.org/x/crypto/nacl/secretbox"
+package secretbox
 
 import (
 	"golang.org/x/crypto/internal/alias"

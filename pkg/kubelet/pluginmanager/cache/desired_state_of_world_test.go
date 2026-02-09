@@ -17,19 +17,20 @@ limitations under the License.
 package cache
 
 import (
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Calls AddOrUpdatePlugin() to add a plugin
 // Verifies newly added plugin exists in GetPluginsToRegister()
 // Verifies newly added plugin returns true for PluginExists()
 func Test_DSW_AddOrUpdatePlugin_Positive_NewPlugin(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	dsw := NewDesiredStateOfWorld()
 	socketPath := "/var/lib/kubelet/device-plugins/test-plugin.sock"
-	err := dsw.AddOrUpdatePlugin(socketPath)
+	err := dsw.AddOrUpdatePlugin(tCtx, socketPath)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddOrUpdatePlugin failed. Expected: <no error> Actual: <%v>", err)
@@ -54,15 +55,11 @@ func Test_DSW_AddOrUpdatePlugin_Positive_NewPlugin(t *testing.T) {
 // Verifies the timestamp the existing plugin is updated
 // Verifies newly added plugin returns true for PluginExists()
 func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
+	tCtx := ktesting.Init(t)
 	dsw := NewDesiredStateOfWorld()
 	socketPath := "/var/lib/kubelet/device-plugins/test-plugin.sock"
 	// Adding the plugin for the first time
-	err := dsw.AddOrUpdatePlugin(socketPath)
+	err := dsw.AddOrUpdatePlugin(tCtx, socketPath)
 	if err != nil {
 		t.Fatalf("AddOrUpdatePlugin failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -75,10 +72,10 @@ func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
 	if dswPlugins[0].SocketPath != socketPath {
 		t.Fatalf("Expected\n%s\nin desired state of world, but got\n%v\n", socketPath, dswPlugins[0])
 	}
-	oldTimestamp := dswPlugins[0].Timestamp
+	oldUUID := dswPlugins[0].UUID
 
 	// Adding the plugin again so that the timestamp will be updated
-	err = dsw.AddOrUpdatePlugin(socketPath)
+	err = dsw.AddOrUpdatePlugin(tCtx, socketPath)
 	if err != nil {
 		t.Fatalf("AddOrUpdatePlugin failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -90,9 +87,9 @@ func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
 		t.Fatalf("Expected\n%s\nin desired state of world, but got\n%v\n", socketPath, newDswPlugins[0])
 	}
 
-	// Verify that the new timestamp is newer than the old timestamp
-	if !newDswPlugins[0].Timestamp.After(oldTimestamp) {
-		t.Fatal("New timestamp is not newer than the old timestamp", newDswPlugins[0].Timestamp, oldTimestamp)
+	// Verify that the new UUID is different from the old UUID
+	if newDswPlugins[0].UUID == oldUUID {
+		t.Fatal("New UUID is not different from the old UUID", newDswPlugins[0].UUID, oldUUID)
 	}
 
 }
@@ -101,9 +98,10 @@ func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
 // Verifies the plugin does not exist in GetPluginsToRegister() after AddOrUpdatePlugin()
 // Verifies the plugin returns false for PluginExists()
 func Test_DSW_AddOrUpdatePlugin_Negative_PluginMissingInfo(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	dsw := NewDesiredStateOfWorld()
 	socketPath := ""
-	err := dsw.AddOrUpdatePlugin(socketPath)
+	err := dsw.AddOrUpdatePlugin(tCtx, socketPath)
 	require.EqualError(t, err, "socket path is empty")
 
 	// Get pluginsToRegister and check the newly added plugin is there
@@ -122,10 +120,11 @@ func Test_DSW_AddOrUpdatePlugin_Negative_PluginMissingInfo(t *testing.T) {
 // Verifies newly removed plugin no longer exists in GetPluginsToRegister()
 // Verifies newly removed plugin returns false for PluginExists()
 func Test_DSW_RemovePlugin_Positive(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// First, add a plugin
 	dsw := NewDesiredStateOfWorld()
 	socketPath := "/var/lib/kubelet/device-plugins/test-plugin.sock"
-	err := dsw.AddOrUpdatePlugin(socketPath)
+	err := dsw.AddOrUpdatePlugin(tCtx, socketPath)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddOrUpdatePlugin failed. Expected: <no error> Actual: <%v>", err)

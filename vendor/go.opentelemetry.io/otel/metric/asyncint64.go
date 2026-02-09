@@ -105,7 +105,9 @@ type Int64ObservableUpDownCounterConfig struct {
 
 // NewInt64ObservableUpDownCounterConfig returns a new
 // [Int64ObservableUpDownCounterConfig] with all opts applied.
-func NewInt64ObservableUpDownCounterConfig(opts ...Int64ObservableUpDownCounterOption) Int64ObservableUpDownCounterConfig {
+func NewInt64ObservableUpDownCounterConfig(
+	opts ...Int64ObservableUpDownCounterOption,
+) Int64ObservableUpDownCounterConfig {
 	var config Int64ObservableUpDownCounterConfig
 	for _, o := range opts {
 		config = o.applyInt64ObservableUpDownCounter(config)
@@ -212,7 +214,7 @@ type Int64Observer interface {
 }
 
 // Int64Callback is a function registered with a Meter that makes observations
-// for an Int64Observerable instrument it is registered with. Calls to the
+// for an Int64Observable instrument it is registered with. Calls to the
 // Int64Observer record measurement values for the Int64Observable.
 //
 // The function needs to complete in a finite amount of time and the deadline
@@ -242,7 +244,9 @@ func (o int64CallbackOpt) applyInt64ObservableCounter(cfg Int64ObservableCounter
 	return cfg
 }
 
-func (o int64CallbackOpt) applyInt64ObservableUpDownCounter(cfg Int64ObservableUpDownCounterConfig) Int64ObservableUpDownCounterConfig {
+func (o int64CallbackOpt) applyInt64ObservableUpDownCounter(
+	cfg Int64ObservableUpDownCounterConfig,
+) Int64ObservableUpDownCounterConfig {
 	cfg.callbacks = append(cfg.callbacks, o.cback)
 	return cfg
 }

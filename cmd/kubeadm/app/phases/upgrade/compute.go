@@ -21,11 +21,9 @@ import (
 	"strings"
 
 	versionutil "k8s.io/apimachinery/pkg/util/version"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -74,7 +72,7 @@ type ClusterState struct {
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, client clientset.Interface, printer output.Printer) ([]Upgrade, error) {
+func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, printer output.Printer) ([]Upgrade, error) {
 	printer.Printf("[upgrade] Fetching available versions to upgrade to\n")
 
 	// Collect the upgrades kubeadm can do in this list
@@ -94,7 +92,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			" nodes to the same version of Kubernetes", strings.Join(verMsg, ", "))
 	}
 
-	// Get the lastest cluster version
+	// Get the latest cluster version
 	clusterVersion, err := getLatestClusterVersion(kubeAPIServerVersions)
 	if err != nil {
 		return upgrades, err
@@ -145,7 +143,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	}
 	isExternalEtcd := len(etcdVersions) == 0
 
-	dnsVersion, err := dns.DeployedDNSAddon(client)
+	dnsVersion, err := versionGetterImpl.DNSAddonVersion()
 	if err != nil {
 		return nil, err
 	}

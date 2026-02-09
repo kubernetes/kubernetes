@@ -199,25 +199,23 @@ func (sf selectableFieldTestCase) Name() string {
 }
 
 func TestSelectableFields(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	// start a conversion webhook
+	handler := conversion.NewObjectConverterWebhookHandler(t, crdConverter)
+	upCh, handler := closeOnCall(handler)
+	whTearDown, webhookClientConfig, err := conversion.StartConversionWebhookServer(handler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(whTearDown)
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
+	_, ctx := ktesting.NewTestContext(t)
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tearDown()
+	t.Cleanup(tearDown)
 
 	crd := selectableFieldFixture.DeepCopy()
-
-	// start a conversion webhook
-	handler := conversion.NewObjectConverterWebhookHandler(t, crdConverter)
-	upCh, handler := closeOnCall(handler)
-	tearDown, webhookClientConfig, err := conversion.StartConversionWebhookServer(handler)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tearDown()
 
 	if webhookClientConfig != nil {
 		crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
@@ -497,7 +495,6 @@ func testDeleteCollection(ctx context.Context, t *testing.T, tcs []selectableFie
 
 func TestFieldSelectorOpenAPI(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -595,8 +592,7 @@ func TestFieldSelectorOpenAPI(t *testing.T) {
 
 func TestFieldSelectorDropFields(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, false)
-	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
+	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t, "--emulated-version=1.31", "--feature-gates=CustomResourceFieldSelectors=false")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -677,7 +673,7 @@ func TestFieldSelectorDropFields(t *testing.T) {
 
 func TestFieldSelectorDisablement(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	tearDown, config, _, err := fixtures.StartDefaultServer(t)
+	tearDown, config, _, err := fixtures.StartDefaultServer(t, "--emulated-version=1.31")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,570 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+# This test case is used to measure the performance of queuing hints when handling the AssignedPodDelete events.
+# First, two groups of blocker pods are created, which will prevents other pods from being scheduled.
+# Then multiple types of pods are created, and each group is filtered by different plugin.
+# Next, blocker pods are gradually deleted and previously unscheduled pods can be scheduled.
+# Plugins covered: InterPodAffinity, NodePorts, NodeResources, NodeVolumeLimits, PodTopologySpread and VolumeRestrictions.
+- name: EventHandlingPodDelete
+  featureGates:
+    SchedulerQueueingHints: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    # Allow max 20 volumes per node.
+    nodeAllocatableStrategy:
+      nodeAllocatable:
+        attachable-volumes-csi-ebs.csi.aws.com: "20"
+      csiNodeAllocatable:
+        ebs.csi.aws.com:
+          count: 20
+  # Create pods that will block other pods from being scheduled.
+  # They'll block using NodePorts, NodeResources, NodeVolumeLimits and PodTopologySpread plugins.
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: templates/poddelete-pod-blocker-topology-ports-resources.yaml
+    persistentVolumeTemplatePath: ../templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+    namespace: blockertopologyportsresources
+  # Create second group of pods that will block another pods from being scheduled.
+  # They'll block using InterPodAffinity and VolumeRestrictions plugins.
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: templates/poddelete-pod-blocker-affinity.yaml
+    persistentVolumeTemplatePath: ../templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc-once-pod.yaml
+    namespace: blockeraffinity
+  # Collect metrics from all createPods ops below.
+  - opcode: startCollectingMetrics
+    name: unschedPods
+    namespaces: [blockertopologyportsresources, blockeraffinity, nodeports, noderesources, nodevolumelimits, interpodaffinity]
+    labelSelector:
+      type: unsched
+  # Create pods blocked using PodTopologySpread plugin.
+  # Note: for this plugin, namespace has to match the blocker's namespace,
+  # so has to be "blockertopologyportsresources".
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/poddelete-pod-podtopologyspread.yaml
+    skipWaitToCompletion: true
+    namespace: blockertopologyportsresources
+  # Create pods blocked using VolumeRestrictions plugin.
+  # Note: these pods uses PVCs and PVs created for second blocker pods,
+  # so the count needs to be equal to $blockerPods
+  # and namespace has to be "blockeraffinity".
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: templates/poddelete-pod-volumerestrictions.yaml
+    skipWaitToCompletion: true
+    namespace: blockeraffinity
+  # Create pods blocked using NodePorts plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/poddelete-pod-nodeports.yaml
+    skipWaitToCompletion: true
+    namespace: nodeports
+  # Create pods blocked using NodeResources plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/poddelete-pod-noderesources.yaml
+    skipWaitToCompletion: true
+    namespace: noderesources
+  # Create pods blocked using NodeVolumeLimits plugin.
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: templates/poddelete-pod-nodevolumelimits.yaml
+    persistentVolumeTemplatePath: ../templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+    skipWaitToCompletion: true
+    namespace: nodevolumelimits
+  # Create pods blocked using InterPodAffinity plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/poddelete-pod-interpodaffinity.yaml
+    skipWaitToCompletion: true
+    namespace: interpodaffinity
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+    labelSelector:
+      type: unsched
+  # Start deleting blocker pods.
+  - opcode: deletePods
+    deletePodsPerSecond: 100
+    namespace: blockertopologyportsresources
+    labelSelector:
+      type: blocker
+    skipWaitToCompletion: true
+  - opcode: deletePods
+    deletePodsPerSecond: 100
+    namespace: blockeraffinity
+    labelSelector:
+      type: blocker
+    skipWaitToCompletion: true
+  # Wait for previously unschedulable pods to be scheduled.
+  - opcode: barrier
+    labelSelector:
+      type: unsched
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 2Nodes_20Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 2
+      blockerPods: 15 # Must be slightly below initNodes * 10 to be stable
+      measurePods: 20 # Must be initNodes * 10
+  - name: 50Nodes_500Pods
+    labels: [performance, short]
+    params:
+      initNodes: 50
+      blockerPods: 480 # Must be slightly below initNodes * 10 to be stable
+      measurePods: 500 # Must be initNodes * 10
+
+# This test case is used to measure the performance of queuing hints when handling the pod update events: 
+# UpdatePodLabel, UpdatePodScaleDown, UpdatePodToleration and UpdatePodSchedulingGatesEliminated.
+# It has a few stages, but general idea is to make a node and block some pods on it
+# or to create additional blocker pods that will prevent the other ones from being scheduled.
+# Then, updating the blocker pods or the unschedulable pods themselves generate cluster events,
+# that through QHints make the pods schedulable. 
+# Plugins covered: InterPodAffinity, NodeResources, NodeUnschedulable, PodTopologySpread, SchedulingGates and TaintToleration.
+- name: EventHandlingPodUpdate
+  featureGates:
+    SchedulerQueueingHints: true
+    InPlacePodVerticalScaling: true
+  workloadTemplate:
+  # Collect metrics from all createPods ops that initially create unschedulable pods (type: unsched).
+  - opcode: startCollectingMetrics
+    namespaces: [nodeunschedulable, tainttoleration, blocker, interpodaffinity, noderesources, schedulinggates]
+    labelSelector:
+      type: unsched
+  # Create one unschedulable node.
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: templates/podupdate-node-unschedulable.yaml
+  # Created pods blocked using NodeUnschedulable plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/podupdate-pod-nodeunschedulable.yaml
+    skipWaitToCompletion: true
+    namespace: nodeunschedulable
+  # Create one node with NoSchedule taint.
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: templates/podupdate-node-with-taint.yaml
+  # Created pods blocked using TaintToleration plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/podupdate-pod-tainttoleration.yaml
+    skipWaitToCompletion: true
+    namespace: tainttoleration
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Update pods blocked using NodeUnschedulable plugin to make them schedulable.
+  - opcode: updateAny
+    countParam: $measurePods
+    templatePath: templates/podupdate-pod-nodeunschedulable-update.yaml
+    updatePerSecond: 100
+    namespace: nodeunschedulable
+  # Update pods blocked using TaintToleration plugin to make them schedulable.
+  - opcode: updateAny
+    countParam: $measurePods
+    templatePath: templates/podupdate-pod-tainttoleration-update.yaml
+    updatePerSecond: 100
+    namespace: tainttoleration
+  # Wait for NodeUnschedulable and TaintToleration pods to be scheduled.
+  - opcode: barrier
+  # Create schedulable nodes.
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: ../templates/node-with-name.yaml
+  # Create pods that will block other pods from being scheduled.
+  # They'll block using InterPodAffinity, NodeResources and PodTopologySpread plugins.
+  # All blocker pods are scheduled before proceeding.
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: templates/podupdate-pod-blocker.yaml
+    namespace: blocker
+  # Created pods blocked using InterPodAffinity plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/podupdate-pod-interpodaffinity.yaml
+    skipWaitToCompletion: true
+    namespace: interpodaffinity
+  # Created pods blocked using NodeResources plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/podupdate-pod-noderesources.yaml
+    skipWaitToCompletion: true
+    namespace: noderesources
+  # Created pods blocked using PodTopologySpread plugin.
+  # Count has to match $blockerPods as pod uses it as a maxSkew value, 
+  # that must be equal to number of blocker pods.
+  - opcode: createPods
+    countParam: $blockerPods
+    podTemplatePath: templates/podupdate-pod-podtopologyspread.yaml
+    skipWaitToCompletion: true
+    namespace: blocker
+  # Created pods blocked using SchedulingGates plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/podupdate-pod-schedulinggates.yaml
+    skipWaitToCompletion: true
+    namespace: schedulinggates
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+    labelSelector:
+      type: unsched
+  # Update blocker pods' labels to make the unschedulable pods schedulable.
+  - opcode: updateAny
+    countParam: $blockerPods
+    templatePath: templates/podupdate-pod-blocker-update.yaml
+    updatePerSecond: 100
+    namespace: blocker
+  # Scale down blocker pods' resource requests to make the unschedulable pods schedulable.
+  - opcode: updateAny
+    countParam: $blockerPods
+    templatePath: templates/podupdate-pod-blocker-scale-down.yaml
+    updatePerSecond: 100
+    namespace: blocker
+    subresources:
+      - resize
+  # Update pods blocked by SchedulingGates by removing the gate from themselves.
+  - opcode: updateAny
+    countParam: $measurePods
+    templatePath: templates/podupdate-pod-schedulinggates-update.yaml
+    updatePerSecond: 100
+    namespace: schedulinggates
+  # Wait for previously unschedulable pods to be scheduled.
+  - opcode: barrier
+    labelSelector:
+      type: unsched
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 1Node_10Pods
+    labels: [integration-test, short]
+    params:
+      blockerPods: 10
+      measurePods: 10
+  - name: 1Node_1000Pods
+    labels: [performance, short]
+    params:
+      blockerPods: 1000
+      measurePods: 1000
+
+# This test case is used to measure the performance of queuing hints when handling the NodeAdd events.
+# First, an unschedulable node is created, which prevents any pod from being scheduled on it.
+# Then multiple types of pods are created, and each group is filtered by different plugin.
+# Next, nodes are created where previously unscheduled pods can be scheduled.
+# The test case is divided into several stages to make sure that the pods are filtered by a specific plugin.
+# Plugins covered: InterPodAffinity, NodeAffinity, NodeResources, NodeUnschedulable, PodTopologySpread and TaintToleration.
+- name: EventHandlingNodeAdd
+  featureGates:
+    SchedulerQueueingHints: true
+  workloadTemplate:
+  # Collect metrics from all createPods ops.
+  - opcode: startCollectingMetrics
+    name: unschedPods
+    namespaces: [nodeunschedulable, noderesources, interpodaffinity, nodeaffinity, podtopologyspread, tainttoleration]
+  # Create one unschedulable node.
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: templates/nodeadd-node-unschedulable.yaml
+  # Created pods blocked using NodeUnschedulable plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeadd-pod-nodeunschedulable.yaml
+    skipWaitToCompletion: true
+    namespace: nodeunschedulable
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Create schedulable node with low capacity.
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: templates/nodeadd-node-low-capacity.yaml
+  # Created pods blocked using NodeResources plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeadd-pod-noderesources.yaml
+    skipWaitToCompletion: true
+    namespace: noderesources
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Create nodes that will have enough resource capacity for pods blocked by NodeResources plugin.
+  # These nodes will still block the next pods from being scheduled.
+  - opcode: createNodes
+    countParam: $nodes
+    nodeTemplatePath: templates/nodeadd-node-high-capacity.yaml
+  # Wait on barrier for NodeUnschedulable and NodeResources pods to be scheduled.
+  - opcode: barrier
+  # Created pods blocked using InterPodAffinity plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeadd-pod-interpodaffinity.yaml
+    skipWaitToCompletion: true
+    namespace: interpodaffinity
+  # Created pods blocked using NodeAffinity plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeadd-pod-nodeaffinity.yaml
+    skipWaitToCompletion: true
+    namespace: nodeaffinity
+  # Created pods blocked using PodTopologySpread plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeadd-pod-podtopologyspread.yaml
+    skipWaitToCompletion: true
+    namespace: podtopologyspread
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Create nodes that will unblock most of the unschedulable pods.
+  - opcode: createNodes
+    countParam: $nodes
+    nodeTemplatePath: templates/nodeadd-node-with-labels.yaml
+  # Wait on barrier for InterPodAffinity, NodeAffinity and PodTopologySpread pods to be scheduled.
+  - opcode: barrier
+  # Created pods blocked using TaintToleration plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeadd-pod-tainttoleration.yaml
+    skipWaitToCompletion: true
+    namespace: tainttoleration
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Create nodes that will unblock pods filtered out by TaintToleration plugin.
+  - opcode: createNodes
+    countParam: $nodes
+    nodeTemplatePath: templates/nodeadd-node-with-taint.yaml
+  # Wait on barrier for TaintToleration pods to be scheduled.
+  - opcode: barrier
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 2Nodes_20Pods
+    labels: [integration-test, short]
+    params:
+      nodes: 2
+      measurePods: 20 # Must be initNodes * 10
+  - name: 100Nodes_1000Pods
+    labels: [performance, short]
+    params:
+      nodes: 100
+      measurePods: 1000 # Must be initNodes * 10
+
+# This test case is used to measure the performance of queuing hints when handling the AssignedPodAdd events.
+# First, two nodes are created. Then, one pod is created and scheduled on one of the nodes.
+# Next, group of topology spreading pods tries to be scheduled, but they can only fill one node,
+# because of the anti affinity to the pod on the second node.
+# Then, group of interpodaffinity pods is created and wait for pods with matching labels to be scheduled first.
+# Next, new pods are scheduled that unblock the previously unschedulable pods, by balancing the topology
+# and scheduling pods with matching labels to the intepodaffinity pods.
+# Plugins covered: InterPodAffinity and PodTopologySpread.
+- name: EventHandlingPodAdd
+  featureGates:
+    SchedulerQueueingHints: true
+  workloadTemplate:
+  # Create two nodes with enough capacity.
+  - opcode: createNodes
+    count: 2
+    nodeTemplatePath: templates/podadd-node.yaml
+  # Create one pod with label that will block topology spreading pods 
+  # from being scheduled on one node using pod anti affinity.
+  - opcode: createPods
+    count: 1
+    podTemplatePath: templates/podadd-pod-with-label.yaml
+    namespace: podtopologyspread
+  # Collect metrics for unsched pods created below.
+  - opcode: startCollectingMetrics
+    name: unschedPods
+    namespaces: [podtopologyspread, interpodaffinity]
+    labelSelector:
+      type: unsched
+  # Create pods blocked using PodTopologySpread plugin.
+  # Max skew is configured to 1, so more pods need to be created on the first node 
+  # (with the pod created above), to fill up the second node with these pods.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/podadd-pod-podtopologyspread.yaml
+    skipWaitToCompletion: true
+    namespace: podtopologyspread
+  # Create pods blocked using InterPodAffinity plugin.
+  # They don't have the affinity to themselves, 
+  # so have to wait for another pods with matching labels to be created at first.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/podadd-pod-interpodaffinity.yaml
+    skipWaitToCompletion: true
+    namespace: interpodaffinity
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+    labelSelector:
+      type: unsched
+  # Create pods that will get scheduled on the node with the first pod created with matching label.
+  # Their creation will gradually unblock topology spreading pods and make them schedulable on the second node.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/podadd-pod-unblocker-topology.yaml
+    namespace: podtopologyspread
+  # Create pods with matching labels to the affinity of previously created interpodaffinity pods.
+  # Each of them will unblock one pod and make it schedulable.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/podadd-pod-unblocker-affinity.yaml
+    namespace: interpodaffinity
+  # Wait for previously unschedulable pods to be scheduled.
+  - opcode: barrier
+    labelSelector:
+      type: unsched
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 10Pods
+    labels: [integration-test, short]
+    params:
+      measurePods: 10
+  - name: 1000Pods
+    labels: [performance, short]
+    params:
+      measurePods: 1000
+
+# This test case is used to measure the performance of queuing hints when handling the NodeUpdate events.
+# First, group of nodes is created and prevent any further pod from being scheduled on them.
+# Then, pods are created and are filtered by a specific plugin, thus unschedulable.
+# Next, nodes are updated and previously unscheduled pods can be scheduled on them.
+# The test case is divided into several stages to make sure that the pods are filtered by a specific plugin.
+# Plugins covered: InterPodAffinity, NodeAffinity, NodeResources, NodeUnschedulable, PodTopologySpread and TaintToleration.
+- name: EventHandlingNodeUpdate
+  featureGates:
+    SchedulerQueueingHints: true
+  workloadTemplate:
+  # Collect metrics from all createPods ops.
+  - opcode: startCollectingMetrics
+    name: unschedPods
+    namespaces: [nodeunschedulable, noderesources, interpodaffinity, nodeaffinity, podtopologyspread, tainttoleration]
+  # Create unschedulable nodes.
+  - opcode: createNodes
+    countParam: $nodes
+    nodeTemplatePath: templates/nodeupdate-node-unschedulable.yaml
+  # Create pods blocked using NodeUnschedulable plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeupdate-pod-nodeunschedulable.yaml
+    skipWaitToCompletion: true
+    namespace: nodeunschedulable
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Update nodes not to be unschedulable anymore.
+  - opcode: updateAny
+    countParam: $nodes
+    templatePath: templates/nodeupdate-node-unschedulable-update.yaml
+    updatePerSecond: 100
+  # Wait on barrier for NodeUnschedulable pods to be scheduled.
+  - opcode: barrier
+  # Create node with low capacity.
+  - opcode: createNodes
+    countParam: $nodes
+    nodeTemplatePath: templates/nodeupdate-node-low-capacity.yaml
+  # Create pods blocked using NodeResources plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeupdate-pod-noderesources.yaml
+    skipWaitToCompletion: true
+    namespace: noderesources
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Update nodes to have enough resource capacity for pods blocked by NodeResources plugin.
+  # These nodes will still block the next pods from being scheduled.
+  - opcode: updateAny
+    countParam: $nodes
+    templatePath: templates/nodeupdate-node-low-capacity-update.yaml
+    updatePerSecond: 100
+  # Wait on barrier for NodeResources pods to be scheduled.
+  - opcode: barrier
+  # Create nodes without any labels.
+  - opcode: createNodes
+    countParam: $nodes
+    nodeTemplatePath: templates/nodeupdate-node-without-labels.yaml
+  # Create pods blocked using InterPodAffinity plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeupdate-pod-interpodaffinity.yaml
+    skipWaitToCompletion: true
+    namespace: interpodaffinity
+  # Create pods blocked using NodeAffinity plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeupdate-pod-nodeaffinity.yaml
+    skipWaitToCompletion: true
+    namespace: nodeaffinity
+  # Create pods blocked using PodTopologySpread plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeupdate-pod-podtopologyspread.yaml
+    skipWaitToCompletion: true
+    namespace: podtopologyspread
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Update nodes to have labels required by the pods above.
+  - opcode: updateAny
+    countParam: $nodes
+    templatePath: templates/nodeupdate-node-without-labels-update.yaml
+    updatePerSecond: 100
+  # Wait on barrier for InterPodAffinity, NodeAffinity and PodTopologySpread pods to be scheduled.
+  - opcode: barrier
+  # Create nodes with taints not matching the tolerations of pods below. 
+  - opcode: createNodes
+    countParam: $nodes
+    nodeTemplatePath: templates/nodeupdate-node-without-taints.yaml
+  # Create pods blocked using TaintToleration plugin.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: templates/nodeupdate-pod-tainttoleration.yaml
+    skipWaitToCompletion: true
+    namespace: tainttoleration
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Update nodes to have matching taints to the pods above.
+  - opcode: updateAny
+    countParam: $nodes
+    templatePath: templates/nodeupdate-node-without-taints-update.yaml
+    updatePerSecond: 100
+  # Wait on barrier for TaintToleration pods to be scheduled.
+  - opcode: barrier
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 2Nodes_20Pods
+    labels: [integration-test, short]
+    params:
+      nodes: 2
+      measurePods: 20 # Must be initNodes * 10
+  - name: 100Nodes_1000Pods
+    labels: [performance, short]
+    params:
+      nodes: 100
+      measurePods: 1000 # Must be initNodes * 10

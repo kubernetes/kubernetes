@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
@@ -92,10 +92,10 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 
 	// Negative values will be treated as the value `1s` on the delete path.
 	if gracePeriodSeconds := options.GracePeriodSeconds; gracePeriodSeconds != nil && *gracePeriodSeconds < 0 {
-		options.GracePeriodSeconds = utilpointer.Int64(1)
+		options.GracePeriodSeconds = ptr.To[int64](1)
 	}
 	if deletionGracePeriodSeconds := objectMeta.GetDeletionGracePeriodSeconds(); deletionGracePeriodSeconds != nil && *deletionGracePeriodSeconds < 0 {
-		objectMeta.SetDeletionGracePeriodSeconds(utilpointer.Int64(1))
+		objectMeta.SetDeletionGracePeriodSeconds(ptr.To[int64](1))
 	}
 
 	gracefulStrategy, ok := strategy.(RESTGracefulDeleteStrategy)
@@ -126,9 +126,22 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 			if period >= *objectMeta.GetDeletionGracePeriodSeconds() {
 				return false, true, nil
 			}
+			// Move the existing deletionTimestamp back by existing object.DeletionGracePeriod, then forward by options.DeletionGracePeriod.
+			// This moves the deletionTimestamp back, since the grace period can only be shortened in this code path.
 			newDeletionTimestamp := metav1.NewTime(
 				objectMeta.GetDeletionTimestamp().Add(-time.Second * time.Duration(*objectMeta.GetDeletionGracePeriodSeconds())).
 					Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+			// Prevent shortening the grace period moving deletionTimestamp into the past
+			if now := metav1Now(); newDeletionTimestamp.Before(&now) {
+				newDeletionTimestamp = now
+				if period != 0 {
+					// Since a graceful deletion was requested (options.GracePeriodSeconds != 0), but the entire grace period has already expired,
+					// shorten to the minimum period possible while still treating this as a graceful delete.
+					// This means the API server updates the object, another actor observes the update
+					// and is still responsible for the final delete with options.GracePeriodSeconds == 0.
+					period = int64(1)
+				}
+			}
 			objectMeta.SetDeletionTimestamp(&newDeletionTimestamp)
 			objectMeta.SetDeletionGracePeriodSeconds(&period)
 			return true, false, nil
@@ -147,8 +160,8 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 		return false, false, errors.NewInternalError(fmt.Errorf("options.GracePeriodSeconds should not be nil"))
 	}
 
-	now := metav1.NewTime(metav1.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
-	objectMeta.SetDeletionTimestamp(&now)
+	requestedDeletionTimestamp := metav1.NewTime(metav1Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+	objectMeta.SetDeletionTimestamp(&requestedDeletionTimestamp)
 	objectMeta.SetDeletionGracePeriodSeconds(options.GracePeriodSeconds)
 	// If it's the first graceful deletion we are going to set the DeletionTimestamp to non-nil.
 	// Controllers of the object that's being deleted shouldn't take any nontrivial actions, hence its behavior changes.

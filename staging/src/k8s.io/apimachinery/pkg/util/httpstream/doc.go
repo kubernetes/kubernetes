@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package httpstream adds multiplexed streaming support to HTTP requests and
 // responses via connection upgrades.
-package httpstream // import "k8s.io/apimachinery/pkg/util/httpstream"
+package httpstream

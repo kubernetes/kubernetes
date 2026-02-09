@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -259,7 +258,7 @@ func TestSafeMakeDir(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			base, err := ioutil.TempDir("", "safe-make-dir-"+test.name+"-")
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err.Error())
 			}
 			defer os.RemoveAll(base)
 			test.prepare(base)
@@ -385,7 +384,7 @@ func TestRemoveEmptyDirs(t *testing.T) {
 		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "remove-empty-dirs-"+test.name+"-")
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 		if err = test.prepare(base); err != nil {
 			os.RemoveAll(base)
@@ -615,7 +614,7 @@ func TestCleanSubPaths(t *testing.T) {
 		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "clean-subpaths-"+test.name+"-")
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 		mounts, err := test.prepare(base)
 		if err != nil {
@@ -872,7 +871,7 @@ func TestBindSubPath(t *testing.T) {
 		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "bind-subpath-"+test.name+"-")
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 
 		mounts, volPath, subPath, err := test.prepare(base)
@@ -986,7 +985,7 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "bind-subpath-"+test.name+"-")
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 		defer os.RemoveAll(base)
 
@@ -1220,7 +1219,7 @@ func TestSafeOpen(t *testing.T) {
 		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "safe-open-"+test.name+"-")
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 
 		test.prepare(base)
@@ -1367,7 +1366,7 @@ func TestFindExistingPrefix(t *testing.T) {
 		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "find-prefix-"+test.name+"-")
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 		test.prepare(base)
 		path := filepath.Join(base, test.path)

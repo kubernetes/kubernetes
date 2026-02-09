@@ -50,18 +50,21 @@ func TestSELinuxOptions(t *testing.T) {
 						Type: "container_kvm_t",
 					}}},
 					{Name: "d", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
-						Type: "bar",
+						Type: "container_engine_t",
 					}}},
 					{Name: "e", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
-						User: "bar",
+						Type: "bar",
 					}}},
 					{Name: "f", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
+						User: "bar",
+					}}},
+					{Name: "g", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
 						Role: "baz",
 					}}},
 				},
 			}},
 			expectReason: `seLinuxOptions`,
-			expectDetail: `pod and containers "d", "e", "f" set forbidden securityContext.seLinuxOptions: types "bar", "foo"; user may not be set; role may not be set`,
+			expectDetail: `pod and containers "e", "f", "g" set forbidden securityContext.seLinuxOptions: types "bar", "foo"; user may not be set; role may not be set`,
 		},
 		{
 			name: "invalid pod",
@@ -82,6 +85,9 @@ func TestSELinuxOptions(t *testing.T) {
 					}}},
 					{Name: "c", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
 						Type: "container_kvm_t",
+					}}},
+					{Name: "d", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
+						Type: "container_engine_t",
 					}}},
 				},
 			}},
@@ -105,18 +111,21 @@ func TestSELinuxOptions(t *testing.T) {
 						Type: "container_kvm_t",
 					}}},
 					{Name: "d", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
-						Type: "bar",
+						Type: "container_engine_t",
 					}}},
 					{Name: "e", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
-						User: "bar",
+						Type: "bar",
 					}}},
 					{Name: "f", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
+						User: "bar",
+					}}},
+					{Name: "g", SecurityContext: &corev1.SecurityContext{SELinuxOptions: &corev1.SELinuxOptions{
 						Role: "baz",
 					}}},
 				},
 			}},
 			expectReason: `seLinuxOptions`,
-			expectDetail: `containers "d", "e", "f" set forbidden securityContext.seLinuxOptions: type "bar"; user may not be set; role may not be set`,
+			expectDetail: `containers "e", "f", "g" set forbidden securityContext.seLinuxOptions: type "bar"; user may not be set; role may not be set`,
 		},
 		{
 			name: "bad type",
@@ -158,7 +167,7 @@ func TestSELinuxOptions(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := seLinuxOptions_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := seLinuxOptions1_31(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if result.Allowed {
 				t.Fatal("expected disallowed")
 			}

@@ -22,5 +22,9 @@ set -o pipefail
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd -P)
 cd "${KUBE_ROOT}"
 
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
+kube::golang::setup_env
+
 # convert dumped spec (see dump-spec.sh) to conformance.yaml
 go run ./test/conformance/walk.go --source="${KUBE_ROOT}" ./_output/specsummaries.json > ./_output/conformance.yaml

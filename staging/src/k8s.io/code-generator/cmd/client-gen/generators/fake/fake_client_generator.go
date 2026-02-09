@@ -58,12 +58,12 @@ func TargetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 						OutputFilename: "fake_" + strings.ToLower(c.Namers["private"].Name(t)) + ".go",
 					},
 					outputPackage:             outputPkg,
+					realClientPackage:         realClientPkg,
 					inputPackage:              inputPkg,
-					group:                     gv.Group.NonEmpty(),
 					version:                   gv.Version.String(),
 					groupGoName:               groupGoName,
 					typeToMatch:               t,
-					imports:                   generator.NewImportTracker(),
+					imports:                   generator.NewImportTrackerForPackage(outputPkg),
 					applyConfigurationPackage: applyBuilderPackage,
 				})
 			}
@@ -74,11 +74,10 @@ func TargetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 				},
 				outputPackage:     outputPkg,
 				realClientPackage: realClientPkg,
-				group:             gv.Group.NonEmpty(),
 				version:           gv.Version.String(),
 				groupGoName:       groupGoName,
 				types:             typeList,
-				imports:           generator.NewImportTracker(),
+				imports:           generator.NewImportTrackerForPackage(outputPkg),
 			})
 			return generators
 		},
@@ -111,7 +110,7 @@ func TargetForClientset(args *args.Args, clientsetDir, clientsetPkg string, appl
 					groups:                    args.Groups,
 					groupGoNames:              groupGoNames,
 					fakeClientsetPackage:      clientsetPkg,
-					imports:                   generator.NewImportTracker(),
+					imports:                   generator.NewImportTrackerForPackage(clientsetPkg),
 					realClientsetPackage:      clientsetPkg,
 					applyConfigurationPackage: applyConfigurationPkg,
 				},
@@ -123,7 +122,7 @@ func TargetForClientset(args *args.Args, clientsetDir, clientsetPkg string, appl
 					OutputPkg:     clientsetPkg,
 					Groups:        args.Groups,
 					GroupGoNames:  groupGoNames,
-					ImportTracker: generator.NewImportTracker(),
+					ImportTracker: generator.NewImportTrackerForPackage(clientsetPkg),
 					PrivateScheme: true,
 				},
 			}

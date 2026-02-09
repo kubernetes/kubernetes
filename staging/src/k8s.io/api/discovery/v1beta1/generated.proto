@@ -38,6 +38,9 @@ message Endpoint {
   // 100. These are all assumed to be fungible and clients may choose to only
   // use the first element. Refer to: https://issue.k8s.io/106267
   // +listType=set
+  // +required
+  // +k8s:required
+  // +k8s:maxItems=100
   repeated string addresses = 1;
 
   // conditions contains information about the current status of the endpoint.
@@ -114,6 +117,11 @@ message EndpointHints {
   // enable topology aware routing. May contain a maximum of 8 entries.
   // +listType=atomic
   repeated ForZone forZones = 1;
+
+  // forNodes indicates the node(s) this endpoint should be consumed by when
+  // using topology aware routing. May contain a maximum of 8 entries.
+  // +listType=atomic
+  repeated ForNode forNodes = 2;
 }
 
 // EndpointPort represents a Port used by an EndpointSlice
@@ -162,6 +170,9 @@ message EndpointSlice {
   // * IPv4: Represents an IPv4 Address.
   // * IPv6: Represents an IPv6 Address.
   // * FQDN: Represents a Fully Qualified Domain Name.
+  // +required
+  // +k8s:required
+  // +k8s:immutable
   optional string addressType = 4;
 
   // endpoints is a list of unique endpoints in this slice. Each slice may
@@ -187,6 +198,12 @@ message EndpointSliceList {
 
   // items is the list of endpoint slices
   repeated EndpointSlice items = 2;
+}
+
+// ForNode provides information about which nodes should consume this endpoint.
+message ForNode {
+  // name represents the name of the node.
+  optional string name = 1;
 }
 
 // ForZone provides information about which zones should consume this endpoint.

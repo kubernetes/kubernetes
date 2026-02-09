@@ -22,7 +22,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,16 +30,22 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.CertificateSigningRequest{}, func(obj interface{}) {
-		SetObjectDefaults_CertificateSigningRequest(obj.(*v1beta1.CertificateSigningRequest))
+	scheme.AddTypeDefaultingFunc(&certificatesv1beta1.CertificateSigningRequest{}, func(obj interface{}) {
+		SetObjectDefaults_CertificateSigningRequest(obj.(*certificatesv1beta1.CertificateSigningRequest))
 	})
-	scheme.AddTypeDefaultingFunc(&v1beta1.CertificateSigningRequestList{}, func(obj interface{}) {
-		SetObjectDefaults_CertificateSigningRequestList(obj.(*v1beta1.CertificateSigningRequestList))
+	scheme.AddTypeDefaultingFunc(&certificatesv1beta1.CertificateSigningRequestList{}, func(obj interface{}) {
+		SetObjectDefaults_CertificateSigningRequestList(obj.(*certificatesv1beta1.CertificateSigningRequestList))
+	})
+	scheme.AddTypeDefaultingFunc(&certificatesv1beta1.PodCertificateRequest{}, func(obj interface{}) {
+		SetObjectDefaults_PodCertificateRequest(obj.(*certificatesv1beta1.PodCertificateRequest))
+	})
+	scheme.AddTypeDefaultingFunc(&certificatesv1beta1.PodCertificateRequestList{}, func(obj interface{}) {
+		SetObjectDefaults_PodCertificateRequestList(obj.(*certificatesv1beta1.PodCertificateRequestList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_CertificateSigningRequest(in *v1beta1.CertificateSigningRequest) {
+func SetObjectDefaults_CertificateSigningRequest(in *certificatesv1beta1.CertificateSigningRequest) {
 	SetDefaults_CertificateSigningRequestSpec(&in.Spec)
 	for i := range in.Status.Conditions {
 		a := &in.Status.Conditions[i]
@@ -47,9 +53,23 @@ func SetObjectDefaults_CertificateSigningRequest(in *v1beta1.CertificateSigningR
 	}
 }
 
-func SetObjectDefaults_CertificateSigningRequestList(in *v1beta1.CertificateSigningRequestList) {
+func SetObjectDefaults_CertificateSigningRequestList(in *certificatesv1beta1.CertificateSigningRequestList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_CertificateSigningRequest(a)
+	}
+}
+
+func SetObjectDefaults_PodCertificateRequest(in *certificatesv1beta1.PodCertificateRequest) {
+	if in.Spec.MaxExpirationSeconds == nil {
+		var ptrVar1 int32 = 86400
+		in.Spec.MaxExpirationSeconds = &ptrVar1
+	}
+}
+
+func SetObjectDefaults_PodCertificateRequestList(in *certificatesv1beta1.PodCertificateRequestList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_PodCertificateRequest(a)
 	}
 }

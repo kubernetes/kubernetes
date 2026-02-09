@@ -20,15 +20,22 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/asaskevich/govalidator"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
+)
+
+var (
+	// base64_length estimate for base64 regex size from github.com/asaskevich/govalidator
+	base64Length = 84
+	// url_length estimate for url regex size from github.com/asaskevich/govalidator
+	urlLength = 1103
 )
 
 // Format provides a CEL library exposing common named Kubernetes string
@@ -90,7 +97,15 @@ var formatLib = &format{}
 type format struct{}
 
 func (*format) LibraryName() string {
-	return "format"
+	return "kubernetes.format"
+}
+
+func (*format) Types() []*cel.Type {
+	return []*cel.Type{apiservercel.FormatType}
+}
+
+func (*format) declarations() map[string][]cel.FunctionOpt {
+	return formatLibraryDecls
 }
 
 func ZeroArgumentFunctionBinding(binding func() ref.Val) decls.OverloadOpt {
@@ -124,7 +139,7 @@ func (*format) ProgramOptions() []cel.ProgramOption {
 	return []cel.ProgramOption{}
 }
 
-var ConstantFormats map[string]*apiservercel.Format = map[string]*apiservercel.Format{
+var ConstantFormats = map[string]apiservercel.Format{
 	"dns1123Label": {
 		Name:         "DNS1123Label",
 		ValidateFunc: func(s string) []string { return apimachineryvalidation.NameIsDNSLabel(s, false) },
@@ -184,7 +199,7 @@ var ConstantFormats map[string]*apiservercel.Format = map[string]*apiservercel.F
 		},
 		// Use govalidator url regex to estimate, since ParseRequestURI
 		// doesnt use regex
-		MaxRegexSize: len(govalidator.URL),
+		MaxRegexSize: urlLength,
 	},
 	"uuid": {
 		Name: "uuid",
@@ -204,7 +219,7 @@ var ConstantFormats map[string]*apiservercel.Format = map[string]*apiservercel.F
 			}
 			return nil
 		},
-		MaxRegexSize: len(govalidator.Base64),
+		MaxRegexSize: base64Length,
 	},
 	"date": {
 		Name: "date",
@@ -252,7 +267,7 @@ var formatLibraryDecls = map[string][]cel.FunctionOpt{
 }
 
 func formatValidate(arg1, arg2 ref.Val) ref.Val {
-	f, ok := arg1.Value().(*apiservercel.Format)
+	f, ok := arg1.Value().(apiservercel.Format)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(arg1)
 	}

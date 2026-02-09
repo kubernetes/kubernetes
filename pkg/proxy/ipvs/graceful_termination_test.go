@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -24,10 +23,9 @@ import (
 	"reflect"
 	"testing"
 
-	netutils "k8s.io/utils/net"
-
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	utilipvstest "k8s.io/kubernetes/pkg/proxy/ipvs/util/testing"
+	netutils "k8s.io/utils/net"
 )
 
 func Test_GracefulDeleteRS(t *testing.T) {

@@ -21,6 +21,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -614,6 +615,29 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, true},
+		{"valid InitConfiguration using ECDSA P384 algorithm",
+			&kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         3446,
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ImageRepository: "registry.k8s.io",
+					Etcd: kubeadmapi.Etcd{
+						Local: &kubeadmapi.LocalEtcd{
+							DataDir: "/some/path",
+						},
+					},
+					Networking: kubeadmapi.Networking{
+						ServiceSubnet: "10.96.0.1/12",
+						DNSDomain:     "cluster.local",
+						PodSubnet:     "10.0.1.15/16",
+					},
+					CertificatesDir:     "/some/other/cert/dir",
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP384,
+				},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
+			}, true},
 	}
 	for _, rt := range tests {
 		actual := ValidateInitConfiguration(rt.s)
@@ -750,6 +774,7 @@ func TestValidateMixedArguments(t *testing.T) {
 		{[]string{"--config=hello", "--skip-token-print=true"}, true},
 		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--skip-token-print"}, true},
 		{[]string{"--config=hello", "--yes=true"}, true},
+		{[]string{"--config=hello", "--print-manifest"}, true},
 		// Expected to fail, --config is mixed with the --foo flag
 		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--foo=bar"}, false},
 		{[]string{"--config=hello", "--foo=bar"}, false},
@@ -770,6 +795,7 @@ func TestValidateMixedArguments(t *testing.T) {
 		f.Bool("allow-experimental-upgrades", true, "upgrade flags for plan and apply command")
 		f.Bool("skip-token-print", false, "flag not bound to config object")
 		f.Bool("yes", false, "flag not bound to config object")
+		f.Bool("print-manifest", false, "flag not bound to config object")
 		f.StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 		if err := f.Parse(rt.args); err != nil {
 			t.Fatal(err)
@@ -1064,7 +1090,7 @@ func TestValidateSocketPath(t *testing.T) {
 		{name: "valid socket URL", criSocket: kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + "/some/path", expectedErrors: false},
 		{name: "unsupported URL scheme", criSocket: "bla:///some/path", expectedErrors: true},
 		{name: "missing URL scheme", criSocket: "/some/path", expectedErrors: true},
-		{name: "unparseable URL", criSocket: ":::", expectedErrors: true},
+		{name: "unparsable URL", criSocket: ":::", expectedErrors: true},
 		{name: "empty CRISocket", criSocket: "", expectedErrors: true},
 	}
 	for _, tc := range tests {
@@ -1584,6 +1610,18 @@ func TestValidateCertValidity(t *testing.T) {
 				},
 			},
 			expectedErrors: 2,
+		},
+		{
+			name: "one error from mismatched durations (CertificateValidityPeriod > CACertificateValidityPeriod) ",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				CertificateValidityPeriod: &metav1.Duration{
+					Duration: time.Hour * 2,
+				},
+				CACertificateValidityPeriod: &metav1.Duration{
+					Duration: time.Hour,
+				},
+			},
+			expectedErrors: 1,
 		},
 	}
 

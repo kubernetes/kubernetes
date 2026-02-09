@@ -18,25 +18,48 @@ package options
 
 import (
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/utils/clock"
 )
 
 type SecureServingOptionsWithLoopback struct {
 	*SecureServingOptions
+	clock clock.PassiveClock
 }
 
 func (o *SecureServingOptions) WithLoopback() *SecureServingOptionsWithLoopback {
-	return &SecureServingOptionsWithLoopback{o}
+	return &SecureServingOptionsWithLoopback{
+		SecureServingOptions: o,
+		clock:                clock.RealClock{},
+	}
 }
+
+// Set a validity period of approximately 3 years for the loopback certificate
+// to avoid kube-apiserver disruptions due to certificate expiration.
+// When this certificate expires, restarting kube-apiserver will automatically
+// regenerate a new certificate with fresh validity dates.
+const maxAge = (3*365 + 1) * 24 * time.Hour
 
 // ApplyTo fills up serving information in the server configuration.
 func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.SecureServingInfo, loopbackClientConfig **rest.Config) error {
+	return s.applyTo(secureServingInfo, loopbackClientConfig, nil)
+}
+
+type HealthzLivezHealthChecksAdder interface {
+	AddHealthzChecks(checks ...healthz.HealthChecker)
+	AddLivezChecks(checks ...healthz.HealthChecker)
+}
+
+func (s *SecureServingOptionsWithLoopback) applyTo(secureServingInfo **server.SecureServingInfo, loopbackClientConfig **rest.Config, healthCheckAdder HealthzLivezHealthChecksAdder) error {
 	if s == nil || s.SecureServingOptions == nil || secureServingInfo == nil {
 		return nil
 	}
@@ -51,7 +74,10 @@ func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.Se
 
 	// create self-signed cert+key with the fake server.LoopbackClientServerNameOverride and
 	// let the server return it when the loopback client connects.
-	certPem, keyPem, err := certutil.GenerateSelfSignedCertKey(server.LoopbackClientServerNameOverride, nil, nil)
+	certPem, keyPem, err := certutil.GenerateSelfSignedCertKeyWithOptions(certutil.SelfSignedCertKeyOptions{
+		Host:   server.LoopbackClientServerNameOverride,
+		MaxAge: maxAge,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to generate self-signed certificate for loopback connection: %v", err)
 	}
@@ -75,7 +101,37 @@ func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.Se
 
 	default:
 		*loopbackClientConfig = secureLoopbackClientConfig
+		if healthCheckAdder != nil {
+			s.addLoopbackServingCertificateHealthCheck(healthCheckAdder)
+		}
 	}
 
 	return nil
+}
+
+func (s *SecureServingOptionsWithLoopback) ApplyToConfig(cfg *server.Config) error {
+	return s.applyTo(&cfg.SecureServing, &cfg.LoopbackClientConfig, cfg)
+}
+
+// addLoopbackServingCertificateHealthCheck adds a health check called `loopback-certificate-expiry` to the
+// server that fails when the loopback client certificate has expired, enabling
+// liveness probes to be used to automatically restart the apiserver.
+func (s *SecureServingOptionsWithLoopback) addLoopbackServingCertificateHealthCheck(healthCheckAdder HealthzLivezHealthChecksAdder) {
+	expirationDate := s.clock.Now().Add(maxAge)
+	check := healthz.NamedCheck("loopback-serving-certificate", func(r *http.Request) error {
+		if s.clock.Now().After(expirationDate) {
+			return LoopbackCertificateExpiredError{}
+		}
+
+		return nil
+	})
+
+	healthCheckAdder.AddHealthzChecks(check)
+	healthCheckAdder.AddLivezChecks(check)
+}
+
+type LoopbackCertificateExpiredError struct{}
+
+func (lcee LoopbackCertificateExpiredError) Error() string {
+	return "loopback serving certificate is expired"
 }

@@ -15,11 +15,13 @@ go_library(
         "navigable.go",
     ],
     importpath = "github.com/google/cel-go/common/ast",
-    deps = [    
+    deps = [
         "//common:go_default_library",
         "//common/types:go_default_library",
         "//common/types/ref:go_default_library",
+        "@dev_cel_expr//:expr",
         "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
+        "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_google_protobuf//types/known/structpb:go_default_library",
     ],
 )
@@ -35,12 +37,13 @@ go_test(
     embed = [
         ":go_default_library",
     ],
-    deps = [    
+    deps = [
         "//checker:go_default_library",
         "//checker/decls:go_default_library",
         "//common:go_default_library",
         "//common/containers:go_default_library",
         "//common/decls:go_default_library",
+        "//common/operators:go_default_library",
         "//common/overloads:go_default_library",
         "//common/stdlib:go_default_library",
         "//common/types:go_default_library",

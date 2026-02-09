@@ -22,13 +22,16 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
@@ -69,7 +72,11 @@ func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
 }
 
 func TestStaticPolicyName(t *testing.T) {
-	policy, _ := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(), nil)
+	logger, _ := ktesting.NewTestContext(t)
+	policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(), nil)
+	if err != nil {
+		t.Fatalf("NewStaticPolicy() failed: %v", err)
+	}
 
 	policyName := policy.Name()
 	if policyName != "static" {
@@ -108,8 +115,29 @@ func TestStaticPolicyStart(t *testing.T) {
 			expErr:          fmt.Errorf("not all reserved cpus: \"0,6\" are present in defaultCpuSet: \"0-1\""),
 		},
 		{
+			description:     "some of reserved cores are present in available cpuset (StrictCPUReservationOption)",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{StrictCPUReservationOption: "true"},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(0, 1),
+			expErr:          fmt.Errorf("some of strictly reserved cpus: \"0\" are present in defaultCpuSet: \"0-1\""),
+		},
+		{
 			description: "assigned core 2 is still present in available cpuset",
 			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"0": cpuset.New(0, 1, 2),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expErr:          fmt.Errorf("pod: fakePod, container: 0 cpuset: \"0-2\" overlaps with default cpuset \"2-11\""),
+		},
+		{
+			description: "assigned core 2 is still present in available cpuset (StrictCPUReservationOption)",
+			topo:        topoDualSocketHT,
+			options:     map[string]string{StrictCPUReservationOption: "true"},
 			stAssignments: state.ContainerCPUAssignments{
 				"fakePod": map[string]cpuset.CPUSet{
 					"0": cpuset.New(0, 1, 2),
@@ -145,13 +173,18 @@ func TestStaticPolicyStart(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), testCase.options)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
 			policy := p.(*staticPolicy)
 			st := &mockState{
 				assignments:   testCase.stAssignments,
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
-			err := policy.Start(st)
+			err = policy.Start(logger, st)
 			if !reflect.DeepEqual(err, testCase.expErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expErr, err)
@@ -509,7 +542,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 			pod:             makePod("fakePod", "fakeContainerBug113537_1", "10000m", "10000m"),
-			expErr:          SMTAlignmentError{RequestedCPUs: 10, CpusPerCore: 2, AvailablePhysicalCPUs: 8},
+			expErr:          SMTAlignmentError{RequestedCPUs: 10, CpusPerCore: 2, AvailablePhysicalCPUs: 8, CausedByPhysicalCPUs: true},
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
 		},
@@ -614,7 +647,11 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	if testCase.reservedCPUs != nil {
 		cpus = testCase.reservedCPUs.Clone()
 	}
-	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpus, tm, testCase.options)
+	logger, _ := ktesting.NewTestContext(t)
+	policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpus, tm, testCase.options)
+	if err != nil {
+		t.Fatalf("NewStaticPolicy() failed: %v", err)
+	}
 
 	st := &mockState{
 		assignments:   testCase.stAssignments,
@@ -622,7 +659,7 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	}
 
 	container := &testCase.pod.Spec.Containers[0]
-	err := policy.Allocate(st, testCase.pod, container)
+	err = policy.Allocate(logger, st, testCase.pod, container)
 	if !reflect.DeepEqual(err, testCase.expErr) {
 		t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %q but got: %q",
 			testCase.description, testCase.expErr, err)
@@ -635,13 +672,13 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 				testCase.description, container.Name, st.assignments)
 		}
 
-		if !reflect.DeepEqual(cset, testCase.expCSet) {
-			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
+		if !cset.Equals(testCase.expCSet) {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s but got %s",
 				testCase.description, testCase.expCSet, cset)
 		}
 
 		if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
-			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s to be disoint from the shared cpuset %s",
 				testCase.description, cset, st.defaultCPUSet)
 		}
 	}
@@ -685,7 +722,11 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		logger, _ := ktesting.NewTestContext(t)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		if err != nil {
+			t.Fatalf("NewStaticPolicy() failed: %v", err)
+		}
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -695,18 +736,18 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			policy.Allocate(st, pod, &container)
+			_ = policy.Allocate(logger, st, pod, &container)
 		}
-		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
-			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %v but got %v",
+		if !st.defaultCPUSet.Equals(testCase.expCSetAfterAlloc) {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %s but got %s",
 				testCase.description, testCase.expCSetAfterAlloc, st.defaultCPUSet)
 		}
 
 		// remove
-		policy.RemoveContainer(st, string(pod.UID), testCase.containerName)
+		_ = policy.RemoveContainer(logger, st, string(pod.UID), testCase.containerName)
 
-		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterRemove) {
-			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %v but got %v",
+		if !st.defaultCPUSet.Equals(testCase.expCSetAfterRemove) {
+			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %sv but got %s",
 				testCase.description, testCase.expCSetAfterRemove, st.defaultCPUSet)
 		}
 		if _, found := st.assignments[string(pod.UID)][testCase.containerName]; found {
@@ -738,7 +779,11 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		logger, _ := ktesting.NewTestContext(t)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		if err != nil {
+			t.Fatalf("NewStaticPolicy() failed: %v", err)
+		}
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -748,14 +793,14 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			err := policy.Allocate(st, pod, &container)
+			err := policy.Allocate(logger, st, pod, &container)
 			if err != nil {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected no error but got %v",
 					testCase.description, err)
 			}
 		}
-		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
-			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %v but got %v",
+		if !st.defaultCPUSet.Equals(testCase.expCSetAfterAlloc) {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %s but got %s",
 				testCase.description, testCase.expCSetAfterAlloc, st.defaultCPUSet)
 		}
 	}
@@ -820,17 +865,21 @@ func TestStaticPolicyRemove(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		logger, _ := ktesting.NewTestContext(t)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		if err != nil {
+			t.Fatalf("NewStaticPolicy() failed: %v", err)
+		}
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
 			defaultCPUSet: testCase.stDefaultCPUSet,
 		}
 
-		policy.RemoveContainer(st, testCase.podUID, testCase.containerName)
+		_ = policy.RemoveContainer(logger, st, testCase.podUID, testCase.containerName)
 
-		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSet) {
-			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %v but got %v",
+		if !st.defaultCPUSet.Equals(testCase.expCSet) {
+			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %s but got %s",
 				testCase.description, testCase.expCSet, st.defaultCPUSet)
 		}
 
@@ -910,28 +959,32 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		logger, _ := ktesting.NewTestContext(t)
+		p, err := NewStaticPolicy(logger, tc.topo, 0, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		if err != nil {
+			t.Fatalf("NewStaticPolicy() failed: %v", err)
+		}
 		policy := p.(*staticPolicy)
 		st := &mockState{
 			assignments:   tc.stAssignments,
 			defaultCPUSet: tc.stDefaultCPUSet,
 		}
-		err := policy.Start(st)
+		err = policy.Start(logger, st)
 		if err != nil {
 			t.Errorf("StaticPolicy Start() error (%v)", err)
 			continue
 		}
 
-		cset, err := policy.allocateCPUs(st, tc.numRequested, tc.socketMask, cpuset.New())
+		cpuAlloc, err := policy.allocateCPUs(klog.Background(), st, tc.numRequested, tc.socketMask, cpuset.New())
 		if err != nil {
 			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v not error %v",
 				tc.description, tc.expCSet, err)
 			continue
 		}
 
-		if !reflect.DeepEqual(tc.expCSet, cset) {
+		if !tc.expCSet.Equals(cpuAlloc.CPUs) {
 			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v but got %v",
-				tc.description, tc.expCSet, cset)
+				tc.description, tc.expCSet, cpuAlloc.CPUs)
 		}
 	}
 }
@@ -939,17 +992,19 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 // above test cases are without kubelet --reserved-cpus cmd option
 // the following tests are with --reserved-cpus configured
 type staticPolicyTestWithResvList struct {
-	description     string
-	topo            *topology.CPUTopology
-	numReservedCPUs int
-	reserved        cpuset.CPUSet
-	stAssignments   state.ContainerCPUAssignments
-	stDefaultCPUSet cpuset.CPUSet
-	pod             *v1.Pod
-	expErr          error
-	expNewErr       error
-	expCPUAlloc     bool
-	expCSet         cpuset.CPUSet
+	description      string
+	topo             *topology.CPUTopology
+	numReservedCPUs  int
+	reserved         cpuset.CPUSet
+	cpuPolicyOptions map[string]string
+	stAssignments    state.ContainerCPUAssignments
+	stDefaultCPUSet  cpuset.CPUSet
+	pod              *v1.Pod
+	expErr           error
+	expNewErr        error
+	expCPUAlloc      bool
+	expCSet          cpuset.CPUSet
+	expUncoreCache   cpuset.CPUSet // represents the expected UncoreCacheIDs
 }
 
 func TestStaticPolicyStartWithResvList(t *testing.T) {
@@ -964,6 +1019,16 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 			expCSet:         cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
+			description:      "empty cpuset with StrictCPUReservationOption enabled",
+			topo:             topoDualSocketHT,
+			numReservedCPUs:  2,
+			reserved:         cpuset.New(0, 1),
+			cpuPolicyOptions: map[string]string{StrictCPUReservationOption: "true"},
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.New(),
+			expCSet:          cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+		},
+		{
 			description:     "reserved cores 0 & 1 are not present in available cpuset",
 			topo:            topoDualSocketHT,
 			numReservedCPUs: 2,
@@ -971,6 +1036,16 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(2, 3, 4, 5),
 			expErr:          fmt.Errorf("not all reserved cpus: \"0-1\" are present in defaultCpuSet: \"2-5\""),
+		},
+		{
+			description:      "reserved cores 0 & 1 are present in available cpuset with StrictCPUReservationOption enabled",
+			topo:             topoDualSocketHT,
+			numReservedCPUs:  2,
+			reserved:         cpuset.New(0, 1),
+			cpuPolicyOptions: map[string]string{StrictCPUReservationOption: "true"},
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.New(0, 1, 2, 3, 4, 5),
+			expErr:           fmt.Errorf("some of strictly reserved cpus: \"0-1\" are present in defaultCpuSet: \"0-5\""),
 		},
 		{
 			description:     "inconsistency between numReservedCPUs and reserved",
@@ -984,7 +1059,9 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), testCase.cpuPolicyOptions)
 			if !reflect.DeepEqual(err, testCase.expNewErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expNewErr, err)
@@ -997,7 +1074,7 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 				assignments:   testCase.stAssignments,
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
-			err = policy.Start(st)
+			err = policy.Start(logger, st)
 			if !reflect.DeepEqual(err, testCase.expErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expErr, err)
@@ -1061,7 +1138,11 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+		logger, _ := ktesting.NewTestContext(t)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+		if err != nil {
+			t.Fatalf("NewStaticPolicy() failed: %v", err)
+		}
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -1069,7 +1150,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 		}
 
 		container := &testCase.pod.Spec.Containers[0]
-		err := policy.Allocate(st, testCase.pod, container)
+		err = policy.Allocate(logger, st, testCase.pod, container)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -1082,13 +1163,13 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 					testCase.description, container.Name, st.assignments)
 			}
 
-			if !reflect.DeepEqual(cset, testCase.expCSet) {
-				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
+			if !cset.Equals(testCase.expCSet) {
+				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s but got %s",
 					testCase.description, testCase.expCSet, cset)
 			}
 
 			if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
-				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s to be disoint from the shared cpuset %s",
 					testCase.description, cset, st.defaultCPUSet)
 			}
 		}
@@ -1100,6 +1181,776 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 					testCase.description, container.Name, st.assignments)
 			}
 		}
+	}
+}
+
+func WithPodUID(pod *v1.Pod, podUID string) *v1.Pod {
+	ret := pod.DeepCopy()
+	ret.UID = types.UID(podUID)
+	return ret
+}
+
+func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+
+	testCases := []staticPolicyTestWithResvList{
+		{
+			description:     "GuPodSingleContainerSaturating, DualSocketHTUncore, ExpectAllocOneUncore, FullUncoreAvail",
+			topo:            topoDualSocketSingleNumaPerSocketSMTUncore,
+			numReservedCPUs: 8,
+			reserved:        cpuset.New(0, 1, 96, 97, 192, 193, 288, 289), // note 4 cpus taken from uncore 0, 4 from uncore 12
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// remove partially used uncores from the available CPUs to simulate fully clean slate
+			stDefaultCPUSet: topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUs().Difference(
+				cpuset.New().Union(
+					topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUsInUncoreCaches(0),
+				).Union(
+					topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUsInUncoreCaches(12),
+				),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"16000m", "16000m"}, // CpusPerUncore=16 with this topology
+					},
+				),
+				"with-app-container-saturating",
+			),
+			expUncoreCache: cpuset.New(1),
+		},
+		{
+			description:     "GuPodMainAndSidecarContainer, DualSocketHTUncore, ExpectAllocOneUncore, FullUncoreAvail",
+			topo:            topoDualSocketSingleNumaPerSocketSMTUncore,
+			numReservedCPUs: 8,
+			reserved:        cpuset.New(0, 1, 96, 97, 192, 193, 288, 289), // note 4 cpus taken from uncore 0, 4 from uncore 12
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// remove partially used uncores from the available CPUs to simulate fully clean slate
+			stDefaultCPUSet: topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUs().Difference(
+				cpuset.New().Union(
+					topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUsInUncoreCaches(0),
+				).Union(
+					topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUsInUncoreCaches(12),
+				),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"12000m", "12000m"},
+						{"2000m", "2000m"},
+					},
+				),
+				"with-app-container-and-sidecar",
+			),
+			expUncoreCache: cpuset.New(1),
+		},
+		{
+			description:     "GuPodSidecarAndMainContainer, DualSocketHTUncore, ExpectAllocOneUncore, FullUncoreAvail",
+			topo:            topoDualSocketSingleNumaPerSocketSMTUncore,
+			numReservedCPUs: 8,
+			reserved:        cpuset.New(0, 1, 96, 97, 192, 193, 288, 289), // note 4 cpus taken from uncore 0, 4 from uncore 12
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// remove partially used uncores from the available CPUs to simulate fully clean slate
+			stDefaultCPUSet: topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUs().Difference(
+				cpuset.New().Union(
+					topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUsInUncoreCaches(0),
+				).Union(
+					topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUsInUncoreCaches(12),
+				),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"2000m", "2000m"},
+						{"12000m", "12000m"},
+					},
+				),
+				"with-sidecar-and-app-container",
+			),
+			expUncoreCache: cpuset.New(1),
+		},
+		{
+			description:     "GuPodMainAndManySidecarContainer, DualSocketHTUncore, ExpectAllocOneUncore, FullUncoreAvail",
+			topo:            topoDualSocketSingleNumaPerSocketSMTUncore,
+			numReservedCPUs: 8,
+			reserved:        cpuset.New(0, 1, 96, 97, 192, 193, 288, 289), // note 4 cpus taken from uncore 0, 4 from uncore 12
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// remove partially used uncores from the available CPUs to simulate fully clean slate
+			stDefaultCPUSet: topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUs().Difference(
+				cpuset.New().Union(
+					topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUsInUncoreCaches(0),
+				).Union(
+					topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUsInUncoreCaches(12),
+				),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"10000m", "10000m"},
+						{"2000m", "2000m"},
+						{"2000m", "2000m"},
+						{"2000m", "2000m"},
+					},
+				),
+				"with-app-container-and-multi-sidecar",
+			),
+			expUncoreCache: cpuset.New(1),
+		},
+		{
+			description:     "GuPodMainAndSidecarContainer, DualSocketHTUncore, ExpectAllocTwoUncore",
+			topo:            topoDualSocketSingleNumaPerSocketSMTUncore,
+			numReservedCPUs: 8,
+			reserved:        cpuset.New(0, 1, 96, 97, 192, 193, 288, 289), // note 4 cpus taken from uncore 0, 4 from uncore 12
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoDualSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"12000m", "12000m"},
+						{"2000m", "2000m"},
+					},
+				),
+				"with-app-container-and-sidecar",
+			),
+			expUncoreCache: cpuset.New(0, 1), // expected CPU alignment to UncoreCacheIDs 0-1
+		},
+		{
+			description:     "GuPodSingleContainer, SingleSocketSMTSmallUncore, ExpectAllocOneUncore",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore,
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 64, 65), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"8000m", "8000m"},
+					},
+				),
+				"with-app-container-saturating",
+			),
+			expUncoreCache: cpuset.New(1),
+		},
+		{
+			// Best-effort policy allows larger containers to be scheduled using a packed method
+			description:     "GuPodSingleContainer, SingleSocketSMTSmallUncore, ExpectAllocTwoUncore",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 64, 65), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// Uncore 1 fully allocated
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs().Difference(
+				topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUsInUncoreCaches(1),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"12000m", "12000m"}, // larger than topology's uncore cache
+					},
+				),
+				"with-app-container-saturating",
+			),
+			expUncoreCache: cpuset.New(0, 2),
+		},
+		{
+			// Best-effort policy allows larger containers to be scheduled using a packed method
+			description:     "GuPodSingleContainer, SingleSocketNoSMTSmallUncore, FragmentedUncore, ExpectAllocThreeUncore",
+			topo:            topoSingleSocketSingleNumaPerSocketNoSMTSmallUncore, // 4 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 2, 3), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// Uncore 2, 3, and 5 fully allocated
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketNoSMTSmallUncore.CPUDetails.CPUs().Difference(
+				cpuset.New().Union(
+					topoSingleSocketSingleNumaPerSocketNoSMTSmallUncore.CPUDetails.CPUsInUncoreCaches(2),
+				).Union(
+					topoSingleSocketSingleNumaPerSocketNoSMTSmallUncore.CPUDetails.CPUsInUncoreCaches(3),
+				).Union(
+					topoSingleSocketSingleNumaPerSocketNoSMTSmallUncore.CPUDetails.CPUsInUncoreCaches(5),
+				),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"12000m", "12000m"}, // 3 uncore cache's worth of CPUs
+					},
+				),
+				"with-app-container-saturating",
+			),
+			expUncoreCache: cpuset.New(1, 4, 6),
+		},
+		{
+			// Uncore cache alignment following a packed methodology
+			description:     "GuPodMultiContainer, DualSocketSMTUncore, FragmentedUncore, ExpectAllocOneUncore",
+			topo:            topoSmallDualSocketSingleNumaPerSocketNoSMTUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 32, 33), // note 2 cpus taken from uncore 0, 2 from uncore 4
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// uncore 1 fully allocated
+			stDefaultCPUSet: topoSmallDualSocketSingleNumaPerSocketNoSMTUncore.CPUDetails.CPUs().Difference(
+				topoSmallDualSocketSingleNumaPerSocketNoSMTUncore.CPUDetails.CPUsInUncoreCaches(1),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+						{"2000m", "2000m"},
+					},
+				),
+				"with-multiple-container",
+			),
+			expUncoreCache: cpuset.New(0),
+		},
+		{
+			// Uncore cache alignment following a packed methodology
+			description:     "GuPodMultiContainer, DualSocketSMTUncore, FragmentedUncore, ExpectAllocTwoUncore",
+			topo:            topoSmallDualSocketSingleNumaPerSocketNoSMTUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 32, 33), // note 2 cpus taken from uncore 0, 2 from uncore 4
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// uncore 1 fully allocated
+			stDefaultCPUSet: topoSmallDualSocketSingleNumaPerSocketNoSMTUncore.CPUDetails.CPUs().Difference(
+				topoSmallDualSocketSingleNumaPerSocketNoSMTUncore.CPUDetails.CPUsInUncoreCaches(1),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+						{"4000m", "4000m"},
+					},
+				),
+				"with-multiple-container",
+			),
+			expUncoreCache: cpuset.New(0, 2),
+		},
+		{
+			// CPU assignments able to fit on partially available uncore cache
+			description:     "GuPodMultiContainer, LargeSingleSocketSMTUncore, PartialUncoreFit, ExpectAllocTwoUncore",
+			topo:            topoLargeSingleSocketSingleNumaPerSocketSMTUncore, // 16 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 128, 129), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// 4 cpus allocated from uncore 1
+			stDefaultCPUSet: topoLargeSingleSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUs().Difference(
+				cpuset.New(8, 9, 136, 137),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"12000m", "12000m"},
+						{"12000m", "12000m"},
+					},
+				),
+				"with-multiple-container",
+			),
+			expUncoreCache: cpuset.New(0, 1),
+		},
+		{
+			// CPU assignments unable to fit on partially available uncore cache
+			description:     "GuPodMultiContainer, LargeSingleSocketSMTUncore, PartialUncoreNoFit, ExpectAllocTwoUncore",
+			topo:            topoLargeSingleSocketSingleNumaPerSocketSMTUncore, // 16 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 128, 129), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// 4 cpus allocated from uncore 1
+			stDefaultCPUSet: topoLargeSingleSocketSingleNumaPerSocketSMTUncore.CPUDetails.CPUs().Difference(
+				cpuset.New(8, 9, 136, 137),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"14000m", "14000m"},
+						{"14000m", "14000m"},
+					},
+				),
+				"with-multiple-container",
+			),
+			expUncoreCache: cpuset.New(2, 3),
+		},
+		{
+			// Full NUMA allocation on split-cache architecture with NPS=2
+			description:     "GuPodLargeSingleContainer, DualSocketNoSMTUncore, FullNUMAsAvail, ExpectAllocFullNUMA",
+			topo:            topoDualSocketMultiNumaPerSocketUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 2, 3), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoDualSocketMultiNumaPerSocketUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"48000m", "48000m"}, // NUMA's worth of CPUs
+					},
+				),
+				"with-large-single-container",
+			),
+			expUncoreCache: cpuset.New(6, 7, 8, 9, 10, 11), // uncore caches of NUMA Node 1
+		},
+		{
+			// PreferAlignByUnCoreCacheOption will not impact monolithic x86 architectures
+			description:     "GuPodSingleContainer, MonoUncoreCacheHT, ExpectAllocCPUSet",
+			topo:            topoDualSocketSubNumaPerSocketHTMonolithicUncore, // Uncore cache CPUs = Socket CPUs
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 120, 121), // note 4 cpus taken from first 2 cores
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoDualSocketSubNumaPerSocketHTMonolithicUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"6000m", "6000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc:    true,
+			expCSet:        cpuset.New(2, 3, 4, 122, 123, 124),
+			expUncoreCache: cpuset.New(0),
+		},
+		{
+			// PreferAlignByUnCoreCacheOption on fragmented monolithic cache x86 architectures
+			description:     "GuPodSingleContainer, MonoUncoreCacheHT, ExpectAllocCPUSet",
+			topo:            topoSingleSocketSingleNumaPerSocketPCoreHTMonolithicUncore, // Uncore cache CPUs = Socket CPUs
+			numReservedCPUs: 2,
+			reserved:        cpuset.New(0, 1),
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// CPUs 4-7 allocated
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketPCoreHTMonolithicUncore.CPUDetails.CPUs().Difference(
+				cpuset.New(4, 5, 6, 7),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"6000m", "6000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc:    true,
+			expCSet:        cpuset.New(2, 3, 8, 9, 16, 17), // identical to default packed assignment
+			expUncoreCache: cpuset.New(0),
+		},
+		{
+			// Compatibility with ARM-based split cache architectures
+			description:     "GuPodSingleContainer, LargeSingleSocketUncore, ExpectAllocOneUncore",
+			topo:            topoLargeSingleSocketSingleNumaPerSocketUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 2, 3), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoLargeSingleSocketSingleNumaPerSocketUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"8000m", "8000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expUncoreCache: cpuset.New(1),
+		},
+		{
+			// PreferAlignByUnCoreCacheOption on fragmented monolithic cache ARM architectures
+			description:     "GuPodSingleContainer, MonoUncoreCacheHT, ExpectFragmentedAllocCPUSet",
+			topo:            topoSingleSocketSingleNumaPerSocketUncore, // Uncore cache CPUs = Socket CPUs
+			numReservedCPUs: 2,
+			reserved:        cpuset.New(0, 1),
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// CPUs 6-9, 12-15, 18-19 allocated
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketUncore.CPUDetails.CPUs().Difference(
+				cpuset.New().Union(
+					cpuset.New(6, 7, 8, 9),
+				).Union(
+					cpuset.New(12, 13, 14, 15),
+				).Union(
+					cpuset.New(18, 19),
+				),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"12000m", "12000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc:    true,
+			expCSet:        cpuset.New(2, 3, 4, 5, 10, 11, 16, 17, 20, 21, 22, 23), // identical to default packed assignment
+			expUncoreCache: cpuset.New(0),
+		},
+		{
+			// Best-effort policy can result in multiple uncore caches
+			// Every uncore cache is partially allocated
+			description:     "GuPodSingleContainer, SingleSocketUncore, PartialUncore, ExpectBestEffortAllocTwoUncore",
+			topo:            topoSmallSingleSocketSingleNumaPerSocketNoSMTUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 2, 3), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments: state.ContainerCPUAssignments{},
+			// Every uncore has partially allocated 4 CPUs
+			stDefaultCPUSet: topoSmallSingleSocketSingleNumaPerSocketNoSMTUncore.CPUDetails.CPUs().Difference(
+				cpuset.New().Union(
+					cpuset.New(8, 9, 10, 11),
+				).Union(
+					cpuset.New(16, 17, 18, 19),
+				).Union(
+					cpuset.New(24, 25, 26, 27),
+				),
+			),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"8000m", "8000m"}, // full uncore cache worth of cpus
+					},
+				),
+				"with-single-container",
+			),
+			expUncoreCache: cpuset.New(0, 1), // best-effort across uncore cache 0 and 1
+		},
+		{
+			// odd integer cpu required on smt-disabled processor
+			description:     "odd integer cpu required on smt-disabled",
+			topo:            topoSmallSingleSocketSingleNumaPerSocketNoSMTUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 2, 3), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption:            "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSmallSingleSocketSingleNumaPerSocketNoSMTUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"5000m", "5000m"}, // full uncore cache worth of cpus
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(8, 9, 10, 11, 12),
+		},
+		{
+			// odd integer cpu requirement on smt-enabled
+			description:     "odd integer required on smt-enabled",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 64, 65), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"3000m", "3000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 3, 66),
+		},
+		{
+			// odd integer cpu required on smt-enabled and odd integer free cpus available on uncore
+			description:     "odd integer required on odd integer partial uncore",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 64), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"3000m", "3000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 65, 66),
+		},
+		{
+			// even integer requested on smt-enabled processor with odd integer available cpus on uncore
+			// even integer cpu containers will not be placed on uncore caches with odd integer free cpus
+			description:     "even integer required on odd integer partial uncore",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 64), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(4, 5, 68, 69),
+		},
+		{
+			// large odd integer cpu required on smt-enabled
+			description:     "large odd integer required on smt-enabled",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 64), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"11000m", "11000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 65, 66, 4, 5, 6, 7, 68, 69, 70, 71), // full uncore 1 and partial uncore 0
+		},
+		{
+			// odd integer cpu required on hyperthread-enabled and monolithic uncore cache
+			description:     "odd integer required on HT monolithic uncore",
+			topo:            topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 120), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"5000m", "5000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 3, 121, 122, 123),
+		},
+		{
+			// even integer cpu required on hyperthread-enabled and monolithic uncore cache
+			description:     "even integer required on HT monolithic uncore",
+			topo:            topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			numReservedCPUs: 3,
+			reserved:        cpuset.New(0, 1, 120), // note 3 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 3, 122, 123), // takeFullCores
+		},
+		{
+			// test feature compatibility with strict-cpu-reservation on split cache architecture
+			description:     "GuPodSingleContainer, SingleSocketSMTSmallUncore, StrictReserveCompatability",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore,
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 64, 65), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				StrictCPUReservationOption:     "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"2000m", "2000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 66), // should avoid reserved cpuset
+		},
+		{
+			// test feature compatibility with strict-cpu-reservation on monolithic uncore architecture
+			description:     "GuPodSingleContainer, DualSocketHTMonoUncore, StrictReserveCompatability",
+			topo:            topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 120, 121), // first two cores reserved
+			cpuPolicyOptions: map[string]string{
+				StrictCPUReservationOption:     "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoDualSocketSubNumaPerSocketHTMonolithicUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 3, 122, 123), // packed assignment avoid reserved cpuset
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), testCase.cpuPolicyOptions)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed with %v", err)
+			}
+
+			st := &mockState{
+				assignments:   testCase.stAssignments,
+				defaultCPUSet: testCase.stDefaultCPUSet.Difference(testCase.reserved), // ensure the cpumanager invariant
+			}
+
+			for idx := range testCase.pod.Spec.Containers {
+				container := &testCase.pod.Spec.Containers[idx]
+				err := policy.Allocate(logger, st, testCase.pod, container)
+				if err != nil {
+					t.Fatalf("Allocate failed: pod=%q container=%q", testCase.pod.UID, container.Name)
+				}
+			}
+
+			if testCase.expCPUAlloc {
+				container := &testCase.pod.Spec.Containers[0]
+				cset, found := st.assignments[string(testCase.pod.UID)][container.Name]
+				if !found {
+					t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
+						testCase.description, container.Name, st.assignments)
+				}
+				if !testCase.expCSet.Equals(cset) {
+					t.Errorf("StaticPolicy Allocate() error (%v). expected CPUSet %v but got %v",
+						testCase.description, testCase.expCSet, cset)
+				}
+				return
+			}
+
+			uncoreCacheIDs, err := getPodUncoreCacheIDs(st, testCase.topo, testCase.pod)
+			if err != nil {
+				t.Fatalf("uncore cache check: %v", err.Error())
+			}
+			ids := cpuset.New(uncoreCacheIDs...)
+
+			if !ids.Equals(testCase.expUncoreCache) {
+				t.Errorf("StaticPolicy Allocate() error (%v). expected UncoreCacheIDs %v but got %v",
+					testCase.description, testCase.expUncoreCache, ids)
+			}
+		})
 	}
 }
 
@@ -1188,7 +2039,64 @@ func TestStaticPolicyOptions(t *testing.T) {
 	}
 }
 
+func TestSMTAlignmentErrorText(t *testing.T) {
+	type smtErrTestCase struct {
+		name     string
+		err      SMTAlignmentError
+		expected string
+	}
+
+	testCases := []smtErrTestCase{
+		{
+			name:     "base SMT alignment error",
+			err:      SMTAlignmentError{RequestedCPUs: 15, CpusPerCore: 4},
+			expected: `SMT Alignment Error: requested 15 cpus not multiple cpus per core = 4`,
+		},
+		{
+			// Note the explicit 0. The intent is to signal the lack of physical CPUs, but
+			// in the corner case of no available physical CPUs at all, without the explicit
+			// flag we cannot distinguish the case, and before PR#127959 we printed the old message
+			name:     "base SMT alignment error, no physical CPUs, missing flag",
+			err:      SMTAlignmentError{RequestedCPUs: 4, CpusPerCore: 2, AvailablePhysicalCPUs: 0},
+			expected: `SMT Alignment Error: requested 4 cpus not multiple cpus per core = 2`,
+		},
+		{
+			name:     "base SMT alignment error, no physical CPUs, explicit flag",
+			err:      SMTAlignmentError{RequestedCPUs: 4, CpusPerCore: 2, AvailablePhysicalCPUs: 0, CausedByPhysicalCPUs: true},
+			expected: `SMT Alignment Error: not enough free physical CPUs: available physical CPUs = 0, requested CPUs = 4, CPUs per core = 2`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := testCase.err.Error()
+			if got != testCase.expected {
+				t.Errorf("got=%v expected=%v", got, testCase.expected)
+			}
+		})
+	}
+}
+
 func newCPUSetPtr(cpus ...int) *cpuset.CPUSet {
 	ret := cpuset.New(cpus...)
 	return &ret
+}
+
+func getPodUncoreCacheIDs(s state.Reader, topo *topology.CPUTopology, pod *v1.Pod) ([]int, error) {
+	var uncoreCacheIDs []int
+	for idx := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[idx]
+		cset, ok := s.GetCPUSet(string(pod.UID), container.Name)
+		if !ok {
+			return nil, fmt.Errorf("GetCPUSet(%s, %s) not ok", pod.UID, container.Name)
+		}
+		for _, cpuID := range cset.UnsortedList() {
+			info, ok := topo.CPUDetails[cpuID]
+			if !ok {
+				return nil, fmt.Errorf("cpuID %v not in topo.CPUDetails", cpuID)
+			}
+			uncoreCacheIDs = append(uncoreCacheIDs, info.UncoreCacheID)
+		}
+	}
+	return uncoreCacheIDs, nil
 }

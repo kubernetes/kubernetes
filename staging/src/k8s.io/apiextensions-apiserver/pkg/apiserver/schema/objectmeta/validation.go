@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	metavalidation "k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -75,15 +75,22 @@ func validate(pth *field.Path, x interface{}, s *structuralschema.Structural) fi
 	return allErrs
 }
 
+func validatePathSegment(name string, prefix bool) []string {
+	if prefix {
+		return content.IsPathSegmentPrefix(name)
+	}
+	return content.IsPathSegmentName(name)
+}
+
 func validateEmbeddedResource(pth *field.Path, x map[string]interface{}, s *structuralschema.Structural) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// require apiVersion and kind, but not metadata
 	if _, found := x["apiVersion"]; !found {
-		allErrs = append(allErrs, field.Required(pth.Child("apiVersion"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(pth.Child("apiVersion"), ""))
 	}
 	if _, found := x["kind"]; !found {
-		allErrs = append(allErrs, field.Required(pth.Child("kind"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(pth.Child("kind"), ""))
 	}
 
 	for k, v := range x {
@@ -112,7 +119,7 @@ func validateEmbeddedResource(pth *field.Path, x map[string]interface{}, s *stru
 				if len(meta.Name) == 0 {
 					meta.Name = "fakename" // we have to set something to avoid an error
 				}
-				allErrs = append(allErrs, metavalidation.ValidateObjectMeta(meta, len(meta.Namespace) > 0, path.ValidatePathSegmentName, pth.Child("metadata"))...)
+				allErrs = append(allErrs, metavalidation.ValidateObjectMeta(meta, len(meta.Namespace) > 0, validatePathSegment, pth.Child("metadata"))...)
 			}
 		}
 	}

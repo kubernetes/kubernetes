@@ -3,12 +3,17 @@
 // license that can be found in the LICENSE file.
 
 // Package curve25519 provides an implementation of the X25519 function, which
-// performs scalar multiplication on the elliptic curve known as Curve25519.
-// See RFC 7748.
+// performs scalar multiplication on the elliptic curve known as Curve25519
+// according to [RFC 7748].
 //
-// Starting in Go 1.20, this package is a wrapper for the X25519 implementation
-// in the crypto/ecdh package.
-package curve25519 // import "golang.org/x/crypto/curve25519"
+// The curve25519 package is a wrapper for the X25519 implementation in the
+// crypto/ecdh package. It is [frozen] and is not accepting new features.
+//
+// [RFC 7748]: https://datatracker.ietf.org/doc/html/rfc7748
+// [frozen]: https://go.dev/wiki/Frozen
+package curve25519
+
+import "crypto/ecdh"
 
 // ScalarMult sets dst to the product scalar * point.
 //
@@ -16,7 +21,13 @@ package curve25519 // import "golang.org/x/crypto/curve25519"
 // zeroes, irrespective of the scalar. Instead, use the X25519 function, which
 // will return an error.
 func ScalarMult(dst, scalar, point *[32]byte) {
-	scalarMult(dst, scalar, point)
+	if _, err := x25519(dst, scalar[:], point[:]); err != nil {
+		// The only error condition for x25519 when the inputs are 32 bytes long
+		// is if the output would have been the all-zero value.
+		for i := range dst {
+			dst[i] = 0
+		}
+	}
 }
 
 // ScalarBaseMult sets dst to the product scalar * base where base is the
@@ -25,7 +36,12 @@ func ScalarMult(dst, scalar, point *[32]byte) {
 // It is recommended to use the X25519 function with Basepoint instead, as
 // copying into fixed size arrays can lead to unexpected bugs.
 func ScalarBaseMult(dst, scalar *[32]byte) {
-	scalarBaseMult(dst, scalar)
+	curve := ecdh.X25519()
+	priv, err := curve.NewPrivateKey(scalar[:])
+	if err != nil {
+		panic("curve25519: " + err.Error())
+	}
+	copy(dst[:], priv.PublicKey().Bytes())
 }
 
 const (
@@ -56,4 +72,22 @@ func X25519(scalar, point []byte) ([]byte, error) {
 	// caller, and possibly avoid escaping to the heap.
 	var dst [32]byte
 	return x25519(&dst, scalar, point)
+}
+
+func x25519(dst *[32]byte, scalar, point []byte) ([]byte, error) {
+	curve := ecdh.X25519()
+	pub, err := curve.NewPublicKey(point)
+	if err != nil {
+		return nil, err
+	}
+	priv, err := curve.NewPrivateKey(scalar)
+	if err != nil {
+		return nil, err
+	}
+	out, err := priv.ECDH(pub)
+	if err != nil {
+		return nil, err
+	}
+	copy(dst[:], out)
+	return dst[:], nil
 }

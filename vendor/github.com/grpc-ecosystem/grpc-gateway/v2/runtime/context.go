@@ -49,6 +49,7 @@ var malformedHTTPHeaders = map[string]struct{}{
 type (
 	rpcMethodKey       struct{}
 	httpPathPatternKey struct{}
+	httpPatternKey     struct{}
 
 	AnnotateContextOption func(ctx context.Context) context.Context
 )
@@ -200,12 +201,12 @@ func annotateContext(ctx context.Context, mux *ServeMux, req *http.Request, rpcM
 	if timeout != 0 {
 		ctx, _ = context.WithTimeout(ctx, timeout)
 	}
-	if len(pairs) == 0 {
-		return ctx, nil, nil
-	}
 	md := metadata.Pairs(pairs...)
 	for _, mda := range mux.metadataAnnotators {
 		md = metadata.Join(md, mda(ctx, req))
+	}
+	if len(md) == 0 {
+		return ctx, nil, nil
 	}
 	return ctx, md, nil
 }
@@ -403,4 +404,14 @@ func HTTPPathPattern(ctx context.Context) (string, bool) {
 
 func withHTTPPathPattern(ctx context.Context, httpPathPattern string) context.Context {
 	return context.WithValue(ctx, httpPathPatternKey{}, httpPathPattern)
+}
+
+// HTTPPattern returns the HTTP path pattern struct relating to the HTTP handler, if one exists.
+func HTTPPattern(ctx context.Context) (Pattern, bool) {
+	v, ok := ctx.Value(httpPatternKey{}).(Pattern)
+	return v, ok
+}
+
+func withHTTPPattern(ctx context.Context, httpPattern Pattern) context.Context {
+	return context.WithValue(ctx, httpPatternKey{}, httpPattern)
 }

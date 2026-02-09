@@ -21,9 +21,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/pkg/errors"
-
 	"sigs.k8s.io/yaml"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 func TestNewCmdVersion(t *testing.T) {

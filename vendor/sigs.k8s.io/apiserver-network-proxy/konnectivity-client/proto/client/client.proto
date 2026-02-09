@@ -30,6 +30,7 @@ enum PacketType {
   CLOSE_RSP = 3;
   DATA = 4;
   DIAL_CLS = 5;
+  DRAIN = 6;
 }
 
 message Packet {
@@ -42,6 +43,7 @@ message Packet {
     CloseRequest closeRequest = 5;
     CloseResponse closeResponse = 6;
     CloseDial closeDial = 7;
+    Drain drain = 8;
   }
 }
 
@@ -83,6 +85,11 @@ message CloseResponse {
 message CloseDial {
     // random id of the DialRequest
     int64 random = 1;
+}
+
+message Drain {
+  // A hint from an Agent to Server that it is pending termination.
+  // A Server should prefer non-draining agents for new dials.
 }
 
 message Data {

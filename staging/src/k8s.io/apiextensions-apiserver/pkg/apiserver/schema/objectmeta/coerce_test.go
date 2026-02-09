@@ -38,7 +38,7 @@ import (
 func TestRoundtripObjectMeta(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	codec := json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
+	codec := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{})
 	seed := rand.Int63()
 	fuzzer := fuzzer.FuzzerFor(metafuzzer.Funcs, rand.NewSource(seed), codecs)
 
@@ -46,7 +46,7 @@ func TestRoundtripObjectMeta(t *testing.T) {
 	for i := 0; i < N; i++ {
 		u := &unstructured.Unstructured{Object: map[string]interface{}{}}
 		original := &metav1.ObjectMeta{}
-		fuzzer.Fuzz(original)
+		fuzzer.Fill(original)
 		if err := SetObjectMeta(u.Object, original); err != nil {
 			t.Fatalf("unexpected error setting ObjectMeta: %v", err)
 		}
@@ -89,7 +89,7 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 	N := 100
 	for i := 0; i < N; i++ {
 		fuzzedObjectMeta := &metav1.ObjectMeta{}
-		fuzzer.Fuzz(fuzzedObjectMeta)
+		fuzzer.Fill(fuzzedObjectMeta)
 		goodMetaMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(fuzzedObjectMeta.DeepCopy())
 		if err != nil {
 			t.Fatal(err)

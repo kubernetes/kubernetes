@@ -32,8 +32,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/watchlist"
 	"k8s.io/klog/v2/ktesting"
 )
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	target, err := NewForConfig(&rest.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if watchlist.DoesClientNotSupportWatchListSemantics(target) {
+		t.Fatalf("Metadata client should support WatchList semantics")
+	}
+}
 
 func TestClient(t *testing.T) {
 	gvr := schema.GroupVersionResource{Group: "group", Version: "v1", Resource: "resource"}

@@ -72,10 +72,10 @@ func TestAPIApproval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		approvedKubeAPI, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), approvedKubeAPI.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		approvedKubeAPI, getErr := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, approvedKubeAPI.Name, metav1.GetOptions{})
+		if getErr != nil {
+			return false, getErr
 		}
 		if approvedKubeAPIApproved := findCRDCondition(approvedKubeAPI, apiextensionsv1.KubernetesAPIApprovalPolicyConformant); approvedKubeAPIApproved == nil || approvedKubeAPIApproved.Status != apiextensionsv1.ConditionTrue {
 			t.Log(approvedKubeAPIApproved)

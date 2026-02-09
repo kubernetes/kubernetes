@@ -18,4 +18,4 @@ limitations under the License.
 // _are_ api related, i.e. which are prerequisite for the API services
 // to work (in contrast to the filters in the server package which are
 // not part of the API contract).
-package filters // import "k8s.io/apiserver/pkg/endpoints/filters"
+package filters

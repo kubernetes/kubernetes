@@ -35,10 +35,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const DefaultHealthzPath = "/healthz"
+
 // HealthChecker is a named healthz checker.
 type HealthChecker interface {
 	Name() string
 	Check(req *http.Request) error
+}
+
+type GroupedHealthChecker interface {
+	HealthChecker
+	GroupName() string
 }
 
 // PingHealthz returns true automatically when checked
@@ -149,12 +156,20 @@ func NamedCheck(name string, check func(r *http.Request) error) HealthChecker {
 	return &healthzCheck{name, check}
 }
 
+// NamedGroupedCheck returns a healthz checker for the given name and function.
+func NamedGroupedCheck(name string, groupName string, check func(r *http.Request) error) HealthChecker {
+	return &groupedHealthzCheck{
+		groupName:     groupName,
+		HealthChecker: &healthzCheck{name, check},
+	}
+}
+
 // InstallHandler registers handlers for health checking on the path
 // "/healthz" to mux. *All handlers* for mux must be specified in
 // exactly one call to InstallHandler. Calling InstallHandler more
 // than once for the same mux will result in a panic.
 func InstallHandler(mux mux, checks ...HealthChecker) {
-	InstallPathHandler(mux, "/healthz", checks...)
+	InstallPathHandler(mux, DefaultHealthzPath, checks...)
 }
 
 // InstallReadyzHandler registers handlers for health checking on the path
@@ -230,6 +245,17 @@ func (c *healthzCheck) Check(r *http.Request) error {
 	return c.check(r)
 }
 
+type groupedHealthzCheck struct {
+	groupName string
+	HealthChecker
+}
+
+var _ GroupedHealthChecker = &groupedHealthzCheck{}
+
+func (c *groupedHealthzCheck) GroupName() string {
+	return c.groupName
+}
+
 // getExcludedChecks extracts the health check names to be excluded from the query param
 func getExcludedChecks(r *http.Request) sets.String {
 	checks, found := r.URL.Query()["exclude"]
@@ -244,6 +270,7 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 	var notifyOnce sync.Once
 	return func(w http.ResponseWriter, r *http.Request) {
 		excluded := getExcludedChecks(r)
+		unknownExcluded := excluded.Clone()
 		// failedVerboseLogOutput is for output to the log.  It indicates detailed failed output information for the log.
 		var failedVerboseLogOutput bytes.Buffer
 		var failedChecks []string
@@ -251,8 +278,14 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 		for _, check := range checks {
 			// no-op the check if we've specified we want to exclude the check
 			if excluded.Has(check.Name()) {
-				excluded.Delete(check.Name())
+				unknownExcluded.Delete(check.Name())
 				fmt.Fprintf(&individualCheckOutput, "[+]%s excluded: ok\n", check.Name())
+				continue
+			}
+			// no-op the check if it is a grouped check and we want to exclude the group
+			if check, ok := check.(GroupedHealthChecker); ok && excluded.Has(check.GroupName()) {
+				unknownExcluded.Delete(check.GroupName())
+				fmt.Fprintf(&individualCheckOutput, "[+]%s excluded with %s: ok\n", check.Name(), check.GroupName())
 				continue
 			}
 			if err := check.Check(r); err != nil {
@@ -268,10 +301,10 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 				fmt.Fprintf(&individualCheckOutput, "[+]%s ok\n", check.Name())
 			}
 		}
-		if excluded.Len() > 0 {
-			fmt.Fprintf(&individualCheckOutput, "warn: some health checks cannot be excluded: no matches for %s\n", formatQuoted(excluded.List()...))
+		if unknownExcluded.Len() > 0 {
+			fmt.Fprintf(&individualCheckOutput, "warn: some health checks cannot be excluded: no matches for %s\n", formatQuoted(unknownExcluded.List()...))
 			klog.V(6).Infof("cannot exclude some health checks, no health checks are installed matching %s",
-				formatQuoted(excluded.List()...))
+				formatQuoted(unknownExcluded.List()...))
 		}
 		// always be verbose on failure
 		if len(failedChecks) > 0 {

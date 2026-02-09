@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -35,7 +34,6 @@ import (
 	"github.com/moby/sys/mountinfo"
 	"golang.org/x/sys/unix"
 
-	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
@@ -114,7 +112,7 @@ func (mounter *Mounter) hasSystemd() bool {
 
 // Map unix.Statfs mount flags ro, nodev, noexec, nosuid, noatime, relatime,
 // nodiratime to mount option flag strings.
-func getUserNSBindMountOptions(path string, statfs func(path string, buf *unix.Statfs_t) (err error)) ([]string, error) {
+func getBindMountOptions(path string, statfs func(path string, buf *unix.Statfs_t) (err error)) ([]string, error) {
 	var s unix.Statfs_t
 	var mountOpts []string
 	if err := statfs(path, &s); err != nil {
@@ -137,32 +135,23 @@ func getUserNSBindMountOptions(path string, statfs func(path string, buf *unix.S
 	return mountOpts, nil
 }
 
-// Do a bind mount including the needed remount for applying the bind opts.
-// If the remount fails and we are running in a user namespace
-// figure out if the source filesystem has the ro, nodev, noexec, nosuid,
-// noatime, relatime or nodiratime flag set and try another remount with the found flags.
+// Performs a bind mount with the specified options, and then remounts
+// the mount point with the same `nodev`, `nosuid`, `noexec`, `nosuid`, `noatime`,
+// `relatime`, `nodiratime` options as the original mount point.
 func (mounter *Mounter) bindMountSensitive(mounterPath string, mountCmd string, source string, target string, fstype string, bindOpts []string, bindRemountOpts []string, bindRemountOptsSensitive []string, mountFlags []string, systemdMountRequired bool) error {
-	err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
+	err := mounter.doMount(mounterPath, mountCmd, source, target, fstype, bindOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
 	if err != nil {
 		return err
 	}
-	err = mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
-	if libcontaineruserns.RunningInUserNS() {
-		if err == nil {
-			return nil
-		}
-		// Check if the source has ro, nodev, noexec, nosuid, noatime, relatime,
-		// nodiratime flag...
-		fixMountOpts, err := getUserNSBindMountOptions(source, unix.Statfs)
-		if err != nil {
-			return &os.PathError{Op: "statfs", Path: source, Err: err}
-		}
-		// ... and retry the mount with flags found above.
-		bindRemountOpts = append(bindRemountOpts, fixMountOpts...)
-		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
-	} else {
-		return err
+	// Check if the source has ro, nodev, noexec, nosuid, noatime, relatime,
+	// nodiratime flag...
+	fixMountOpts, err := getBindMountOptions(source, unix.Statfs)
+	if err != nil {
+		return &os.PathError{Op: "statfs", Path: source, Err: err}
 	}
+	// ... and retry the mount with flags found above.
+	bindRemountOpts = append(bindRemountOpts, fixMountOpts...)
+	return mounter.doMount(mounterPath, mountCmd, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
@@ -439,7 +428,7 @@ func (*Mounter) List() ([]MountPoint, error) {
 
 func statx(file string) (unix.Statx_t, error) {
 	var stat unix.Statx_t
-	if err := unix.Statx(0, file, unix.AT_STATX_DONT_SYNC, 0, &stat); err != nil {
+	if err := unix.Statx(unix.AT_FDCWD, file, unix.AT_STATX_DONT_SYNC, 0, &stat); err != nil {
 		if err == unix.ENOSYS {
 			return stat, errStatxNotSupport
 		}
@@ -623,7 +612,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 			sensitiveOptionsLog := sanitizedOptionsForLogging(options, sensitiveOptions)
 			detailedErr := fmt.Sprintf("format of disk %q failed: type:(%q) target:(%q) options:(%q) errcode:(%v) output:(%v) ", source, fstype, target, sensitiveOptionsLog, err, string(output))
 			klog.Error(detailedErr)
-			return NewMountError(FormatFailed, detailedErr)
+			return NewMountError(FormatFailed, "%s", detailedErr)
 		}
 
 		klog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
@@ -631,7 +620,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 		if fstype != existingFormat {
 			// Verify that the disk is formatted with filesystem type we are expecting
 			mountErrorValue = FilesystemMismatch
-			klog.Warningf("Configured to mount disk %s as %s but current format is %s, things might break", source, existingFormat, fstype)
+			klog.Warningf("Configured to mount disk %s as %s but current format is %s, things might break", source, fstype, existingFormat)
 		}
 
 		if !readOnly {
@@ -646,7 +635,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	// Mount the disk
 	klog.V(4).Infof("Attempting to mount disk %s in %s format at %s", source, fstype, target)
 	if err := mounter.MountSensitive(source, target, fstype, options, sensitiveOptions); err != nil {
-		return NewMountError(mountErrorValue, err.Error())
+		return NewMountError(mountErrorValue, "%s", err.Error())
 	}
 
 	return nil
@@ -732,7 +721,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	return getDiskFormat(mounter.Exec, disk)
 }
 
-// ListProcMounts is shared with NsEnterMounter
+// ListProcMounts returns a list of all mounted filesystems.
 func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
 	content, err := readMountInfo(mountFilePath)
 	if err != nil {
@@ -786,7 +775,6 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 // Some filesystems may share a source name, e.g. tmpfs. And for bind mounting,
 // it's possible to mount a non-root path of a filesystem, so we need to use
 // root path and major:minor to represent mount source uniquely.
-// This implementation is shared between Linux and NsEnterMounter
 func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 	mis, err := ParseMountInfo(mountInfoPath)
 	if err != nil {

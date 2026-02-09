@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	policyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
+	applyconfigurationspolicyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,38 @@ type PodDisruptionBudgetsGetter interface {
 
 // PodDisruptionBudgetInterface has methods to work with PodDisruptionBudget resources.
 type PodDisruptionBudgetInterface interface {
-	Create(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget, opts v1.CreateOptions) (*v1beta1.PodDisruptionBudget, error)
-	Update(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget, opts v1.UpdateOptions) (*v1beta1.PodDisruptionBudget, error)
+	Create(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudget, opts v1.CreateOptions) (*policyv1beta1.PodDisruptionBudget, error)
+	Update(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudget, opts v1.UpdateOptions) (*policyv1beta1.PodDisruptionBudget, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget, opts v1.UpdateOptions) (*v1beta1.PodDisruptionBudget, error)
+	UpdateStatus(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudget, opts v1.UpdateOptions) (*policyv1beta1.PodDisruptionBudget, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.PodDisruptionBudget, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PodDisruptionBudgetList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*policyv1beta1.PodDisruptionBudget, error)
+	List(ctx context.Context, opts v1.ListOptions) (*policyv1beta1.PodDisruptionBudgetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error)
-	Apply(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodDisruptionBudget, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *policyv1beta1.PodDisruptionBudget, err error)
+	Apply(ctx context.Context, podDisruptionBudget *applyconfigurationspolicyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *policyv1beta1.PodDisruptionBudget, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodDisruptionBudget, err error)
+	ApplyStatus(ctx context.Context, podDisruptionBudget *applyconfigurationspolicyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *policyv1beta1.PodDisruptionBudget, err error)
 	PodDisruptionBudgetExpansion
 }
 
 // podDisruptionBudgets implements PodDisruptionBudgetInterface
 type podDisruptionBudgets struct {
-	*gentype.ClientWithListAndApply[*v1beta1.PodDisruptionBudget, *v1beta1.PodDisruptionBudgetList, *policyv1beta1.PodDisruptionBudgetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*policyv1beta1.PodDisruptionBudget, *policyv1beta1.PodDisruptionBudgetList, *applyconfigurationspolicyv1beta1.PodDisruptionBudgetApplyConfiguration]
 }
 
 // newPodDisruptionBudgets returns a PodDisruptionBudgets
 func newPodDisruptionBudgets(c *PolicyV1beta1Client, namespace string) *podDisruptionBudgets {
 	return &podDisruptionBudgets{
-		gentype.NewClientWithListAndApply[*v1beta1.PodDisruptionBudget, *v1beta1.PodDisruptionBudgetList, *policyv1beta1.PodDisruptionBudgetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*policyv1beta1.PodDisruptionBudget, *policyv1beta1.PodDisruptionBudgetList, *applyconfigurationspolicyv1beta1.PodDisruptionBudgetApplyConfiguration](
 			"poddisruptionbudgets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta1.PodDisruptionBudget { return &v1beta1.PodDisruptionBudget{} },
-			func() *v1beta1.PodDisruptionBudgetList { return &v1beta1.PodDisruptionBudgetList{} }),
+			func() *policyv1beta1.PodDisruptionBudget { return &policyv1beta1.PodDisruptionBudget{} },
+			func() *policyv1beta1.PodDisruptionBudgetList { return &policyv1beta1.PodDisruptionBudgetList{} },
+			gentype.PrefersProtobuf[*policyv1beta1.PodDisruptionBudget](),
+		),
 	}
 }

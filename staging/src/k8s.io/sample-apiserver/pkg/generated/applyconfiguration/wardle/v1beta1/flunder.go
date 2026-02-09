@@ -21,12 +21,16 @@ package v1beta1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
+	internal "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/internal"
 )
 
 // FlunderApplyConfiguration represents a declarative configuration of the Flunder type for use
 // with apply.
+//
+// Flunder is an example type with a spec and a status.
 type FlunderApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -45,11 +49,54 @@ func Flunder(name, namespace string) *FlunderApplyConfiguration {
 	return b
 }
 
+// ExtractFlunderFrom extracts the applied configuration owned by fieldManager from
+// flunder for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// flunder must be a unmodified Flunder API object that was retrieved from the Kubernetes API.
+// ExtractFlunderFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractFlunderFrom(flunder *wardlev1beta1.Flunder, fieldManager string, subresource string) (*FlunderApplyConfiguration, error) {
+	b := &FlunderApplyConfiguration{}
+	err := managedfields.ExtractInto(flunder, internal.Parser().Type("io.k8s.sample-apiserver.pkg.apis.wardle.v1beta1.Flunder"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(flunder.Name)
+	b.WithNamespace(flunder.Namespace)
+
+	b.WithKind("Flunder")
+	b.WithAPIVersion("wardle.example.com/v1beta1")
+	return b, nil
+}
+
+// ExtractFlunder extracts the applied configuration owned by fieldManager from
+// flunder. If no managedFields are found in flunder for fieldManager, a
+// FlunderApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// flunder must be a unmodified Flunder API object that was retrieved from the Kubernetes API.
+// ExtractFlunder provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractFlunder(flunder *wardlev1beta1.Flunder, fieldManager string) (*FlunderApplyConfiguration, error) {
+	return ExtractFlunderFrom(flunder, fieldManager, "")
+}
+
+// ExtractFlunderStatus extracts the applied configuration owned by fieldManager from
+// flunder for the status subresource.
+func ExtractFlunderStatus(flunder *wardlev1beta1.Flunder, fieldManager string) (*FlunderApplyConfiguration, error) {
+	return ExtractFlunderFrom(flunder, fieldManager, "status")
+}
+
+func (b FlunderApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithKind(value string) *FlunderApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -57,7 +104,7 @@ func (b *FlunderApplyConfiguration) WithKind(value string) *FlunderApplyConfigur
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithAPIVersion(value string) *FlunderApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -66,7 +113,7 @@ func (b *FlunderApplyConfiguration) WithAPIVersion(value string) *FlunderApplyCo
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithName(value string) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -75,7 +122,7 @@ func (b *FlunderApplyConfiguration) WithName(value string) *FlunderApplyConfigur
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithGenerateName(value string) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -84,7 +131,7 @@ func (b *FlunderApplyConfiguration) WithGenerateName(value string) *FlunderApply
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithNamespace(value string) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -93,7 +140,7 @@ func (b *FlunderApplyConfiguration) WithNamespace(value string) *FlunderApplyCon
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithUID(value types.UID) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -102,7 +149,7 @@ func (b *FlunderApplyConfiguration) WithUID(value types.UID) *FlunderApplyConfig
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithResourceVersion(value string) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -111,7 +158,7 @@ func (b *FlunderApplyConfiguration) WithResourceVersion(value string) *FlunderAp
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithGeneration(value int64) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -120,7 +167,7 @@ func (b *FlunderApplyConfiguration) WithGeneration(value int64) *FlunderApplyCon
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithCreationTimestamp(value metav1.Time) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -129,7 +176,7 @@ func (b *FlunderApplyConfiguration) WithCreationTimestamp(value metav1.Time) *Fl
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -138,7 +185,7 @@ func (b *FlunderApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *Fl
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *FlunderApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -148,11 +195,11 @@ func (b *FlunderApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) 
 // overwriting an existing map entries in Labels field with the same key.
 func (b *FlunderApplyConfiguration) WithLabels(entries map[string]string) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -163,11 +210,11 @@ func (b *FlunderApplyConfiguration) WithLabels(entries map[string]string) *Flund
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *FlunderApplyConfiguration) WithAnnotations(entries map[string]string) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -181,7 +228,7 @@ func (b *FlunderApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefer
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -192,7 +239,7 @@ func (b *FlunderApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefer
 func (b *FlunderApplyConfiguration) WithFinalizers(values ...string) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -219,8 +266,24 @@ func (b *FlunderApplyConfiguration) WithStatus(value wardlev1beta1.FlunderStatus
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *FlunderApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *FlunderApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *FlunderApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *FlunderApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

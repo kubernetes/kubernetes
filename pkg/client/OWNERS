@@ -22,7 +22,6 @@ reviewers:
   - luxas
   - janetkuo
   - justinsb
-  - ncdc
   - mwielgus
   - feiskyer
   - soltysh
@@ -31,3 +30,5 @@ reviewers:
 emeritus_approvers:
   - krousey
   - lavalamp
+emeritus_reviewers:
+  - ncdc

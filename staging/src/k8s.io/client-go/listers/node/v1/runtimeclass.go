@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/node/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	nodev1 "k8s.io/api/node/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // RuntimeClassLister helps list RuntimeClasses.
@@ -30,19 +30,19 @@ import (
 type RuntimeClassLister interface {
 	// List lists all RuntimeClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.RuntimeClass, err error)
+	List(selector labels.Selector) (ret []*nodev1.RuntimeClass, err error)
 	// Get retrieves the RuntimeClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.RuntimeClass, error)
+	Get(name string) (*nodev1.RuntimeClass, error)
 	RuntimeClassListerExpansion
 }
 
 // runtimeClassLister implements the RuntimeClassLister interface.
 type runtimeClassLister struct {
-	listers.ResourceIndexer[*v1.RuntimeClass]
+	listers.ResourceIndexer[*nodev1.RuntimeClass]
 }
 
 // NewRuntimeClassLister returns a new RuntimeClassLister.
 func NewRuntimeClassLister(indexer cache.Indexer) RuntimeClassLister {
-	return &runtimeClassLister{listers.New[*v1.RuntimeClass](indexer, v1.Resource("runtimeclass"))}
+	return &runtimeClassLister{listers.New[*nodev1.RuntimeClass](indexer, nodev1.Resource("runtimeclass"))}
 }

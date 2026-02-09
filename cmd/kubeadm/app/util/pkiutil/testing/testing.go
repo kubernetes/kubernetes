@@ -108,7 +108,7 @@ func newPrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Signer, e
 
 	keyName := ""
 	switch keyType {
-	case kubeadmapi.EncryptionAlgorithmECDSAP256:
+	case kubeadmapi.EncryptionAlgorithmECDSAP256, kubeadmapi.EncryptionAlgorithmECDSAP384:
 		ecdsa++
 		keyName = fmt.Sprintf("%d.ecdsa", ecdsa)
 	default:

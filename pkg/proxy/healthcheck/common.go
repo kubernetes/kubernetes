@@ -17,25 +17,28 @@ limitations under the License.
 package healthcheck
 
 import (
+	"context"
 	"net"
 	"net/http"
+
+	netutils "k8s.io/utils/net"
 )
 
-// listener allows for testing of ServiceHealthServer and ProxierHealthServer.
+// listener allows for testing of ServiceHealthServer and ProxyHealthServer.
 type listener interface {
-	// Listen is very much like net.Listen, except the first arg (network) is
+	// Listen is very much like netutils.MultiListen, except the second arg (network) is
 	// fixed to be "tcp".
-	Listen(addr string) (net.Listener, error)
+	Listen(ctx context.Context, addrs ...string) (net.Listener, error)
 }
 
-// httpServerFactory allows for testing of ServiceHealthServer and ProxierHealthServer.
+// httpServerFactory allows for testing of ServiceHealthServer and ProxyHealthServer.
 type httpServerFactory interface {
 	// New creates an instance of a type satisfying HTTPServer.  This is
 	// designed to include http.Server.
-	New(addr string, handler http.Handler) httpServer
+	New(handler http.Handler) httpServer
 }
 
-// httpServer allows for testing of ServiceHealthServer and ProxierHealthServer.
+// httpServer allows for testing of ServiceHealthServer and ProxyHealthServer.
 // It is designed so that http.Server satisfies this interface,
 type httpServer interface {
 	Serve(listener net.Listener) error
@@ -45,8 +48,8 @@ type httpServer interface {
 // Implement listener in terms of net.Listen.
 type stdNetListener struct{}
 
-func (stdNetListener) Listen(addr string) (net.Listener, error) {
-	return net.Listen("tcp", addr)
+func (stdNetListener) Listen(ctx context.Context, addrs ...string) (net.Listener, error) {
+	return netutils.MultiListen(ctx, "tcp", addrs...)
 }
 
 var _ listener = stdNetListener{}
@@ -54,9 +57,8 @@ var _ listener = stdNetListener{}
 // Implement httpServerFactory in terms of http.Server.
 type stdHTTPServerFactory struct{}
 
-func (stdHTTPServerFactory) New(addr string, handler http.Handler) httpServer {
+func (stdHTTPServerFactory) New(handler http.Handler) httpServer {
 	return &http.Server{
-		Addr:    addr,
 		Handler: handler,
 	}
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestGomegaFormatObject(t *testing.T) {
@@ -34,24 +35,21 @@ func TestGomegaFormatObject(t *testing.T) {
 		indentation uint
 	}{
 		"int":            {value: 1, expected: `<int>: 1`},
-		"string":         {value: "hello world", expected: `<string>: "hello world"`},
+		"string":         {value: "hello world", expected: `<string>: hello world`},
 		"struct":         {value: myStruct{a: 1, b: 2}, expected: `<format_test.myStruct>: {a: 1, b: 2}`},
 		"gomegastringer": {value: typeWithGomegaStringer(2), expected: `<format_test.typeWithGomegaStringer>: my stringer 2`},
 		"pod": {value: v1.Pod{}, expected: `<v1.Pod>: 
-    metadata:
-      creationTimestamp: null
+    metadata: {}
     spec:
       containers: null
     status: {}`},
 		"pod-indented": {value: v1.Pod{}, indentation: 1, expected: `    <v1.Pod>: 
-        metadata:
-          creationTimestamp: null
+        metadata: {}
         spec:
           containers: null
         status: {}`},
 		"pod-ptr": {value: &v1.Pod{}, expected: `<*v1.Pod | <hex>>: 
-    metadata:
-      creationTimestamp: null
+    metadata: {}
     spec:
       containers: null
     status: {}`},
@@ -60,6 +58,13 @@ func TestGomegaFormatObject(t *testing.T) {
 		"podlist": {value: v1.PodList{}, expected: `<v1.PodList>: 
     items: null
     metadata: {}`},
+		"unstructured": {value: func() any {
+			var obj unstructured.Unstructured
+			obj.SetName("some-name")
+			return &obj
+		}(), expected: `<*unstructured.Unstructured | <hex>>: 
+    metadata:
+      name: some-name`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			actual := format.Object(test.value, test.indentation)

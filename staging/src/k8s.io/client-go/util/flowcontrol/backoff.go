@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/utils/clock"
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 type backoffEntry struct {
@@ -32,7 +31,12 @@ type backoffEntry struct {
 
 type Backoff struct {
 	sync.RWMutex
-	Clock           clock.Clock
+	Clock clock.Clock
+	// HasExpiredFunc controls the logic that determines whether the backoff
+	// counter should be reset, and when to GC old backoff entries. If nil, the
+	// default hasExpired function will restart the backoff factor to the
+	// beginning after observing time has passed at least equal to 2*maxDuration
+	HasExpiredFunc  func(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool
 	defaultDuration time.Duration
 	maxDuration     time.Duration
 	perItemBackoff  map[string]*backoffEntry
@@ -44,7 +48,7 @@ type Backoff struct {
 	maxJitterFactor float64
 }
 
-func NewFakeBackOff(initial, max time.Duration, tc *testingclock.FakeClock) *Backoff {
+func NewFakeBackOff(initial, max time.Duration, tc clock.Clock) *Backoff {
 	return newBackoff(tc, initial, max, 0.0)
 }
 
@@ -52,7 +56,7 @@ func NewBackOff(initial, max time.Duration) *Backoff {
 	return NewBackOffWithJitter(initial, max, 0.0)
 }
 
-func NewFakeBackOffWithJitter(initial, max time.Duration, tc *testingclock.FakeClock, maxJitterFactor float64) *Backoff {
+func NewFakeBackOffWithJitter(initial, max time.Duration, tc clock.Clock, maxJitterFactor float64) *Backoff {
 	return newBackoff(tc, initial, max, maxJitterFactor)
 }
 
@@ -93,7 +97,7 @@ func (p *Backoff) Next(id string, eventTime time.Time) {
 	p.Lock()
 	defer p.Unlock()
 	entry, ok := p.perItemBackoff[id]
-	if !ok || hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
+	if !ok || p.hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
 		entry = p.initEntryUnsafe(id)
 		entry.backoff += p.jitter(entry.backoff)
 	} else {
@@ -119,7 +123,7 @@ func (p *Backoff) IsInBackOffSince(id string, eventTime time.Time) bool {
 	if !ok {
 		return false
 	}
-	if hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
+	if p.hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
 		return false
 	}
 	return p.Clock.Since(eventTime) < entry.backoff
@@ -133,21 +137,21 @@ func (p *Backoff) IsInBackOffSinceUpdate(id string, eventTime time.Time) bool {
 	if !ok {
 		return false
 	}
-	if hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
+	if p.hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
 		return false
 	}
 	return eventTime.Sub(entry.lastUpdate) < entry.backoff
 }
 
-// Garbage collect records that have aged past maxDuration. Backoff users are expected
-// to invoke this periodically.
+// Garbage collect records that have aged past their expiration, which defaults
+// to 2*maxDuration (see hasExpired godoc). Backoff users are expected to invoke
+// this periodically.
 func (p *Backoff) GC() {
 	p.Lock()
 	defer p.Unlock()
 	now := p.Clock.Now()
 	for id, entry := range p.perItemBackoff {
-		if now.Sub(entry.lastUpdate) > p.maxDuration*2 {
-			// GC when entry has not been updated for 2*maxDuration
+		if p.hasExpired(now, entry.lastUpdate, p.maxDuration) {
 			delete(p.perItemBackoff, id)
 		}
 	}
@@ -174,7 +178,10 @@ func (p *Backoff) jitter(delay time.Duration) time.Duration {
 	return time.Duration(p.rand.Float64() * p.maxJitterFactor * float64(delay))
 }
 
-// After 2*maxDuration we restart the backoff factor to the beginning
-func hasExpired(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
+// Unless an alternate function is provided, after 2*maxDuration we restart the backoff factor to the beginning
+func (p *Backoff) hasExpired(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
+	if p.HasExpiredFunc != nil {
+		return p.HasExpiredFunc(eventTime, lastUpdate, maxDuration)
+	}
 	return eventTime.Sub(lastUpdate) > maxDuration*2 // consider stable if it's ok for twice the maxDuration
 }

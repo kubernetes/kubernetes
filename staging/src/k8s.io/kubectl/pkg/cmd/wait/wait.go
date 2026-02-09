@@ -46,13 +46,13 @@ import (
 
 var (
 	waitLong = templates.LongDesc(i18n.T(`
-		Experimental: Wait for a specific condition on one or many resources.
+		Wait for a specific condition on one or many resources.
 
 		The command takes multiple resources and waits until the specified condition
 		is seen in the Status field of every given resource.
 
-		Alternatively, the command can wait for the given set of resources to be deleted
-		by providing the "delete" keyword as the value to the --for flag.
+		Alternatively, the command can wait for the given set of resources to be created or
+		deleted by providing the "create" or "delete" keyword as the value to the --for flag.
 
 		A successful message will be printed to stdout indicating when the specified
         condition has been met. You can use -o option to change to output destination.`))
@@ -70,8 +70,12 @@ var (
 		# Wait for pod "busybox1" to be Ready
 		kubectl wait --for='jsonpath={.status.conditions[?(@.type=="Ready")].status}=True' pod/busybox1
 
-		# Wait for the service "loadbalancer" to have ingress.
+		# Wait for the service "loadbalancer" to have ingress
 		kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/loadbalancer
+
+		# Wait for the secret "busybox1" to be created, with a timeout of 30s
+		kubectl create secret generic busybox1
+		kubectl wait --for=create secret/busybox1 --timeout=30s
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
 		kubectl delete pod/busybox1
@@ -119,8 +123,8 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available|--for=jsonpath='{}'[=value]]",
-		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources"),
+		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=create|--for=delete|--for condition=available|--for=jsonpath='{}'[=value]]",
+		Short:   i18n.T("Wait for a specific condition on one or many resources"),
 		Long:    waitLong,
 		Example: waitExample,
 
@@ -128,7 +132,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
-			cmdutil.CheckErr(o.RunWait())
+			cmdutil.CheckErr(o.RunWaitContext(cmd.Context()))
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
@@ -143,8 +147,8 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.PrintFlags.AddFlags(cmd)
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
-	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true.  Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
+	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up. Zero means check once and don't wait, negative means wait for a week.")
+	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [create|delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true. Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -195,8 +199,8 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	case lowercaseCond == "create":
 		return IsCreated, nil
 
-	case strings.HasPrefix(lowercaseCond, "condition="):
-		conditionName := lowercaseCond[len("condition="):]
+	case strings.HasPrefix(condition, "condition="):
+		conditionName := strings.TrimPrefix(condition, "condition=")
 		conditionValue := "true"
 		if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
 			conditionValue = conditionName[equalsIndex+1:]
@@ -209,8 +213,8 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 			errOut:          errOut,
 		}.IsConditionMet, nil
 
-	case strings.HasPrefix(lowercaseCond, "jsonpath="):
-		jsonPathInput := strings.TrimPrefix(lowercaseCond, "jsonpath=")
+	case strings.HasPrefix(condition, "jsonpath="):
+		jsonPathInput := strings.TrimPrefix(condition, "jsonpath=")
 		jsonPathExp, jsonPathValue, err := processJSONPathInput(jsonPathInput)
 		if err != nil {
 			return nil, err
@@ -313,11 +317,15 @@ type WaitOptions struct {
 // ConditionFunc is the interface for providing condition checks
 type ConditionFunc func(ctx context.Context, info *resource.Info, o *WaitOptions) (finalObject runtime.Object, done bool, err error)
 
-// RunWait runs the waiting logic
+// Deprecated: Use RunWaitContext instead, which allows canceling.
 func (o *WaitOptions) RunWait() error {
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-	defer cancel()
+	return o.RunWaitContext(context.Background())
+}
 
+// RunWaitContext runs the waiting logic
+func (o *WaitOptions) RunWaitContext(ctx context.Context) error {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, o.Timeout)
+	defer cancel()
 	if strings.ToLower(o.ForCondition) == "create" {
 		// TODO(soltysh): this is not ideal solution, because we're polling every .5s,
 		// and we have to use ResourceFinder, which contains the resource name.
@@ -325,7 +333,9 @@ func (o *WaitOptions) RunWait() error {
 		// or functions from ResourceBuilder for parsing those. Lastly, this poll
 		// should be replaced with a ListWatch cache.
 		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, o.Timeout, true, func(context.Context) (done bool, err error) {
+			foundResource := false
 			visitErr := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+				foundResource = true
 				return nil
 			})
 			if apierrors.IsNotFound(visitErr) {
@@ -334,10 +344,10 @@ func (o *WaitOptions) RunWait() error {
 			if visitErr != nil {
 				return false, visitErr
 			}
-			return true, nil
+			return foundResource, nil
 		}); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				return fmt.Errorf("%s", wait.ErrWaitTimeout.Error()) // nolint:staticcheck // SA1019
+				return fmt.Errorf("%s", wait.ErrorInterrupted(nil).Error()) // nolint:staticcheck // SA1019
 			}
 			return err
 		}
@@ -356,7 +366,7 @@ func (o *WaitOptions) RunWait() error {
 			return nil
 		}
 		if err == nil {
-			return fmt.Errorf("%v unsatisified for unknown reason", finalObject)
+			return fmt.Errorf("%v unsatisfied for unknown reason", finalObject)
 		}
 		return err
 	}

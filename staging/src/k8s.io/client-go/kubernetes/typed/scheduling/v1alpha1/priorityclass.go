@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	schedulingv1alpha1 "k8s.io/client-go/applyconfigurations/scheduling/v1alpha1"
+	applyconfigurationsschedulingv1alpha1 "k8s.io/client-go/applyconfigurations/scheduling/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type PriorityClassesGetter interface {
 
 // PriorityClassInterface has methods to work with PriorityClass resources.
 type PriorityClassInterface interface {
-	Create(ctx context.Context, priorityClass *v1alpha1.PriorityClass, opts v1.CreateOptions) (*v1alpha1.PriorityClass, error)
-	Update(ctx context.Context, priorityClass *v1alpha1.PriorityClass, opts v1.UpdateOptions) (*v1alpha1.PriorityClass, error)
+	Create(ctx context.Context, priorityClass *schedulingv1alpha1.PriorityClass, opts v1.CreateOptions) (*schedulingv1alpha1.PriorityClass, error)
+	Update(ctx context.Context, priorityClass *schedulingv1alpha1.PriorityClass, opts v1.UpdateOptions) (*schedulingv1alpha1.PriorityClass, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.PriorityClass, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.PriorityClassList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*schedulingv1alpha1.PriorityClass, error)
+	List(ctx context.Context, opts v1.ListOptions) (*schedulingv1alpha1.PriorityClassList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PriorityClass, err error)
-	Apply(ctx context.Context, priorityClass *schedulingv1alpha1.PriorityClassApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.PriorityClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *schedulingv1alpha1.PriorityClass, err error)
+	Apply(ctx context.Context, priorityClass *applyconfigurationsschedulingv1alpha1.PriorityClassApplyConfiguration, opts v1.ApplyOptions) (result *schedulingv1alpha1.PriorityClass, err error)
 	PriorityClassExpansion
 }
 
 // priorityClasses implements PriorityClassInterface
 type priorityClasses struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.PriorityClass, *v1alpha1.PriorityClassList, *schedulingv1alpha1.PriorityClassApplyConfiguration]
+	*gentype.ClientWithListAndApply[*schedulingv1alpha1.PriorityClass, *schedulingv1alpha1.PriorityClassList, *applyconfigurationsschedulingv1alpha1.PriorityClassApplyConfiguration]
 }
 
 // newPriorityClasses returns a PriorityClasses
 func newPriorityClasses(c *SchedulingV1alpha1Client) *priorityClasses {
 	return &priorityClasses{
-		gentype.NewClientWithListAndApply[*v1alpha1.PriorityClass, *v1alpha1.PriorityClassList, *schedulingv1alpha1.PriorityClassApplyConfiguration](
+		gentype.NewClientWithListAndApply[*schedulingv1alpha1.PriorityClass, *schedulingv1alpha1.PriorityClassList, *applyconfigurationsschedulingv1alpha1.PriorityClassApplyConfiguration](
 			"priorityclasses",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.PriorityClass { return &v1alpha1.PriorityClass{} },
-			func() *v1alpha1.PriorityClassList { return &v1alpha1.PriorityClassList{} }),
+			func() *schedulingv1alpha1.PriorityClass { return &schedulingv1alpha1.PriorityClass{} },
+			func() *schedulingv1alpha1.PriorityClassList { return &schedulingv1alpha1.PriorityClassList{} },
+			gentype.PrefersProtobuf[*schedulingv1alpha1.PriorityClass](),
+		),
 	}
 }

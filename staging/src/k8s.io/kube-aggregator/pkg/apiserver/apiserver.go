@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,8 +36,10 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/tracing"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
@@ -49,10 +52,15 @@ import (
 	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	openapiv3controller "k8s.io/kube-aggregator/pkg/controllers/openapiv3"
 	openapiv3aggregator "k8s.io/kube-aggregator/pkg/controllers/openapiv3/aggregator"
-	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
+	localavailability "k8s.io/kube-aggregator/pkg/controllers/status/local"
+	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
+	remoteavailability "k8s.io/kube-aggregator/pkg/controllers/status/remote"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
+
+// making sure we only register metrics once into legacy registry
+var registerIntoLegacyRegistryOnce sync.Once
 
 func init() {
 	// we need to add the options (like ListOptions) to empty v1
@@ -96,12 +104,15 @@ type ExtraConfig struct {
 
 	RejectForwardingRedirects bool
 
-	// DisableAvailableConditionController disables the controller that updates the Available conditions for
-	// APIServices, Endpoints and Services. This controller runs in kube-aggregator and can interfere with
-	// Generic Control Plane components when certain apis are not available.
-	// TODO: We should find a better way to handle this. For now it will be for Generic Control Plane authors to
-	// disable this controller if they see issues.
-	DisableAvailableConditionController bool
+	// DisableRemoteAvailableConditionController disables the controller that updates the Available conditions for
+	// remote APIServices via querying endpoints of the referenced services. In generic controlplane use-cases,
+	// the concept of services and endpoints might differ, and might require another implementation of this
+	// controller. Local APIService are reconciled nevertheless.
+	DisableRemoteAvailableConditionController bool
+
+	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
+	// that can not be served locally
+	PeerProxy utilpeerproxy.Interface
 }
 
 // Config represents the configuration needed to create an APIAggregator.
@@ -250,13 +261,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		tracerProvider:             c.GenericConfig.TracerProvider,
 	}
 
-	// used later  to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(s.GenericAPIServer.EffectiveVersion.EmulationVersion())
-	if err != nil {
-		return nil, err
-	}
-
-	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter, resourceExpirationEvaluator.ShouldServeForVersion(1, 22))
+	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter, false)
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
 	}
@@ -275,12 +280,17 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		discoveryGroup: discoveryGroup(enabledVersions),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
-		apisHandlerWithAggregationSupport := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager)
-		s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandlerWithAggregationSupport)
-	} else {
-		s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) && c.ExtraConfig.PeerProxy != nil {
+		s.GenericAPIServer.PeerAggregatedDiscoveryManager = aggregated.NewPeerAggregatedDiscoveryHandler(s.GenericAPIServer.APIServerID, s.GenericAPIServer.AggregatedDiscoveryGroupManager, c.ExtraConfig.PeerProxy, "apis")
+
+		// Register cache invalidation callback to the peer proxy handler
+		if s.GenericAPIServer.PeerAggregatedDiscoveryManager != nil {
+			c.ExtraConfig.PeerProxy.RegisterCacheInvalidationCallback(s.GenericAPIServer.PeerAggregatedDiscoveryManager.InvalidateCache)
+		}
 	}
+
+	apisHandlerWithAggregationSupport := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager, s.GenericAPIServer.PeerAggregatedDiscoveryManager)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandlerWithAggregationSupport)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
@@ -291,103 +301,113 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		}
 		// We are passing the context to ProxyCerts.RunOnce as it needs to implement RunOnce(ctx) however the
 		// context is not used at all. So passing a empty context shouldn't be a problem
-		ctx := context.TODO()
-		if err := aggregatorProxyCerts.RunOnce(ctx); err != nil {
+		if err := aggregatorProxyCerts.RunOnce(context.Background()); err != nil {
 			return nil, err
 		}
 		aggregatorProxyCerts.AddListener(apiserviceRegistrationController)
 		s.proxyCurrentCertKeyContent = aggregatorProxyCerts.CurrentCertKeyContent
 
 		s.GenericAPIServer.AddPostStartHookOrDie("aggregator-reload-proxy-client-cert", func(postStartHookContext genericapiserver.PostStartHookContext) error {
-			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
-			// TODO: See if we can pass ctx to the current method
-			ctx, cancel := context.WithCancel(context.Background())
-			go func() {
-				select {
-				case <-postStartHookContext.StopCh:
-					cancel() // stopCh closed, so cancel our context
-				case <-ctx.Done():
-				}
-			}()
-			go aggregatorProxyCerts.Run(ctx, 1)
+			go aggregatorProxyCerts.Run(postStartHookContext, 1)
 			return nil
 		})
 	}
 
-	// If the AvailableConditionController is disabled, we don't need to start the informers
-	// and the controller.
-	if !c.ExtraConfig.DisableAvailableConditionController {
-		availableController, err := statuscontrollers.NewAvailableConditionController(
+	s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
+		informerFactory.Start(context.Done())
+		c.GenericConfig.SharedInformerFactory.Start(context.Done())
+		return nil
+	})
+
+	// create shared (remote and local) availability metrics
+	// TODO: decouple from legacyregistry
+	metrics := availabilitymetrics.New()
+	registerIntoLegacyRegistryOnce.Do(func() { err = metrics.Register(legacyregistry.Register, legacyregistry.CustomRegister) })
+	if err != nil {
+		return nil, err
+	}
+
+	// always run local availability controller
+	local, err := localavailability.New(
+		informerFactory.Apiregistration().V1().APIServices(),
+		apiregistrationClient.ApiregistrationV1(),
+		metrics,
+	)
+	if err != nil {
+		return nil, err
+	}
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-local-available-controller", func(context genericapiserver.PostStartHookContext) error {
+		// if we end up blocking for long periods of time, we may need to increase workers.
+		go local.Run(5, context.Done())
+		return nil
+	})
+
+	// conditionally run remote availability controller. This could be replaced in certain
+	// generic controlplane use-cases where there is another concept of services and/or endpoints.
+	if !c.ExtraConfig.DisableRemoteAvailableConditionController {
+		remote, err := remoteavailability.New(
 			informerFactory.Apiregistration().V1().APIServices(),
 			c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
-			c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
+			c.GenericConfig.SharedInformerFactory.Discovery().V1().EndpointSlices(),
 			apiregistrationClient.ApiregistrationV1(),
 			proxyTransportDial,
 			(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
 			s.serviceResolver,
+			metrics,
 		)
 		if err != nil {
 			return nil, err
 		}
-
-		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
-			informerFactory.Start(context.Done())
-			c.GenericConfig.SharedInformerFactory.Start(context.Done())
-			return nil
-		})
-
-		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-remote-available-controller", func(context genericapiserver.PostStartHookContext) error {
 			// if we end up blocking for long periods of time, we may need to increase workers.
-			go availableController.Run(5, context.Done())
+			go remote.Run(5, context.Done())
 			return nil
 		})
 	}
 
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		go apiserviceRegistrationController.Run(context.StopCh, apiServiceRegistrationControllerInitiated)
+		go apiserviceRegistrationController.Run(context.Done(), apiServiceRegistrationControllerInitiated)
 		select {
-		case <-context.StopCh:
+		case <-context.Done():
 		case <-apiServiceRegistrationControllerInitiated:
 		}
 
 		return nil
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
-		s.discoveryAggregationController = NewDiscoveryManager(
-			// Use aggregator as the source name to avoid overwriting native/CRD
-			// groups
-			s.GenericAPIServer.AggregatedDiscoveryGroupManager.WithSource(aggregated.AggregatorSource),
-		)
+	s.discoveryAggregationController = NewDiscoveryManager(
+		// Use aggregator as the source name to avoid overwriting native/CRD
+		// groups
+		s.GenericAPIServer.AggregatedDiscoveryGroupManager.WithSource(aggregated.AggregatorSource),
+	)
 
-		// Setup discovery endpoint
-		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
-			// Discovery aggregation depends on the apiservice registration controller
-			// having the full list of APIServices already synced
-			select {
-			case <-context.StopCh:
-				return nil
-			// Context cancelled, should abort/clean goroutines
-			case <-apiServiceRegistrationControllerInitiated:
-			}
-
-			// Run discovery manager's worker to watch for new/removed/updated
-			// APIServices to the discovery document can be updated at runtime
-			// When discovery is ready, all APIServices will be present, with APIServices
-			// that have not successfully synced discovery to be present but marked as Stale.
-			discoverySyncedCh := make(chan struct{})
-			go s.discoveryAggregationController.Run(context.StopCh, discoverySyncedCh)
-
-			select {
-			case <-context.StopCh:
-				return nil
-			// Context cancelled, should abort/clean goroutines
-			case <-discoverySyncedCh:
-				// API services successfully sync
-			}
+	// Setup discovery endpoint
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
+		// Discovery aggregation depends on the apiservice registration controller
+		// having the full list of APIServices already synced
+		select {
+		case <-context.Done():
 			return nil
-		})
-	}
+		// Context cancelled, should abort/clean goroutines
+		case <-apiServiceRegistrationControllerInitiated:
+		}
+
+		// Run discovery manager's worker to watch for new/removed/updated
+		// APIServices to the discovery document can be updated at runtime
+		// When discovery is ready, all APIServices will be present, with APIServices
+		// that have not successfully synced discovery to be present but marked as Stale.
+		discoverySyncedCh := make(chan struct{})
+		go s.discoveryAggregationController.Run(context.Done(), discoverySyncedCh)
+
+		select {
+		case <-context.Done():
+			return nil
+		// Context cancelled, should abort/clean goroutines
+		case <-discoverySyncedCh:
+			// API services successfully sync
+		}
+		return nil
+	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
@@ -411,7 +431,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 					return false, err
 				}
 				return true, nil
-			}, hookContext.StopCh); err != nil {
+			}, hookContext.Done()); err != nil {
 				return fmt.Errorf("failed to wait for apiserver-identity lease %s to be created: %v",
 					s.GenericAPIServer.APIServerID, err)
 			}
@@ -427,14 +447,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 				// to register all built-in resources when the generic apiservers install APIs.
 				s.GenericAPIServer.StorageVersionManager.UpdateStorageVersions(hookContext.LoopbackClientConfig, s.GenericAPIServer.APIServerID)
 				return false, nil
-			}, hookContext.StopCh)
+			}, hookContext.Done())
 			// Once the storage version updater finishes the first round of update,
 			// the PostStartHook will return to unblock /healthz. The handler chain
 			// won't block write requests anymore. Check every second since it's not
 			// expensive.
 			wait.PollImmediateUntil(1*time.Second, func() (bool, error) {
 				return s.GenericAPIServer.StorageVersionManager.Completed(), nil
-			}, hookContext.StopCh)
+			}, hookContext.Done())
 			return nil
 		})
 	}
@@ -448,14 +468,14 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	// add post start hook before generic PrepareRun in order to be before /healthz installation
 	if s.openAPIConfig != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
-			go s.openAPIAggregationController.Run(context.StopCh)
+			go s.openAPIAggregationController.Run(context.Done())
 			return nil
 		})
 	}
 
 	if s.openAPIV3Config != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapiv3-controller", func(context genericapiserver.PostStartHookContext) error {
-			go s.openAPIV3AggregationController.Run(context.StopCh)
+			go s.openAPIV3AggregationController.Run(context.Done())
 			return nil
 		})
 	}

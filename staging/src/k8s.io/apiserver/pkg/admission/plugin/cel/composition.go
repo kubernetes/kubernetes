@@ -34,42 +34,102 @@ import (
 	"k8s.io/apiserver/pkg/cel/lazy"
 )
 
-const VariablesTypeName = "kubernetes.variables"
+const variablesTypeName = "kubernetes.variables"
 
+// CompositedCompiler compiles expressions with variable composition.
 type CompositedCompiler struct {
 	Compiler
-	FilterCompiler
+	ConditionCompiler
+	MutatingCompiler
 
-	CompositionEnv *CompositionEnv
+	state *compositionState
 }
 
-type CompositedFilter struct {
-	Filter
+// CompositedConditionEvaluator provides evaluation of a condition expression with variable composition.
+// The expressions must return a boolean.
+type CompositedConditionEvaluator struct {
+	ConditionEvaluator
 
-	compositionEnv *CompositionEnv
+	state *compositionState
+}
+
+// CompositedEvaluator provides evaluation of a single expression with variable composition.
+// The types that may returned by the expression is determined at compilation time.
+type CompositedEvaluator struct {
+	MutatingEvaluator
+
+	state *compositionState
 }
 
 func NewCompositedCompiler(envSet *environment.EnvSet) (*CompositedCompiler, error) {
-	compositionContext, err := NewCompositionEnv(VariablesTypeName, envSet)
+	newMapType := apiservercel.NewObjectType(variablesTypeName, map[string]*apiservercel.DeclField{})
+
+	newEnvSet, err := envSet.Extend(environment.VersionedOptions{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		EnvOptions: []cel.EnvOption{
+			cel.Variable("variables", newMapType.CelType()),
+		},
+		DeclTypes: []*apiservercel.DeclType{
+			newMapType,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
-	return NewCompositedCompilerFromTemplate(compositionContext), nil
+
+	state := &compositionState{
+		mapType:           newMapType,
+		EnvSet:            newEnvSet,
+		compiledVariables: map[string]CompilationResult{},
+	}
+
+	compiler := NewCompiler(state.EnvSet)
+	conditionCompiler := &conditionCompiler{compiler}
+	mutation := &mutatingCompiler{compiler}
+	return &CompositedCompiler{
+		Compiler:          compiler,
+		ConditionCompiler: conditionCompiler,
+		MutatingCompiler:  mutation,
+		state:             state,
+	}, nil
 }
 
-func NewCompositedCompilerFromTemplate(context *CompositionEnv) *CompositedCompiler {
-	context = &CompositionEnv{
-		MapType:           context.MapType,
-		EnvSet:            context.EnvSet,
-		CompiledVariables: map[string]CompilationResult{},
+// NewCompositedCompilerForTypeChecking creates a CompositedCompiler for type checking.
+// It initializes the composition state but leaves the Compilers nil, as they are expected
+// to be replaced by the caller (who is doing type checking).
+func NewCompositedCompilerForTypeChecking(envSet *environment.EnvSet) (*CompositedCompiler, error) {
+	newMapType := apiservercel.NewObjectType(variablesTypeName, map[string]*apiservercel.DeclField{})
+
+	newEnvSet, err := envSet.Extend(environment.VersionedOptions{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		EnvOptions: []cel.EnvOption{
+			cel.Variable("variables", newMapType.CelType()),
+		},
+		DeclTypes: []*apiservercel.DeclType{
+			newMapType,
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
-	compiler := NewCompiler(context.EnvSet)
-	filterCompiler := NewFilterCompiler(context.EnvSet)
+
+	state := &compositionState{
+		mapType:           newMapType,
+		EnvSet:            newEnvSet,
+		compiledVariables: map[string]CompilationResult{},
+	}
 	return &CompositedCompiler{
-		Compiler:       compiler,
-		FilterCompiler: filterCompiler,
-		CompositionEnv: context,
-	}
+		state: state,
+	}, nil
+}
+
+// Env returns the CEL environment for the given mode.
+func (c *CompositedCompiler) Env(mode environment.Type) (*cel.Env, error) {
+	return c.state.Env(mode)
+}
+
+func (c *CompositedCompiler) CreateContext(parent context.Context) CompositionContext {
+	return c.state.CreateContext(parent)
 }
 
 func (c *CompositedCompiler) CompileAndStoreVariables(variables []NamedExpressionAccessor, options OptionalVariableDeclarations, mode environment.Type) {
@@ -80,56 +140,43 @@ func (c *CompositedCompiler) CompileAndStoreVariables(variables []NamedExpressio
 
 func (c *CompositedCompiler) CompileAndStoreVariable(variable NamedExpressionAccessor, options OptionalVariableDeclarations, mode environment.Type) CompilationResult {
 	result := c.Compiler.CompileCELExpression(variable, options, mode)
-	c.CompositionEnv.AddField(variable.GetName(), result.OutputType)
-	c.CompositionEnv.CompiledVariables[variable.GetName()] = result
+	c.state.AddField(variable.GetName(), result.OutputType)
+	c.state.compiledVariables[variable.GetName()] = result
 	return result
 }
 
-func (c *CompositedCompiler) Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) Filter {
-	filter := c.FilterCompiler.Compile(expressions, optionalDecls, envType)
-	return &CompositedFilter{
-		Filter:         filter,
-		compositionEnv: c.CompositionEnv,
+func (c *CompositedCompiler) CompileCondition(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) ConditionEvaluator {
+	condition := c.ConditionCompiler.CompileCondition(expressions, optionalDecls, envType)
+	return &CompositedConditionEvaluator{
+		ConditionEvaluator: condition,
+		state:              c.state,
 	}
 }
 
-type CompositionEnv struct {
+// CompileEvaluator compiles an mutatingEvaluator for the given expression, options and environment.
+func (c *CompositedCompiler) CompileMutatingEvaluator(expression ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) MutatingEvaluator {
+	mutation := c.MutatingCompiler.CompileMutatingEvaluator(expression, optionalDecls, envType)
+	return &CompositedEvaluator{
+		MutatingEvaluator: mutation,
+		state:             c.state,
+	}
+}
+
+type compositionState struct {
 	*environment.EnvSet
 
-	MapType           *apiservercel.DeclType
-	CompiledVariables map[string]CompilationResult
+	mapType           *apiservercel.DeclType
+	compiledVariables map[string]CompilationResult
 }
 
-func (c *CompositionEnv) AddField(name string, celType *cel.Type) {
-	c.MapType.Fields[name] = apiservercel.NewDeclField(name, convertCelTypeToDeclType(celType), true, nil, nil)
+func (c *compositionState) AddField(name string, celType *cel.Type) {
+	c.mapType.Fields[name] = apiservercel.NewDeclField(name, convertCelTypeToDeclType(celType), true, nil, nil)
 }
 
-func NewCompositionEnv(typeName string, baseEnvSet *environment.EnvSet) (*CompositionEnv, error) {
-	declType := apiservercel.NewObjectType(typeName, map[string]*apiservercel.DeclField{})
-	envSet, err := baseEnvSet.Extend(environment.VersionedOptions{
-		// set to 1.0 because composition is one of the fundamental components
-		IntroducedVersion: version.MajorMinor(1, 0),
-		EnvOptions: []cel.EnvOption{
-			cel.Variable("variables", declType.CelType()),
-		},
-		DeclTypes: []*apiservercel.DeclType{
-			declType,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &CompositionEnv{
-		MapType:           declType,
-		EnvSet:            envSet,
-		CompiledVariables: map[string]CompilationResult{},
-	}, nil
-}
-
-func (c *CompositionEnv) CreateContext(parent context.Context) CompositionContext {
+func (c *compositionState) CreateContext(parent context.Context) CompositionContext {
 	return &compositionContext{
-		Context:        parent,
-		compositionEnv: c,
+		Context: parent,
+		state:   c,
 	}
 }
 
@@ -142,13 +189,13 @@ type CompositionContext interface {
 type compositionContext struct {
 	context.Context
 
-	compositionEnv  *CompositionEnv
+	state           *compositionState
 	accumulatedCost int64
 }
 
 func (c *compositionContext) Variables(activation any) ref.Val {
-	lazyMap := lazy.NewMapValue(c.compositionEnv.MapType)
-	for name, result := range c.compositionEnv.CompiledVariables {
+	lazyMap := lazy.NewMapValue(c.state.mapType)
+	for name, result := range c.state.compiledVariables {
 		accessor := &variableAccessor{
 			name:       name,
 			result:     result,
@@ -160,9 +207,9 @@ func (c *compositionContext) Variables(activation any) ref.Val {
 	return lazyMap
 }
 
-func (f *CompositedFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
-	ctx = f.compositionEnv.CreateContext(ctx)
-	return f.Filter.ForInput(ctx, versionedAttr, request, optionalVars, namespace, runtimeCELCostBudget)
+func (f *CompositedConditionEvaluator) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
+	ctx = f.state.CreateContext(ctx)
+	return f.ConditionEvaluator.ForInput(ctx, versionedAttr, request, optionalVars, namespace, runtimeCELCostBudget)
 }
 
 func (c *compositionContext) reportCost(cost int64) {

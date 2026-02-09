@@ -19,17 +19,49 @@ limitations under the License.
 package v1
 
 import (
-	apinetworkingv1 "k8s.io/api/networking/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // NetworkPolicySpecApplyConfiguration represents a declarative configuration of the NetworkPolicySpec type for use
 // with apply.
+//
+// NetworkPolicySpec provides the specification of a NetworkPolicy
 type NetworkPolicySpecApplyConfiguration struct {
-	PodSelector *v1.LabelSelectorApplyConfiguration          `json:"podSelector,omitempty"`
-	Ingress     []NetworkPolicyIngressRuleApplyConfiguration `json:"ingress,omitempty"`
-	Egress      []NetworkPolicyEgressRuleApplyConfiguration  `json:"egress,omitempty"`
-	PolicyTypes []apinetworkingv1.PolicyType                 `json:"policyTypes,omitempty"`
+	// podSelector selects the pods to which this NetworkPolicy object applies.
+	// The array of rules is applied to any pods selected by this field. An empty
+	// selector matches all pods in the policy's namespace.
+	// Multiple network policies can select the same set of pods. In this case,
+	// the ingress rules for each are combined additively.
+	// This field is optional. If it is not specified, it defaults to an empty selector.
+	PodSelector *metav1.LabelSelectorApplyConfiguration `json:"podSelector,omitempty"`
+	// ingress is a list of ingress rules to be applied to the selected pods.
+	// Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod
+	// (and cluster policy otherwise allows the traffic), OR if the traffic source is
+	// the pod's local node, OR if the traffic matches at least one ingress rule
+	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
+	// this field is empty then this NetworkPolicy does not allow any traffic (and serves
+	// solely to ensure that the pods it selects are isolated by default)
+	Ingress []NetworkPolicyIngressRuleApplyConfiguration `json:"ingress,omitempty"`
+	// egress is a list of egress rules to be applied to the selected pods. Outgoing traffic
+	// is allowed if there are no NetworkPolicies selecting the pod (and cluster policy
+	// otherwise allows the traffic), OR if the traffic matches at least one egress rule
+	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
+	// this field is empty then this NetworkPolicy limits all outgoing traffic (and serves
+	// solely to ensure that the pods it selects are isolated by default).
+	// This field is beta-level in 1.8
+	Egress []NetworkPolicyEgressRuleApplyConfiguration `json:"egress,omitempty"`
+	// policyTypes is a list of rule types that the NetworkPolicy relates to.
+	// Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"].
+	// If this field is not specified, it will default based on the existence of ingress or egress rules;
+	// policies that contain an egress section are assumed to affect egress, and all policies
+	// (whether or not they contain an ingress section) are assumed to affect ingress.
+	// If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ].
+	// Likewise, if you want to write a policy that specifies that no egress is allowed,
+	// you must specify a policyTypes value that include "Egress" (since such a policy would not include
+	// an egress section and would otherwise default to just [ "Ingress" ]).
+	// This field is beta-level in 1.8
+	PolicyTypes []networkingv1.PolicyType `json:"policyTypes,omitempty"`
 }
 
 // NetworkPolicySpecApplyConfiguration constructs a declarative configuration of the NetworkPolicySpec type for use with
@@ -41,7 +73,7 @@ func NetworkPolicySpec() *NetworkPolicySpecApplyConfiguration {
 // WithPodSelector sets the PodSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PodSelector field is set to the value of the last call.
-func (b *NetworkPolicySpecApplyConfiguration) WithPodSelector(value *v1.LabelSelectorApplyConfiguration) *NetworkPolicySpecApplyConfiguration {
+func (b *NetworkPolicySpecApplyConfiguration) WithPodSelector(value *metav1.LabelSelectorApplyConfiguration) *NetworkPolicySpecApplyConfiguration {
 	b.PodSelector = value
 	return b
 }
@@ -75,7 +107,7 @@ func (b *NetworkPolicySpecApplyConfiguration) WithEgress(values ...*NetworkPolic
 // WithPolicyTypes adds the given value to the PolicyTypes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the PolicyTypes field.
-func (b *NetworkPolicySpecApplyConfiguration) WithPolicyTypes(values ...apinetworkingv1.PolicyType) *NetworkPolicySpecApplyConfiguration {
+func (b *NetworkPolicySpecApplyConfiguration) WithPolicyTypes(values ...networkingv1.PolicyType) *NetworkPolicySpecApplyConfiguration {
 	for i := range values {
 		b.PolicyTypes = append(b.PolicyTypes, values[i])
 	}

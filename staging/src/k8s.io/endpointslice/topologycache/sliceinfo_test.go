@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	discovery "k8s.io/api/discovery/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func Test_getTotalReadyEndpoints(t *testing.T) {
@@ -93,14 +93,14 @@ func sliceWithNEndpoints(ready, unready int) *discovery.EndpointSlice {
 	for i := 0; i < ready; i++ {
 		endpoints[i] = discovery.Endpoint{
 			Addresses:  []string{fmt.Sprintf("10.1.2.%d", i)},
-			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 		}
 	}
 
 	for i := 0; i < unready; i++ {
 		endpoints[ready+i] = discovery.Endpoint{
 			Addresses:  []string{fmt.Sprintf("10.1.2.%d", ready+i)},
-			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+			Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
 		}
 	}
 

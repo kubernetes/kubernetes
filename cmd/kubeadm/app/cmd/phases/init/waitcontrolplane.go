@@ -19,42 +19,19 @@ package phases
 import (
 	"fmt"
 	"io"
-	"text/template"
 	"time"
 
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
-)
-
-var (
-	kubeletFailTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
-	Unfortunately, an error has occurred:
-		{{ .Error }}
-
-	This error is likely caused by:
-		- The kubelet is not running
-		- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-
-	If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
-		- 'systemctl status kubelet'
-		- 'journalctl -xeu kubelet'
-
-	Additionally, a control plane component may have crashed or exited when started by the container runtime.
-	To troubleshoot, list all containers using your preferred container runtimes CLI.
-	Here is one example how you may list all running Kubernetes containers by using crictl:
-		- 'crictl --runtime-endpoint {{ .Socket }} ps -a | grep kube | grep -v pause'
-		Once you have found the failing container, you can inspect its logs with:
-		- 'crictl --runtime-endpoint {{ .Socket }} logs CONTAINERID'
-	`)))
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 // NewWaitControlPlanePhase is a hidden phase that runs after the control-plane and etcd phases
@@ -62,10 +39,7 @@ func NewWaitControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "wait-control-plane",
 		Short: "Wait for the control plane to start",
-		// TODO: unhide this phase once WaitForAllControlPlaneComponents goes GA:
-		// https://github.com/kubernetes/kubeadm/issues/2907
-		Hidden: true,
-		Run:    runWaitControlPlanePhase,
+		Run:   runWaitControlPlanePhase,
 	}
 	return phase
 }
@@ -84,8 +58,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		}
 	}
 
-	// Both Wait* calls below use a /healthz endpoint, thus a client without permissions works fine
-	client, err := data.ClientWithoutBootstrap()
+	client, err := data.WaitControlPlaneClient()
 	if err != nil {
 		return errors.Wrap(err, "cannot obtain client without bootstrap")
 	}
@@ -99,19 +72,6 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		" from directory %q\n",
 		data.ManifestDir())
 
-	handleError := func(err error) error {
-		context := struct {
-			Error  string
-			Socket string
-		}{
-			Error:  fmt.Sprintf("%v", err),
-			Socket: data.Cfg().NodeRegistration.CRISocket,
-		}
-
-		kubeletFailTempl.Execute(data.OutputWriter(), context)
-		return errors.New("could not initialize a Kubernetes cluster")
-	}
-
 	waiter.SetTimeout(data.Cfg().Timeouts.KubeletHealthCheck.Duration)
 	kubeletConfig := data.Cfg().ClusterConfiguration.ComponentConfigs[componentconfigs.KubeletGroup].Get()
 	kubeletConfigTyped, ok := kubeletConfig.(*kubeletconfig.KubeletConfiguration)
@@ -119,17 +79,21 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.New("could not convert the KubeletConfiguration to a typed object")
 	}
 	if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
-		return handleError(err)
+		apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
+		return errors.Wrap(err, "failed while waiting for the kubelet to start")
 	}
 
+	var podMap map[string]*v1.Pod
 	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
-	if features.Enabled(data.Cfg().ClusterConfiguration.FeatureGates, features.WaitForAllControlPlaneComponents) {
-		err = waiter.WaitForControlPlaneComponents(&data.Cfg().ClusterConfiguration)
-	} else {
-		err = waiter.WaitForAPI()
+	podMap, err = staticpodutil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
+		constants.ControlPlaneComponents...)
+	if err == nil {
+		err = waiter.WaitForControlPlaneComponents(podMap,
+			data.Cfg().LocalAPIEndpoint.AdvertiseAddress)
 	}
 	if err != nil {
-		return handleError(err)
+		apiclient.PrintControlPlaneErrorHelpScreen(data.OutputWriter(), data.Cfg().NodeRegistration.CRISocket)
+		return errors.Wrap(err, "failed while waiting for the control plane to start")
 	}
 
 	return nil

@@ -23,21 +23,21 @@ package v1alpha1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	configv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
-	v1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	cloudproviderconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
+	configv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1alpha1.KubeControllerManagerConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_KubeControllerManagerConfiguration(obj.(*v1alpha1.KubeControllerManagerConfiguration))
+	scheme.AddTypeDefaultingFunc(&configv1alpha1.KubeControllerManagerConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_KubeControllerManagerConfiguration(obj.(*configv1alpha1.KubeControllerManagerConfiguration))
 	})
 	return nil
 }
 
-func SetObjectDefaults_KubeControllerManagerConfiguration(in *v1alpha1.KubeControllerManagerConfiguration) {
+func SetObjectDefaults_KubeControllerManagerConfiguration(in *configv1alpha1.KubeControllerManagerConfiguration) {
 	SetDefaults_KubeControllerManagerConfiguration(in)
-	configv1alpha1.SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
+	cloudproviderconfigv1alpha1.SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
 }

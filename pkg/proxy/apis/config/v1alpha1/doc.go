@@ -21,4 +21,4 @@ limitations under the License.
 // +k8s:defaulter-gen-input=k8s.io/kube-proxy/config/v1alpha1
 // +groupName=kubeproxy.config.k8s.io
 
-package v1alpha1 // import "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
+package v1alpha1

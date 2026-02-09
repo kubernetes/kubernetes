@@ -76,7 +76,7 @@ func (mutatingWebhookConfigurationStrategy) Validate(ctx context.Context, obj ru
 func (mutatingWebhookConfigurationStrategy) Canonicalize(obj runtime.Object) {
 }
 
-// AllowCreateOnUpdate is true for mutatingWebhookConfiguration; this means you may create one with a PUT request.
+// AllowCreateOnUpdate is false for mutatingWebhookConfiguration; this means you may not create one with a PUT request.
 func (mutatingWebhookConfigurationStrategy) AllowCreateOnUpdate() bool {
 	return false
 }

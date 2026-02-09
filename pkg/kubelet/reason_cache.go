@@ -18,10 +18,9 @@ package kubelet
 
 import (
 	"fmt"
-	"sync"
-
-	"github.com/golang/groupcache/lru"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/lru"
+
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -37,7 +36,6 @@ import (
 // TODO(random-liu): Use more reliable cache which could collect garbage of failed pod.
 // TODO(random-liu): Move reason cache to somewhere better.
 type ReasonCache struct {
-	lock  sync.Mutex
 	cache *lru.Cache
 }
 
@@ -63,8 +61,6 @@ func (c *ReasonCache) composeKey(uid types.UID, name string) string {
 
 // add adds error reason into the cache
 func (c *ReasonCache) add(uid types.UID, name string, reason error, message string) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	c.cache.Add(c.composeKey(uid, name), ReasonItem{reason, message})
 }
 
@@ -86,8 +82,6 @@ func (c *ReasonCache) Update(uid types.UID, result kubecontainer.PodSyncResult) 
 
 // Remove removes error reason from the cache
 func (c *ReasonCache) Remove(uid types.UID, name string) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	c.cache.Remove(c.composeKey(uid, name))
 }
 
@@ -95,8 +89,6 @@ func (c *ReasonCache) Remove(uid types.UID, name string) {
 // whether an error reason is found in the cache. If no error reason is found, empty string will
 // be returned for error reason and error message.
 func (c *ReasonCache) Get(uid types.UID, name string) (*ReasonItem, bool) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	value, ok := c.cache.Get(c.composeKey(uid, name))
 	if !ok {
 		return nil, false

@@ -19,18 +19,42 @@ limitations under the License.
 package v2
 
 import (
-	v2 "k8s.io/api/autoscaling/v2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 )
 
 // MetricStatusApplyConfiguration represents a declarative configuration of the MetricStatus type for use
 // with apply.
+//
+// MetricStatus describes the last-read state of a single metric.
 type MetricStatusApplyConfiguration struct {
-	Type              *v2.MetricSourceType                             `json:"type,omitempty"`
-	Object            *ObjectMetricStatusApplyConfiguration            `json:"object,omitempty"`
-	Pods              *PodsMetricStatusApplyConfiguration              `json:"pods,omitempty"`
-	Resource          *ResourceMetricStatusApplyConfiguration          `json:"resource,omitempty"`
+	// type is the type of metric source.  It will be one of "ContainerResource", "External",
+	// "Object", "Pods" or "Resource", each corresponds to a matching field in the object.
+	Type *autoscalingv2.MetricSourceType `json:"type,omitempty"`
+	// object refers to a metric describing a single kubernetes object
+	// (for example, hits-per-second on an Ingress object).
+	Object *ObjectMetricStatusApplyConfiguration `json:"object,omitempty"`
+	// pods refers to a metric describing each pod in the current scale target
+	// (for example, transactions-processed-per-second).  The values will be
+	// averaged together before being compared to the target value.
+	Pods *PodsMetricStatusApplyConfiguration `json:"pods,omitempty"`
+	// resource refers to a resource metric (such as those specified in
+	// requests and limits) known to Kubernetes describing each pod in the
+	// current scale target (e.g. CPU or memory). Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics using the "pods" source.
+	Resource *ResourceMetricStatusApplyConfiguration `json:"resource,omitempty"`
+	// container resource refers to a resource metric (such as those specified in
+	// requests and limits) known to Kubernetes describing a single container in each pod in the
+	// current scale target (e.g. CPU or memory). Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics using the "pods" source.
 	ContainerResource *ContainerResourceMetricStatusApplyConfiguration `json:"containerResource,omitempty"`
-	External          *ExternalMetricStatusApplyConfiguration          `json:"external,omitempty"`
+	// external refers to a global metric that is not associated
+	// with any Kubernetes object. It allows autoscaling based on information
+	// coming from components running outside of cluster
+	// (for example length of queue in cloud messaging service, or
+	// QPS from loadbalancer running outside of cluster).
+	External *ExternalMetricStatusApplyConfiguration `json:"external,omitempty"`
 }
 
 // MetricStatusApplyConfiguration constructs a declarative configuration of the MetricStatus type for use with
@@ -42,7 +66,7 @@ func MetricStatus() *MetricStatusApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *MetricStatusApplyConfiguration) WithType(value v2.MetricSourceType) *MetricStatusApplyConfiguration {
+func (b *MetricStatusApplyConfiguration) WithType(value autoscalingv2.MetricSourceType) *MetricStatusApplyConfiguration {
 	b.Type = &value
 	return b
 }

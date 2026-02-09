@@ -22,9 +22,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
@@ -36,17 +37,23 @@ type v1PodResourcesServer struct {
 	cpusProvider             CPUsProvider
 	memoryProvider           MemoryProvider
 	dynamicResourcesProvider DynamicResourcesProvider
+	useActivePods            bool
+	podresourcesv1.UnsafePodResourcesListerServer
 }
 
 // NewV1PodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider
 // with device information provided by the DevicesProvider
-func NewV1PodResourcesServer(providers PodResourcesProviders) podresourcesv1.PodResourcesListerServer {
+func NewV1PodResourcesServer(ctx context.Context, providers PodResourcesProviders) podresourcesv1.PodResourcesListerServer {
+	logger := klog.FromContext(ctx)
+	useActivePods := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesListUseActivePods)
+	logger.Info("podresources", "method", "list", "useActivePods", useActivePods)
 	return &v1PodResourcesServer{
 		podsProvider:             providers.Pods,
 		devicesProvider:          providers.Devices,
 		cpusProvider:             providers.Cpus,
 		memoryProvider:           providers.Memory,
 		dynamicResourcesProvider: providers.DynamicResources,
+		useActivePods:            useActivePods,
 	}
 }
 
@@ -55,7 +62,24 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsListCount.WithLabelValues("v1").Inc()
 
-	pods := p.podsProvider.GetPods()
+	var pods []*v1.Pod
+	if p.useActivePods {
+		// GetActivePods already filters out terminal pods, so no need for additional filtering.
+		pods = p.podsProvider.GetActivePods()
+	} else {
+		// GetPods may include terminal pods, so we filter them out ourselves.
+		allPods := p.podsProvider.GetPods()
+		pods = make([]*v1.Pod, 0, len(allPods))
+		for _, pod := range allPods {
+			// Skip terminal pods (Failed or Succeeded).
+			// Terminal pods should not appear in podresources as they no longer consume resources.
+			if podutil.IsPodTerminal(pod) {
+				continue
+			}
+			pods = append(pods, pod)
+		}
+	}
+
 	podResources := make([]*podresourcesv1.PodResources, len(pods))
 	p.devicesProvider.UpdateAllocatedDevices()
 
@@ -66,16 +90,13 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 			Containers: make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.Containers)),
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SidecarContainers) {
-			pRes.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
-
-			for _, container := range pod.Spec.InitContainers {
-				if !types.IsRestartableInitContainer(&container) {
-					continue
-				}
-
-				pRes.Containers = append(pRes.Containers, p.getContainerResources(pod, &container))
+		pRes.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
+		for _, container := range pod.Spec.InitContainers {
+			if !podutil.IsRestartableInitContainer(&container) {
+				continue
 			}
+
+			pRes.Containers = append(pRes.Containers, p.getContainerResources(pod, &container))
 		}
 
 		for _, container := range pod.Spec.Containers {
@@ -126,16 +147,13 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetP
 		Containers: make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.Containers)),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SidecarContainers) {
-		podResources.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
-
-		for _, container := range pod.Spec.InitContainers {
-			if !types.IsRestartableInitContainer(&container) {
-				continue
-			}
-
-			podResources.Containers = append(podResources.Containers, p.getContainerResources(pod, &container))
+	podResources.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
+	for _, container := range pod.Spec.InitContainers {
+		if !podutil.IsRestartableInitContainer(&container) {
+			continue
 		}
+
+		podResources.Containers = append(podResources.Containers, p.getContainerResources(pod, &container))
 	}
 
 	for _, container := range pod.Spec.Containers {

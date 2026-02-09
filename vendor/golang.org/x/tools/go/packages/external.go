@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -34,8 +35,8 @@ type DriverRequest struct {
 	// Tests specifies whether the patterns should also return test packages.
 	Tests bool `json:"tests"`
 
-	// Overlay maps file paths (relative to the driver's working directory) to the byte contents
-	// of overlay files.
+	// Overlay maps file paths (relative to the driver's working directory)
+	// to the contents of overlay files (see Config.Overlay).
 	Overlay map[string][]byte `json:"overlay"`
 }
 
@@ -79,17 +80,17 @@ type DriverResponse struct {
 
 // driver is the type for functions that query the build system for the
 // packages named by the patterns.
-type driver func(cfg *Config, patterns ...string) (*DriverResponse, error)
+type driver func(cfg *Config, patterns []string) (*DriverResponse, error)
 
 // findExternalDriver returns the file path of a tool that supplies
-// the build system package structure, or "" if not found."
+// the build system package structure, or "" if not found.
 // If GOPACKAGESDRIVER is set in the environment findExternalTool returns its
 // value, otherwise it searches for a binary named gopackagesdriver on the PATH.
 func findExternalDriver(cfg *Config) driver {
 	const toolPrefix = "GOPACKAGESDRIVER="
 	tool := ""
 	for _, env := range cfg.Env {
-		if val := strings.TrimPrefix(env, toolPrefix); val != env {
+		if val, ok := strings.CutPrefix(env, toolPrefix); ok {
 			tool = val
 		}
 	}
@@ -103,7 +104,7 @@ func findExternalDriver(cfg *Config) driver {
 			return nil
 		}
 	}
-	return func(cfg *Config, words ...string) (*DriverResponse, error) {
+	return func(cfg *Config, patterns []string) (*DriverResponse, error) {
 		req, err := json.Marshal(DriverRequest{
 			Mode:       cfg.Mode,
 			Env:        cfg.Env,
@@ -117,9 +118,21 @@ func findExternalDriver(cfg *Config) driver {
 
 		buf := new(bytes.Buffer)
 		stderr := new(bytes.Buffer)
-		cmd := exec.CommandContext(cfg.Context, tool, words...)
+		cmd := exec.CommandContext(cfg.Context, tool, patterns...)
 		cmd.Dir = cfg.Dir
-		cmd.Env = cfg.Env
+		// The cwd gets resolved to the real path. On Darwin, where
+		// /tmp is a symlink, this breaks anything that expects the
+		// working directory to keep the original path, including the
+		// go command when dealing with modules.
+		//
+		// os.Getwd stdlib has a special feature where if the
+		// cwd and the PWD are the same node then it trusts
+		// the PWD, so by setting it in the env for the child
+		// process we fix up all the paths returned by the go
+		// command.
+		//
+		// (See similar trick in Invocation.run in ../../internal/gocommand/invoke.go)
+		cmd.Env = append(slices.Clip(cfg.Env), "PWD="+cfg.Dir)
 		cmd.Stdin = bytes.NewReader(req)
 		cmd.Stdout = buf
 		cmd.Stderr = stderr

@@ -19,29 +19,26 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1beta1 "k8s.io/api/authentication/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	authenticationv1beta1 "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 )
 
-// FakeSelfSubjectReviews implements SelfSubjectReviewInterface
-type FakeSelfSubjectReviews struct {
+// fakeSelfSubjectReviews implements SelfSubjectReviewInterface
+type fakeSelfSubjectReviews struct {
+	*gentype.FakeClient[*v1beta1.SelfSubjectReview]
 	Fake *FakeAuthenticationV1beta1
 }
 
-var selfsubjectreviewsResource = v1beta1.SchemeGroupVersion.WithResource("selfsubjectreviews")
-
-var selfsubjectreviewsKind = v1beta1.SchemeGroupVersion.WithKind("SelfSubjectReview")
-
-// Create takes the representation of a selfSubjectReview and creates it.  Returns the server's representation of the selfSubjectReview, and an error, if there is any.
-func (c *FakeSelfSubjectReviews) Create(ctx context.Context, selfSubjectReview *v1beta1.SelfSubjectReview, opts v1.CreateOptions) (result *v1beta1.SelfSubjectReview, err error) {
-	emptyResult := &v1beta1.SelfSubjectReview{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(selfsubjectreviewsResource, selfSubjectReview, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeSelfSubjectReviews(fake *FakeAuthenticationV1beta1) authenticationv1beta1.SelfSubjectReviewInterface {
+	return &fakeSelfSubjectReviews{
+		gentype.NewFakeClient[*v1beta1.SelfSubjectReview](
+			fake.Fake,
+			"",
+			v1beta1.SchemeGroupVersion.WithResource("selfsubjectreviews"),
+			v1beta1.SchemeGroupVersion.WithKind("SelfSubjectReview"),
+			func() *v1beta1.SelfSubjectReview { return &v1beta1.SelfSubjectReview{} },
+		),
+		fake,
 	}
-	return obj.(*v1beta1.SelfSubjectReview), err
 }

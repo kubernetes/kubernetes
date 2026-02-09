@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //go:build linux
-// +build linux
 
 package netutil
 
@@ -22,15 +21,17 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
-	"sort"
+	"slices"
 	"syscall"
 
 	"go.etcd.io/etcd/pkg/v3/cpuutil"
 )
 
-var errNoDefaultRoute = fmt.Errorf("could not find default route")
-var errNoDefaultHost = fmt.Errorf("could not find default host")
-var errNoDefaultInterface = fmt.Errorf("could not find default interface")
+var (
+	errNoDefaultRoute     = fmt.Errorf("could not find default route")
+	errNoDefaultHost      = fmt.Errorf("could not find default host")
+	errNoDefaultInterface = fmt.Errorf("could not find default interface")
+)
 
 // GetDefaultHost obtains the first IP address of machine from the routing table and returns the IP address as string.
 // An IPv4 address is preferred to an IPv6 address for backward compatibility.
@@ -49,14 +50,13 @@ func GetDefaultHost() (string, error) {
 	}
 
 	// sort so choice is deterministic
-	var families []int
+	var families []uint8
 	for family := range rmsgs {
-		families = append(families, int(family))
+		families = append(families, family)
 	}
-	sort.Ints(families)
+	slices.Sort(families)
 
-	for _, f := range families {
-		family := uint8(f)
+	for _, family := range families {
 		if host, err := chooseHost(family, rmsgs[family]); host != "" || err != nil {
 			return host, err
 		}
@@ -154,7 +154,6 @@ func getIfaceAddr(idx uint32, family uint8) (*syscall.NetlinkMessage, error) {
 	}
 
 	return nil, fmt.Errorf("could not find address for interface index %v", idx)
-
 }
 
 // Used to get a name of interface.

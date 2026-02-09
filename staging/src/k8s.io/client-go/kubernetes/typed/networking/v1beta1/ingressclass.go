@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	networkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
+	applyconfigurationsnetworkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type IngressClassesGetter interface {
 
 // IngressClassInterface has methods to work with IngressClass resources.
 type IngressClassInterface interface {
-	Create(ctx context.Context, ingressClass *v1beta1.IngressClass, opts v1.CreateOptions) (*v1beta1.IngressClass, error)
-	Update(ctx context.Context, ingressClass *v1beta1.IngressClass, opts v1.UpdateOptions) (*v1beta1.IngressClass, error)
+	Create(ctx context.Context, ingressClass *networkingv1beta1.IngressClass, opts v1.CreateOptions) (*networkingv1beta1.IngressClass, error)
+	Update(ctx context.Context, ingressClass *networkingv1beta1.IngressClass, opts v1.UpdateOptions) (*networkingv1beta1.IngressClass, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.IngressClass, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.IngressClassList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*networkingv1beta1.IngressClass, error)
+	List(ctx context.Context, opts v1.ListOptions) (*networkingv1beta1.IngressClassList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.IngressClass, err error)
-	Apply(ctx context.Context, ingressClass *networkingv1beta1.IngressClassApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.IngressClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *networkingv1beta1.IngressClass, err error)
+	Apply(ctx context.Context, ingressClass *applyconfigurationsnetworkingv1beta1.IngressClassApplyConfiguration, opts v1.ApplyOptions) (result *networkingv1beta1.IngressClass, err error)
 	IngressClassExpansion
 }
 
 // ingressClasses implements IngressClassInterface
 type ingressClasses struct {
-	*gentype.ClientWithListAndApply[*v1beta1.IngressClass, *v1beta1.IngressClassList, *networkingv1beta1.IngressClassApplyConfiguration]
+	*gentype.ClientWithListAndApply[*networkingv1beta1.IngressClass, *networkingv1beta1.IngressClassList, *applyconfigurationsnetworkingv1beta1.IngressClassApplyConfiguration]
 }
 
 // newIngressClasses returns a IngressClasses
 func newIngressClasses(c *NetworkingV1beta1Client) *ingressClasses {
 	return &ingressClasses{
-		gentype.NewClientWithListAndApply[*v1beta1.IngressClass, *v1beta1.IngressClassList, *networkingv1beta1.IngressClassApplyConfiguration](
+		gentype.NewClientWithListAndApply[*networkingv1beta1.IngressClass, *networkingv1beta1.IngressClassList, *applyconfigurationsnetworkingv1beta1.IngressClassApplyConfiguration](
 			"ingressclasses",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1beta1.IngressClass { return &v1beta1.IngressClass{} },
-			func() *v1beta1.IngressClassList { return &v1beta1.IngressClassList{} }),
+			func() *networkingv1beta1.IngressClass { return &networkingv1beta1.IngressClass{} },
+			func() *networkingv1beta1.IngressClassList { return &networkingv1beta1.IngressClassList{} },
+			gentype.PrefersProtobuf[*networkingv1beta1.IngressClass](),
+		),
 	}
 }

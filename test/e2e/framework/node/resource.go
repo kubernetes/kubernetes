@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net"
 	"strings"
 	"time"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
+	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/test/e2e/framework"
 	netutil "k8s.io/utils/net"
 )
@@ -128,7 +130,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					}
 					if !silent {
-						framework.Logf(msg)
+						framework.Logf("%s", msg)
 					}
 					return false
 				}
@@ -325,12 +327,13 @@ func GetPublicIps(ctx context.Context, c clientset.Interface) ([]string, error) 
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
 // If there are no nodes that are both ready and schedulable, this will return an error.
 func GetReadySchedulableNodes(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
+	logger := klog.FromContext(ctx)
 	nodes, err = checkWaitListSchedulableNodes(ctx, c)
 	if err != nil {
 		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
-		return IsNodeSchedulable(&node) && isNodeUntainted(&node)
+		return IsNodeSchedulable(logger, &node) && isNodeUntainted(logger, &node)
 	})
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
@@ -374,25 +377,26 @@ func GetRandomReadySchedulableNode(ctx context.Context, c clientset.Interface) (
 // E.g. in tests related to nodes with gpu we care about nodes despite
 // presence of nvidia.com/gpu=present:NoSchedule taint
 func GetReadyNodesIncludingTainted(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
+	logger := klog.FromContext(ctx)
 	nodes, err = checkWaitListSchedulableNodes(ctx, c)
 	if err != nil {
 		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
-		return IsNodeSchedulable(&node)
+		return IsNodeSchedulable(logger, &node)
 	})
 	return nodes, nil
 }
 
 // isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
 // TODO: need to discuss wether to return bool and error type
-func isNodeUntainted(node *v1.Node) bool {
-	return isNodeUntaintedWithNonblocking(node, "")
+func isNodeUntainted(logger klog.Logger, node *v1.Node) bool {
+	return isNodeUntaintedWithNonblocking(logger, node, "")
 }
 
 // isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
 // but allows for taints in the list of non-blocking taints.
-func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
+func isNodeUntaintedWithNonblocking(logger klog.Logger, node *v1.Node, nonblockingTaints string) bool {
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}
 	for _, t := range strings.Split(nonblockingTaints, ",") {
@@ -413,10 +417,10 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		n = nodeCopy
 	}
 
-	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, nil)
+	return toleratesTaintsWithNoScheduleNoExecuteEffects(logger, n.Spec.Taints, nil)
 }
 
-func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {
+func toleratesTaintsWithNoScheduleNoExecuteEffects(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration) bool {
 	filteredTaints := []v1.Taint{}
 	for _, taint := range taints {
 		if taint.Effect == v1.TaintEffectNoExecute || taint.Effect == v1.TaintEffectNoSchedule {
@@ -426,7 +430,8 @@ func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, toleration
 
 	toleratesTaint := func(taint v1.Taint) bool {
 		for _, toleration := range tolerations {
-			if toleration.ToleratesTaint(&taint) {
+			//	TaintTolerationComparisonOperators feature gate will be false for e2e since the feature is in Alpha.
+			if toleration.ToleratesTaint(logger, &taint, false) {
 				return true
 			}
 		}
@@ -446,17 +451,18 @@ func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, toleration
 // IsNodeSchedulable returns true if:
 // 1) doesn't have "unschedulable" field set
 // 2) it also returns true from IsNodeReady
-func IsNodeSchedulable(node *v1.Node) bool {
+func IsNodeSchedulable(logger klog.Logger, node *v1.Node) bool {
 	if node == nil {
 		return false
 	}
-	return !node.Spec.Unschedulable && IsNodeReady(node)
+
+	return !node.Spec.Unschedulable && IsNodeReady(logger, node)
 }
 
 // IsNodeReady returns true if:
 // 1) it's Ready condition is set to true
 // 2) doesn't have NetworkUnavailable condition set to true
-func IsNodeReady(node *v1.Node) bool {
+func IsNodeReady(logger klog.Logger, node *v1.Node) bool {
 	nodeReady := IsConditionSetAsExpected(node, v1.NodeReady, true)
 	networkReady := isConditionUnset(node, v1.NodeNetworkUnavailable) ||
 		IsConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
@@ -467,8 +473,8 @@ func IsNodeReady(node *v1.Node) bool {
 // 1) doesn't have "unschedulable" field set
 // 2) it also returns true from IsNodeReady
 // 3) it also returns true from isNodeUntainted
-func isNodeSchedulableWithoutTaints(node *v1.Node) bool {
-	return IsNodeSchedulable(node) && isNodeUntainted(node)
+func isNodeSchedulableWithoutTaints(logger klog.Logger, node *v1.Node) bool {
+	return IsNodeSchedulable(logger, node) && isNodeUntainted(logger, node)
 }
 
 // hasNonblockingTaint returns true if the node contains at least
@@ -495,6 +501,59 @@ func hasNonblockingTaint(node *v1.Node, nonblockingTaints string) bool {
 	return false
 }
 
+// GetNodeAllocatableAndAvailableQuantities with resourceName set to v1.ResourceCPU ( or set to v1.ResourceMemory ) returns
+//   - the first return value, upon success is the allocatable portion of a node's total "CPU" ( or "Memory" ) capacity that's available for pods to use,
+//     calculated by subtracting "CPU" ( or "Memory") resources reserved for node's operating system, Kubelet and other
+//     system daemons from the node's total "CPU" ( or "Memory" ) resource, upon failure is empty.
+//   - the second return value, upon success is the available portion of a node's allocatable "CPU" capacity, calculated by subtracting "CPU"
+//     ( or "Memory" ) resource reserved for node's pods from the node's allocatable "CPU" ( or "Memory" ) resource, upon failure is empty.
+//   - the third return value, upon success is nil, upon failure is the coresponding error.
+func GetNodeAllocatableAndAvailableQuantities(ctx context.Context, c clientset.Interface, n *v1.Node, resourceName v1.ResourceName) (resource.Quantity, resource.Quantity, error) {
+	var nodeAllocatable, podAllocated, nodeAvailable resource.Quantity
+	switch resourceName {
+	case v1.ResourceCPU:
+		nodeAllocatable = n.Status.Allocatable.Cpu().DeepCopy()
+	case v1.ResourceMemory:
+		nodeAllocatable = n.Status.Allocatable.Memory().DeepCopy()
+	default:
+		return resource.Quantity{}, resource.Quantity{}, fmt.Errorf("unexpected resource type %q; expected either 'CPU' or 'Memory'", resourceName)
+	}
+
+	if n.Status.Allocatable == nil {
+		return resource.Quantity{}, resource.Quantity{}, fmt.Errorf("unexpected empty value of allocatable, while attempting to get node's allocatable %s", resourceName.String())
+	}
+
+	// Exclude pods that are in the Succeeded or Failed states
+	selector := fmt.Sprintf("spec.nodeName=%s,status.phase!=%v,status.phase!=%v", n.Name, v1.PodSucceeded, v1.PodFailed)
+	listOptions := metav1.ListOptions{FieldSelector: selector}
+	podList, err := c.CoreV1().Pods(metav1.NamespaceAll).List(ctx, listOptions)
+	if err != nil {
+		return resource.Quantity{}, resource.Quantity{}, fmt.Errorf("error getting list of pods: %w, while attempting to get node's allocatable %s", err, resourceName.String())
+	}
+
+	for _, pod := range podList.Items {
+		podRequest := resourceapi.GetResourceRequestQuantity(&pod, resourceName)
+		podAllocated.Add(podRequest)
+	}
+	nodeAvailable = nodeAllocatable.DeepCopy()
+	nodeAvailable.Sub(podAllocated)
+	if nodeAvailable.Sign() < 0 {
+		return resource.Quantity{}, resource.Quantity{}, fmt.Errorf("unexpected negative value of nodeAvailable %s, while attempting to get node's allocatable and available %s", nodeAvailable.String(), resourceName.String())
+	}
+
+	return nodeAllocatable, nodeAvailable, nil
+}
+
+// GetNodeHeartbeatTime returns the timestamp of the last status update of the node.
+func GetNodeHeartbeatTime(node *v1.Node) metav1.Time {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == v1.NodeReady {
+			return condition.LastHeartbeatTime
+		}
+	}
+	return metav1.Time{}
+}
+
 // PodNodePairs return podNode pairs for all pods in a namespace
 func PodNodePairs(ctx context.Context, c clientset.Interface, ns string) ([]PodNode, error) {
 	var result []PodNode
@@ -518,7 +577,7 @@ func PodNodePairs(ctx context.Context, c clientset.Interface, ns string) ([]PodN
 func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
 	nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %w", err)
+		return nil, fmt.Errorf("error getting nodes while attempting to list cluster zones: %w", err)
 	}
 
 	// collect values of zone label from all nodes
@@ -822,6 +881,6 @@ func verifyThatTaintIsGone(ctx context.Context, c clientset.Interface, nodeName 
 	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
 	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
 	if taintExists(nodeUpdated.Spec.Taints, taint) {
-		framework.Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
+		framework.Fail("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }

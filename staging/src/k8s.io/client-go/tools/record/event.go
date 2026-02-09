@@ -334,7 +334,7 @@ func recordEvent(ctx context.Context, sink EventSink, event *v1.Event, patch []b
 		newEvent, err = sink.Patch(event, patch)
 	}
 	// Update can fail because the event may have been removed and it no longer exists.
-	if !updateExistingEvent || (updateExistingEvent && util.IsKeyNotFoundError(err)) {
+	if !updateExistingEvent || util.IsKeyNotFoundError(err) {
 		// Making sure that ResourceVersion is empty on creation
 		event.ResourceVersion = ""
 		newEvent, err = sink.Create(event)
@@ -489,7 +489,7 @@ func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, annotations map
 	}
 	return &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
+			Name:        util.GenerateEventName(ref.Name, t.UnixNano()),
 			Namespace:   namespace,
 			Annotations: annotations,
 		},

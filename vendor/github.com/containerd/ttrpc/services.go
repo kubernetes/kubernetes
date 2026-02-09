@@ -140,7 +140,11 @@ func (s *serviceSet) handle(ctx context.Context, req *Request, respond func(*sta
 			respond(st, p, stream.StreamingServer, true)
 		}()
 
-		if req.Payload != nil {
+		// Empty proto messages serialized to 0 payloads,
+		// so signatures like: rpc Stream(google.protobuf.Empty) returns (stream Data);
+		// don't get invoked here, which causes hang on client side.
+		// See https://github.com/containerd/ttrpc/issues/126
+		if req.Payload != nil || !info.StreamingClient {
 			unmarshal := func(obj interface{}) error {
 				return protoUnmarshal(req.Payload, obj)
 			}

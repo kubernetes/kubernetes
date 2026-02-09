@@ -18,6 +18,8 @@ limitations under the License.
 package cadvisor
 
 import (
+	"context"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 )
@@ -32,14 +34,14 @@ type Interface interface {
 	VersionInfo() (*cadvisorapi.VersionInfo, error)
 
 	// Returns usage information about the filesystem holding container images.
-	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
+	ImagesFsInfo(context.Context) (cadvisorapiv2.FsInfo, error)
 
 	// Returns usage information about the root filesystem.
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 
 	// Returns usage information about the writeable layer.
 	// KEP 4191 can separate the image filesystem
-	ContainerFsInfo() (cadvisorapiv2.FsInfo, error)
+	ContainerFsInfo(context.Context) (cadvisorapiv2.FsInfo, error)
 
 	// Get filesystem information for the filesystem that contains the given file.
 	GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error)

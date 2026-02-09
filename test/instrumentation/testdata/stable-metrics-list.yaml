@@ -1,3 +1,55 @@
+- name: automatic_reload_last_timestamp_seconds
+  subsystem: authentication_config_controller
+  namespace: apiserver
+  help: Timestamp of the last automatic reload of authentication configuration split
+    by status and apiserver identity.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
+- name: automatic_reloads_total
+  subsystem: authentication_config_controller
+  namespace: apiserver
+  help: Total number of automatic reloads of authentication configuration split by
+    status and apiserver identity.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
+- name: automatic_reload_last_timestamp_seconds
+  subsystem: authorization_config_controller
+  namespace: apiserver
+  help: Timestamp of the last automatic reload of authorization configuration split
+    by status and apiserver identity.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
+- name: automatic_reloads_total
+  subsystem: authorization_config_controller
+  namespace: apiserver
+  help: Total number of automatic reloads of authorization configuration split by
+    status and apiserver identity.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
+- name: compilation_duration_seconds
+  subsystem: cel
+  namespace: apiserver
+  help: CEL compilation time in seconds.
+  type: Histogram
+  stabilityLevel: BETA
+- name: evaluation_duration_seconds
+  subsystem: cel
+  namespace: apiserver
+  help: CEL evaluation time in seconds.
+  type: Histogram
+  stabilityLevel: BETA
 - name: current_executing_requests
   subsystem: flowcontrol
   namespace: apiserver
@@ -80,12 +132,99 @@
   - 10
   - 15
   - 30
+- name: check_duration_seconds
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission latency for individual validation expressions in seconds,
+    labeled by policy and further including binding and enforcement action taken.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - enforcement_action
+  - error_type
+  - policy
+  - policy_binding
+  buckets:
+  - 5e-07
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+- name: check_total
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission policy check total, labeled by policy and further identified
+    by binding and enforcement action taken.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - enforcement_action
+  - error_type
+  - policy
+  - policy_binding
+- name: declarative_validation_mismatch_total
+  subsystem: validation
+  namespace: apiserver
+  help: Number of times declarative validation results differed from handwritten validation
+    results for core types.
+  type: Counter
+  stabilityLevel: BETA
+- name: declarative_validation_panic_total
+  subsystem: validation
+  namespace: apiserver
+  help: Number of times declarative validation has panicked during validation.
+  type: Counter
+  stabilityLevel: BETA
+- name: watch_list_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution in seconds for watch list requests broken by
+    group, version, resource and scope.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - scope
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 2
+  - 4
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter
   stabilityLevel: BETA
 - name: hidden_metrics_total
   help: The count of hidden metrics.
+  type: Counter
+  stabilityLevel: BETA
+- name: image_volume_mounted_errors_total
+  subsystem: kubelet
+  help: Number of failed image volume mounts.
+  type: Counter
+  stabilityLevel: BETA
+- name: image_volume_mounted_succeed_total
+  subsystem: kubelet
+  help: Number of successful image volume mounts.
+  type: Counter
+  stabilityLevel: BETA
+- name: image_volume_requested_total
+  subsystem: kubelet
+  help: Number of requested image volumes.
   type: Counter
   stabilityLevel: BETA
 - name: feature_enabled
@@ -96,6 +235,19 @@
   labels:
   - name
   - stage
+- name: probe_total
+  subsystem: prober
+  help: Cumulative number of a liveness, readiness or startup probe for a container
+    by result.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - container
+  - namespace
+  - pod
+  - pod_uid
+  - probe_type
+  - result
 - name: registered_metrics_total
   help: The count of registered metrics broken by stability level and deprecation
     version.
@@ -133,6 +285,79 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: adds_total
+  subsystem: workqueue
+  help: Total number of adds handled by workqueue
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: depth
+  subsystem: workqueue
+  help: Current depth of workqueue
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: longest_running_processor_seconds
+  subsystem: workqueue
+  help: How many seconds has the longest running processor for workqueue been running.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: queue_duration_seconds
+  subsystem: workqueue
+  help: How long in seconds an item stays in workqueue before being requested.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  buckets:
+  - 1e-08
+  - 1e-07
+  - 1e-06
+  - 9.999999999999999e-06
+  - 9.999999999999999e-05
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+  - 10
+- name: retries_total
+  subsystem: workqueue
+  help: Total number of retries handled by workqueue
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: unfinished_work_seconds
+  subsystem: workqueue
+  help: How many seconds of work has done that is in progress and hasn't been observed
+    by work_duration. Large values indicate stuck threads. One can deduce the number
+    of stuck threads by observing the rate at which this increases.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: work_duration_seconds
+  subsystem: workqueue
+  help: How long in seconds processing an item from workqueue takes.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  buckets:
+  - 1e-08
+  - 1e-07
+  - 1e-06
+  - 9.999999999999999e-06
+  - 9.999999999999999e-05
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+  - 10
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver
@@ -303,9 +528,11 @@
   - 1e+08
   - 1e+09
 - name: apiserver_storage_objects
-  help: Number of stored objects at the time of last check split by kind. In case
-    of a fetching error, the value will be -1.
+  help: '[DEPRECATED, consider using apiserver_resource_objects instead] Number of
+    stored objects at the time of last check split by kind. In case of a fetching
+    error, the value will be -1.'
   type: Gauge
+  deprecatedVersion: 1.34.0
   stabilityLevel: STABLE
   labels:
   - resource
@@ -530,36 +757,6 @@
   - 4
   - 8
   - 16
-- name: pod_scheduling_duration_seconds
-  subsystem: scheduler
-  help: E2e latency for a pod being scheduled which may include multiple scheduling
-    attempts.
-  type: Histogram
-  deprecatedVersion: 1.29.0
-  stabilityLevel: STABLE
-  labels:
-  - attempts
-  buckets:
-  - 0.01
-  - 0.02
-  - 0.04
-  - 0.08
-  - 0.16
-  - 0.32
-  - 0.64
-  - 1.28
-  - 2.56
-  - 5.12
-  - 10.24
-  - 20.48
-  - 40.96
-  - 81.92
-  - 163.84
-  - 327.68
-  - 655.36
-  - 1310.72
-  - 2621.44
-  - 5242.88
 - name: preemption_attempts_total
   subsystem: scheduler
   help: Total preemption attempts in the cluster till now

@@ -17,8 +17,9 @@ limitations under the License.
 package config
 
 import (
-	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,18 +28,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/utils/ptr"
 )
 
-func noDefault(*core.Pod) error { return nil }
+func noDefault(klog.Logger, *core.Pod) error { return nil }
 
 func TestDecodeSinglePod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
@@ -79,7 +86,7 @@ func TestDecodeSinglePod(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	parsed, podOut, err := tryDecodeSinglePod(json, noDefault)
+	parsed, podOut, err := tryDecodeSinglePod(logger, json, noDefault)
 	if !parsed {
 		t.Errorf("expected to have parsed file: (%s)", string(json))
 	}
@@ -97,7 +104,7 @@ func TestDecodeSinglePod(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		parsed, podOut, err = tryDecodeSinglePod(yaml, noDefault)
+		parsed, podOut, err = tryDecodeSinglePod(logger, yaml, noDefault)
 		if !parsed {
 			t.Errorf("expected to have parsed file: (%s)", string(yaml))
 		}
@@ -111,6 +118,7 @@ func TestDecodeSinglePod(t *testing.T) {
 }
 
 func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
@@ -174,13 +182,110 @@ func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	_, _, err = tryDecodeSinglePod(json, noDefault)
-	if !errors.Is(err, ErrStaticPodTriedToUseClusterTrustBundle) {
-		t.Errorf("Got error %q, want %q", err, ErrStaticPodTriedToUseClusterTrustBundle)
+	_, _, err = tryDecodeSinglePod(logger, json, noDefault)
+	if !strings.Contains(err.Error(), "may not reference clustertrustbundles") {
+		t.Errorf("Got error %q, want %q", err, fmt.Errorf("static pods may not reference clustertrustbundles API objects"))
+	}
+}
+
+func TestDecodeSinglePodRejectsResourceClaims(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			UID:       "12345",
+			Namespace: "mynamespace",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			DNSPolicy:                     v1.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+			Containers: []v1.Container{{
+				Name:                     "image",
+				Image:                    "test/image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
+				Resources: v1.ResourceRequirements{
+					Claims: []v1.ResourceClaim{{
+						Name: "my-claim",
+					}},
+				},
+			}},
+			ResourceClaims: []v1.PodResourceClaim{{
+				Name:              "my-claim",
+				ResourceClaimName: ptr.To("some-external-claim"),
+			}},
+			SecurityContext:    &v1.PodSecurityContext{},
+			SchedulerName:      v1.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
+		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
+	}
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	_, _, err = tryDecodeSinglePod(logger, json, noDefault)
+	if !strings.Contains(err.Error(), "may not reference resourceclaims") {
+		t.Errorf("Got error %q, want %q", err, fmt.Errorf("static pods may not reference resourceclaims API objects"))
+	}
+}
+
+func TestDecodeSinglePodWithOptions(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	logger, _ := ktesting.NewTestContext(t)
+	restartPolicyAlways := v1.ContainerRestartPolicyAlways
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			UID:       "12345",
+			Namespace: "mynamespace",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{{
+				Name:                     "image",
+				Image:                    "test/image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
+				RestartPolicy:            &restartPolicyAlways,
+			}},
+		},
+	}
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	parsed, _, err := tryDecodeSinglePod(logger, json, noDefault)
+	if err != nil {
+		t.Errorf("unexpected error: %v (%s)", err, string(json))
+	}
+	if !parsed {
+		t.Errorf("expected to have parsed file: (%s)", string(json))
 	}
 }
 
 func TestDecodePodList(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
@@ -225,7 +330,7 @@ func TestDecodePodList(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	parsed, podListOut, err := tryDecodePodList(json, noDefault)
+	parsed, podListOut, err := tryDecodePodList(logger, json, noDefault)
 	if !parsed {
 		t.Errorf("expected to have parsed file: (%s)", string(json))
 	}
@@ -244,7 +349,7 @@ func TestDecodePodList(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 
-		parsed, podListOut, err = tryDecodePodList(yaml, noDefault)
+		parsed, podListOut, err = tryDecodePodList(logger, yaml, noDefault)
 		if !parsed {
 			t.Errorf("expected to have parsed file: (%s): %v", string(yaml), err)
 			continue

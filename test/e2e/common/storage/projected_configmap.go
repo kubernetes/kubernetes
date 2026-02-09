@@ -28,7 +28,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -60,7 +59,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 		doProjectedConfigMapE2EWithoutMappings(ctx, f, false, 0, &defaultMode)
 	})
 
-	f.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
+	f.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
@@ -76,7 +75,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 		doProjectedConfigMapE2EWithoutMappings(ctx, f, true, 0, nil)
 	})
 
-	f.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
+	f.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doProjectedConfigMapE2EWithoutMappings(ctx, f, true, 1001, nil)
@@ -111,7 +110,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 		doProjectedConfigMapE2EWithMappings(ctx, f, true, 0, nil)
 	})
 
-	f.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
+	f.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doProjectedConfigMapE2EWithMappings(ctx, f, true, 1001, nil)

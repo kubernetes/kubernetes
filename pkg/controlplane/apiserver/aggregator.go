@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,6 +117,7 @@ func CreateAggregatorConfig(
 			ServiceResolver:           serviceResolver,
 			ProxyTransport:            proxyTransport,
 			RejectForwardingRedirects: commandOptions.AggregatorRejectForwardingRedirects,
+			PeerProxy:                 peerProxy,
 		},
 	}
 
@@ -129,6 +131,20 @@ func CreateAggregatorServer(aggregatorConfig aggregatorapiserver.CompletedConfig
 	aggregatorServer, err := aggregatorConfig.NewWithDelegate(delegateAPIServer)
 	if err != nil {
 		return nil, err
+	}
+
+	// Set informers for peer proxy handler to exclude CRD and APIService GVs
+	// from peer proxying and peer-aggregated discovery.
+	if aggregatorConfig.ExtraConfig.PeerProxy != nil {
+		if err := aggregatorConfig.ExtraConfig.PeerProxy.RegisterCRDInformerHandlers(crds.Informer(), crdExtractor); err != nil {
+			return nil, err
+		}
+		if err := aggregatorConfig.ExtraConfig.PeerProxy.RegisterAPIServiceInformerHandlers(
+			aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices().Informer(),
+			apiServiceExtractor,
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	// create controllers for auto-registration
@@ -192,6 +208,38 @@ func CreateAggregatorServer(aggregatorConfig aggregatorapiserver.CompletedConfig
 	}
 
 	return aggregatorServer, nil
+}
+
+// crdExtractor extracts group-versions from CustomResourceDefinition objects
+// for use in the peer proxy exclusion filter.
+func crdExtractor(obj interface{}) []schema.GroupVersion {
+	crd, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
+	if !ok {
+		klog.Errorf("Expected CustomResourceDefinition but got %T", obj)
+		return nil
+	}
+	var gvs []schema.GroupVersion
+	for _, v := range crd.Spec.Versions {
+		gvs = append(gvs, schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name})
+	}
+	return gvs
+}
+
+// apiServiceExtractor extracts group-versions from APIService objects
+// for use in the peer proxy exclusion filter. Only aggregated APIs
+// (those with a Service reference) are excluded.
+func apiServiceExtractor(obj interface{}) []schema.GroupVersion {
+	apiService, ok := obj.(*v1.APIService)
+	if !ok {
+		klog.Errorf("Expected APIService but got %T", obj)
+		return nil
+	}
+	// Only exclude if the APIService points to a service, implying it's an aggregated API
+	if apiService.Spec.Service == nil {
+		return nil
+	}
+	gv := schema.GroupVersion{Group: apiService.Spec.Group, Version: apiService.Spec.Version}
+	return []schema.GroupVersion{gv}
 }
 
 func makeAPIService(gv schema.GroupVersion, apiVersionPriorities map[schema.GroupVersion]APIServicePriority) *v1.APIService {
@@ -277,6 +325,7 @@ func DefaultGenericAPIServicePriorities() map[schema.GroupVersion]APIServicePrio
 		{Group: "authentication.k8s.io", Version: "v1alpha1"}:        {Group: 17700, Version: 1},
 		{Group: "authorization.k8s.io", Version: "v1"}:               {Group: 17600, Version: 15},
 		{Group: "certificates.k8s.io", Version: "v1"}:                {Group: 17300, Version: 15},
+		{Group: "certificates.k8s.io", Version: "v1beta1"}:           {Group: 17300, Version: 9},
 		{Group: "certificates.k8s.io", Version: "v1alpha1"}:          {Group: 17300, Version: 1},
 		{Group: "rbac.authorization.k8s.io", Version: "v1"}:          {Group: 17000, Version: 15},
 		{Group: "apiextensions.k8s.io", Version: "v1"}:               {Group: 16700, Version: 15},
@@ -284,6 +333,8 @@ func DefaultGenericAPIServicePriorities() map[schema.GroupVersion]APIServicePrio
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1"}:  {Group: 16700, Version: 12},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {Group: 16700, Version: 9},
 		{Group: "coordination.k8s.io", Version: "v1"}:                {Group: 16500, Version: 15},
+		{Group: "coordination.k8s.io", Version: "v1beta1"}:           {Group: 16500, Version: 13},
+		{Group: "coordination.k8s.io", Version: "v1alpha2"}:          {Group: 16500, Version: 12},
 		{Group: "discovery.k8s.io", Version: "v1"}:                   {Group: 16200, Version: 15},
 		{Group: "discovery.k8s.io", Version: "v1beta1"}:              {Group: 16200, Version: 12},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1"}:       {Group: 16100, Version: 21},
@@ -292,8 +343,8 @@ func DefaultGenericAPIServicePriorities() map[schema.GroupVersion]APIServicePrio
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"}:  {Group: 16100, Version: 12},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"}: {Group: 16100, Version: 9},
 		{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"}:    {Group: 16000, Version: 9},
-		{Group: "resource.k8s.io", Version: "v1alpha2"}:              {Group: 15900, Version: 9},
-		{Group: "storagemigration.k8s.io", Version: "v1alpha1"}:      {Group: 15800, Version: 9},
+		{Group: "resource.k8s.io", Version: "v1alpha3"}:              {Group: 15900, Version: 9},
+		{Group: "storagemigration.k8s.io", Version: "v1beta1"}:       {Group: 15800, Version: 9},
 		// Append a new group to the end of the list if unsure.
 		// You can use min(existing group)-100 as the initial value for a group.
 		// Version can be set to 9 (to have space around) for a new group.

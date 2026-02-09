@@ -1,5 +1,17 @@
 rules:
   # Discourage import of k8s.io/kubernetes/test/e2e
+  # because integration tests should "not depend on e2e tests" (from commit aa0b284ca12bdff7bdc9ef31fdbd69dd8091c073).
+  #
+  # However, some of the helper packages can be useful
+  # if they are written such that they:
+  # - take a kubernetes.Interface as parameter instead of a Framework
+  # - return errors instead of calling framework.Fail
+  #
+  # At least the following packages follow that approach.
+  # More may be added as needed.
+  - selectorRegexp: k8s[.]io/kubernetes/test/e2e/framework/(pod|daemonset)
+    allowedPrefixes:
+      - ""
   - selectorRegexp: k8s[.]io/kubernetes/test/e2e
     forbiddenPrefixes:
       - ""

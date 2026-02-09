@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type pdbStates map[string]policy.PodDisruptionBudget
@@ -509,7 +509,7 @@ func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 5, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = pointer.Int32(5)
+	rs.Spec.Replicas = ptr.To[int32](5)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(ctx, pdbName)
@@ -535,7 +535,7 @@ func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 4, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = pointer.Int32(3)
+	rs.Spec.Replicas = ptr.To[int32](3)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(ctx, pdbName)
@@ -625,7 +625,7 @@ func TestTotalUnmanagedPods(t *testing.T) {
 	dc.sync(ctx, pdbName)
 	var pods []*v1.Pod
 	pods = append(pods, pod)
-	_, unmanagedPods, _ := dc.getExpectedScale(ctx, pdb, pods)
+	_, unmanagedPods, _ := dc.getExpectedScale(ctx, pods)
 	if len(unmanagedPods) != 1 {
 		t.Fatalf("expected one pod to be unmanaged pod but found %d", len(unmanagedPods))
 	}

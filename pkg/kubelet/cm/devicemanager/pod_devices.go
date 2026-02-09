@@ -17,17 +17,15 @@ limitations under the License.
 package devicemanager
 
 import (
+	"maps"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
 	"k8s.io/klog/v2"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
-	"k8s.io/kubernetes/pkg/kubelet/cm/util/cdi"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -183,8 +181,24 @@ func (pdev *podDevices) devices() map[string]sets.Set[string] {
 	return ret
 }
 
+// Returns podUID and containerName for a device
+func (pdev *podDevices) getPodAndContainerForDevice(deviceID string) (string, string) {
+	pdev.RLock()
+	defer pdev.RUnlock()
+	for podUID, containerDevices := range pdev.devs {
+		for containerName, resources := range containerDevices {
+			for _, devices := range resources {
+				if devices.deviceIds.Devices().Has(deviceID) {
+					return podUID, containerName
+				}
+			}
+		}
+	}
+	return "", ""
+}
+
 // Turns podDevices to checkpointData.
-func (pdev *podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
+func (pdev *podDevices) toCheckpointData(logger klog.Logger) []checkpoint.PodDevicesEntry {
 	var data []checkpoint.PodDevicesEntry
 	pdev.RLock()
 	defer pdev.RUnlock()
@@ -192,13 +206,13 @@ func (pdev *podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 		for conName, resources := range containerDevices {
 			for resource, devices := range resources {
 				if devices.allocResp == nil {
-					klog.ErrorS(nil, "Can't marshal allocResp, allocation response is missing", "podUID", podUID, "containerName", conName, "resourceName", resource)
+					logger.Error(nil, "Can't marshal allocResp, allocation response is missing", "podUID", podUID, "containerName", conName, "resourceName", resource)
 					continue
 				}
 
-				allocResp, err := devices.allocResp.Marshal()
+				allocResp, err := proto.Marshal(devices.allocResp)
 				if err != nil {
-					klog.ErrorS(err, "Can't marshal allocResp", "podUID", podUID, "containerName", conName, "resourceName", resource)
+					logger.Error(err, "Can't marshal allocResp", "podUID", podUID, "containerName", conName, "resourceName", resource)
 					continue
 				}
 				data = append(data, checkpoint.PodDevicesEntry{
@@ -214,15 +228,15 @@ func (pdev *podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 }
 
 // Populates podDevices from the passed in checkpointData.
-func (pdev *podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
+func (pdev *podDevices) fromCheckpointData(logger klog.Logger, data []checkpoint.PodDevicesEntry) {
 	for _, entry := range data {
-		klog.V(2).InfoS("Get checkpoint entry",
+		logger.V(2).Info("Get checkpoint entry",
 			"podUID", entry.PodUID, "containerName", entry.ContainerName,
 			"resourceName", entry.ResourceName, "deviceIDs", entry.DeviceIDs, "allocated", entry.AllocResp)
 		allocResp := &pluginapi.ContainerAllocateResponse{}
-		err := allocResp.Unmarshal(entry.AllocResp)
+		err := proto.Unmarshal(entry.AllocResp, allocResp)
 		if err != nil {
-			klog.ErrorS(err, "Can't unmarshal allocResp", "podUID", entry.PodUID, "containerName", entry.ContainerName, "resourceName", entry.ResourceName)
+			logger.Error(err, "Can't unmarshal allocResp", "podUID", entry.PodUID, "containerName", entry.ContainerName, "resourceName", entry.ResourceName)
 			continue
 		}
 		pdev.insert(entry.PodUID, entry.ContainerName, entry.ResourceName, entry.DeviceIDs, allocResp)
@@ -230,7 +244,7 @@ func (pdev *podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 }
 
 // Returns combined container runtime settings to consume the container's allocated devices.
-func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *DeviceRunContainerOptions {
+func (pdev *podDevices) deviceRunContainerOptions(logger klog.Logger, podUID, contName string) *DeviceRunContainerOptions {
 	pdev.RLock()
 	defer pdev.RUnlock()
 
@@ -263,13 +277,13 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 		// Updates RunContainerOptions.Envs.
 		for k, v := range resp.Envs {
 			if e, ok := envsMap[k]; ok {
-				klog.V(4).InfoS("Skip existing env", "envKey", k, "envValue", v)
+				logger.V(4).Info("Skip existing env", "envKey", k, "envValue", v)
 				if e != v {
-					klog.ErrorS(nil, "Environment variable has conflicting setting", "envKey", k, "expected", v, "got", e)
+					logger.Error(nil, "Environment variable has conflicting setting", "envKey", k, "expected", v, "got", e)
 				}
 				continue
 			}
-			klog.V(4).InfoS("Add env", "envKey", k, "envValue", v)
+			logger.V(4).Info("Add env", "envKey", k, "envValue", v)
 			envsMap[k] = v
 			opts.Envs = append(opts.Envs, kubecontainer.EnvVar{Name: k, Value: v})
 		}
@@ -277,14 +291,14 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 		// Updates RunContainerOptions.Devices.
 		for _, dev := range resp.Devices {
 			if d, ok := devsMap[dev.ContainerPath]; ok {
-				klog.V(4).InfoS("Skip existing device", "containerPath", dev.ContainerPath, "hostPath", dev.HostPath)
+				logger.V(4).Info("Skip existing device", "containerPath", dev.ContainerPath, "hostPath", dev.HostPath)
 				if d != dev.HostPath {
-					klog.ErrorS(nil, "Container device has conflicting mapping host devices",
+					logger.Error(nil, "Container device has conflicting mapping host devices",
 						"containerPath", dev.ContainerPath, "got", d, "expected", dev.HostPath)
 				}
 				continue
 			}
-			klog.V(4).InfoS("Add device", "containerPath", dev.ContainerPath, "hostPath", dev.HostPath)
+			logger.V(4).Info("Add device", "containerPath", dev.ContainerPath, "hostPath", dev.HostPath)
 			devsMap[dev.ContainerPath] = dev.HostPath
 			opts.Devices = append(opts.Devices, kubecontainer.DeviceInfo{
 				PathOnHost:      dev.HostPath,
@@ -296,14 +310,14 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 		// Updates RunContainerOptions.Mounts.
 		for _, mount := range resp.Mounts {
 			if m, ok := mountsMap[mount.ContainerPath]; ok {
-				klog.V(4).InfoS("Skip existing mount", "containerPath", mount.ContainerPath, "hostPath", mount.HostPath)
+				logger.V(4).Info("Skip existing mount", "containerPath", mount.ContainerPath, "hostPath", mount.HostPath)
 				if m != mount.HostPath {
-					klog.ErrorS(nil, "Container mount has conflicting mapping host mounts",
+					logger.Error(nil, "Container mount has conflicting mapping host mounts",
 						"containerPath", mount.ContainerPath, "conflictingPath", m, "hostPath", mount.HostPath)
 				}
 				continue
 			}
-			klog.V(4).InfoS("Add mount", "containerPath", mount.ContainerPath, "hostPath", mount.HostPath)
+			logger.V(4).Info("Add mount", "containerPath", mount.ContainerPath, "hostPath", mount.HostPath)
 			mountsMap[mount.ContainerPath] = mount.HostPath
 			opts.Mounts = append(opts.Mounts, kubecontainer.Mount{
 				Name:          mount.ContainerPath,
@@ -318,77 +332,34 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 		// Updates for Annotations
 		for k, v := range resp.Annotations {
 			if e, ok := annotationsMap[k]; ok {
-				klog.V(4).InfoS("Skip existing annotation", "annotationKey", k, "annotationValue", v)
+				logger.V(4).Info("Skip existing annotation", "annotationKey", k, "annotationValue", v)
 				if e != v {
-					klog.ErrorS(nil, "Annotation has conflicting setting", "annotationKey", k, "expected", e, "got", v)
+					logger.Error(nil, "Annotation has conflicting setting", "annotationKey", k, "expected", e, "got", v)
 				}
 				continue
 			}
-			klog.V(4).InfoS("Add annotation", "annotationKey", k, "annotationValue", v)
+			logger.V(4).Info("Add annotation", "annotationKey", k, "annotationValue", v)
 			annotationsMap[k] = v
 			opts.Annotations = append(opts.Annotations, kubecontainer.Annotation{Name: k, Value: v})
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DevicePluginCDIDevices) {
-			// Updates for CDI devices.
-			cdiDevices := getCDIDeviceInfo(resp, allCDIDevices)
-			opts.CDIDevices = append(opts.CDIDevices, cdiDevices...)
-		}
-	}
-
-	// Although the CDI devices are expected to be empty when this feature is disabled, we still
-	// guard this with a feature gate to avoid any potential issues.
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DevicePluginCDIDevices) {
-		// We construct a resource ID from the pod UID and container name.
-		// This ID has no semantic meaning, and is only used to ensure that the generated CDI annotation key is unique
-		// for a given container. Since this is only called once per pod-container combination, this should be the case.
-		resourceID := podUID + "-" + contName
-		cdiAnnotations := getCDIAnnotations(resourceID, allCDIDevices, annotationsMap)
-		opts.Annotations = append(opts.Annotations, cdiAnnotations...)
+		// Updates for CDI devices.
+		cdiDevices := getCDIDeviceInfo(logger, resp, allCDIDevices)
+		opts.CDIDevices = append(opts.CDIDevices, cdiDevices...)
 	}
 
 	return opts
 }
 
-// getCDIAnnotations returns the cdi annotations for a given container.
-// This creates a CDI annotation with a key of the form: devicemanager_{{resourceID}}.
-// The value of the annotation is a comma separated list of sorted CDI device IDs.
-// If the annotation key is already defined in the provided annotations map, then the existing value is used.
-func getCDIAnnotations(resourceID string, cdiDevices sets.Set[string], annotationsMap map[string]string) []kubecontainer.Annotation {
-	// We sort the CDI devices to ensure that the annotation value is deterministic.
-	sortedCDIDevices := sets.List[string](cdiDevices)
-	annotations, err := cdi.GenerateAnnotations(types.UID(resourceID), "devicemanager", sortedCDIDevices)
-	if err != nil {
-		klog.ErrorS(err, "Failed to create CDI annotations")
-		return nil
-	}
-
-	var cdiAnnotations []kubecontainer.Annotation
-	for _, annotation := range annotations {
-		if e, ok := annotationsMap[annotation.Name]; ok {
-			klog.V(4).InfoS("Skip existing annotation", "annotationKey", annotation.Name, "annotationValue", annotation.Value)
-			if e != annotation.Value {
-				klog.ErrorS(nil, "Annotation has conflicting setting", "annotationKey", annotation.Name, "expected", e, "got", annotation.Value)
-			}
-			continue
-		}
-		klog.V(4).InfoS("Add annotation", "annotationKey", annotation.Name, "annotationValue", annotation.Value)
-		annotationsMap[annotation.Name] = annotation.Value
-		cdiAnnotations = append(cdiAnnotations, kubecontainer.Annotation{Name: annotation.Name, Value: annotation.Value})
-	}
-
-	return cdiAnnotations
-}
-
 // getCDIDeviceInfo returns CDI devices from an allocate response
-func getCDIDeviceInfo(resp *pluginapi.ContainerAllocateResponse, knownCDIDevices sets.Set[string]) []kubecontainer.CDIDevice {
+func getCDIDeviceInfo(logger klog.Logger, resp *pluginapi.ContainerAllocateResponse, knownCDIDevices sets.Set[string]) []kubecontainer.CDIDevice {
 	var cdiDevices []kubecontainer.CDIDevice
-	for _, cdiDevice := range resp.CDIDevices {
+	for _, cdiDevice := range resp.CdiDevices {
 		if knownCDIDevices.Has(cdiDevice.Name) {
-			klog.V(4).InfoS("Skip existing CDI Device", "name", cdiDevice.Name)
+			logger.V(4).Info("Skip existing CDI Device", "name", cdiDevice.Name)
 			continue
 		}
-		klog.V(4).InfoS("Add CDI device", "name", cdiDevice.Name)
+		logger.V(4).Info("Add CDI device", "name", cdiDevice.Name)
 		knownCDIDevices.Insert(cdiDevice.Name)
 
 		device := kubecontainer.CDIDevice{
@@ -416,7 +387,7 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 		if len(allocateInfo.deviceIds) == 0 {
 			continue
 		}
-		devicePluginMap := make(map[string]pluginapi.Device)
+		devicePluginMap := make(map[string]*pluginapi.Device)
 		for numaid, devlist := range allocateInfo.deviceIds {
 			for _, devID := range devlist {
 				var topology *pluginapi.TopologyInfo
@@ -431,7 +402,7 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 					// ID and Healthy are not relevant here.
 					topology = &pluginapi.TopologyInfo{Nodes: NUMANodes}
 				}
-				devicePluginMap[devID] = pluginapi.Device{
+				devicePluginMap[devID] = &pluginapi.Device{
 					Topology: topology,
 				}
 			}
@@ -442,7 +413,7 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 }
 
 // DeviceInstances is a mapping device name -> plugin device data
-type DeviceInstances map[string]pluginapi.Device
+type DeviceInstances map[string]*pluginapi.Device
 
 // ResourceDeviceInstances is a mapping resource name -> DeviceInstances
 type ResourceDeviceInstances map[string]DeviceInstances
@@ -456,10 +427,7 @@ func NewResourceDeviceInstances() ResourceDeviceInstances {
 func (rdev ResourceDeviceInstances) Clone() ResourceDeviceInstances {
 	clone := NewResourceDeviceInstances()
 	for resourceName, resourceDevs := range rdev {
-		clone[resourceName] = make(map[string]pluginapi.Device)
-		for devID, dev := range resourceDevs {
-			clone[resourceName][devID] = dev
-		}
+		clone[resourceName] = maps.Clone(resourceDevs)
 	}
 	return clone
 }

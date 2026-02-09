@@ -84,9 +84,7 @@ func (strategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	newObj := obj.(*rbac.ClusterRoleBinding)
-	errorList := validation.ValidateClusterRoleBinding(newObj)
-	return append(errorList, validation.ValidateClusterRoleBindingUpdate(newObj, old.(*rbac.ClusterRoleBinding))...)
+	return validation.ValidateClusterRoleBindingUpdate(obj.(*rbac.ClusterRoleBinding), old.(*rbac.ClusterRoleBinding))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

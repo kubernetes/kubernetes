@@ -117,7 +117,7 @@ func TestDeleteSystemPriorityClass(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	key := "test/system-node-critical"
+	key := "/priorityclasses/test/system-node-critical"
 	ctx := genericapirequest.NewContext()
 	pc := schedulingapiv1.SystemPriorityClasses()[0]
 	internalPc := &scheduling.PriorityClass{}

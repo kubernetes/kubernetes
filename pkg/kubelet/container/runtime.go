@@ -33,6 +33,8 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -98,7 +100,7 @@ type Runtime interface {
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(ctx context.Context, gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// SyncPod syncs the running pod into the desired pod.
-	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
@@ -126,7 +128,7 @@ type Runtime interface {
 	// and store the resulting archive to the checkpoint directory.
 	CheckpointContainer(ctx context.Context, options *runtimeapi.CheckpointContainerRequest) error
 	// Generate pod status from the CRI event
-	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) (*PodStatus, error)
+	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *PodStatus
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
 	// This list should be static at startup: either the client and server restart together when
 	// adding or removing metrics descriptors, or they should not change.
@@ -135,6 +137,16 @@ type Runtime interface {
 	ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error)
 	// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
+	// GetContainerStatus returns the status for the container.
+	GetContainerStatus(ctx context.Context, podUID types.UID, id ContainerID) (*Status, error)
+	// GetContainerSwapBehavior reports whether a container could be swappable.
+	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
+	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
+	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
+	// (allocated resources != actuated resources).
+	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
+	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
+	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
@@ -149,8 +161,11 @@ type StreamingRuntime interface {
 // ImageService interfaces allows to work with image service.
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
-	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
-	PullImage(ctx context.Context, image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	// secrets if necessary.
+	// It returns a reference (digest or ID) to the pulled image and the credentials
+	// that were used to pull the image. If the returned credentials are nil, the
+	// pull was anonymous.
+	PullImage(ctx context.Context, image ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(ctx context.Context, image ImageSpec) (string, error)
@@ -225,7 +240,10 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		klog.ErrorS(err, "Parsing containerID failed")
+		// Use klog.TODO() because we currently do not have a proper logger to pass in.
+		// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
+		logger := klog.TODO()
+		logger.Error(err, "Parsing containerID failed")
 	}
 	return id
 }
@@ -315,6 +333,8 @@ type PodStatus struct {
 	IPs []string
 	// Status of containers in the pod.
 	ContainerStatuses []*Status
+	// Statuses of containers of the active sandbox in the pod.
+	ActiveContainerStatuses []*Status
 	// Status of the pod sandbox.
 	// Only for kuberuntime now, other runtime may keep it nil.
 	SandboxStatuses []*runtimeapi.PodSandboxStatus
@@ -374,6 +394,10 @@ type Status struct {
 	Resources *ContainerResources
 	// User identity information of the first process of this container
 	User *ContainerUser
+	// Mounts are the volume mounts of the container
+	Mounts []Mount
+	// StopSignal is used to show the container's effective stop signal in the Status
+	StopSignal *v1.Signal
 }
 
 // ContainerUser represents user identity information
@@ -466,7 +490,15 @@ type Mount struct {
 	SELinuxRelabel bool
 	// Requested propagation mode
 	Propagation runtimeapi.MountPropagation
+	// Image is set if an OCI volume as image ID or digest should get mounted (special case).
+	Image *runtimeapi.ImageSpec
+	// ImageSubPath is set if an image volume sub path should get mounted. This
+	// field is only required if the above Image is set.
+	ImageSubPath string
 }
+
+// ImageVolumes is a map of image specs by volume name.
+type ImageVolumes = map[string]*runtimeapi.ImageSpec
 
 // PortMapping contains information about the port mapping.
 type PortMapping struct {
@@ -492,7 +524,8 @@ type DeviceInfo struct {
 
 // CDIDevice contains information about CDI device
 type CDIDevice struct {
-	// Name is a fully qualified device name
+	// Name is a fully qualified device name according to
+	// https://github.com/cncf-tags/container-device-interface/blob/e66544063aa7760c4ea6330ce9e6c757f8e61df2/README.md?plain=1#L9-L15
 	Name string
 }
 
@@ -516,8 +549,6 @@ type RunContainerOptions struct {
 	PodContainerDir string
 	// The type of container rootfs
 	ReadOnly bool
-	// hostname for pod containers
-	Hostname string
 }
 
 // VolumeInfo contains information about the volume.
@@ -556,6 +587,8 @@ type RuntimeStatus struct {
 	Conditions []RuntimeCondition
 	// Handlers is an array of current available handlers
 	Handlers []RuntimeHandler
+	// Features is the set of features implemented by the runtime
+	Features *RuntimeFeatures
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.
@@ -579,7 +612,7 @@ func (r *RuntimeStatus) String() string {
 	for _, h := range r.Handlers {
 		sh = append(sh, h.String())
 	}
-	return fmt.Sprintf("Runtime Conditions: %s; Handlers: %s", strings.Join(ss, ", "), strings.Join(sh, ", "))
+	return fmt.Sprintf("Runtime Conditions: %s; Handlers: %s, Features: %s", strings.Join(ss, ", "), strings.Join(sh, ", "), r.Features.String())
 }
 
 // RuntimeHandler contains condition information for the runtime handler.
@@ -615,6 +648,19 @@ type RuntimeCondition struct {
 // String formats the runtime condition into human readable string.
 func (c *RuntimeCondition) String() string {
 	return fmt.Sprintf("%s=%t reason:%s message:%s", c.Type, c.Status, c.Reason, c.Message)
+}
+
+// RuntimeFeatures contains the set of features implemented by the runtime
+type RuntimeFeatures struct {
+	SupplementalGroupsPolicy bool
+}
+
+// String formats the runtime condition into a human readable string.
+func (f *RuntimeFeatures) String() string {
+	if f == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v", f.SupplementalGroupsPolicy)
 }
 
 // Pods represents the list of pods

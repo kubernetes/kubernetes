@@ -18,17 +18,17 @@ package expand
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"net"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -68,6 +68,8 @@ type CSINameTranslator interface {
 	GetCSINameFromInTreeName(pluginName string) (string, error)
 }
 
+// Deprecated: This controller is deprecated and for now exists for the sole purpose of adding
+// necessary annotations if necessary, so as volume can be expanded externally in the control-plane
 type expandController struct {
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.
@@ -203,7 +205,7 @@ func (expc *expandController) syncHandler(ctx context.Context, key string) error
 		return err
 	}
 	pvc, err := expc.pvcLister.PersistentVolumeClaims(namespace).Get(name)
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	logger := klog.FromContext(ctx)
@@ -254,14 +256,14 @@ func (expc *expandController) syncHandler(ctx context.Context, key string) error
 		if err != nil {
 			errorMsg := fmt.Sprintf("error getting CSI driver name for pvc %s, with error %v", key, err)
 			expc.recorder.Event(pvc, v1.EventTypeWarning, events.ExternalExpanding, errorMsg)
-			return fmt.Errorf(errorMsg)
+			return errors.New(errorMsg)
 		}
 
 		pvc, err := util.SetClaimResizer(pvc, csiResizerName, expc.kubeClient)
 		if err != nil {
 			errorMsg := fmt.Sprintf("error setting resizer annotation to pvc %s, with error %v", key, err)
 			expc.recorder.Event(pvc, v1.EventTypeWarning, events.ExternalExpanding, errorMsg)
-			return fmt.Errorf(errorMsg)
+			return errors.New(errorMsg)
 		}
 		return nil
 	}
@@ -321,19 +323,26 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 // TODO make concurrency configurable (workers argument). previously, nestedpendingoperations spawned unlimited goroutines
 func (expc *expandController) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
-	defer expc.queue.ShutDown()
+
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting expand controller")
-	defer logger.Info("Shutting down expand controller")
 
-	if !cache.WaitForNamedCacheSync("expand", ctx.Done(), expc.pvcsSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down expand controller")
+		expc.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, expc.pvcsSynced) {
 		return
 	}
 
 	for i := 0; i < defaultWorkerCount; i++ {
-		go wait.UntilWithContext(ctx, expc.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, expc.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 
@@ -396,7 +405,7 @@ func (expc *expandController) GetKubeClient() clientset.Interface {
 	return expc.kubeClient
 }
 
-func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by expand controller's VolumeHost implementation")
 }
 
@@ -404,20 +413,8 @@ func (expc *expandController) NewWrapperUnmounter(volName string, spec volume.Sp
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by expand controller's VolumeHost implementation")
 }
 
-func (expc *expandController) GetMounter(pluginName string) mount.Interface {
+func (expc *expandController) GetMounter() mount.Interface {
 	return nil
-}
-
-func (expc *expandController) GetExec(pluginName string) utilexec.Interface {
-	return utilexec.New()
-}
-
-func (expc *expandController) GetHostName() string {
-	return ""
-}
-
-func (expc *expandController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP not supported by expand controller's VolumeHost implementation")
 }
 
 func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {

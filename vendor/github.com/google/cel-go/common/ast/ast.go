@@ -160,6 +160,13 @@ func MaxID(a *AST) int64 {
 	return visitor.maxID + 1
 }
 
+// Heights computes the heights of all AST expressions and returns a map from expression id to height.
+func Heights(a *AST) map[int64]int {
+	visitor := make(heightVisitor)
+	PostOrderVisit(a.Expr(), visitor)
+	return visitor
+}
+
 // NewSourceInfo creates a simple SourceInfo object from an input common.Source value.
 func NewSourceInfo(src common.Source) *SourceInfo {
 	var lineOffsets []int32
@@ -310,21 +317,18 @@ func (s *SourceInfo) SetOffsetRange(id int64, o OffsetRange) {
 	s.offsetRanges[id] = o
 }
 
+// ClearOffsetRange removes the OffsetRange for the given expression id.
+func (s *SourceInfo) ClearOffsetRange(id int64) {
+	if s != nil {
+		delete(s.offsetRanges, id)
+	}
+}
+
 // GetStartLocation calculates the human-readable 1-based line and 0-based column of the first character
 // of the expression node at the id.
 func (s *SourceInfo) GetStartLocation(id int64) common.Location {
 	if o, found := s.GetOffsetRange(id); found {
-		line := 1
-		col := int(o.Start)
-		for _, lineOffset := range s.LineOffsets() {
-			if lineOffset < o.Start {
-				line++
-				col = int(o.Start - lineOffset)
-			} else {
-				break
-			}
-		}
-		return common.NewLocation(line, col)
+		return s.GetLocationByOffset(o.Start)
 	}
 	return common.NoLocation
 }
@@ -336,19 +340,23 @@ func (s *SourceInfo) GetStartLocation(id int64) common.Location {
 // be identical to the start location for the expression.
 func (s *SourceInfo) GetStopLocation(id int64) common.Location {
 	if o, found := s.GetOffsetRange(id); found {
-		line := 1
-		col := int(o.Stop)
-		for _, lineOffset := range s.LineOffsets() {
-			if lineOffset < o.Stop {
-				line++
-				col = int(o.Stop - lineOffset)
-			} else {
-				break
-			}
-		}
-		return common.NewLocation(line, col)
+		return s.GetLocationByOffset(o.Stop)
 	}
 	return common.NoLocation
+}
+
+// GetLocationByOffset returns the line and column information for a given character offset.
+func (s *SourceInfo) GetLocationByOffset(offset int32) common.Location {
+	line := 1
+	col := int(offset)
+	for _, lineOffset := range s.LineOffsets() {
+		if lineOffset > offset {
+			break
+		}
+		line++
+		col = int(offset - lineOffset)
+	}
+	return common.NewLocation(line, col)
 }
 
 // ComputeOffset calculates the 0-based character offset from a 1-based line and 0-based column.
@@ -453,4 +461,75 @@ func (v *maxIDVisitor) VisitEntryExpr(e EntryExpr) {
 	if v.maxID < e.ID() {
 		v.maxID = e.ID()
 	}
+}
+
+type heightVisitor map[int64]int
+
+// VisitExpr computes the height of a given node as the max height of its children plus one.
+//
+// Identifiers and literals are treated as having a height of zero.
+func (hv heightVisitor) VisitExpr(e Expr) {
+	// default includes IdentKind, LiteralKind
+	hv[e.ID()] = 0
+	switch e.Kind() {
+	case SelectKind:
+		hv[e.ID()] = 1 + hv[e.AsSelect().Operand().ID()]
+	case CallKind:
+		c := e.AsCall()
+		height := hv.maxHeight(c.Args()...)
+		if c.IsMemberFunction() {
+			tHeight := hv[c.Target().ID()]
+			if tHeight > height {
+				height = tHeight
+			}
+		}
+		hv[e.ID()] = 1 + height
+	case ListKind:
+		l := e.AsList()
+		hv[e.ID()] = 1 + hv.maxHeight(l.Elements()...)
+	case MapKind:
+		m := e.AsMap()
+		hv[e.ID()] = 1 + hv.maxEntryHeight(m.Entries()...)
+	case StructKind:
+		s := e.AsStruct()
+		hv[e.ID()] = 1 + hv.maxEntryHeight(s.Fields()...)
+	case ComprehensionKind:
+		comp := e.AsComprehension()
+		hv[e.ID()] = 1 + hv.maxHeight(comp.IterRange(), comp.AccuInit(), comp.LoopCondition(), comp.LoopStep(), comp.Result())
+	}
+}
+
+// VisitEntryExpr computes the max height of a map or struct entry and associates the height with the entry id.
+func (hv heightVisitor) VisitEntryExpr(e EntryExpr) {
+	hv[e.ID()] = 0
+	switch e.Kind() {
+	case MapEntryKind:
+		me := e.AsMapEntry()
+		hv[e.ID()] = hv.maxHeight(me.Value(), me.Key())
+	case StructFieldKind:
+		sf := e.AsStructField()
+		hv[e.ID()] = hv[sf.Value().ID()]
+	}
+}
+
+func (hv heightVisitor) maxHeight(exprs ...Expr) int {
+	max := 0
+	for _, e := range exprs {
+		h := hv[e.ID()]
+		if h > max {
+			max = h
+		}
+	}
+	return max
+}
+
+func (hv heightVisitor) maxEntryHeight(entries ...EntryExpr) int {
+	max := 0
+	for _, e := range entries {
+		h := hv[e.ID()]
+		if h > max {
+			max = h
+		}
+	}
+	return max
 }

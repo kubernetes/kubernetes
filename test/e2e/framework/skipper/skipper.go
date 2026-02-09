@@ -46,10 +46,13 @@ func Skipf(format string, args ...interface{}) {
 	panic("unreachable")
 }
 
+// Skip is an alias for ginkgo.Skip.
+var Skip = ginkgo.Skip
+
 // SkipUnlessAtLeast skips if the value is less than the minValue.
 func SkipUnlessAtLeast(value int, minValue int, message string) {
 	if value < minValue {
-		skipInternalf(1, message)
+		skipInternalf(1, "%s", message)
 	}
 }
 
@@ -127,6 +130,17 @@ func SkipUnlessMultizone(ctx context.Context, c clientset.Interface) {
 	}
 	if zones.Len() <= 1 {
 		skipInternalf(1, "Requires more than one zone")
+	}
+}
+
+// SkipUnlessAtLeastNZones skips if the cluster does not have n multizones.
+func SkipUnlessAtLeastNZones(ctx context.Context, c clientset.Interface, n int) {
+	zones, err := e2enode.GetClusterZones(ctx, c)
+	if err != nil {
+		skipInternalf(1, "Error listing cluster zones")
+	}
+	if zones.Len() < n {
+		skipInternalf(1, "Requires >= %d zones", n)
 	}
 }
 

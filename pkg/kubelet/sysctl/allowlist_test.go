@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -24,9 +23,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewAllowlist(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	type Test struct {
 		sysctls []string
 		err     bool
@@ -42,7 +43,7 @@ func TestNewAllowlist(t *testing.T) {
 		{sysctls: []string{"foo"}, err: true},
 		{sysctls: []string{"foo*"}, err: true},
 	} {
-		_, err := NewAllowlist(append(SafeSysctlAllowlist(), test.sysctls...))
+		_, err := NewAllowlist(append(SafeSysctlAllowlist(tCtx), test.sysctls...))
 		if test.err && err == nil {
 			t.Errorf("expected an error creating a allowlist for %v", test.sysctls)
 		} else if !test.err && err != nil {
@@ -52,6 +53,7 @@ func TestNewAllowlist(t *testing.T) {
 }
 
 func TestAllowlist(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	type Test struct {
 		sysctl           string
 		hostNet, hostIPC bool
@@ -78,7 +80,7 @@ func TestAllowlist(t *testing.T) {
 	pod.Spec.SecurityContext = &v1.PodSecurityContext{}
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod}
 
-	w, err := NewAllowlist(append(SafeSysctlAllowlist(), "kernel.msg*", "kernel.sem", "net.b.*"))
+	w, err := NewAllowlist(append(SafeSysctlAllowlist(tCtx), "kernel.msg*", "kernel.sem", "net.b.*"))
 	if err != nil {
 		t.Fatalf("failed to create allowlist: %v", err)
 	}

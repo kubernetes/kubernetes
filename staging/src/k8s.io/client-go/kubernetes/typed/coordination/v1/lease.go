@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/coordination/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	coordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
+	applyconfigurationscoordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type LeasesGetter interface {
 
 // LeaseInterface has methods to work with Lease resources.
 type LeaseInterface interface {
-	Create(ctx context.Context, lease *v1.Lease, opts metav1.CreateOptions) (*v1.Lease, error)
-	Update(ctx context.Context, lease *v1.Lease, opts metav1.UpdateOptions) (*v1.Lease, error)
+	Create(ctx context.Context, lease *coordinationv1.Lease, opts metav1.CreateOptions) (*coordinationv1.Lease, error)
+	Update(ctx context.Context, lease *coordinationv1.Lease, opts metav1.UpdateOptions) (*coordinationv1.Lease, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Lease, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.LeaseList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*coordinationv1.Lease, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*coordinationv1.LeaseList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Lease, err error)
-	Apply(ctx context.Context, lease *coordinationv1.LeaseApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Lease, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *coordinationv1.Lease, err error)
+	Apply(ctx context.Context, lease *applyconfigurationscoordinationv1.LeaseApplyConfiguration, opts metav1.ApplyOptions) (result *coordinationv1.Lease, err error)
 	LeaseExpansion
 }
 
 // leases implements LeaseInterface
 type leases struct {
-	*gentype.ClientWithListAndApply[*v1.Lease, *v1.LeaseList, *coordinationv1.LeaseApplyConfiguration]
+	*gentype.ClientWithListAndApply[*coordinationv1.Lease, *coordinationv1.LeaseList, *applyconfigurationscoordinationv1.LeaseApplyConfiguration]
 }
 
 // newLeases returns a Leases
 func newLeases(c *CoordinationV1Client, namespace string) *leases {
 	return &leases{
-		gentype.NewClientWithListAndApply[*v1.Lease, *v1.LeaseList, *coordinationv1.LeaseApplyConfiguration](
+		gentype.NewClientWithListAndApply[*coordinationv1.Lease, *coordinationv1.LeaseList, *applyconfigurationscoordinationv1.LeaseApplyConfiguration](
 			"leases",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Lease { return &v1.Lease{} },
-			func() *v1.LeaseList { return &v1.LeaseList{} }),
+			func() *coordinationv1.Lease { return &coordinationv1.Lease{} },
+			func() *coordinationv1.LeaseList { return &coordinationv1.LeaseList{} },
+			gentype.PrefersProtobuf[*coordinationv1.Lease](),
+		),
 	}
 }

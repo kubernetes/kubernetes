@@ -94,7 +94,7 @@ resources:
       - name: key1
         secret: c2VjcmV0IGlzIHNlY3VyZQ==
 `
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("failed to start Kube API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -117,7 +117,6 @@ resources:
 		{"apiregistration.k8s.io", "v1", "APIService", "apiservices", "as2.foo.com", ""},
 		{"", "v1", "Pod", "pods", "pod1", testNamespace},
 	} {
-		tt := tt
 		t.Run(tt.resource, func(t *testing.T) {
 			t.Parallel()
 

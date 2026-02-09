@@ -20,21 +20,41 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ConfigMapApplyConfiguration represents a declarative configuration of the ConfigMap type for use
 // with apply.
+//
+// ConfigMap holds configuration data for pods to consume.
 type ConfigMapApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Immutable                        *bool             `json:"immutable,omitempty"`
-	Data                             map[string]string `json:"data,omitempty"`
-	BinaryData                       map[string][]byte `json:"binaryData,omitempty"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	// Immutable, if set to true, ensures that data stored in the ConfigMap cannot
+	// be updated (only object metadata can be modified).
+	// If not set to true, the field can be modified at any time.
+	// Defaulted to nil.
+	Immutable *bool `json:"immutable,omitempty"`
+	// Data contains the configuration data.
+	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
+	// Values with non-UTF-8 byte sequences must use the BinaryData field.
+	// The keys stored in Data must not overlap with the keys in
+	// the BinaryData field, this is enforced during validation process.
+	Data map[string]string `json:"data,omitempty"`
+	// BinaryData contains the binary data.
+	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
+	// BinaryData can contain byte sequences that are not in the UTF-8 range.
+	// The keys stored in BinaryData must not overlap with the ones in
+	// the Data field, this is enforced during validation process.
+	// Using this field will require 1.10+ apiserver and
+	// kubelet.
+	BinaryData map[string][]byte `json:"binaryData,omitempty"`
 }
 
 // ConfigMap constructs a declarative configuration of the ConfigMap type for use with
@@ -48,29 +68,14 @@ func ConfigMap(name, namespace string) *ConfigMapApplyConfiguration {
 	return b
 }
 
-// ExtractConfigMap extracts the applied configuration owned by fieldManager from
-// configMap. If no managedFields are found in configMap for fieldManager, a
-// ConfigMapApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractConfigMapFrom extracts the applied configuration owned by fieldManager from
+// configMap for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // configMap must be a unmodified ConfigMap API object that was retrieved from the Kubernetes API.
-// ExtractConfigMap provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractConfigMapFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractConfigMap(configMap *corev1.ConfigMap, fieldManager string) (*ConfigMapApplyConfiguration, error) {
-	return extractConfigMap(configMap, fieldManager, "")
-}
-
-// ExtractConfigMapStatus is the same as ExtractConfigMap except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractConfigMapStatus(configMap *corev1.ConfigMap, fieldManager string) (*ConfigMapApplyConfiguration, error) {
-	return extractConfigMap(configMap, fieldManager, "status")
-}
-
-func extractConfigMap(configMap *corev1.ConfigMap, fieldManager string, subresource string) (*ConfigMapApplyConfiguration, error) {
+func ExtractConfigMapFrom(configMap *corev1.ConfigMap, fieldManager string, subresource string) (*ConfigMapApplyConfiguration, error) {
 	b := &ConfigMapApplyConfiguration{}
 	err := managedfields.ExtractInto(configMap, internal.Parser().Type("io.k8s.api.core.v1.ConfigMap"), fieldManager, b, subresource)
 	if err != nil {
@@ -84,11 +89,27 @@ func extractConfigMap(configMap *corev1.ConfigMap, fieldManager string, subresou
 	return b, nil
 }
 
+// ExtractConfigMap extracts the applied configuration owned by fieldManager from
+// configMap. If no managedFields are found in configMap for fieldManager, a
+// ConfigMapApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// configMap must be a unmodified ConfigMap API object that was retrieved from the Kubernetes API.
+// ExtractConfigMap provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractConfigMap(configMap *corev1.ConfigMap, fieldManager string) (*ConfigMapApplyConfiguration, error) {
+	return ExtractConfigMapFrom(configMap, fieldManager, "")
+}
+
+func (b ConfigMapApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ConfigMapApplyConfiguration) WithKind(value string) *ConfigMapApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -96,7 +117,7 @@ func (b *ConfigMapApplyConfiguration) WithKind(value string) *ConfigMapApplyConf
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ConfigMapApplyConfiguration) WithAPIVersion(value string) *ConfigMapApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -105,7 +126,7 @@ func (b *ConfigMapApplyConfiguration) WithAPIVersion(value string) *ConfigMapApp
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ConfigMapApplyConfiguration) WithName(value string) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -114,7 +135,7 @@ func (b *ConfigMapApplyConfiguration) WithName(value string) *ConfigMapApplyConf
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ConfigMapApplyConfiguration) WithGenerateName(value string) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -123,7 +144,7 @@ func (b *ConfigMapApplyConfiguration) WithGenerateName(value string) *ConfigMapA
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ConfigMapApplyConfiguration) WithNamespace(value string) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -132,7 +153,7 @@ func (b *ConfigMapApplyConfiguration) WithNamespace(value string) *ConfigMapAppl
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ConfigMapApplyConfiguration) WithUID(value types.UID) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -141,7 +162,7 @@ func (b *ConfigMapApplyConfiguration) WithUID(value types.UID) *ConfigMapApplyCo
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ConfigMapApplyConfiguration) WithResourceVersion(value string) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -150,25 +171,25 @@ func (b *ConfigMapApplyConfiguration) WithResourceVersion(value string) *ConfigM
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ConfigMapApplyConfiguration) WithGeneration(value int64) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ConfigMapApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ConfigMapApplyConfiguration {
+func (b *ConfigMapApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ConfigMapApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ConfigMapApplyConfiguration {
+func (b *ConfigMapApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -177,7 +198,7 @@ func (b *ConfigMapApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ConfigMapApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -187,11 +208,11 @@ func (b *ConfigMapApplyConfiguration) WithDeletionGracePeriodSeconds(value int64
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ConfigMapApplyConfiguration) WithLabels(entries map[string]string) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -202,11 +223,11 @@ func (b *ConfigMapApplyConfiguration) WithLabels(entries map[string]string) *Con
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ConfigMapApplyConfiguration) WithAnnotations(entries map[string]string) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -214,13 +235,13 @@ func (b *ConfigMapApplyConfiguration) WithAnnotations(entries map[string]string)
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ConfigMapApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ConfigMapApplyConfiguration {
+func (b *ConfigMapApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -231,14 +252,14 @@ func (b *ConfigMapApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRef
 func (b *ConfigMapApplyConfiguration) WithFinalizers(values ...string) *ConfigMapApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *ConfigMapApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -278,8 +299,24 @@ func (b *ConfigMapApplyConfiguration) WithBinaryData(entries map[string][]byte) 
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ConfigMapApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ConfigMapApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ConfigMapApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ConfigMapApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

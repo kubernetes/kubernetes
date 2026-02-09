@@ -655,7 +655,6 @@ func TestRunOverride(t *testing.T) {
 			expectedOutput: `apiVersion: v1
 kind: Pod
 metadata:
-  creationTimestamp: null
   labels:
     run: test
   name: test
@@ -678,7 +677,6 @@ status: {}
 			expectedOutput: `apiVersion: v1
 kind: Pod
 metadata:
-  creationTimestamp: null
   labels:
     run: test
   name: test
@@ -701,7 +699,6 @@ status: {}
 			expectedOutput: `apiVersion: v1
 kind: Pod
 metadata:
-  creationTimestamp: null
   labels:
     run: test
   name: test
@@ -729,7 +726,6 @@ status: {}
 			expectedOutput: `apiVersion: v1
 kind: Pod
 metadata:
-  creationTimestamp: null
   labels:
     foo: bar
     run: test

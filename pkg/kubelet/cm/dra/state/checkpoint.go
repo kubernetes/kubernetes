@@ -18,105 +18,90 @@ package state
 
 import (
 	"encoding/json"
-	"fmt"
-	"hash/fnv"
-	"strings"
+	"hash/crc32"
 
-	"k8s.io/apimachinery/pkg/util/dump"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
-var _ checkpointmanager.Checkpoint = &DRAManagerCheckpoint{}
+const (
+	CheckpointAPIGroup   = "checkpoint.dra.kubelet.k8s.io"
+	CheckpointKind       = "DRACheckpoint"
+	CheckpointAPIVersion = CheckpointAPIGroup + "/v1"
+)
 
-const checkpointVersion = "v1"
-
-// DRAManagerCheckpoint struct is used to store pod dynamic resources assignments in a checkpoint
-type DRAManagerCheckpoint struct {
-	Version  string             `json:"version"`
-	Entries  ClaimInfoStateList `json:"entries,omitempty"`
-	Checksum checksum.Checksum  `json:"checksum"`
+// Checkpoint represents a structure to store DRA checkpoint data
+type Checkpoint struct {
+	// Data is a JSON serialized checkpoint data
+	Data string
+	// Checksum is a checksum of Data
+	Checksum uint32
 }
 
-// DraManagerCheckpoint struct is an old implementation of the DraManagerCheckpoint
-type DRAManagerCheckpointWithoutResourceHandles struct {
-	Version  string                                   `json:"version"`
-	Entries  ClaimInfoStateListWithoutResourceHandles `json:"entries,omitempty"`
-	Checksum checksum.Checksum                        `json:"checksum"`
+type CheckpointData struct {
+	metav1.TypeMeta
+	ClaimInfoStateList ClaimInfoStateList
 }
 
-// List of claim info to store in checkpoint
-type ClaimInfoStateList []ClaimInfoState
-
-// List of claim info to store in checkpoint
-// TODO: remove in Beta
-type ClaimInfoStateListWithoutResourceHandles []ClaimInfoStateWithoutResourceHandles
-
-// NewDRAManagerCheckpoint returns an instance of Checkpoint
-func NewDRAManagerCheckpoint() *DRAManagerCheckpoint {
-	return &DRAManagerCheckpoint{
-		Version: checkpointVersion,
-		Entries: ClaimInfoStateList{},
+// NewCheckpoint creates a new checkpoint from a list of claim info states
+func NewCheckpoint(data ClaimInfoStateList) (*Checkpoint, error) {
+	cpData := &CheckpointData{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       CheckpointKind,
+			APIVersion: CheckpointAPIVersion,
+		},
+		ClaimInfoStateList: data,
 	}
-}
 
-// MarshalCheckpoint returns marshalled checkpoint
-func (dc *DRAManagerCheckpoint) MarshalCheckpoint() ([]byte, error) {
-	// make sure checksum wasn't set before so it doesn't affect output checksum
-	dc.Checksum = 0
-	dc.Checksum = checksum.New(dc)
-	return json.Marshal(*dc)
-}
-
-// UnmarshalCheckpoint tries to unmarshal passed bytes to checkpoint
-func (dc *DRAManagerCheckpoint) UnmarshalCheckpoint(blob []byte) error {
-	return json.Unmarshal(blob, dc)
-}
-
-// VerifyChecksum verifies that current checksum of checkpoint is valid
-func (dc *DRAManagerCheckpoint) VerifyChecksum() error {
-	ck := dc.Checksum
-	dc.Checksum = 0
-	err := ck.Verify(dc)
-	if err == errors.ErrCorruptCheckpoint {
-		// Verify with old structs without ResourceHandles field
-		// TODO: remove in Beta
-		err = verifyChecksumWithoutResourceHandles(dc, ck)
+	cpDataBytes, err := json.Marshal(cpData)
+	if err != nil {
+		return nil, err
 	}
-	dc.Checksum = ck
-	return err
+
+	cp := &Checkpoint{
+		Data:     string(cpDataBytes),
+		Checksum: crc32.ChecksumIEEE(cpDataBytes),
+	}
+
+	return cp, nil
 }
 
-// verifyChecksumWithoutResourceHandles is a helper function that verifies checksum of the
-// checkpoint in the old format, without ResourceHandles field.
-// TODO: remove in Beta.
-func verifyChecksumWithoutResourceHandles(dc *DRAManagerCheckpoint, checkSum checksum.Checksum) error {
-	entries := ClaimInfoStateListWithoutResourceHandles{}
-	for _, entry := range dc.Entries {
-		entries = append(entries, ClaimInfoStateWithoutResourceHandles{
-			DriverName: entry.DriverName,
-			ClassName:  entry.ClassName,
-			ClaimUID:   entry.ClaimUID,
-			ClaimName:  entry.ClaimName,
-			Namespace:  entry.Namespace,
-			PodUIDs:    entry.PodUIDs,
-			CDIDevices: entry.CDIDevices,
-		})
+// MarshalCheckpoint marshals checkpoint to JSON
+func (cp *Checkpoint) MarshalCheckpoint() ([]byte, error) {
+	return json.Marshal(cp)
+}
+
+// UnmarshalCheckpoint unmarshals checkpoint from JSON
+// and verifies its data checksum
+func (cp *Checkpoint) UnmarshalCheckpoint(blob []byte) error {
+	if err := json.Unmarshal(blob, cp); err != nil {
+		return err
 	}
-	oldcheckpoint := &DRAManagerCheckpointWithoutResourceHandles{
-		Version:  checkpointVersion,
-		Entries:  entries,
-		Checksum: 0,
+
+	// verify checksum
+	if err := cp.VerifyChecksum(); err != nil {
+		return err
 	}
-	// Calculate checksum for old checkpoint
-	object := dump.ForHash(oldcheckpoint)
-	object = strings.Replace(object, "DRAManagerCheckpointWithoutResourceHandles", "DRAManagerCheckpoint", 1)
-	object = strings.Replace(object, "ClaimInfoStateListWithoutResourceHandles", "ClaimInfoStateList", 1)
-	hash := fnv.New32a()
-	fmt.Fprintf(hash, "%v", object)
-	if checkSum != checksum.Checksum(hash.Sum32()) {
-		return errors.ErrCorruptCheckpoint
+
+	return nil
+}
+
+// VerifyChecksum verifies that current checksum
+// of checkpointed Data is valid
+func (cp *Checkpoint) VerifyChecksum() error {
+	expectedCS := crc32.ChecksumIEEE([]byte(cp.Data))
+	if expectedCS != cp.Checksum {
+		return &errors.CorruptCheckpointError{ActualCS: uint64(cp.Checksum), ExpectedCS: uint64(expectedCS)}
 	}
 	return nil
+}
+
+// GetClaimInfoStateList returns list of claim info states from checkpoint
+func (cp *Checkpoint) GetClaimInfoStateList() (ClaimInfoStateList, error) {
+	var data CheckpointData
+	if err := json.Unmarshal([]byte(cp.Data), &data); err != nil {
+		return nil, err
+	}
+
+	return data.ClaimInfoStateList, nil
 }

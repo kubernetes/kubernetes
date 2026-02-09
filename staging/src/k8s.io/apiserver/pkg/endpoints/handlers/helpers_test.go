@@ -80,9 +80,9 @@ func TestLazyVerb(t *testing.T) {
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyVerb{}))
 
 	u, _ := url.Parse("?watch=true")
-	req := &http.Request{Method: "GET", URL: u}
+	req := &http.Request{Method: request.MethodGet, URL: u}
 	verbWithReq := &lazyVerb{req: req}
-	assert.Equal(t, "WATCH", fmt.Sprintf("%v", verbWithReq))
+	assert.Equal(t, request.MethodWatch, fmt.Sprintf("%v", verbWithReq))
 }
 
 func TestLazyApiGroup(t *testing.T) {

@@ -21,15 +21,19 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
-type NodeName struct{}
+type NodeName struct {
+	enableSchedulingQueueHint bool
+}
 
-var _ framework.FilterPlugin = &NodeName{}
-var _ framework.EnqueueExtensions = &NodeName{}
+var _ fwk.FilterPlugin = &NodeName{}
+var _ fwk.EnqueueExtensions = &NodeName{}
+var _ fwk.SignPlugin = &NodeName{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -41,10 +45,22 @@ const (
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodeName) EventsToRegister() []framework.ClusterEventWithHint {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
+func (pl *NodeName) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	// A note about UpdateNodeTaint/UpdateNodeLabel event:
+	// Ideally, it's supposed to register only Add because any Node update event will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel
+	if pl.enableSchedulingQueueHint {
+		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
+		nodeActionType = fwk.Add
 	}
+
+	return []fwk.ClusterEventWithHint{
+		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
+		// (the same as Queue)
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
+	}, nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -52,21 +68,30 @@ func (pl *NodeName) Name() string {
 	return Name
 }
 
+// NodeName scoring and feasibility are dependent on the NodeName field.
+func (pl *NodeName) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return []fwk.SignFragment{
+		{Key: fwk.NodeNameSignerName, Value: pod.Spec.NodeName},
+	}, nil
+}
+
 // Filter invoked at the filter extension point.
-func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *NodeName) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 
 	if !Fits(pod, nodeInfo) {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason)
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReason)
 	}
 	return nil
 }
 
 // Fits actually checks if the pod fits the node.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
 	return len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == nodeInfo.Node().Name
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-	return &NodeName{}, nil
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+	return &NodeName{
+		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+	}, nil
 }

@@ -23,7 +23,7 @@ func (s1 *IPv6SrHdr) Equal(s2 IPv6SrHdr) bool {
 		return false
 	}
 	for i := range s1.Segments {
-		if s1.Segments[i].Equal(s2.Segments[i]) != true {
+		if !s1.Segments[i].Equal(s2.Segments[i]) {
 			return false
 		}
 	}
@@ -89,7 +89,7 @@ func DecodeSEG6Encap(buf []byte) (int, []net.IP, error) {
 	}
 	buf = buf[12:]
 	if len(buf)%16 != 0 {
-		err := fmt.Errorf("DecodeSEG6Encap: error parsing Segment List (buf len: %d)\n", len(buf))
+		err := fmt.Errorf("DecodeSEG6Encap: error parsing Segment List (buf len: %d)", len(buf))
 		return mode, nil, err
 	}
 	for len(buf) > 0 {

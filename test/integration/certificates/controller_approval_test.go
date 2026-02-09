@@ -174,7 +174,7 @@ func ensureCertificateRequestNotApproved(client clientset.Interface, name string
 	// There is currently no way to explicitly check if the CSR has been rejected for auto-approval.
 	err := waitForCertificateRequestApproved(client, name)
 	switch {
-	case err == wait.ErrWaitTimeout:
+	case wait.Interrupted(err):
 		return nil
 	case err == nil:
 		return fmt.Errorf("CertificateSigningRequest was auto-approved")

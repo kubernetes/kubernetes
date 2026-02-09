@@ -221,7 +221,9 @@ define TEST_E2E_NODE_HELP_INFO
 # Args:
 #  FOCUS: Regexp that matches the tests to be run.  Defaults to "".
 #  SKIP: Regexp that matches the tests that needs to be skipped.
-#    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]".
+#    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]" unless LABEL_FILTER is set.
+#    If LABEL_FILTER is set, then no tests are skipped by default.
+#  LABEL_FILTER: Use Ginkgo labels query language to filter the tests to be run. May contain spaces and special characters (exclamation mark, vertical bar, etc.) but not quotation marks.
 #  TEST_ARGS: A space-separated list of arguments to pass to node e2e test.
 #    Defaults to "".
 #  RUN_UNTIL_FAILURE: If true, pass --until-it-fails=true to ginkgo so tests are run
@@ -323,27 +325,6 @@ else
 clean:
 	build/make-clean.sh
 	hack/make-rules/clean.sh
-endif
-
-define VET_HELP_INFO
-# Run 'go vet'.
-#
-# Args:
-#   WHAT: Directory names to vet.  All *.go files under these
-#     directories will be vetted.  If not specified, "everything" will be
-#     vetted.
-#
-# Example:
-#   make vet
-#   make vet WHAT=./pkg/kubelet
-endef
-.PHONY: vet
-ifeq ($(PRINT_HELP),y)
-vet:
-	echo "$$VET_HELP_INFO"
-else
-vet:
-	hack/make-rules/vet.sh $(WHAT)
 endif
 
 define LINT_HELP_INFO

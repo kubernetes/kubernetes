@@ -19,7 +19,6 @@ package generators
 import (
 	"path"
 
-	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -49,12 +48,8 @@ func DefaultNameSystem() string {
 	return "sorting_namer"
 }
 
-func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
-	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
-	if err != nil {
-		klog.Fatalf("Failed loading boilerplate: %v", err)
-	}
-
+// GetOpenAPITargets returns the targets for OpenAPI definition generation.
+func GetOpenAPITargets(context *generator.Context, args *args.Args, boilerplate []byte) []generator.Target {
 	reportPath := "-"
 	if args.ReportFilename != "" {
 		reportPath = args.ReportFilename
@@ -81,4 +76,57 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			FilterFunc: apiTypeFilterFunc,
 		},
 	}
+}
+
+// GetModelNameTargets returns the targets for model name generation.
+func GetModelNameTargets(context *generator.Context, args *args.Args, boilerplate []byte) []generator.Target {
+	var targets []generator.Target
+	for _, i := range context.Inputs {
+		klog.V(5).Infof("Considering pkg %q", i)
+
+		pkg := context.Universe[i]
+
+		openAPISchemaNamePackage, err := extractOpenAPISchemaNamePackage(pkg.Comments)
+		if err != nil {
+			klog.Fatalf("Package %v: invalid %s:%v", i, tagModelPackage, err)
+		}
+		hasPackageTag := len(openAPISchemaNamePackage) > 0
+
+		hasCandidates := false
+		for _, t := range pkg.Types {
+			v, err := singularTag(tagModelPackage, t.CommentLines)
+			if err != nil {
+				klog.Fatalf("Type %v: invalid %s:%v", t.Name, tagModelPackage, err)
+			}
+			hasTag := hasPackageTag || v != nil
+			hasModel := isSchemaNameType(t)
+			if hasModel && hasTag {
+				hasCandidates = true
+				break
+			}
+		}
+		if !hasCandidates {
+			klog.V(5).Infof("  skipping package")
+			continue
+		}
+
+		klog.V(3).Infof("Generating package %q", pkg.Path)
+
+		targets = append(targets,
+			&generator.SimpleTarget{
+				PkgName:       path.Base(pkg.Path),
+				PkgPath:       pkg.Path,
+				PkgDir:        pkg.Dir, // output pkg is the same as the input
+				HeaderComment: boilerplate,
+				FilterFunc: func(c *generator.Context, t *types.Type) bool {
+					return t.Name.Package == pkg.Path
+				},
+				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
+					return []generator.Generator{
+						NewSchemaNameGen(args.OutputModelNameFile, pkg.Path, openAPISchemaNamePackage),
+					}
+				},
+			})
+	}
+	return targets
 }

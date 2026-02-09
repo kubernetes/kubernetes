@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
@@ -45,6 +44,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
@@ -59,16 +59,11 @@ func newCmdConfig(out io.Writer) *cobra.Command {
 		Long: fmt.Sprintf(dedent.Dedent(`
 			There is a ConfigMap in the %s namespace called %q that kubeadm uses to store internal configuration about the
 			cluster. kubeadm CLI v1.8.0+ automatically creates this ConfigMap with the config used with 'kubeadm init', but if you
-			initialized your cluster using kubeadm v1.7.x or lower, you must use the 'kubeadm init phase upload-config' command to 
+			initialized your cluster using kubeadm v1.7.x or lower, you must use the 'kubeadm init phase upload-config' command to
 			create this ConfigMap. This is required so that 'kubeadm upgrade' can configure your upgraded cluster correctly.
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
-		// Without this callback, if a user runs just the "upload"
-		// command without a subcommand, or with an invalid subcommand,
-		// cobra will print usage information, but still exit cleanly.
-		// We want to return an error code in these cases so that the
-		// user knows that their command was invalid.
-		Run: cmdutil.SubCmdRun(),
 	}
+	cmdutil.RequireSubcommand(cmd)
 
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
@@ -88,8 +83,8 @@ func newCmdConfigPrint(out io.Writer) *cobra.Command {
 		Long: dedent.Dedent(`
 			This command prints configurations for subcommands provided.
 			For details, see: https://pkg.go.dev/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm#section-directories`),
-		Run: cmdutil.SubCmdRun(),
 	}
+	cmdutil.RequireSubcommand(cmd)
 	cmd.AddCommand(newCmdConfigPrintInitDefaults(out))
 	cmd.AddCommand(newCmdConfigPrintJoinDefaults(out))
 	cmd.AddCommand(newCmdConfigPrintResetDefaults(out))
@@ -316,7 +311,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 // newCmdConfigValidate returns cobra.Command for the "kubeadm config validate" command
 func newCmdConfigValidate(out io.Writer) *cobra.Command {
 	var cfgPath string
-	var allowExperimental bool
+	var allowDeprecated, allowExperimental bool
 
 	cmd := &cobra.Command{
 		Use:   "validate",
@@ -341,7 +336,7 @@ func newCmdConfigValidate(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			if err := configutil.ValidateConfig(cfgBytes, allowExperimental); err != nil {
+			if err := configutil.ValidateConfig(cfgBytes, allowDeprecated, allowExperimental); err != nil {
 				return err
 			}
 			fmt.Fprintln(out, "ok")
@@ -351,6 +346,7 @@ func newCmdConfigValidate(out io.Writer) *cobra.Command {
 		Args: cobra.NoArgs,
 	}
 	options.AddConfigFlag(cmd.Flags(), &cfgPath)
+	cmd.Flags().BoolVar(&allowDeprecated, options.AllowDeprecatedAPI, false, "Allow validation of deprecated APIs.")
 	cmd.Flags().BoolVar(&allowExperimental, options.AllowExperimentalAPI, false, "Allow validation of experimental, unreleased APIs.")
 	return cmd
 }
@@ -360,8 +356,8 @@ func newCmdConfigImages(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "images",
 		Short: "Interact with container images used by kubeadm",
-		Run:   cmdutil.SubCmdRun(),
 	}
+	cmdutil.RequireSubcommand(cmd)
 	cmd.AddCommand(newCmdConfigImagesList(out, nil))
 	cmd.AddCommand(newCmdConfigImagesPull())
 	return cmd
@@ -392,6 +388,7 @@ func newCmdConfigImagesPull() *cobra.Command {
 			if err := containerRuntime.Connect(); err != nil {
 				return err
 			}
+			defer containerRuntime.Close()
 			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
 		},
 		Args: cobra.NoArgs,

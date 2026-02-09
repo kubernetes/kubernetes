@@ -28,9 +28,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -38,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/controller/replication"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -47,7 +50,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("ReplicationController", func() {
@@ -73,7 +76,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {
 		// requires private images
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		TestReplicationControllerServeImageOrFail(ctx, f, "private", privateimage.GetE2EImage())
 	})
@@ -151,8 +154,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.WatchEventSequenceVerifier(ctx, dc, rcResource, testRcNamespace, testRcName, metav1.ListOptions{LabelSelector: "test-rc-static=true"}, expectedWatchEvents, func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 			ginkgo.By("creating a ReplicationController")
 			// Create a ReplicationController
-			_, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Create(ctx, &rcTest, metav1.CreateOptions{})
+			testRcCreated, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Create(ctx, &rcTest, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Failed to create ReplicationController")
+			gomega.Expect(testRcCreated).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By("waiting for RC to be added")
 			eventFound := false
@@ -207,6 +211,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			testRcPatched, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(ctx, testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "Failed to patch ReplicationController")
 			gomega.Expect(testRcPatched.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-rc", "patched"), "failed to patch RC")
+			gomega.Expect(resourceversion.CompareResourceVersion(testRcCreated.ResourceVersion, testRcPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
 			ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
@@ -429,7 +434,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		expectedRCReplicaCount := int32(2)
 
 		ginkgo.By(fmt.Sprintf("Creating ReplicationController %q", rcName))
-		rc := newRC(rcName, initialRCReplicaCount, map[string]string{"name": rcName}, WebserverImageName, WebserverImage, nil)
+		rc := newRC(rcName, initialRCReplicaCount, map[string]string{"name": rcName}, AgnhostImageName, AgnhostImage, nil)
 		_, err := rcClient.Create(ctx, rc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create ReplicationController: %v", err)
 
@@ -460,7 +465,7 @@ func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageNa
 			Name: rsName,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(replicas),
+			Replicas: ptr.To[int32](replicas),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: rcPodLabels,
@@ -485,6 +490,7 @@ func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageNa
 // The image serves its hostname which is checked for each replica.
 func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework.Framework, test string, image string) {
 	name := "my-hostname-" + test + "-" + string(uuid.NewUUID())
+	rcLabels := map[string]string{"name": name}
 	replicas := int32(1)
 
 	// Create a replication controller for a service
@@ -492,14 +498,14 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 	// The source for the Docker container kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	ginkgo.By(fmt.Sprintf("Creating replication controller %s", name))
-	newRC := newRC(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
+	newRC := newRC(name, replicas, rcLabels, name, image, []string{"serve-hostname"})
 	newRC.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
 	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(ctx, newRC, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	// Check that pods for the new RC were created.
 	// TODO: Maybe switch PodsCreated to just check owner references.
-	pods, err := e2epod.PodsCreated(ctx, f.ClientSet, f.Namespace.Name, name, replicas)
+	pods, err := e2epod.PodsCreatedByLabel(ctx, f.ClientSet, f.Namespace.Name, name, replicas, labels.SelectorFromSet(rcLabels))
 	framework.ExpectNoError(err)
 
 	// Wait for the pods to enter the running state and are Ready. Waiting loops until the pods
@@ -529,7 +535,7 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
-	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, true, 2*time.Minute, pods))
+	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, labels.SelectorFromSet(rcLabels), true, 2*time.Minute, pods))
 }
 
 // 1. Create a quota restricting pods in the current namespace to 2.
@@ -561,7 +567,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating rc %q that asks for more than the allowed pod quota", name))
-	rc := newRC(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage, nil)
+	rc := newRC(name, 3, map[string]string{"name": name}, AgnhostImageName, AgnhostImage, nil)
 	rc, err = c.CoreV1().ReplicationControllers(namespace).Create(ctx, rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -631,7 +637,7 @@ func testRCAdoptMatchingOrphans(ctx context.Context, f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: WebserverImage,
+					Image: AgnhostImage,
 				},
 			},
 		},
@@ -639,7 +645,7 @@ func testRCAdoptMatchingOrphans(ctx context.Context, f *framework.Framework) {
 
 	ginkgo.By("When a replication controller with a matching selector is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, AgnhostImage, nil)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(ctx, rcSt, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
@@ -666,15 +672,16 @@ func testRCAdoptMatchingOrphans(ctx context.Context, f *framework.Framework) {
 
 func testRCReleaseControlledNotMatching(ctx context.Context, f *framework.Framework) {
 	name := "pod-release"
+	rcLabels := map[string]string{"name": name}
 	ginkgo.By("Given a ReplicationController is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
-	rcSt.Spec.Selector = map[string]string{"name": name}
+	rcSt := newRC(name, replicas, rcLabels, name, AgnhostImage, nil)
+	rcSt.Spec.Selector = rcLabels
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(ctx, rcSt, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("When the matched label of one of its pods change")
-	pods, err := e2epod.PodsCreated(ctx, f.ClientSet, f.Namespace.Name, rc.Name, replicas)
+	pods, err := e2epod.PodsCreatedByLabel(ctx, f.ClientSet, f.Namespace.Name, rc.Name, replicas, labels.SelectorFromSet(rcLabels))
 	framework.ExpectNoError(err)
 
 	p := pods.Items[0]

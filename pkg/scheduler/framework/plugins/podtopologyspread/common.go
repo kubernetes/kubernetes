@@ -22,15 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/utils/ptr"
 )
-
-type topologyPair struct {
-	key   string
-	value string
-}
 
 // topologySpreadConstraint is an internal version for v1.TopologySpreadConstraint
 // and where the selector is parsed.
@@ -44,7 +40,7 @@ type topologySpreadConstraint struct {
 	NodeTaintsPolicy   v1.NodeInclusionPolicy
 }
 
-func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(pod *v1.Pod, node *v1.Node, require nodeaffinity.RequiredNodeAffinity) bool {
+func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(logger klog.Logger, pod *v1.Pod, node *v1.Node, require nodeaffinity.RequiredNodeAffinity, enableComparisonOperators bool) bool {
 	if tsc.NodeAffinityPolicy == v1.NodeInclusionPolicyHonor {
 		// We ignore parsing errors here for backwards compatibility.
 		if match, _ := require.Match(node); !match {
@@ -53,7 +49,7 @@ func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(pod *v1.Pod, nod
 	}
 
 	if tsc.NodeTaintsPolicy == v1.NodeInclusionPolicyHonor {
-		if _, untolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc()); untolerated {
+		if _, untolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), enableComparisonOperators); untolerated {
 			return false
 		}
 	}
@@ -146,17 +142,17 @@ func mergeLabelSetWithSelector(matchLabels labels.Set, s labels.Selector) labels
 	return mergedSelector
 }
 
-func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selector, ns string) int {
+func countPodsMatchSelector(podInfos []fwk.PodInfo, selector labels.Selector, ns string) int {
 	if selector.Empty() {
 		return 0
 	}
 	count := 0
 	for _, p := range podInfos {
 		// Bypass terminating Pod (see #87621).
-		if p.Pod.DeletionTimestamp != nil || p.Pod.Namespace != ns {
+		if p.GetPod().DeletionTimestamp != nil || p.GetPod().Namespace != ns {
 			continue
 		}
-		if selector.Matches(labels.Set(p.Pod.Labels)) {
+		if selector.Matches(labels.Set(p.GetPod().Labels)) {
 			count++
 		}
 	}

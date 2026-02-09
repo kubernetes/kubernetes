@@ -19,7 +19,9 @@ package featuregate
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,6 +32,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/naming"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	baseversion "k8s.io/component-base/version"
@@ -62,7 +65,7 @@ var (
 	}
 
 	// Special handling for a few gates.
-	specialFeatures = map[Feature]func(known map[Feature]VersionedSpecs, enabled map[Feature]bool, val bool, cVer *version.Version){
+	specialFeatures = map[Feature]func(known map[Feature]VersionedSpecs, enabled map[Feature]bool, val bool, emuVer, minCompatVer *version.Version){
 		allAlphaGate: setUnsetAlphaGates,
 		allBetaGate:  setUnsetBetaGates,
 	}
@@ -79,6 +82,39 @@ type FeatureSpec struct {
 	// If multiple FeatureSpecs exist for a Feature, the one with the highest version that is less
 	// than or equal to the effective version of the component is used.
 	Version *version.Version
+	// MinCompatibilityVersion indicates the lowest version that this feature spec is compatible with.
+	// The component's minimum compatibility version must be greater than or equal to this version for this spec to be used.
+	// This allows features with skew compatibility implications to be introduced as Beta,
+	// but only on by default once the minimum compatibility version is high enough.
+	// If unspecified, it is inherited from the previous feature stage.
+	// If specified, it must be preceded by another FeatureSpec with the same version and different default but without the MinCompatibilityVersion.
+	// i.e. MinCompatibilityVersion should only be used to specify a different default value at the same version.
+	//
+	// Version vs. MinCompatibilityVersion:
+	//  - Version determines the stability of the feature based on the server's emulation version.
+	//  - MinCompatibilityVersion adds a further check based on the version compatibility
+	// with all servers in the control plane this server expects to communicate with.
+	//
+	// Example:
+	// 	FeatureA: []FeatureSpec{
+	// 		{Version: version.MustParse("1.35"), Default: false, PreRelease: Beta},
+	// 		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.35")},
+	// 	}
+	// In a server running version 1.35:
+	//  - With --min-compatibility-version=1.34 (default), FeatureA is Beta and disabled by default.
+	//  - With --min-compatibility-version=1.35, FeatureA becomes enabled by default.
+	MinCompatibilityVersion *version.Version
+}
+
+func (spec *FeatureSpec) HelpString(featureName Feature, includeCompatVer bool) string {
+	if spec.PreRelease == GA || spec.PreRelease == Deprecated || spec.PreRelease == PreAlpha {
+		return ""
+	}
+	s := fmt.Sprintf("%s=true|false (%s - default=%t)", featureName, spec.PreRelease, spec.Default)
+	if includeCompatVer && spec.MinCompatibilityVersion != nil {
+		return s + fmt.Sprintf(" if --min-compatibility-version>=%s", spec.MinCompatibilityVersion)
+	}
+	return s
 }
 
 type VersionedSpecs []FeatureSpec
@@ -110,13 +146,12 @@ type FeatureGate interface {
 	Enabled(key Feature) bool
 	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
 	KnownFeatures() []string
+	// Dependencies returns a copy of the known feature dependencies.
+	Dependencies() map[Feature][]Feature
 	// DeepCopy returns a deep copy of the FeatureGate object, such that gates can be
 	// set on the copy without mutating the original. This is useful for validating
 	// config against potential feature gate changes before committing those changes.
 	DeepCopy() MutableVersionedFeatureGate
-	// CopyKnownFeatures returns a partial copy of the FeatureGate object, with all the known features and overrides.
-	// This is useful for creating a new instance of feature gate without inheriting all the enabled configurations of the base feature gate.
-	CopyKnownFeatures() MutableVersionedFeatureGate
 	// Validate checks if the flag gates are valid at the emulated version.
 	Validate() []error
 }
@@ -154,6 +189,14 @@ type MutableFeatureGate interface {
 	OverrideDefault(name Feature, override bool) error
 }
 
+// MutableFeatureGateWithLogger provides alternatives to some methods in [MutableFeatureGate]
+// which use a logger provided by the caller instead of the global klog logger.
+type MutableFeatureGateWithLogger interface {
+	SetWithLogger(logger klog.Logger, value string) error
+	SetFromMapWithLogger(logger klog.Logger, m map[string]bool) error
+	OverrideDefaultWithLogger(logger klog.Logger, name Feature, override bool) error
+}
+
 // MutableVersionedFeatureGate parses and stores flag gates for known features from
 // a string like feature1=true,feature2=false,...
 // MutableVersionedFeatureGate sets options based on the emulated version of the featured gate.
@@ -163,14 +206,26 @@ type MutableVersionedFeatureGate interface {
 	// If set, the feature gate would enable/disable features based on
 	// feature availability and pre-release at the emulated version instead of the binary version.
 	EmulationVersion() *version.Version
-	// SetEmulationVersion overrides the emulationVersion of the feature gate.
+	// MinCompatibilityVersion returns the minimum version of all control plane components
+	// that the current server must maintain compatibility with.
+	// This is used to gate features that have cross-component compatibility concerns, for example, during cluster upgrades/rollbacks.
+	// If not explicitly set, it defaults to one minor version prior to EmulationVersion().
+	// A feature stage is disabled if its FeatureSpec.MinCompatibilityVersion is greater than this version.
+	MinCompatibilityVersion() *version.Version
+	// SetEmulationVersion overrides the emulationVersion of the feature gate, and
+	// overrides the minCompatibilityVersion to 1 minor before emulationVersion.`
 	// Otherwise, the emulationVersion will be the same as the binary version.
 	// If set, the feature defaults and availability will be as if the binary is at the emulated version.
 	SetEmulationVersion(emulationVersion *version.Version) error
+	// SetEmulationVersion overrides the emulationVersion and minCompatibilityVersion of the feature gate.
+	SetEmulationVersionAndMinCompatibilityVersion(emulationVersion *version.Version, minCompatibilityVersion *version.Version) error
 	// GetAll returns a copy of the map of known feature names to versioned feature specs.
 	GetAllVersioned() map[Feature]VersionedSpecs
 	// AddVersioned adds versioned feature specs to the featureGate.
 	AddVersioned(features map[Feature]VersionedSpecs) error
+	// AddDependencies marks features that depend on other features. Must be called after all
+	// referenced features have already been added (dependents & depnedencies). Cycles are forbidden.
+	AddDependencies(features map[Feature][]Feature) error
 	// OverrideDefaultAtVersion sets a local override for the registered default value of a named
 	// feature for the prerelease lifecycle the given version is at.
 	// If the feature has not been previously registered (e.g. by a call to Add),
@@ -188,20 +243,33 @@ type MutableVersionedFeatureGate interface {
 	ExplicitlySet(name Feature) bool
 	// ResetFeatureValueToDefault resets the value of the feature back to the default value.
 	ResetFeatureValueToDefault(name Feature) error
+	// DeepCopyAndReset copies all the registered features of the FeatureGate object, with all the known features and overrides,
+	// and resets all the enabled status of the new feature gate.
+	// This is useful for creating a new instance of feature gate without inheriting all the enabled configurations of the base feature gate.
+	DeepCopyAndReset() MutableVersionedFeatureGate
+}
+
+// MutableVersionedFeatureGateWithLogger provides alternatives to some methods in [MutableVersionedFeatureGate]
+// which use a logger provided by the caller instead of the global klog logger.
+type MutableVersionedFeatureGateWithLogger interface {
+	SetEmulationVersionWithLogger(logger klog.Logger, emulationVersion *version.Version) error
+	SetEmulationVersionAndMinCompatibilityVersionWithLogger(logger klog.Logger, emulationVersion *version.Version, minCompatibilityVersion *version.Version) error
+	OverrideDefaultAtVersionWithLogger(logger klog.Logger, name Feature, override bool, ver *version.Version) error
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
 type featureGate struct {
 	featureGateName string
 
-	special map[Feature]func(map[Feature]VersionedSpecs, map[Feature]bool, bool, *version.Version)
+	special map[Feature]func(map[Feature]VersionedSpecs, map[Feature]bool, bool, *version.Version, *version.Version)
 
 	// lock guards writes to all below fields.
 	lock sync.Mutex
 	// known holds a map[Feature]FeatureSpec
 	known atomic.Value
 	// enabled holds a map[Feature]bool
-	enabled atomic.Value
+	enabled      atomic.Value
+	dependencies atomic.Pointer[map[Feature][]Feature]
 	// enabledRaw holds a raw map[string]bool of the parsed flag.
 	// It keeps the original values of "special" features like "all alpha gates",
 	// while enabled keeps the values of all resolved features.
@@ -210,16 +278,20 @@ type featureGate struct {
 	closed bool
 	// queriedFeatures stores all the features that have been queried through the Enabled interface.
 	// It is reset when SetEmulationVersion is called.
-	queriedFeatures  atomic.Value
-	emulationVersion atomic.Pointer[version.Version]
+	queriedFeatures         atomic.Value
+	emulationVersion        atomic.Pointer[version.Version]
+	minCompatibilityVersion atomic.Pointer[version.Version]
 }
 
-func setUnsetAlphaGates(known map[Feature]VersionedSpecs, enabled map[Feature]bool, val bool, cVer *version.Version) {
+var _ MutableVersionedFeatureGateWithLogger = &featureGate{}
+var _ MutableFeatureGateWithLogger = &featureGate{}
+
+func setUnsetAlphaGates(known map[Feature]VersionedSpecs, enabled map[Feature]bool, val bool, emuVer, minCompatVer *version.Version) {
 	for k, v := range known {
 		if k == "AllAlpha" || k == "AllBeta" {
 			continue
 		}
-		featureSpec := featureSpecAtEmulationVersion(v, cVer)
+		featureSpec := featureSpecAtEmulationAndMinCompatVersion(v, emuVer, minCompatVer)
 		if featureSpec.PreRelease == Alpha {
 			if _, found := enabled[k]; !found {
 				enabled[k] = val
@@ -228,12 +300,12 @@ func setUnsetAlphaGates(known map[Feature]VersionedSpecs, enabled map[Feature]bo
 	}
 }
 
-func setUnsetBetaGates(known map[Feature]VersionedSpecs, enabled map[Feature]bool, val bool, cVer *version.Version) {
+func setUnsetBetaGates(known map[Feature]VersionedSpecs, enabled map[Feature]bool, val bool, emuVer, minCompatVer *version.Version) {
 	for k, v := range known {
 		if k == "AllAlpha" || k == "AllBeta" {
 			continue
 		}
-		featureSpec := featureSpecAtEmulationVersion(v, cVer)
+		featureSpec := featureSpecAtEmulationAndMinCompatVersion(v, emuVer, minCompatVer)
 		if featureSpec.PreRelease == Beta {
 			if _, found := enabled[k]; !found {
 				enabled[k] = val
@@ -250,8 +322,13 @@ var _ pflag.Value = &featureGate{}
 var internalPackages = []string{"k8s.io/component-base/featuregate/feature_gate.go"}
 
 // NewVersionedFeatureGate creates a feature gate with the emulation version set to the provided version.
+// Equivalent to calling NewVersionedFeatureGateWithMinCompatibility with emulationVersion, emulationVersion-1.
 // SetEmulationVersion can be called after to change emulation version to a desired value.
 func NewVersionedFeatureGate(emulationVersion *version.Version) *featureGate {
+	return NewVersionedFeatureGateWithMinCompatibility(emulationVersion, emulationVersion.SubtractMinor(1))
+}
+
+func NewVersionedFeatureGateWithMinCompatibility(emulationVersion, minCompatibilityVersion *version.Version) *featureGate {
 	known := map[Feature]VersionedSpecs{}
 	for k, v := range defaultFeatures {
 		known[k] = v
@@ -262,11 +339,12 @@ func NewVersionedFeatureGate(emulationVersion *version.Version) *featureGate {
 		special:         specialFeatures,
 	}
 	f.known.Store(known)
+	f.dependencies.Store(new(map[Feature][]Feature))
 	f.enabled.Store(map[Feature]bool{})
 	f.enabledRaw.Store(map[string]bool{})
 	f.emulationVersion.Store(emulationVersion)
-	f.queriedFeatures.Store(map[Feature]struct{}{})
-	klog.V(1).Infof("new feature gate with emulationVersion=%s", f.emulationVersion.Load().String())
+	f.minCompatibilityVersion.Store(minCompatibilityVersion)
+	f.queriedFeatures.Store(sets.Set[Feature]{})
 	return f
 }
 
@@ -278,7 +356,18 @@ func NewFeatureGate() *featureGate {
 
 // Set parses a string of the form "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
+//
+//logcheck:context // SetWithLogger must be used instead.
 func (f *featureGate) Set(value string) error {
+	return f.SetWithLogger(klog.Background(), value)
+}
+
+// Set parses a string of the form "key1=value1,key2=value2,..." into a
+// map[string]bool of known keys or returns an error.
+func (f *featureGate) SetWithLogger(logger klog.Logger, value string) error {
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+
 	m := make(map[string]bool)
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
@@ -296,7 +385,7 @@ func (f *featureGate) Set(value string) error {
 		}
 		m[k] = boolValue
 	}
-	return f.SetFromMap(m)
+	return f.SetFromMapWithLogger(logger, m)
 }
 
 // Validate checks if the flag gates are valid at the emulated version.
@@ -308,16 +397,19 @@ func (f *featureGate) Validate() []error {
 		return []error{fmt.Errorf("cannot cast enabledRaw to map[string]bool")}
 	}
 	enabled := map[Feature]bool{}
-	return f.unsafeSetFromMap(enabled, m, f.EmulationVersion())
+	// Disable logging here. They would be misleading because we don't actually set anything.
+	return f.unsafeSetFromMap(klog.Logger{}, enabled, m, f.EmulationVersion(), f.MinCompatibilityVersion())
 }
 
 // unsafeSetFromMap stores flag gates for known features from a map[string]bool into an enabled map.
-func (f *featureGate) unsafeSetFromMap(enabled map[Feature]bool, m map[string]bool, emulationVersion *version.Version) []error {
+func (f *featureGate) unsafeSetFromMap(logger klog.Logger, enabled map[Feature]bool, m map[string]bool, emulationVersion, minCompatibilityVersion *version.Version) []error {
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+
 	var errs []error
 	// Copy existing state
 	known := map[Feature]VersionedSpecs{}
 	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		sort.Sort(v)
 		known[k] = v
 	}
 
@@ -329,34 +421,67 @@ func (f *featureGate) unsafeSetFromMap(enabled map[Feature]bool, m map[string]bo
 			errs = append(errs, fmt.Errorf("unrecognized feature gate: %s", k))
 			return errs
 		}
-		featureSpec := featureSpecAtEmulationVersion(versionedSpecs, emulationVersion)
+		featureSpec := featureSpecAtEmulationAndMinCompatVersion(versionedSpecs, emulationVersion, minCompatibilityVersion)
 		if featureSpec.LockToDefault && featureSpec.Default != v {
 			errs = append(errs, fmt.Errorf("cannot set feature gate %v to %v, feature is locked to %v", k, v, featureSpec.Default))
 			continue
 		}
 		// Handle "special" features like "all alpha gates"
 		if fn, found := f.special[key]; found {
-			fn(known, enabled, v, emulationVersion)
+			fn(known, enabled, v, emulationVersion, minCompatibilityVersion)
 			enabled[key] = v
 			continue
 		}
 		if featureSpec.PreRelease == PreAlpha {
-			errs = append(errs, fmt.Errorf("cannot set feature gate %v to %v, feature is PreAlpha at emulated version %s", k, v, emulationVersion.String()))
+			errs = append(errs, fmt.Errorf("cannot set feature gate %v to %v, feature is PreAlpha at emulated version %s, min compatibility version %s", k, v, emulationVersion, minCompatibilityVersion))
 			continue
 		}
 		enabled[key] = v
 
 		if featureSpec.PreRelease == Deprecated {
-			klog.Warningf("Setting deprecated feature gate %s=%t. It will be removed in a future release.", k, v)
+			logger.Info("Warning: setting deprecated feature gate. It will be removed in a future release.", "featureGate", k, "value", v)
 		} else if featureSpec.PreRelease == GA {
-			klog.Warningf("Setting GA feature gate %s=%t. It will be removed in a future release.", k, v)
+			logger.Info("Warning: setting GA feature gate. It will be removed in a future release.", "featureGate", k, "value", v)
 		}
 	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+
+	// If enabled features were set successfully, validate them against the dependencies.
+	dependencies := *f.dependencies.Load()
+	for feature, deps := range dependencies {
+		if !featureEnabled(feature, enabled, known, emulationVersion, minCompatibilityVersion) {
+			continue
+		}
+
+		var disabledDeps []Feature
+		for _, dep := range deps {
+			if !featureEnabled(dep, enabled, known, emulationVersion, minCompatibilityVersion) {
+				disabledDeps = append(disabledDeps, dep)
+			}
+		}
+		if len(disabledDeps) > 0 {
+			errs = append(errs, fmt.Errorf("%s is enabled, but depends on features that are disabled: %v", feature, disabledDeps))
+		}
+	}
+
 	return errs
 }
 
 // SetFromMap stores flag gates for known features from a map[string]bool or returns an error
+//
+//logcheck:context // SetFromMapWithLogger must be used instead.
 func (f *featureGate) SetFromMap(m map[string]bool) error {
+	return f.SetFromMapWithLogger(klog.Background(), m)
+}
+
+// SetFromMapWithLogger stores flag gates for known features from a map[string]bool or returns an error
+func (f *featureGate) SetFromMapWithLogger(logger klog.Logger, m map[string]bool) error {
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -378,11 +503,11 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 	}
 	f.enabledRaw.Store(enabledRaw)
 
-	errs := f.unsafeSetFromMap(enabled, enabledRaw, f.EmulationVersion())
+	errs := f.unsafeSetFromMap(logger, enabled, enabledRaw, f.EmulationVersion(), f.MinCompatibilityVersion())
 	if len(errs) == 0 {
 		// Persist changes
 		f.enabled.Store(enabled)
-		klog.V(1).Infof("feature gates: %v", f.enabled)
+		logger.V(1).Info("Updated", "featureGates", enabled)
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -420,36 +545,243 @@ func (f *featureGate) AddVersioned(features map[Feature]VersionedSpecs) error {
 	if f.closed {
 		return fmt.Errorf("cannot add a feature gate after adding it to the flag set")
 	}
-
 	// Copy existing state
-	known := map[Feature]VersionedSpecs{}
-	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		known[k] = v
-	}
+	known := f.GetAllVersioned()
 
 	for name, specs := range features {
-		sort.Sort(specs)
+		var completedSpecs VersionedSpecs
+		// Validate new specs are well-formed
+		var lastSpec FeatureSpec
+		var wasBeta, wasGA, wasDeprecated, wasLockedToDefault bool
+		for i, spec := range specs {
+			if spec.Version == nil {
+				return fmt.Errorf("feature %q did not provide a version", name)
+			}
+			if len(spec.Version.Components()) != 2 {
+				return fmt.Errorf("feature %q specified patch version: %s", name, spec.Version)
+			}
+			if spec.MinCompatibilityVersion != nil {
+				if i == 0 || !spec.Version.EqualTo(lastSpec.Version) {
+					return fmt.Errorf("feature %q specified MinCompatibilityVersion: %s without a preceding entry at the same Version without MinCompatibilityVersion set", name, spec.MinCompatibilityVersion)
+				}
+				if len(spec.MinCompatibilityVersion.Components()) != 2 {
+					return fmt.Errorf("feature %q specified patch MinCompatibilityVersion: %s", name, spec.MinCompatibilityVersion)
+				}
+				if spec.MinCompatibilityVersion.GreaterThan(spec.Version) {
+					return fmt.Errorf("feature %q MinCompatibilityVersion %s greater than Version %s", name, spec.MinCompatibilityVersion, spec.Version)
+				}
+			}
+			// gates that begin as deprecated must indicate their prior state
+			if i == 0 && spec.PreRelease == Deprecated && spec.Version.Minor() != 0 {
+				return fmt.Errorf("feature %q introduced as deprecated must provide a 1.0 entry indicating initial state", name)
+			}
+			if i > 0 {
+				// either versions or minCompatibilityVersions have to increase
+				if spec.Version.LessThan(lastSpec.Version) {
+					return fmt.Errorf("feature %q lists version transitions in decreasing order (%s < %s)", name, spec.Version, lastSpec.Version)
+				}
+				if spec.MinCompatibilityVersion != nil && lastSpec.MinCompatibilityVersion != nil && spec.MinCompatibilityVersion.LessThan(lastSpec.MinCompatibilityVersion) {
+					return fmt.Errorf("feature %q lists min compatibility version transitions in decreasing order (%s < %s)", name, spec.MinCompatibilityVersion, lastSpec.MinCompatibilityVersion)
+				}
+				if spec.Version.EqualTo(lastSpec.Version) {
+					if spec.MinCompatibilityVersion.EqualTo(lastSpec.MinCompatibilityVersion) {
+						return fmt.Errorf("feature %q lists duplicate entries with the same versions (%s = %s)", name, spec.Version, lastSpec.Version)
+					}
+					if spec.PreRelease != lastSpec.PreRelease {
+						return fmt.Errorf("feature %q lists stability changes with the same version (%s -> %s)", name, lastSpec.PreRelease, spec.PreRelease)
+					}
+					if spec.LockToDefault != lastSpec.LockToDefault {
+						return fmt.Errorf("feature %q lists locked to default changes with the same version (%v -> %v)", name, lastSpec.LockToDefault, spec.LockToDefault)
+					}
+				}
+				if spec.PreRelease == lastSpec.PreRelease && spec.Default == lastSpec.Default && spec.LockToDefault == lastSpec.LockToDefault {
+					return fmt.Errorf("feature %q lists transition without stability change (%s -> %s)", name, lastSpec.Version, spec.Version)
+				}
+				if wasLockedToDefault && !spec.LockToDefault {
+					return fmt.Errorf("feature %q must not unlock after locking to default", name)
+				}
+				// stability must not regress from ga --> {beta,alpha} or beta --> alpha, and
+				// Deprecated state must be the terminal state
+				switch {
+				case spec.PreRelease != Deprecated && wasDeprecated:
+					return fmt.Errorf("deprecated feature %q must not resurrect from its terminal state", name)
+				case spec.PreRelease == Alpha && (wasBeta || wasGA):
+					return fmt.Errorf("feature %q regresses stability from more stable level to %s in %s", name, spec.PreRelease, spec.Version)
+				case spec.PreRelease == Beta && wasGA:
+					return fmt.Errorf("feature %q regresses stability from more stable level to %s in %s", name, spec.PreRelease, spec.Version)
+				}
+			}
+			completedSpec := spec
+			// set MinCompatibilityVersion to the last MinCompatibilityVersion if unspecified.
+			// this makes sure MinCompatibilityVersion does not decrease.
+			// For example:
+			// 	FeatureA: {
+			// 		{Version: version.MustParse("1.35"), Default: false, PreRelease: Beta},
+			// 		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta, MinCompatibilityVersion: 1.35},
+			//      {Version: version.MustParse("1.37"), Default: true, PreRelease: GA},
+			// 	},
+			// FeatureA should have MinCompatibilityVersion at least 1.35 at GA.
+			if completedSpec.MinCompatibilityVersion == nil && i > 0 {
+				completedSpec.MinCompatibilityVersion = lastSpec.MinCompatibilityVersion
+			}
+			completedSpecs = append(completedSpecs, completedSpec)
+			lastSpec = completedSpec
+			wasBeta = wasBeta || spec.PreRelease == Beta
+			wasGA = wasGA || spec.PreRelease == GA
+			wasDeprecated = wasDeprecated || spec.PreRelease == Deprecated
+			wasLockedToDefault = wasLockedToDefault || spec.LockToDefault
+		}
 		if existingSpec, found := known[name]; found {
-			sort.Sort(existingSpec)
-			if reflect.DeepEqual(existingSpec, specs) {
+			if reflect.DeepEqual(existingSpec, completedSpecs) {
 				continue
 			}
 			return fmt.Errorf("feature gate %q with different spec already exists: %v", name, existingSpec)
 		}
-		known[name] = specs
+		known[name] = completedSpecs
 	}
-
 	// Persist updated state
 	f.known.Store(known)
 
 	return nil
 }
 
-func (f *featureGate) OverrideDefault(name Feature, override bool) error {
-	return f.OverrideDefaultAtVersion(name, override, f.EmulationVersion())
+// AddDependencies adds feature gate dependencies.
+func (f *featureGate) AddDependencies(dependencies map[Feature][]Feature) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.closed {
+		return fmt.Errorf("cannot add a feature gate dependency after adding it to the flag set")
+	}
+	// Copy existing state
+	known := f.GetAllVersioned()
+
+	// Merge existing dependencies in.
+	existing := *f.dependencies.Load()
+	for k, v := range existing {
+		dependencies[k] = append(dependencies[k], v...)
+	}
+
+	// Sort and compact all dependency lists.
+	for k, v := range dependencies {
+		slices.Sort(v)
+		dependencies[k] = slices.Compact(v)
+	}
+
+	// Validate dependencies for each emulated version:
+	// 1. Features & dependencies must be known
+	// 2. Features cannot depend on features with a lower prerelease level
+	// 3. Enabled features cannot depend on disabled features
+	// 4. Locked-to-default featurs cannot depend on unlocked features
+	for feature, deps := range dependencies {
+		versionedFeature, ok := known[feature]
+		if !ok {
+			return fmt.Errorf("cannot add dependency for unknown feature %s", feature)
+		}
+
+		for _, dep := range deps {
+			versionedDep, ok := known[dep]
+			if !ok {
+				return fmt.Errorf("cannot add dependency from %s to unknown feature %s", feature, dep)
+			}
+
+			// Check versions starting with the most recent for more intuitive error messages.
+			for _, spec := range slices.Backward(versionedFeature) {
+				// depSpec is the effective FeatureSpec for the dependency at the version declared by the dependent FeatureSpec.
+				depSpec := featureSpecAtEmulationAndMinCompatVersion(versionedDep, spec.Version, spec.MinCompatibilityVersion)
+
+				if stabilityOrder(spec.PreRelease) > stabilityOrder(depSpec.PreRelease) {
+					return fmt.Errorf("%s feature %s cannot depend on %s feature %s at version %s", spec.PreRelease, feature, depSpec.PreRelease, dep, spec.Version)
+				}
+				if spec.Default && !depSpec.Default {
+					return fmt.Errorf("default-enabled feature %s cannot depend on default-disabled feature %s at version %s", feature, dep, spec.Version)
+				}
+				if spec.LockToDefault && !depSpec.LockToDefault {
+					return fmt.Errorf("locked-to-default feature %s cannot depend on unlocked feature %s at version %s", feature, dep, spec.Version)
+				}
+			}
+		}
+	}
+
+	// Check for cycles
+	visited := map[Feature]bool{}
+	finished := map[Feature]bool{}
+	var detectCycles func(Feature) error
+	detectCycles = func(feature Feature) error {
+		if finished[feature] {
+			return nil
+		}
+		if visited[feature] {
+			return fmt.Errorf("cycle detected with feature %s", feature)
+		}
+		visited[feature] = true
+		for _, dep := range dependencies[feature] {
+			if err := detectCycles(dep); err != nil {
+				return err
+			}
+		}
+		finished[feature] = true
+		return nil
+	}
+	for feature := range dependencies {
+		if err := detectCycles(feature); err != nil {
+			return err
+		}
+	}
+
+	// Persist updated state
+	f.dependencies.Store(&dependencies)
+
+	return nil
 }
 
+// stabilityOrder converts prereleases to a numerical value for dependency comparison.
+// Features cannot depend on features with a lower prerelease level.
+func stabilityOrder(p prerelease) int {
+	switch p {
+	case Deprecated:
+		return 0 // Non-deprecated features cannot depend on deprecated features.
+	case PreAlpha, Alpha: // Alpha features are allowed to depend on pre-alpha features.
+		return 1
+	case Beta:
+		return 2
+	case GA:
+		return 3
+	default:
+		return -1 // Unknown prerelease
+	}
+}
+
+func (f *featureGate) Dependencies() map[Feature][]Feature {
+	return maps.Clone(*f.dependencies.Load())
+}
+
+//logcheck:context // OverridedDefaultWithLogger must be used instead.
+func (f *featureGate) OverrideDefault(name Feature, override bool) error {
+	return f.OverrideDefaultWithLogger(klog.Background(), name, override)
+}
+
+func (f *featureGate) OverrideDefaultWithLogger(logger klog.Logger, name Feature, override bool) error {
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+	return f.overrideDefaultAtEmulationAndMinCompatVersion(logger, name, override, f.EmulationVersion(), f.MinCompatibilityVersion())
+}
+
+//logcheck:context // OverrideDefaultAtWithLogger must be used instead.
 func (f *featureGate) OverrideDefaultAtVersion(name Feature, override bool, ver *version.Version) error {
+	return f.OverrideDefaultAtVersionWithLogger(klog.Background(), name, override, ver)
+}
+
+func (f *featureGate) OverrideDefaultAtVersionWithLogger(logger klog.Logger, name Feature, override bool, ver *version.Version) error {
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+	return f.overrideDefaultAtEmulationAndMinCompatVersion(logger, name, override, ver, nil)
+}
+
+func (f *featureGate) overrideDefaultAtEmulationAndMinCompatVersion(logger klog.Logger, name Feature, override bool, emuVer, minCompatVer *version.Version) error {
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -457,26 +789,23 @@ func (f *featureGate) OverrideDefaultAtVersion(name Feature, override bool, ver 
 		return fmt.Errorf("cannot override default for feature %q: gates already added to a flag set", name)
 	}
 
-	known := map[Feature]VersionedSpecs{}
-	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		sort.Sort(v)
-		known[k] = v
-	}
+	// Copy existing state
+	known := f.GetAllVersioned()
 
 	specs, ok := known[name]
 	if !ok {
 		return fmt.Errorf("cannot override default: feature %q is not registered", name)
 	}
-	spec := featureSpecAtEmulationVersion(specs, ver)
+	spec := featureSpecAtEmulationAndMinCompatVersion(specs, emuVer, minCompatVer)
 	switch {
 	case spec.LockToDefault:
 		return fmt.Errorf("cannot override default: feature %q default is locked to %t", name, spec.Default)
 	case spec.PreRelease == PreAlpha:
-		return fmt.Errorf("cannot override default: feature %q is not available before version %s", name, ver.String())
+		return fmt.Errorf("cannot override default: feature %q is not available before version %s", name, emuVer)
 	case spec.PreRelease == Deprecated:
-		klog.Warningf("Overriding default of deprecated feature gate %s=%t. It will be removed in a future release.", name, override)
+		logger.Info("Warning: overriding default of deprecated feature gate. It will be removed in a future release.", "featureGate", name, "value", override)
 	case spec.PreRelease == GA:
-		klog.Warningf("Overriding default of GA feature gate %s=%t. It will be removed in a future release.", name, override)
+		logger.Info("Warning: overriding default of GA feature gate. It will be removed in a future release.", "featureGate", name, "value", override)
 	}
 
 	spec.Default = override
@@ -492,9 +821,10 @@ func (f *featureGate) GetAll() map[Feature]FeatureSpec {
 	f.lock.Lock()
 	versionedSpecs := f.GetAllVersioned()
 	emuVer := f.EmulationVersion()
+	minCompatVer := f.MinCompatibilityVersion()
 	f.lock.Unlock()
 	for k, v := range versionedSpecs {
-		spec := featureSpecAtEmulationVersion(v, emuVer)
+		spec := featureSpecAtEmulationAndMinCompatVersion(v, emuVer, minCompatVer)
 		if spec.PreRelease == PreAlpha {
 			// The feature is not available at the emulation version.
 			continue
@@ -508,18 +838,39 @@ func (f *featureGate) GetAll() map[Feature]FeatureSpec {
 func (f *featureGate) GetAllVersioned() map[Feature]VersionedSpecs {
 	retval := map[Feature]VersionedSpecs{}
 	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		retval[k] = v
+		vCopy := make([]FeatureSpec, len(v))
+		_ = copy(vCopy, v)
+		retval[k] = vCopy
 	}
 	return retval
 }
 
+//logcheck:context // SetEmulationVersionWithLogger must be used instead.
 func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) error {
-	if emulationVersion.EqualTo(f.EmulationVersion()) {
+	return f.SetEmulationVersionWithLogger(klog.Background(), emulationVersion)
+}
+
+func (f *featureGate) SetEmulationVersionWithLogger(logger klog.Logger, emulationVersion *version.Version) error {
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+	return f.SetEmulationVersionAndMinCompatibilityVersionWithLogger(logger, emulationVersion, emulationVersion.SubtractMinor(1))
+}
+
+//logcheck:context // SetEmulationVersionAndMinCompatibilityWithLogger must be used instead.
+func (f *featureGate) SetEmulationVersionAndMinCompatibilityVersion(emulationVersion *version.Version, minCompatibilityVersion *version.Version) error {
+	return f.SetEmulationVersionAndMinCompatibilityVersionWithLogger(klog.Background(), emulationVersion, minCompatibilityVersion)
+}
+
+func (f *featureGate) SetEmulationVersionAndMinCompatibilityVersionWithLogger(logger klog.Logger, emulationVersion *version.Version, minCompatibilityVersion *version.Version) error {
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+
+	if emulationVersion.EqualTo(f.EmulationVersion()) && minCompatibilityVersion.EqualTo(f.MinCompatibilityVersion()) {
 		return nil
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	klog.V(1).Infof("set feature gate emulationVersion to %s", emulationVersion.String())
+	logger.V(1).Info("Set feature gate emulation", "emulationVersion", emulationVersion, "minCompatibilityVersion", minCompatibilityVersion)
 
 	// Copy existing state
 	enabledRaw := map[string]bool{}
@@ -528,15 +879,15 @@ func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) err
 	}
 	// enabled map should be reset whenever emulationVersion is changed.
 	enabled := map[Feature]bool{}
-	errs := f.unsafeSetFromMap(enabled, enabledRaw, emulationVersion)
+	errs := f.unsafeSetFromMap(logger, enabled, enabledRaw, emulationVersion, minCompatibilityVersion)
 
-	queriedFeatures := f.queriedFeatures.Load().(map[Feature]struct{})
+	queriedFeatures := f.queriedFeatures.Load().(sets.Set[Feature])
 	known := f.known.Load().(map[Feature]VersionedSpecs)
 	for feature := range queriedFeatures {
-		newVal := featureEnabled(feature, enabled, known, emulationVersion)
-		oldVal := featureEnabled(feature, f.enabled.Load().(map[Feature]bool), known, f.EmulationVersion())
+		newVal := featureEnabled(feature, enabled, known, emulationVersion, minCompatibilityVersion)
+		oldVal := featureEnabled(feature, f.enabled.Load().(map[Feature]bool), known, f.EmulationVersion(), f.MinCompatibilityVersion())
 		if newVal != oldVal {
-			klog.Warningf("SetEmulationVersion will change already queried feature:%s from %v to %v", feature, oldVal, newVal)
+			logger.Info("Warning: SetEmulationVersionAndMinCompatibilityVersion will change already queried feature", "featureGate", feature, "oldValue", oldVal, newVal)
 		}
 	}
 
@@ -544,7 +895,8 @@ func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) err
 		// Persist changes
 		f.enabled.Store(enabled)
 		f.emulationVersion.Store(emulationVersion)
-		f.queriedFeatures.Store(map[Feature]struct{}{})
+		f.minCompatibilityVersion.Store(minCompatibilityVersion)
+		f.queriedFeatures.Store(sets.Set[Feature]{})
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -553,35 +905,39 @@ func (f *featureGate) EmulationVersion() *version.Version {
 	return f.emulationVersion.Load()
 }
 
+func (f *featureGate) MinCompatibilityVersion() *version.Version {
+	return f.minCompatibilityVersion.Load()
+}
+
 // featureSpec returns the featureSpec at the EmulationVersion if the key exists, an error otherwise.
 // This is useful to keep multiple implementations of a feature based on the PreRelease or Version info.
 func (f *featureGate) featureSpec(key Feature) (FeatureSpec, error) {
 	if v, ok := f.known.Load().(map[Feature]VersionedSpecs)[key]; ok {
-		featureSpec := f.featureSpecAtEmulationVersion(v)
+		featureSpec := f.featureSpecAtEmulationAndMinCompatVersion(v)
 		return *featureSpec, nil
 	}
 	return FeatureSpec{}, fmt.Errorf("feature %q is not registered in FeatureGate %q", key, f.featureGateName)
 }
 
 func (f *featureGate) unsafeRecordQueried(key Feature) {
-	queriedFeatures := map[Feature]struct{}{}
-	for k := range f.queriedFeatures.Load().(map[Feature]struct{}) {
-		queriedFeatures[k] = struct{}{}
-	}
+	queriedFeatures := f.queriedFeatures.Load().(sets.Set[Feature])
 	if _, ok := queriedFeatures[key]; ok {
 		return
 	}
-	queriedFeatures[key] = struct{}{}
-	f.queriedFeatures.Store(queriedFeatures)
+	// Clone items from queriedFeatures before mutating it
+	newQueriedFeatures := queriedFeatures.Clone()
+	newQueriedFeatures.Insert(key)
+	f.queriedFeatures.Store(newQueriedFeatures)
 }
 
-func featureEnabled(key Feature, enabled map[Feature]bool, known map[Feature]VersionedSpecs, emulationVersion *version.Version) bool {
+func featureEnabled(key Feature, enabled map[Feature]bool, known map[Feature]VersionedSpecs, emulationVersion, minCompatibilityVersion *version.Version) bool {
 	// check explicitly set enabled list
 	if v, ok := enabled[key]; ok {
 		return v
 	}
 	if v, ok := known[key]; ok {
-		return featureSpecAtEmulationVersion(v, emulationVersion).Default
+		featureSpec := featureSpecAtEmulationAndMinCompatVersion(v, emulationVersion, minCompatibilityVersion)
+		return featureSpec.Default
 	}
 
 	panic(fmt.Errorf("feature %q is not registered in FeatureGate", key))
@@ -590,19 +946,26 @@ func featureEnabled(key Feature, enabled map[Feature]bool, known map[Feature]Ver
 // Enabled returns true if the key is enabled.  If the key is not known, this call will panic.
 func (f *featureGate) Enabled(key Feature) bool {
 	// TODO: ideally we should lock the feature gate in this call to be safe, need to evaluate how much performance impact locking would have.
-	v := featureEnabled(key, f.enabled.Load().(map[Feature]bool), f.known.Load().(map[Feature]VersionedSpecs), f.EmulationVersion())
+	v := featureEnabled(key, f.enabled.Load().(map[Feature]bool), f.known.Load().(map[Feature]VersionedSpecs), f.EmulationVersion(), f.MinCompatibilityVersion())
 	f.unsafeRecordQueried(key)
 	return v
 }
 
-func (f *featureGate) featureSpecAtEmulationVersion(v VersionedSpecs) *FeatureSpec {
-	return featureSpecAtEmulationVersion(v, f.EmulationVersion())
+func (f *featureGate) featureSpecAtEmulationAndMinCompatVersion(v VersionedSpecs) *FeatureSpec {
+	return featureSpecAtEmulationAndMinCompatVersion(v, f.EmulationVersion(), f.MinCompatibilityVersion())
 }
 
-func featureSpecAtEmulationVersion(v VersionedSpecs, emulationVersion *version.Version) *FeatureSpec {
+func featureSpecAtEmulationAndMinCompatVersion(v VersionedSpecs, emulationVersion, minCompatibilityVersion *version.Version) *FeatureSpec {
 	i := len(v) - 1
+	if minCompatibilityVersion == nil {
+		minCompatibilityVersion = emulationVersion.SubtractMinor(1)
+	}
 	for ; i >= 0; i-- {
 		if v[i].Version.GreaterThan(emulationVersion) {
+			continue
+		}
+		specMinCompatibilityVersion := v[i].MinCompatibilityVersion
+		if specMinCompatibilityVersion != nil && !minCompatibilityVersion.AtLeast(specMinCompatibilityVersion) {
 			continue
 		}
 		return &v[i]
@@ -650,20 +1013,36 @@ func (f *featureGate) KnownFeatures() []string {
 			known = append(known, fmt.Sprintf("%s=true|false (%s - default=%t)", k, v[0].PreRelease, v[0].Default))
 			continue
 		}
-		featureSpec := f.featureSpecAtEmulationVersion(v)
-		if featureSpec.PreRelease == GA || featureSpec.PreRelease == Deprecated || featureSpec.PreRelease == PreAlpha {
+		featureSpec := f.featureSpecAtEmulationAndMinCompatVersion(v)
+		featureSpecStr := featureSpec.HelpString(k, false)
+		featureSpecMinCompatMode := featureSpecAtEmulationAndMinCompatVersion(v, f.EmulationVersion(), f.EmulationVersion())
+		featureSpecMinCompatModeStr := featureSpecMinCompatMode.HelpString(k, true)
+		if reflect.DeepEqual(featureSpec, featureSpecMinCompatMode) {
+			if featureSpecStr != "" {
+				known = append(known, featureSpecStr)
+			}
 			continue
 		}
-		known = append(known, fmt.Sprintf("%s=true|false (%s - default=%t)", k, featureSpec.PreRelease, featureSpec.Default))
+		components := []string{}
+		if featureSpecStr != "" {
+			components = append(components, featureSpecStr)
+		}
+		if featureSpecMinCompatModeStr != "" {
+			components = append(components, featureSpecMinCompatModeStr)
+		}
+		if len(components) > 0 {
+			known = append(known, strings.Join(components, ", or "))
+		}
 	}
 	sort.Strings(known)
 	return known
 }
 
-// CopyKnownFeatures returns a partial copy of the FeatureGate object, with all the known features and overrides.
+// DeepCopyAndReset copies all the registered features of the FeatureGate object, with all the known features and overrides,
+// and resets all the enabled status of the new feature gate.
 // This is useful for creating a new instance of feature gate without inheriting all the enabled configurations of the base feature gate.
-func (f *featureGate) CopyKnownFeatures() MutableVersionedFeatureGate {
-	fg := NewVersionedFeatureGate(f.EmulationVersion())
+func (f *featureGate) DeepCopyAndReset() MutableVersionedFeatureGate {
+	fg := NewVersionedFeatureGateWithMinCompatibility(f.EmulationVersion(), f.MinCompatibilityVersion())
 	known := f.GetAllVersioned()
 	fg.known.Store(known)
 	return fg
@@ -676,10 +1055,7 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	// Copy existing state.
-	known := map[Feature]VersionedSpecs{}
-	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		known[k] = v
-	}
+	known := f.GetAllVersioned()
 	enabled := map[Feature]bool{}
 	for k, v := range f.enabled.Load().(map[Feature]bool) {
 		enabled[k] = v
@@ -687,6 +1063,10 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 	enabledRaw := map[string]bool{}
 	for k, v := range f.enabledRaw.Load().(map[string]bool) {
 		enabledRaw[k] = v
+	}
+	dependencies := map[Feature][]Feature{}
+	for k, v := range *f.dependencies.Load() {
+		dependencies[k] = append([]Feature{}, v...)
 	}
 
 	// Construct a new featureGate around the copied state.
@@ -697,10 +1077,12 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 		closed:  f.closed,
 	}
 	fg.emulationVersion.Store(f.EmulationVersion())
+	fg.minCompatibilityVersion.Store(f.MinCompatibilityVersion())
 	fg.known.Store(known)
 	fg.enabled.Store(enabled)
+	fg.dependencies.Store(&dependencies)
 	fg.enabledRaw.Store(enabledRaw)
-	fg.queriedFeatures.Store(map[Feature]struct{}{})
+	fg.queriedFeatures.Store(sets.Set[Feature]{})
 	return fg
 }
 

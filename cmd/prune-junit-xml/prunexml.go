@@ -23,7 +23,9 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 
+	"k8s.io/kubernetes/cmd/prune-junit-xml/logparse"
 	"k8s.io/kubernetes/third_party/forked/gotestsum/junitxml"
 )
 
@@ -64,25 +66,57 @@ func main() {
 
 func pruneXML(suites *junitxml.JUnitTestSuites, maxBytes int) {
 	for _, suite := range suites.Suites {
-		for _, testcase := range suite.TestCases {
+		for i := range suite.TestCases {
+			// Modify directly in the TestCases slice, if necessary.
+			testcase := &suite.TestCases[i]
 			if testcase.SkipMessage != nil {
-				if len(testcase.SkipMessage.Message) > maxBytes {
-					fmt.Printf("clipping skip message in test case : %s\n", testcase.Name)
-					head := testcase.SkipMessage.Message[:maxBytes/2]
-					tail := testcase.SkipMessage.Message[len(testcase.SkipMessage.Message)-maxBytes/2:]
-					testcase.SkipMessage.Message = head + "[...clipped...]" + tail
-				}
+				pruneStringIfNeeded(&testcase.SkipMessage.Message, maxBytes, "clipping skip message in test case : %s\n", testcase.Name)
 			}
 			if testcase.Failure != nil {
-				if len(testcase.Failure.Contents) > maxBytes {
-					fmt.Printf("clipping failure message in test case : %s\n", testcase.Name)
-					head := testcase.Failure.Contents[:maxBytes/2]
-					tail := testcase.Failure.Contents[len(testcase.Failure.Contents)-maxBytes/2:]
-					testcase.Failure.Contents = head + "[...clipped...]" + tail
+				// In Go unit tests, the entire test output
+				// becomes the failure message because `go
+				// test` doesn't track why a test fails. This
+				// can make the failure message pretty large.
+				//
+				// We cannot identify the real failure here
+				// either because Kubernetes has no convention
+				// for how to format test failures. What we can
+				// do is recognize log output added by klog.
+				//
+				// Therefore here we move the full text to
+				// to the test output and only keep those
+				// lines in the failure which are not from
+				// klog.
+				if testcase.SystemOut == "" {
+					var buf strings.Builder
+					// Iterate over all the log entries and decide what to keep as failure message.
+					for entry := range logparse.All(strings.NewReader(testcase.Failure.Contents)) {
+						if _, ok := entry.(*logparse.KlogEntry); ok {
+							continue
+						}
+						_, _ = buf.WriteString(entry.LogData())
+					}
+					if buf.Len() < len(testcase.Failure.Contents) {
+						// Update both strings because they became different.
+						testcase.SystemOut = testcase.Failure.Contents
+						pruneStringIfNeeded(&testcase.SystemOut, maxBytes, "clipping log output in test case: %s\n", testcase.Name)
+						testcase.Failure.Contents = buf.String()
+					}
 				}
+				pruneStringIfNeeded(&testcase.Failure.Contents, maxBytes, "clipping failure message in test case : %s\n", testcase.Name)
 			}
 		}
 	}
+}
+
+func pruneStringIfNeeded(str *string, maxBytes int, msg string, args ...any) {
+	if len(*str) <= maxBytes {
+		return
+	}
+	fmt.Printf(msg, args...)
+	head := (*str)[:maxBytes/2]
+	tail := (*str)[len(*str)-maxBytes/2:]
+	*str = head + "[...clipped...]" + tail
 }
 
 // This function condenses the junit xml to have package name as top level identifier
@@ -101,22 +135,54 @@ func pruneTESTS(suites *junitxml.JUnitTestSuites) {
 		updatedTestcase.Classname = match[1]
 		updatedTestcase.Name = match[2]
 		updatedTestcase.Time = suite.Time
+		updatedSystemOut := ""
+		updatedSystemErr := ""
 		for _, testcase := range suite.TestCases {
 			// The top level testcase element in a JUnit xml file does not have the / character.
 			if testcase.Failure != nil {
 				failflag = true
-				updatedTestcaseFailure.Message = updatedTestcaseFailure.Message + testcase.Failure.Message + ";"
-				updatedTestcaseFailure.Contents = updatedTestcaseFailure.Contents + testcase.Failure.Contents + ";"
-				updatedTestcaseFailure.Type = updatedTestcaseFailure.Type + testcase.Failure.Type
+				updatedTestcaseFailure.Message = joinTexts(updatedTestcaseFailure.Message, testcase.Failure.Message)
+				updatedTestcaseFailure.Contents = joinTexts(updatedTestcaseFailure.Contents, testcase.Failure.Contents)
+				updatedTestcaseFailure.Type = joinTexts(updatedTestcaseFailure.Type, testcase.Failure.Type)
+				updatedSystemOut = joinTexts(updatedSystemOut, testcase.SystemOut)
+				updatedSystemErr = joinTexts(updatedSystemErr, testcase.SystemErr)
 			}
 		}
 		if failflag {
 			updatedTestcase.Failure = &updatedTestcaseFailure
+			updatedTestcase.SystemOut = updatedSystemOut
+			updatedTestcase.SystemErr = updatedSystemErr
 		}
 		suite.TestCases = append(updatedTestcases, updatedTestcase)
 		updatedTestsuites = append(updatedTestsuites, suite)
 	}
 	suites.Suites = updatedTestsuites
+}
+
+// joinTexts returns "<a><empty line><b>" if both are non-empty,
+// otherwise just the non-empty string, if there is one.
+//
+// If <b> is contained completely in <a>, <a> gets returned because repeating
+// exactly the same string again doesn't add any information. Typically
+// this occurs when joining the failure message because that is the fixed
+// string "Failed" for all tests, regardless of what the test logged.
+// The test log output is typically different because it cointains "=== RUN
+// <test name>" and thus doesn't get dropped.
+func joinTexts(a, b string) string {
+	if a == "" {
+		return b
+	}
+	if b == "" {
+		return a
+	}
+	if strings.Contains(a, b) {
+		return a
+	}
+	sep := "\n"
+	if !strings.HasSuffix(a, "\n") {
+		sep = "\n\n"
+	}
+	return a + sep + b
 }
 
 func fetchXML(xmlReader io.Reader) (*junitxml.JUnitTestSuites, error) {

@@ -61,7 +61,7 @@ func SplitEnvironmentFromResources(args []string) (resources, envArgs []string, 
 // envVarType is for making errors more specific to user intentions.
 func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) ([]v1.EnvVar, []string, bool, error) {
 	env := []v1.EnvVar{}
-	exists := sets.NewString()
+	exists := sets.New[string]()
 	var remove []string
 	usedStdin := false
 	for _, envSpec := range spec {

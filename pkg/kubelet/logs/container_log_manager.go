@@ -53,9 +53,8 @@ const (
 //
 // Implementation is thread-safe.
 type ContainerLogManager interface {
-	// TODO(random-liu): Add RotateLogs function and call it under disk pressure.
 	// Start container log manager.
-	Start()
+	Start(ctx context.Context)
 	// Clean removes all logs of specified container.
 	Clean(ctx context.Context, containerID string) error
 }
@@ -73,58 +72,16 @@ type LogRotatePolicy struct {
 
 // GetAllLogs gets all inuse (rotated/compressed) logs for a specific container log.
 // Returned logs are sorted in oldest to newest order.
-// TODO(#59902): Leverage this function to support log rotation in `kubectl logs`.
 func GetAllLogs(log string) ([]string, error) {
 	// pattern is used to match all rotated files.
 	pattern := fmt.Sprintf("%s.*", log)
 	logs, err := filepath.Glob(pattern)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list all log files with pattern %q: %v", pattern, err)
+		return nil, fmt.Errorf("failed to list all log files with pattern %q: %w", pattern, err)
 	}
 	inuse, _ := filterUnusedLogs(logs)
 	sort.Strings(inuse)
 	return append(inuse, log), nil
-}
-
-// compressReadCloser wraps gzip.Reader with a function to close file handler.
-type compressReadCloser struct {
-	f *os.File
-	*gzip.Reader
-}
-
-func (rc *compressReadCloser) Close() error {
-	ferr := rc.f.Close()
-	rerr := rc.Reader.Close()
-	if ferr != nil {
-		return ferr
-	}
-	if rerr != nil {
-		return rerr
-	}
-	return nil
-}
-
-// UncompressLog compresses a compressed log and return a readcloser for the
-// stream of the uncompressed content.
-// TODO(#59902): Leverage this function to support log rotation in `kubectl logs`.
-func UncompressLog(log string) (_ io.ReadCloser, retErr error) {
-	if !strings.HasSuffix(log, compressSuffix) {
-		return nil, fmt.Errorf("log is not compressed")
-	}
-	f, err := os.Open(log)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log: %v", err)
-	}
-	defer func() {
-		if retErr != nil {
-			f.Close()
-		}
-	}()
-	r, err := gzip.NewReader(f)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gzip reader: %v", err)
-	}
-	return &compressReadCloser{f: f, Reader: r}, nil
 }
 
 // parseMaxSize parses quantity string to int64 max size in bytes.
@@ -158,7 +115,7 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, osInterfa
 	}
 	parsedMaxSize, err := parseMaxSize(maxSize)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse container log max size %q: %v", maxSize, err)
+		return nil, fmt.Errorf("failed to parse container log max size %q: %w", maxSize, err)
 	}
 	// Negative number means to disable container log rotation
 	if parsedMaxSize < 0 {
@@ -184,9 +141,9 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, osInterfa
 }
 
 // Start the container log manager.
-func (c *containerLogManager) Start() {
-	ctx := context.Background()
-	klog.InfoS("Initializing container log rotate workers", "workers", c.maxWorkers, "monitorPeriod", c.monitoringPeriod)
+func (c *containerLogManager) Start(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Initializing container log rotate workers", "workers", c.maxWorkers, "monitorPeriod", c.monitoringPeriod)
 	for i := 0; i < c.maxWorkers; i++ {
 		worker := i + 1
 		go c.processQueueItems(ctx, worker)
@@ -194,7 +151,7 @@ func (c *containerLogManager) Start() {
 	// Start a goroutine periodically does container log rotation.
 	go wait.Forever(func() {
 		if err := c.rotateLogs(ctx); err != nil {
-			klog.ErrorS(err, "Failed to rotate container logs")
+			logger.Error(err, "Failed to rotate container logs")
 		}
 	}, c.monitoringPeriod.Duration)
 }
@@ -205,7 +162,7 @@ func (c *containerLogManager) Clean(ctx context.Context, containerID string) err
 	defer c.mutex.Unlock()
 	resp, err := c.runtimeService.ContainerStatus(ctx, containerID, false)
 	if err != nil {
-		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
+		return fmt.Errorf("failed to get container status %q: %w", containerID, err)
 	}
 	if resp.GetStatus() == nil {
 		return fmt.Errorf("container status is nil for %q", containerID)
@@ -213,12 +170,12 @@ func (c *containerLogManager) Clean(ctx context.Context, containerID string) err
 	pattern := fmt.Sprintf("%s*", resp.GetStatus().GetLogPath())
 	logs, err := c.osInterface.Glob(pattern)
 	if err != nil {
-		return fmt.Errorf("failed to list all log files with pattern %q: %v", pattern, err)
+		return fmt.Errorf("failed to list all log files with pattern %q: %w", pattern, err)
 	}
 
 	for _, l := range logs {
 		if err := c.osInterface.Remove(l); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove container %q log %q: %v", containerID, l, err)
+			return fmt.Errorf("failed to remove container %q log %q: %w", containerID, l, err)
 		}
 	}
 
@@ -226,20 +183,22 @@ func (c *containerLogManager) Clean(ctx context.Context, containerID string) err
 }
 
 func (c *containerLogManager) processQueueItems(ctx context.Context, worker int) {
-	klog.V(4).InfoS("Starting container log rotation worker", "workerID", worker)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Starting container log rotation worker", "workerID", worker)
 	for c.processContainer(ctx, worker) {
 	}
-	klog.V(4).InfoS("Terminating container log rotation worker", "workerID", worker)
+	logger.V(4).Info("Terminating container log rotation worker", "workerID", worker)
 }
 
 func (c *containerLogManager) rotateLogs(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	klog.V(4).InfoS("Starting container log rotation sequence")
+	logger.V(4).Info("Starting container log rotation sequence")
 	// TODO(#59998): Use kubelet pod cache.
 	containers, err := c.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{})
 	if err != nil {
-		return fmt.Errorf("failed to list containers: %v", err)
+		return fmt.Errorf("failed to list containers: %w", err)
 	}
 	for _, container := range containers {
 		// Only rotate logs for running containers. Non-running containers won't
@@ -248,8 +207,8 @@ func (c *containerLogManager) rotateLogs(ctx context.Context) error {
 			continue
 		}
 		// Doing this to avoid additional overhead with logging of label like arguments that can prove costly
-		if v := klog.V(4); v.Enabled() {
-			klog.V(4).InfoS("Adding new entry to the queue for processing", "id", container.GetId(), "name", container.Metadata.GetName(), "labels", container.GetLabels())
+		if v := logger.V(4); v.Enabled() {
+			logger.V(4).Info("Adding new entry to the queue for processing", "id", container.GetId(), "name", container.Metadata.GetName(), "labels", container.GetLabels())
 		}
 		c.queue.Add(container.GetId())
 	}
@@ -268,14 +227,14 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 	// Always default the return to true to keep the processing of Queue ongoing
 	ok = true
 	id := key
-
+	logger := klog.FromContext(ctx)
 	resp, err := c.runtimeService.ContainerStatus(ctx, id, false)
 	if err != nil {
-		klog.ErrorS(err, "Failed to get container status", "worker", worker, "containerID", id)
+		logger.Error(err, "Failed to get container status", "worker", worker, "containerID", id)
 		return
 	}
 	if resp.GetStatus() == nil {
-		klog.ErrorS(err, "Container status is nil", "worker", worker, "containerID", id)
+		logger.Error(err, "Container status is nil", "worker", worker, "containerID", id)
 		return
 	}
 	path := resp.GetStatus().GetLogPath()
@@ -283,28 +242,28 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 
 	if err != nil {
 		if !os.IsNotExist(err) {
-			klog.ErrorS(err, "Failed to stat container log", "worker", worker, "containerID", id, "path", path)
+			logger.Error(err, "Failed to stat container log", "worker", worker, "containerID", id, "path", path)
 			return
 		}
 
 		if err = c.runtimeService.ReopenContainerLog(ctx, id); err != nil {
-			klog.ErrorS(err, "Container log doesn't exist, reopen container log failed", "worker", worker, "containerID", id, "path", path)
+			logger.Error(err, "Container log doesn't exist, reopen container log failed", "worker", worker, "containerID", id, "path", path)
 			return
 		}
 
 		info, err = c.osInterface.Stat(path)
 		if err != nil {
-			klog.ErrorS(err, "Failed to stat container log after reopen", "worker", worker, "containerID", id, "path", path)
+			logger.Error(err, "Failed to stat container log after reopen", "worker", worker, "containerID", id, "path", path)
 			return
 		}
 	}
 	if info.Size() < c.policy.MaxSize {
-		klog.V(7).InfoS("log file doesn't need to be rotated", "worker", worker, "containerID", id, "path", path, "currentSize", info.Size(), "maxSize", c.policy.MaxSize)
+		logger.V(7).Info("log file doesn't need to be rotated", "worker", worker, "containerID", id, "path", path, "currentSize", info.Size(), "maxSize", c.policy.MaxSize)
 		return
 	}
 
 	if err := c.rotateLog(ctx, id, path); err != nil {
-		klog.ErrorS(err, "Failed to rotate log for container", "worker", worker, "containerID", id, "path", path, "currentSize", info.Size(), "maxSize", c.policy.MaxSize)
+		logger.Error(err, "Failed to rotate log for container", "worker", worker, "containerID", id, "path", path, "currentSize", info.Size(), "maxSize", c.policy.MaxSize)
 		return
 	}
 	return
@@ -315,17 +274,17 @@ func (c *containerLogManager) rotateLog(ctx context.Context, id, log string) err
 	pattern := fmt.Sprintf("%s.*", log)
 	logs, err := filepath.Glob(pattern)
 	if err != nil {
-		return fmt.Errorf("failed to list all log files with pattern %q: %v", pattern, err)
+		return fmt.Errorf("failed to list all log files with pattern %q: %w", pattern, err)
 	}
 
 	logs, err = c.cleanupUnusedLogs(logs)
 	if err != nil {
-		return fmt.Errorf("failed to cleanup logs: %v", err)
+		return fmt.Errorf("failed to cleanup logs: %w", err)
 	}
 
 	logs, err = c.removeExcessLogs(logs)
 	if err != nil {
-		return fmt.Errorf("failed to remove excess logs: %v", err)
+		return fmt.Errorf("failed to remove excess logs: %w", err)
 	}
 
 	// Compress uncompressed log files.
@@ -334,12 +293,12 @@ func (c *containerLogManager) rotateLog(ctx context.Context, id, log string) err
 			continue
 		}
 		if err := c.compressLog(l); err != nil {
-			return fmt.Errorf("failed to compress log %q: %v", l, err)
+			return fmt.Errorf("failed to compress log %q: %w", l, err)
 		}
 	}
 
 	if err := c.rotateLatestLog(ctx, id, log); err != nil {
-		return fmt.Errorf("failed to rotate log %q: %v", log, err)
+		return fmt.Errorf("failed to rotate log %q: %w", log, err)
 	}
 
 	return nil
@@ -351,7 +310,7 @@ func (c *containerLogManager) cleanupUnusedLogs(logs []string) ([]string, error)
 	inuse, unused := filterUnusedLogs(logs)
 	for _, l := range unused {
 		if err := c.osInterface.Remove(l); err != nil {
-			return nil, fmt.Errorf("failed to remove unused log %q: %v", l, err)
+			return nil, fmt.Errorf("failed to remove unused log %q: %w", l, err)
 		}
 	}
 	return inuse, nil
@@ -404,7 +363,7 @@ func (c *containerLogManager) removeExcessLogs(logs []string) ([]string, error) 
 	i := 0
 	for ; i < len(logs)-maxRotatedFiles; i++ {
 		if err := c.osInterface.Remove(logs[i]); err != nil {
-			return nil, fmt.Errorf("failed to remove old log %q: %v", logs[i], err)
+			return nil, fmt.Errorf("failed to remove old log %q: %w", logs[i], err)
 		}
 	}
 	logs = logs[i:]
@@ -413,15 +372,19 @@ func (c *containerLogManager) removeExcessLogs(logs []string) ([]string, error) 
 
 // compressLog compresses a log to log.gz with gzip.
 func (c *containerLogManager) compressLog(log string) error {
+	logInfo, err := os.Stat(log)
+	if err != nil {
+		return fmt.Errorf("failed to stat log file: %w", err)
+	}
 	r, err := c.osInterface.Open(log)
 	if err != nil {
-		return fmt.Errorf("failed to open log %q: %v", log, err)
+		return fmt.Errorf("failed to open log %q: %w", log, err)
 	}
 	defer r.Close()
 	tmpLog := log + tmpSuffix
-	f, err := c.osInterface.OpenFile(tmpLog, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	f, err := c.osInterface.OpenFile(tmpLog, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, logInfo.Mode())
 	if err != nil {
-		return fmt.Errorf("failed to create temporary log %q: %v", tmpLog, err)
+		return fmt.Errorf("failed to create temporary log %q: %w", tmpLog, err)
 	}
 	defer func() {
 		// Best effort cleanup of tmpLog.
@@ -431,19 +394,19 @@ func (c *containerLogManager) compressLog(log string) error {
 	w := gzip.NewWriter(f)
 	defer w.Close()
 	if _, err := io.Copy(w, r); err != nil {
-		return fmt.Errorf("failed to compress %q to %q: %v", log, tmpLog, err)
+		return fmt.Errorf("failed to compress %q to %q: %w", log, tmpLog, err)
 	}
 	// The archive needs to be closed before renaming, otherwise an error will occur on Windows.
 	w.Close()
 	f.Close()
 	compressedLog := log + compressSuffix
 	if err := c.osInterface.Rename(tmpLog, compressedLog); err != nil {
-		return fmt.Errorf("failed to rename %q to %q: %v", tmpLog, compressedLog, err)
+		return fmt.Errorf("failed to rename %q to %q: %w", tmpLog, compressedLog, err)
 	}
 	// Remove old log file.
 	r.Close()
 	if err := c.osInterface.Remove(log); err != nil {
-		return fmt.Errorf("failed to remove log %q after compress: %v", log, err)
+		return fmt.Errorf("failed to remove log %q after compress: %w", log, err)
 	}
 	return nil
 }
@@ -451,10 +414,11 @@ func (c *containerLogManager) compressLog(log string) error {
 // rotateLatestLog rotates latest log without compression, so that container can still write
 // and fluentd can finish reading.
 func (c *containerLogManager) rotateLatestLog(ctx context.Context, id, log string) error {
+	logger := klog.FromContext(ctx)
 	timestamp := c.clock.Now().Format(timestampFormat)
 	rotated := fmt.Sprintf("%s.%s", log, timestamp)
 	if err := c.osInterface.Rename(log, rotated); err != nil {
-		return fmt.Errorf("failed to rotate log %q to %q: %v", log, rotated, err)
+		return fmt.Errorf("failed to rotate log %q to %q: %w", log, rotated, err)
 	}
 	if err := c.runtimeService.ReopenContainerLog(ctx, id); err != nil {
 		// Rename the rotated log back, so that we can try rotating it again
@@ -464,9 +428,9 @@ func (c *containerLogManager) rotateLatestLog(ctx context.Context, id, log strin
 			// This shouldn't happen.
 			// Report an error if this happens, because we will lose original
 			// log.
-			klog.ErrorS(renameErr, "Failed to rename rotated log", "rotatedLog", rotated, "newLog", log, "containerID", id)
+			logger.Error(renameErr, "Failed to rename rotated log", "rotatedLog", rotated, "newLog", log, "containerID", id)
 		}
-		return fmt.Errorf("failed to reopen container log %q: %v", id, err)
+		return fmt.Errorf("failed to reopen container log %q: %w", id, err)
 	}
 	return nil
 }

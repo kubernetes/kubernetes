@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -39,7 +40,9 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "resourceclaimtemplates",
 	}
-	resourceClaimTemplateStorage, err := NewREST(restOptions)
+	fakeClient := fake.NewSimpleClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	resourceClaimTemplateStorage, err := NewREST(restOptions, mockNSClient)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -51,12 +54,6 @@ func validNewClaimTemplate(name string) *resource.ResourceClaimTemplate {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: resource.ResourceClaimTemplateSpec{
-			Spec: resource.ResourceClaimSpec{
-				ResourceClassName: "valid-class",
-				AllocationMode:    resource.AllocationModeImmediate,
-			},
 		},
 	}
 }
@@ -95,7 +92,7 @@ func TestUpdate(t *testing.T) {
 		//invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*resource.ResourceClaimTemplate)
-			object.Spec.Spec.ResourceClassName = ""
+			object.Name = "^%$#@#%"
 			return object
 		},
 	)

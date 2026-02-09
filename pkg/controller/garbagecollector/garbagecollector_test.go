@@ -24,22 +24,24 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"golang.org/x/time/rate"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/lru"
 
-	"github.com/golang/groupcache/lru"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -60,9 +63,11 @@ import (
 	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metricsutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	c "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -120,7 +125,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	}
 	assert.Len(t, gc.dependencyGraphBuilder.monitors, 1)
 
-	go gc.Run(tCtx, 1)
+	go gc.Run(tCtx, 1, 5*time.Second)
 
 	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
@@ -223,7 +228,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 		t.Fatal(err)
 	}
 	stop := make(chan struct{})
-	go sharedInformers.Start(stop)
+	sharedInformers.Start(stop)
 	return garbageCollector{gc, stop}
 }
 
@@ -495,7 +500,7 @@ func TestAbsentOwnerCache(t *testing.T) {
 			Name:       "rc1",
 			UID:        "1",
 			APIVersion: "v1",
-			Controller: pointer.Bool(true),
+			Controller: ptr.To(true),
 		},
 	})
 	rc1Pod2 := getPod("rc1Pod2", []metav1.OwnerReference{
@@ -504,7 +509,7 @@ func TestAbsentOwnerCache(t *testing.T) {
 			Name:       "rc1",
 			UID:        "1",
 			APIVersion: "v1",
-			Controller: pointer.Bool(false),
+			Controller: ptr.To(false),
 		},
 	})
 	rc2Pod1 := getPod("rc2Pod1", []metav1.OwnerReference{
@@ -813,8 +818,17 @@ func TestGetDeletableResources(t *testing.T) {
 	}
 }
 
+type wrappedKubeClientWithUnsupportedWatchListSemantics struct {
+	kubernetes.Interface
+}
+
+func (c *wrappedKubeClientWithUnsupportedWatchListSemantics) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 // TestGarbageCollectorSync ensures that a discovery client error
-// will not cause the garbage collector to block infinitely.
+// or an informer sync error will not cause the garbage collector
+// to block infinitely.
 func TestGarbageCollectorSync(t *testing.T) {
 	serverResources := []*metav1.APIResourceList{
 		{
@@ -845,7 +859,6 @@ func TestGarbageCollectorSync(t *testing.T) {
 		PreferredResources: serverResources,
 		Error:              nil,
 		Lock:               sync.Mutex{},
-		InterfaceUsedCount: 0,
 	}
 
 	testHandler := &fakeActionHandler{
@@ -864,13 +877,32 @@ func TestGarbageCollectorSync(t *testing.T) {
 			},
 		},
 	}
-	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+
+	testHandler2 := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/secrets": {
+				200,
+				[]byte("{}"),
+			},
+		},
+	}
+	var secretSyncOK atomic.Bool
+	var alternativeTestHandler = func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/v1/secrets" && secretSyncOK.Load() {
+			testHandler2.ServeHTTP(response, request)
+			return
+		}
+		testHandler.ServeHTTP(response, request)
+	}
+	srv, clientConfig := testServerAndClientConfig(alternativeTestHandler)
 	defer srv.Close()
 	clientConfig.ContentConfig.NegotiatedSerializer = nil
-	client, err := kubernetes.NewForConfig(clientConfig)
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// TODO(#115478): migrate this test to use fakeClient instead of the real client.
+	client := &wrappedKubeClientWithUnsupportedWatchListSemantics{kubeClient}
 
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	tweakableRM.AddSpecific(schema.GroupVersionKind{Version: "v1", Kind: "Pod"}, schema.GroupVersionResource{Version: "v1", Resource: "pods"}, schema.GroupVersionResource{Version: "v1", Resource: "pod"}, meta.RESTScopeNamespace)
@@ -884,16 +916,24 @@ func TestGarbageCollectorSync(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
-	tCtx := ktesting.Init(t)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	logger, tCtx := ktesting.NewTestContext(t)
 	defer tCtx.Cancel("test has completed")
+
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
+
 	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	go gc.Run(tCtx, 1)
+	syncPeriod := 200 * time.Millisecond
+	wg.Go(func() {
+		gc.Run(tCtx, 1, syncPeriod)
+	})
 	// The pseudo-code of GarbageCollector.Sync():
 	// GarbageCollector.Sync(client, period, stopCh):
 	//    wait.Until() loops with `period` until the `stopCh` is closed :
@@ -908,14 +948,16 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// The 1s sleep in the test allows GetDeletableResources and
 	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go gc.Sync(tCtx, fakeDiscoveryClient, 200*time.Millisecond)
+	wg.Go(func() {
+		gc.Sync(tCtx, fakeDiscoveryClient, syncPeriod)
+	})
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
 	if err != nil {
-		t.Fatalf("Expected garbagecollector.Sync to be running but it is blocked: %v", err)
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
 	assertMonitors(t, gc, "pods", "deployments")
 
@@ -930,7 +972,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// Remove the error from being returned and see if the garbage collector sync is still working
 	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
@@ -946,7 +988,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// Put the resources back to normal and ensure garbage collector sync recovers
 	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
@@ -963,12 +1005,33 @@ func TestGarbageCollectorSync(t *testing.T) {
 	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
-	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
 	// Unsyncable monitor removed
 	assertMonitors(t, gc, "pods", "deployments")
+
+	// Simulate initial not-synced informer which will be synced at the end.
+	metrics.GarbageCollectorResourcesSyncError.Reset()
+	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources, nil)
+	time.Sleep(1 * time.Second)
+	assertMonitors(t, gc, "pods", "secrets")
+	if gc.IsSynced(logger) {
+		t.Fatal("cache from garbage collector should not be synced")
+	}
+	val, _ := metricsutil.GetCounterMetricValue(metrics.GarbageCollectorResourcesSyncError)
+	if val < 1 {
+		t.Fatalf("expect sync error metric > 0")
+	}
+
+	// The informer is synced now.
+	secretSyncOK.Store(true)
+	if err := wait.PollUntilContextTimeout(tCtx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		return gc.IsSynced(logger), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func assertMonitors(t *testing.T, gc *GarbageCollector, resources ...string) {
@@ -983,27 +1046,15 @@ func assertMonitors(t *testing.T, gc *GarbageCollector, resources ...string) {
 	}
 }
 
-func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *sync.RWMutex) error {
+func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources) error {
 	before := fakeDiscoveryClient.getInterfaceUsedCount()
 	t := 1 * time.Second
 	time.Sleep(t)
 	after := fakeDiscoveryClient.getInterfaceUsedCount()
 	if before == after {
-		return fmt.Errorf("discoveryClient.ServerPreferredResources() called %d times over %v", after-before, t)
+		return fmt.Errorf("discoveryClient.ServerPreferredResources() not called over %v", t)
 	}
-
-	workerLockAcquired := make(chan struct{})
-	go func() {
-		workerLock.Lock()
-		defer workerLock.Unlock()
-		close(workerLockAcquired)
-	}()
-	select {
-	case <-workerLockAcquired:
-		return nil
-	case <-time.After(t):
-		return fmt.Errorf("workerLock blocked for at least %v", t)
-	}
+	return nil
 }
 
 type fakeServerResources struct {
@@ -2282,6 +2333,123 @@ func TestConflictingData(t *testing.T) {
 				}),
 			},
 		},
+		{
+			// https://github.com/kubernetes/kubernetes/issues/114603
+			name: "resourceVersion conflict between Get/Delete while processing object deletion",
+			steps: []step{
+				// setup, 0,1
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod1ns1)),                        // good parent
+				createObjectInClient("", "v1", "pods", "ns1", withRV(makeMetadataObj(pod2ns1, pod1ns1), "42")), // good child
+				// events, 2,3
+				processEvent(makeAddEvent(pod1ns1)),
+				processEvent(withRV(makeAddEvent(pod2ns1, pod1ns1), "42")),
+				// delete parent, 4,5,6
+				deleteObjectFromClient("", "v1", "pods", "ns1", pod1ns1.Name),
+				processEvent(makeDeleteEvent(pod1ns1)),
+				assertState(state{
+					absentOwnerCache: []objectReference{pod1ns1},
+					graphNodes: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+					},
+				}),
+
+				// add reactor to enforce RV precondition, 7
+				prependReactor("delete", "pods", (func() func(ctx stepContext) clientgotesting.ReactionFunc {
+					call := 0
+					return func(ctx stepContext) clientgotesting.ReactionFunc {
+						return func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
+							call++
+							deleteAction, ok := action.(clientgotesting.DeleteAction)
+							if !ok {
+								ctx.t.Error("missing DeleteAction")
+								return false, nil, nil
+							}
+
+							preconditionRV := ""
+							if preconditions := deleteAction.GetDeleteOptions().Preconditions; preconditions != nil {
+								if rv := preconditions.ResourceVersion; rv != nil {
+									preconditionRV = *rv
+								}
+							}
+
+							objectRV := ""
+							var metadataObj *metav1.PartialObjectMetadata
+							if obj, err := ctx.metadataClient.Tracker().Get(deleteAction.GetResource(), deleteAction.GetNamespace(), deleteAction.GetName(), metav1.GetOptions{}); err == nil {
+								metadataObj = obj.(*metav1.PartialObjectMetadata)
+								objectRV = metadataObj.ResourceVersion
+							}
+
+							switch call {
+							case 1:
+								if preconditionRV == "42" && objectRV == "42" {
+									// simulate a concurrent change that modifies the owner references
+									ctx.t.Log("changing rv 42 --> 43 concurrently")
+									metadataObj.OwnerReferences = []metav1.OwnerReference{role1v1.OwnerReference}
+									metadataObj.ResourceVersion = "43"
+									if err := ctx.metadataClient.Tracker().Update(deleteAction.GetResource(), metadataObj, deleteAction.GetNamespace()); err != nil {
+										ctx.t.Errorf("unexpected error updating tracker: %v", err)
+									}
+									return true, nil, errors.NewConflict(deleteAction.GetResource().GroupResource(), deleteAction.GetName(), fmt.Errorf("expected 42, got 43"))
+								} else {
+									ctx.t.Errorf("expected delete with rv=42 precondition on call 1, got %q, %q", preconditionRV, objectRV)
+								}
+							case 2:
+								if preconditionRV == "43" && objectRV == "43" {
+									// simulate a concurrent change that *does not* modify the owner references
+									ctx.t.Log("changing rv 43 --> 44 concurrently")
+									metadataObj.ResourceVersion = "44"
+									if err := ctx.metadataClient.Tracker().Update(deleteAction.GetResource(), metadataObj, deleteAction.GetNamespace()); err != nil {
+										ctx.t.Errorf("unexpected error updating tracker: %v", err)
+									}
+									return true, nil, errors.NewConflict(deleteAction.GetResource().GroupResource(), deleteAction.GetName(), fmt.Errorf("expected 43, got 44"))
+								} else {
+									ctx.t.Errorf("expected delete with rv=43 precondition on call 2, got %q, %q", preconditionRV, objectRV)
+								}
+							case 3:
+								if preconditionRV != "" {
+									ctx.t.Errorf("expected delete with no rv precondition on call 3, got %q", preconditionRV)
+								}
+							default:
+								ctx.t.Errorf("expected delete call %d", call)
+							}
+							return false, nil, nil
+						}
+					}
+				})()),
+
+				// 8,9
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname2",    // first get sees rv=42, pod1ns1 owner
+						"delete /v1, Resource=pods ns=ns1 name=podname2", // first delete with rv=42 precondition gets confict, triggers a live get
+						"get /v1, Resource=pods ns=ns1 name=podname2",    // get has new ownerReferences, exits attemptToDelete
+					},
+					absentOwnerCache: []objectReference{pod1ns1},
+					graphNodes: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+				}),
+
+				// reattempt delete, 10,11
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname2",                        // first get sees rv=43, role1v1 owner
+						"get rbac.authorization.k8s.io/v1, Resource=roles ns=ns1 name=role1", // verify missing owner
+						"delete /v1, Resource=pods ns=ns1 name=podname2",                     // first delete RV precondition triggers a live Get
+						"get /v1, Resource=pods ns=ns1 name=podname2",                        // the object has same ownerReferences, causing unconditional Delete
+						"delete /v1, Resource=pods ns=ns1 name=podname2",                     // unconditional Delete
+					},
+					absentOwnerCache: []objectReference{pod1ns1, role1v1},
+					graphNodes: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+				}),
+			},
+		},
 	}
 
 	alwaysStarted := make(chan struct{})
@@ -2338,6 +2506,7 @@ func TestConflictingData(t *testing.T) {
 						uidToNode:     make(map[types.UID]*node),
 					},
 					attemptToDelete:  attemptToDelete,
+					attemptToOrphan:  attemptToOrphan,
 					absentOwnerCache: absentOwnerCache,
 				},
 			}
@@ -2442,6 +2611,16 @@ func makeObj(identity objectReference, owners ...objectReference) *metaonly.Meta
 	return obj
 }
 
+func withRV[T any](obj T, rv string) T {
+	switch t := any(obj).(type) {
+	case *metav1.PartialObjectMetadata:
+		t.ResourceVersion = rv
+	case *event:
+		withRV(t.obj, rv)
+	}
+	return obj
+}
+
 func makeMetadataObj(identity objectReference, owners ...objectReference) *metav1.PartialObjectMetadata {
 	obj := &metav1.PartialObjectMetadata{
 		TypeMeta:   metav1.TypeMeta{APIVersion: identity.APIVersion, Kind: identity.Kind},
@@ -2488,6 +2667,18 @@ func processPendingGraphChanges(count int) step {
 					ctx.gc.dependencyGraphBuilder.processGraphChanges(ctx.logger)
 				}
 			}
+		},
+	}
+}
+
+type reactionFuncFactory func(ctx stepContext) clientgotesting.ReactionFunc
+
+func prependReactor(verb, resource string, reaction reactionFuncFactory) step {
+	return step{
+		name: "prependReactor",
+		check: func(ctx stepContext) {
+			ctx.t.Helper()
+			ctx.metadataClient.PrependReactor(verb, resource, reaction(ctx))
 		},
 	}
 }
@@ -2623,7 +2814,7 @@ func assertState(s state) step {
 				}
 				if len(s.absentOwnerCache) != ctx.gc.absentOwnerCache.cache.Len() {
 					// only way to inspect is to drain them all, but that's ok because we're failing the test anyway
-					ctx.gc.absentOwnerCache.cache.OnEvicted = func(key lru.Key, item interface{}) {
+					err := ctx.gc.absentOwnerCache.cache.SetEvictionFunc(func(key lru.Key, item interface{}) {
 						found := false
 						for _, absent := range s.absentOwnerCache {
 							if absent == key {
@@ -2634,6 +2825,9 @@ func assertState(s state) step {
 						if !found {
 							ctx.t.Errorf("unexpected item in absent owner cache: %s", key)
 						}
+					})
+					if err != nil {
+						ctx.t.Error("unexpected error setting eviction function: %w", err)
 					}
 					ctx.gc.absentOwnerCache.cache.Clear()
 					ctx.t.Error("unexpected items in absent owner cache")

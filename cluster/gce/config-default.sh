@@ -88,13 +88,14 @@ fi
 # By default, the latest image from the image family will be used unless an
 # explicit image will be set.
 GCI_VERSION=${KUBE_GCI_VERSION:-}
-IMAGE_FAMILY=${KUBE_IMAGE_FAMILY:-cos-109-lts}
+IMAGE_FAMILY=${KUBE_GCE_IMAGE_FAMILY:-cos-125-lts}
+IMAGE_PROJECT=${KUBE_GCE_IMAGE_PROJECT:-cos-cloud}
 export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 export MASTER_IMAGE_FAMILY=${KUBE_GCE_MASTER_IMAGE_FAMILY:-${IMAGE_FAMILY}}
-export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
+export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${IMAGE_PROJECT}}
 export NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
 export NODE_IMAGE_FAMILY=${KUBE_GCE_NODE_IMAGE_FAMILY:-${IMAGE_FAMILY}}
-export NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
+export NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${IMAGE_PROJECT}}
 export NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 
 # KUBELET_TEST_ARGS are extra arguments passed to kubelet.
@@ -109,8 +110,8 @@ export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import
 # if KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION or KUBE_UBUNTU_INSTALL_RUNC_VERSION
 # is set to empty then we do not override the version(s) and just
 # use whatever is in the default installation of containerd package
-export UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-}
-export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-}
+export UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-v2.1.4}
+export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-v1.3.2}
 
 # Ability to inject custom versions (COS images ONLY)
 # if KUBE_COS_INSTALL_CONTAINERD_VERSION or KUBE_COS_INSTALL_RUNC_VERSION
@@ -265,7 +266,7 @@ fi
 RUN_CCM_CONTROLLERS="${RUN_CCM_CONTROLLERS:-*,-gkenetworkparamset}"
 
 # List of the set of feature gates recognized by the GCP CCM
-export CCM_FEATURE_GATES="APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,CustomResourceValidationExpressions,KMSv2,OpenAPIEnums,OpenAPIV3,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
+export CCM_FEATURE_GATES="APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,KMSv2,OpenAPIEnums,OpenAPIV3,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
 
 # Optional: set feature gates
 # shellcheck disable=SC2034 # Variables sourced in other scripts.
@@ -300,7 +301,7 @@ NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
 CNI_HASH="${CNI_HASH:-}"
 CNI_TAR_PREFIX="${CNI_TAR_PREFIX:-cni-plugins-linux-amd64-}"
-CNI_STORAGE_URL_BASE="${CNI_STORAGE_URL_BASE:-https://storage.googleapis.com/k8s-artifacts-cni/release}"
+CNI_STORAGE_URL_BASE="${CNI_STORAGE_URL_BASE:-https://github.com/containernetworking/plugins/releases/download}"
 
 # Optional: Create autoscaler for cluster's nodes.
 ENABLE_CLUSTER_AUTOSCALER="${KUBE_ENABLE_CLUSTER_AUTOSCALER:-false}"
@@ -467,17 +468,6 @@ ENABLE_NODE_JOURNAL="${ENABLE_NODE_JOURNAL:-false}"
 PROMETHEUS_TO_SD_ENDPOINT="${PROMETHEUS_TO_SD_ENDPOINT:-https://monitoring.googleapis.com/}"
 PROMETHEUS_TO_SD_PREFIX="${PROMETHEUS_TO_SD_PREFIX:-custom.googleapis.com}"
 ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-false}"
-
-# TODO(#51292): Make kube-proxy Daemonset default and remove the configuration here.
-# Optional: [Experiment Only] Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
-KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
-
-# Control whether the startup scripts manage the lifecycle of kube-proxy
-# When true, the startup scripts do not enable kube-proxy either as a daemonset addon or as a static pod
-# regardless of the value of KUBE_PROXY_DAEMONSET.
-# When false, the value of KUBE_PROXY_DAEMONSET controls whether kube-proxy comes up as a static pod or
-# as an addon daemonset.
-KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
 
 # Will be passed into the kube-proxy via `--detect-local-mode`
 DETECT_LOCAL_MODE="${DETECT_LOCAL_MODE:-}"

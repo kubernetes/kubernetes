@@ -21,11 +21,8 @@ import (
 	"sort"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 )
 
 // watchCacheInterval serves as an abstraction over a source
@@ -92,26 +89,33 @@ type watchCacheInterval struct {
 	// lock on each invocation of Next().
 	buffer *watchCacheIntervalBuffer
 
+	// resourceVersion is the resourceVersion from which
+	// the interval was constructed.
+	resourceVersion uint64
+
 	// lock effectively protects access to the underlying source
 	// of events through - indexer and indexValidator.
 	//
 	// Given that indexer and indexValidator only read state, if
 	// possible, Locker obtained through RLocker() is provided.
 	lock sync.Locker
+
+	// initialEventsEndBookmark will be sent after sending all events in cacheInterval
+	initialEventsEndBookmark *watchCacheEvent
 }
 
-type attrFunc func(runtime.Object) (labels.Set, fields.Set, error)
 type indexerFunc func(int) *watchCacheEvent
 type indexValidator func(int) bool
 
-func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValidator indexValidator, locker sync.Locker) *watchCacheInterval {
+func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValidator indexValidator, resourceVersion uint64, locker sync.Locker) *watchCacheInterval {
 	return &watchCacheInterval{
-		startIndex:     startIndex,
-		endIndex:       endIndex,
-		indexer:        indexer,
-		indexValidator: indexValidator,
-		buffer:         &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, bufferSize)},
-		lock:           locker,
+		startIndex:      startIndex,
+		endIndex:        endIndex,
+		indexer:         indexer,
+		indexValidator:  indexValidator,
+		buffer:          &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, bufferSize)},
+		resourceVersion: resourceVersion,
+		lock:            locker,
 	}
 }
 
@@ -133,12 +137,11 @@ func (s sortableWatchCacheEvents) Swap(i, j int) {
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getAttrsFunc attrFunc, key string, matchesSingle bool) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
-
 	if matchesSingle {
-		item, exists, err := store.GetByKey(key)
+		item, exists, err := indexer.GetByKey(key)
 		if err != nil {
 			return nil, err
 		}
@@ -147,23 +150,19 @@ func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getA
 			allItems = append(allItems, item)
 		}
 	} else {
-		allItems = store.List()
+		allItems = indexer.List()
 	}
 	buffer.buffer = make([]*watchCacheEvent, len(allItems))
 	for i, item := range allItems {
-		elem, ok := item.(*storeElement)
+		elem, ok := item.(*store.Element)
 		if !ok {
 			return nil, fmt.Errorf("not a storeElement: %v", elem)
-		}
-		objLabels, objFields, err := getAttrsFunc(elem.Object)
-		if err != nil {
-			return nil, err
 		}
 		buffer.buffer[i] = &watchCacheEvent{
 			Type:            watch.Added,
 			Object:          elem.Object,
-			ObjLabels:       objLabels,
-			ObjFields:       objFields,
+			ObjLabels:       elem.Labels,
+			ObjFields:       elem.Fields,
 			Key:             elem.Key,
 			ResourceVersion: resourceVersion,
 		}
@@ -173,8 +172,9 @@ func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getA
 	ci := &watchCacheInterval{
 		startIndex: 0,
 		// Simulate that we already have all the events we're looking for.
-		endIndex: 0,
-		buffer:   buffer,
+		endIndex:        0,
+		buffer:          buffer,
+		resourceVersion: resourceVersion,
 	}
 
 	return ci, nil

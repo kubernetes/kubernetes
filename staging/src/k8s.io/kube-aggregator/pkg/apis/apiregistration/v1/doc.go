@@ -18,9 +18,11 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:conversion-gen=k8s.io/kube-aggregator/pkg/apis/apiregistration
 // +k8s:openapi-gen=true
-// +groupName=apiregistration.k8s.io
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-package=io.k8s.kube-aggregator.pkg.apis.apiregistration.v1
+
+// +groupName=apiregistration.k8s.io
 
 // Package v1 contains the API Registration API, which is responsible for
 // registering an API `Group`/`Version` with another kubernetes like API server.
@@ -35,4 +37,4 @@ limitations under the License.
 // The return status is a set of conditions for this aggregation. Currently
 // there is only one condition named "Available", if true, it means the
 // api/server requests will be redirected to specified API server.
-package v1 // import "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+package v1

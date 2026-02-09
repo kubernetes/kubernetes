@@ -110,13 +110,13 @@ func TestErrorNew(t *testing.T) {
 	if time, ok := SuggestsClientDelay(NewTooManyRequests("doing something", 1)); time != 1 || !ok {
 		t.Errorf("unexpected %d", time)
 	}
-	if time, ok := SuggestsClientDelay(NewGenericServerResponse(429, "get", resource("tests"), "test", "doing something", 10, true)); time != 10 || !ok {
+	if time, ok := SuggestsClientDelay(NewGenericServerResponse(429, http.MethodGet, resource("tests"), "test", "doing something", 10, true)); time != 10 || !ok {
 		t.Errorf("unexpected %d", time)
 	}
-	if time, ok := SuggestsClientDelay(NewGenericServerResponse(500, "get", resource("tests"), "test", "doing something", 10, true)); time != 10 || !ok {
+	if time, ok := SuggestsClientDelay(NewGenericServerResponse(500, http.MethodGet, resource("tests"), "test", "doing something", 10, true)); time != 10 || !ok {
 		t.Errorf("unexpected %d", time)
 	}
-	if time, ok := SuggestsClientDelay(NewGenericServerResponse(429, "get", resource("tests"), "test", "doing something", 0, true)); time != 0 || ok {
+	if time, ok := SuggestsClientDelay(NewGenericServerResponse(429, http.MethodGet, resource("tests"), "test", "doing something", 0, true)); time != 0 || ok {
 		t.Errorf("unexpected %d", time)
 	}
 }

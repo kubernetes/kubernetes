@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloud
+package node
 
 import (
 	"context"
@@ -53,6 +53,154 @@ func Test_syncNode(t *testing.T) {
 		updatedNode  *v1.Node
 		expectedErr  bool
 	}{
+		{
+			name: "node initialized with hostname",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				ErrByProviderID: nil,
+				Err:             nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "nodeoverriden",
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://12345",
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "node initialized with hostname and cloud provider missing hostname",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				ErrByProviderID: nil,
+				Err:             nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "nodeoverriden",
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://12345",
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+						{
+							Type:    v1.NodeHostName,
+							Address: "nodeoverriden",
+						},
+					},
+				},
+			},
+		},
 		{
 			name: "node initialized with provider ID",
 			fakeCloud: &fakecloud.Cloud{
@@ -1450,9 +1598,14 @@ func Test_syncNode(t *testing.T) {
 					// and should be discarded
 					"topology.kubernetes.io/region": "us-other-west",
 					"topology.k8s.io/region":        "us-other-west",
+					"kubernetes.io/region":          "us-other-west",
+					"k8s.io/region":                 "us-other-west",
 					// Should discard labels that already exist
 					"my.custom.label/foo": "bar",
 					"my.custom.label/bar": "foo",
+					// Should add labels that not match regex
+					"app.k8snio/bar": "foo",
+					"k8snio/bar":     "foo",
 				},
 			},
 			existingNode: &v1.Node{
@@ -1513,6 +1666,8 @@ func Test_syncNode(t *testing.T) {
 						"topology.kubernetes.io/zone":              "us-west-1a",
 						"my.custom.label/foo":                      "fizz",
 						"my.custom.label/bar":                      "foo",
+						"app.k8snio/bar":                           "foo",
+						"k8snio/bar":                               "foo",
 					},
 				},
 				Spec: v1.NodeSpec{

@@ -22,7 +22,10 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
-var Encode = EncMode{
+// encode is the basis for the Encode mode, with no JSONMarshalerTranscoder
+// configured. TranscodeFromJSON uses this directly rather than Encode to avoid an initialization
+// cycle between the two. Everything else should use one of the exported EncModes.
+var encode = EncMode{
 	delegate: func() cbor.UserBufferEncMode {
 		encode, err := cbor.EncOptions{
 			// Map keys need to be sorted to have deterministic output, and this is the order
@@ -94,6 +97,10 @@ var Encode = EncMode{
 			// Disable default recognition of types implementing encoding.BinaryMarshaler, which
 			// is not recognized for JSON encoding.
 			BinaryMarshaler: cbor.BinaryMarshalerNone,
+
+			// Unmarshal into types that implement encoding.TextUnmarshaler by passing
+			// the contents of a CBOR string to their UnmarshalText method.
+			TextMarshaler: cbor.TextMarshalerTextString,
 		}.UserBufferEncMode()
 		if err != nil {
 			panic(err)
@@ -102,10 +109,25 @@ var Encode = EncMode{
 	}(),
 }
 
+var Encode = EncMode{
+	delegate: func() cbor.UserBufferEncMode {
+		opts := encode.options()
+		// To encode a value of a type that implements json.Marshaler (and does not
+		// implement cbor.Marshaler), transcode the result of calling its MarshalJSON method
+		// directly to CBOR.
+		opts.JSONMarshalerTranscoder = TranscodeFunc(TranscodeFromJSON)
+		em, err := opts.UserBufferEncMode()
+		if err != nil {
+			panic(err)
+		}
+		return em
+	}(),
+}
+
 var EncodeNondeterministic = EncMode{
 	delegate: func() cbor.UserBufferEncMode {
 		opts := Encode.options()
-		opts.Sort = cbor.SortNone // TODO: Use cbor.SortFastShuffle after bump to v2.7.0.
+		opts.Sort = cbor.SortFastShuffle
 		em, err := opts.UserBufferEncMode()
 		if err != nil {
 			panic(err)

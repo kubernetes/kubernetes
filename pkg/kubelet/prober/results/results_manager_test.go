@@ -39,7 +39,7 @@ func TestCacheOperations(t *testing.T) {
 
 	m.Set(setID, Success, &corev1.Pod{})
 	result, found := m.Get(setID)
-	assert.True(t, result == Success, "set result")
+	assert.Equal(t, Success, result, "set result")
 	assert.True(t, found, "set result found")
 
 	m.Remove(setID)

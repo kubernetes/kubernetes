@@ -1,14 +1,6 @@
 # One inline resource claim, one pod, two containers.
 # One container uses resource, one does not.
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-inline-claim-parameters
-  namespace: default
-data:
-  a: b
----
-apiVersion: resource.k8s.io/v1alpha2
+apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
 metadata:
   name: test-inline-claim-template
@@ -18,10 +10,16 @@ spec:
     labels:
       app: inline-resource
   spec:
-    resourceClassName: example
-    parametersRef:
-      kind: ConfigMap
-      name: test-inline-claim-parameters
+    devices:
+      requests:
+      - name: my-device
+        exactly:
+          deviceClassName: example
+      config:
+      - opaque:
+          driver: test-driver.cdi.k8s.io
+          parameters:
+            a: b
 ---
 apiVersion: v1
 kind: Pod
@@ -31,14 +29,15 @@ spec:
   restartPolicy: Never
   containers:
   - name: with-resource
-    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
-    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+    image: registry.k8s.io/e2e-test-images/agnhost:2.63.0
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && /agnhost pause"]
     resources:
       claims:
       - name: resource
   - name: without-resource
-    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
-    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+    image: registry.k8s.io/e2e-test-images/agnhost:2.63.0
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && /agnhost pause"]
+  terminationGracePeriodSeconds: 0 # Shut down immediately.
   resourceClaims:
   - name: resource
     resourceClaimTemplateName: test-inline-claim-template

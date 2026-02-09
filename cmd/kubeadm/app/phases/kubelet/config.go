@@ -22,11 +22,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	"sigs.k8s.io/yaml"
@@ -34,9 +33,14 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 )
+
+var applyKubeletConfigPatchesFunc = applyKubeletConfigPatches
 
 // WriteConfigToDisk writes the kubelet config object down to a file
 // Used at "kubeadm init" and "kubeadm upgrade" time
@@ -57,13 +61,63 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patches
 
 	// Apply patches to the KubeletConfiguration
 	if len(patchesDir) != 0 {
-		kubeletBytes, err = applyKubeletConfigPatches(kubeletBytes, patchesDir, output)
+		kubeletBytes, err = applyKubeletConfigPatchesFunc(kubeletBytes, patchesDir, output)
 		if err != nil {
 			return errors.Wrap(err, "could not apply patches to the KubeletConfiguration")
 		}
 	}
 
-	return writeConfigBytesToDisk(kubeletBytes, kubeletDir)
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
+		file := filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName)
+		kubeletBytes, err = applyKubeletConfigPatchFromFile(kubeletBytes, file, output)
+		if err != nil {
+			return errors.Wrapf(err, "could not apply kubelet instance configuration as a patch from %q", file)
+		}
+	}
+	return writeConfigBytesToDisk(kubeletBytes, kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
+}
+
+// WriteInstanceConfigToDisk writes the container runtime endpoint configuration
+// to the instance configuration file in the specified kubelet directory.
+func WriteInstanceConfigToDisk(cfg *kubeletconfig.KubeletConfiguration, kubeletDir string) error {
+	instanceFileContent := fmt.Sprintf("containerRuntimeEndpoint: %q\n", cfg.ContainerRuntimeEndpoint)
+	return writeConfigBytesToDisk([]byte(instanceFileContent), kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName)
+}
+
+// ApplyPatchesToConfig applies the patches located in patchesDir to the KubeletConfiguration stored
+// in the ClusterConfiguration.ComponentConfigs map.
+func ApplyPatchesToConfig(cfg *kubeadmapi.ClusterConfiguration, patchesDir string) error {
+	kubeletCfg, ok := cfg.ComponentConfigs[componentconfigs.KubeletGroup]
+	if !ok {
+		return errors.New("no kubelet component config found")
+	}
+
+	if err := kubeletCfg.Mutate(); err != nil {
+		return err
+	}
+
+	kubeletBytes, err := kubeletCfg.Marshal()
+	if err != nil {
+		return err
+	}
+
+	// Apply patches to the KubeletConfiguration. Output is discarded.
+	if len(patchesDir) != 0 {
+		kubeletBytes, err = applyKubeletConfigPatchesFunc(kubeletBytes, patchesDir, io.Discard)
+		if err != nil {
+			return errors.Wrap(err, "could not apply patches to the KubeletConfiguration")
+		}
+	}
+
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(kubeletBytes)
+	if err != nil {
+		return err
+	}
+	if err := kubeletCfg.Unmarshal(gvkmap); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // CreateConfigMap creates a ConfigMap with the generic kubelet configuration.
@@ -96,7 +150,7 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 		componentconfigs.SignConfigMap(configMap)
 	}
 
-	if err := apiclient.CreateOrUpdateConfigMap(client, configMap); err != nil {
+	if err := apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(configMap.GetNamespace()), configMap); err != nil {
 		return err
 	}
 
@@ -108,7 +162,7 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 
 // createConfigMapRBACRules creates the RBAC rules for exposing the base kubelet ConfigMap in the kube-system namespace to unauthenticated users
 func createConfigMapRBACRules(client clientset.Interface) error {
-	if err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
+	if err := apiclient.CreateOrUpdate(client.RbacV1().Roles(metav1.NamespaceSystem), &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigMapRole,
 			Namespace: metav1.NamespaceSystem,
@@ -125,7 +179,7 @@ func createConfigMapRBACRules(client clientset.Interface) error {
 		return err
 	}
 
-	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
+	return apiclient.CreateOrUpdate(client.RbacV1().RoleBindings(metav1.NamespaceSystem), &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigMapRole,
 			Namespace: metav1.NamespaceSystem,
@@ -149,8 +203,8 @@ func createConfigMapRBACRules(client clientset.Interface) error {
 }
 
 // writeConfigBytesToDisk writes a byte slice down to disk at the specific location of the kubelet config file
-func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
-	configFile := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
+func writeConfigBytesToDisk(b []byte, kubeletDir, fileName string) error {
+	configFile := filepath.Join(kubeletDir, fileName)
 	fmt.Printf("[kubelet-start] Writing kubelet configuration to file %q\n", configFile)
 
 	// creates target folder if not already exists
@@ -159,7 +213,7 @@ func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
 	}
 
 	if err := os.WriteFile(configFile, b, 0644); err != nil {
-		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", configFile)
+		return errors.Wrapf(err, "failed to write kubelet configuration file %q", configFile)
 	}
 	return nil
 }
@@ -185,4 +239,46 @@ func applyKubeletConfigPatches(kubeletBytes []byte, patchesDir string, output io
 		return nil, err
 	}
 	return kubeletBytes, nil
+}
+
+// applyKubeletConfigPatchFromFile applies a single patch file to the kubelet configuration bytes.
+func applyKubeletConfigPatchFromFile(kubeletConfigBytes []byte, patchFilePath string, output io.Writer) ([]byte, error) {
+	// Get the patch data from the file.
+	data, err := os.ReadFile(patchFilePath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not read patch file %q", patchFilePath)
+	}
+
+	patchSet, err := patches.CreatePatchSet(patches.KubeletConfiguration, types.StrategicMergePatchType, string(data))
+	if err != nil {
+		return nil, err
+	}
+
+	patchManager := patches.NewPatchManager([]*patches.PatchSet{patchSet}, []string{patches.KubeletConfiguration}, output)
+
+	// Always convert the target data to JSON.
+	patchData, err := yaml.YAMLToJSON(kubeletConfigBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Define the patch target.
+	patchTarget := &patches.PatchTarget{
+		Name:                      patches.KubeletConfiguration,
+		StrategicMergePatchObject: kubeletconfig.KubeletConfiguration{},
+		Data:                      patchData,
+	}
+
+	err = patchManager.ApplyPatchesToTarget(patchTarget)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert the patched data back to YAML and return it.
+	kubeletConfigBytes, err = yaml.JSONToYAML(patchTarget.Data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert patched data to YAML")
+	}
+
+	return kubeletConfigBytes, nil
 }

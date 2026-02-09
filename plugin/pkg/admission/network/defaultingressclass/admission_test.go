@@ -31,7 +31,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/controller"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestAdmission(t *testing.T) {
@@ -134,30 +134,30 @@ func TestAdmission(t *testing.T) {
 			classes:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      nil,
 			classAnnotation: nil,
-			expectedClass:   utilpointer.String(defaultClass1.Name),
+			expectedClass:   ptr.To(defaultClass1.Name),
 			expectedError:   nil,
 		},
 		{
 			name:            "one default, no modification of Ingress with class field=''",
 			classes:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			classField:      utilpointer.String(""),
+			classField:      ptr.To(""),
 			classAnnotation: nil,
-			expectedClass:   utilpointer.String(""),
+			expectedClass:   ptr.To(""),
 			expectedError:   nil,
 		},
 		{
 			name:            "one default, no modification of Ingress with class field='foo'",
 			classes:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			classField:      utilpointer.String("foo"),
+			classField:      ptr.To("foo"),
 			classAnnotation: nil,
-			expectedClass:   utilpointer.String("foo"),
+			expectedClass:   ptr.To("foo"),
 			expectedError:   nil,
 		},
 		{
 			name:            "one default, no modification of Ingress with class annotation='foo'",
 			classes:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      nil,
-			classAnnotation: utilpointer.String("foo"),
+			classAnnotation: ptr.To("foo"),
 			expectedClass:   nil,
 			expectedError:   nil,
 		},
@@ -166,15 +166,15 @@ func TestAdmission(t *testing.T) {
 			classes:         []*networkingv1.IngressClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      nil,
 			classAnnotation: nil,
-			expectedClass:   utilpointer.String(defaultClass1.Name),
+			expectedClass:   ptr.To(defaultClass1.Name),
 			expectedError:   nil,
 		},
 		{
 			name:            "two defaults, no modification with Ingress with class field=''",
 			classes:         []*networkingv1.IngressClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			classField:      utilpointer.String(""),
+			classField:      ptr.To(""),
 			classAnnotation: nil,
-			expectedClass:   utilpointer.String(""),
+			expectedClass:   ptr.To(""),
 			expectedError:   nil,
 		},
 		{
@@ -182,7 +182,7 @@ func TestAdmission(t *testing.T) {
 			classes:         []*networkingv1.IngressClass{defaultClassWithCreateTime1, defaultClassWithCreateTime2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      nil,
 			classAnnotation: nil,
-			expectedClass:   utilpointer.String(defaultClassWithCreateTime1.Name),
+			expectedClass:   ptr.To(defaultClassWithCreateTime1.Name),
 			expectedError:   nil,
 		},
 	}

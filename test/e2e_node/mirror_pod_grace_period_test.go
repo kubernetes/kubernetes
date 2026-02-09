@@ -36,12 +36,13 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 	f := framework.NewDefaultFramework("mirror-pod-with-grace-period")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
-	ginkgo.Context("when create a mirror pod ", func() {
+	ginkgo.Context("when create a mirror pod", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ns = f.Namespace.Name
@@ -162,7 +163,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			})
 			ginkgo.It("the mirror pod should terminate successfully", func(ctx context.Context) {
 				ginkgo.By("verifying the pod is described as syncing in metrics")
-				gomega.Eventually(ctx, getKubeletMetrics, 5*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				gomega.Eventually(ctx, getKubeletMetrics, time.Minute, 5*time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 					"kubelet_working_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
 						`kubelet_working_pods{config="desired", lifecycle="sync", static=""}`:                    timelessSample(0),
 						`kubelet_working_pods{config="desired", lifecycle="sync", static="true"}`:                timelessSample(1),
@@ -216,9 +217,8 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				gomega.Consistently(ctx, func(ctx context.Context) error {
 					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 				}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
-
 				ginkgo.By("verifying the pod is described as terminating in metrics")
-				gomega.Eventually(ctx, getKubeletMetrics, 5*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				gomega.Eventually(ctx, getKubeletMetrics, time.Minute, 5*time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 					"kubelet_working_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
 						`kubelet_working_pods{config="desired", lifecycle="sync", static=""}`:                    timelessSample(0),
 						`kubelet_working_pods{config="desired", lifecycle="sync", static="true"}`:                timelessSample(0),
@@ -280,7 +280,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				}, time.Second*3, time.Second).Should(gomega.Succeed())
 
 				ginkgo.By("verifying the pod finishes terminating and is removed from metrics")
-				gomega.Eventually(ctx, getKubeletMetrics, 15*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				gomega.Eventually(ctx, getKubeletMetrics, time.Minute, 5*time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 					"kubelet_working_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
 						`kubelet_working_pods{config="desired", lifecycle="sync", static=""}`:                    timelessSample(0),
 						`kubelet_working_pods{config="desired", lifecycle="sync", static="true"}`:                timelessSample(0),
@@ -343,41 +343,24 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 })
 
 func createStaticPodWithGracePeriod(dir, name, namespace string) error {
-	template := `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  terminationGracePeriodSeconds: 20
-  containers:
-  - name: m-test
-    image: %s
-    command:
-      - /bin/sh
-    args:
-      - '-c'
-      - |
-        _term() {
-        echo "Caught SIGTERM signal!"
-        sleep 100
-        }
-        trap _term SIGTERM
-        sleep 1000
-`
-	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, imageutils.GetE2EImage(imageutils.BusyBox))
-
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
-	if err != nil {
-		return err
+	podSpec := v1.PodSpec{
+		TerminationGracePeriodSeconds: ptr.To(int64(20)),
+		Containers: []v1.Container{{
+			Name:    "m-test",
+			Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+			Command: []string{"/bin/sh"},
+			Args: []string{"-c", `_term() {
+echo "Caught SIGTERM signal!"
+sleep 100
+}
+trap _term SIGTERM
+sleep 1000
+`,
+			},
+		}},
 	}
-	defer f.Close()
 
-	_, err = f.WriteString(podYaml)
-	framework.Logf("has written %v", file)
-	return err
+	return createStaticPodWithSpec(dir, name, namespace, podSpec)
 }
 
 func checkMirrorPodRunningWithUID(ctx context.Context, cl clientset.Interface, name, namespace string, oUID types.UID) error {

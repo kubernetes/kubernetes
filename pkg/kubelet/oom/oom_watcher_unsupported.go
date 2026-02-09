@@ -1,5 +1,4 @@
 //go:build !linux
-// +build !linux
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -20,6 +19,8 @@ limitations under the License.
 package oom
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 )
@@ -33,6 +34,6 @@ func NewWatcher(_ record.EventRecorder) (Watcher, error) {
 	return &oomWatcherUnsupported{}, nil
 }
 
-func (ow *oomWatcherUnsupported) Start(_ *v1.ObjectReference) error {
+func (ow *oomWatcherUnsupported) Start(_ context.Context, _ *v1.ObjectReference) error {
 	return nil
 }

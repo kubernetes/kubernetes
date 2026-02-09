@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -29,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -42,46 +42,307 @@ func getLockPaths() (string, string) {
 	return lock14x, lock16x
 }
 
-func testIPTablesVersionCmds(t *testing.T, protocol Protocol) {
-	version := " v1.4.22"
-	iptablesCmd := iptablesCommand(protocol)
-	iptablesRestoreCmd := iptablesRestoreCommand(protocol)
+type testCommand struct {
+	command string
+	action  fakeexec.FakeAction
+}
 
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			// iptables version response (for runner instantiation)
-			func() ([]byte, []byte, error) { return []byte(iptablesCmd + version), nil, nil },
-			// iptables-restore version response (for runner instantiation)
-			func() ([]byte, []byte, error) { return []byte(iptablesRestoreCmd + version), nil, nil },
-		},
-	}
+// Creates a FakeExec that expects exactly commands to be run (and will fail otherwise).
+func fakeExecForCommands(commands []testCommand) *fakeexec.FakeExec {
 	fexec := &fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		CommandScript: make([]fakeexec.FakeCommandAction, len(commands)),
+		ExactOrder:    true,
+	}
+	for i := range commands {
+		fcmd := fakeexec.FakeCmd{
+			CombinedOutputScript: []fakeexec.FakeAction{commands[i].action},
+		}
+		argv := strings.Fields(commands[i].command)
+		fexec.CommandScript[i] = func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, argv[0], argv[1:]...) }
+	}
+	return fexec
+}
+
+func TestFakeExecForCommands(t *testing.T) {
+	var panicresult interface{}
+	defer func() {
+		panicresult = recover()
+	}()
+
+	fake1 := fakeExecForCommands([]testCommand{{
+		command: "foo bar baz",
+		action:  func() ([]byte, []byte, error) { return []byte("output"), nil, nil },
+	}})
+	cmd := fake1.Command("foo", "bar", "baz")
+	out, err := cmd.CombinedOutput()
+	if string(out) != "output" {
+		t.Errorf("fake1: wrong output: expected %q, got %q", "output", out)
+	}
+	if err != nil {
+		t.Errorf("fake1: expected no error, got %v", err)
+	}
+	if panicresult != nil {
+		t.Errorf("fake1: expected no panic, got %q", panicresult)
+	}
+
+	fake2 := fakeExecForCommands([]testCommand{{
+		command: "foo bar baz",
+		action:  func() ([]byte, []byte, error) { return []byte("output"), nil, nil },
+	}})
+	_ = fake2.Command("foo", "baz")
+	if panicresult == nil {
+		t.Errorf("fake2: expected panic from FakeExec, got none")
+	}
+}
+
+func TestNew(t *testing.T) {
+	testCases := []struct {
+		name     string
+		commands []testCommand
+		expected *runner
+	}{
+		{
+			name: "ancient",
+			commands: []testCommand{
+				{
+					command: "iptables --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables v1.4.0"), nil, nil },
+				},
+				{
+					// iptables-restore version check: ignores --version and just no-ops
+					command: "iptables-restore --version",
+					action:  func() ([]byte, []byte, error) { return nil, nil, nil },
+				},
+			},
+			expected: &runner{
+				hasCheck:        false,
+				hasRandomFully:  false,
+				waitFlag:        nil,
+				restoreWaitFlag: nil,
+			},
+		},
+		{
+			name: "RHEL/CentOS 7",
+			commands: []testCommand{
+				{
+					command: "iptables --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables v1.4.21"), nil, nil },
+				},
+				{
+					command: "iptables-restore --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables-restore v1.4.21"), nil, nil },
+				},
+			},
+			expected: &runner{
+				hasCheck:        true,
+				hasRandomFully:  false,
+				waitFlag:        []string{"-w"},
+				restoreWaitFlag: []string{"-w"},
+			},
+		},
+		{
+			name: "1.6",
+			commands: []testCommand{
+				{
+					command: "iptables --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables v1.6.2"), nil, nil },
+				},
+			},
+			expected: &runner{
+				hasCheck:        true,
+				hasRandomFully:  true,
+				waitFlag:        []string{"-w", "5"},
+				restoreWaitFlag: []string{"-w", "5"},
+			},
+		},
+		{
+			name: "1.8",
+			commands: []testCommand{
+				{
+					command: "iptables --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables v1.8.11"), nil, nil },
+				},
+			},
+			expected: &runner{
+				hasCheck:        true,
+				hasRandomFully:  true,
+				waitFlag:        []string{"-w", "5"},
+				restoreWaitFlag: []string{"-w", "5"},
+			},
+		},
+		{
+			name: "no iptables",
+			commands: []testCommand{
+				{
+					command: "iptables --version",
+					action:  func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("no such file or directory") },
+				},
+			},
+			expected: &runner{
+				hasCheck:        false,
+				hasRandomFully:  false,
+				waitFlag:        nil,
+				restoreWaitFlag: nil,
+			},
 		},
 	}
-	_ = New(fexec, protocol)
 
-	// Check that proper iptables version command was used during runner instantiation
-	if !sets.New(fcmd.CombinedOutputLog[0]...).HasAll(iptablesCmd, "--version") {
-		t.Errorf("%s runner instantiate: Expected cmd '%s --version', Got '%s'", protocol, iptablesCmd, fcmd.CombinedOutputLog[0])
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fexec := fakeExecForCommands(tc.commands)
+			runner := newInternal(fexec, ProtocolIPv4, "", "").(*runner)
+
+			if runner.hasCheck != tc.expected.hasCheck {
+				t.Errorf("Expected hasCheck=%v, got %v", tc.expected.hasCheck, runner.hasCheck)
+			}
+			if runner.hasRandomFully != tc.expected.hasRandomFully {
+				t.Errorf("Expected hasRandomFully=%v, got %v", tc.expected.hasRandomFully, runner.hasRandomFully)
+			}
+			if !reflect.DeepEqual(runner.waitFlag, tc.expected.waitFlag) {
+				t.Errorf("Expected waitFlag=%v, got %v", tc.expected.waitFlag, runner.waitFlag)
+			}
+			if !reflect.DeepEqual(runner.restoreWaitFlag, tc.expected.restoreWaitFlag) {
+				t.Errorf("Expected restoreWaitFlag=%v, got %v", tc.expected.restoreWaitFlag, runner.restoreWaitFlag)
+			}
+		})
+	}
+}
+
+func TestNewDualStack(t *testing.T) {
+	testCases := []struct {
+		name     string
+		commands []testCommand
+		ipv4     bool
+		ipv6     bool
+	}{
+		{
+			name: "both available",
+			commands: []testCommand{
+				{
+					// ipv4 creation
+					command: "iptables --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables v1.8.0"), nil, nil },
+				},
+				{
+					// ipv4 Present()
+					command: "iptables -w 5 -S POSTROUTING -t nat",
+					action:  func() ([]byte, []byte, error) { return nil, nil, nil },
+				},
+				{
+					// ipv6 creation
+					command: "ip6tables --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables v1.8.0"), nil, nil },
+				},
+				{
+					// ipv6 Present()
+					command: "ip6tables -w 5 -S POSTROUTING -t nat",
+					action:  func() ([]byte, []byte, error) { return nil, nil, nil },
+				},
+			},
+			ipv4: true,
+			ipv6: true,
+		},
+		{
+			name: "ipv4 available, ipv6 not installed",
+			commands: []testCommand{
+				{
+					// ipv4 creation
+					command: "iptables --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables v1.8.0"), nil, nil },
+				},
+				{
+					// ipv4 Present()
+					command: "iptables -w 5 -S POSTROUTING -t nat",
+					action:  func() ([]byte, []byte, error) { return nil, nil, nil },
+				},
+				{
+					// ipv6 creation
+					command: "ip6tables --version",
+					action:  func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("no such file or directory") },
+				},
+				{
+					// ipv6 Present()
+					command: "ip6tables -S POSTROUTING -t nat",
+					action:  func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("no such file or directory") },
+				},
+			},
+			ipv4: true,
+			ipv6: false,
+		},
+		{
+			name: "ipv4 available, ipv6 disabled",
+			commands: []testCommand{
+				{
+					// ipv4 creation
+					command: "iptables --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables v1.8.0"), nil, nil },
+				},
+				{
+					// ipv4 Present()
+					command: "iptables -w 5 -S POSTROUTING -t nat",
+					action:  func() ([]byte, []byte, error) { return nil, nil, nil },
+				},
+				{
+					// ipv6 creation
+					command: "ip6tables --version",
+					action:  func() ([]byte, []byte, error) { return []byte("iptables v1.8.0"), nil, nil },
+				},
+				{
+					// ipv6 Present()
+					command: "ip6tables -w 5 -S POSTROUTING -t nat",
+					action:  func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("ipv6 is broken") },
+				},
+			},
+			ipv4: true,
+			ipv6: false,
+		},
+		{
+			name: "no iptables support",
+			commands: []testCommand{
+				{
+					// ipv4 creation
+					command: "iptables --version",
+					action:  func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("no such file or directory") },
+				},
+				{
+					// ipv4 Present()
+					command: "iptables -S POSTROUTING -t nat",
+					action:  func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("no such file or directory") },
+				},
+				{
+					// ipv6 creation
+					command: "ip6tables --version",
+					action:  func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("no such file or directory") },
+				},
+				{
+					// ipv6 Present()
+					command: "ip6tables -S POSTROUTING -t nat",
+					action:  func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("no such file or directory") },
+				},
+			},
+			ipv4: false,
+			ipv6: false,
+		},
 	}
 
-	// Check that proper iptables restore version command was used during runner instantiation
-	if !sets.New(fcmd.CombinedOutputLog[1]...).HasAll(iptablesRestoreCmd, "--version") {
-		t.Errorf("%s runner instantiate: Expected cmd '%s --version', Got '%s'", protocol, iptablesRestoreCmd, fcmd.CombinedOutputLog[1])
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fexec := fakeExecForCommands(tc.commands)
+			runners := newDualStackInternal(fexec)
+
+			if tc.ipv4 && runners[v1.IPv4Protocol] == nil {
+				t.Errorf("Expected ipv4 runner, got nil")
+			} else if !tc.ipv4 && runners[v1.IPv4Protocol] != nil {
+				t.Errorf("Expected no ipv4 runner, got one")
+			}
+			if tc.ipv6 && runners[v1.IPv6Protocol] == nil {
+				t.Errorf("Expected ipv6 runner, got nil")
+			} else if !tc.ipv6 && runners[v1.IPv6Protocol] != nil {
+				t.Errorf("Expected no ipv6 runner, got one")
+			}
+		})
 	}
 }
-
-func TestIPTablesVersionCmdsIPv4(t *testing.T) {
-	testIPTablesVersionCmds(t, ProtocolIPv4)
-}
-
-func TestIPTablesVersionCmdsIPv6(t *testing.T) {
-	testIPTablesVersionCmds(t, ProtocolIPv6)
-}
-
 func testEnsureChain(t *testing.T, protocol Protocol) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
@@ -103,7 +364,7 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, protocol)
+	runner := newInternal(fexec, protocol, "", "")
 	// Success.
 	exists, err := runner.EnsureChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
@@ -160,7 +421,7 @@ func TestFlushChain(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	// Success.
 	err := runner.FlushChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
@@ -197,7 +458,7 @@ func TestDeleteChain(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	// Success.
 	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
@@ -233,7 +494,7 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	exists, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -269,7 +530,7 @@ func TestEnsureRuleNew(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	exists, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -302,7 +563,7 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	_, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -332,7 +593,7 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	_, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -359,7 +620,7 @@ func TestDeleteRuleDoesNotExist(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -392,7 +653,7 @@ func TestDeleteRuleExists(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -422,7 +683,7 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -452,7 +713,7 @@ func TestDeleteRuleErrorDeleting(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -471,7 +732,7 @@ func TestGetIPTablesHasCheckCommand(t *testing.T) {
 		{"iptables v1.4.11", true},
 		{"iptables v1.4.19.1", true},
 		{"iptables v2.0.0", true},
-		{"total junk", true},
+		{"total junk", false},
 	}
 
 	for _, testCase := range testCases {
@@ -487,7 +748,7 @@ func TestGetIPTablesHasCheckCommand(t *testing.T) {
 				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			},
 		}
-		ipt := New(fexec, ProtocolIPv4)
+		ipt := newInternal(fexec, ProtocolIPv4, "", "")
 		runner := ipt.(*runner)
 		if testCase.Expected != runner.hasCheck {
 			t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, runner.hasCheck)
@@ -567,6 +828,113 @@ COMMIT
 	}
 }
 
+func TestGetIPTablesRestoreWaitFlag(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		version              string
+		restoreVersionOutput string
+		protocol             string
+		expected             []string
+	}{
+		{
+			name:     "version >= WaitRestoreMinVersion (1.6.2)",
+			version:  "1.6.2",
+			protocol: "ipv4",
+			expected: []string{WaitString, WaitSecondsValue},
+		},
+		{
+			name:                 "version < WaitRestoreMinVersion (1.6.2) with valid restore version",
+			version:              "1.4.22",
+			restoreVersionOutput: "iptables v1.4.22",
+			protocol:             "ipv4",
+			expected:             []string{WaitString},
+		},
+		{
+			name:                 "version < WaitRestoreMinVersion (1.6.2) with empty restore version",
+			version:              "1.4.21",
+			restoreVersionOutput: "",
+			protocol:             "ipv4",
+			expected:             nil,
+		},
+		{
+			name:                 "version < WaitRestoreMinVersion (1.6.2) with unparseable restore version",
+			version:              "1.4.21",
+			restoreVersionOutput: "invalid-version",
+			protocol:             "ipv4",
+			expected:             nil,
+		},
+		{
+			name:                 "version < WaitRestoreMinVersion with restore command error",
+			version:              "1.4.21",
+			restoreVersionOutput: "error",
+			protocol:             "ipv4",
+			expected:             nil,
+		},
+		{
+			name:                 "IPv6 protocol test with valid restore version",
+			version:              "1.4.22",
+			restoreVersionOutput: "iptables v1.4.22",
+			protocol:             "ipv6",
+			expected:             []string{WaitString},
+		},
+		{
+			name:                 "Very old version (1.0.0)",
+			version:              "1.0.0",
+			restoreVersionOutput: "iptables v1.0.0",
+			protocol:             "ipv4",
+			expected:             []string{WaitString},
+		},
+		{
+			name:                 "Version just below WaitRestoreMinVersion (1.6.1)",
+			version:              "1.6.1",
+			restoreVersionOutput: "iptables v1.6.1",
+			protocol:             "ipv4",
+			expected:             []string{WaitString},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fcmd := fakeexec.FakeCmd{
+				CombinedOutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) {
+						if tc.restoreVersionOutput == "error" {
+							return nil, nil, fmt.Errorf("error getting version")
+						}
+						return []byte(tc.restoreVersionOutput), nil, nil
+					},
+				},
+			}
+			fexec := &fakeexec.FakeExec{
+				CommandScript: []fakeexec.FakeCommandAction{
+					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+				},
+			}
+
+			version := utilversion.MustParseGeneric(tc.version)
+
+			var protocol Protocol
+			if tc.protocol == "ipv6" {
+				protocol = ProtocolIPv6
+			} else {
+				protocol = ProtocolIPv4
+			}
+
+			result := getIPTablesRestoreWaitFlag(version, fexec, protocol)
+
+			if !reflect.DeepEqual(result, tc.expected) {
+				t.Errorf("Expected %v, got %v", tc.expected, result)
+			}
+
+			if version.LessThan(WaitRestoreMinVersion) && tc.restoreVersionOutput != "" && tc.restoreVersionOutput != "error" {
+				if fcmd.CombinedOutputCalls != 1 {
+					t.Errorf("Expected iptables-restore --version to be called once, got %d calls", fcmd.CombinedOutputCalls)
+				}
+			}
+		})
+	}
+}
+
 func TestCheckRuleWithoutCheckAbsent(t *testing.T) {
 	iptablesSaveOutput := `# Generated by iptables-save v1.4.7 on Wed Oct 29 14:56:01 2014
 *nat
@@ -617,7 +985,9 @@ func TestIPTablesWaitFlag(t *testing.T) {
 		{"1.4.21", []string{WaitString}},
 		{"1.4.22", []string{WaitString, WaitSecondsValue}},
 		{"1.5.0", []string{WaitString, WaitSecondsValue}},
-		{"2.0.0", []string{WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue}},
+		{"1.8.7", []string{WaitString, WaitSecondsValue}},
+		{"1.8.8", []string{WaitString, WaitSecondsValue}},
+		{"2.0.0", []string{WaitString, WaitSecondsValue}},
 	}
 
 	for _, testCase := range testCases {
@@ -648,7 +1018,7 @@ func TestWaitFlagUnavailable(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -679,7 +1049,7 @@ func TestWaitFlagOld(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -713,7 +1083,7 @@ func TestWaitFlagNew(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, ProtocolIPv4)
+	runner := newInternal(fexec, ProtocolIPv4, "", "")
 	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -722,37 +1092,6 @@ func TestWaitFlagNew(t *testing.T) {
 		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 	if !sets.New(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString, WaitSecondsValue) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
-	}
-}
-
-func TestWaitIntervalFlagNew(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			// iptables version check
-			func() ([]byte, []byte, error) { return []byte("iptables v1.6.1"), nil, nil },
-			// iptables-restore version check
-			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
-			// Success.
-			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
-		},
-	}
-	fexec := &fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	runner := New(fexec, ProtocolIPv4)
-	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.New(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
@@ -789,7 +1128,7 @@ COMMIT
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, protocol)
+	runner := newInternal(fexec, protocol, "", "")
 	buffer := bytes.NewBuffer(nil)
 
 	// Success.
@@ -857,7 +1196,7 @@ func testRestore(t *testing.T, protocol Protocol) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec, protocol)
+	runner := newInternal(fexec, protocol, "", "")
 
 	// both flags true
 	err := runner.Restore(TableNAT, []byte{}, FlushTables, RestoreCounters)
@@ -989,7 +1328,7 @@ func TestRestoreAllWait(t *testing.T) {
 	}
 
 	commandSet := sets.New(fcmd.CombinedOutputLog[1]...)
-	if !commandSet.HasAll("iptables-restore", WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue, "--counters", "--noflush") {
+	if !commandSet.HasAll("iptables-restore", WaitString, WaitSecondsValue, "--counters", "--noflush") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 

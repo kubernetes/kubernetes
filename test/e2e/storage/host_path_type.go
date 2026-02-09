@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -270,7 +269,7 @@ var _ = utils.SIGDescribe("HostPathType Character Device", framework.WithSlow(),
 		targetCharDev = path.Join(hostBaseDir, "achardev")
 		ginkgo.By("Create a character device for further testing")
 		cmd := fmt.Sprintf("mknod %s c 89 1", path.Join(mountBaseDir, "achardev"))
-		stdout, stderr, err := e2evolume.PodExec(f, basePod, cmd)
+		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, basePod.Name, cmd)
 		framework.ExpectNoError(err, "command: %q, stdout: %s\nstderr: %s", cmd, stdout, stderr)
 	})
 
@@ -340,7 +339,7 @@ var _ = utils.SIGDescribe("HostPathType Block Device", framework.WithSlow(), fun
 		targetBlockDev = path.Join(hostBaseDir, "ablkdev")
 		ginkgo.By("Create a block device for further testing")
 		cmd := fmt.Sprintf("mknod %s b 89 1", path.Join(mountBaseDir, "ablkdev"))
-		stdout, stderr, err := e2evolume.PodExec(f, basePod, cmd)
+		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, basePod.Name, cmd)
 		framework.ExpectNoError(err, "command %q: stdout: %s\nstderr: %s", cmd, stdout, stderr)
 	})
 

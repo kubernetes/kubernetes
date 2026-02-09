@@ -17,9 +17,9 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path"
 
 	"github.com/lithammer/dedent"
@@ -39,24 +39,22 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 var (
-	iptablesCleanupInstructions = dedent.Dedent(`
-		The reset process does not reset or clean up iptables rules or IPVS tables.
-		If you wish to reset iptables, you must do so manually by using the "iptables" command.
+	manualCleanupInstructions = dedent.Dedent(`
+		The reset process does not perform cleanup of CNI plugin configuration,
+		network filtering rules and kubeconfig files.
 
-		If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
-		to reset your system's IPVS tables.
+		For information on how to perform this cleanup manually, please see:
+		    https://k8s.io/docs/reference/setup-tools/kubeadm/kubeadm-reset/
 
-		The reset process does not clean your kubeconfig files and you must remove them manually.
-		Please, check the contents of the $HOME/.kube/config file.
-	`)
-
-	cniCleanupInstructions = dedent.Dedent(`
-		The reset process does not clean CNI configuration. To do so, you must remove /etc/cni/net.d
 	`)
 )
 
@@ -104,7 +102,10 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		return nil, err
 	}
 
-	var initCfg *kubeadmapi.InitConfiguration
+	var (
+		initCfg *kubeadmapi.InitConfiguration
+		client  clientset.Interface
+	)
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal ResetConfiguration and validates cfg.
 	resetCfg, err := configutil.LoadOrDefaultResetConfiguration(opts.cfgPath, opts.externalcfg, configutil.LoadOrDefaultConfigurationOptions{
@@ -115,10 +116,27 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		return nil, err
 	}
 
-	client, err := cmdutil.GetClientSet(opts.kubeconfigPath, false)
+	dryRunFlag := cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun, opts.externalcfg.DryRun).(bool)
+	if dryRunFlag {
+		dryRun := apiclient.NewDryRun().WithDefaultMarshalFunction().WithWriter(os.Stdout)
+		dryRun.AppendReactor(dryRun.GetKubeadmConfigReactor()).
+			AppendReactor(dryRun.GetKubeletConfigReactor()).
+			AppendReactor(dryRun.GetKubeProxyConfigReactor())
+		client = dryRun.FakeClient()
+		_, err = os.Stat(opts.kubeconfigPath)
+		if err == nil {
+			err = dryRun.WithKubeConfigFile(opts.kubeconfigPath)
+		}
+	} else {
+		client, err = kubeconfigutil.ClientSetFromFile(opts.kubeconfigPath)
+	}
+
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", opts.kubeconfigPath)
-		initCfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false)
+		getNodeRegistration := true
+		getAPIEndpoint := staticpodutil.IsControlPlaneNode()
+		getComponentConfigs := true
+		initCfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
 		if err != nil {
 			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
@@ -149,7 +167,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		certificatesDir = opts.externalcfg.CertificatesDir
 	} else if len(resetCfg.CertificatesDir) > 0 { // configured in the ResetConfiguration
 		certificatesDir = resetCfg.CertificatesDir
-	} else if len(initCfg.ClusterConfiguration.CertificatesDir) > 0 { // fetch from cluster
+	} else if initCfg != nil && len(initCfg.ClusterConfiguration.CertificatesDir) > 0 { // fetch from cluster
 		certificatesDir = initCfg.ClusterConfiguration.CertificatesDir
 	}
 
@@ -162,8 +180,8 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		outputWriter:          out,
 		cfg:                   initCfg,
 		resetCfg:              resetCfg,
-		dryRun:                cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun, opts.externalcfg.DryRun).(bool),
-		forceReset:            cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.ForceReset, resetCfg.Force, opts.externalcfg.Force).(bool),
+		dryRun:                dryRunFlag,
+		forceReset:            cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.Force, resetCfg.Force, opts.externalcfg.Force).(bool),
 		cleanupTmpDir:         cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir, opts.externalcfg.CleanupTmpDir).(bool),
 	}, nil
 }
@@ -175,7 +193,7 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 		`The path to the directory where the certificates are stored. If specified, clean this directory.`,
 	)
 	flagSet.BoolVarP(
-		&resetOptions.externalcfg.Force, options.ForceReset, "f", resetOptions.externalcfg.Force,
+		&resetOptions.externalcfg.Force, options.Force, "f", resetOptions.externalcfg.Force,
 		"Reset the node without prompting for confirmation.",
 	)
 	flagSet.BoolVar(
@@ -184,7 +202,7 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 	)
 	flagSet.BoolVar(
 		&resetOptions.externalcfg.CleanupTmpDir, options.CleanupTmpDir, resetOptions.externalcfg.CleanupTmpDir,
-		fmt.Sprintf("Cleanup the %q directory", path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDirForKubeadm)),
+		fmt.Sprintf("Cleanup the %q directory", path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDir)),
 	)
 	options.AddKubeConfigFlag(flagSet, &resetOptions.kubeconfigPath)
 	options.AddConfigFlag(flagSet, &resetOptions.cfgPath)
@@ -214,10 +232,7 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 				return err
 			}
 
-			// output help text instructing user how to remove cni folders
-			fmt.Print(cniCleanupInstructions)
-			// Output help text instructing user how to remove iptables rules
-			fmt.Print(iptablesCleanupInstructions)
+			fmt.Print(manualCleanupInstructions)
 			return nil
 		},
 	}

@@ -20,7 +20,10 @@ package v1
 
 // PodIPApplyConfiguration represents a declarative configuration of the PodIP type for use
 // with apply.
+//
+// PodIP represents a single IP address allocated to the pod.
 type PodIPApplyConfiguration struct {
+	// IP is the IP address assigned to the pod
 	IP *string `json:"ip,omitempty"`
 }
 

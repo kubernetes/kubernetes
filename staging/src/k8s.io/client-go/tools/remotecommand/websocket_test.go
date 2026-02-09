@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,19 +32,23 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	gwebsocket "github.com/gorilla/websocket"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestWebSocketClient_LoopbackStdinToStdout returns random data sent on the STDIN channel
@@ -1045,6 +1050,7 @@ func TestWebSocketClient_ExecutorErrors(t *testing.T) {
 }
 
 func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	var upgrader = gwebsocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Accepting all requests
@@ -1077,7 +1083,7 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 	var expectedMsg = "test heartbeat message"
 	var period = 100 * time.Millisecond
 	var deadline = 200 * time.Millisecond
-	heartbeat := newHeartbeat(client, period, deadline)
+	heartbeat := newHeartbeat(logger, client, period, deadline)
 	heartbeat.setMessage(expectedMsg)
 	// Add a channel to the handler to retrieve the "pong" message.
 	pongMsgCh := make(chan string)
@@ -1117,7 +1123,8 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 }
 
 func TestLateStreamCreation(t *testing.T) {
-	c := newWSStreamCreator(nil)
+	logger, _ := ktesting.NewTestContext(t)
+	c := newWSStreamCreator(logger, nil)
 	c.closeAllStreamReaders(nil)
 	if err := c.setStream(0, nil); err == nil {
 		t.Fatal("expected error adding stream after closeAllStreamReaders")
@@ -1125,8 +1132,10 @@ func TestLateStreamCreation(t *testing.T) {
 }
 
 func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	// Validate Stream functions.
-	c := newWSStreamCreator(nil)
+	c := newWSStreamCreator(logger, nil)
 	headers := http.Header{}
 	headers.Set(v1.StreamType, v1.StreamTypeStdin)
 	s, err := c.CreateStream(headers)
@@ -1339,4 +1348,112 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *opti
 	}(streams[remotecommand.StreamErr])
 
 	return wsStreams, nil
+}
+
+func TestWebSocketClient_ProxySucceeds(t *testing.T) {
+	// Validate websocket proxy succeeds for each of the enumerated schemes.
+	proxySchemes := []string{"http", "https"}
+	for _, proxyScheme := range proxySchemes {
+		// Create the proxy handler, keeping track of how many times it was called.
+		var proxyCalled atomic.Int64
+		proxyHandler := utilnettesting.NewHTTPProxyHandler(t, func(req *http.Request) bool {
+			proxyCalled.Add(1)
+			return true
+		})
+		defer proxyHandler.Wait()
+		// Create/Start the proxy server, adding TLS functionality depending on scheme.
+		proxyServer := httptest.NewUnstartedServer(proxyHandler)
+		if proxyScheme == "https" {
+			cert, err := tls.X509KeyPair(localhostCert, localhostKey)
+			if err != nil {
+				t.Errorf("https (valid hostname): proxy_test: %v", err)
+			}
+			proxyServer.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
+			proxyServer.StartTLS()
+		} else {
+			proxyServer.Start()
+		}
+		defer proxyServer.Close() //nolint:errcheck
+		proxyLocation, err := url.Parse(proxyServer.URL)
+		require.NoError(t, err)
+		t.Logf("Proxy URL: %s", proxyLocation.String())
+
+		// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
+		websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
+			if err != nil {
+				t.Fatalf("error on webSocketServerStreams: %v", err)
+			}
+			defer conns.conn.Close() //nolint:errcheck
+			// Loopback the STDIN stream onto the STDOUT stream.
+			_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
+			if err != nil {
+				t.Fatalf("error copying STDIN to STDOUT: %v", err)
+			}
+		}))
+		defer websocketServer.Close() //nolint:errcheck
+
+		// Now create the WebSocket client (executor), and point it to the TLS proxy server.
+		// The proxy server should open a websocket connection to the fake websocket server.
+		websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stdout=true"
+		websocketLocation, err := url.Parse(websocketServer.URL)
+		require.NoError(t, err)
+		clientConfig := &rest.Config{
+			Host: websocketLocation.Host,
+			// Unused if "http" scheme.
+			TLSClientConfig: rest.TLSClientConfig{CAData: localhostCert},
+			Proxy: func(req *http.Request) (*url.URL, error) {
+				return proxyLocation, nil
+			},
+		}
+		exec, err := NewWebSocketExecutor(clientConfig, "GET", websocketServer.URL)
+		require.NoError(t, err)
+
+		// Generate random data, and set it up to stream on STDIN. The data will be
+		// returned on the STDOUT buffer.
+		randomSize := 1024 * 1024
+		randomData := make([]byte, randomSize)
+		if _, err := rand.Read(randomData); err != nil {
+			t.Errorf("unexpected error reading random data: %v", err)
+		}
+		var stdout bytes.Buffer
+		options := &StreamOptions{
+			Stdin:  bytes.NewReader(randomData),
+			Stdout: &stdout,
+		}
+		errorChan := make(chan error)
+		go func() {
+			// Start the streaming on the WebSocket "exec" client.
+			errorChan <- exec.StreamWithContext(context.Background(), *options)
+		}()
+
+		select {
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatalf("expect stream to be closed after connection is closed.")
+		case err := <-errorChan:
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// Validate remote command v5 protocol was negotiated.
+			streamExec := exec.(*wsStreamExecutor)
+			if remotecommand.StreamProtocolV5Name != streamExec.negotiated {
+				t.Fatalf("expected remote command v5 protocol, got (%s)", streamExec.negotiated)
+			}
+		}
+		data, err := io.ReadAll(bytes.NewReader(stdout.Bytes()))
+		if err != nil {
+			t.Fatalf("error reading the stream: %v", err)
+		}
+		// Check the random data sent on STDIN was the same returned on STDOUT.
+		t.Logf("comparing %d random bytes sent data versus received", len(randomData))
+		if !bytes.Equal(randomData, data) {
+			t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
+		} else {
+			t.Log("success--random bytes are the same")
+		}
+		// Ensure the proxy was called once
+		if e, a := int64(1), proxyCalled.Load(); e != a {
+			t.Errorf("expected %d proxy call, got %d", e, a)
+		}
+	}
 }

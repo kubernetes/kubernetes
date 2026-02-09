@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -92,15 +91,29 @@ type execPluginCall struct {
 	callStatus string
 }
 
-type execPluginMetrics struct {
-	calls []execPluginCall
+type execPluginPolicyCall struct {
+	status string
 }
+
+type wantMetrics struct {
+	calls       []execPluginCall
+	policyCalls []execPluginPolicyCall
+}
+
+// go does not allow implementing different interfaces that share method names,
+// so implement the interfaces on type aliases instead, casting them as needed
+type execPluginMetrics wantMetrics
+type execPluginPolicyMetrics wantMetrics
 
 func (m *execPluginMetrics) Increment(exitCode int, callStatus string) {
 	m.calls = append(m.calls, execPluginCall{exitCode: exitCode, callStatus: callStatus})
 }
 
-var execPluginMetricsComparer = cmp.Comparer(func(a, b *execPluginMetrics) bool {
+func (m *execPluginPolicyMetrics) Increment(status string) {
+	m.policyCalls = append(m.policyCalls, execPluginPolicyCall{status: status})
+}
+
+var wantMetricsComparer = cmp.Comparer(func(a, b *wantMetrics) bool {
 	return reflect.DeepEqual(a, b)
 })
 
@@ -111,7 +124,7 @@ type execPluginClientTestData struct {
 	wantCertificate               *tls.Certificate
 	wantGetCertificateErrorPrefix string
 	wantClientErrorPrefix         string
-	wantMetrics                   *execPluginMetrics
+	wantMetrics                   *wantMetrics
 }
 
 func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byte, clientAuthorizedToken, clientCertFileName, clientKeyFileName string) []execPluginClientTestData {
@@ -135,11 +148,16 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			wantAuthorizationHeaderValues: [][]string{{"Bearer unauthorized"}},
 			wantCertificate:               &tls.Certificate{},
 			wantClientErrorPrefix:         "Unauthorized",
-			wantMetrics: &execPluginMetrics{
+			wantMetrics: &wantMetrics{
 				calls: []execPluginCall{
 					// 2 calls since we preemptively refresh the creds upon a 401 HTTP response.
 					{exitCode: 0, callStatus: "no_error"},
 					{exitCode: 0, callStatus: "no_error"},
+				},
+				policyCalls: []execPluginPolicyCall{
+					// 2 calls since we preemptively refresh the creds upon a 401 HTTP response.
+					{status: "allowed"},
+					{status: "allowed"},
 				},
 			},
 		},
@@ -163,11 +181,16 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			wantAuthorizationHeaderValues: [][]string{nil},
 			wantCertificate:               x509KeyPair(unauthorizedCert, unauthorizedKey, true),
 			wantClientErrorPrefix:         "Unauthorized",
-			wantMetrics: &execPluginMetrics{
+			wantMetrics: &wantMetrics{
 				calls: []execPluginCall{
 					// 2 calls since we preemptively refresh the creds upon a 401 HTTP response.
 					{exitCode: 0, callStatus: "no_error"},
 					{exitCode: 0, callStatus: "no_error"},
+				},
+				policyCalls: []execPluginPolicyCall{
+					// 2 calls since we preemptively refresh the creds upon a 401 HTTP response.
+					{status: "allowed"},
+					{status: "allowed"},
 				},
 			},
 		},
@@ -189,7 +212,10 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
 			wantCertificate:               &tls.Certificate{},
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 0, callStatus: "no_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
 		},
 		{
 			name: "authorized certificate",
@@ -210,7 +236,10 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantAuthorizationHeaderValues: [][]string{nil},
 			wantCertificate:               loadX509KeyPair(clientCertFileName, clientKeyFileName),
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 0, callStatus: "no_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
 		},
 		{
 			name: "authorized token and certificate",
@@ -232,7 +261,10 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
 			wantCertificate:               loadX509KeyPair(clientCertFileName, clientKeyFileName),
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 0, callStatus: "no_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
 		},
 		{
 			name: "unauthorized token and authorized certificate favors authorized certificate",
@@ -254,7 +286,10 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Bearer client-unauthorized-token"}},
 			wantCertificate:               loadX509KeyPair(clientCertFileName, clientKeyFileName),
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 0, callStatus: "no_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
 		},
 		{
 			name: "authorized token and unauthorized certificate favors authorized token",
@@ -276,7 +311,10 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
 			wantCertificate:               x509KeyPair([]byte(unauthorizedCert), []byte(unauthorizedKey), true),
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 0, callStatus: "no_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
 		},
 		{
 			name: "unauthorized token and unauthorized certificate",
@@ -299,11 +337,16 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			wantAuthorizationHeaderValues: [][]string{{"Bearer client-unauthorized-token"}},
 			wantCertificate:               x509KeyPair(unauthorizedCert, unauthorizedKey, true),
 			wantClientErrorPrefix:         "Unauthorized",
-			wantMetrics: &execPluginMetrics{
+			wantMetrics: &wantMetrics{
 				calls: []execPluginCall{
 					// 2 calls since we preemptively refresh the creds upon a 401 HTTP response.
 					{exitCode: 0, callStatus: "no_error"},
 					{exitCode: 0, callStatus: "no_error"},
+				},
+				policyCalls: []execPluginPolicyCall{
+					// 2 calls since we preemptively refresh the creds upon a 401 HTTP response.
+					{status: "allowed"},
+					{status: "allowed"},
 				},
 			},
 		},
@@ -327,7 +370,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Basic " + basicAuthHeaderValue("unauthorized", "unauthorized")}},
 			wantClientErrorPrefix:         "Unauthorized",
-			wantMetrics:                   &execPluginMetrics{},
+			wantMetrics:                   &wantMetrics{},
 		},
 		{
 			name: "good token with static auth bearer token favors static auth bearer token",
@@ -348,7 +391,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Bearer some-unauthorized-token"}},
 			wantClientErrorPrefix:         "Unauthorized",
-			wantMetrics:                   &execPluginMetrics{},
+			wantMetrics:                   &wantMetrics{},
 		},
 		{
 			name: "good token with static auth cert and key favors static cert",
@@ -371,7 +414,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			wantAuthorizationHeaderValues: [][]string{nil},
 			wantClientErrorPrefix:         "Unauthorized",
 			wantCertificate:               x509KeyPair(unauthorizedCert, unauthorizedKey, false),
-			wantMetrics:                   &execPluginMetrics{},
+			wantMetrics:                   &wantMetrics{},
 		},
 		{
 			name: "unknown binary",
@@ -380,16 +423,22 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantGetCertificateErrorPrefix: "exec: executable does not exist not found",
 			wantClientErrorPrefix:         `Get "https`,
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 1, callStatus: "plugin_not_found_error"}}},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 1, callStatus: "plugin_not_found_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
 		},
 		{
 			name: "binary not executable",
 			clientConfigFunc: func(c *rest.Config) {
 				c.ExecProvider.Command = "./testdata/exec-plugin-not-executable.sh"
 			},
-			wantGetCertificateErrorPrefix: "exec: fork/exec ./testdata/exec-plugin-not-executable.sh: permission denied",
+			wantGetCertificateErrorPrefix: "exec: fork/exec testdata/exec-plugin-not-executable.sh: permission denied",
 			wantClientErrorPrefix:         `Get "https`,
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 1, callStatus: "plugin_not_found_error"}}},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 1, callStatus: "plugin_not_found_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
 		},
 		{
 			name: "binary fails",
@@ -403,7 +452,88 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantGetCertificateErrorPrefix: "exec: executable testdata/exec-plugin.sh failed with exit code 10",
 			wantClientErrorPrefix:         `Get "https`,
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 10, callStatus: "plugin_execution_error"}}},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 10, callStatus: "plugin_execution_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
+		},
+		{
+			name: "binary denied by denyall policy",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyDenyAll
+			},
+			wantGetCertificateErrorPrefix: "plugin",
+			wantClientErrorPrefix:         `Get "https`,
+			wantMetrics: &wantMetrics{
+				policyCalls: []execPluginPolicyCall{{status: "denied"}},
+			},
+		},
+		{
+			name: "binary denied by allowlist policy",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowlist
+				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
+					{Name: "/only/my/very/secure/binary"},
+					{Name: "other-very-secure-binary"},
+				}
+			},
+			wantGetCertificateErrorPrefix: `plugin path "testdata/exec-plugin.sh" is not permitted by the credential plugin allowlist`,
+			wantClientErrorPrefix:         `Get "https`,
+			wantMetrics: &wantMetrics{
+				policyCalls: []execPluginPolicyCall{{status: "denied"}},
+			},
+		},
+		{
+			name: "allowall policy happy path",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowAll
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name: outputEnvVar,
+						Value: fmt.Sprintf(`{
+						"kind": "ExecCredential",
+						"apiVersion": "client.authentication.k8s.io/v1",
+						"status": {
+							"token": "%s"
+						}
+					}`, clientAuthorizedToken),
+					},
+				}
+			},
+			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
+			wantCertificate:               &tls.Certificate{},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 0, callStatus: "no_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
+		},
+		{
+			name: "allowlist policy happy path",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.PluginPolicy.PolicyType = clientcmdapi.PluginPolicyAllowlist
+				c.ExecProvider.PluginPolicy.Allowlist = []clientcmdapi.AllowlistEntry{
+					{Name: "testdata/exec-plugin.sh"},
+					{Name: "other-very-secure-binary"},
+				}
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name: outputEnvVar,
+						Value: fmt.Sprintf(`{
+						"kind": "ExecCredential",
+						"apiVersion": "client.authentication.k8s.io/v1",
+						"status": {
+							"token": "%s"
+						}
+					}`, clientAuthorizedToken),
+					},
+				}
+			},
+			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
+			wantCertificate:               &tls.Certificate{},
+			wantMetrics: &wantMetrics{
+				calls:       []execPluginCall{{exitCode: 0, callStatus: "no_error"}},
+				policyCalls: []execPluginPolicyCall{{status: "allowed"}},
+			},
 		},
 	}
 	return append(v1Tests, v1beta1TestsFromV1Tests(v1Tests)...)
@@ -412,7 +542,6 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 func v1beta1TestsFromV1Tests(v1Tests []execPluginClientTestData) []execPluginClientTestData {
 	v1beta1Tests := make([]execPluginClientTestData, 0, len(v1Tests))
 	for _, v1Test := range v1Tests {
-		v1Test := v1Test
 
 		v1beta1Test := v1Test
 		v1beta1Test.name = fmt.Sprintf("%s v1beta1", v1Test.name)
@@ -443,7 +572,6 @@ func TestExecPluginViaClient(t *testing.T) {
 	tests := execPluginClientTests(t, unauthorizedCert, unauthorizedKey, clientAuthorizedToken, clientCertFileName, clientKeyFileName)
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			actualMetrics := captureMetrics(t)
 
@@ -487,7 +615,7 @@ func TestExecPluginViaClient(t *testing.T) {
 			}
 
 			// Validate that the proper metrics were set.
-			if diff := cmp.Diff(test.wantMetrics, actualMetrics, execPluginMetricsComparer); diff != "" {
+			if diff := cmp.Diff(test.wantMetrics, actualMetrics, wantMetricsComparer); diff != "" {
 				t.Error("unexpected metrics; -want, +got:\n" + diff)
 			}
 
@@ -522,14 +650,18 @@ func TestExecPluginViaClient(t *testing.T) {
 	}
 }
 
-func captureMetrics(t *testing.T) *execPluginMetrics {
+func captureMetrics(t *testing.T) *wantMetrics {
 	previousCallsMetric := metrics.ExecPluginCalls
+	previousPolicyCallsMetric := metrics.ExecPluginPolicyCalls
 	t.Cleanup(func() {
 		metrics.ExecPluginCalls = previousCallsMetric
+		metrics.ExecPluginPolicyCalls = previousPolicyCallsMetric
 	})
 
-	actualMetrics := &execPluginMetrics{}
-	metrics.ExecPluginCalls = actualMetrics
+	actualMetrics := &wantMetrics{}
+
+	metrics.ExecPluginCalls = (*execPluginMetrics)(actualMetrics)
+	metrics.ExecPluginPolicyCalls = (*execPluginPolicyMetrics)(actualMetrics)
 	return actualMetrics
 }
 
@@ -608,7 +740,7 @@ func (is *informerSpy) waitForEvents(t *testing.T, wantEvents bool) {
 			t.Fatalf("wanted events, but got error: %v", err)
 		}
 	} else {
-		if !errors.Is(err, wait.ErrWaitTimeout) {
+		if !wait.Interrupted(err) {
 			if err != nil {
 				t.Fatalf("wanted no events, but got error: %v", err)
 			} else {
@@ -1009,7 +1141,6 @@ func TestExecPluginGlobalCache(t *testing.T) {
 	getTestExecClientAddresses := func(t *testing.T, tests []execPluginClientTestData, suffix string) []string {
 		var addresses []string
 		for i, test := range tests {
-			test := test
 			t.Run(test.name+" "+suffix, func(t *testing.T) {
 				clientConfig := rest.AnonymousClientConfig(result.ClientConfig)
 				clientConfig.ExecProvider = &clientcmdapi.ExecConfig{

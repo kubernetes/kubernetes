@@ -10,3 +10,5 @@ rules:
       - github.com/ghodss/yaml
       # prevent kubernetes from opening sctp sockets (ref: https://github.com/kubernetes/kubernetes/pull/87926#discussion_r376642015)
       - github.com/ishidawataru/sctp
+      # use k8s.io/client-go/kubernetes/scheme
+      - k8s.io/kubectl/pkg/scheme

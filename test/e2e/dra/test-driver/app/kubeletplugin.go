@@ -23,37 +23,61 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
-	resourceapi "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
+	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
-	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 )
 
+type Options struct {
+	EnableHealthService bool
+}
+
+type DeviceHealthUpdate struct {
+	PoolName   string
+	DeviceName string
+	Health     string
+}
+
 type ExamplePlugin struct {
-	stopCh  <-chan struct{}
-	logger  klog.Logger
-	d       kubeletplugin.DRAPlugin
-	fileOps FileOperations
+	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
+	stopCh         <-chan struct{}
+	logger         klog.Logger
+	resourceClient cgoresource.ResourceV1Interface
+	d              *kubeletplugin.Helper
+	fileOps        FileOperations
 
 	cdiDir     string
 	driverName string
 	nodeName   string
-	instances  sets.Set[string]
 
-	mutex          sync.Mutex
-	instancesInUse sets.Set[string]
-	prepared       map[ClaimID]any
-	gRPCCalls      []GRPCCall
+	// The mutex is needed because there are other goroutines checking the state.
+	// Serializing in the gRPC server alone is not enough because writing would
+	// race with reading.
+	mutex     sync.Mutex
+	prepared  map[ClaimID][]kubeletplugin.Device // prepared claims -> result of nodePrepareResource
+	gRPCCalls []GRPCCall
+
+	healthMutex       sync.Mutex
+	deviceHealth      map[string]string
+	HealthControlChan chan DeviceHealthUpdate
 
 	blockPrepareResourcesMutex   sync.Mutex
 	blockUnprepareResourcesMutex sync.Mutex
@@ -63,7 +87,17 @@ type ExamplePlugin struct {
 
 	unprepareResourcesFailure   error
 	failUnprepareResourcesMutex sync.Mutex
+
+	// cancelMainContext is used to cancel an upper-level context.
+	// It's called from HandleError if set.
+	cancelMainContext context.CancelCauseFunc
 }
+
+var _ kubeletplugin.DRAPlugin = &ExamplePlugin{}
+var _ drahealthv1alpha1.DRAResourceHealthServer = &ExamplePlugin{}
+
+//nolint:unused
+func (ex *ExamplePlugin) mustEmbedUnimplementedDRAResourceHealthServer() {}
 
 type GRPCCall struct {
 	// FullMethod is the fully qualified, e.g. /package.service/method.
@@ -84,14 +118,22 @@ type GRPCCall struct {
 // sufficient to make the ClaimID unique.
 type ClaimID struct {
 	Name string
-	UID  string
+	UID  types.UID
 }
 
-var _ drapbv1alpha3.NodeServer = &ExamplePlugin{}
+type Device struct {
+	PoolName    string
+	DeviceName  string
+	RequestName string
+	CDIDeviceID string
+}
+
+var _ kubeletplugin.DRAPlugin = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
-func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
-	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.json", ex.driverName, claimUID))
+func (ex *ExamplePlugin) getJSONFilePath(claimUID types.UID, requestName string) string {
+	baseRequestRef := resourceclaim.BaseRequestRef(requestName)
+	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s-%s.json", ex.driverName, claimUID, baseRequestRef))
 }
 
 // FileOperations defines optional callbacks for handling CDI files
@@ -104,15 +146,18 @@ type FileOperations struct {
 	// file does not exist.
 	Remove func(name string) error
 
-	// NumResourceInstances determines whether the plugin reports resources
-	// instances and how many. A negative value causes it to report "not implemented"
-	// in the NodeListAndWatchResources gRPC call.
-	NumResourceInstances int
+	// HandleError is an optional callback for ResourceSlice publishing problems.
+	HandleError func(ctx context.Context, err error, msg string)
+
+	// DriverResources provides the information that the driver will use to
+	// construct the ResourceSlices that it will publish.
+	DriverResources *resourceslice.DriverResources
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func StartPlugin(ctx context.Context, cdiDir, driverName string, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...any) (*ExamplePlugin, error) {
 	logger := klog.FromContext(ctx)
+
 	if fileOps.Create == nil {
 		fileOps.Create = func(name string, content []byte) error {
 			return os.WriteFile(name, content, os.FileMode(0644))
@@ -126,38 +171,64 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, nodeName string
 			return nil
 		}
 	}
-	ex := &ExamplePlugin{
-		stopCh:         ctx.Done(),
-		logger:         logger,
-		fileOps:        fileOps,
-		cdiDir:         cdiDir,
-		driverName:     driverName,
-		nodeName:       nodeName,
-		instances:      sets.New[string](),
-		instancesInUse: sets.New[string](),
-		prepared:       make(map[ClaimID]any),
-	}
 
-	for i := 0; i < ex.fileOps.NumResourceInstances; i++ {
-		ex.instances.Insert(fmt.Sprintf("instance-%02d", i))
-	}
-
-	opts = append(opts,
-		kubeletplugin.Logger(logger),
+	publicOpts := []kubeletplugin.Option{
 		kubeletplugin.DriverName(driverName),
+		kubeletplugin.NodeName(nodeName),
+		kubeletplugin.KubeClient(kubeClient),
+	}
+
+	testOpts := &options{}
+	pluginOpts := &Options{}
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case Options:
+			*pluginOpts = typedOpt
+		case TestOption:
+			if err := typedOpt(testOpts); err != nil {
+				return nil, fmt.Errorf("apply test option: %w", err)
+			}
+		case kubeletplugin.Option:
+			publicOpts = append(publicOpts, typedOpt)
+		default:
+			return nil, fmt.Errorf("unexpected option type %T", opt)
+		}
+	}
+
+	ex := &ExamplePlugin{
+		stopCh:            ctx.Done(),
+		logger:            logger,
+		resourceClient:    draclient.New(kubeClient),
+		fileOps:           fileOps,
+		cdiDir:            cdiDir,
+		driverName:        driverName,
+		nodeName:          nodeName,
+		prepared:          make(map[ClaimID][]kubeletplugin.Device),
+		cancelMainContext: testOpts.cancelMainContext,
+		deviceHealth:      make(map[string]string),
+		HealthControlChan: make(chan DeviceHealthUpdate, 10),
+	}
+
+	publicOpts = append(publicOpts,
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
-	d, err := kubeletplugin.Start(ex, opts...)
+	d, err := kubeletplugin.Start(ctx, ex, publicOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}
 	ex.d = d
 
+	if fileOps.DriverResources != nil {
+		if err := ex.d.PublishResources(ctx, *fileOps.DriverResources); err != nil {
+			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
+		}
+	}
+
 	return ex, nil
 }
 
-// stop ensures that all servers are stopped and resources freed.
+// Stop ensures that all servers are stopped and resources freed.
 func (ex *ExamplePlugin) Stop() {
 	ex.d.Stop()
 }
@@ -168,6 +239,17 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 		return false
 	}
 	return status.PluginRegistered
+}
+
+func (ex *ExamplePlugin) HandleError(ctx context.Context, err error, msg string) {
+	if ex.fileOps.HandleError != nil {
+		ex.fileOps.HandleError(ctx, err, msg)
+		return
+	}
+	utilruntime.HandleErrorWithContext(ctx, err, msg)
+	if ex.cancelMainContext != nil {
+		ex.cancelMainContext(err)
+	}
 }
 
 // BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it
@@ -226,11 +308,11 @@ func (ex *ExamplePlugin) getUnprepareResourcesFailure() error {
 	return ex.unprepareResourcesFailure
 }
 
-// NodePrepareResource ensures that the CDI file for the claim exists. It uses
+// NodePrepareResource ensures that the CDI file(s) (one per request) for the claim exists. It uses
 // a deterministic name to simplify NodeUnprepareResource (no need to remember
 // or discover the name) and idempotency (when called again, the file simply
 // gets written again).
-func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimName string, claimUID string, resourceHandle string, structuredResourceHandle []*resourceapi.StructuredResourceHandle) ([]string, error) {
+func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourceapi.ResourceClaim) ([]kubeletplugin.Device, error) {
 	logger := klog.FromContext(ctx)
 
 	ex.mutex.Lock()
@@ -238,116 +320,110 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimName stri
 	ex.blockPrepareResourcesMutex.Lock()
 	defer ex.blockPrepareResourcesMutex.Unlock()
 
-	deviceName := "claim-" + claimUID
-	vendor := ex.driverName
-	class := "test"
-	dev := vendor + "/" + class + "=" + deviceName
-	claimID := ClaimID{Name: claimName, UID: claimUID}
-	if _, ok := ex.prepared[claimID]; ok {
+	claimID := ClaimID{Name: claim.Name, UID: claim.UID}
+	if result, ok := ex.prepared[claimID]; ok {
 		// Idempotent call, nothing to do.
-		return []string{dev}, nil
+		return result, nil
 	}
 
-	// Determine environment variables.
-	var p parameters
-	var actualResourceHandle any
-	var instanceNames []string
-	switch len(structuredResourceHandle) {
-	case 0:
-		// Control plane controller did the allocation.
-		if err := json.Unmarshal([]byte(resourceHandle), &p); err != nil {
-			return nil, fmt.Errorf("unmarshal resource handle: %w", err)
+	var devices []kubeletplugin.Device
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		// Only handle allocations for the current driver.
+		if ex.driverName != result.Driver {
+			continue
 		}
-		actualResourceHandle = resourceHandle
-	case 1:
-		// Scheduler did the allocation with structured parameters.
-		handle := structuredResourceHandle[0]
-		if handle == nil {
-			return nil, errors.New("unexpected nil StructuredResourceHandle")
-		}
-		p.NodeName = handle.NodeName
-		if err := extractParameters(handle.VendorClassParameters, &p.EnvVars, "admin"); err != nil {
-			return nil, err
-		}
-		if err := extractParameters(handle.VendorClaimParameters, &p.EnvVars, "user"); err != nil {
-			return nil, err
-		}
-		for _, result := range handle.Results {
-			if err := extractParameters(result.VendorRequestParameters, &p.EnvVars, "user"); err != nil {
-				return nil, err
-			}
-			namedResources := result.NamedResources
-			if namedResources == nil {
-				return nil, errors.New("missing named resources allocation result")
-			}
-			instanceName := namedResources.Name
-			if instanceName == "" {
-				return nil, errors.New("empty named resources instance name")
-			}
-			if !ex.instances.Has(instanceName) {
-				return nil, fmt.Errorf("unknown allocated instance %q", instanceName)
-			}
-			if ex.instancesInUse.Has(instanceName) {
-				return nil, fmt.Errorf("resource instance %q used more than once", instanceName)
-			}
-			instanceNames = append(instanceNames, instanceName)
-		}
-		actualResourceHandle = handle
-	default:
-		// Huh?
-		return nil, fmt.Errorf("invalid length of NodePrepareResourceRequest.StructuredResourceHandle: %d", len(structuredResourceHandle))
-	}
 
-	// Sanity check scheduling.
-	if p.NodeName != "" && ex.nodeName != "" && p.NodeName != ex.nodeName {
-		return nil, fmt.Errorf("claim was allocated for %q, cannot be prepared on %q", p.NodeName, ex.nodeName)
-	}
+		baseRequestName := resourceclaim.BaseRequestRef(result.Request)
 
-	// CDI wants env variables as set of strings.
-	envs := []string{}
-	for key, val := range p.EnvVars {
-		envs = append(envs, key+"="+val)
-	}
+		// The driver joins all env variables in the order in which
+		// they appear in results (last one wins).
+		configs := resourceclaim.ConfigForResult(claim.Status.Allocation.Devices.Config, result)
+		env := make(map[string]string)
+		for i, config := range configs {
+			// Only use configs for the current driver.
+			if config.Opaque.Driver != ex.driverName {
+				continue
+			}
+			if err := extractParameters(config.Opaque.Parameters, &env, config.Source == resourceapi.AllocationConfigSourceClass); err != nil {
+				return nil, fmt.Errorf("parameters in config #%d: %w", i, err)
+			}
+		}
 
-	spec := &spec{
-		Version: "0.3.0", // This has to be a version accepted by the runtimes.
-		Kind:    vendor + "/" + class,
-		// At least one device is required and its entry must have more
-		// than just the name.
-		Devices: []device{
-			{
-				Name: deviceName,
-				ContainerEdits: containerEdits{
-					Env: envs,
+		// It also sets a claim_<claim name>_<request name>=true env variable.
+		// This can be used to identify which devices where mapped into a container.
+		claimReqName := "claim_" + claim.Name + "_" + baseRequestName
+		claimReqName = regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(claimReqName, "_")
+		env[claimReqName] = "true"
+
+		deviceName := "claim-" + string(claim.UID) + "-" + baseRequestName
+		vendor := ex.driverName
+		class := "test"
+		cdiDeviceID := vendor + "/" + class + "=" + deviceName
+
+		// CDI wants env variables as set of strings.
+		envs := []string{}
+		for key, val := range env {
+			envs = append(envs, key+"="+val)
+		}
+		sort.Strings(envs)
+
+		if len(envs) == 0 {
+			// CDI does not support empty ContainerEdits. For example,
+			// kubelet+crio then fail with:
+			//    CDI device injection failed: unresolvable CDI devices ...
+			//
+			// Inject nothing instead, which is supported by DRA.
+			continue
+		}
+
+		spec := &spec{
+			Version: "0.3.0", // This has to be a version accepted by the runtimes.
+			Kind:    vendor + "/" + class,
+			// At least one device is required and its entry must have more
+			// than just the name.
+			Devices: []device{
+				{
+					Name: deviceName,
+					ContainerEdits: containerEdits{
+						Env: envs,
+					},
 				},
 			},
-		},
-	}
-	filePath := ex.getJSONFilePath(claimUID)
-	buffer, err := json.Marshal(spec)
-	if err != nil {
-		return nil, fmt.Errorf("marshal spec: %w", err)
-	}
-	if err := ex.fileOps.Create(filePath, buffer); err != nil {
-		return nil, fmt.Errorf("failed to write CDI file %v", err)
+		}
+		filePath := ex.getJSONFilePath(claim.UID, baseRequestName)
+		buffer, err := json.Marshal(spec)
+		if err != nil {
+			return nil, fmt.Errorf("marshal spec: %w", err)
+		}
+		if err := ex.fileOps.Create(filePath, buffer); err != nil {
+			return nil, fmt.Errorf("failed to write CDI file: %w", err)
+		}
+		device := kubeletplugin.Device{
+			PoolName:     result.Pool,
+			DeviceName:   result.Device,
+			ShareID:      result.ShareID,
+			Requests:     []string{result.Request}, // May also return baseRequestName here.
+			CDIDeviceIDs: []string{cdiDeviceID},
+		}
+		devices = append(devices, device)
 	}
 
-	ex.prepared[claimID] = actualResourceHandle
-	for _, instanceName := range instanceNames {
-		ex.instancesInUse.Insert(instanceName)
-	}
-
-	logger.V(3).Info("CDI file created", "path", filePath, "device", dev)
-	return []string{dev}, nil
+	logger.V(3).Info("CDI file(s) created", "devices", devices)
+	ex.prepared[claimID] = devices
+	return devices, nil
 }
 
-func extractParameters(parameters runtime.RawExtension, env *map[string]string, kind string) error {
+func extractParameters(parameters runtime.RawExtension, env *map[string]string, admin bool) error {
 	if len(parameters.Raw) == 0 {
 		return nil
 	}
+	kind := "user"
+	if admin {
+		kind = "admin"
+	}
 	var data map[string]string
 	if err := json.Unmarshal(parameters.Raw, &data); err != nil {
-		return fmt.Errorf("decoding %s parameters: %v", kind, err)
+		return fmt.Errorf("decoding %s parameters: %w", kind, err)
 	}
 	if len(data) > 0 && *env == nil {
 		*env = make(map[string]string)
@@ -358,132 +434,69 @@ func extractParameters(parameters runtime.RawExtension, env *map[string]string, 
 	return nil
 }
 
-func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1alpha3.NodePrepareResourcesRequest) (*drapbv1alpha3.NodePrepareResourcesResponse, error) {
-	resp := &drapbv1alpha3.NodePrepareResourcesResponse{
-		Claims: make(map[string]*drapbv1alpha3.NodePrepareResourceResponse),
-	}
-
+func (ex *ExamplePlugin) PrepareResourceClaims(ctx context.Context, claims []*resourceapi.ResourceClaim) (map[types.UID]kubeletplugin.PrepareResult, error) {
 	if failure := ex.getPrepareResourcesFailure(); failure != nil {
-		return resp, failure
+		return nil, failure
 	}
 
-	for _, claimReq := range req.Claims {
-		cdiDevices, err := ex.nodePrepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
+	result := make(map[types.UID]kubeletplugin.PrepareResult)
+	for _, claim := range claims {
+		devices, err := ex.nodePrepareResource(ctx, claim)
+		var claimResult kubeletplugin.PrepareResult
 		if err != nil {
-			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodePrepareResourceResponse{
-				Error: err.Error(),
-			}
+			claimResult.Err = err
 		} else {
-			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodePrepareResourceResponse{
-				CDIDevices: cdiDevices,
-			}
+			claimResult.Devices = devices
 		}
+		result[claim.UID] = claimResult
 	}
-	return resp, nil
+	return result, nil
 }
 
 // NodeUnprepareResource removes the CDI file created by
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
-func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimName string, claimUID string, resourceHandle string, structuredResourceHandle []*resourceapi.StructuredResourceHandle) error {
+func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimRef kubeletplugin.NamespacedObject) error {
 	ex.blockUnprepareResourcesMutex.Lock()
 	defer ex.blockUnprepareResourcesMutex.Unlock()
 
 	logger := klog.FromContext(ctx)
 
-	filePath := ex.getJSONFilePath(claimUID)
-	if err := ex.fileOps.Remove(filePath); err != nil {
-		return fmt.Errorf("error removing CDI file: %w", err)
-	}
-	logger.V(3).Info("CDI file removed", "path", filePath)
-
-	ex.mutex.Lock()
-	defer ex.mutex.Unlock()
-
-	claimID := ClaimID{Name: claimName, UID: claimUID}
-	expectedResourceHandle, ok := ex.prepared[claimID]
+	claimID := ClaimID{Name: claimRef.Name, UID: claimRef.UID}
+	devices, ok := ex.prepared[claimID]
 	if !ok {
 		// Idempotent call, nothing to do.
 		return nil
 	}
 
-	var actualResourceHandle any = resourceHandle
-	if structuredResourceHandle != nil {
-		if len(structuredResourceHandle) != 1 {
-			return fmt.Errorf("unexpected number of entries in StructuredResourceHandle: %d", len(structuredResourceHandle))
-		}
-		actualResourceHandle = structuredResourceHandle[0]
-	}
-	if diff := cmp.Diff(expectedResourceHandle, actualResourceHandle); diff != "" {
-		return fmt.Errorf("difference between expected (-) and actual resource handle (+):\n%s", diff)
-	}
-	delete(ex.prepared, claimID)
-	if structuredResourceHandle := structuredResourceHandle; structuredResourceHandle != nil {
-		for _, handle := range structuredResourceHandle {
-			for _, result := range handle.Results {
-				instanceName := result.NamedResources.Name
-				ex.instancesInUse.Delete(instanceName)
+	for _, device := range devices {
+		// In practice we only prepare one, but let's not assume that here.
+		for _, request := range device.Requests {
+			filePath := ex.getJSONFilePath(claimRef.UID, request)
+			if err := ex.fileOps.Remove(filePath); err != nil {
+				return fmt.Errorf("error removing CDI file: %w", err)
 			}
+			logger.V(3).Info("CDI file removed", "path", filePath)
 		}
 	}
-	delete(ex.prepared, ClaimID{Name: claimName, UID: claimUID})
+
+	delete(ex.prepared, claimID)
 
 	return nil
 }
 
-func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
-	resp := &drapbv1alpha3.NodeUnprepareResourcesResponse{
-		Claims: make(map[string]*drapbv1alpha3.NodeUnprepareResourceResponse),
-	}
+func (ex *ExamplePlugin) UnprepareResourceClaims(ctx context.Context, claims []kubeletplugin.NamespacedObject) (map[types.UID]error, error) {
+	result := make(map[types.UID]error)
 
 	if failure := ex.getUnprepareResourcesFailure(); failure != nil {
-		return resp, failure
+		return nil, failure
 	}
 
-	for _, claimReq := range req.Claims {
-		err := ex.nodeUnprepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
-		if err != nil {
-			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodeUnprepareResourceResponse{
-				Error: err.Error(),
-			}
-		} else {
-			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodeUnprepareResourceResponse{}
-		}
+	for _, claimRef := range claims {
+		err := ex.nodeUnprepareResource(ctx, claimRef)
+		result[claimRef.UID] = err
 	}
-	return resp, nil
-}
-
-func (ex *ExamplePlugin) NodeListAndWatchResources(req *drapbv1alpha3.NodeListAndWatchResourcesRequest, stream drapbv1alpha3.Node_NodeListAndWatchResourcesServer) error {
-	if ex.fileOps.NumResourceInstances < 0 {
-		ex.logger.Info("Sending no NodeResourcesResponse")
-		return status.New(codes.Unimplemented, "node resource support disabled").Err()
-	}
-
-	instances := make([]resourceapi.NamedResourcesInstance, len(ex.instances))
-	for i, name := range sets.List(ex.instances) {
-		instances[i].Name = name
-	}
-	resp := &drapbv1alpha3.NodeListAndWatchResourcesResponse{
-		Resources: []*resourceapi.ResourceModel{
-			{
-				NamedResources: &resourceapi.NamedResourcesResources{
-					Instances: instances,
-				},
-			},
-		},
-	}
-
-	ex.logger.Info("Sending NodeListAndWatchResourcesResponse", "response", resp)
-	if err := stream.Send(resp); err != nil {
-		return err
-	}
-
-	// Keep the stream open until the test is done.
-	// TODO: test sending more updates later
-	<-ex.stopCh
-	ex.logger.Info("Done sending NodeListAndWatchResourcesResponse, closing stream")
-
-	return nil
+	return result, nil
 }
 
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
@@ -516,23 +529,24 @@ func (ex *ExamplePlugin) recordGRPCCall(ctx context.Context, req interface{}, in
 	return call.Response, call.Err
 }
 
-func (ex *ExamplePlugin) recordGRPCStream(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	call := GRPCCall{
-		FullMethod: info.FullMethod,
-	}
+func (ex *ExamplePlugin) recordGRPCStream(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 	ex.mutex.Lock()
-	ex.gRPCCalls = append(ex.gRPCCalls, call)
-	index := len(ex.gRPCCalls) - 1
+	// Append a new empty GRPCCall struct to get its index.
+	ex.gRPCCalls = append(ex.gRPCCalls, GRPCCall{})
+
+	pCall := &ex.gRPCCalls[len(ex.gRPCCalls)-1]
+
+	pCall.FullMethod = info.FullMethod
 	ex.mutex.Unlock()
 
-	// We don't hold the mutex here to allow concurrent calls.
-	call.Err = handler(srv, stream)
+	defer func() {
+		ex.mutex.Lock()
+		defer ex.mutex.Unlock()
+		pCall.Err = err
+	}()
 
-	ex.mutex.Lock()
-	ex.gRPCCalls[index] = call
-	ex.mutex.Unlock()
-
-	return call.Err
+	err = handler(srv, stream)
+	return err
 }
 
 func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
@@ -547,6 +561,15 @@ func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
 	return calls
 }
 
+// ResetGRPCCalls clears the internal tracking of GRPC calls made to the plugin.
+// This is useful in tests to start with a clean slate when verifying plugin
+// registration behavior, particularly when testing registration retry scenarios.
+func (ex *ExamplePlugin) ResetGRPCCalls() {
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+	ex.gRPCCalls = nil
+}
+
 // CountCalls counts GRPC calls with the given method suffix.
 func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 	count := 0
@@ -556,4 +579,120 @@ func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 		}
 	}
 	return count
+}
+
+func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
+	return ex.resourceClient.ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
+}
+
+// SetGetInfoError sets an error to be returned by the plugin's GetInfo call.
+// This can be used in tests to simulate a registration failure scenario,
+// allowing verification that the kubelet plugin manager retries registration
+// when GetInfo fails.
+//
+// To restore normal GetInfo behavior, call SetGetInfoError(nil).
+func (ex *ExamplePlugin) SetGetInfoError(err error) {
+	ex.d.SetGetInfoError(err)
+}
+
+// SetNotifyRegistrationStatusError sets an error to be returned by the
+// plugin's NotifyRegistrationStatus call.
+// This can be used in tests to simulate a registration failure scenario,
+// allowing verification that the kubelet plugin manager retries registration
+// when NotifyRegistrationStatus fails.
+//
+// To restore normal NotifyRegistrationStatus behavior, call SetNotifyRegistrationStatusError(nil).
+func (ex *ExamplePlugin) SetNotifyRegistrationStatusError(err error) {
+	ex.d.SetNotifyRegistrationStatusError(err)
+}
+
+func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1alpha1.NodeWatchResourcesRequest, srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+	logger := klog.FromContext(srv.Context())
+	logger.V(3).Info("Starting dynamic NodeWatchResources stream")
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	// Send an initial update immediately to report on pre-configured devices.
+	if err := ex.sendHealthUpdate(srv); err != nil {
+		logger.Error(err, "Failed to send initial health update")
+	}
+
+	for {
+		select {
+		case <-srv.Context().Done():
+			logger.V(3).Info("NodeWatchResources stream canceled by kubelet")
+			return nil
+		case update, ok := <-ex.HealthControlChan:
+			if !ok {
+				logger.V(3).Info("HealthControlChan closed, exiting NodeWatchResources stream.")
+				return nil
+			}
+			logger.V(3).Info("Received health update from control channel", "update", update)
+			ex.healthMutex.Lock()
+			key := update.PoolName + "/" + update.DeviceName
+			ex.deviceHealth[key] = update.Health
+			ex.healthMutex.Unlock()
+
+			if err := ex.sendHealthUpdate(srv); err != nil {
+				logger.Error(err, "Failed to send health update after control message")
+			}
+		case <-ticker.C:
+			if err := ex.sendHealthUpdate(srv); err != nil {
+				if srv.Context().Err() != nil {
+					logger.V(3).Info("NodeWatchResources stream closed during periodic update, exiting.")
+					return nil
+				}
+				logger.Error(err, "Failed to send periodic health update")
+			}
+		}
+	}
+}
+
+// sendHealthUpdate dynamically builds the health report from the current state of the deviceHealth map.
+func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+	logger := klog.FromContext(srv.Context())
+	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
+
+	ex.healthMutex.Lock()
+	for key, health := range ex.deviceHealth {
+		parts := strings.SplitN(key, "/", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		poolName := parts[0]
+		deviceName := parts[1]
+
+		var healthEnum drahealthv1alpha1.HealthStatus
+		switch health {
+		case "Healthy":
+			healthEnum = drahealthv1alpha1.HealthStatus_HEALTHY
+		case "Unhealthy":
+			healthEnum = drahealthv1alpha1.HealthStatus_UNHEALTHY
+		default:
+			healthEnum = drahealthv1alpha1.HealthStatus_UNKNOWN
+		}
+
+		healthUpdates = append(healthUpdates, &drahealthv1alpha1.DeviceHealth{
+			Device: &drahealthv1alpha1.DeviceIdentifier{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+			},
+			Health:          healthEnum,
+			LastUpdatedTime: time.Now().Unix(),
+		})
+	}
+	ex.healthMutex.Unlock()
+
+	// Sorting slice to ensure consistent ordering in tests.
+	sort.Slice(healthUpdates, func(i, j int) bool {
+		if healthUpdates[i].GetDevice().GetPoolName() != healthUpdates[j].GetDevice().GetPoolName() {
+			return healthUpdates[i].GetDevice().GetPoolName() < healthUpdates[j].GetDevice().GetPoolName()
+		}
+		return healthUpdates[i].GetDevice().GetDeviceName() < healthUpdates[j].GetDevice().GetDeviceName()
+	})
+
+	resp := &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: healthUpdates}
+	logger.V(5).Info("Test driver sending health update", "response", resp)
+	return srv.Send(resp)
 }

@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	certificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
+	applyconfigurationscertificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,42 @@ type CertificateSigningRequestsGetter interface {
 
 // CertificateSigningRequestInterface has methods to work with CertificateSigningRequest resources.
 type CertificateSigningRequestInterface interface {
-	Create(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest, opts v1.CreateOptions) (*v1beta1.CertificateSigningRequest, error)
-	Update(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest, opts v1.UpdateOptions) (*v1beta1.CertificateSigningRequest, error)
+	Create(ctx context.Context, certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, opts v1.CreateOptions) (*certificatesv1beta1.CertificateSigningRequest, error)
+	Update(ctx context.Context, certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, opts v1.UpdateOptions) (*certificatesv1beta1.CertificateSigningRequest, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest, opts v1.UpdateOptions) (*v1beta1.CertificateSigningRequest, error)
+	UpdateStatus(ctx context.Context, certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, opts v1.UpdateOptions) (*certificatesv1beta1.CertificateSigningRequest, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.CertificateSigningRequest, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CertificateSigningRequestList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*certificatesv1beta1.CertificateSigningRequest, error)
+	List(ctx context.Context, opts v1.ListOptions) (*certificatesv1beta1.CertificateSigningRequestList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error)
-	Apply(ctx context.Context, certificateSigningRequest *certificatesv1beta1.CertificateSigningRequestApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CertificateSigningRequest, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *certificatesv1beta1.CertificateSigningRequest, err error)
+	Apply(ctx context.Context, certificateSigningRequest *applyconfigurationscertificatesv1beta1.CertificateSigningRequestApplyConfiguration, opts v1.ApplyOptions) (result *certificatesv1beta1.CertificateSigningRequest, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, certificateSigningRequest *certificatesv1beta1.CertificateSigningRequestApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CertificateSigningRequest, err error)
+	ApplyStatus(ctx context.Context, certificateSigningRequest *applyconfigurationscertificatesv1beta1.CertificateSigningRequestApplyConfiguration, opts v1.ApplyOptions) (result *certificatesv1beta1.CertificateSigningRequest, err error)
 	CertificateSigningRequestExpansion
 }
 
 // certificateSigningRequests implements CertificateSigningRequestInterface
 type certificateSigningRequests struct {
-	*gentype.ClientWithListAndApply[*v1beta1.CertificateSigningRequest, *v1beta1.CertificateSigningRequestList, *certificatesv1beta1.CertificateSigningRequestApplyConfiguration]
+	*gentype.ClientWithListAndApply[*certificatesv1beta1.CertificateSigningRequest, *certificatesv1beta1.CertificateSigningRequestList, *applyconfigurationscertificatesv1beta1.CertificateSigningRequestApplyConfiguration]
 }
 
 // newCertificateSigningRequests returns a CertificateSigningRequests
 func newCertificateSigningRequests(c *CertificatesV1beta1Client) *certificateSigningRequests {
 	return &certificateSigningRequests{
-		gentype.NewClientWithListAndApply[*v1beta1.CertificateSigningRequest, *v1beta1.CertificateSigningRequestList, *certificatesv1beta1.CertificateSigningRequestApplyConfiguration](
+		gentype.NewClientWithListAndApply[*certificatesv1beta1.CertificateSigningRequest, *certificatesv1beta1.CertificateSigningRequestList, *applyconfigurationscertificatesv1beta1.CertificateSigningRequestApplyConfiguration](
 			"certificatesigningrequests",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1beta1.CertificateSigningRequest { return &v1beta1.CertificateSigningRequest{} },
-			func() *v1beta1.CertificateSigningRequestList { return &v1beta1.CertificateSigningRequestList{} }),
+			func() *certificatesv1beta1.CertificateSigningRequest {
+				return &certificatesv1beta1.CertificateSigningRequest{}
+			},
+			func() *certificatesv1beta1.CertificateSigningRequestList {
+				return &certificatesv1beta1.CertificateSigningRequestList{}
+			},
+			gentype.PrefersProtobuf[*certificatesv1beta1.CertificateSigningRequest](),
+		),
 	}
 }

@@ -28,8 +28,9 @@ type Checksum uint64
 
 // Verify verifies that passed checksum is same as calculated checksum
 func (cs Checksum) Verify(data interface{}) error {
-	if cs != New(data) {
-		return errors.ErrCorruptCheckpoint
+	actualCS := New(data)
+	if cs != actualCS {
+		return &errors.CorruptCheckpointError{ActualCS: uint64(actualCS), ExpectedCS: uint64(cs)}
 	}
 	return nil
 }

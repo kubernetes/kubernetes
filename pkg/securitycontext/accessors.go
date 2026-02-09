@@ -35,6 +35,7 @@ type PodSecurityContextAccessor interface {
 	SeccompProfile() *api.SeccompProfile
 	SupplementalGroups() []int64
 	FSGroup() *int64
+	FSGroupChangePolicy() *api.PodFSGroupChangePolicy
 }
 
 // PodSecurityContextMutator allows reading and writing the values of a PodSecurityContext object
@@ -52,6 +53,7 @@ type PodSecurityContextMutator interface {
 	SetSeccompProfile(*api.SeccompProfile)
 	SetSupplementalGroups([]int64)
 	SetFSGroup(*int64)
+	SetFSGroupChangePolicy(*api.PodFSGroupChangePolicy)
 
 	// PodSecurityContext returns the current PodSecurityContext object
 	PodSecurityContext() *api.PodSecurityContext
@@ -229,6 +231,23 @@ func (w *podSecurityContextWrapper) SetFSGroup(v *int64) {
 	}
 	w.ensurePodSC()
 	w.podSC.FSGroup = v
+}
+
+func (w *podSecurityContextWrapper) FSGroupChangePolicy() *api.PodFSGroupChangePolicy {
+	if w.podSC == nil {
+		return nil
+	}
+
+	return w.podSC.FSGroupChangePolicy
+}
+
+func (w *podSecurityContextWrapper) SetFSGroupChangePolicy(v *api.PodFSGroupChangePolicy) {
+	if w.podSC == nil && v == nil {
+		return
+	}
+
+	w.ensurePodSC()
+	w.podSC.FSGroupChangePolicy = v
 }
 
 // ContainerSecurityContextAccessor allows reading the values of a SecurityContext object

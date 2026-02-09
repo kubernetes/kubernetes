@@ -19,10 +19,9 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewCheckEtcdPhase is a hidden phase that runs after the control-plane-prepare and
@@ -53,6 +52,11 @@ func runCheckEtcdPhase(c workflow.RunData) error {
 
 	if cfg.Etcd.External != nil {
 		fmt.Println("[check-etcd] Skipping etcd check in external mode")
+		return nil
+	}
+
+	if data.DryRun() {
+		fmt.Println("[dryrun] Would check that the etcd cluster is healthy")
 		return nil
 	}
 

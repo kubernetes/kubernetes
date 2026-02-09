@@ -115,7 +115,7 @@ func (p *parserHelper) newObjectField(fieldID int64, field string, value ast.Exp
 
 func (p *parserHelper) newComprehension(ctx any,
 	iterRange ast.Expr,
-	iterVar string,
+	iterVar,
 	accuVar string,
 	accuInit ast.Expr,
 	condition ast.Expr,
@@ -123,6 +123,18 @@ func (p *parserHelper) newComprehension(ctx any,
 	result ast.Expr) ast.Expr {
 	return p.exprFactory.NewComprehension(
 		p.newID(ctx), iterRange, iterVar, accuVar, accuInit, condition, step, result)
+}
+
+func (p *parserHelper) newComprehensionTwoVar(ctx any,
+	iterRange ast.Expr,
+	iterVar, iterVar2,
+	accuVar string,
+	accuInit ast.Expr,
+	condition ast.Expr,
+	step ast.Expr,
+	result ast.Expr) ast.Expr {
+	return p.exprFactory.NewComprehensionTwoVar(
+		p.newID(ctx), iterRange, iterVar, iterVar2, accuVar, accuInit, condition, step, result)
 }
 
 func (p *parserHelper) newID(ctx any) int64 {
@@ -140,15 +152,12 @@ func (p *parserHelper) id(ctx any) int64 {
 	var offset ast.OffsetRange
 	switch c := ctx.(type) {
 	case antlr.ParserRuleContext:
-		start, stop := c.GetStart(), c.GetStop()
-		if stop == nil {
-			stop = start
-		}
+		start := c.GetStart()
 		offset.Start = p.sourceInfo.ComputeOffset(int32(start.GetLine()), int32(start.GetColumn()))
-		offset.Stop = p.sourceInfo.ComputeOffset(int32(stop.GetLine()), int32(stop.GetColumn()))
+		offset.Stop = offset.Start + int32(len(c.GetText()))
 	case antlr.Token:
 		offset.Start = p.sourceInfo.ComputeOffset(int32(c.GetLine()), int32(c.GetColumn()))
-		offset.Stop = offset.Start
+		offset.Stop = offset.Start + int32(len(c.GetText()))
 	case common.Location:
 		offset.Start = p.sourceInfo.ComputeOffset(int32(c.Line()), int32(c.Column()))
 		offset.Stop = offset.Start
@@ -164,8 +173,19 @@ func (p *parserHelper) id(ctx any) int64 {
 	return id
 }
 
+func (p *parserHelper) deleteID(id int64) {
+	p.sourceInfo.ClearOffsetRange(id)
+	if id == p.nextID-1 {
+		p.nextID--
+	}
+}
+
 func (p *parserHelper) getLocation(id int64) common.Location {
 	return p.sourceInfo.GetStartLocation(id)
+}
+
+func (p *parserHelper) getLocationByOffset(offset int32) common.Location {
+	return p.getSourceInfo().GetLocationByOffset(offset)
 }
 
 // buildMacroCallArg iterates the expression and returns a new expression
@@ -375,8 +395,10 @@ func (e *exprHelper) Copy(expr ast.Expr) ast.Expr {
 		cond := e.Copy(compre.LoopCondition())
 		step := e.Copy(compre.LoopStep())
 		result := e.Copy(compre.Result())
-		return e.exprFactory.NewComprehension(copyID,
-			iterRange, compre.IterVar(), compre.AccuVar(), accuInit, cond, step, result)
+		// All comprehensions can be represented by the two-variable comprehension since the
+		// differentiation between one and two-variable is whether the iterVar2 value is non-empty.
+		return e.exprFactory.NewComprehensionTwoVar(copyID,
+			iterRange, compre.IterVar(), compre.IterVar2(), compre.AccuVar(), accuInit, cond, step, result)
 	}
 	return e.exprFactory.NewUnspecifiedExpr(copyID)
 }
@@ -424,6 +446,20 @@ func (e *exprHelper) NewComprehension(
 		e.nextMacroID(), iterRange, iterVar, accuVar, accuInit, condition, step, result)
 }
 
+// NewComprehensionTwoVar implements the ExprHelper interface method.
+func (e *exprHelper) NewComprehensionTwoVar(
+	iterRange ast.Expr,
+	iterVar,
+	iterVar2,
+	accuVar string,
+	accuInit,
+	condition,
+	step,
+	result ast.Expr) ast.Expr {
+	return e.exprFactory.NewComprehensionTwoVar(
+		e.nextMacroID(), iterRange, iterVar, iterVar2, accuVar, accuInit, condition, step, result)
+}
+
 // NewIdent implements the ExprHelper interface method.
 func (e *exprHelper) NewIdent(name string) ast.Expr {
 	return e.exprFactory.NewIdent(e.nextMacroID(), name)
@@ -432,6 +468,11 @@ func (e *exprHelper) NewIdent(name string) ast.Expr {
 // NewAccuIdent implements the ExprHelper interface method.
 func (e *exprHelper) NewAccuIdent() ast.Expr {
 	return e.exprFactory.NewAccuIdent(e.nextMacroID())
+}
+
+// AccuIdentName implements the ExprHelper interface method.
+func (e *exprHelper) AccuIdentName() string {
+	return e.exprFactory.AccuIdentName()
 }
 
 // NewGlobalCall implements the ExprHelper interface method.

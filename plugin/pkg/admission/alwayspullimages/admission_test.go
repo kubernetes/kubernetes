@@ -47,6 +47,11 @@ func TestAdmission(t *testing.T) {
 				{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
 				{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
 			},
+			Volumes: []api.Volume{
+				{Name: "volume1", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullNever}}},
+				{Name: "volume2", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullIfNotPresent}}},
+				{Name: "volume3", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullAlways}}},
+			},
 		},
 	}
 	err := handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -61,6 +66,11 @@ func TestAdmission(t *testing.T) {
 	for _, c := range pod.Spec.Containers {
 		if c.ImagePullPolicy != api.PullAlways {
 			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
+		}
+	}
+	for _, v := range pod.Spec.Volumes {
+		if v.Image.PullPolicy != api.PullAlways {
+			t.Errorf("Image volume %v: expected pull always, got %v", v, v.Image.PullPolicy)
 		}
 	}
 }
@@ -83,6 +93,12 @@ func TestValidate(t *testing.T) {
 				{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
 				{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
 			},
+			Volumes: []api.Volume{
+				{Name: "volume1", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: ""}}},
+				{Name: "volume2", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullNever}}},
+				{Name: "volume3", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullIfNotPresent}}},
+				{Name: "volume4", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{PullPolicy: api.PullAlways}}},
+			},
 		},
 	}
 	expectedError := `[` +
@@ -91,7 +107,11 @@ func TestValidate(t *testing.T) {
 		`pods "123" is forbidden: spec.initContainers[2].imagePullPolicy: Unsupported value: "IfNotPresent": supported values: "Always", ` +
 		`pods "123" is forbidden: spec.containers[0].imagePullPolicy: Unsupported value: "": supported values: "Always", ` +
 		`pods "123" is forbidden: spec.containers[1].imagePullPolicy: Unsupported value: "Never": supported values: "Always", ` +
-		`pods "123" is forbidden: spec.containers[2].imagePullPolicy: Unsupported value: "IfNotPresent": supported values: "Always"]`
+		`pods "123" is forbidden: spec.containers[2].imagePullPolicy: Unsupported value: "IfNotPresent": supported values: "Always", ` +
+		`pods "123" is forbidden: spec.volumes[0].image.pullPolicy: Unsupported value: "": supported values: "Always", ` +
+		`pods "123" is forbidden: spec.volumes[1].image.pullPolicy: Unsupported value: "Never": supported values: "Always", ` +
+		`pods "123" is forbidden: spec.volumes[2].image.pullPolicy: Unsupported value: "IfNotPresent": supported values: "Always"` +
+		`]`
 	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Fatal("missing expected error")

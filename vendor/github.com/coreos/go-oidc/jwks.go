@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/pquerna/cachecontrol"
-	jose "gopkg.in/square/go-jose.v2"
+	jose "gopkg.in/go-jose/go-jose.v2"
 )
 
 // keysExpiryDelta is the allowed clock skew between a client and the OpenID Connect

@@ -39,13 +39,15 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -335,7 +337,8 @@ var _ = SIGDescribe("Pods Extended", func() {
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 
-			err := e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, "Evicted", f.Namespace.Name)
+			// Intentionally increase the timeout to ensure the metrics availability required for this test.
+			err := e2epod.WaitForPodTerminatedInNamespaceTimeout(ctx, f.ClientSet, pod.Name, "Evicted", f.Namespace.Name, 10*time.Minute)
 			if err != nil {
 				framework.Failf("error waiting for pod to be evicted: %v", err)
 			}
@@ -367,7 +370,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 							},
 						},
 					},
-					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+					TerminationGracePeriodSeconds: ptr.To[int64](-1),
 				},
 			}
 
@@ -391,7 +394,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "failed to query for pod")
 				ginkgo.By("updating the pod to have a negative TerminationGracePeriodSeconds")
-				pod.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(-1)
+				pod.Spec.TerminationGracePeriodSeconds = ptr.To[int64](-1)
 				_, err = podClient.PodInterface.Update(ctx, pod, metav1.UpdateOptions{})
 				return err
 			})
@@ -414,8 +417,838 @@ var _ = SIGDescribe("Pods Extended", func() {
 			})
 		})
 	})
-
 })
+
+var _ = SIGDescribe("Pods Extended (pod generation)", func() {
+	f := framework.NewDefaultFramework("pods")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	ginkgo.Describe("Pod Generation", func() {
+		var podClient *e2epod.PodClient
+		ginkgo.BeforeEach(func() {
+			podClient = e2epod.NewPodClient(f)
+		})
+
+		/*
+			Release: v1.35
+			Testname: Pods Generation, updates
+			Description: Create a Pod, and perform a few updates, ensuring that the pod's metadata.generation and status.observedGeneration are updated as expected.
+		*/
+		framework.ConformanceIt("pod generation should start at 1 and increment per update [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			podName := "pod-generation-" + string(uuid.NewUUID())
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil)
+			pod.Spec.InitContainers = []v1.Container{{
+				Name:  "init-container",
+				Image: imageutils.GetE2EImage(imageutils.BusyBox),
+			}}
+
+			ginkgo.By("submitting the pod to kubernetes")
+			pod = podClient.CreateSync(ctx, pod)
+			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(1))
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+
+			ginkgo.By("verifying pod generation bumps as expected")
+			tests := []struct {
+				name                 string
+				updateFn             func(*v1.Pod)
+				expectGenerationBump bool
+			}{
+				{
+					name:                 "empty update",
+					updateFn:             func(pod *v1.Pod) {},
+					expectGenerationBump: false,
+				},
+
+				{
+					name: "updating Tolerations to trigger generation bump",
+					updateFn: func(pod *v1.Pod) {
+						pod.Spec.Tolerations = []v1.Toleration{
+							{
+								Key:      "foo-" + string(uuid.NewUUID()),
+								Operator: v1.TolerationOpEqual,
+								Value:    "bar",
+								Effect:   v1.TaintEffectNoSchedule,
+							},
+						}
+					},
+					expectGenerationBump: true,
+				},
+
+				{
+					name: "updating ActiveDeadlineSeconds to trigger generation bump",
+					updateFn: func(pod *v1.Pod) {
+						int5000 := int64(5000)
+						pod.Spec.ActiveDeadlineSeconds = &int5000
+					},
+					expectGenerationBump: true,
+				},
+
+				{
+					name: "updating container image to trigger generation bump",
+					updateFn: func(pod *v1.Pod) {
+						pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Nginx)
+					},
+					expectGenerationBump: true,
+				},
+
+				{
+					name: "updating initContainer image to trigger generation bump",
+					updateFn: func(pod *v1.Pod) {
+						pod.Spec.InitContainers[0].Image = imageutils.GetE2EImage(imageutils.Pause)
+					},
+					expectGenerationBump: true,
+				},
+
+				{
+					name: "updates to pod metadata should not trigger generation bump",
+					updateFn: func(pod *v1.Pod) {
+						pod.SetAnnotations(map[string]string{"key": "value"})
+					},
+					expectGenerationBump: false,
+				},
+
+				{
+					name: "pod generation updated by client should be ignored",
+					updateFn: func(pod *v1.Pod) {
+						pod.SetGeneration(1)
+					},
+					expectGenerationBump: false,
+				},
+			}
+
+			expectedPodGeneration := int64(1)
+			for _, test := range tests {
+				ginkgo.By(test.name)
+				podClient.Update(ctx, podName, test.updateFn)
+				pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
+				framework.ExpectNoError(err, "failed to query for pod")
+				if test.expectGenerationBump {
+					expectedPodGeneration++
+				}
+				gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
+				framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, 20*time.Second))
+			}
+		})
+
+		/*
+			Release: v1.35
+			Testname: Pods Generation, graceful delete
+			Description: Create a Pod, ensure that triggering a graceful delete causes the generation to be updated.
+		*/
+		framework.ConformanceIt("custom-set generation on new pods and graceful delete", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			name := "pod-generation-" + string(uuid.NewUUID())
+			value := strconv.Itoa(time.Now().Nanosecond())
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, name, nil, nil, nil)
+			pod.ObjectMeta.Labels = map[string]string{
+				"time": value,
+			}
+			pod.SetGeneration(100)
+
+			ginkgo.By("submitting the pod to kubernetes")
+			pod = podClient.CreateSync(ctx, pod)
+
+			ginkgo.By("verifying the new pod's generation is 1")
+			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(1))
+
+			ginkgo.By("issue a graceful delete to trigger generation bump")
+			// We need to wait for the pod to be running, otherwise the deletion
+			// may be carried out immediately rather than gracefully.
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to GET scheduled pod")
+
+			var lastPod v1.Pod
+			var statusCode int
+			// Set gracePeriodSeconds to 60 to give us time to verify the generation bump.
+			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "60").Do(ctx).StatusCode(&statusCode).Into(&lastPod)
+			framework.ExpectNoError(err, "failed to use http client to send delete")
+			gomega.Expect(statusCode).To(gomega.Equal(http.StatusOK), "failed to delete gracefully by client request")
+
+			ginkgo.By("verifying the pod generation was bumped")
+			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(2))
+		})
+
+		/*
+			Release: v1.35
+			Testname: Pods Generation, 500 updates
+			Description: Create a Pod, issue 499 podSpec updates and verify generation and observedGeneration eventually converge to 500.
+		*/
+		framework.ConformanceIt("issue 500 podspec updates and verify generation and observedGeneration eventually converge [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			name := "pod-generation-" + string(uuid.NewUUID())
+			value := strconv.Itoa(time.Now().Nanosecond())
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, name, nil, nil, nil)
+			pod.ObjectMeta.Labels = map[string]string{
+				"time": value,
+			}
+			pod.Spec.ActiveDeadlineSeconds = ptr.To[int64](5000)
+
+			ginkgo.By("submitting the pod to kubernetes")
+			pod = podClient.CreateSync(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+
+			for i := 0; i < 499; i++ {
+				podClient.Update(ctx, pod.Name, func(pod *v1.Pod) {
+					*pod.Spec.ActiveDeadlineSeconds--
+				})
+			}
+
+			// Verify pod observedGeneration converges to the expected generation.
+			expectedPodGeneration := int64(500)
+			framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, 30*time.Second))
+
+			// Verify pod generation converges to the expected generation.
+			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
+		})
+
+		// This is the same test as https://github.com/kubernetes/kubernetes/blob/aa08c90fca8d30038d3f05c0e8f127b540b40289/test/e2e/node/pod_admission.go#L35,
+		// except that this verifies the pod generation and observedGeneration, which is
+		// currently behind a feature gate. When we GA observedGeneration functionality,
+		// we can fold these tests together into one.
+		ginkgo.It("pod rejected by kubelet should have updated generation and observedGeneration", func(ctx context.Context) {
+			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+			framework.ExpectNoError(err, "Failed to get a ready schedulable node")
+
+			// Create a pod that requests more CPU than the node has.
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-out-of-cpu",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "pod-out-of-cpu",
+							Image: imageutils.GetPauseImageName(),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("1000000000000"), // requests more CPU than any node has
+								},
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("submitting the pod to kubernetes")
+			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+
+			// Wait for the scheduler to update the pod status
+			err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
+			framework.ExpectNoError(err)
+
+			// Fetch the pod to verify that the scheduler has set the PodScheduled condition
+			// with observedGeneration.
+			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(len(pod.Status.Conditions)).To(gomega.BeEquivalentTo(1))
+			gomega.Expect(pod.Status.Conditions[0].Type).To(gomega.BeEquivalentTo(v1.PodScheduled))
+			gomega.Expect(pod.Status.Conditions[0].ObservedGeneration).To(gomega.BeEquivalentTo(1))
+
+			// Force assign the Pod to a node in order to get rejection status.
+			binding := &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					UID:       pod.UID,
+				},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: node.Name,
+				},
+			}
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Bind(ctx, binding, metav1.CreateOptions{}))
+
+			// Kubelet has rejected the pod.
+			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "OutOfcpu", f.Timeouts.PodStart)
+			framework.ExpectNoError(err)
+
+			// Fetch the rejected Pod and verify the generation and observedGeneration.
+			gotPod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(gotPod.Generation).To(gomega.BeEquivalentTo(1))
+			gomega.Expect(gotPod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(1))
+		})
+
+		ginkgo.It("pod observedGeneration field set in pod conditions", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			name := "pod-generation-" + string(uuid.NewUUID())
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, name, nil, nil, nil)
+
+			// Set the pod image to something that doesn't exist to induce a pull error
+			// to start with.
+			agnImage := pod.Spec.Containers[0].Image
+			pod.Spec.Containers[0].Image = "some-image-that-doesnt-exist"
+
+			ginkgo.By("submitting the pod to kubernetes")
+			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+
+			expectedPodConditions := []v1.PodConditionType{
+				v1.PodReadyToStartContainers,
+				v1.PodInitialized,
+				v1.PodReady,
+				v1.ContainersReady,
+				v1.PodScheduled,
+			}
+
+			ginkgo.By("verifying the pod conditions have observedGeneration values")
+			expectedObservedGeneration := int64(1)
+			for _, condition := range expectedPodConditions {
+				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, 30*time.Second))
+			}
+
+			ginkgo.By("updating pod to have a valid image")
+			podClient.Update(ctx, pod.Name, func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Image = agnImage
+			})
+			expectedObservedGeneration++
+
+			ginkgo.By("verifying the pod conditions have updated observedGeneration values")
+			for _, condition := range expectedPodConditions {
+				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, 30*time.Second))
+			}
+		})
+	})
+})
+
+var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFeatureGate(features.ContainerRestartRules), func() {
+	f := framework.NewDefaultFramework("pods")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	ginkgo.Describe("Container Restart Rules", func() {
+		var (
+			containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+			containerRestartPolicyNever  = v1.ContainerRestartPolicyNever
+		)
+
+		ginkgo.It("should restart container on rule match", func(ctx context.Context) {
+			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:          "main-container",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "exit 42"},
+							RestartPolicy: &containerRestartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{
+								{
+									Action: v1.ContainerRestartRuleActionRestart,
+									ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+										Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+										Values:   []int32{42},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			createAndValidateRestartableContainer(ctx, f, pod, podName, "main-container")
+		})
+
+		ginkgo.It("should not restart container on rule mismatch, container restart policy Never", func(ctx context.Context) {
+			podName := "restart-rules-no-restart-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:          "main-container",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "exit 1"},
+							RestartPolicy: &containerRestartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{
+								{
+									Action: v1.ContainerRestartRuleActionRestart,
+									ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+										Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+										Values:   []int32{42},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			createAndValidateNonRestartableContainer(ctx, f, pod, podName, "main-container")
+		})
+
+		ginkgo.It("should restart container on container-level restart policy Never", func(ctx context.Context) {
+			podName := "restart-rules-no-restart-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					Containers: []v1.Container{
+						{
+							Name:          "main-container",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "exit 1"},
+							RestartPolicy: &containerRestartPolicyNever,
+						},
+					},
+				},
+			}
+
+			createAndValidateNonRestartableContainer(ctx, f, pod, podName, "main-container")
+		})
+
+		ginkgo.It("should restart container on container-level restart policy Always", func(ctx context.Context) {
+			podName := "restart-rules-no-restart-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:          "main-container",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "exit 1"},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+				},
+			}
+
+			createAndValidateRestartableContainer(ctx, f, pod, podName, "main-container")
+		})
+
+		ginkgo.It("should restart container on pod-level restart policy Always when no container-level restart policy", func(ctx context.Context) {
+			podName := "restart-rules-no-match-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					Containers: []v1.Container{
+						{
+							Name:    "main-container",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "exit 1"},
+						},
+					},
+				},
+			}
+
+			createAndValidateRestartableContainer(ctx, f, pod, podName, "main-container")
+		})
+	})
+})
+
+var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeatureGate(features.ContainerRestartRules), framework.WithFeatureGate(features.RestartAllContainersOnContainerExits), func() {
+	f := framework.NewDefaultFramework("pods")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	ginkgo.Describe("RestartAllContainers", func() {
+		var (
+			containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+			containerRestartPolicyNever  = v1.ContainerRestartPolicyNever
+		)
+
+		restartAllContainersRules := []v1.ContainerRestartRule{
+			{
+				Action: v1.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+					Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{42},
+				},
+			},
+		}
+
+		ginkgo.It("should restart all containers on regular container exit", func(ctx context.Context) {
+			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:    "init",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "exit 0"},
+						},
+						{
+							Name:          "sidecar",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "sleep 10000"},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:               "source-container",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "if [ -f /mnt/restart-complete ]; then sleep 10000; else touch /mnt/restart-complete; exit 42; fi"},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			// All containers should be restarted once
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+			validateAllContainersRestarted(ctx, f, pod, []string{"init", "sidecar", "source-container", "regular"})
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+		})
+
+		ginkgo.It("should restart all containers on sidecar container exit", func(ctx context.Context) {
+			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:    "init",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "exit 0"},
+						},
+						{
+							Name:          "sidecar",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "sleep 10000"},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+						{
+							Name:               "source-sidecar",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "if [ -f /mnt/init-complete ]; then sleep 10000; else touch /mnt/init-complete; sleep 30; exit 42; fi"},
+							RestartPolicy:      &containerRestartPolicyAlways,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			// All containers should be restarted once
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+			validateAllContainersRestarted(ctx, f, pod, []string{"init", "sidecar", "source-sidecar", "regular"})
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-sidecar", 3*time.Minute))
+		})
+
+		ginkgo.It("should restart init and sidecar containers on init container exit", func(ctx context.Context) {
+			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:          "sidecar",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "sleep 10000"},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+						{
+							Name:    "init",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "exit 0"},
+						},
+						{
+							Name:               "source-init",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "if [ -f /mnt/init-complete ]; then exit 0; else touch /mnt/init-complete; exit 42; fi"},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			// All containers should be restarted once
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+			validateAllContainersRestarted(ctx, f, pod, []string{"init", "sidecar", "source-init"})
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+		})
+
+		ginkgo.It("should allow multiple RestartAllContainers actions and not introduce a loop", func(ctx context.Context) {
+			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:               "source-container",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "if [ -f /mnt/restart-complete ]; then sleep 10000; else touch /mnt/restart-complete; sleep 10; exit 42; fi"},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+						{
+							Name:               "regular",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "sleep 10000"},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			// All containers should be restarted once
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+			validateAllContainersRestarted(ctx, f, pod, []string{"source-container", "regular"})
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+		})
+
+		ginkgo.It("should restart all containers on a previously restarted regular container exit", func(ctx context.Context) {
+			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:               "source-container",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "if [ -f /mnt/restart-complete ]; then sleep 10000; elif [ -f /mnt/restart-1 ]; then touch /mnt/restart-complete; exit 42; else touch /mnt/restart-1; exit 1; fi"},
+							RestartPolicy:      &containerRestartPolicyAlways,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			// All containers should be restarted once
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+			validateAllContainersRestarted(ctx, f, pod, []string{"source-container", "regular"})
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+		})
+	})
+})
+
+func validateAllContainersRestarted(ctx context.Context, f *framework.Framework, pod *v1.Pod, containers []string) {
+	ginkgo.By("Waiting for all containers to restart")
+	err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "all containers restarted", 3*time.Minute, func(pod *v1.Pod) (bool, error) {
+		restartedCount := 0
+		for _, cName := range containers {
+			restarted := false
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.Name == cName && status.RestartCount > 0 {
+					restarted = true
+				}
+			}
+			for _, status := range pod.Status.InitContainerStatuses {
+				if status.Name == cName && status.RestartCount > 0 {
+					restarted = true
+				}
+			}
+			if restarted {
+				restartedCount++
+			} else {
+				framework.Logf("container %s did not restart", cName)
+			}
+		}
+		framework.Logf("%d out of %d containers restarted", restartedCount, len(containers))
+		return restartedCount == len(containers), nil
+	})
+	framework.ExpectNoError(err, "failed to see all containers restart")
+}
+
+func createAndValidateRestartableContainer(ctx context.Context, f *framework.Framework, pod *v1.Pod, podName, containerName string) {
+	ginkgo.By("Creating the pod")
+	e2epod.NewPodClient(f).Create(ctx, pod)
+
+	ginkgo.By("Waiting for the container to restart")
+	err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName, "container restarted", 10*time.Minute, func(pod *v1.Pod) (bool, error) {
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name == containerName && status.RestartCount > 0 {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	framework.ExpectNoError(err, "failed to see container restart")
+}
+
+func createAndValidateNonRestartableContainer(ctx context.Context, f *framework.Framework, pod *v1.Pod, podName, containerName string) {
+	ginkgo.By("Creating the pod")
+	e2epod.NewPodClient(f).Create(ctx, pod)
+
+	ginkgo.By("Waiting for the pod to terminate")
+	err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name, 10*time.Minute)
+	framework.ExpectNoError(err, "failed to wait for pod terminate")
+
+	ginkgo.By("Checking container restart count")
+	p, err := e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "failed to get pod")
+	for _, status := range p.Status.ContainerStatuses {
+		if status.Name == containerName {
+			gomega.Expect(status.RestartCount).To(gomega.BeZero())
+		}
+	}
+}
 
 func createAndTestPodRepeatedly(ctx context.Context, workers, iterations int, scenario podScenario, podClient v1core.PodInterface) {
 	var (
@@ -610,7 +1443,7 @@ func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
 				InitContainers: []v1.Container{
 					{
 						Name:  "fail",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{
 							"/bin/false",
 						},
@@ -625,7 +1458,7 @@ func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
 				Containers: []v1.Container{
 					{
 						Name:  "blocked",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{
 							"/bin/true",
 						},
@@ -654,7 +1487,7 @@ func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "fail",
-					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{
 						"/bin/false",
 					},

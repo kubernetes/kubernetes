@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver/validation"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
@@ -106,24 +107,35 @@ const (
 
 var codecs serializer.CodecFactory
 
-// this atomic bool allows us to swap enablement of the KMSv2KDF feature in tests
+// this map allows us to swap enablement of the KMSv2KDF feature in tests
 // as the feature gate is now locked to true starting with v1.29
 // Note: it cannot be set by an end user
-var kdfDisabled atomic.Bool
+// KDF enablement is tracked per KMS provider to allow tests to run in parallel.
+var kdfEnabledPerKMS sync.Map // map[string]bool, KMS name -> KDF enabled
 
 // this function should only be called in tests to swap enablement of the KMSv2KDF feature
-func SetKDFForTests(b bool) func() {
-	kdfDisabled.Store(!b)
-	return func() {
-		kdfDisabled.Store(false)
+// Caller must guarantee that all KMS providers have distinct names across all tests.
+func SetKDFForTests(kmsName string, b bool) func() {
+	if len(kmsName) == 0 { // guarantee that GetKDF("") returns the default value
+		panic("empty KMS name used in test")
 	}
+	if _, loaded := kdfEnabledPerKMS.LoadOrStore(kmsName, b); loaded {
+		panic("duplicate KMS name used in test")
+	}
+	return func() { kdfEnabledPerKMS.Delete(kmsName) }
 }
 
 // this function should be used to determine enablement of the KMSv2KDF feature
 // instead of getting it from DefaultFeatureGate as the feature gate is now locked
 // to true starting with v1.29
-func GetKDF() bool {
-	return !kdfDisabled.Load()
+// to allow integration tests to run in parallel, this "feature flag" can be set
+// per KMS provider as long as all providers use distinct names.
+func GetKDF(kmsName string) bool {
+	kdfEnabled, ok := kdfEnabledPerKMS.Load(kmsName)
+	if !ok {
+		return true // explicit config is missing, but KDF is enabled by default
+	}
+	return kdfEnabled.(bool) // this will panic if a non-bool ever gets stored, which should never happen
 }
 
 func init() {
@@ -383,19 +395,19 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// allow writes indefinitely as long as there is no error
 	// allow writes for only up to kmsv2PluginWriteDEKSourceMaxTTL from now when there are errors
 	// we start the timer before we make the network call because kmsv2PluginWriteDEKSourceMaxTTL is meant to be the upper bound
-	expirationTimestamp := envelopekmsv2.NowFunc().Add(kmsv2PluginWriteDEKSourceMaxTTL)
+	expirationTimestamp := envelopekmsv2.GetNowFunc(h.name)().Add(kmsv2PluginWriteDEKSourceMaxTTL)
 
 	// dynamically check if we want to use KDF seed to derive DEKs or just a single DEK
 	// this gate can only change during tests, but the check is cheap enough to always make
 	// this allows us to easily exercise both modes without restarting the API server
 	// TODO integration test that this dynamically takes effect
-	useSeed := GetKDF()
-	stateUseSeed := state.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
+	useSeed := GetKDF(h.name)
+	stateUseSeed := state.EncryptedObjectEncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 
 	// state is valid and status keyID is unchanged from when we generated this DEK/seed so there is no need to rotate it
 	// just move the expiration of the current state forward by the reuse interval
 	// useSeed can only change at runtime during tests, so we check it here to allow us to easily exercise both modes
-	if errState == nil && state.EncryptedObject.KeyID == statusKeyID && stateUseSeed == useSeed {
+	if errState == nil && state.EncryptedObjectKeyID == statusKeyID && stateUseSeed == useSeed {
 		state.ExpirationTimestamp = expirationTimestamp
 		h.state.Store(&state)
 		return nil
@@ -411,11 +423,15 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// TODO maybe add success metrics?
 	if errGen == nil && encObject.KeyID == statusKeyID {
 		h.state.Store(&envelopekmsv2.State{
-			Transformer:         transformer,
-			EncryptedObject:     *encObject,
-			UID:                 uid,
-			ExpirationTimestamp: expirationTimestamp,
-			CacheKey:            cacheKey,
+			Transformer:                           transformer,
+			EncryptedObjectKeyID:                  encObject.KeyID,
+			EncryptedObjectEncryptedDEKSource:     encObject.EncryptedDEKSource,
+			EncryptedObjectAnnotations:            encObject.Annotations,
+			EncryptedObjectEncryptedDEKSourceType: encObject.EncryptedDEKSourceType,
+			UID:                                   uid,
+			ExpirationTimestamp:                   expirationTimestamp,
+			CacheKey:                              cacheKey,
+			KMSProviderName:                       h.name,
 		})
 
 		// it should be logically impossible for the new state to be invalid but check just in case
@@ -427,7 +443,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 					"uid", uid,
 					"useSeed", useSeed,
 					"newKeyIDHash", envelopekmsv2.GetHashIfNotEmpty(encObject.KeyID),
-					"oldKeyIDHash", envelopekmsv2.GetHashIfNotEmpty(state.EncryptedObject.KeyID),
+					"oldKeyIDHash", envelopekmsv2.GetHashIfNotEmpty(state.EncryptedObjectKeyID),
 					"expirationTimestamp", expirationTimestamp.Format(time.RFC3339),
 				)
 			}
@@ -435,8 +451,9 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 		}
 	}
 
+	//nolint:errorlint // printing the <nil> error is intentional
 	return fmt.Errorf("failed to rotate DEK uid=%q, useSeed=%v, errState=%v, errGen=%v, statusKeyIDHash=%q, encryptKeyIDHash=%q, stateKeyIDHash=%q, expirationTimestamp=%s",
-		uid, useSeed, errState, errGen, envelopekmsv2.GetHashIfNotEmpty(statusKeyID), envelopekmsv2.GetHashIfNotEmpty(encObject.KeyID), envelopekmsv2.GetHashIfNotEmpty(state.EncryptedObject.KeyID), state.ExpirationTimestamp.Format(time.RFC3339))
+		uid, useSeed, errState, errGen, envelopekmsv2.GetHashIfNotEmpty(statusKeyID), envelopekmsv2.GetHashIfNotEmpty(encObject.KeyID), envelopekmsv2.GetHashIfNotEmpty(state.EncryptedObjectKeyID), state.ExpirationTimestamp.Format(time.RFC3339))
 }
 
 // getCurrentState returns the latest state from the last status and encrypt calls.
@@ -449,11 +466,13 @@ func (h *kmsv2PluginProbe) getCurrentState() (envelopekmsv2.State, error) {
 		return envelopekmsv2.State{}, fmt.Errorf("got unexpected nil transformer")
 	}
 
-	encryptedObjectCopy := state.EncryptedObject
-	if len(encryptedObjectCopy.EncryptedData) != 0 {
-		return envelopekmsv2.State{}, fmt.Errorf("got unexpected non-empty EncryptedData")
+	encryptedObjectCopy := kmstypes.EncryptedObject{
+		KeyID:                  state.EncryptedObjectKeyID,
+		EncryptedDEKSource:     state.EncryptedObjectEncryptedDEKSource,
+		Annotations:            state.EncryptedObjectAnnotations,
+		EncryptedDEKSourceType: state.EncryptedObjectEncryptedDEKSourceType,
+		EncryptedData:          []byte{0}, // any non-empty value to pass validation
 	}
-	encryptedObjectCopy.EncryptedData = []byte{0} // any non-empty value to pass validation
 	if err := envelopekmsv2.ValidateEncryptedObject(&encryptedObjectCopy); err != nil {
 		return envelopekmsv2.State{}, fmt.Errorf("got invalid EncryptedObject: %w", err)
 	}
@@ -760,10 +779,6 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserver.KMSConfiguratio
 		}, nil
 
 	case kmsAPIVersionV2:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) {
-			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2 plugin %q, KMSv2 feature is not enabled", kmsName)
-		}
-
 		envelopeService, err := EnvelopeKMSv2ServiceFactory(ctx, config.Endpoint, config.Name, config.Timeout.Duration)
 		if err != nil {
 			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, error: %w", kmsName, err)
@@ -778,7 +793,9 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserver.KMSConfiguratio
 			apiServerID:  apiServerID,
 		}
 		// initialize state so that Load always works
-		probe.state.Store(&envelopekmsv2.State{})
+		probe.state.Store(&envelopekmsv2.State{
+			KMSProviderName: kmsName,
+		})
 
 		primeAndProbeKMSv2(ctx, probe, kmsName)
 		transformer := storagevalue.PrefixTransformer{
@@ -893,9 +910,8 @@ func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, 
 
 // computeEncryptionConfigHash returns the expected hash for an encryption config file that has been loaded as bytes.
 // We use a hash instead of the raw file contents when tracking changes to avoid holding any encryption keys in memory outside of their associated transformers.
-// This hash must be used in-memory and not externalized to the process because it has no cross-release stability guarantees.
 func computeEncryptionConfigHash(data []byte) string {
-	return fmt.Sprintf("k8s:enc:unstable:1:%x", sha256.Sum256(data))
+	return fmt.Sprintf("sha256:%x", sha256.Sum256(data))
 }
 
 var _ storagevalue.ResourceTransformers = &DynamicTransformers{}
@@ -1013,7 +1029,9 @@ var anyGroupAnyResource = schema.GroupResource{
 	Resource: "*",
 }
 
-func transformerFromOverrides(transformerOverrides map[schema.GroupResource]storagevalue.Transformer, resource schema.GroupResource) storagevalue.Transformer {
+func transformerFromOverrides(transformerOverrides map[schema.GroupResource]storagevalue.Transformer, resource schema.GroupResource) (out storagevalue.Transformer) {
+	defer func() { out = newRequestInfoTransformer(resource, out) }()
+
 	if transformer := transformerOverrides[resource]; transformer != nil {
 		return transformer
 	}
@@ -1038,4 +1056,42 @@ func grYAMLString(gr schema.GroupResource) string {
 	}
 
 	return gr.String()
+}
+
+var _ storagevalue.Transformer = &requestInfoTransformer{}
+
+type requestInfoTransformer struct {
+	baseValueCtx context.Context
+	delegate     storagevalue.Transformer
+}
+
+func newRequestInfoTransformer(resource schema.GroupResource, delegate storagevalue.Transformer) *requestInfoTransformer {
+	return &requestInfoTransformer{
+		baseValueCtx: request.WithRequestInfo(context.Background(), &request.RequestInfo{IsResourceRequest: true, APIGroup: resource.Group, Resource: resource.Resource}),
+		delegate:     delegate,
+	}
+}
+
+func (l *requestInfoTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) ([]byte, bool, error) {
+	return l.delegate.TransformFromStorage(l.withBaseValueCtx(ctx), data, dataCtx)
+}
+
+func (l *requestInfoTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) ([]byte, error) {
+	return l.delegate.TransformToStorage(l.withBaseValueCtx(ctx), data, dataCtx)
+}
+
+func (l *requestInfoTransformer) withBaseValueCtx(ctx context.Context) context.Context {
+	return &joinValueContext{Context: ctx, baseValueCtx: l.baseValueCtx}
+}
+
+type joinValueContext struct {
+	context.Context
+	baseValueCtx context.Context
+}
+
+func (j *joinValueContext) Value(key any) any {
+	if val := j.Context.Value(key); val != nil {
+		return val
+	}
+	return j.baseValueCtx.Value(key)
 }

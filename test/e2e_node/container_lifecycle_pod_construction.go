@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -48,6 +49,8 @@ type execCommand struct {
 	// ContainerName is the name of the container to append the log. If empty,
 	// the name specified in ExecCommand will be used.
 	ContainerName string
+	// LoopPeriod is the time interval for executing the loop.
+	LoopPeriod float32
 }
 
 // ExecCommand returns the command to execute in the container that implements
@@ -88,12 +91,17 @@ func ExecCommand(name string, c execCommand) []string {
 	if c.Delay != 0 {
 		fmt.Fprint(&cmd, sleepCommand(c.Delay))
 	}
+
+	loopPeriod := float32(1)
+	if c.LoopPeriod != 0 {
+		loopPeriod = c.LoopPeriod
+	}
 	if c.LoopForever {
-		fmt.Fprintf(&cmd, "while true; do echo %s '%s Looping' | tee -a %s >> /proc/1/fd/1 ; sleep 1 ; done; ", timeCmd, name, containerLog)
+		fmt.Fprintf(&cmd, "while true; do echo %s '%s Looping' | tee -a %s >> /proc/1/fd/1 ; sleep %f ; done; ", timeCmd, name, containerLog, loopPeriod)
 	}
 	fmt.Fprintf(&cmd, "echo %s '%s Exiting'  | tee -a %s >> /proc/1/fd/1; ", timeCmd, name, containerLog)
 	fmt.Fprintf(&cmd, "exit %d", c.ExitCode)
-	return []string{"sh", "-c", cmd.String()}
+	return e2epod.GenerateScriptCmd(cmd.String())
 }
 
 // sleepCommand returns a command that sleeps for the given number of seconds
@@ -176,24 +184,6 @@ func (o containerOutputList) StartsBefore(lhs, rhs string) error {
 	if rhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s started after %s, got\n%v", rhs, lhs, o)
 	}
-	return nil
-}
-
-// DoesntStartAfter returns an error if lhs started after rhs
-func (o containerOutputList) DoesntStartAfter(lhs, rhs string) error {
-	rhsStart := o.findIndex(rhs, "Starting", 0)
-
-	if rhsStart == -1 {
-		return fmt.Errorf("couldn't find that %s ever started, got\n%v", rhs, o)
-	}
-
-	// this works even for the same names (restart case)
-	lhsStart := o.findIndex(lhs, "Started", rhsStart+1)
-
-	if lhsStart != -1 {
-		return fmt.Errorf("expected %s to not start after %s, got\n%v", lhs, rhs, o)
-	}
-
 	return nil
 }
 
@@ -326,6 +316,8 @@ func (o containerOutputList) TimeOfLastLoop(name string) (int64, error) {
 	return o[idx].timestamp.UnixMilli(), nil
 }
 
+var logRe = regexp.MustCompile(`unable to retrieve container logs for (cri-o|containerd)://[0-9a-f]{64}`)
+
 // parseOutput combines the container log from all of the init and regular
 // containers and parses/sorts the outputs to produce an execution log
 func parseOutput(ctx context.Context, f *framework.Framework, pod *v1.Pod) containerOutputList {
@@ -351,12 +343,17 @@ func parseOutput(ctx context.Context, f *framework.Framework, pod *v1.Pod) conta
 	sc := bufio.NewScanner(&buf)
 	var res containerOutputList
 	for sc.Scan() {
-		fields := strings.Fields(sc.Text())
+		log := sc.Text()
+
+		// Trim possible prefixed output if the container logs are not available for the time being
+		log = logRe.ReplaceAllString(log, "")
+
+		fields := strings.Fields(log)
 		if len(fields) < 3 {
 			framework.ExpectNoError(fmt.Errorf("%v should have at least length 3", fields))
 		}
 		timestamp, err := time.Parse(time.RFC3339, fields[0])
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "Failed to parse the timestamp, log: %q", log)
 		res = append(res, containerOutput{
 			timestamp:     timestamp,
 			containerName: fields[1],

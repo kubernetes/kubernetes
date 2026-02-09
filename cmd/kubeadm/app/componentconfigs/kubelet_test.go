@@ -230,7 +230,7 @@ func TestKubeletDefault(t *testing.T) {
 			got.Default(&test.clusterCfg, &kubeadmapi.APIEndpoint{}, &kubeadmapi.NodeRegistrationOptions{})
 
 			if !reflect.DeepEqual(got, &expected) {
-				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, *got)
+				t.Fatalf("Mismatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, *got)
 			}
 		})
 	}
@@ -271,7 +271,7 @@ func TestKubeletFromDocumentMap(t *testing.T) {
 
 func TestKubeletFromCluster(t *testing.T) {
 	runKubeletFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
-		client := clientsetfake.NewSimpleClientset(
+		client := clientsetfake.NewClientset(
 			testKubeletConfigMap(yaml),
 		)
 		return kubeletHandler.FromCluster(client, testClusterCfg())

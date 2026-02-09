@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -35,14 +36,16 @@ import (
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
 type VolumeRestrictions struct {
-	pvcLister    corelisters.PersistentVolumeClaimLister
-	sharedLister framework.SharedLister
+	pvcLister                 corelisters.PersistentVolumeClaimLister
+	sharedLister              fwk.SharedLister
+	enableSchedulingQueueHint bool
 }
 
-var _ framework.PreFilterPlugin = &VolumeRestrictions{}
-var _ framework.FilterPlugin = &VolumeRestrictions{}
-var _ framework.EnqueueExtensions = &VolumeRestrictions{}
-var _ framework.StateData = &preFilterState{}
+var _ fwk.PreFilterPlugin = &VolumeRestrictions{}
+var _ fwk.FilterPlugin = &VolumeRestrictions{}
+var _ fwk.EnqueueExtensions = &VolumeRestrictions{}
+var _ fwk.StateData = &preFilterState{}
+var _ fwk.SignPlugin = &VolumeRestrictions{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -53,8 +56,8 @@ const (
 
 	// ErrReasonDiskConflict is used for NoDiskConflict predicate error.
 	ErrReasonDiskConflict = "node(s) had no available disk"
-	// ErrReasonReadWriteOncePodConflict is used when a pod is found using the same PVC with the ReadWriteOncePod access mode.
-	ErrReasonReadWriteOncePodConflict = "node has pod using PersistentVolumeClaim with the same name and ReadWriteOncePod access mode"
+	// ErrReasonReadWriteOncePodConflict is used when a PVC with ReadWriteOncePod access mode is already in-use by another pod.
+	ErrReasonReadWriteOncePodConflict = "node(s) unavailable due to PersistentVolumeClaim with ReadWriteOncePod access mode already in-use by another pod"
 )
 
 // preFilterState computed at PreFilter and used at Filter.
@@ -65,13 +68,13 @@ type preFilterState struct {
 	conflictingPVCRefCount int
 }
 
-func (s *preFilterState) updateWithPod(podInfo *framework.PodInfo, multiplier int) {
+func (s *preFilterState) updateWithPod(podInfo fwk.PodInfo, multiplier int) {
 	s.conflictingPVCRefCount += multiplier * s.conflictingPVCRefCountForPod(podInfo)
 }
 
-func (s *preFilterState) conflictingPVCRefCountForPod(podInfo *framework.PodInfo) int {
+func (s *preFilterState) conflictingPVCRefCountForPod(podInfo fwk.PodInfo) int {
 	conflicts := 0
-	for _, volume := range podInfo.Pod.Spec.Volumes {
+	for _, volume := range podInfo.GetPod().Spec.Volumes {
 		if volume.PersistentVolumeClaim == nil {
 			continue
 		}
@@ -83,7 +86,7 @@ func (s *preFilterState) conflictingPVCRefCountForPod(podInfo *framework.PodInfo
 }
 
 // Clone the prefilter state.
-func (s *preFilterState) Clone() framework.StateData {
+func (s *preFilterState) Clone() fwk.StateData {
 	if s == nil {
 		return nil
 	}
@@ -96,6 +99,13 @@ func (s *preFilterState) Clone() framework.StateData {
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeRestrictions) Name() string {
 	return Name
+}
+
+// Feasibility and scoring based on the non-synthetic volume sources.
+func (pl *VolumeRestrictions) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return []fwk.SignFragment{
+		{Key: fwk.VolumesSignerName, Value: fwk.VolumesSigner(pod)},
+	}, nil
 }
 
 func isVolumeConflict(volume *v1.Volume, pod *v1.Pod) bool {
@@ -161,7 +171,7 @@ func needsRestrictionsCheck(v v1.Volume) bool {
 }
 
 // PreFilter computes and stores cycleState containing details for enforcing ReadWriteOncePod.
-func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	needsCheck := false
 	for i := range pod.Spec.Volumes {
 		if needsRestrictionsCheck(pod.Spec.Volumes[i]) {
@@ -173,44 +183,44 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 	pvcs, err := pl.readWriteOncePodPVCsForPod(ctx, pod)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+			return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, err.Error())
 		}
-		return nil, framework.AsStatus(err)
+		return nil, fwk.AsStatus(err)
 	}
 
 	s, err := pl.calPreFilterState(ctx, pod, pvcs)
 	if err != nil {
-		return nil, framework.AsStatus(err)
+		return nil, fwk.AsStatus(err)
 	}
 
 	if !needsCheck && s.conflictingPVCRefCount == 0 {
-		return nil, framework.NewStatus(framework.Skip)
+		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	cycleState.Write(preFilterStateKey, s)
 	return nil, nil
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	state.updateWithPod(podInfoToAdd, 1)
 	return nil
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	state.updateWithPod(podInfoToRemove, -1)
 	return nil
 }
 
-func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
+func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
 		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
@@ -263,14 +273,14 @@ func (pl *VolumeRestrictions) readWriteOncePodPVCsForPod(ctx context.Context, po
 
 // Checks if scheduling the pod onto this node would cause any conflicts with
 // existing volumes.
-func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
+func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
 	for i := range pod.Spec.Volumes {
 		v := pod.Spec.Volumes[i]
 		if !needsRestrictionsCheck(v) {
 			continue
 		}
-		for _, ev := range nodeInfo.Pods {
-			if isVolumeConflict(&v, ev.Pod) {
+		for _, ev := range nodeInfo.GetPods() {
+			if isVolumeConflict(&v, ev.GetPod()) {
 				return false
 			}
 		}
@@ -279,18 +289,18 @@ func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 }
 
 // Checks if scheduling the pod would cause any ReadWriteOncePod PVC access mode conflicts.
-func satisfyReadWriteOncePod(ctx context.Context, state *preFilterState) *framework.Status {
+func satisfyReadWriteOncePod(ctx context.Context, state *preFilterState) *fwk.Status {
 	if state == nil {
 		return nil
 	}
 	if state.conflictingPVCRefCount > 0 {
-		return framework.NewStatus(framework.Unschedulable, ErrReasonReadWriteOncePodConflict)
+		return fwk.NewStatus(fwk.Unschedulable, ErrReasonReadWriteOncePodConflict)
 	}
 	return nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *VolumeRestrictions) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *VolumeRestrictions) PreFilterExtensions() fwk.PreFilterExtensions {
 	return pl
 }
 
@@ -305,45 +315,55 @@ func (pl *VolumeRestrictions) PreFilterExtensions() framework.PreFilterExtension
 // - ISCSI forbids if any two pods share at least same IQN and ISCSI volume is read-only
 // If the pod uses PVCs with the ReadWriteOncePod access mode, it evaluates if
 // these PVCs are already in-use and if preemption will help.
-func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if !satisfyVolumeConflicts(pod, nodeInfo) {
-		return framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
+		return fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	}
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	return satisfyReadWriteOncePod(ctx, state)
 }
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHint {
-	return []framework.ClusterEventWithHint{
+func (pl *VolumeRestrictions) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	// A note about UpdateNodeTaint/UpdateNodeLabel event:
+	// Ideally, it's supposed to register only Add because any Node update event will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel
+	if pl.enableSchedulingQueueHint {
+		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
+		nodeActionType = fwk.Add
+	}
+
+	return []fwk.ClusterEventWithHint{
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
 		// Due to immutable fields `spec.volumes`, pod update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		// A new Node may make a pod schedulable.
 		// We intentionally don't set QueueingHint since all Node/Add events could make Pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
 		// This PVC is required to exist to check its access modes.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add},
 			QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimAdded},
-	}
+	}, nil
 }
 
 // isSchedulableAfterPersistentVolumeClaimAdded is invoked whenever a PersistentVolumeClaim added or changed, It checks whether
 // that change made a previously unschedulable pod schedulable.
-func (pl *VolumeRestrictions) isSchedulableAfterPersistentVolumeClaimAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeRestrictions) isSchedulableAfterPersistentVolumeClaimAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, newPersistentVolumeClaim, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
 	}
 
 	if newPersistentVolumeClaim.Namespace != pod.Namespace {
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	for _, volume := range pod.Spec.Volumes {
@@ -353,42 +373,63 @@ func (pl *VolumeRestrictions) isSchedulableAfterPersistentVolumeClaimAdded(logge
 
 		if volume.PersistentVolumeClaim.ClaimName == newPersistentVolumeClaim.Name {
 			logger.V(5).Info("PVC that is referred from the pod was created, which might make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(newPersistentVolumeClaim))
-			return framework.Queue, nil
+			return fwk.Queue, nil
 		}
 	}
 	logger.V(5).Info("PVC irrelevant to the Pod was created, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(newPersistentVolumeClaim))
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // isSchedulableAfterPodDeleted is invoked whenever a pod deleted,
 // It checks whether the deleted pod will conflict with volumes of other pods on the same node
-// TODO If we observe good throughput, we will add a check for conflicts between the deleted Pod and the readWriteOncePodPVC of the current Pod.
-func (pl *VolumeRestrictions) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeRestrictions) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
 	}
 
 	if deletedPod.Namespace != pod.Namespace {
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	nodeInfo := framework.NewNodeInfo(deletedPod)
 	if !satisfyVolumeConflicts(pod, nodeInfo) {
-		return framework.Queue, nil
+		logger.V(5).Info("Pod with the volume that the target pod requires was deleted, which might make this pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+		return fwk.Queue, nil
 	}
 
-	return framework.QueueSkip, nil
+	// Return Queue if a deleted pod uses the same PVC since the pod may be unschedulable due to the ReadWriteOncePod access mode of the PVC.
+	//
+	// For now, we don't actually fetch PVC and check the access mode because that operation could be expensive.
+	// Once the observability around QHint is established,
+	// we may want to do that depending on how much the operation would impact the QHint latency negatively.
+	// https://github.com/kubernetes/kubernetes/issues/124566
+	claims := sets.New[string]()
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			claims.Insert(volume.PersistentVolumeClaim.ClaimName)
+		}
+	}
+	for _, volume := range deletedPod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil && claims.Has(volume.PersistentVolumeClaim.ClaimName) {
+			logger.V(5).Info("Pod with the same PVC that the target pod requires was deleted, which might make this pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+			return fwk.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("An irrelevant Pod was deleted, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	return fwk.QueueSkip, nil
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	sharedLister := handle.SnapshotSharedLister()
 
 	return &VolumeRestrictions{
-		pvcLister:    pvcLister,
-		sharedLister: sharedLister,
+		pvcLister:                 pvcLister,
+		sharedLister:              sharedLister,
+		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 	}, nil
 }

@@ -128,10 +128,11 @@ func Listen(ctx context.Context, clientset kubernetes.Interface, restConfig *res
 
 					for i, c := range l.connections {
 						if c == nil {
-							klog.V(5).Infof("%s: trying to create a new connection #%d", prefix, connectionsCreated)
+							// This can fail repeatedly while the apiserver is down. This is nothing to worry about.
+							klog.V(7).Infof("%s: trying to create a new connection #%d", prefix, connectionsCreated)
 							stream, err := dial(ctx, fmt.Sprintf("%s #%d", prefix, connectionsCreated), dialer, addr.Port)
 							if err != nil {
-								klog.Errorf("%s: no connection: %v", prefix, err)
+								klog.V(7).Infof("%s: no connection: %v", prefix, err)
 								return
 							}
 							// Make the connection available to Accept below.

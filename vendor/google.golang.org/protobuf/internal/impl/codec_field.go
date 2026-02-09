@@ -5,15 +5,12 @@
 package impl
 
 import (
-	"fmt"
 	"reflect"
-	"sync"
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/runtime/protoiface"
 )
 
@@ -65,6 +62,9 @@ func (mi *MessageInfo) initOneofFieldCoders(od protoreflect.OneofDescriptor, si 
 			if err != nil {
 				return out, err
 			}
+			if cf.funcs.isInit == nil {
+				out.initialized = true
+			}
 			vi.Set(vw)
 			return out, nil
 		}
@@ -115,78 +115,6 @@ func (mi *MessageInfo) initOneofFieldCoders(od protoreflect.OneofDescriptor, si 
 			}
 			return info.funcs.isInit(p, info)
 		}
-	}
-}
-
-func makeWeakMessageFieldCoder(fd protoreflect.FieldDescriptor) pointerCoderFuncs {
-	var once sync.Once
-	var messageType protoreflect.MessageType
-	lazyInit := func() {
-		once.Do(func() {
-			messageName := fd.Message().FullName()
-			messageType, _ = protoregistry.GlobalTypes.FindMessageByName(messageName)
-		})
-	}
-
-	return pointerCoderFuncs{
-		size: func(p pointer, f *coderFieldInfo, opts marshalOptions) int {
-			m, ok := p.WeakFields().get(f.num)
-			if !ok {
-				return 0
-			}
-			lazyInit()
-			if messageType == nil {
-				panic(fmt.Sprintf("weak message %v is not linked in", fd.Message().FullName()))
-			}
-			return sizeMessage(m, f.tagsize, opts)
-		},
-		marshal: func(b []byte, p pointer, f *coderFieldInfo, opts marshalOptions) ([]byte, error) {
-			m, ok := p.WeakFields().get(f.num)
-			if !ok {
-				return b, nil
-			}
-			lazyInit()
-			if messageType == nil {
-				panic(fmt.Sprintf("weak message %v is not linked in", fd.Message().FullName()))
-			}
-			return appendMessage(b, m, f.wiretag, opts)
-		},
-		unmarshal: func(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (unmarshalOutput, error) {
-			fs := p.WeakFields()
-			m, ok := fs.get(f.num)
-			if !ok {
-				lazyInit()
-				if messageType == nil {
-					return unmarshalOutput{}, errUnknown
-				}
-				m = messageType.New().Interface()
-				fs.set(f.num, m)
-			}
-			return consumeMessage(b, m, wtyp, opts)
-		},
-		isInit: func(p pointer, f *coderFieldInfo) error {
-			m, ok := p.WeakFields().get(f.num)
-			if !ok {
-				return nil
-			}
-			return proto.CheckInitialized(m)
-		},
-		merge: func(dst, src pointer, f *coderFieldInfo, opts mergeOptions) {
-			sm, ok := src.WeakFields().get(f.num)
-			if !ok {
-				return
-			}
-			dm, ok := dst.WeakFields().get(f.num)
-			if !ok {
-				lazyInit()
-				if messageType == nil {
-					panic(fmt.Sprintf("weak message %v is not linked in", fd.Message().FullName()))
-				}
-				dm = messageType.New().Interface()
-				dst.WeakFields().set(f.num, dm)
-			}
-			opts.Merge(dm, sm)
-		},
 	}
 }
 

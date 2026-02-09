@@ -17,25 +17,30 @@ limitations under the License.
 package cache
 
 import (
-	"runtime"
+	goruntime "runtime"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Calls AddPlugin() to add a plugin
 // Verifies newly added plugin exists in GetRegisteredPlugins()
-// Verifies PluginExistsWithCorrectTimestamp returns true for the plugin
+// Verifies PluginExistsWithCorrectUUID returns true for the plugin
+// Verifies PluginExistsWithCorrectTimestamp returns true for the plugin (excluded on Windows)
 func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pluginInfo := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 		Handler:    nil,
 		Name:       "test",
 	}
 	asw := NewActualStateOfWorld()
-	err := asw.AddPlugin(pluginInfo)
+	err := asw.AddPlugin(tCtx, pluginInfo)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPlugin failed. Expected: <no error> Actual: <%v>", err)
@@ -50,24 +55,34 @@ func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
 		t.Fatalf("Expected\n%v\nin actual state of world, but got\n%v\n", pluginInfo, aswPlugins[0])
 	}
 
+	// Check PluginExistsWithCorrectUUID returns true
+	if !asw.PluginExistsWithCorrectUUID(pluginInfo) {
+		t.Fatalf("PluginExistsWithCorrectUUID returns false for plugin that should be registered")
+	}
+
 	// Check PluginExistsWithCorrectTimestamp returns true
-	if !asw.PluginExistsWithCorrectTimestamp(pluginInfo) {
+	// Skipped on Windows. Time measurements are not as fine-grained on Windows and can lead to
+	// 2 consecutive time.Now() calls to be return identical timestamps.
+	if goruntime.GOOS != "windows" && !asw.PluginExistsWithCorrectTimestamp(pluginInfo) {
 		t.Fatalf("PluginExistsWithCorrectTimestamp returns false for plugin that should be registered")
 	}
 }
 
 // Calls AddPlugin() to add an empty string for socket path
 // Verifies the plugin does not exist in GetRegisteredPlugins()
-// Verifies PluginExistsWithCorrectTimestamp returns false
+// Verifies PluginExistsWithCorrectUUID returns false
+// Verifies PluginExistsWithCorrectTimestamp returns false (excluded on Windows)
 func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
 		SocketPath: "",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 		Handler:    nil,
 		Name:       "test",
 	}
-	err := asw.AddPlugin(pluginInfo)
+	err := asw.AddPlugin(tCtx, pluginInfo)
 	require.EqualError(t, err, "socket path is empty")
 
 	// Get registered plugins and check the newly added plugin is there
@@ -76,25 +91,35 @@ func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
 		t.Fatalf("Actual state of world length should be zero but it's %d", len(aswPlugins))
 	}
 
+	// Check PluginExistsWithCorrectUUID returns false
+	if asw.PluginExistsWithCorrectUUID(pluginInfo) {
+		t.Fatalf("PluginExistsWithCorrectUUID returns true for plugin that's not registered")
+	}
+
 	// Check PluginExistsWithCorrectTimestamp returns false
-	if asw.PluginExistsWithCorrectTimestamp(pluginInfo) {
+	// Skipped on Windows. Time measurements are not as fine-grained on Windows and can lead to
+	// 2 consecutive time.Now() calls to be return identical timestamps.
+	if goruntime.GOOS != "windows" && asw.PluginExistsWithCorrectTimestamp(pluginInfo) {
 		t.Fatalf("PluginExistsWithCorrectTimestamp returns true for plugin that's not registered")
 	}
 }
 
 // Calls RemovePlugin() to remove a plugin
 // Verifies newly removed plugin no longer exists in GetRegisteredPlugins()
-// Verifies PluginExistsWithCorrectTimestamp returns false
+// Verifies PluginExistsWithCorrectUUID returns false
+// Verifies PluginExistsWithCorrectTimestamp returns false (excluded on Windows)
 func Test_ASW_RemovePlugin_Positive(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 		Handler:    nil,
 		Name:       "test",
 	}
-	err := asw.AddPlugin(pluginInfo)
+	err := asw.AddPlugin(tCtx, pluginInfo)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPlugin failed. Expected: <no error> Actual: <%v>", err)
@@ -109,29 +134,33 @@ func Test_ASW_RemovePlugin_Positive(t *testing.T) {
 		t.Fatalf("Actual state of world length should be zero but it's %d", len(aswPlugins))
 	}
 
+	// Check PluginExistsWithCorrectUUID returns false
+	if asw.PluginExistsWithCorrectUUID(pluginInfo) {
+		t.Fatalf("PluginExistsWithCorrectUUID returns true for the removed plugin")
+	}
+
 	// Check PluginExistsWithCorrectTimestamp returns false
-	if asw.PluginExistsWithCorrectTimestamp(pluginInfo) {
+	// Skipped on Windows. Time measurements are not as fine-grained on Windows and can lead to
+	// 2 consecutive time.Now() calls to be return identical timestamps.
+	if goruntime.GOOS != "windows" && asw.PluginExistsWithCorrectTimestamp(pluginInfo) {
 		t.Fatalf("PluginExistsWithCorrectTimestamp returns true for the removed plugin")
 	}
 }
 
-// Verifies PluginExistsWithCorrectTimestamp returns false for an existing
-// plugin with the wrong timestamp
-func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
+// Verifies PluginExistsWithCorrectUUID returns false for an existing
+// plugin with the wrong UUID
+func Test_ASW_PluginExistsWithCorrectUUID_Negative_WrongUUID(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 		Handler:    nil,
 		Name:       "test",
 	}
-	err := asw.AddPlugin(pluginInfo)
+	err := asw.AddPlugin(tCtx, pluginInfo)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPlugin failed. Expected: <no error> Actual: <%v>", err)
@@ -140,9 +169,10 @@ func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testin
 	newerPlugin := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 	}
-	// Check PluginExistsWithCorrectTimestamp returns false
-	if asw.PluginExistsWithCorrectTimestamp(newerPlugin) {
-		t.Fatalf("PluginExistsWithCorrectTimestamp returns true for a plugin with newer timestamp")
+	// Check PluginExistsWithCorrectUUID returns false
+	if asw.PluginExistsWithCorrectUUID(newerPlugin) {
+		t.Fatalf("PluginExistsWithCorrectUUID returns true for a plugin with a different UUID")
 	}
 }

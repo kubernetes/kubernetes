@@ -17,8 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -32,13 +36,16 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/util/certificate/csr"
 	capi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/pointer"
+	testclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -206,7 +213,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.TooLong(specPath.Child("signerName"), maxLengthSignerName+".toolong", len(maxLengthSignerName)),
+				field.TooLong(specPath.Child("signerName"), "" /*unused*/, len(maxLengthSignerName)),
 			},
 		},
 		"signerName with a fqdn greater than 253 characters should be rejected": {
@@ -220,7 +227,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.TooLong(specPath.Child("signerName"), fmt.Sprintf("%s.extra", maxLengthFQDN), len(maxLengthFQDN)),
+				field.TooLong(specPath.Child("signerName"), "" /*unused*/, len(maxLengthFQDN)),
 			},
 		},
 		"signerName can have a longer path if the domain component is less than the max length": {
@@ -270,7 +277,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					Usages:            validUsages,
 					Request:           newCSRPEM(t),
 					SignerName:        validSignerName,
-					ExpirationSeconds: pointer.Int32(-1),
+					ExpirationSeconds: ptr.To[int32](-1),
 				},
 			},
 			errs: field.ErrorList{
@@ -284,7 +291,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					Usages:            validUsages,
 					Request:           newCSRPEM(t),
 					SignerName:        validSignerName,
-					ExpirationSeconds: pointer.Int32(0),
+					ExpirationSeconds: ptr.To[int32](0),
 				},
 			},
 			errs: field.ErrorList{
@@ -298,7 +305,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					Usages:            validUsages,
 					Request:           newCSRPEM(t),
 					SignerName:        validSignerName,
-					ExpirationSeconds: pointer.Int32(1),
+					ExpirationSeconds: ptr.To[int32](1),
 				},
 			},
 			errs: field.ErrorList{
@@ -356,6 +363,71 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), allValidUsages.List()),
 				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), allValidUsages.List()),
 				field.Duplicate(specPath.Child("usages").Index(1), capi.KeyUsage("unknown")),
+			},
+		},
+		"approved condition only": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     validUsages,
+					Request:    newCSRPEM(t),
+					SignerName: validSignerName,
+				},
+				Status: capi.CertificateSigningRequestStatus{
+					Conditions: []capi.CertificateSigningRequestCondition{
+						{Type: capi.CertificateApproved, Status: core.ConditionTrue},
+					},
+				},
+			},
+		},
+		"denied condition only": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     validUsages,
+					Request:    newCSRPEM(t),
+					SignerName: validSignerName,
+				},
+				Status: capi.CertificateSigningRequestStatus{
+					Conditions: []capi.CertificateSigningRequestCondition{
+						{Type: capi.CertificateDenied, Status: core.ConditionTrue},
+					},
+				},
+			},
+		},
+		"both approved and denied conditions": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     validUsages,
+					Request:    newCSRPEM(t),
+					SignerName: validSignerName,
+				},
+				Status: capi.CertificateSigningRequestStatus{
+					Conditions: []capi.CertificateSigningRequestCondition{
+						{Type: capi.CertificateApproved, Status: core.ConditionTrue},
+						{Type: capi.CertificateDenied, Status: core.ConditionTrue},
+					},
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(field.NewPath("status", "conditions"), capi.CertificateDenied, "Approved and Denied conditions are mutually exclusive").WithOrigin("zeroOrOneOf").MarkCoveredByDeclarative(),
+			},
+		},
+		"approved and failed conditions allowed": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     validUsages,
+					Request:    newCSRPEM(t),
+					SignerName: validSignerName,
+				},
+				Status: capi.CertificateSigningRequestStatus{
+					Conditions: []capi.CertificateSigningRequestCondition{
+						{Type: capi.CertificateApproved, Status: core.ConditionTrue},
+						{Type: capi.CertificateFailed, Status: core.ConditionTrue},
+					},
+				},
 			},
 		},
 	}
@@ -581,6 +653,27 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 		oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
 		errs: []string{
 			`status.certificate: Forbidden: updates may not set certificate content`,
+		},
+	}, {
+		name: "add both approved and denied conditions",
+		newCSR: &capi.CertificateSigningRequest{
+			ObjectMeta: validUpdateMeta,
+			Spec:       validSpec,
+			Status: capi.CertificateSigningRequestStatus{
+				Conditions: []capi.CertificateSigningRequestCondition{
+					{Type: capi.CertificateApproved, Status: core.ConditionTrue},
+					{Type: capi.CertificateDenied, Status: core.ConditionTrue},
+				},
+			},
+		},
+		oldCSR: &capi.CertificateSigningRequest{
+			ObjectMeta: validUpdateMetaWithFinalizers,
+			Spec:       validSpec,
+		},
+		errs: []string{
+			`status.conditions: Forbidden: updates may not add a condition of type "Approved"`,
+			`status.conditions: Forbidden: updates may not add a condition of type "Denied"`,
+			`status.conditions: Invalid value: "Denied": Approved and Denied conditions are mutually exclusive`,
 		},
 	}}
 
@@ -929,7 +1022,7 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 				},
 			},
 			lenientOpts: certificateValidationOptions{allowBothApprovedAndDenied: true},
-			strictErrs:  []string{`status.conditions[1].type: Invalid value: "Denied": Approved and Denied conditions are mutually exclusive`},
+			strictErrs:  []string{`status.conditions: Invalid value: "Denied": Approved and Denied conditions are mutually exclusive`},
 		}, {
 			name: "duplicate condition",
 			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
@@ -1002,6 +1095,15 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 			},
 			lenientOpts:   certificateValidationOptions{allowArbitraryCertificate: true},
 			strictRegexes: []regexp.Regexp{*regexp.MustCompile(`status.certificate: Invalid value: "\<certificate data\>": (asn1: structure error: sequence tag mismatch|x509: invalid RDNSequence)`)},
+		}, {
+			name: "approved and denied",
+			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+				Status: capi.CertificateSigningRequestStatus{
+					Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}, {Type: capi.CertificateDenied, Status: core.ConditionTrue}},
+				},
+			},
+			lenientOpts: certificateValidationOptions{allowBothApprovedAndDenied: true},
+			strictErrs:  []string{`status.conditions: Invalid value: "Denied": Approved and Denied conditions are mutually exclusive`},
 		},
 	}
 
@@ -1137,7 +1239,7 @@ func TestValidateClusterTrustBundle(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "trustBundle"), fmt.Sprintf("<value omitted, len %d>", len(badTooBigBundle)), core.MaxSecretSize),
+				field.TooLong(field.NewPath("spec", "trustBundle"), "" /*unused*/, core.MaxSecretSize),
 			},
 		},
 		{
@@ -1504,6 +1606,2923 @@ func TestValidateClusterTrustBundleUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidatePodCertificateRequestCreate(t *testing.T) {
+	podUID1 := "pod-uid-1"
+	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
+	_, _, ed25519PubPKIX2, ed25519Proof2 := mustMakeEd25519KeyAndProof(t, []byte("other-value"))
+	_, _, _, ed25519Proof3 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
+	_, _, ecdsaP224PubPKIX1, ecdsaP224Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P224(), []byte(podUID1))
+	_, _, ecdsaP256PubPKIX1, ecdsaP256Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P256(), []byte(podUID1))
+	_, _, ecdsaP384PubPKIX1, ecdsaP384Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P384(), []byte(podUID1))
+	_, _, ecdsaP521PubPKIX1, ecdsaP521Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P521(), []byte(podUID1))
+	_, _, ecdsaWrongProofPKIX, ecdsaWrongProof := mustMakeECDSAKeyAndProof(t, elliptic.P384(), []byte("other-value"))
+	_, _, rsa2048PubPKIX1, rsa2048Proof1 := mustMakeRSAKeyAndProof(t, 2048, []byte(podUID1))
+	_, _, rsa3072PubPKIX1, rsa3072Proof1 := mustMakeRSAKeyAndProof(t, 3072, []byte(podUID1))
+	_, _, rsa4096PubPKIX1, rsa4096Proof1 := mustMakeRSAKeyAndProof(t, 4096, []byte(podUID1))
+	_, _, rsaWrongProofPKIX, rsaWrongProof := mustMakeRSAKeyAndProof(t, 3072, []byte("other-value"))
+
+	podUIDEmpty := ""
+	_, _, pubPKIXEmpty, proofEmpty := mustMakeEd25519KeyAndProof(t, []byte(podUIDEmpty))
+
+	testCases := []struct {
+		description string
+		pcr         *capi.PodCertificateRequest
+		wantErrors  field.ErrorList
+	}{
+		{
+			description: "valid Ed25519 PCR",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: nil,
+		},
+		{
+			description: "invalid Ed25519 proof of possession (correct key signed wrong message)",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX2,
+					ProofOfPossession:    ed25519Proof2,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "proofOfPossession"), field.OmitValueType{}, "could not verify proof-of-possession signature"),
+			},
+		},
+		{
+			description: "invalid Ed25519 proof of possession (signed by different key)",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof3,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "proofOfPossession"), field.OmitValueType{}, "could not verify proof-of-possession signature"),
+			},
+		},
+		{
+			description: "invalid ECDSA P224 PCR",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ecdsaP224PubPKIX1,
+					ProofOfPossession:    ecdsaP224Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "pkixPublicKey"), "curve P-224", "elliptic public keys must use curve P256 or P384"),
+			},
+		},
+		{
+			description: "valid ECDSA P256 PCR",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ecdsaP256PubPKIX1,
+					ProofOfPossession:    ecdsaP256Proof1,
+				},
+			},
+			wantErrors: nil,
+		},
+		{
+			description: "valid ECDSA P384 PCR",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ecdsaP384PubPKIX1,
+					ProofOfPossession:    ecdsaP384Proof1,
+				},
+			},
+			wantErrors: nil,
+		},
+		{
+			description: "valid ECDSA P521 PCR",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ecdsaP521PubPKIX1,
+					ProofOfPossession:    ecdsaP521Proof1,
+				},
+			},
+			wantErrors: nil,
+		},
+		{
+			description: "invalid ECDSA proof of possession (correct key signed wrong message)",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ecdsaWrongProofPKIX,
+					ProofOfPossession:    ecdsaWrongProof,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "proofOfPossession"), field.OmitValueType{}, "could not verify proof-of-possession signature"),
+			},
+		},
+		{
+			description: "invalid RSA 2048 PCR",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        rsa2048PubPKIX1,
+					ProofOfPossession:    rsa2048Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "pkixPublicKey"), "2048-bit modulus", "RSA keys must have modulus size 3072 or 4096"),
+			},
+		},
+		{
+			description: "valid RSA 3072 PCR",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        rsa3072PubPKIX1,
+					ProofOfPossession:    rsa3072Proof1,
+				},
+			},
+			wantErrors: nil,
+		},
+		{
+			description: "valid RSA 4096 PCR",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        rsa4096PubPKIX1,
+					ProofOfPossession:    rsa4096Proof1,
+				},
+			},
+			wantErrors: nil,
+		},
+		{
+			description: "invalid RSA proof of possession (correct key signed wrong message)",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        rsaWrongProofPKIX,
+					ProofOfPossession:    rsaWrongProof,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "proofOfPossession"), field.OmitValueType{}, "could not verify proof-of-possession signature"),
+			},
+		},
+		{
+			description: "bad signer name",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "not-valid-signername",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "signerName"), "not-valid-signername", "must be a fully qualified domain and path of the form 'example.com/signer-name'"),
+			},
+		},
+		{
+			description: "bad pod name",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1-bad!!!!!",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podName"), "pod-1-bad!!!!!", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		{
+			description: "bad pod uid",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(""),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIXEmpty,
+					ProofOfPossession:    proofEmpty,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podUID"), types.UID(""), "must not be empty"),
+			},
+		},
+		{
+			description: "bad service account name",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1-bad!!!!!",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "serviceAccountName"), "sa-1-bad!!!!!", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		{
+			description: "bad service account uid",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "serviceAccountUID"), types.UID(""), "must not be empty"),
+			},
+		},
+		{
+			description: "bad node name",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1-bad!!!!!",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "nodeName"), types.NodeName("node-1-bad!!!!!"), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		{
+			description: "bad node uid",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "nodeUID"), types.UID(""), "must not be empty"),
+			},
+		},
+		{
+			description: "maxExpirationSeconds missing",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:         "foo.com/abc",
+					PodName:            "pod-1",
+					PodUID:             types.UID(podUID1),
+					ServiceAccountName: "sa-1",
+					ServiceAccountUID:  "sa-uid-1",
+					NodeName:           "node-1",
+					NodeUID:            "node-uid-1",
+					PKIXPublicKey:      ed25519PubPKIX1,
+					ProofOfPossession:  ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Required(field.NewPath("spec", "maxExpirationSeconds"), "must be set"),
+			},
+		},
+		{
+			description: "maxExpirationSeconds too large",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](91*86400 + 1),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "maxExpirationSeconds"), ptr.To[int32](91*86400+1), fmt.Sprintf("must be in the range [%d, %d]", capi.MinMaxExpirationSeconds, capi.MaxMaxExpirationSeconds)),
+			},
+		},
+		{
+			description: "maxExpirationSeconds too large (Kubernetes signer)",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "kubernetes.io/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86401),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "maxExpirationSeconds"), ptr.To[int32](86401), fmt.Sprintf("must be in the range [%d, %d]", capi.MinMaxExpirationSeconds, capi.KubernetesMaxMaxExpirationSeconds)),
+			},
+		},
+		{
+			description: "maxExpirationSeconds too small",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](3600 - 1),
+					PKIXPublicKey:        ed25519PubPKIX1,
+					ProofOfPossession:    ed25519Proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "maxExpirationSeconds"), ptr.To[int32](3600-1), fmt.Sprintf("must be in the range [%d, %d]", capi.MinMaxExpirationSeconds, capi.MaxMaxExpirationSeconds)),
+			},
+		},
+		{
+			description: "pkixPublicKey too long",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        make([]byte, capi.MaxPKIXPublicKeySize+1),
+					ProofOfPossession:    []byte{},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "pkixPublicKey"), make([]byte, capi.MaxPKIXPublicKeySize+1), capi.MaxPKIXPublicKeySize),
+			},
+		},
+		{
+			description: "proofOfPossession too long",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        []byte{},
+					ProofOfPossession:    make([]byte, capi.MaxProofOfPossessionSize+1),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "proofOfPossession"), make([]byte, capi.MaxProofOfPossessionSize+1), capi.MaxProofOfPossessionSize),
+			},
+		},
+		{
+			description: "bad user annotations key name",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:                "foo.com/abc",
+					PodName:                   "pod-1",
+					PodUID:                    types.UID(podUID1),
+					ServiceAccountName:        "sa-1",
+					ServiceAccountUID:         "sa-uid-1",
+					NodeName:                  "node-1",
+					NodeUID:                   "node-uid-1",
+					MaxExpirationSeconds:      ptr.To[int32](86400),
+					PKIXPublicKey:             ed25519PubPKIX1,
+					ProofOfPossession:         ed25519Proof1,
+					UnverifiedUserAnnotations: map[string]string{"test/domain/foo": "bar"},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "unverifiedUserAnnotations"), "test/domain/foo", "a valid label key must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')"),
+			},
+		},
+		{
+			description: "bad user annotations key prefix too long",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:                "foo.com/abc",
+					PodName:                   "pod-1",
+					PodUID:                    types.UID(podUID1),
+					ServiceAccountName:        "sa-1",
+					ServiceAccountUID:         "sa-uid-1",
+					NodeName:                  "node-1",
+					NodeUID:                   "node-uid-1",
+					MaxExpirationSeconds:      ptr.To[int32](86400),
+					PKIXPublicKey:             ed25519PubPKIX1,
+					ProofOfPossession:         ed25519Proof1,
+					UnverifiedUserAnnotations: map[string]string{strings.Repeat("a", 254) + "/foo": "bar"},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "unverifiedUserAnnotations"), strings.Repeat("a", 254)+"/foo", "prefix part must be no more than 253 bytes"),
+			},
+		},
+		{
+			description: "bad user annotations key/value total size too long",
+			pcr: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:                "foo.com/abc",
+					PodName:                   "pod-1",
+					PodUID:                    types.UID(podUID1),
+					ServiceAccountName:        "sa-1",
+					ServiceAccountUID:         "sa-uid-1",
+					NodeName:                  "node-1",
+					NodeUID:                   "node-uid-1",
+					MaxExpirationSeconds:      ptr.To[int32](86400),
+					PKIXPublicKey:             ed25519PubPKIX1,
+					ProofOfPossession:         ed25519Proof1,
+					UnverifiedUserAnnotations: map[string]string{"foo/bar": strings.Repeat("d", apimachineryvalidation.TotalAnnotationSizeLimitB)},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "unverifiedUserAnnotations"), "", apimachineryvalidation.TotalAnnotationSizeLimitB),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			gotErrors := ValidatePodCertificateRequestCreate(tc.pcr)
+			if diff := cmp.Diff(gotErrors, tc.wantErrors); diff != "" {
+				t.Errorf("Unexpected error output from ValidatePodCertificateRequestCreate; diff (-got +want)\n%s", diff)
+				t.Logf("Got errors: %+v", gotErrors)
+			}
+		})
+	}
+}
+
+func TestValidatePodCertificateRequestUpdate(t *testing.T) {
+	podUID1 := "pod-uid-1"
+	_, _, pubPKIX1, proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
+
+	testCases := []struct {
+		description    string
+		oldPCR, newPCR *capi.PodCertificateRequest
+		wantErrors     field.ErrorList
+	}{
+
+		{
+			description: "changing spec fields disallowed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:                "foo.com/abc",
+					PodName:                   "pod-1",
+					PodUID:                    types.UID(podUID1),
+					ServiceAccountName:        "sa-1",
+					ServiceAccountUID:         "sa-uid-1",
+					NodeName:                  "node-1",
+					NodeUID:                   "node-uid-1",
+					MaxExpirationSeconds:      ptr.To[int32](86400),
+					PKIXPublicKey:             pubPKIX1,
+					ProofOfPossession:         proof1,
+					UnverifiedUserAnnotations: map[string]string{"test.domain/foo": "bar"},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:                "foo.com/new",
+					PodName:                   "new",
+					PodUID:                    types.UID("new"),
+					ServiceAccountName:        "new",
+					ServiceAccountUID:         "new",
+					NodeName:                  "new",
+					NodeUID:                   "new",
+					MaxExpirationSeconds:      ptr.To[int32](86401),
+					PKIXPublicKey:             pubPKIX1,
+					ProofOfPossession:         proof1,
+					UnverifiedUserAnnotations: map[string]string{"test.domain/foo": "foo"},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec"),
+					capi.PodCertificateRequestSpec{
+						SignerName:                "foo.com/new",
+						PodName:                   "new",
+						PodUID:                    types.UID("new"),
+						ServiceAccountName:        "new",
+						ServiceAccountUID:         "new",
+						NodeName:                  "new",
+						NodeUID:                   "new",
+						MaxExpirationSeconds:      ptr.To[int32](86401),
+						PKIXPublicKey:             pubPKIX1,
+						ProofOfPossession:         proof1,
+						UnverifiedUserAnnotations: map[string]string{"test.domain/foo": "foo"},
+					},
+					"field is immutable",
+				),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			tc.oldPCR.ObjectMeta.ResourceVersion = "1"
+			tc.newPCR.ObjectMeta.ResourceVersion = "2"
+
+			gotErrors := ValidatePodCertificateRequestUpdate(tc.newPCR, tc.oldPCR)
+			if diff := cmp.Diff(gotErrors, tc.wantErrors); diff != "" {
+				t.Errorf("Unexpected error output from ValidatePodCertificateRequestUpdate; diff (-got +want)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
+	caCertDER, caPrivKey := mustMakeCA(t)
+	intermediateCACertDER, intermediateCAPrivKey := mustMakeIntermediateCA(t, caCertDER, caPrivKey)
+
+	podUID1 := "pod-uid-1"
+	_, pub1, pubPKIX1, proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
+
+	pod1Cert1 := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, false, "", "")
+	pod1Cert2 := mustSignCertForPublicKey(t, 18*time.Hour, pub1, caCertDER, caPrivKey, false, "", "")
+	badCertTooShort := mustSignCertForPublicKey(t, 50*time.Minute, pub1, caCertDER, caPrivKey, false, "", "")
+	badCertTooLong := mustSignCertForPublicKey(t, 25*time.Hour, pub1, caCertDER, caPrivKey, false, "", "")
+	certWithBadDNSName1 := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, true, "", "")
+	certWithBadDNSName2 := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, true, "test-name..example", "")
+	certWithBadDNSName3 := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, true, ".example", "")
+	certWithBadDNSName4 := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, true, "example.", "")
+	certWithBadEmailAddress := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, false, "", "email@@address")
+
+	certFromIntermediate := mustSignCertForPublicKey(t, 24*time.Hour, pub1, intermediateCACertDER, intermediateCAPrivKey, false, "", "")
+
+	testCases := []struct {
+		description    string
+		oldPCR, newPCR *capi.PodCertificateRequest
+		wantErrors     field.ErrorList
+	}{
+		{
+			description: "changing nothing is allowed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+		},
+		{
+			description: "adding unknown condition types is not allowed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Unknown",
+							Status:             metav1.ConditionFalse,
+							Reason:             "Foo",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("status", "conditions", "[0]", "type"), "Unknown", []string{capi.PodCertificateRequestConditionTypeIssued, capi.PodCertificateRequestConditionTypeDenied, capi.PodCertificateRequestConditionTypeFailed}),
+			},
+		},
+		{
+			description: "Issued must have status True",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Issued",
+							Status:             metav1.ConditionFalse,
+							Reason:             "Foo",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+			},
+		},
+		{
+			description: "Denied must have status True",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Denied",
+							Status:             metav1.ConditionFalse,
+							Reason:             "Foo",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+			},
+		},
+		{
+			description: "Failed must have status True",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Failed",
+							Status:             metav1.ConditionFalse,
+							Reason:             "Foo",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+			},
+		},
+		{
+			description: "transitioning to Denied status is allowed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeDenied,
+							Status:             metav1.ConditionTrue,
+							Reason:             capi.PodCertificateRequestConditionUnsupportedKeyType,
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "you can't issue a certificate if you set Denied status",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeDenied,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(
+					field.NewPath("status"),
+					field.OmitValueType{},
+					"non-condition status fields must be empty when denying or failing the PodCertificateRequest",
+				),
+			},
+		},
+		{
+			description: "transitioning to Failed status is allowed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeFailed,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "you can't issue a certificate if you set Failed status",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeFailed,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(
+					field.NewPath("status"),
+					field.OmitValueType{},
+					"non-condition status fields must be empty when denying or failing the PodCertificateRequest",
+				),
+			},
+		},
+		{
+			description: "valid issuance",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+		},
+		{
+			description: "valid issuance with intermediate CA",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: certFromIntermediate + "\n" + pemEncode("CERTIFICATE", intermediateCACertDER),
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+		},
+		{
+			description: "Once issued, the certificate cannot be changed to a different valid certificate",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert2,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T18:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status"), field.OmitValueType{}, "immutable after PodCertificateRequest is issued, denied, or failed"),
+			},
+		},
+		{
+			description: "a request cannot be both Denied and Failed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeDenied,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+						{
+							Type:               capi.PodCertificateRequestConditionTypeFailed,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+			},
+		},
+		{
+			description: "certificate cannot be issued and denied",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+						{
+							Type:               capi.PodCertificateRequestConditionTypeDenied,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Denied", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+			},
+		},
+		{
+			description: "certificate cannot be issued and failed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+						{
+							Type:               capi.PodCertificateRequestConditionTypeFailed,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+			},
+		},
+		{
+			description: "a request cannot change from Denied to Failed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeDenied,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeFailed,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status"), field.OmitValueType{}, `immutable after PodCertificateRequest is issued, denied, or failed`),
+			},
+		},
+		{
+			description: "a request cannot change from Failed to Denied",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeFailed,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeDenied,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status"), field.OmitValueType{}, `immutable after PodCertificateRequest is issued, denied, or failed`),
+			},
+		},
+		{
+			description: "a request cannot change from Denied to pending",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeDenied,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status"), field.OmitValueType{}, `immutable after PodCertificateRequest is issued, denied, or failed`),
+			},
+		},
+		{
+			description: "a request cannot change from Failed to pending",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeFailed,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status"), field.OmitValueType{}, `immutable after PodCertificateRequest is issued, denied, or failed`),
+			},
+		},
+		{
+			description: "a request cannot change from issued to pending",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status"), field.OmitValueType{}, `immutable after PodCertificateRequest is issued, denied, or failed`),
+			},
+		},
+		{
+			description: "a request cannot change from issued to Failed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeFailed,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status"), field.OmitValueType{}, `immutable after PodCertificateRequest is issued, denied, or failed`),
+			},
+		},
+		{
+			description: "a request cannot change from issued to Denied",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeDenied,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status"), field.OmitValueType{}, `immutable after PodCertificateRequest is issued, denied, or failed`),
+			},
+		},
+		{
+			description: "notbefore must be consistent with leaf certificate",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1971-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "notBefore"), mustParseTime(t, "1971-01-01T00:00:00Z"), "must be set to the NotBefore time encoded in the leaf certificate"),
+			},
+		},
+		{
+			description: "notAfter must be consistent with leaf certificate",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1971-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "notAfter"), mustParseTime(t, "1971-01-02T00:00:00Z"), "must be set to the NotAfter time encoded in the leaf certificate"),
+			},
+		},
+		{
+			description: "beginRefreshAt must be >= notBefore + 10 min",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:05:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "beginRefreshAt"), mustParseTime(t, "1970-01-01T00:05:00Z"), "must be at least 10 minutes after status.notBefore"),
+			},
+		},
+		{
+			description: "beginRefreshAt must be <= notAfter - 10 min",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T23:55:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "beginRefreshAt"), mustParseTime(t, "1970-01-01T23:55:00Z"), "must be at least 10 minutes before status.notAfter"),
+			},
+		},
+		{
+			description: "timestamps must be set",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: pod1Cert1,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Required(field.NewPath("status", "notBefore"), "must be present and consistent with the issued certificate"),
+				field.Required(field.NewPath("status", "notAfter"), "must be present and consistent with the issued certificate"),
+				field.Required(field.NewPath("status", "beginRefreshAt"), "must be present and in the range [notbefore+10min, notafter-10min]"),
+			},
+		},
+		{
+			description: "certs shorter than one hour are rejected",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: badCertTooShort,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:25:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:50:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "certificateChain"), 50*time.Minute, "leaf certificate lifetime must be >= 1 hour"),
+			},
+		},
+		{
+			description: "certs longer than maxExpirationSeconds are rejected",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: badCertTooLong,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T01:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "certificateChain"), 25*time.Hour, "leaf certificate lifetime must be <= spec.maxExpirationSeconds (86400)"),
+			},
+		},
+		{
+			description: "leaf cert can not contain empty DNSName",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: certWithBadDNSName1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "certificateChain"), "", "leaf certificate should not contain empty DNSName"),
+			},
+		},
+		{
+			description: "leaf cert can not contain DNSName contains '..'",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: certWithBadDNSName2,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "certificateChain"), "test-name..example", "leaf certificate's DNSName should not contain '..'"),
+			},
+		},
+		{
+			description: "leaf cert can not contain DNSName start with '.'",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: certWithBadDNSName3,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "certificateChain"), ".example", "leaf certificate's DNSName should not start or end with '.'"),
+			},
+		},
+		{
+			description: "leaf cert can not contain DNSName end with '.'",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: certWithBadDNSName4,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "certificateChain"), "example.", "leaf certificate's DNSName should not start or end with '.'"),
+			},
+		},
+		{
+			description: "leaf cert can not contain bad email address",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               capi.PodCertificateRequestConditionTypeIssued,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Whatever",
+							Message:            "Foo message",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+					CertificateChain: certWithBadEmailAddress,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("status", "certificateChain"), "email@@address", "leaf certificate should not contain invalid EmailAddress"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			tc.oldPCR.ObjectMeta.ResourceVersion = "1"
+			tc.newPCR.ObjectMeta.ResourceVersion = "2"
+
+			gotErrors := ValidatePodCertificateRequestStatusUpdate(tc.newPCR, tc.oldPCR, testclock.NewFakeClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+			if diff := cmp.Diff(gotErrors, tc.wantErrors); diff != "" {
+				t.Errorf("Unexpected error output from ValidatePodCertificateRequestUpdate; diff (-got +want)\n%s", diff)
+			}
+		})
+	}
+}
+
+func mustMakeCA(t *testing.T) ([]byte, ed25519.PrivateKey) {
+	signPub, signPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Error while generating CA signing key: %v", err)
+	}
+
+	caCertTemplate := &x509.Certificate{
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		NotBefore:             mustParseTime(t, "1970-01-01T00:00:00Z"),
+		NotAfter:              mustParseTime(t, "1971-01-01T00:00:00Z"),
+	}
+
+	caCertDER, err := x509.CreateCertificate(rand.Reader, caCertTemplate, caCertTemplate, signPub, signPriv)
+	if err != nil {
+		t.Fatalf("Error while creating CA certificate: %v", err)
+	}
+
+	return caCertDER, signPriv
+}
+
+func mustMakeIntermediateCA(t *testing.T, rootDER []byte, rootPrivateKey crypto.PrivateKey) ([]byte, ed25519.PrivateKey) {
+	intermediatePub, intermediatePriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Error while generating intermediate signing key: %v", err)
+	}
+
+	intermediateCertTemplate := &x509.Certificate{
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		NotBefore:             mustParseTime(t, "1970-01-01T00:00:00Z"),
+		NotAfter:              mustParseTime(t, "1971-01-01T00:00:00Z"),
+	}
+
+	rootCert, err := x509.ParseCertificate(rootDER)
+	if err != nil {
+		t.Fatalf("Error while parsing root certificate: %v", err)
+	}
+
+	intermediateCertDER, err := x509.CreateCertificate(rand.Reader, intermediateCertTemplate, rootCert, intermediatePub, rootPrivateKey)
+	if err != nil {
+		t.Fatalf("Error while creating intermediate certificate: %v", err)
+	}
+
+	return intermediateCertDER, intermediatePriv
+}
+
+func mustParseTime(t *testing.T, stamp string) time.Time {
+	got, err := time.Parse(time.RFC3339, stamp)
+	if err != nil {
+		t.Fatalf("Error while parsing timestamp: %v", err)
+	}
+	return got
+}
+
+func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte) (ed25519.PrivateKey, ed25519.PublicKey, []byte, []byte) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Error while generating ed25519 key: %v", err)
+	}
+	pubPKIX, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		t.Fatalf("Error while marshaling PKIX public key: %v", err)
+	}
+	sig := ed25519.Sign(priv, toBeSigned)
+	return priv, pub, pubPKIX, sig
+}
+
+func mustMakeECDSAKeyAndProof(t *testing.T, curve elliptic.Curve, toBeSigned []byte) (*ecdsa.PrivateKey, *ecdsa.PublicKey, []byte, []byte) {
+	priv, err := ecdsa.GenerateKey(curve, rand.Reader)
+	if err != nil {
+		t.Fatalf("Error while generating ECDSA key: %v", err)
+	}
+	pubPKIX, err := x509.MarshalPKIXPublicKey(priv.Public())
+	if err != nil {
+		t.Fatalf("Error while marshaling PKIX public key: %v", err)
+	}
+	sig, err := ecdsa.SignASN1(rand.Reader, priv, hashBytes(toBeSigned))
+	if err != nil {
+		t.Fatalf("Error while making proof of possession: %v", err)
+	}
+	return priv, &priv.PublicKey, pubPKIX, sig
+}
+
+func mustMakeRSAKeyAndProof(t *testing.T, modulusSize int, toBeSigned []byte) (*rsa.PrivateKey, *rsa.PublicKey, []byte, []byte) {
+	priv, err := rsa.GenerateKey(rand.Reader, modulusSize)
+	if err != nil {
+		t.Fatalf("Error while generating RSA key: %v", err)
+	}
+	pubPKIX, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+	if err != nil {
+		t.Fatalf("Error while marshaling public key: %v", err)
+	}
+	sig, err := rsa.SignPSS(rand.Reader, priv, crypto.SHA256, hashBytes(toBeSigned), nil)
+	if err != nil {
+		t.Fatalf("Error while making proof of possession: %v", err)
+	}
+	return priv, &priv.PublicKey, pubPKIX, sig
+}
+
+func mustSignCertForPublicKey(t *testing.T, validity time.Duration, subjectPublicKey crypto.PublicKey, caCertDER []byte, caPrivateKey crypto.PrivateKey, usebadDNSName bool, badDNSName, badEmailAddress string) string {
+	certTemplate := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: "foo",
+		},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		NotBefore:   mustParseTime(t, "1970-01-01T00:00:00Z"),
+		NotAfter:    mustParseTime(t, "1970-01-01T00:00:00Z").Add(validity),
+	}
+	if usebadDNSName {
+		certTemplate.DNSNames = append(certTemplate.DNSNames, badDNSName)
+	}
+	if badEmailAddress != "" {
+		certTemplate.EmailAddresses = append(certTemplate.EmailAddresses, badEmailAddress)
+	}
+
+	caCert, err := x509.ParseCertificate(caCertDER)
+	if err != nil {
+		t.Fatalf("Error while parsing CA certificate: %v", err)
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, certTemplate, caCert, subjectPublicKey, caPrivateKey)
+	if err != nil {
+		t.Fatalf("Error while signing subject certificate: %v", err)
+	}
+
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certDER,
+	})
+
+	return string(certPEM)
+}
+
+func pemEncode(blockType string, data []byte) string {
+	return string(pem.EncodeToMemory(&pem.Block{
+		Type:  blockType,
+		Bytes: data,
+	}))
 }
 
 var (

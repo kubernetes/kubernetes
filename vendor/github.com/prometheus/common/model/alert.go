@@ -14,6 +14,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -64,7 +65,7 @@ func (a *Alert) Resolved() bool {
 	return a.ResolvedAt(time.Now())
 }
 
-// ResolvedAt returns true off the activity interval ended before
+// ResolvedAt returns true iff the activity interval ended before
 // the given timestamp.
 func (a *Alert) ResolvedAt(ts time.Time) bool {
 	if a.EndsAt.IsZero() {
@@ -89,16 +90,16 @@ func (a *Alert) StatusAt(ts time.Time) AlertStatus {
 // Validate checks whether the alert data is inconsistent.
 func (a *Alert) Validate() error {
 	if a.StartsAt.IsZero() {
-		return fmt.Errorf("start time missing")
+		return errors.New("start time missing")
 	}
 	if !a.EndsAt.IsZero() && a.EndsAt.Before(a.StartsAt) {
-		return fmt.Errorf("start time must be before end time")
+		return errors.New("start time must be before end time")
 	}
 	if err := a.Labels.Validate(); err != nil {
 		return fmt.Errorf("invalid label set: %w", err)
 	}
 	if len(a.Labels) == 0 {
-		return fmt.Errorf("at least one label pair required")
+		return errors.New("at least one label pair required")
 	}
 	if err := a.Annotations.Validate(); err != nil {
 		return fmt.Errorf("invalid annotations: %w", err)

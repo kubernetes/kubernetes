@@ -69,7 +69,6 @@ contexts:
   name: token-bootstrap-client@somecluster
 current-context: token-bootstrap-client@somecluster
 kind: Config
-preferences: {}
 users: null
 `
 	)
@@ -78,10 +77,12 @@ users: null
 		name                     string
 		tokenID                  string
 		tokenSecret              string
+		currentContextCluster    string
 		cfg                      *kubeadmapi.Discovery
 		configMap                *fakeConfigMap
 		delayedJWSSignaturePatch bool
 		expectedError            bool
+		expectedErrorString      string
 	}{
 		{
 			// This is the default behavior. The JWS signature is patched after the cluster-info ConfigMap is created
@@ -130,6 +131,24 @@ users: null
 				name: bootstrapapi.ConfigMapClusterInfo,
 				data: nil,
 			},
+		},
+		{
+			name:        "invalid: the kubeconfig in the configmap has the wrong current context",
+			tokenID:     "123456",
+			tokenSecret: "abcdef1234567890",
+			cfg: &kubeadmapi.Discovery{
+				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
+					Token:        "123456.abcdef1234567890",
+					CACertHashes: []string{caCertHash},
+				},
+			},
+			configMap: &fakeConfigMap{
+				name: bootstrapapi.ConfigMapClusterInfo,
+				data: nil,
+			},
+			currentContextCluster: "foo",
+			expectedError:         true,
+			expectedErrorString:   `malformed kubeconfig in the cluster-info ConfigMap: no matching cluster for the current context: token-bootstrap-client@somecluster`,
 		},
 		{
 			name:        "invalid: token format is invalid",
@@ -217,6 +236,13 @@ users: null
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			kubeconfig := buildSecureBootstrapKubeConfig("127.0.0.1", []byte(caCert), "somecluster")
+			if len(test.currentContextCluster) > 0 {
+				currentContext := kubeconfig.Contexts[kubeconfig.CurrentContext]
+				if currentContext == nil {
+					t.Fatal("unexpected nil current context")
+				}
+				currentContext.Cluster = test.currentContextCluster
+			}
 			kubeconfigBytes, err := clientcmd.Write(*kubeconfig)
 			if err != nil {
 				t.Fatalf("cannot marshal kubeconfig %v", err)
@@ -242,7 +268,7 @@ users: null
 			}
 
 			// Create a fake client and create the cluster-info ConfigMap
-			client := fakeclient.NewSimpleClientset()
+			client := fakeclient.NewClientset()
 			if err = test.configMap.createOrUpdate(client); err != nil {
 				t.Fatalf("could not create ConfigMap: %v", err)
 			}
@@ -263,13 +289,18 @@ users: null
 			}
 
 			// Retrieve validated configuration
-			kubeconfig, err = retrieveValidatedConfigInfo(client, test.cfg, interval, timeout)
+			kubeconfig, err = retrieveValidatedConfigInfo(client, test.cfg, interval, timeout, false, true)
 			if (err != nil) != test.expectedError {
 				t.Errorf("expected error %v, got %v, error: %v", test.expectedError, err != nil, err)
 			}
 
-			// Return if an error is expected
-			if test.expectedError {
+			if err != nil {
+				if len(test.expectedErrorString) > 0 && test.expectedErrorString != err.Error() {
+					t.Fatalf("expected error string: %s, got: %s",
+						test.expectedErrorString, err.Error())
+				}
+
+				// Return if an error is expected
 				return
 			}
 
@@ -303,7 +334,7 @@ type fakeConfigMap struct {
 }
 
 func (c *fakeConfigMap) createOrUpdate(client clientset.Interface) error {
-	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+	return apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(metav1.NamespacePublic), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.name,
 			Namespace: metav1.NamespacePublic,

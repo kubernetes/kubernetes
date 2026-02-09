@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/util/exec"
+	"k8s.io/klog/v2"
 )
 
 // streamProtocolV4 implements version 4 of the streaming protocol for attach
@@ -47,26 +48,31 @@ func (p *streamProtocolV4) createStreams(conn streamCreator) error {
 	return p.streamProtocolV3.createStreams(conn)
 }
 
-func (p *streamProtocolV4) handleResizes() {
-	p.streamProtocolV3.handleResizes()
+func (p *streamProtocolV4) handleResizes(logger klog.Logger) {
+	p.streamProtocolV3.handleResizes(logger)
 }
 
-func (p *streamProtocolV4) stream(conn streamCreator) error {
+func (p *streamProtocolV4) stream(logger klog.Logger, conn streamCreator, ready chan<- struct{}) error {
 	if err := p.createStreams(conn); err != nil {
 		return err
 	}
 
+	// Signal that all streams have been created.
+	if ready != nil {
+		close(ready)
+	}
+
 	// now that all the streams have been created, proceed with reading & copying
 
-	errorChan := watchErrorStream(p.errorStream, &errorDecoderV4{})
+	errorChan := watchErrorStream(logger, p.errorStream, &errorDecoderV4{})
 
-	p.handleResizes()
+	p.handleResizes(logger)
 
-	p.copyStdin()
+	p.copyStdin(logger)
 
 	var wg sync.WaitGroup
-	p.copyStdout(&wg)
-	p.copyStderr(&wg)
+	p.copyStdout(logger, &wg)
+	p.copyStderr(logger, &wg)
 
 	// we're waiting for stdout/stderr to finish copying
 	wg.Wait()
@@ -115,5 +121,5 @@ func (d *errorDecoderV4) decode(message []byte) error {
 		return errors.New("error stream protocol error: unknown error")
 	}
 
-	return fmt.Errorf(status.Message)
+	return errors.New(status.Message)
 }

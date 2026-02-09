@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -125,11 +126,6 @@ func NewTestableTimingHistogramVec(nowFunc func() time.Time, opts *TimingHistogr
 	opts.StabilityLevel.setDefaults()
 
 	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
-	allowListLock.RLock()
-	if allowList, ok := labelValueAllowLists[fqName]; ok {
-		opts.LabelValueAllowLists = allowList
-	}
-	allowListLock.RUnlock()
 
 	v := &TimingHistogramVec{
 		TimingHistogramVec:  noopTimingHistogramVec,
@@ -173,6 +169,17 @@ func (v *TimingHistogramVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric,
 		}
 		return noop, errNotRegistered
 	}
+
+	// Initialize label allow lists if not already initialized
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
+	// Constrain label values to allowed values
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
 	}
@@ -212,10 +219,24 @@ func (v *TimingHistogramVec) WithChecked(labels map[string]string) (GaugeMetric,
 		}
 		return noop, errNotRegistered
 	}
+
+	// Initialize label allow lists if not already initialized
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
+	// Constrain label map to allowed values
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
 	ops, err := v.TimingHistogramVec.GetMetricWith(labels)
+	if err != nil {
+		return noop, err
+	}
 	return ops.(GaugeMetric), err
 }
 
@@ -252,6 +273,13 @@ func (v *TimingHistogramVec) Reset() {
 	}
 
 	v.TimingHistogramVec.Reset()
+}
+
+// ResetLabelAllowLists resets the label allow list for the TimingHistogramVec.
+// NOTE: This should only be used in test.
+func (v *TimingHistogramVec) ResetLabelAllowLists() {
+	v.initializeLabelAllowListsOnce = sync.Once{}
+	v.LabelValueAllowLists = nil
 }
 
 // WithContext returns wrapped TimingHistogramVec with context

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestCheckReadyForTests specifically is concerned about the multi-node logic
@@ -195,6 +196,7 @@ func TestCheckReadyForTests(t *testing.T) {
 }
 
 func TestReadyForTests(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	fromVanillaNode := func(f func(*v1.Node)) *v1.Node {
 		vanillaNode := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
@@ -269,7 +271,7 @@ func TestReadyForTests(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.desc, func(t *testing.T) {
-			out := readyForTests(tc.node, tc.nonblockingTaints)
+			out := readyForTests(logger, tc.node, tc.nonblockingTaints)
 			if out != tc.expected {
 				t.Errorf("Expected %v but got %v", tc.expected, out)
 			}

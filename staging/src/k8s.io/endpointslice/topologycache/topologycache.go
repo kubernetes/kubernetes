@@ -214,11 +214,11 @@ func (t *TopologyCache) SetNodes(logger klog.Logger, nodes []*v1.Node) {
 
 	for _, node := range nodes {
 		if hasExcludedLabels(node.Labels) {
-			logger.V(2).Info("Ignoring node because it has an excluded label", "node", klog.KObj(node))
+			logger.V(6).Info("Ignoring node because it has an excluded label", "node", klog.KObj(node))
 			continue
 		}
 		if !isNodeReady(node) {
-			logger.V(2).Info("Ignoring node because it is not ready", "node", klog.KObj(node))
+			logger.V(6).Info("Ignoring node because it is not ready", "node", klog.KObj(node))
 			continue
 		}
 

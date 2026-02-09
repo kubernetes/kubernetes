@@ -126,7 +126,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fake client and set up default test configuration
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 
 			// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
 			initConfiguration, err := configutil.DefaultedStaticInitConfiguration()
@@ -228,14 +228,12 @@ func TestPrintOrCreateKubeProxyObjects(t *testing.T) {
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  creationTimestamp: null
   name: kube-proxy
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  creationTimestamp: null
   name: kubeadm:node-proxier
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -249,7 +247,6 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  creationTimestamp: null
   name: kube-proxy
   namespace: kube-system
 rules:
@@ -265,7 +262,6 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  creationTimestamp: null
   name: kube-proxy
   namespace: kube-system
 roleRef:
@@ -300,7 +296,7 @@ bar
 }
 
 func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
-	client := clientsetfake.NewSimpleClientset()
+	client := clientsetfake.NewClientset()
 	_, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Create(context.TODO(), &apps.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",

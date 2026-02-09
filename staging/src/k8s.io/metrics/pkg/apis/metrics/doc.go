@@ -18,4 +18,4 @@ limitations under the License.
 // +groupName=metrics.k8s.io
 
 // Package metrics defines an API for exposing metrics.
-package metrics // import "k8s.io/metrics/pkg/apis/metrics"
+package metrics

@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package storageversion provides Registry interface and it's RESTStorage
 // implementation for storing StorageVersion api objects.
-package storageversion // import "k8s.io/kubernetes/pkg/registry/apiserverinternal/storageversion"
+package storageversion

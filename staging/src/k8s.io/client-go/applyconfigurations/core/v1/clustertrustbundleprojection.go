@@ -19,17 +19,36 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ClusterTrustBundleProjectionApplyConfiguration represents a declarative configuration of the ClusterTrustBundleProjection type for use
 // with apply.
+//
+// ClusterTrustBundleProjection describes how to select a set of
+// ClusterTrustBundle objects and project their contents into the pod
+// filesystem.
 type ClusterTrustBundleProjectionApplyConfiguration struct {
-	Name          *string                             `json:"name,omitempty"`
-	SignerName    *string                             `json:"signerName,omitempty"`
-	LabelSelector *v1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
-	Optional      *bool                               `json:"optional,omitempty"`
-	Path          *string                             `json:"path,omitempty"`
+	// Select a single ClusterTrustBundle by object name.  Mutually-exclusive
+	// with signerName and labelSelector.
+	Name *string `json:"name,omitempty"`
+	// Select all ClusterTrustBundles that match this signer name.
+	// Mutually-exclusive with name.  The contents of all selected
+	// ClusterTrustBundles will be unified and deduplicated.
+	SignerName *string `json:"signerName,omitempty"`
+	// Select all ClusterTrustBundles that match this label selector.  Only has
+	// effect if signerName is set.  Mutually-exclusive with name.  If unset,
+	// interpreted as "match nothing".  If set but empty, interpreted as "match
+	// everything".
+	LabelSelector *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
+	// If true, don't block pod startup if the referenced ClusterTrustBundle(s)
+	// aren't available.  If using name, then the named ClusterTrustBundle is
+	// allowed not to exist.  If using signerName, then the combination of
+	// signerName and labelSelector is allowed to match zero
+	// ClusterTrustBundles.
+	Optional *bool `json:"optional,omitempty"`
+	// Relative path from the volume root to write the bundle.
+	Path *string `json:"path,omitempty"`
 }
 
 // ClusterTrustBundleProjectionApplyConfiguration constructs a declarative configuration of the ClusterTrustBundleProjection type for use with
@@ -57,7 +76,7 @@ func (b *ClusterTrustBundleProjectionApplyConfiguration) WithSignerName(value st
 // WithLabelSelector sets the LabelSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LabelSelector field is set to the value of the last call.
-func (b *ClusterTrustBundleProjectionApplyConfiguration) WithLabelSelector(value *v1.LabelSelectorApplyConfiguration) *ClusterTrustBundleProjectionApplyConfiguration {
+func (b *ClusterTrustBundleProjectionApplyConfiguration) WithLabelSelector(value *metav1.LabelSelectorApplyConfiguration) *ClusterTrustBundleProjectionApplyConfiguration {
 	b.LabelSelector = value
 	return b
 }

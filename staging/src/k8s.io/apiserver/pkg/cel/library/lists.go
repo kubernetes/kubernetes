@@ -96,7 +96,15 @@ var listsLib = &lists{}
 type lists struct{}
 
 func (*lists) LibraryName() string {
-	return "k8s.lists"
+	return "kubernetes.lists"
+}
+
+func (*lists) Types() []*cel.Type {
+	return []*cel.Type{}
+}
+
+func (*lists) declarations() map[string][]cel.FunctionOpt {
+	return listsLibraryDecls
 }
 
 var paramA = cel.TypeParamType("A")

@@ -19,15 +19,14 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
@@ -73,7 +72,6 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 				RunAllSiblings: true,
 				ArgsValidator:  cobra.NoArgs,
 			},
-			newEtcdLocalSubphase(),
 			newMarkControlPlaneSubphase(),
 		},
 	}
@@ -83,33 +81,11 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 func NewEtcdJoinPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:          "etcd-join",
-		Short:         fmt.Sprintf("[EXPERIMENTAL] Join etcd for control plane nodes (only used when feature gate %s is enabled)", features.ControlPlaneKubeletLocalMode),
+		Short:         "Join etcd for control plane nodes",
 		Run:           runEtcdPhase,
 		Example:       etcdJoinExample,
 		InheritFlags:  getControlPlaneJoinPhaseFlags("etcd"),
 		ArgsValidator: cobra.NoArgs,
-		// TODO: unhide this phase once ControlPlaneKubeletLocalMode goes GA:
-		// https://github.com/kubernetes/enhancements/issues/4471
-		Hidden: true,
-		// Only run this phase as if `ControlPlaneKubeletLocalMode` is activated.
-		RunIf: func(c workflow.RunData) (bool, error) {
-			return checkFeatureState(c, features.ControlPlaneKubeletLocalMode, true)
-		},
-	}
-}
-
-func newEtcdLocalSubphase() workflow.Phase {
-	return workflow.Phase{
-		Name:          "etcd",
-		Short:         "Add a new local etcd member",
-		Run:           runEtcdPhase,
-		InheritFlags:  getControlPlaneJoinPhaseFlags("etcd"),
-		ArgsValidator: cobra.NoArgs,
-		// Only run this phase as subphase of control-plane-join phase if
-		// `ControlPlaneKubeletLocalMode` is deactivated.
-		RunIf: func(c workflow.RunData) (bool, error) {
-			return checkFeatureState(c, features.ControlPlaneKubeletLocalMode, false)
-		},
 	}
 }
 

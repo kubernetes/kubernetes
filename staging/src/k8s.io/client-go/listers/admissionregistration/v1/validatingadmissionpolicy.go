@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ValidatingAdmissionPolicyLister helps list ValidatingAdmissionPolicies.
@@ -30,19 +30,19 @@ import (
 type ValidatingAdmissionPolicyLister interface {
 	// List lists all ValidatingAdmissionPolicies in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ValidatingAdmissionPolicy, err error)
+	List(selector labels.Selector) (ret []*admissionregistrationv1.ValidatingAdmissionPolicy, err error)
 	// Get retrieves the ValidatingAdmissionPolicy from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ValidatingAdmissionPolicy, error)
+	Get(name string) (*admissionregistrationv1.ValidatingAdmissionPolicy, error)
 	ValidatingAdmissionPolicyListerExpansion
 }
 
 // validatingAdmissionPolicyLister implements the ValidatingAdmissionPolicyLister interface.
 type validatingAdmissionPolicyLister struct {
-	listers.ResourceIndexer[*v1.ValidatingAdmissionPolicy]
+	listers.ResourceIndexer[*admissionregistrationv1.ValidatingAdmissionPolicy]
 }
 
 // NewValidatingAdmissionPolicyLister returns a new ValidatingAdmissionPolicyLister.
 func NewValidatingAdmissionPolicyLister(indexer cache.Indexer) ValidatingAdmissionPolicyLister {
-	return &validatingAdmissionPolicyLister{listers.New[*v1.ValidatingAdmissionPolicy](indexer, v1.Resource("validatingadmissionpolicy"))}
+	return &validatingAdmissionPolicyLister{listers.New[*admissionregistrationv1.ValidatingAdmissionPolicy](indexer, admissionregistrationv1.Resource("validatingadmissionpolicy"))}
 }

@@ -19,31 +19,26 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1beta1 "k8s.io/api/authorization/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	authorizationv1beta1 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 )
 
-// FakeLocalSubjectAccessReviews implements LocalSubjectAccessReviewInterface
-type FakeLocalSubjectAccessReviews struct {
+// fakeLocalSubjectAccessReviews implements LocalSubjectAccessReviewInterface
+type fakeLocalSubjectAccessReviews struct {
+	*gentype.FakeClient[*v1beta1.LocalSubjectAccessReview]
 	Fake *FakeAuthorizationV1beta1
-	ns   string
 }
 
-var localsubjectaccessreviewsResource = v1beta1.SchemeGroupVersion.WithResource("localsubjectaccessreviews")
-
-var localsubjectaccessreviewsKind = v1beta1.SchemeGroupVersion.WithKind("LocalSubjectAccessReview")
-
-// Create takes the representation of a localSubjectAccessReview and creates it.  Returns the server's representation of the localSubjectAccessReview, and an error, if there is any.
-func (c *FakeLocalSubjectAccessReviews) Create(ctx context.Context, localSubjectAccessReview *v1beta1.LocalSubjectAccessReview, opts v1.CreateOptions) (result *v1beta1.LocalSubjectAccessReview, err error) {
-	emptyResult := &v1beta1.LocalSubjectAccessReview{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(localsubjectaccessreviewsResource, c.ns, localSubjectAccessReview, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeLocalSubjectAccessReviews(fake *FakeAuthorizationV1beta1, namespace string) authorizationv1beta1.LocalSubjectAccessReviewInterface {
+	return &fakeLocalSubjectAccessReviews{
+		gentype.NewFakeClient[*v1beta1.LocalSubjectAccessReview](
+			fake.Fake,
+			namespace,
+			v1beta1.SchemeGroupVersion.WithResource("localsubjectaccessreviews"),
+			v1beta1.SchemeGroupVersion.WithKind("LocalSubjectAccessReview"),
+			func() *v1beta1.LocalSubjectAccessReview { return &v1beta1.LocalSubjectAccessReview{} },
+		),
+		fake,
 	}
-	return obj.(*v1beta1.LocalSubjectAccessReview), err
 }

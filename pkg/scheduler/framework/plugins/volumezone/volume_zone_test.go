@@ -28,10 +28,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
-	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
@@ -97,8 +100,8 @@ func TestSingleZone(t *testing.T) {
 		name                string
 		Pod                 *v1.Pod
 		Node                *v1.Node
-		wantPreFilterStatus *framework.Status
-		wantFilterStatus    *framework.Status
+		wantPreFilterStatus *fwk.Status
+		wantFilterStatus    *fwk.Status
 	}{
 		{
 			name: "pod without volume",
@@ -109,7 +112,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
 				},
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "node without labels",
@@ -149,7 +152,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaRegion: "no_us-west1", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "beta zone label doesn't match",
@@ -160,7 +163,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "zone label matched",
@@ -191,7 +194,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelTopologyRegion: "no_us-west1", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "zone label doesn't match",
@@ -202,7 +205,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelTopologyZone: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "pv with zone and region, node with only zone",
@@ -215,7 +218,7 @@ func TestSingleZone(t *testing.T) {
 					},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "pv with zone,node with beta zone",
@@ -228,7 +231,7 @@ func TestSingleZone(t *testing.T) {
 					},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "pv with beta label,node with ga label, matched",
@@ -253,7 +256,7 @@ func TestSingleZone(t *testing.T) {
 					},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 	}
 
@@ -267,11 +270,12 @@ func TestSingleZone(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				nil,
+				pvLister:                  pvLister,
+				pvcLister:                 pvcLister,
+				scLister:                  nil,
+				enableSchedulingQueueHint: false,
 			}
-			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -333,8 +337,8 @@ func TestMultiZone(t *testing.T) {
 		name                string
 		Pod                 *v1.Pod
 		Node                *v1.Node
-		wantPreFilterStatus *framework.Status
-		wantFilterStatus    *framework.Status
+		wantPreFilterStatus *fwk.Status
+		wantFilterStatus    *fwk.Status
 	}{
 		{
 			name: "node without labels",
@@ -364,7 +368,7 @@ func TestMultiZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "zone label matched",
@@ -385,7 +389,7 @@ func TestMultiZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelTopologyZone: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 	}
 
@@ -399,11 +403,12 @@ func TestMultiZone(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				nil,
+				pvLister:                  pvLister,
+				pvcLister:                 pvcLister,
+				scLister:                  nil,
+				enableSchedulingQueueHint: false,
 			}
-			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -473,8 +478,8 @@ func TestWithBinding(t *testing.T) {
 		name                string
 		Pod                 *v1.Pod
 		Node                *v1.Node
-		wantPreFilterStatus *framework.Status
-		wantFilterStatus    *framework.Status
+		wantPreFilterStatus *fwk.Status
+		wantFilterStatus    *fwk.Status
 	}{
 		{
 			name: "label zone failure domain matched",
@@ -485,32 +490,32 @@ func TestWithBinding(t *testing.T) {
 			name: "unbound volume empty storage class",
 			Pod:  createPodWithVolume("pod_1", "PVC_EmptySC"),
 			Node: testNode,
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"PersistentVolumeClaim had no pv name and storageClass name"),
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"PersistentVolumeClaim had no pv name and storageClass name"),
 		},
 		{
 			name: "unbound volume no storage class",
 			Pod:  createPodWithVolume("pod_1", "PVC_NoSC"),
 			Node: testNode,
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				`storageclasses.storage.k8s.io "Class_0" not found`),
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				`storageclasses.storage.k8s.io "Class_0" not found`),
 		},
 		{
 			name:                "unbound volume immediate binding mode",
 			Pod:                 createPodWithVolume("pod_1", "PVC_ImmediateSC"),
 			Node:                testNode,
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
-			wantFilterStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
+			wantFilterStatus:    fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
 		},
 		{
 			name:                "unbound volume wait binding mode",
 			Pod:                 createPodWithVolume("pod_1", "PVC_WaitSC"),
 			Node:                testNode,
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 	}
 
@@ -524,11 +529,12 @@ func TestWithBinding(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				scLister,
+				pvLister:                  pvLister,
+				pvcLister:                 pvcLister,
+				scLister:                  scLister,
+				enableSchedulingQueueHint: false,
 			}
-			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -544,13 +550,13 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"error-wrong-new-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			newObj:       "not-a-pvc",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"pvc-was-added-but-pod-refers-no-pvc": {
@@ -559,7 +565,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"pvc-was-added-and-pod-was-bound-to-different-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_2"),
@@ -567,7 +573,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"pvc-was-added-and-pod-was-bound-to-pvc-but-different-ns": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -575,7 +581,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "ns1"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"pvc-was-added-and-pod-was-bound-to-the-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -583,7 +589,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pvc-was-updated-and-pod-was-bound-to-the-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -595,7 +601,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pvc-was-updated-but-pod-refers-no-pvc": {
 			pod: st.MakePod().Name("pod_1").Namespace(metav1.NamespaceDefault).Obj(),
@@ -607,7 +613,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 	}
 
@@ -633,13 +639,13 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"error-wrong-new-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			newObj:       "not-a-storageclass",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"sc-doesn't-have-volume-binding-mode": {
@@ -647,7 +653,7 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 			newObj: &storagev1.StorageClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"new-sc-is-wait-for-first-consumer-mode": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -655,7 +661,7 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 				ObjectMeta:        metav1.ObjectMeta{Name: "SC_1"},
 				VolumeBindingMode: &modeWait,
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 	}
 
@@ -679,20 +685,20 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"error-wrong-new-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			newObj:       "not-a-pv",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"error-wrong-old-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			oldObj:       "not-a-pv",
 			newObj:       st.MakePersistentVolume().Name("Vol_1").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"new-pv-was-added": {
@@ -703,7 +709,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pv-was-updated-and-changed-topology": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -719,7 +725,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pv-was-updated-and-added-topology-label": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -736,7 +742,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 						v1.LabelTopologyZone: "zone"},
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pv-was-updated-but-no-topology-is-changed": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -754,7 +760,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 						v1.LabelTopologyZone: "zone"},
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 	}
 
@@ -803,11 +809,12 @@ func BenchmarkVolumeZone(b *testing.B) {
 
 	for _, tt := range tests {
 		b.Run(tt.Name, func(b *testing.B) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(b)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			nodes := makeNodesWithTopologyZone(tt.NumNodes)
 			pl := newPluginWithListers(ctx, b, []*v1.Pod{tt.Pod}, nodes, makePVCsWithPV(tt.NumPVC), makePVsWithZoneLabel(tt.NumPV))
-			nodeInfos := make([]*framework.NodeInfo, len(nodes))
+			nodeInfos := make([]fwk.NodeInfo, len(nodes))
 			for i := 0; i < len(nodes); i++ {
 				nodeInfo := &framework.NodeInfo{}
 				nodeInfo.SetNode(nodes[i])
@@ -820,7 +827,7 @@ func BenchmarkVolumeZone(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				if tt.PreFilter {
-					_, _ = p.PreFilter(ctx, state, tt.Pod)
+					_, _ = p.PreFilter(ctx, state, tt.Pod, nil)
 				}
 				for _, node := range nodeInfos {
 					_ = p.Filter(ctx, state, tt.Pod, node)
@@ -830,7 +837,7 @@ func BenchmarkVolumeZone(b *testing.B) {
 	}
 }
 
-func newPluginWithListers(ctx context.Context, tb testing.TB, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim, pvs []*v1.PersistentVolume) framework.Plugin {
+func newPluginWithListers(ctx context.Context, tb testing.TB, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim, pvs []*v1.PersistentVolume) fwk.Plugin {
 	snapshot := cache.NewSnapshot(pods, nodes)
 
 	objects := make([]runtime.Object, 0, len(pvcs))
@@ -840,7 +847,7 @@ func newPluginWithListers(ctx context.Context, tb testing.TB, pods []*v1.Pod, no
 	for _, pv := range pvs {
 		objects = append(objects, pv)
 	}
-	return plugintesting.SetupPluginWithInformers(ctx, tb, New, &config.InterPodAffinityArgs{}, snapshot, objects)
+	return plugintesting.SetupPluginWithInformers(ctx, tb, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, objects)
 }
 
 func makePVsWithZoneLabel(num int) []*v1.PersistentVolume {

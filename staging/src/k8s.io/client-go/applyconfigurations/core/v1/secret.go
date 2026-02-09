@@ -20,22 +20,41 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // SecretApplyConfiguration represents a declarative configuration of the Secret type for use
 // with apply.
+//
+// Secret holds secret data of a certain type. The total bytes of the values in
+// the Data field must be less than MaxSecretSize bytes.
 type SecretApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Immutable                        *bool              `json:"immutable,omitempty"`
-	Data                             map[string][]byte  `json:"data,omitempty"`
-	StringData                       map[string]string  `json:"stringData,omitempty"`
-	Type                             *corev1.SecretType `json:"type,omitempty"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	// Immutable, if set to true, ensures that data stored in the Secret cannot
+	// be updated (only object metadata can be modified).
+	// If not set to true, the field can be modified at any time.
+	// Defaulted to nil.
+	Immutable *bool `json:"immutable,omitempty"`
+	// Data contains the secret data. Each key must consist of alphanumeric
+	// characters, '-', '_' or '.'. The serialized form of the secret data is a
+	// base64 encoded string, representing the arbitrary (possibly non-string)
+	// data value here. Described in https://tools.ietf.org/html/rfc4648#section-4
+	Data map[string][]byte `json:"data,omitempty"`
+	// stringData allows specifying non-binary secret data in string form.
+	// It is provided as a write-only input field for convenience.
+	// All keys and values are merged into the data field on write, overwriting any existing values.
+	// The stringData field is never output when reading from the API.
+	StringData map[string]string `json:"stringData,omitempty"`
+	// Used to facilitate programmatic handling of secret data.
+	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
+	Type *corev1.SecretType `json:"type,omitempty"`
 }
 
 // Secret constructs a declarative configuration of the Secret type for use with
@@ -49,29 +68,14 @@ func Secret(name, namespace string) *SecretApplyConfiguration {
 	return b
 }
 
-// ExtractSecret extracts the applied configuration owned by fieldManager from
-// secret. If no managedFields are found in secret for fieldManager, a
-// SecretApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractSecretFrom extracts the applied configuration owned by fieldManager from
+// secret for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // secret must be a unmodified Secret API object that was retrieved from the Kubernetes API.
-// ExtractSecret provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractSecretFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractSecret(secret *corev1.Secret, fieldManager string) (*SecretApplyConfiguration, error) {
-	return extractSecret(secret, fieldManager, "")
-}
-
-// ExtractSecretStatus is the same as ExtractSecret except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractSecretStatus(secret *corev1.Secret, fieldManager string) (*SecretApplyConfiguration, error) {
-	return extractSecret(secret, fieldManager, "status")
-}
-
-func extractSecret(secret *corev1.Secret, fieldManager string, subresource string) (*SecretApplyConfiguration, error) {
+func ExtractSecretFrom(secret *corev1.Secret, fieldManager string, subresource string) (*SecretApplyConfiguration, error) {
 	b := &SecretApplyConfiguration{}
 	err := managedfields.ExtractInto(secret, internal.Parser().Type("io.k8s.api.core.v1.Secret"), fieldManager, b, subresource)
 	if err != nil {
@@ -85,11 +89,27 @@ func extractSecret(secret *corev1.Secret, fieldManager string, subresource strin
 	return b, nil
 }
 
+// ExtractSecret extracts the applied configuration owned by fieldManager from
+// secret. If no managedFields are found in secret for fieldManager, a
+// SecretApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// secret must be a unmodified Secret API object that was retrieved from the Kubernetes API.
+// ExtractSecret provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractSecret(secret *corev1.Secret, fieldManager string) (*SecretApplyConfiguration, error) {
+	return ExtractSecretFrom(secret, fieldManager, "")
+}
+
+func (b SecretApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *SecretApplyConfiguration) WithKind(value string) *SecretApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -97,7 +117,7 @@ func (b *SecretApplyConfiguration) WithKind(value string) *SecretApplyConfigurat
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *SecretApplyConfiguration) WithAPIVersion(value string) *SecretApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -106,7 +126,7 @@ func (b *SecretApplyConfiguration) WithAPIVersion(value string) *SecretApplyConf
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *SecretApplyConfiguration) WithName(value string) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -115,7 +135,7 @@ func (b *SecretApplyConfiguration) WithName(value string) *SecretApplyConfigurat
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *SecretApplyConfiguration) WithGenerateName(value string) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -124,7 +144,7 @@ func (b *SecretApplyConfiguration) WithGenerateName(value string) *SecretApplyCo
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *SecretApplyConfiguration) WithNamespace(value string) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -133,7 +153,7 @@ func (b *SecretApplyConfiguration) WithNamespace(value string) *SecretApplyConfi
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *SecretApplyConfiguration) WithUID(value types.UID) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -142,7 +162,7 @@ func (b *SecretApplyConfiguration) WithUID(value types.UID) *SecretApplyConfigur
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *SecretApplyConfiguration) WithResourceVersion(value string) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -151,25 +171,25 @@ func (b *SecretApplyConfiguration) WithResourceVersion(value string) *SecretAppl
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *SecretApplyConfiguration) WithGeneration(value int64) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *SecretApplyConfiguration) WithCreationTimestamp(value metav1.Time) *SecretApplyConfiguration {
+func (b *SecretApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *SecretApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *SecretApplyConfiguration {
+func (b *SecretApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -178,7 +198,7 @@ func (b *SecretApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *Sec
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *SecretApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -188,11 +208,11 @@ func (b *SecretApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *
 // overwriting an existing map entries in Labels field with the same key.
 func (b *SecretApplyConfiguration) WithLabels(entries map[string]string) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -203,11 +223,11 @@ func (b *SecretApplyConfiguration) WithLabels(entries map[string]string) *Secret
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *SecretApplyConfiguration) WithAnnotations(entries map[string]string) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -215,13 +235,13 @@ func (b *SecretApplyConfiguration) WithAnnotations(entries map[string]string) *S
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *SecretApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *SecretApplyConfiguration {
+func (b *SecretApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -232,14 +252,14 @@ func (b *SecretApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefere
 func (b *SecretApplyConfiguration) WithFinalizers(values ...string) *SecretApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *SecretApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -287,8 +307,24 @@ func (b *SecretApplyConfiguration) WithType(value corev1.SecretType) *SecretAppl
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *SecretApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *SecretApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *SecretApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *SecretApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

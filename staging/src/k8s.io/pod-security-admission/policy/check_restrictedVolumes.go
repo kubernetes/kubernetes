@@ -36,6 +36,7 @@ limits usage of inline pod volume sources to:
 * csi
 * persistentVolumeClaim
 * ephemeral
+* image
 
 **Restricted Fields:**
 
@@ -95,6 +96,7 @@ func restrictedVolumes_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 			volume.DownwardAPI != nil,
 			volume.EmptyDir != nil,
 			volume.Ephemeral != nil,
+			volume.Image != nil,
 			volume.PersistentVolumeClaim != nil,
 			volume.Projected != nil,
 			volume.Secret != nil:

@@ -26,19 +26,21 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/admission/v1beta1"
+	v1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	admissionregistrationv1alpha1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
+	admissionregistrationv1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 	admissionregistrationv1beta1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -47,7 +49,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 )
 
@@ -169,7 +170,7 @@ var testSpec admissionregistration.ValidatingAdmissionPolicy = admissionregistra
 	},
 }
 
-func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convertedRules []admissionregistrationv1beta1.NamedRuleWithOperations) error {
+func createV1beta1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clientset.Interface, convertedRules []admissionregistrationv1beta1.NamedRuleWithOperations) error {
 	denyAction := admissionregistrationv1beta1.DenyAction
 	exact := admissionregistrationv1beta1.Exact
 	equivalent := admissionregistrationv1beta1.Equivalent
@@ -201,18 +202,18 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 		MatchPolicy:   &equivalent,
 	}
 
-	exactPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(context.TODO(), exactPolicyTemplate, metav1.CreateOptions{})
+	exactPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, exactPolicyTemplate, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
-	convertPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(context.TODO(), convertedPolicyTemplate, metav1.CreateOptions{})
+	convertPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, convertedPolicyTemplate, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
 	// Create a param that holds the options for this
-	configuration, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), &corev1.ConfigMap{
+	configuration, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1beta1-param",
 			Namespace: "default",
@@ -230,7 +231,7 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 		return err
 	}
 
-	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), &corev1.ConfigMap{
+	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1beta1-convert-param",
 			Namespace: "default",
@@ -248,7 +249,7 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 		return err
 	}
 
-	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
+	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-policy-v1beta1-binding",
 		},
@@ -265,7 +266,7 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 	if err != nil {
 		return err
 	}
-	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
+	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-policy-v1beta1-convert-binding",
 		},
@@ -286,22 +287,22 @@ func createV1beta1ValidatingPolicyAndBinding(client clientset.Interface, convert
 	return nil
 }
 
-func createV1alpha1ValidatingPolicyAndBinding(client clientset.Interface, convertedRules []admissionregistrationv1alpha1.NamedRuleWithOperations) error {
-	exact := admissionregistrationv1alpha1.Exact
-	equivalent := admissionregistrationv1alpha1.Equivalent
-	denyAction := admissionregistrationv1alpha1.DenyAction
+func createV1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clientset.Interface, convertedRules []admissionregistrationv1.NamedRuleWithOperations) error {
+	exact := admissionregistrationv1.Exact
+	equivalent := admissionregistrationv1.Equivalent
+	denyAction := admissionregistrationv1.DenyAction
 
-	var outSpec admissionregistrationv1alpha1.ValidatingAdmissionPolicy
-	if err := admissionregistrationv1alpha1apis.Convert_admissionregistration_ValidatingAdmissionPolicy_To_v1alpha1_ValidatingAdmissionPolicy(&testSpec, &outSpec, nil); err != nil {
+	var outSpec admissionregistrationv1.ValidatingAdmissionPolicy
+	if err := admissionregistrationv1apis.Convert_admissionregistration_ValidatingAdmissionPolicy_To_v1_ValidatingAdmissionPolicy(&testSpec, &outSpec, nil); err != nil {
 		return err
 	}
 
 	exactPolicyTemplate := outSpec.DeepCopy()
 	convertedPolicyTemplate := outSpec.DeepCopy()
 
-	exactPolicyTemplate.SetName("test-policy-v1alpha1")
-	exactPolicyTemplate.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
-		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
+	exactPolicyTemplate.SetName("test-policy-v1")
+	exactPolicyTemplate.Spec.MatchConstraints = &admissionregistrationv1.MatchResources{
+		ResourceRules: []admissionregistrationv1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: admissionregistrationv1.RuleWithOperations{
 					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
@@ -312,33 +313,33 @@ func createV1alpha1ValidatingPolicyAndBinding(client clientset.Interface, conver
 		MatchPolicy: &exact,
 	}
 
-	convertedPolicyTemplate.SetName("test-policy-v1alpha1-convert")
-	convertedPolicyTemplate.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
+	convertedPolicyTemplate.SetName("test-policy-v1-convert")
+	convertedPolicyTemplate.Spec.MatchConstraints = &admissionregistrationv1.MatchResources{
 		ResourceRules: convertedRules,
 		MatchPolicy:   &equivalent,
 	}
 
-	exactPolicy, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), exactPolicyTemplate, metav1.CreateOptions{})
+	exactPolicy, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, exactPolicyTemplate, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
-	convertPolicy, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), convertedPolicyTemplate, metav1.CreateOptions{})
+	convertPolicy, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, convertedPolicyTemplate, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
 	// Create a param that holds the options for this
-	configuration, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), &corev1.ConfigMap{
+	configuration, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-policy-v1alpha1-param",
+			Name:      "test-policy-v1-param",
 			Namespace: "default",
 			Annotations: map[string]string{
 				"skipMatch": "yes",
 			},
 		},
 		Data: map[string]string{
-			"version": "v1alpha1",
+			"version": "v1",
 			"phase":   validation,
 			"convert": "false",
 		},
@@ -347,16 +348,16 @@ func createV1alpha1ValidatingPolicyAndBinding(client clientset.Interface, conver
 		return err
 	}
 
-	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), &corev1.ConfigMap{
+	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-policy-v1alpha1-convert-param",
+			Name:      "test-policy-v1-convert-param",
 			Namespace: "default",
 			Annotations: map[string]string{
 				"skipMatch": "yes",
 			},
 		},
 		Data: map[string]string{
-			"version": "v1alpha1",
+			"version": "v1",
 			"phase":   validation,
 			"convert": "true",
 		},
@@ -365,14 +366,14 @@ func createV1alpha1ValidatingPolicyAndBinding(client clientset.Interface, conver
 		return err
 	}
 
-	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), &admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding{
+	_, err = client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-policy-v1alpha1-binding",
+			Name: "test-policy-v1-binding",
 		},
-		Spec: admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingSpec{
+		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName:        exactPolicy.GetName(),
-			ValidationActions: []admissionregistrationv1alpha1.ValidationAction{admissionregistrationv1alpha1.Warn},
-			ParamRef: &admissionregistrationv1alpha1.ParamRef{
+			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Warn},
+			ParamRef: &admissionregistrationv1.ParamRef{
 				Name:                    configuration.GetName(),
 				Namespace:               configuration.GetNamespace(),
 				ParameterNotFoundAction: &denyAction,
@@ -382,14 +383,14 @@ func createV1alpha1ValidatingPolicyAndBinding(client clientset.Interface, conver
 	if err != nil {
 		return err
 	}
-	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), &admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding{
+	_, err = client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-policy-v1alpha1-convert-binding",
+			Name: "test-policy-v1-convert-binding",
 		},
-		Spec: admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingSpec{
+		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName:        convertPolicy.GetName(),
-			ValidationActions: []admissionregistrationv1alpha1.ValidationAction{admissionregistrationv1alpha1.Warn},
-			ParamRef: &admissionregistrationv1alpha1.ParamRef{
+			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Warn},
+			ParamRef: &admissionregistrationv1.ParamRef{
 				Name:                    configurationConvert.GetName(),
 				Namespace:               configurationConvert.GetNamespace(),
 				ParameterNotFoundAction: &denyAction,
@@ -405,15 +406,39 @@ func createV1alpha1ValidatingPolicyAndBinding(client clientset.Interface, conver
 
 // This test shows that policy intercepts all requests for all resources,
 // subresources, verbs, and input versions of policy/binding.
+// The test emulates v1.33 as that was the last version before v1beta1 resource was removed.
+// Remove this test once v1.33 cannot be emulated in v1.37.
+//
+// This test tries to mirror very closely the same test for webhook admission
+// test/integration/apiserver/admissionwebhook/admission_test.go testWebhookAdmission
+func TestPolicyAdmissionV1beta1(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(vapV1beta1LastEmulatableVersion))
+	testPolicyAdmission(t, true)
+}
+
+// This test shows that policy intercepts all requests for all resources,
+// subresources, verbs, and input versions of policy/binding.
 //
 // This test tries to mirror very closely the same test for webhook admission
 // test/integration/apiserver/admissionwebhook/admission_test.go testWebhookAdmission
 func TestPolicyAdmission(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)
+	testPolicyAdmission(t, false)
+}
+
+func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
+	_, ctx := ktesting.NewTestContext(t)
+	supportedVersions := []string{}
+	if supportV1Beta1 {
+		supportedVersions = append(supportedVersions, "v1beta1")
+	} else {
+		supportedVersions = append(supportedVersions, "v1")
+	}
 
 	holder := &policyExpectationHolder{
+		supportedVersions: supportedVersions,
 		holder: holder{
 			t:                 t,
+			supportedVersions: supportedVersions,
 			gvrToConvertedGVR: map[metav1.GroupVersionResource]metav1.GroupVersionResource{},
 			gvrToConvertedGVK: map[metav1.GroupVersionResource]schema.GroupVersionKind{},
 		},
@@ -441,7 +466,7 @@ func TestPolicyAdmission(t *testing.T) {
 	// create CRDs
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
-	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -507,7 +532,7 @@ func TestPolicyAdmission(t *testing.T) {
 	convertedResources := map[string]schema.GroupVersionResource{}
 	// build the webhook rules enumerating the specific group/version/resources we want
 	convertedV1beta1Rules := []admissionregistrationv1beta1.NamedRuleWithOperations{}
-	convertedV1alpha1Rules := []admissionregistrationv1alpha1.NamedRuleWithOperations{}
+	convertedV1Rules := []admissionregistrationv1.NamedRuleWithOperations{}
 	for _, gvr := range gvrsToTest {
 		metaGVR := metav1.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
 
@@ -524,10 +549,10 @@ func TestPolicyAdmission(t *testing.T) {
 					Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
 				},
 			})
-			convertedV1alpha1Rules = append(convertedV1alpha1Rules, admissionregistrationv1alpha1.NamedRuleWithOperations{
+			convertedV1Rules = append(convertedV1Rules, admissionregistrationv1.NamedRuleWithOperations{
 				RuleWithOperations: admissionregistrationv1.RuleWithOperations{
-					Operations: []admissionregistrationv1alpha1.OperationType{admissionregistrationv1alpha1.OperationAll},
-					Rule:       admissionregistrationv1alpha1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
+					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+					Rule:       admissionregistrationv1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
 				},
 			})
 		}
@@ -537,16 +562,47 @@ func TestPolicyAdmission(t *testing.T) {
 		holder.gvrToConvertedGVK[metaGVR] = schema.GroupVersionKind{Group: resourcesByGVR[convertedGVR].Group, Version: resourcesByGVR[convertedGVR].Version, Kind: resourcesByGVR[convertedGVR].Kind}
 	}
 
-	if err := createV1alpha1ValidatingPolicyAndBinding(client, convertedV1alpha1Rules); err != nil {
+	if supportV1Beta1 {
+		if err := createV1beta1ValidatingPolicyAndBinding(ctx, client, convertedV1beta1Rules); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		if err := createV1ValidatingPolicyAndBinding(ctx, client, convertedV1Rules); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	testConfigmap := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-k8s",
+		},
+	}
+	_, err = client.CoreV1().ConfigMaps(testNamespace).Create(ctx, &testConfigmap, metav1.CreateOptions{})
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := createV1beta1ValidatingPolicyAndBinding(client, convertedV1beta1Rules); err != nil {
-		t.Fatal(err)
+	// Try to patch the configmap and look for the warning message.
+	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, time.Second*5, false, func(ctx context.Context) (bool, error) {
+		holder.reset(t)
+		_, err = client.CoreV1().ConfigMaps(testNamespace).Patch(ctx, testConfigmap.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
+		if err != nil {
+			return false, nil
+		}
+		for _, warning := range holder.warnings {
+			if strings.Contains(warning, beginSentinel) {
+				return true, nil
+			}
+		}
+		return false, nil
+	}); err != nil {
+		t.Errorf("timed out waiting policy and binding to establish: %v", err)
 	}
 
-	// Allow the policy & binding to establish
-	time.Sleep(1 * time.Second)
+	err = client.CoreV1().ConfigMaps(testNamespace).Delete(ctx, testConfigmap.Name, metav1.DeleteOptions{})
+	if err != nil {
+		t.Errorf("failed to delete ConfigMap with error: %+v", err)
+	}
 
 	start := time.Now()
 	count := 0
@@ -562,14 +618,15 @@ func TestPolicyAdmission(t *testing.T) {
 						holder.reset(t)
 						testFunc := getTestFunc(gvr, verb)
 						testFunc(&testContext{
-							t:               t,
-							admissionHolder: holder,
-							client:          dynamicClient,
-							clientset:       client,
-							verb:            verb,
-							gvr:             gvr,
-							resource:        resource,
-							resources:       resourcesByGVR,
+							t:                     t,
+							emulateV1beta1Version: supportV1Beta1,
+							admissionHolder:       holder,
+							client:                dynamicClient,
+							clientset:             client,
+							verb:                  verb,
+							gvr:                   gvr,
+							resource:              resource,
+							resources:             resourcesByGVR,
 						})
 						holder.verify(t)
 					})
@@ -591,8 +648,9 @@ func TestPolicyAdmission(t *testing.T) {
 
 type policyExpectationHolder struct {
 	holder
-	warningLock sync.Mutex
-	warnings    []string
+	supportedVersions []string
+	warningLock       sync.Mutex
+	warnings          []string
 }
 
 func (p *policyExpectationHolder) reset(t *testing.T) {
@@ -603,7 +661,7 @@ func (p *policyExpectationHolder) reset(t *testing.T) {
 	p.holder.reset(t)
 
 }
-func (p *policyExpectationHolder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool) {
+func (p *policyExpectationHolder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1.Operation, name, namespace string, object, oldObject, options bool) {
 	p.holder.expect(gvr, gvk, optionsGVK, operation, name, namespace, object, oldObject, options)
 
 	p.lock.Lock()
@@ -612,7 +670,7 @@ func (p *policyExpectationHolder) expect(gvr schema.GroupVersionResource, gvk, o
 	p.recorded = map[webhookOptions]*admissionRequest{}
 	for _, phase := range []string{validation} {
 		for _, converted := range []bool{true, false} {
-			for _, version := range []string{"v1alpha1", "v1beta1"} {
+			for _, version := range p.supportedVersions {
 				p.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = nil
 			}
 		}
@@ -647,7 +705,7 @@ func (p *policyExpectationHolder) verify(t *testing.T) {
 					header = record
 				} else {
 					line := map[string]string{}
-					for i := 0; i < len(record); i++ {
+					for i := range record {
 						line[header[i]] = record[i]
 					}
 					mappedCSV = append(mappedCSV, line)

@@ -87,7 +87,7 @@ func parseDoctype(s string) (n *Node, quirks bool) {
 			}
 		}
 		if lastAttr := n.Attr[len(n.Attr)-1]; lastAttr.Key == "system" &&
-			strings.ToLower(lastAttr.Val) == "http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd" {
+			strings.EqualFold(lastAttr.Val, "http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd") {
 			quirks = true
 		}
 	}

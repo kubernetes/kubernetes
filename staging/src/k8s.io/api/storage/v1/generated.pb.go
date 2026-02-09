@@ -23,698 +23,59 @@ import (
 	fmt "fmt"
 
 	io "io"
+	"sort"
 
-	proto "github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	k8s_io_api_core_v1 "k8s.io/api/core/v1"
 	v11 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+func (m *CSIDriver) Reset() { *m = CSIDriver{} }
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+func (m *CSIDriverList) Reset() { *m = CSIDriverList{} }
 
-func (m *CSIDriver) Reset()      { *m = CSIDriver{} }
-func (*CSIDriver) ProtoMessage() {}
-func (*CSIDriver) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{0}
-}
-func (m *CSIDriver) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSIDriver) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSIDriver) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSIDriver.Merge(m, src)
-}
-func (m *CSIDriver) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSIDriver) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSIDriver.DiscardUnknown(m)
-}
+func (m *CSIDriverSpec) Reset() { *m = CSIDriverSpec{} }
 
-var xxx_messageInfo_CSIDriver proto.InternalMessageInfo
+func (m *CSINode) Reset() { *m = CSINode{} }
 
-func (m *CSIDriverList) Reset()      { *m = CSIDriverList{} }
-func (*CSIDriverList) ProtoMessage() {}
-func (*CSIDriverList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{1}
-}
-func (m *CSIDriverList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSIDriverList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSIDriverList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSIDriverList.Merge(m, src)
-}
-func (m *CSIDriverList) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSIDriverList) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSIDriverList.DiscardUnknown(m)
-}
+func (m *CSINodeDriver) Reset() { *m = CSINodeDriver{} }
 
-var xxx_messageInfo_CSIDriverList proto.InternalMessageInfo
+func (m *CSINodeList) Reset() { *m = CSINodeList{} }
 
-func (m *CSIDriverSpec) Reset()      { *m = CSIDriverSpec{} }
-func (*CSIDriverSpec) ProtoMessage() {}
-func (*CSIDriverSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{2}
-}
-func (m *CSIDriverSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSIDriverSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSIDriverSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSIDriverSpec.Merge(m, src)
-}
-func (m *CSIDriverSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSIDriverSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSIDriverSpec.DiscardUnknown(m)
-}
+func (m *CSINodeSpec) Reset() { *m = CSINodeSpec{} }
 
-var xxx_messageInfo_CSIDriverSpec proto.InternalMessageInfo
+func (m *CSIStorageCapacity) Reset() { *m = CSIStorageCapacity{} }
 
-func (m *CSINode) Reset()      { *m = CSINode{} }
-func (*CSINode) ProtoMessage() {}
-func (*CSINode) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{3}
-}
-func (m *CSINode) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSINode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSINode) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSINode.Merge(m, src)
-}
-func (m *CSINode) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSINode) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSINode.DiscardUnknown(m)
-}
+func (m *CSIStorageCapacityList) Reset() { *m = CSIStorageCapacityList{} }
 
-var xxx_messageInfo_CSINode proto.InternalMessageInfo
+func (m *StorageClass) Reset() { *m = StorageClass{} }
 
-func (m *CSINodeDriver) Reset()      { *m = CSINodeDriver{} }
-func (*CSINodeDriver) ProtoMessage() {}
-func (*CSINodeDriver) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{4}
-}
-func (m *CSINodeDriver) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSINodeDriver) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSINodeDriver) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSINodeDriver.Merge(m, src)
-}
-func (m *CSINodeDriver) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSINodeDriver) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSINodeDriver.DiscardUnknown(m)
-}
+func (m *StorageClassList) Reset() { *m = StorageClassList{} }
 
-var xxx_messageInfo_CSINodeDriver proto.InternalMessageInfo
+func (m *TokenRequest) Reset() { *m = TokenRequest{} }
 
-func (m *CSINodeList) Reset()      { *m = CSINodeList{} }
-func (*CSINodeList) ProtoMessage() {}
-func (*CSINodeList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{5}
-}
-func (m *CSINodeList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSINodeList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSINodeList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSINodeList.Merge(m, src)
-}
-func (m *CSINodeList) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSINodeList) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSINodeList.DiscardUnknown(m)
-}
+func (m *VolumeAttachment) Reset() { *m = VolumeAttachment{} }
 
-var xxx_messageInfo_CSINodeList proto.InternalMessageInfo
+func (m *VolumeAttachmentList) Reset() { *m = VolumeAttachmentList{} }
 
-func (m *CSINodeSpec) Reset()      { *m = CSINodeSpec{} }
-func (*CSINodeSpec) ProtoMessage() {}
-func (*CSINodeSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{6}
-}
-func (m *CSINodeSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSINodeSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSINodeSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSINodeSpec.Merge(m, src)
-}
-func (m *CSINodeSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSINodeSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSINodeSpec.DiscardUnknown(m)
-}
+func (m *VolumeAttachmentSource) Reset() { *m = VolumeAttachmentSource{} }
 
-var xxx_messageInfo_CSINodeSpec proto.InternalMessageInfo
+func (m *VolumeAttachmentSpec) Reset() { *m = VolumeAttachmentSpec{} }
 
-func (m *CSIStorageCapacity) Reset()      { *m = CSIStorageCapacity{} }
-func (*CSIStorageCapacity) ProtoMessage() {}
-func (*CSIStorageCapacity) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{7}
-}
-func (m *CSIStorageCapacity) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSIStorageCapacity) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSIStorageCapacity) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSIStorageCapacity.Merge(m, src)
-}
-func (m *CSIStorageCapacity) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSIStorageCapacity) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSIStorageCapacity.DiscardUnknown(m)
-}
+func (m *VolumeAttachmentStatus) Reset() { *m = VolumeAttachmentStatus{} }
 
-var xxx_messageInfo_CSIStorageCapacity proto.InternalMessageInfo
+func (m *VolumeAttributesClass) Reset() { *m = VolumeAttributesClass{} }
 
-func (m *CSIStorageCapacityList) Reset()      { *m = CSIStorageCapacityList{} }
-func (*CSIStorageCapacityList) ProtoMessage() {}
-func (*CSIStorageCapacityList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{8}
-}
-func (m *CSIStorageCapacityList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSIStorageCapacityList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSIStorageCapacityList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSIStorageCapacityList.Merge(m, src)
-}
-func (m *CSIStorageCapacityList) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSIStorageCapacityList) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSIStorageCapacityList.DiscardUnknown(m)
-}
+func (m *VolumeAttributesClassList) Reset() { *m = VolumeAttributesClassList{} }
 
-var xxx_messageInfo_CSIStorageCapacityList proto.InternalMessageInfo
+func (m *VolumeError) Reset() { *m = VolumeError{} }
 
-func (m *StorageClass) Reset()      { *m = StorageClass{} }
-func (*StorageClass) ProtoMessage() {}
-func (*StorageClass) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{9}
-}
-func (m *StorageClass) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StorageClass) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StorageClass) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StorageClass.Merge(m, src)
-}
-func (m *StorageClass) XXX_Size() int {
-	return m.Size()
-}
-func (m *StorageClass) XXX_DiscardUnknown() {
-	xxx_messageInfo_StorageClass.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StorageClass proto.InternalMessageInfo
-
-func (m *StorageClassList) Reset()      { *m = StorageClassList{} }
-func (*StorageClassList) ProtoMessage() {}
-func (*StorageClassList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{10}
-}
-func (m *StorageClassList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StorageClassList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StorageClassList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StorageClassList.Merge(m, src)
-}
-func (m *StorageClassList) XXX_Size() int {
-	return m.Size()
-}
-func (m *StorageClassList) XXX_DiscardUnknown() {
-	xxx_messageInfo_StorageClassList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StorageClassList proto.InternalMessageInfo
-
-func (m *TokenRequest) Reset()      { *m = TokenRequest{} }
-func (*TokenRequest) ProtoMessage() {}
-func (*TokenRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{11}
-}
-func (m *TokenRequest) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *TokenRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *TokenRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TokenRequest.Merge(m, src)
-}
-func (m *TokenRequest) XXX_Size() int {
-	return m.Size()
-}
-func (m *TokenRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_TokenRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_TokenRequest proto.InternalMessageInfo
-
-func (m *VolumeAttachment) Reset()      { *m = VolumeAttachment{} }
-func (*VolumeAttachment) ProtoMessage() {}
-func (*VolumeAttachment) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{12}
-}
-func (m *VolumeAttachment) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachment) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachment) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachment.Merge(m, src)
-}
-func (m *VolumeAttachment) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachment) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachment.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttachment proto.InternalMessageInfo
-
-func (m *VolumeAttachmentList) Reset()      { *m = VolumeAttachmentList{} }
-func (*VolumeAttachmentList) ProtoMessage() {}
-func (*VolumeAttachmentList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{13}
-}
-func (m *VolumeAttachmentList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachmentList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachmentList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachmentList.Merge(m, src)
-}
-func (m *VolumeAttachmentList) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachmentList) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachmentList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttachmentList proto.InternalMessageInfo
-
-func (m *VolumeAttachmentSource) Reset()      { *m = VolumeAttachmentSource{} }
-func (*VolumeAttachmentSource) ProtoMessage() {}
-func (*VolumeAttachmentSource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{14}
-}
-func (m *VolumeAttachmentSource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachmentSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachmentSource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachmentSource.Merge(m, src)
-}
-func (m *VolumeAttachmentSource) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachmentSource) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachmentSource.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttachmentSource proto.InternalMessageInfo
-
-func (m *VolumeAttachmentSpec) Reset()      { *m = VolumeAttachmentSpec{} }
-func (*VolumeAttachmentSpec) ProtoMessage() {}
-func (*VolumeAttachmentSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{15}
-}
-func (m *VolumeAttachmentSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachmentSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachmentSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachmentSpec.Merge(m, src)
-}
-func (m *VolumeAttachmentSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachmentSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachmentSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttachmentSpec proto.InternalMessageInfo
-
-func (m *VolumeAttachmentStatus) Reset()      { *m = VolumeAttachmentStatus{} }
-func (*VolumeAttachmentStatus) ProtoMessage() {}
-func (*VolumeAttachmentStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{16}
-}
-func (m *VolumeAttachmentStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachmentStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachmentStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachmentStatus.Merge(m, src)
-}
-func (m *VolumeAttachmentStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachmentStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachmentStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttachmentStatus proto.InternalMessageInfo
-
-func (m *VolumeError) Reset()      { *m = VolumeError{} }
-func (*VolumeError) ProtoMessage() {}
-func (*VolumeError) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{17}
-}
-func (m *VolumeError) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeError) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeError) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeError.Merge(m, src)
-}
-func (m *VolumeError) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeError) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeError.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeError proto.InternalMessageInfo
-
-func (m *VolumeNodeResources) Reset()      { *m = VolumeNodeResources{} }
-func (*VolumeNodeResources) ProtoMessage() {}
-func (*VolumeNodeResources) Descriptor() ([]byte, []int) {
-	return fileDescriptor_662262cc70094b41, []int{18}
-}
-func (m *VolumeNodeResources) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeNodeResources) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeNodeResources) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeNodeResources.Merge(m, src)
-}
-func (m *VolumeNodeResources) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeNodeResources) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeNodeResources.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeNodeResources proto.InternalMessageInfo
-
-func init() {
-	proto.RegisterType((*CSIDriver)(nil), "k8s.io.api.storage.v1.CSIDriver")
-	proto.RegisterType((*CSIDriverList)(nil), "k8s.io.api.storage.v1.CSIDriverList")
-	proto.RegisterType((*CSIDriverSpec)(nil), "k8s.io.api.storage.v1.CSIDriverSpec")
-	proto.RegisterType((*CSINode)(nil), "k8s.io.api.storage.v1.CSINode")
-	proto.RegisterType((*CSINodeDriver)(nil), "k8s.io.api.storage.v1.CSINodeDriver")
-	proto.RegisterType((*CSINodeList)(nil), "k8s.io.api.storage.v1.CSINodeList")
-	proto.RegisterType((*CSINodeSpec)(nil), "k8s.io.api.storage.v1.CSINodeSpec")
-	proto.RegisterType((*CSIStorageCapacity)(nil), "k8s.io.api.storage.v1.CSIStorageCapacity")
-	proto.RegisterType((*CSIStorageCapacityList)(nil), "k8s.io.api.storage.v1.CSIStorageCapacityList")
-	proto.RegisterType((*StorageClass)(nil), "k8s.io.api.storage.v1.StorageClass")
-	proto.RegisterMapType((map[string]string)(nil), "k8s.io.api.storage.v1.StorageClass.ParametersEntry")
-	proto.RegisterType((*StorageClassList)(nil), "k8s.io.api.storage.v1.StorageClassList")
-	proto.RegisterType((*TokenRequest)(nil), "k8s.io.api.storage.v1.TokenRequest")
-	proto.RegisterType((*VolumeAttachment)(nil), "k8s.io.api.storage.v1.VolumeAttachment")
-	proto.RegisterType((*VolumeAttachmentList)(nil), "k8s.io.api.storage.v1.VolumeAttachmentList")
-	proto.RegisterType((*VolumeAttachmentSource)(nil), "k8s.io.api.storage.v1.VolumeAttachmentSource")
-	proto.RegisterType((*VolumeAttachmentSpec)(nil), "k8s.io.api.storage.v1.VolumeAttachmentSpec")
-	proto.RegisterType((*VolumeAttachmentStatus)(nil), "k8s.io.api.storage.v1.VolumeAttachmentStatus")
-	proto.RegisterMapType((map[string]string)(nil), "k8s.io.api.storage.v1.VolumeAttachmentStatus.AttachmentMetadataEntry")
-	proto.RegisterType((*VolumeError)(nil), "k8s.io.api.storage.v1.VolumeError")
-	proto.RegisterType((*VolumeNodeResources)(nil), "k8s.io.api.storage.v1.VolumeNodeResources")
-}
-
-func init() {
-	proto.RegisterFile("k8s.io/api/storage/v1/generated.proto", fileDescriptor_662262cc70094b41)
-}
-
-var fileDescriptor_662262cc70094b41 = []byte{
-	// 1655 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x58, 0xbd, 0x6f, 0x1b, 0xc9,
-	0x15, 0xd7, 0x8a, 0xd4, 0xd7, 0x50, 0xb2, 0xa4, 0x91, 0xe4, 0x30, 0x2a, 0x48, 0x61, 0xed, 0x24,
-	0xb2, 0x13, 0x2f, 0x6d, 0xd9, 0x31, 0x0c, 0x07, 0x2e, 0xb4, 0x12, 0x1d, 0x0b, 0x11, 0x25, 0x65,
-	0xa8, 0x18, 0x46, 0x90, 0x04, 0x1e, 0xed, 0x8e, 0xa8, 0xb1, 0xb8, 0x1f, 0xde, 0x19, 0x2a, 0x62,
-	0xaa, 0xa4, 0x49, 0x17, 0x20, 0x69, 0xf3, 0x57, 0x24, 0x40, 0xd2, 0x5c, 0x79, 0xc5, 0xc1, 0xd7,
-	0x19, 0x57, 0xb9, 0x22, 0xce, 0xbc, 0xfa, 0xae, 0xbc, 0x42, 0xd5, 0x61, 0x66, 0x87, 0xdc, 0x0f,
-	0x2e, 0x65, 0xa9, 0x61, 0xc7, 0x99, 0xf7, 0xde, 0xef, 0xbd, 0x99, 0xf7, 0xde, 0x6f, 0xde, 0x12,
-	0xfc, 0xe4, 0xf4, 0x09, 0x33, 0xa8, 0x57, 0xc1, 0x3e, 0xad, 0x30, 0xee, 0x05, 0xb8, 0x41, 0x2a,
-	0x67, 0x0f, 0x2a, 0x0d, 0xe2, 0x92, 0x00, 0x73, 0x62, 0x1b, 0x7e, 0xe0, 0x71, 0x0f, 0xae, 0x84,
-	0x6a, 0x06, 0xf6, 0xa9, 0xa1, 0xd4, 0x8c, 0xb3, 0x07, 0xab, 0xf7, 0x1a, 0x94, 0x9f, 0xb4, 0x8e,
-	0x0c, 0xcb, 0x73, 0x2a, 0x0d, 0xaf, 0xe1, 0x55, 0xa4, 0xf6, 0x51, 0xeb, 0x58, 0xae, 0xe4, 0x42,
-	0xfe, 0x0a, 0x51, 0x56, 0xf5, 0x98, 0x33, 0xcb, 0x0b, 0xb2, 0x3c, 0xad, 0x3e, 0x8a, 0x74, 0x1c,
-	0x6c, 0x9d, 0x50, 0x97, 0x04, 0xed, 0x8a, 0x7f, 0xda, 0x90, 0x46, 0x01, 0x61, 0x5e, 0x2b, 0xb0,
-	0xc8, 0xb5, 0xac, 0x58, 0xc5, 0x21, 0x1c, 0x67, 0xf9, 0xaa, 0x0c, 0xb3, 0x0a, 0x5a, 0x2e, 0xa7,
-	0xce, 0xa0, 0x9b, 0xc7, 0x9f, 0x32, 0x60, 0xd6, 0x09, 0x71, 0x70, 0xda, 0x4e, 0xff, 0xbf, 0x06,
-	0x66, 0xb6, 0xea, 0x3b, 0xdb, 0x01, 0x3d, 0x23, 0x01, 0x7c, 0x0d, 0xa6, 0x45, 0x44, 0x36, 0xe6,
-	0xb8, 0xa8, 0xad, 0x69, 0xeb, 0x85, 0x8d, 0xfb, 0x46, 0x74, 0xbf, 0x7d, 0x60, 0xc3, 0x3f, 0x6d,
-	0x88, 0x0d, 0x66, 0x08, 0x6d, 0xe3, 0xec, 0x81, 0xb1, 0x7f, 0xf4, 0x86, 0x58, 0xbc, 0x46, 0x38,
-	0x36, 0xe1, 0xbb, 0x4e, 0x79, 0xac, 0xdb, 0x29, 0x83, 0x68, 0x0f, 0xf5, 0x51, 0xe1, 0x73, 0x90,
-	0x67, 0x3e, 0xb1, 0x8a, 0xe3, 0x12, 0xfd, 0xb6, 0x91, 0x99, 0x3d, 0xa3, 0x1f, 0x51, 0xdd, 0x27,
-	0x96, 0x39, 0xab, 0x10, 0xf3, 0x62, 0x85, 0xa4, 0xbd, 0xfe, 0x3f, 0x0d, 0xcc, 0xf5, 0xb5, 0x76,
-	0x29, 0xe3, 0xf0, 0x0f, 0x03, 0xb1, 0x1b, 0x57, 0x8b, 0x5d, 0x58, 0xcb, 0xc8, 0x17, 0x94, 0x9f,
-	0xe9, 0xde, 0x4e, 0x2c, 0xee, 0x2a, 0x98, 0xa0, 0x9c, 0x38, 0xac, 0x38, 0xbe, 0x96, 0x5b, 0x2f,
-	0x6c, 0xac, 0x7d, 0x2a, 0x70, 0x73, 0x4e, 0x81, 0x4d, 0xec, 0x08, 0x33, 0x14, 0x5a, 0xeb, 0x5f,
-	0xe5, 0x63, 0x61, 0x8b, 0xe3, 0xc0, 0xa7, 0xe0, 0x06, 0xe6, 0x1c, 0x5b, 0x27, 0x88, 0xbc, 0x6d,
-	0xd1, 0x80, 0xd8, 0x32, 0xf8, 0x69, 0x13, 0x76, 0x3b, 0xe5, 0x1b, 0x9b, 0x09, 0x09, 0x4a, 0x69,
-	0x0a, 0x5b, 0xdf, 0xb3, 0x77, 0xdc, 0x63, 0x6f, 0xdf, 0xad, 0x79, 0x2d, 0x97, 0xcb, 0x6b, 0x55,
-	0xb6, 0x07, 0x09, 0x09, 0x4a, 0x69, 0x42, 0x0b, 0x2c, 0x9f, 0x79, 0xcd, 0x96, 0x43, 0x76, 0xe9,
-	0x31, 0xb1, 0xda, 0x56, 0x93, 0xd4, 0x3c, 0x9b, 0xb0, 0x62, 0x6e, 0x2d, 0xb7, 0x3e, 0x63, 0x56,
-	0xba, 0x9d, 0xf2, 0xf2, 0xcb, 0x0c, 0xf9, 0x45, 0xa7, 0xbc, 0x94, 0xb1, 0x8f, 0x32, 0xc1, 0xe0,
-	0x33, 0x30, 0xaf, 0x2e, 0x67, 0x0b, 0xfb, 0xd8, 0xa2, 0xbc, 0x5d, 0xcc, 0xcb, 0x08, 0x97, 0xba,
-	0x9d, 0xf2, 0x7c, 0x3d, 0x29, 0x42, 0x69, 0x5d, 0xf8, 0x02, 0xcc, 0x1d, 0xb3, 0x5f, 0x07, 0x5e,
-	0xcb, 0x3f, 0xf0, 0x9a, 0xd4, 0x6a, 0x17, 0x27, 0xd6, 0xb4, 0xf5, 0x19, 0x53, 0xef, 0x76, 0xca,
-	0x73, 0xcf, 0xeb, 0x31, 0xc1, 0x45, 0x7a, 0x03, 0x25, 0x0d, 0xe1, 0x6b, 0x30, 0xc7, 0xbd, 0x53,
-	0xe2, 0x8a, 0xab, 0x23, 0x8c, 0xb3, 0xe2, 0xa4, 0x4c, 0xe3, 0xad, 0x21, 0x69, 0x3c, 0x8c, 0xe9,
-	0x9a, 0x2b, 0x2a, 0x93, 0x73, 0xf1, 0x5d, 0x86, 0x92, 0x80, 0x70, 0x0b, 0x2c, 0x06, 0x61, 0x5e,
-	0x18, 0x22, 0x7e, 0xeb, 0xa8, 0x49, 0xd9, 0x49, 0x71, 0x4a, 0x1e, 0x76, 0xa5, 0xdb, 0x29, 0x2f,
-	0xa2, 0xb4, 0x10, 0x0d, 0xea, 0xc3, 0x47, 0x60, 0x96, 0x91, 0x5d, 0xea, 0xb6, 0xce, 0xc3, 0x74,
-	0x4e, 0x4b, 0xfb, 0x85, 0x6e, 0xa7, 0x3c, 0x5b, 0xaf, 0x46, 0xfb, 0x28, 0xa1, 0xa5, 0xff, 0x57,
-	0x03, 0x53, 0x5b, 0xf5, 0x9d, 0x3d, 0xcf, 0x26, 0x23, 0xe8, 0xe0, 0xed, 0x44, 0x07, 0xeb, 0xc3,
-	0x1b, 0x41, 0xc4, 0x33, 0xb4, 0x7f, 0xbf, 0x0b, 0xfb, 0x57, 0xe8, 0x28, 0xee, 0x59, 0x03, 0x79,
-	0x17, 0x3b, 0x44, 0x46, 0x3d, 0x13, 0xd9, 0xec, 0x61, 0x87, 0x20, 0x29, 0x81, 0x3f, 0x05, 0x93,
-	0xae, 0x67, 0x93, 0x9d, 0x6d, 0xe9, 0x7b, 0xc6, 0xbc, 0xa1, 0x74, 0x26, 0xf7, 0xe4, 0x2e, 0x52,
-	0x52, 0x71, 0x8b, 0xdc, 0xf3, 0xbd, 0xa6, 0xd7, 0x68, 0xff, 0x86, 0xb4, 0x7b, 0x25, 0x2d, 0x6f,
-	0xf1, 0x30, 0xb6, 0x8f, 0x12, 0x5a, 0xf0, 0x8f, 0xa0, 0x80, 0x9b, 0x4d, 0xcf, 0xc2, 0x1c, 0x1f,
-	0x35, 0x89, 0xac, 0xd3, 0xc2, 0xc6, 0xdd, 0x21, 0xc7, 0x0b, 0x5b, 0x40, 0xf8, 0x45, 0x8a, 0xf8,
-	0x99, 0x39, 0xdf, 0xed, 0x94, 0x0b, 0x9b, 0x11, 0x04, 0x8a, 0xe3, 0xe9, 0xff, 0xd1, 0x40, 0x41,
-	0x1d, 0x78, 0x04, 0x74, 0xb5, 0x95, 0xa4, 0xab, 0xd2, 0xe5, 0x59, 0x1a, 0x42, 0x56, 0x7f, 0xea,
-	0x47, 0x2c, 0x99, 0x6a, 0x1f, 0x4c, 0xd9, 0x32, 0x55, 0xac, 0xa8, 0x49, 0xd4, 0xdb, 0x97, 0xa3,
-	0x2a, 0x22, 0x9c, 0x57, 0xd8, 0x53, 0xe1, 0x9a, 0xa1, 0x1e, 0x8a, 0xfe, 0x7d, 0x0e, 0xc0, 0xad,
-	0xfa, 0x4e, 0x8a, 0x06, 0x46, 0x50, 0xc2, 0x14, 0xcc, 0x8a, 0x52, 0xe9, 0x15, 0x83, 0x2a, 0xe5,
-	0x87, 0x57, 0xbc, 0x7f, 0x7c, 0x44, 0x9a, 0x75, 0xd2, 0x24, 0x16, 0xf7, 0x82, 0xb0, 0xaa, 0xf6,
-	0x62, 0x60, 0x28, 0x01, 0x0d, 0xb7, 0xc1, 0x42, 0x8f, 0xd5, 0x9a, 0x98, 0x31, 0x51, 0xcd, 0xc5,
-	0x9c, 0xac, 0xde, 0xa2, 0x0a, 0x71, 0xa1, 0x9e, 0x92, 0xa3, 0x01, 0x0b, 0xf8, 0x0a, 0x4c, 0x5b,
-	0x71, 0x02, 0xfd, 0x44, 0xb1, 0x18, 0xbd, 0x69, 0xc4, 0xf8, 0x6d, 0x0b, 0xbb, 0x9c, 0xf2, 0xb6,
-	0x39, 0x2b, 0x0a, 0xa5, 0xcf, 0xb4, 0x7d, 0x34, 0xc8, 0xc0, 0xa2, 0x83, 0xcf, 0xa9, 0xd3, 0x72,
-	0xc2, 0x92, 0xae, 0xd3, 0xbf, 0x10, 0x49, 0xb3, 0xd7, 0x77, 0x21, 0x69, 0xae, 0x96, 0x06, 0x43,
-	0x83, 0xf8, 0xfa, 0x17, 0x1a, 0xb8, 0x39, 0x98, 0xf8, 0x11, 0xb4, 0xc5, 0x5e, 0xb2, 0x2d, 0xee,
-	0x0c, 0x2f, 0xe0, 0x54, 0x6c, 0x43, 0x3a, 0xe4, 0x1f, 0x93, 0x60, 0x36, 0x9e, 0xbe, 0x11, 0xd4,
-	0xee, 0x2f, 0x41, 0xc1, 0x0f, 0xbc, 0x33, 0xca, 0xa8, 0xe7, 0x92, 0x40, 0x31, 0xe1, 0x92, 0x32,
-	0x29, 0x1c, 0x44, 0x22, 0x14, 0xd7, 0x83, 0x0d, 0x00, 0x7c, 0x1c, 0x60, 0x87, 0x70, 0xd1, 0xbf,
-	0x39, 0x79, 0xfc, 0x87, 0x43, 0x8e, 0x1f, 0x3f, 0x91, 0x71, 0xd0, 0xb7, 0xaa, 0xba, 0x3c, 0x68,
-	0x47, 0xd1, 0x45, 0x02, 0x14, 0x83, 0x86, 0xa7, 0x60, 0x2e, 0x20, 0x56, 0x13, 0x53, 0x47, 0xbd,
-	0xd9, 0x79, 0x19, 0x61, 0x55, 0x3c, 0xa0, 0x28, 0x2e, 0xb8, 0xe8, 0x94, 0xef, 0x0f, 0x4e, 0xdd,
-	0xc6, 0x01, 0x09, 0x18, 0x65, 0x9c, 0xb8, 0x3c, 0x2c, 0x98, 0x84, 0x0d, 0x4a, 0x62, 0x0b, 0xa6,
-	0x77, 0xc4, 0x13, 0xb8, 0xef, 0x73, 0xea, 0xb9, 0xac, 0x38, 0x11, 0x31, 0x7d, 0x2d, 0xb6, 0x8f,
-	0x12, 0x5a, 0x70, 0x17, 0x2c, 0x0b, 0x66, 0xfe, 0x73, 0xe8, 0xa0, 0x7a, 0xee, 0x63, 0x57, 0xdc,
-	0x52, 0x71, 0x52, 0xbe, 0xb6, 0x45, 0x31, 0xfa, 0x6c, 0x66, 0xc8, 0x51, 0xa6, 0x15, 0x7c, 0x05,
-	0x16, 0xc3, 0xd9, 0xc7, 0xa4, 0xae, 0x4d, 0xdd, 0x86, 0x98, 0x7c, 0xe4, 0xc3, 0x3f, 0x63, 0xde,
-	0x15, 0x1d, 0xf1, 0x32, 0x2d, 0xbc, 0xc8, 0xda, 0x44, 0x83, 0x20, 0xf0, 0x2d, 0x58, 0x94, 0x1e,
-	0x89, 0xad, 0xe8, 0x84, 0x12, 0x56, 0x9c, 0x96, 0xa9, 0x5b, 0x8f, 0xa7, 0x4e, 0x5c, 0x5d, 0x38,
-	0xb5, 0x84, 0xa4, 0xd3, 0x23, 0xa7, 0x43, 0x12, 0x38, 0xe6, 0x8f, 0x55, 0xbe, 0x16, 0x37, 0xd3,
-	0x50, 0x68, 0x10, 0x7d, 0xf5, 0x19, 0x98, 0x4f, 0x25, 0x1c, 0x2e, 0x80, 0xdc, 0x29, 0x69, 0x87,
-	0xcf, 0x32, 0x12, 0x3f, 0xe1, 0x32, 0x98, 0x38, 0xc3, 0xcd, 0x16, 0x09, 0x8b, 0x0f, 0x85, 0x8b,
-	0xa7, 0xe3, 0x4f, 0x34, 0xfd, 0x33, 0x0d, 0x24, 0xe8, 0x6c, 0x04, 0x2d, 0xfd, 0x22, 0xd9, 0xd2,
-	0xb7, 0xae, 0x50, 0xd3, 0x43, 0x9a, 0xf9, 0x6f, 0x1a, 0x98, 0x8d, 0x8f, 0x78, 0xf0, 0x17, 0x60,
-	0x1a, 0xb7, 0x6c, 0x4a, 0x5c, 0xab, 0x37, 0x95, 0xf4, 0x03, 0xd9, 0x54, 0xfb, 0xa8, 0xaf, 0x21,
-	0x06, 0x40, 0x72, 0xee, 0xd3, 0x00, 0x8b, 0x22, 0xab, 0x13, 0xcb, 0x73, 0x6d, 0x26, 0x6f, 0x28,
-	0x17, 0x32, 0x63, 0x35, 0x2d, 0x44, 0x83, 0xfa, 0xfa, 0xbf, 0xc7, 0xc1, 0x42, 0x58, 0x1b, 0xe1,
-	0xe8, 0xef, 0x10, 0x97, 0x8f, 0x80, 0x54, 0x6a, 0x89, 0x99, 0xee, 0xe7, 0x97, 0x0e, 0x3d, 0x51,
-	0x60, 0xc3, 0x86, 0x3b, 0xf8, 0x3b, 0x30, 0xc9, 0x38, 0xe6, 0x2d, 0x26, 0x9f, 0xba, 0xc2, 0xc6,
-	0xbd, 0xab, 0x02, 0x4a, 0xa3, 0x68, 0xae, 0x0b, 0xd7, 0x48, 0x81, 0xe9, 0x9f, 0x6b, 0x60, 0x39,
-	0x6d, 0x32, 0x82, 0x0a, 0xdb, 0x4d, 0x56, 0xd8, 0xcf, 0xae, 0x78, 0x98, 0x61, 0x5f, 0x80, 0x1a,
-	0xb8, 0x39, 0x70, 0x6e, 0xf9, 0x92, 0x0a, 0x5e, 0xf2, 0x53, 0xec, 0xb7, 0x17, 0x4d, 0xc4, 0x92,
-	0x97, 0x0e, 0x32, 0xe4, 0x28, 0xd3, 0x0a, 0xbe, 0x01, 0x0b, 0xd4, 0x6d, 0x52, 0x97, 0xa8, 0x87,
-	0x37, 0xca, 0x6f, 0x26, 0x79, 0xa4, 0x91, 0x65, 0x72, 0x97, 0xc5, 0x7c, 0xb2, 0x93, 0x42, 0x41,
-	0x03, 0xb8, 0xfa, 0x97, 0x19, 0x99, 0x91, 0x33, 0xa3, 0x68, 0x21, 0xb9, 0x43, 0x82, 0x81, 0x16,
-	0x52, 0xfb, 0xa8, 0xaf, 0x21, 0xeb, 0x46, 0x5e, 0x85, 0x0a, 0xf4, 0xca, 0x75, 0x23, 0x8d, 0x62,
-	0x75, 0x23, 0xd7, 0x48, 0x81, 0x89, 0x20, 0xc4, 0x4c, 0x16, 0x9b, 0xbd, 0xfa, 0x41, 0xec, 0xa9,
-	0x7d, 0xd4, 0xd7, 0xd0, 0xbf, 0xcd, 0x65, 0x24, 0x48, 0x16, 0x60, 0xec, 0x34, 0xbd, 0xaf, 0xf4,
-	0xf4, 0x69, 0xec, 0xfe, 0x69, 0x6c, 0xf8, 0x2f, 0x0d, 0x40, 0xdc, 0x87, 0xa8, 0xf5, 0x0a, 0x34,
-	0xac, 0xa2, 0xea, 0xb5, 0x5a, 0xc2, 0xd8, 0x1c, 0xc0, 0x09, 0x5f, 0xe3, 0x55, 0xe5, 0x1f, 0x0e,
-	0x2a, 0xa0, 0x0c, 0xe7, 0xd0, 0x06, 0x85, 0x70, 0xb7, 0x1a, 0x04, 0x5e, 0xa0, 0xda, 0x53, 0xbf,
-	0x34, 0x16, 0xa9, 0x69, 0x96, 0xe4, 0xc7, 0x4d, 0x64, 0x7a, 0xd1, 0x29, 0x17, 0x62, 0x72, 0x14,
-	0x87, 0x15, 0x5e, 0x6c, 0x12, 0x79, 0xc9, 0x5f, 0xcf, 0xcb, 0x36, 0x19, 0xee, 0x25, 0x06, 0xbb,
-	0x5a, 0x05, 0x3f, 0x1a, 0x72, 0x2d, 0xd7, 0x7a, 0xb3, 0xfe, 0xae, 0x81, 0xb8, 0x0f, 0xb8, 0x0b,
-	0xf2, 0x9c, 0xaa, 0xae, 0x4b, 0x7e, 0x00, 0x5e, 0x42, 0x24, 0x87, 0xd4, 0x21, 0x11, 0x15, 0x8a,
-	0x15, 0x92, 0x28, 0xf0, 0x0e, 0x98, 0x72, 0x08, 0x63, 0xb8, 0xa1, 0x3c, 0x47, 0x9f, 0x43, 0xb5,
-	0x70, 0x1b, 0xf5, 0xe4, 0xfa, 0x63, 0xb0, 0x94, 0xf1, 0x59, 0x09, 0xcb, 0x60, 0xc2, 0x92, 0x7f,
-	0x06, 0x88, 0x80, 0x26, 0xcc, 0x19, 0xc1, 0x28, 0x5b, 0xf2, 0x5f, 0x80, 0x70, 0xdf, 0xfc, 0xd5,
-	0xbb, 0x8f, 0xa5, 0xb1, 0xf7, 0x1f, 0x4b, 0x63, 0x1f, 0x3e, 0x96, 0xc6, 0xfe, 0xda, 0x2d, 0x69,
-	0xef, 0xba, 0x25, 0xed, 0x7d, 0xb7, 0xa4, 0x7d, 0xe8, 0x96, 0xb4, 0xaf, 0xbb, 0x25, 0xed, 0x9f,
-	0xdf, 0x94, 0xc6, 0x7e, 0xbf, 0x92, 0xf9, 0x77, 0xea, 0x0f, 0x01, 0x00, 0x00, 0xff, 0xff, 0x7a,
-	0x55, 0x95, 0x9f, 0x66, 0x15, 0x00, 0x00,
-}
+func (m *VolumeNodeResources) Reset() { *m = VolumeNodeResources{} }
 
 func (m *CSIDriver) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -826,6 +187,21 @@ func (m *CSIDriverSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ServiceAccountTokenInSecrets != nil {
+		i--
+		if *m.ServiceAccountTokenInSecrets {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x50
+	}
+	if m.NodeAllocatableUpdatePeriodSeconds != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.NodeAllocatableUpdatePeriodSeconds))
+		i--
+		dAtA[i] = 0x48
+	}
 	if m.SELinuxMount != nil {
 		i--
 		if *m.SELinuxMount {
@@ -1283,7 +659,7 @@ func (m *StorageClass) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		for k := range m.Parameters {
 			keysForParameters = append(keysForParameters, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForParameters)
+		sort.Strings(keysForParameters)
 		for iNdEx := len(keysForParameters) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.Parameters[string(keysForParameters[iNdEx])]
 			baseI := i
@@ -1634,7 +1010,7 @@ func (m *VolumeAttachmentStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 		for k := range m.AttachmentMetadata {
 			keysForAttachmentMetadata = append(keysForAttachmentMetadata, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForAttachmentMetadata)
+		sort.Strings(keysForAttachmentMetadata)
 		for iNdEx := len(keysForAttachmentMetadata) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.AttachmentMetadata[string(keysForAttachmentMetadata[iNdEx])]
 			baseI := i
@@ -1664,6 +1040,115 @@ func (m *VolumeAttachmentStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	return len(dAtA) - i, nil
 }
 
+func (m *VolumeAttributesClass) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeAttributesClass) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *VolumeAttributesClass) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Parameters) > 0 {
+		keysForParameters := make([]string, 0, len(m.Parameters))
+		for k := range m.Parameters {
+			keysForParameters = append(keysForParameters, string(k))
+		}
+		sort.Strings(keysForParameters)
+		for iNdEx := len(keysForParameters) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Parameters[string(keysForParameters[iNdEx])]
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
+			i = encodeVarintGenerated(dAtA, i, uint64(len(v)))
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForParameters[iNdEx])
+			copy(dAtA[i:], keysForParameters[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForParameters[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
+	i -= len(m.DriverName)
+	copy(dAtA[i:], m.DriverName)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.DriverName)))
+	i--
+	dAtA[i] = 0x12
+	{
+		size, err := m.ObjectMeta.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *VolumeAttributesClassList) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeAttributesClassList) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *VolumeAttributesClassList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Items) > 0 {
+		for iNdEx := len(m.Items) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Items[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	{
+		size, err := m.ListMeta.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func (m *VolumeError) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1684,6 +1169,11 @@ func (m *VolumeError) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ErrorCode != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.ErrorCode))
+		i--
+		dAtA[i] = 0x18
+	}
 	i -= len(m.Message)
 	copy(dAtA[i:], m.Message)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Message)))
@@ -1806,6 +1296,12 @@ func (m *CSIDriverSpec) Size() (n int) {
 		n += 2
 	}
 	if m.SELinuxMount != nil {
+		n += 2
+	}
+	if m.NodeAllocatableUpdatePeriodSeconds != nil {
+		n += 1 + sovGenerated(uint64(*m.NodeAllocatableUpdatePeriodSeconds))
+	}
+	if m.ServiceAccountTokenInSecrets != nil {
 		n += 2
 	}
 	return n
@@ -2086,6 +1582,44 @@ func (m *VolumeAttachmentStatus) Size() (n int) {
 	return n
 }
 
+func (m *VolumeAttributesClass) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.DriverName)
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Parameters) > 0 {
+		for k, v := range m.Parameters {
+			_ = k
+			_ = v
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + len(v) + sovGenerated(uint64(len(v)))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
+func (m *VolumeAttributesClassList) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *VolumeError) Size() (n int) {
 	if m == nil {
 		return 0
@@ -2096,6 +1630,9 @@ func (m *VolumeError) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Message)
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.ErrorCode != nil {
+		n += 1 + sovGenerated(uint64(*m.ErrorCode))
+	}
 	return n
 }
 
@@ -2162,6 +1699,8 @@ func (this *CSIDriverSpec) String() string {
 		`TokenRequests:` + repeatedStringForTokenRequests + `,`,
 		`RequiresRepublish:` + valueToStringGenerated(this.RequiresRepublish) + `,`,
 		`SELinuxMount:` + valueToStringGenerated(this.SELinuxMount) + `,`,
+		`NodeAllocatableUpdatePeriodSeconds:` + valueToStringGenerated(this.NodeAllocatableUpdatePeriodSeconds) + `,`,
+		`ServiceAccountTokenInSecrets:` + valueToStringGenerated(this.ServiceAccountTokenInSecrets) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2264,7 +1803,7 @@ func (this *StorageClass) String() string {
 	for k := range this.Parameters {
 		keysForParameters = append(keysForParameters, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForParameters)
+	sort.Strings(keysForParameters)
 	mapStringForParameters := "map[string]string{"
 	for _, k := range keysForParameters {
 		mapStringForParameters += fmt.Sprintf("%v: %v,", k, this.Parameters[k])
@@ -2369,7 +1908,7 @@ func (this *VolumeAttachmentStatus) String() string {
 	for k := range this.AttachmentMetadata {
 		keysForAttachmentMetadata = append(keysForAttachmentMetadata, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAttachmentMetadata)
+	sort.Strings(keysForAttachmentMetadata)
 	mapStringForAttachmentMetadata := "map[string]string{"
 	for _, k := range keysForAttachmentMetadata {
 		mapStringForAttachmentMetadata += fmt.Sprintf("%v: %v,", k, this.AttachmentMetadata[k])
@@ -2384,6 +1923,44 @@ func (this *VolumeAttachmentStatus) String() string {
 	}, "")
 	return s
 }
+func (this *VolumeAttributesClass) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForParameters := make([]string, 0, len(this.Parameters))
+	for k := range this.Parameters {
+		keysForParameters = append(keysForParameters, k)
+	}
+	sort.Strings(keysForParameters)
+	mapStringForParameters := "map[string]string{"
+	for _, k := range keysForParameters {
+		mapStringForParameters += fmt.Sprintf("%v: %v,", k, this.Parameters[k])
+	}
+	mapStringForParameters += "}"
+	s := strings.Join([]string{`&VolumeAttributesClass{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`DriverName:` + fmt.Sprintf("%v", this.DriverName) + `,`,
+		`Parameters:` + mapStringForParameters + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeAttributesClassList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForItems := "[]VolumeAttributesClass{"
+	for _, f := range this.Items {
+		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "VolumeAttributesClass", "VolumeAttributesClass", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForItems += "}"
+	s := strings.Join([]string{`&VolumeAttributesClassList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + repeatedStringForItems + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *VolumeError) String() string {
 	if this == nil {
 		return "nil"
@@ -2391,6 +1968,7 @@ func (this *VolumeError) String() string {
 	s := strings.Join([]string{`&VolumeError{`,
 		`Time:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Time), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`ErrorCode:` + valueToStringGenerated(this.ErrorCode) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2879,6 +2457,47 @@ func (m *CSIDriverSpec) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.SELinuxMount = &b
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeAllocatableUpdatePeriodSeconds", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.NodeAllocatableUpdatePeriodSeconds = &v
+		case 10:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceAccountTokenInSecrets", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.ServiceAccountTokenInSecrets = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -5154,6 +4773,365 @@ func (m *VolumeAttachmentStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *VolumeAttributesClass) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeAttributesClass: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeAttributesClass: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DriverName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DriverName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Parameters", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Parameters == nil {
+				m.Parameters = make(map[string]string)
+			}
+			var mapkey string
+			var mapvalue string
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var stringLenmapvalue uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapvalue |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapvalue := int(stringLenmapvalue)
+					if intStringLenmapvalue < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapvalue := iNdEx + intStringLenmapvalue
+					if postStringIndexmapvalue < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapvalue > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = string(dAtA[iNdEx:postStringIndexmapvalue])
+					iNdEx = postStringIndexmapvalue
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Parameters[mapkey] = mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeAttributesClassList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeAttributesClassList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeAttributesClassList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, VolumeAttributesClass{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *VolumeError) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5248,6 +5226,26 @@ func (m *VolumeError) Unmarshal(dAtA []byte) error {
 			}
 			m.Message = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ErrorCode", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.ErrorCode = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

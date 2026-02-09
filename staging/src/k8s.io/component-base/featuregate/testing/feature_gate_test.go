@@ -17,10 +17,12 @@ limitations under the License.
 package testing
 
 import (
+	"maps"
 	gotest "testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
@@ -158,6 +160,134 @@ func TestSetFeatureGateInTest(t *gotest.T) {
 	assert.True(t, gate.Enabled("feature"))
 }
 
+func TestSetFeatureGatesInTestWithDependencies(t *gotest.T) {
+	const (
+		alphaFeature      = "AlphaFeature"
+		alphaFeatureDep   = "AlphaFeatureDep"
+		betaOffFeature    = "BetaOffFeature"
+		betaOffFeatureDep = "BetaOffFeatureDep"
+		betaOnFeature     = "BetaOnFeature"
+		betaOnFeatureDep  = "BetaOnFeatureDep"
+		gaFeature         = "GAFeature"
+	)
+	gate := featuregate.NewFeatureGate()
+	require.NoError(t, gate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
+		alphaFeature:      {PreRelease: featuregate.Alpha, Default: false},
+		alphaFeatureDep:   {PreRelease: featuregate.Alpha, Default: false},
+		betaOffFeature:    {PreRelease: featuregate.Beta, Default: false},
+		betaOffFeatureDep: {PreRelease: featuregate.Beta, Default: false},
+		betaOnFeature:     {PreRelease: featuregate.Beta, Default: true},
+		betaOnFeatureDep:  {PreRelease: featuregate.Beta, Default: true},
+		gaFeature:         {PreRelease: featuregate.GA, Default: true},
+	}))
+	require.NoError(t, gate.AddDependencies(map[featuregate.Feature][]featuregate.Feature{
+		alphaFeature:   {betaOnFeatureDep, betaOffFeatureDep, alphaFeatureDep},
+		betaOffFeature: {betaOnFeatureDep, betaOffFeatureDep},
+		betaOnFeature:  {betaOnFeatureDep},
+		gaFeature:      {},
+	}))
+
+	initialState := map[featuregate.Feature]bool{
+		"AllAlpha": false,
+		"AllBeta":  false,
+
+		alphaFeature:      false,
+		alphaFeatureDep:   false,
+		betaOffFeature:    false,
+		betaOffFeatureDep: false,
+		betaOnFeature:     true,
+		betaOnFeatureDep:  true,
+		gaFeature:         true,
+	}
+	expect(t, gate, initialState)
+
+	tests := []struct {
+		name              string
+		overrides         FeatureOverrides
+		expectedOverrides FeatureOverrides
+		expectError       bool
+	}{{
+		name:      "AllBeta",
+		overrides: FeatureOverrides{"AllBeta": true},
+		expectedOverrides: FeatureOverrides{
+			"AllBeta":         true,
+			betaOffFeature:    true,
+			betaOffFeatureDep: true,
+		},
+	}, {
+		name:      "AllBeta=false",
+		overrides: FeatureOverrides{"AllBeta": false},
+		expectedOverrides: FeatureOverrides{
+			"AllBeta":        false,
+			betaOnFeature:    false,
+			betaOnFeatureDep: false,
+		},
+	}, {
+		name:      "AllBeta+AllAlpha",
+		overrides: FeatureOverrides{"AllBeta": true, "AllAlpha": true},
+		expectedOverrides: FeatureOverrides{
+			"AllAlpha":        true,
+			"AllBeta":         true,
+			alphaFeature:      true,
+			alphaFeatureDep:   true,
+			betaOffFeature:    true,
+			betaOffFeatureDep: true,
+		},
+	}, {
+		name:        "AllAlpha",
+		overrides:   FeatureOverrides{"AllAlpha": true},
+		expectError: true,
+	}, {
+		name:      "Automatically disable deps",
+		overrides: FeatureOverrides{betaOnFeatureDep: false},
+		expectedOverrides: FeatureOverrides{
+			betaOnFeature:    false,
+			betaOnFeatureDep: false,
+		},
+	}, {
+		name:      "Don't automatically enable deps",
+		overrides: FeatureOverrides{betaOffFeatureDep: true},
+		expectedOverrides: FeatureOverrides{
+			betaOffFeatureDep: true,
+			betaOffFeature:    false,
+		},
+	}, {
+		name: "Error when disabling dependency",
+		overrides: FeatureOverrides{
+			betaOnFeature:    true, // Explicitly enabled so it's not automatically disabled.
+			betaOnFeatureDep: false,
+		},
+		expectError: true,
+	}, {
+		name: "Error when enabling dependent",
+		overrides: FeatureOverrides{
+			betaOffFeature: true,
+		},
+		expectError: true,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *gotest.T) {
+			// Separate inner test so we can verify cleanup in the outer test.
+			t.Run("Set", func(t *gotest.T) {
+				if test.expectError {
+					fakeT := &ignoreErrorT{ignoreFatalT: &ignoreFatalT{T: t}}
+					SetFeatureGatesDuringTest(fakeT, gate, test.overrides)
+					require.True(t, fakeT.errorRecorded, "should capture error")
+					expect(t, gate, initialState)
+				} else {
+					SetFeatureGatesDuringTest(t, gate, test.overrides)
+					expectedState := maps.Clone(initialState)
+					maps.Copy(expectedState, test.expectedOverrides)
+					expect(t, gate, expectedState)
+				}
+			})
+			// Verify revert in cleanup.
+			expect(t, gate, initialState)
+		})
+	}
+}
+
 func TestSpecialGatesVersioned(t *gotest.T) {
 	originalEmulationVersion := version.MustParse("1.31")
 	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion)
@@ -173,15 +303,15 @@ func TestSpecialGatesVersioned(t *gotest.T) {
 			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 		},
 		"beta_default_on_set_off": {
-			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 		},
 		"beta_default_off": {
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
 		},
 		"beta_default_off_set_on": {
-			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		},
 	})
 	require.NoError(t, err)
@@ -426,6 +556,130 @@ func TestDetectEmulationVersionLeakToOtherSubtest(t *gotest.T) {
 	})
 }
 
+func TestSetFeatureGateVersionsInTest(t *gotest.T) {
+	t.Cleanup(cleanup)
+	originalEmuVer := version.MustParse("1.31")
+	originalMinCompatVer := version.MustParse("1.30")
+	gate := featuregate.NewVersionedFeatureGateWithMinCompatibility(originalEmuVer, originalMinCompatVer)
+
+	assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+
+	newEmuVer := version.MustParse("1.29")
+	newMinCompatVer := version.MustParse("1.27")
+
+	SetFeatureGateVersionsDuringTest(t, gate, newEmuVer, newMinCompatVer)
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+
+	t.Run("Subtest", func(t *gotest.T) {
+		assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+		newerEmuVer := version.MustParse("1.27")
+		newerMinCompatVer := version.MustParse("1.26")
+		SetFeatureGateVersionsDuringTest(t, gate, newerEmuVer, newerMinCompatVer)
+		assert.True(t, gate.EmulationVersion().EqualTo(newerEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newerMinCompatVer))
+	})
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+
+	t.Run("ParallelSubtest", func(t *gotest.T) {
+		assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+		t.Parallel()
+		assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+	})
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+}
+
+func TestDetectVersionsLeakToMainTest(t *gotest.T) {
+	t.Cleanup(cleanup)
+	originalEmuVer := version.MustParse("1.31")
+	originalMinCompatVer := version.MustParse("1.30")
+	gate := featuregate.NewVersionedFeatureGateWithMinCompatibility(originalEmuVer, originalMinCompatVer)
+	assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+
+	newEmuVer := version.MustParse("1.29")
+	newMinCompatVer := version.MustParse("1.28")
+
+	// Subtest setting feature gate and calling parallel will leak it out
+	t.Run("LeakingSubtest", func(t *gotest.T) {
+		fakeT := &ignoreFatalT{T: t}
+		SetFeatureGateVersionsDuringTest(fakeT, gate, newEmuVer, newMinCompatVer)
+		// Calling t.Parallel in subtest will resume the main test body
+		t.Parallel()
+		// Leaked from main test
+		assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+	})
+	// Leaked from subtest
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+	fakeT := &ignoreFatalT{T: t}
+	SetFeatureGateVersionsDuringTest(fakeT, gate, originalEmuVer, originalMinCompatVer)
+	assert.True(t, fakeT.fatalRecorded)
+}
+
+func TestNoLeakFromSameVersionsToMainTest(t *gotest.T) {
+	t.Cleanup(cleanup)
+	originalEmuVer := version.MustParse("1.31")
+	originalMinCompatVer := version.MustParse("1.30")
+	gate := featuregate.NewVersionedFeatureGateWithMinCompatibility(originalEmuVer, originalMinCompatVer)
+	assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+
+	newEmuVer := version.MustParse("1.31")
+	newMinCompatVer := version.MustParse("1.30")
+
+	// Subtest setting feature gate and calling parallel will leak it out
+	t.Run("LeakingSubtest", func(t *gotest.T) {
+		SetFeatureGateVersionsDuringTest(t, gate, newEmuVer, newMinCompatVer)
+		// Calling t.Parallel in subtest will resume the main test body
+		t.Parallel()
+		// Leaked from main test
+		assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+	})
+	// Leaked from subtest
+	assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+	SetFeatureGateVersionsDuringTest(t, gate, originalEmuVer, originalMinCompatVer)
+}
+
+func TestDetectVersionsLeakToOtherSubtest(t *gotest.T) {
+	t.Cleanup(cleanup)
+	originalEmuVer := version.MustParse("1.31")
+	originalMinCompatVer := version.MustParse("1.30")
+	gate := featuregate.NewVersionedFeatureGateWithMinCompatibility(originalEmuVer, originalMinCompatVer)
+	assert.True(t, gate.EmulationVersion().EqualTo(originalEmuVer))
+	assert.True(t, gate.MinCompatibilityVersion().EqualTo(originalMinCompatVer))
+
+	subtestName := "Subtest"
+	newEmuVer := version.MustParse("1.29")
+	newMinCompatVer := version.MustParse("1.28")
+
+	// Subtest setting feature gate and calling parallel will leak it out
+	t.Run(subtestName, func(t *gotest.T) {
+		fakeT := &ignoreFatalT{T: t}
+		SetFeatureGateVersionsDuringTest(fakeT, gate, newEmuVer, newMinCompatVer)
+		t.Parallel()
+	})
+	// Add suffix to name to prevent tests with the same prefix.
+	t.Run(subtestName+"Suffix", func(t *gotest.T) {
+		// Leaked newEmulationVersion and newMinCompatibilityVersion
+		assert.True(t, gate.EmulationVersion().EqualTo(newEmuVer))
+		assert.True(t, gate.MinCompatibilityVersion().EqualTo(newMinCompatVer))
+
+		fakeT := &ignoreFatalT{T: t}
+		SetFeatureGateVersionsDuringTest(fakeT, gate, originalEmuVer, originalMinCompatVer)
+		assert.True(t, fakeT.fatalRecorded)
+	})
+}
+
 type ignoreFatalT struct {
 	*gotest.T
 	fatalRecorded bool
@@ -434,7 +688,7 @@ type ignoreFatalT struct {
 func (f *ignoreFatalT) Fatal(args ...any) {
 	f.T.Helper()
 	f.fatalRecorded = true
-	newArgs := []any{"[IGNORED]"}
+	newArgs := []any{"[IGNORED Fatal]"}
 	newArgs = append(newArgs, args...)
 	f.T.Log(newArgs...)
 }
@@ -442,11 +696,30 @@ func (f *ignoreFatalT) Fatal(args ...any) {
 func (f *ignoreFatalT) Fatalf(format string, args ...any) {
 	f.T.Helper()
 	f.fatalRecorded = true
-	f.T.Logf("[IGNORED] "+format, args...)
+	f.T.Logf("[IGNORED Fatalf] "+format, args...)
+}
+
+type ignoreErrorT struct {
+	*ignoreFatalT
+	errorRecorded bool
+}
+
+func (f *ignoreErrorT) Error(args ...any) {
+	f.T.Helper()
+	f.errorRecorded = true
+	newArgs := []any{"[IGNORED Error]"}
+	newArgs = append(newArgs, args...)
+	f.T.Log(newArgs...)
+}
+
+func (f *ignoreErrorT) Errorf(format string, args ...any) {
+	f.T.Helper()
+	f.errorRecorded = true
+	f.T.Logf("[IGNORED Errorf] "+format, args...)
 }
 
 func cleanup() {
 	featureFlagOverride = map[featuregate.Feature]string{}
-	emulationVersionOverride = ""
-	emulationVersionOverrideValue = nil
+	versionsOverride = ""
+	versionsOverrideValue = ""
 }

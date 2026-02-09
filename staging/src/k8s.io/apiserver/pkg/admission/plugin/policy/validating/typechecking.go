@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -39,8 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -179,20 +177,17 @@ func (c *TypeChecker) CreateContext(policy *v1.ValidatingAdmissionPolicy) *TypeC
 
 func (c *TypeChecker) compiler(ctx *TypeCheckingContext, typeOverwrite typeOverwrite) (*plugincel.CompositedCompiler, error) {
 	envSet, err := buildEnvSet(
-		/* hasParams */ ctx.paramDeclType != nil,
+		/* hasParams */ !ctx.paramGVK.Empty(),
 		/* hasAuthorizer */ true,
 		typeOverwrite)
 	if err != nil {
 		return nil, err
 	}
-	env, err := plugincel.NewCompositionEnv(plugincel.VariablesTypeName, envSet)
+	compiler, err := plugincel.NewCompositedCompilerForTypeChecking(envSet)
 	if err != nil {
 		return nil, err
 	}
-	compiler := &plugincel.CompositedCompiler{
-		Compiler:       &typeCheckingCompiler{typeOverwrite: typeOverwrite, compositionEnv: env},
-		CompositionEnv: env,
-	}
+	compiler.Compiler = &typeCheckingCompiler{typeOverwrite: typeOverwrite, compiler: compiler}
 	return compiler, nil
 }
 
@@ -210,9 +205,8 @@ func (c *TypeChecker) CheckExpression(ctx *TypeCheckingContext, expression strin
 			continue
 		}
 		options := plugincel.OptionalVariableDeclarations{
-			HasParams:     ctx.paramDeclType != nil,
+			HasParams:     !ctx.paramGVK.Empty(),
 			HasAuthorizer: true,
-			StrictCost:    utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP),
 		}
 		compiler.CompileAndStoreVariables(convertv1beta1Variables(ctx.variables), options, environment.StoredExpressions)
 		result := compiler.CompileCELExpression(celExpression(expression), options, environment.StoredExpressions)
@@ -250,7 +244,11 @@ func (c *TypeChecker) declType(gvk schema.GroupVersionKind) (*apiservercel.DeclT
 	if err != nil {
 		return nil, err
 	}
-	return common.SchemaDeclType(&openapi.Schema{Schema: s}, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
+	declType := common.SchemaDeclType(&openapi.Schema{Schema: s}, true)
+	if declType == nil {
+		return nil, nil
+	}
+	return declType.MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
 }
 
 func (c *TypeChecker) paramsGVK(policy *v1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
@@ -394,7 +392,7 @@ func (c *TypeChecker) tryRefreshRESTMapper() {
 }
 
 func buildEnvSet(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*environment.EnvSet, error) {
-	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP))
+	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	requestType := plugincel.BuildRequestType()
 	namespaceType := plugincel.BuildNamespaceType()
 
@@ -410,12 +408,16 @@ func buildEnvSet(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*envi
 	varOpts = append(varOpts, createVariableOpts(requestType, plugincel.RequestVarName)...)
 
 	// object and oldObject, same type, type(s) resolved from constraints
-	declTypes = append(declTypes, types.object)
+	if types.object != nil {
+		declTypes = append(declTypes, types.object)
+	}
 	varOpts = append(varOpts, createVariableOpts(types.object, plugincel.ObjectVarName, plugincel.OldObjectVarName)...)
 
 	// params, defined by ParamKind
-	if hasParams && types.params != nil {
-		declTypes = append(declTypes, types.params)
+	if hasParams {
+		if types.params != nil {
+			declTypes = append(declTypes, types.params)
+		}
 		varOpts = append(varOpts, createVariableOpts(types.params, plugincel.ParamsVarName)...)
 	}
 
@@ -452,8 +454,8 @@ func createVariableOpts(declType *apiservercel.DeclType, variables ...string) []
 }
 
 type typeCheckingCompiler struct {
-	compositionEnv *plugincel.CompositionEnv
-	typeOverwrite  typeOverwrite
+	compiler      *plugincel.CompositedCompiler
+	typeOverwrite typeOverwrite
 }
 
 // CompileCELExpression compiles the given expression.
@@ -472,7 +474,7 @@ func (c *typeCheckingCompiler) CompileCELExpression(expressionAccessor plugincel
 			ExpressionAccessor: expressionAccessor,
 		}
 	}
-	env, err := c.compositionEnv.Env(mode)
+	env, err := c.compiler.Env(mode)
 	if err != nil {
 		return resultError(fmt.Sprintf("fail to build env: %v", err), apiservercel.ErrorTypeInternal)
 	}

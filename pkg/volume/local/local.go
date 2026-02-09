@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/keymutex"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -111,7 +112,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.LocalVolumeSource, bool, error) {
 	return nil, false, fmt.Errorf("Spec does not reference a Local volume type")
 }
 
-func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	_, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -132,7 +133,7 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 			pod:             pod,
 			podUID:          pod.UID,
 			volName:         spec.Name(),
-			mounter:         plugin.host.GetMounter(plugin.GetPluginName()),
+			mounter:         plugin.host.GetMounter(),
 			hostUtil:        kvh.GetHostUtil(),
 			plugin:          plugin,
 			globalPath:      globalLocalPath,
@@ -149,14 +150,13 @@ func (plugin *localVolumePlugin) NewUnmounter(volName string, podUID types.UID) 
 		localVolume: &localVolume{
 			podUID:  podUID,
 			volName: volName,
-			mounter: plugin.host.GetMounter(plugin.GetPluginName()),
+			mounter: plugin.host.GetMounter(),
 			plugin:  plugin,
 		},
 	}, nil
 }
 
-func (plugin *localVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod,
-	_ volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+func (plugin *localVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod) (volume.BlockVolumeMapper, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -202,7 +202,7 @@ func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath strin
 	// For filesystem volume with block source, we should resolve to its device
 	// path if global mount path exists.
 	var path string
-	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	mounter := plugin.host.GetMounter()
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		return volume.ReconstructedVolume{}, err
@@ -310,9 +310,13 @@ func (plugin *localVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error
 	if !ok {
 		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
+	return plugin.newDeviceMounterInternal(kvh, plugin.host.GetMounter(), utilexec.New())
+}
+
+func (plugin *localVolumePlugin) newDeviceMounterInternal(kvh volume.KubeletVolumeHost, mounter mount.Interface, exec utilexec.Interface) (volume.DeviceMounter, error) {
 	return &deviceMounter{
 		plugin:   plugin,
-		mounter:  util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mounter:  mount.NewSafeFormatAndMount(mounter, exec),
 		hostUtil: kvh.GetHostUtil(),
 	}, nil
 }
@@ -406,7 +410,7 @@ func (plugin *localVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOptio
 
 	switch fileType {
 	case hostutil.FileTypeBlockDev:
-		_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), localDevicePath, resizeOptions.DeviceMountPath)
+		_, err = util.GenericResizeFS(plugin.host, localDevicePath, resizeOptions.DeviceMountPath)
 		if err != nil {
 			return false, err
 		}
@@ -450,14 +454,18 @@ func (dm *deviceMounter) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 }
 
 func (plugin *localVolumePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.newDeviceUnmounterInternal(plugin.host.GetMounter(), utilexec.New())
+}
+
+func (plugin *localVolumePlugin) newDeviceUnmounterInternal(mounter mount.Interface, exec utilexec.Interface) (volume.DeviceUnmounter, error) {
 	return &deviceMounter{
 		plugin:  plugin,
-		mounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mounter: mount.NewSafeFormatAndMount(mounter, exec),
 	}, nil
 }
 
 func (plugin *localVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	mounter := plugin.host.GetMounter()
 	return mounter.GetMountRefs(deviceMountPath)
 }
 
@@ -611,7 +619,9 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 	if !m.readOnly {
 		// Volume owner will be written only once on the first volume mount
 		if len(refs) == 0 {
-			return volume.SetVolumeOwnership(m, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(m.plugin, nil))
+			ownershipChanger := volume.NewVolumeOwnership(m, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(m.plugin, nil))
+			ownershipChanger.AddProgressNotifier(m.pod, mounterArgs.Recorder)
+			return ownershipChanger.ChangePermissions()
 		}
 	}
 	return nil

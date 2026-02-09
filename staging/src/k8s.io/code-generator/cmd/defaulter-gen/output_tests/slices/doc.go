@@ -17,4 +17,4 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 
 // This is a test package.
-package slices // import "k8s.io/code-generator/cmd/defaulter-gen/output_tests/slices"
+package slices

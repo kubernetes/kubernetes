@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PodLister helps list Pods.
@@ -30,7 +30,7 @@ import (
 type PodLister interface {
 	// List lists all Pods in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Pod, err error)
+	List(selector labels.Selector) (ret []*corev1.Pod, err error)
 	// Pods returns an object that can list and get Pods.
 	Pods(namespace string) PodNamespaceLister
 	PodListerExpansion
@@ -38,17 +38,17 @@ type PodLister interface {
 
 // podLister implements the PodLister interface.
 type podLister struct {
-	listers.ResourceIndexer[*v1.Pod]
+	listers.ResourceIndexer[*corev1.Pod]
 }
 
 // NewPodLister returns a new PodLister.
 func NewPodLister(indexer cache.Indexer) PodLister {
-	return &podLister{listers.New[*v1.Pod](indexer, v1.Resource("pod"))}
+	return &podLister{listers.New[*corev1.Pod](indexer, corev1.Resource("pod"))}
 }
 
 // Pods returns an object that can list and get Pods.
 func (s *podLister) Pods(namespace string) PodNamespaceLister {
-	return podNamespaceLister{listers.NewNamespaced[*v1.Pod](s.ResourceIndexer, namespace)}
+	return podNamespaceLister{listers.NewNamespaced[*corev1.Pod](s.ResourceIndexer, namespace)}
 }
 
 // PodNamespaceLister helps list and get Pods.
@@ -56,15 +56,15 @@ func (s *podLister) Pods(namespace string) PodNamespaceLister {
 type PodNamespaceLister interface {
 	// List lists all Pods in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Pod, err error)
+	List(selector labels.Selector) (ret []*corev1.Pod, err error)
 	// Get retrieves the Pod from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Pod, error)
+	Get(name string) (*corev1.Pod, error)
 	PodNamespaceListerExpansion
 }
 
 // podNamespaceLister implements the PodNamespaceLister
 // interface.
 type podNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Pod]
+	listers.ResourceIndexer[*corev1.Pod]
 }

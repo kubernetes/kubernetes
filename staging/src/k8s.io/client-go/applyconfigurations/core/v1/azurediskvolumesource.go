@@ -19,18 +19,29 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // AzureDiskVolumeSourceApplyConfiguration represents a declarative configuration of the AzureDiskVolumeSource type for use
 // with apply.
+//
+// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 type AzureDiskVolumeSourceApplyConfiguration struct {
-	DiskName    *string                      `json:"diskName,omitempty"`
-	DataDiskURI *string                      `json:"diskURI,omitempty"`
-	CachingMode *v1.AzureDataDiskCachingMode `json:"cachingMode,omitempty"`
-	FSType      *string                      `json:"fsType,omitempty"`
-	ReadOnly    *bool                        `json:"readOnly,omitempty"`
-	Kind        *v1.AzureDataDiskKind        `json:"kind,omitempty"`
+	// diskName is the Name of the data disk in the blob storage
+	DiskName *string `json:"diskName,omitempty"`
+	// diskURI is the URI of data disk in the blob storage
+	DataDiskURI *string `json:"diskURI,omitempty"`
+	// cachingMode is the Host Caching mode: None, Read Only, Read Write.
+	CachingMode *corev1.AzureDataDiskCachingMode `json:"cachingMode,omitempty"`
+	// fsType is Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType *string `json:"fsType,omitempty"`
+	// readOnly Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly *bool `json:"readOnly,omitempty"`
+	// kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+	Kind *corev1.AzureDataDiskKind `json:"kind,omitempty"`
 }
 
 // AzureDiskVolumeSourceApplyConfiguration constructs a declarative configuration of the AzureDiskVolumeSource type for use with
@@ -58,7 +69,7 @@ func (b *AzureDiskVolumeSourceApplyConfiguration) WithDataDiskURI(value string) 
 // WithCachingMode sets the CachingMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CachingMode field is set to the value of the last call.
-func (b *AzureDiskVolumeSourceApplyConfiguration) WithCachingMode(value v1.AzureDataDiskCachingMode) *AzureDiskVolumeSourceApplyConfiguration {
+func (b *AzureDiskVolumeSourceApplyConfiguration) WithCachingMode(value corev1.AzureDataDiskCachingMode) *AzureDiskVolumeSourceApplyConfiguration {
 	b.CachingMode = &value
 	return b
 }
@@ -82,7 +93,7 @@ func (b *AzureDiskVolumeSourceApplyConfiguration) WithReadOnly(value bool) *Azur
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
-func (b *AzureDiskVolumeSourceApplyConfiguration) WithKind(value v1.AzureDataDiskKind) *AzureDiskVolumeSourceApplyConfiguration {
+func (b *AzureDiskVolumeSourceApplyConfiguration) WithKind(value corev1.AzureDataDiskKind) *AzureDiskVolumeSourceApplyConfiguration {
 	b.Kind = &value
 	return b
 }

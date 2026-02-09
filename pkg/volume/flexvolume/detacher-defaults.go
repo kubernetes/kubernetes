@@ -42,5 +42,5 @@ func (d *detacherDefaults) WaitForDetach(devicePath string, timeout time.Duratio
 // UnmountDevice is part of the volume.Detacher interface.
 func (d *detacherDefaults) UnmountDevice(deviceMountPath string) error {
 	klog.Warning(logPrefix(d.plugin.flexVolumePlugin), "using default UnmountDevice for device mount path ", deviceMountPath)
-	return mount.CleanupMountPoint(deviceMountPath, d.plugin.host.GetMounter(d.plugin.GetPluginName()), false)
+	return mount.CleanupMountPoint(deviceMountPath, d.plugin.host.GetMounter(), false)
 }

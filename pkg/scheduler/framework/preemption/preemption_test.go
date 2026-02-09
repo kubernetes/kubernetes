@@ -18,35 +18,32 @@ package preemption
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
@@ -60,14 +57,18 @@ var (
 	}
 )
 
+func init() {
+	metrics.Register()
+}
+
 type FakePostFilterPlugin struct {
 	numViolatingVictim int
 }
 
 func (pl *FakePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state *framework.CycleState, pod *v1.Pod,
-	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *framework.Status) {
-	return append(victims, nodeInfo.Pods[0].Pod), pl.numViolatingVictim, nil
+	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
+	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
+	return append(victims, nodeInfo.GetPods()[0].GetPod()), pl.numViolatingVictim, nil
 }
 
 func (pl *FakePostFilterPlugin) GetOffsetAndNumCandidates(nodes int32) (int32, int32) {
@@ -78,7 +79,7 @@ func (pl *FakePostFilterPlugin) CandidatesToVictimsMap(candidates []Candidate) m
 	return nil
 }
 
-func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string) {
+func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
 	return true, ""
 }
 
@@ -89,9 +90,9 @@ func (pl *FakePostFilterPlugin) OrderedScoreFuncs(ctx context.Context, nodesToVi
 type FakePreemptionScorePostFilterPlugin struct{}
 
 func (pl *FakePreemptionScorePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state *framework.CycleState, pod *v1.Pod,
-	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *framework.Status) {
-	return append(victims, nodeInfo.Pods[0].Pod), 1, nil
+	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
+	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
+	return append(victims, nodeInfo.GetPods()[0].GetPod()), 1, nil
 }
 
 func (pl *FakePreemptionScorePostFilterPlugin) GetOffsetAndNumCandidates(nodes int32) (int32, int32) {
@@ -106,7 +107,7 @@ func (pl *FakePreemptionScorePostFilterPlugin) CandidatesToVictimsMap(candidates
 	return m
 }
 
-func (pl *FakePreemptionScorePostFilterPlugin) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string) {
+func (pl *FakePreemptionScorePostFilterPlugin) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
 	return true, ""
 }
 
@@ -120,128 +121,6 @@ func (pl *FakePreemptionScorePostFilterPlugin) OrderedScoreFuncs(ctx context.Con
 			// The smaller the sumContainers, the higher the score.
 			return -sumContainers
 		},
-	}
-}
-
-func TestNodesWherePreemptionMightHelp(t *testing.T) {
-	// Prepare 4 nodes names.
-	nodeNames := []string{"node1", "node2", "node3", "node4"}
-	tests := []struct {
-		name          string
-		nodesStatuses framework.NodeToStatusMap
-		expected      sets.Set[string] // set of expected node names.
-	}{
-		{
-			name: "No node should be attempted",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReasonPod),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
-				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
-				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
-			},
-			expected: sets.New[string](),
-		},
-		{
-			name: "ErrReasonAntiAffinityRulesNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod anti-affinity",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
-				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
-				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-			},
-			expected: sets.New("node1", "node4"),
-		},
-		{
-			name: "ErrReasonAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrReasonAntiAffinityRulesNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod anti-affinity",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
-				"node2": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
-				"node3": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-			},
-			expected: sets.New("node2", "node3", "node4"),
-		},
-		{
-			name: "Mix of failed predicates works fine",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
-				"node2": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
-				"node3": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-			},
-			expected: sets.New("node2", "node3", "node4"),
-		},
-		{
-			name: "Node condition errors should be considered unresolvable",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnknownCondition),
-				"node2": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-				"node3": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-			},
-			expected: sets.New("node2", "node3", "node4"),
-		},
-		{
-			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumezone.ErrReasonConflict),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumebinding.ErrReasonNodeConflict)),
-				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumebinding.ErrReasonBindConflict)),
-				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-			},
-			expected: sets.New("node4"),
-		},
-		{
-			name: "ErrReasonConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
-				"node3": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
-				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
-			},
-			expected: sets.New("node1", "node3", "node4"),
-		},
-		{
-			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.Unschedulable, ""),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
-				"node3": framework.NewStatus(framework.Unschedulable, ""),
-				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
-			},
-			expected: sets.New("node1", "node3"),
-		},
-		{
-			name: "ErrReasonNodeLabelNotMatch should not be tried as it indicates that the pod is unschedulable due to node doesn't have the required label",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.Unschedulable, ""),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, podtopologyspread.ErrReasonNodeLabelNotMatch),
-				"node3": framework.NewStatus(framework.Unschedulable, ""),
-				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
-			},
-			expected: sets.New("node1", "node3"),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var nodeInfos []*framework.NodeInfo
-			for _, name := range nodeNames {
-				ni := framework.NewNodeInfo()
-				ni.SetNode(st.MakeNode().Name(name).Obj())
-				nodeInfos = append(nodeInfos, ni)
-			}
-			nodes, _ := nodesWherePreemptionMightHelp(nodeInfos, tt.nodesStatuses)
-			if len(tt.expected) != len(nodes) {
-				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(tt.expected), len(nodes), nodes)
-			}
-			for _, node := range nodes {
-				name := node.Node().Name
-				if _, found := tt.expected[name]; !found {
-					t.Errorf("node %v is not expected.", name)
-				}
-			}
-		})
 	}
 }
 
@@ -321,7 +200,7 @@ func TestDryRunPreemption(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			registeredPlugins := append([]tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -335,13 +214,12 @@ func TestDryRunPreemption(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
-			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, tt.nodes)),
@@ -370,9 +248,8 @@ func TestDryRunPreemption(t *testing.T) {
 					PluginName: "FakePostFilter",
 					Handler:    fwk,
 					Interface:  fakePostPlugin,
-					State:      state,
 				}
-				got, _, _ := pe.DryRunPreemption(context.Background(), pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
+				got, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -423,7 +300,7 @@ func TestSelectCandidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
 				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
@@ -439,14 +316,13 @@ func TestSelectCandidate(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 			snapshot := internalcache.NewSnapshot(tt.testPods, nodes)
-			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := tf.NewFramework(
 				ctx,
 				registeredPlugins,
 				"",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithLogger(logger),
 			)
@@ -472,9 +348,8 @@ func TestSelectCandidate(t *testing.T) {
 					PluginName: "FakePreemptionScorePostFilter",
 					Handler:    fwk,
 					Interface:  fakePreemptionScorePostFilterPlugin,
-					State:      state,
 				}
-				candidates, _, _ := pe.DryRunPreemption(context.Background(), pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
+				candidates, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
 				if s == nil || len(s.Name()) == 0 {
 					t.Errorf("expect any node in %v, but no candidate selected", tt.expected)
@@ -482,6 +357,272 @@ func TestSelectCandidate(t *testing.T) {
 				}
 				if diff := cmp.Diff(tt.expected, s.Name()); diff != "" {
 					t.Errorf("expect any node in %v, but got %v", tt.expected, s.Name())
+				}
+			}
+		})
+	}
+}
+
+type fakeExtender struct {
+	ignorable            bool
+	errProcessPreemption bool
+	supportsPreemption   bool
+	returnsNoVictims     bool
+}
+
+func newFakeExtender() *fakeExtender {
+	return &fakeExtender{}
+}
+
+func (f *fakeExtender) WithIgnorable(ignorable bool) *fakeExtender {
+	f.ignorable = ignorable
+	return f
+}
+
+func (f *fakeExtender) WithErrProcessPreemption(errProcessPreemption bool) *fakeExtender {
+	f.errProcessPreemption = errProcessPreemption
+	return f
+}
+
+func (f *fakeExtender) WithSupportsPreemption(supportsPreemption bool) *fakeExtender {
+	f.supportsPreemption = supportsPreemption
+	return f
+}
+
+func (f *fakeExtender) WithReturnNoVictims(returnsNoVictims bool) *fakeExtender {
+	f.returnsNoVictims = returnsNoVictims
+	return f
+}
+
+func (f *fakeExtender) Name() string {
+	return "fakeExtender"
+}
+
+func (f *fakeExtender) IsIgnorable() bool {
+	return f.ignorable
+}
+
+func (f *fakeExtender) ProcessPreemption(
+	_ *v1.Pod,
+	victims map[string]*extenderv1.Victims,
+	_ fwk.NodeInfoLister,
+) (map[string]*extenderv1.Victims, error) {
+	if f.supportsPreemption {
+		if f.errProcessPreemption {
+			return nil, errors.New("extender preempt error")
+		}
+		if f.returnsNoVictims {
+			return map[string]*extenderv1.Victims{"mock": {}}, nil
+		}
+		return victims, nil
+	}
+	return nil, nil
+}
+
+func (f *fakeExtender) SupportsPreemption() bool {
+	return f.supportsPreemption
+}
+
+func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
+	return pod != nil
+}
+
+func (f *fakeExtender) Filter(_ *v1.Pod, _ []fwk.NodeInfo) ([]fwk.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
+	return nil, nil, nil, nil
+}
+
+func (f *fakeExtender) Prioritize(
+	_ *v1.Pod,
+	_ []fwk.NodeInfo,
+) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error) {
+	return nil, 0, nil
+}
+
+func (f *fakeExtender) Bind(_ *v1.Binding) error {
+	return nil
+}
+
+func (f *fakeExtender) IsBinder() bool {
+	return true
+}
+
+func (f *fakeExtender) IsPrioritizer() bool {
+	return true
+}
+
+func (f *fakeExtender) IsFilter() bool {
+	return true
+}
+
+func TestCallExtenders(t *testing.T) {
+	var (
+		node1Name            = "node1"
+		defaultSchedulerName = "default-scheduler"
+		preemptor            = st.MakePod().Name("preemptor").UID("preemptor").
+					SchedulerName(defaultSchedulerName).Priority(highPriority).
+					Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+					Obj()
+		victim = st.MakePod().Name("victim").UID("victim").
+			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
+			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+			Obj()
+		makeCandidates = func(nodeName string, pods ...*v1.Pod) []Candidate {
+			return []Candidate{
+				&candidate{
+					name: nodeName,
+					victims: &extenderv1.Victims{
+						Pods: pods,
+					},
+				},
+			}
+		}
+	)
+	tests := []struct {
+		name           string
+		extenders      []fwk.Extender
+		candidates     []Candidate
+		wantStatus     *fwk.Status
+		wantCandidates []Candidate
+	}{
+		{
+			name:           "no extenders",
+			extenders:      []fwk.Extender{},
+			candidates:     makeCandidates(node1Name, victim),
+			wantStatus:     nil,
+			wantCandidates: makeCandidates(node1Name, victim),
+		},
+		{
+			name: "one extender supports preemption",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true),
+			},
+			candidates:     makeCandidates(node1Name, victim),
+			wantStatus:     nil,
+			wantCandidates: makeCandidates(node1Name, victim),
+		},
+		{
+			name: "one extender with return no victims",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithReturnNoVictims(true),
+			},
+			candidates:     makeCandidates(node1Name, victim),
+			wantStatus:     fwk.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", node1Name)),
+			wantCandidates: []Candidate{},
+		},
+		{
+			name: "one extender does not support preemption",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(false),
+			},
+			candidates:     makeCandidates(node1Name, victim),
+			wantStatus:     nil,
+			wantCandidates: makeCandidates(node1Name, victim),
+		},
+		{
+			name: "one extender with no return victims and is ignorable",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).
+					WithReturnNoVictims(true).WithIgnorable(true),
+			},
+			candidates:     makeCandidates(node1Name, victim),
+			wantStatus:     nil,
+			wantCandidates: []Candidate{},
+		},
+		{
+			name: "one extender returns error and is ignorable",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithIgnorable(true).
+					WithSupportsPreemption(true).WithErrProcessPreemption(true),
+			},
+			candidates:     makeCandidates(node1Name, victim),
+			wantStatus:     nil,
+			wantCandidates: makeCandidates(node1Name, victim),
+		},
+		{
+			name: "one extender returns error and is not ignorable",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithErrProcessPreemption(true).
+					WithSupportsPreemption(true),
+			},
+			candidates:     makeCandidates(node1Name, victim),
+			wantStatus:     fwk.AsStatus(fmt.Errorf("extender preempt error")),
+			wantCandidates: nil,
+		},
+		{
+			name: "one extender with empty victims input",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true),
+			},
+			candidates:     []Candidate{},
+			wantStatus:     nil,
+			wantCandidates: []Candidate{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metrics.Register()
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			nodes := make([]*v1.Node, len([]string{node1Name}))
+			for i, nodeName := range []string{node1Name} {
+				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
+			}
+			registeredPlugins := append([]tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			)
+			var objs []runtime.Object
+			objs = append(objs, preemptor)
+			cs := clientsetfake.NewClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			apiDispatcher := apidispatcher.New(cs, 16, apicalls.Relevances)
+			apiDispatcher.Run(logger)
+			defer apiDispatcher.Close()
+
+			fwk, err := tf.NewFramework(
+				ctx,
+				registeredPlugins, "",
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithAPIDispatcher(apiDispatcher),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithExtenders(tt.extenders),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot([]*v1.Pod{preemptor}, nodes)),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+			cache := internalcache.New(ctx, apiDispatcher)
+			fwk.SetAPICacher(apicache.New(nil, cache))
+
+			fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
+			pe := Evaluator{
+				PluginName: "FakePreemptionScorePostFilter",
+				Handler:    fwk,
+				Interface:  fakePreemptionScorePostFilterPlugin,
+			}
+			gotCandidates, status := pe.callExtenders(logger, preemptor, tt.candidates)
+			if (tt.wantStatus == nil) != (status == nil) || status.Code() != tt.wantStatus.Code() {
+				t.Errorf("callExtenders() status mismatch. got: %v, want: %v", status, tt.wantStatus)
+			}
+
+			if len(gotCandidates) != len(tt.wantCandidates) {
+				t.Errorf("callExtenders() returned unexpected number of results. got: %d, want: %d", len(gotCandidates), len(tt.wantCandidates))
+			} else {
+				for i, gotCandidate := range gotCandidates {
+					wantCandidate := tt.wantCandidates[i]
+					if gotCandidate.Name() != wantCandidate.Name() {
+						t.Errorf("callExtenders() node name mismatch. got: %s, want: %s", gotCandidate.Name(), wantCandidate.Name())
+					}
+					if len(gotCandidate.Victims().Pods) != len(wantCandidate.Victims().Pods) {
+						t.Errorf("callExtenders() number of victim pods mismatch for node %s. got: %d, want: %d", gotCandidate.Name(), len(gotCandidate.Victims().Pods), len(wantCandidate.Victims().Pods))
+					}
 				}
 			}
 		})

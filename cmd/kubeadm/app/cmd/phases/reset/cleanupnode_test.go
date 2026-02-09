@@ -185,7 +185,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			dirsToClean := []string{
 				filepath.Join(tmpDir, test.resetDir),
 				filepath.Join(tmpDir, kubeadmconstants.ManifestsSubDirName),
-				filepath.Join(tmpDir, kubeadmconstants.TempDirForKubeadm),
+				filepath.Join(tmpDir, kubeadmconstants.TempDir),
 			}
 			resetConfigDir(tmpDir, dirsToClean, false)
 

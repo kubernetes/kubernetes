@@ -27,21 +27,6 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-func TestValidateWorks(t *testing.T) {
-	if isValidEndpoint("", 0) {
-		t.Errorf("Didn't fail for empty set")
-	}
-	if isValidEndpoint("foobar", 0) {
-		t.Errorf("Didn't fail with invalid port")
-	}
-	if isValidEndpoint("foobar", -1) {
-		t.Errorf("Didn't fail with a negative port")
-	}
-	if !isValidEndpoint("foobar", 8080) {
-		t.Errorf("Failed a valid config.")
-	}
-}
-
 func TestShouldSkipService(t *testing.T) {
 	testCases := []struct {
 		service    *v1.Service
@@ -697,7 +682,8 @@ func TestIsZeroCIDR(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := IsZeroCIDR(tc.input); tc.expected != got {
+			_, cidr, _ := netutils.ParseCIDRSloppy(tc.input)
+			if got := IsZeroCIDR(cidr); tc.expected != got {
 				t.Errorf("IsZeroCIDR() = %t, want %t", got, tc.expected)
 			}
 		})

@@ -39,7 +39,7 @@ kube::verify::generated() {
 
     _tmpdir="$(kube::realpath "$(mktemp -d -t "verify-generated-$(basename "$1").XXXXXX")")"
     git worktree add -f -q "${_tmpdir}" HEAD
-    kube::util::trap_add "git worktree remove -f ${_tmpdir}" EXIT
+    kube::util::trap_add "git worktree remove -f ${_tmpdir:?}; rm -rf ${_tmpdir:?}" EXIT
     cd "${_tmpdir}"
 
     # Update generated files.

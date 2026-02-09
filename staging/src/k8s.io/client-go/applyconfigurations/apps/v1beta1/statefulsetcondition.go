@@ -19,19 +19,26 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // StatefulSetConditionApplyConfiguration represents a declarative configuration of the StatefulSetCondition type for use
 // with apply.
+//
+// StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetConditionApplyConfiguration struct {
-	Type               *v1beta1.StatefulSetConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus               `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                      `json:"lastTransitionTime,omitempty"`
-	Reason             *string                           `json:"reason,omitempty"`
-	Message            *string                           `json:"message,omitempty"`
+	// Type of statefulset condition.
+	Type *appsv1beta1.StatefulSetConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *v1.ConditionStatus `json:"status,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // StatefulSetConditionApplyConfiguration constructs a declarative configuration of the StatefulSetCondition type for use with
@@ -43,7 +50,7 @@ func StatefulSetCondition() *StatefulSetConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *StatefulSetConditionApplyConfiguration) WithType(value v1beta1.StatefulSetConditionType) *StatefulSetConditionApplyConfiguration {
+func (b *StatefulSetConditionApplyConfiguration) WithType(value appsv1beta1.StatefulSetConditionType) *StatefulSetConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

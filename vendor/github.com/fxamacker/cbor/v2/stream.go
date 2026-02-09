@@ -26,7 +26,7 @@ func NewDecoder(r io.Reader) *Decoder {
 }
 
 // Decode reads CBOR value and decodes it into the value pointed to by v.
-func (dec *Decoder) Decode(v interface{}) error {
+func (dec *Decoder) Decode(v any) error {
 	_, err := dec.readNext()
 	if err != nil {
 		// Return validation error or read error.
@@ -170,7 +170,7 @@ func NewEncoder(w io.Writer) *Encoder {
 }
 
 // Encode writes the CBOR encoding of v.
-func (enc *Encoder) Encode(v interface{}) error {
+func (enc *Encoder) Encode(v any) error {
 	if len(enc.indefTypes) > 0 && v != nil {
 		indefType := enc.indefTypes[len(enc.indefTypes)-1]
 		if indefType == cborTypeTextString {

@@ -69,7 +69,6 @@ func Example_view() {
 	//   name: federal-context
 	// current-context: federal-context
 	// kind: Config
-	// preferences: {}
 	// users:
 	// - name: red-user
 	//   user:

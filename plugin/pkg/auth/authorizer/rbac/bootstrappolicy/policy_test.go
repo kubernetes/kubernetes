@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/auth/rbac/validation"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -174,6 +177,28 @@ func TestBootstrapClusterRoles(t *testing.T) {
 	testObjects(t, list, "cluster-roles.yaml")
 }
 
+func TestBootstrapClusterRolesWithFeatureGatesEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
+
+	bootstrapRoles := bootstrappolicy.ClusterRoles()
+	featureGateList := &api.List{}
+	featureGateNames := sets.NewString()
+	featureGateRoles := map[string]runtime.Object{}
+	for i := range bootstrapRoles {
+		role := bootstrapRoles[i]
+		featureGateNames.Insert(role.Name)
+		featureGateRoles[role.Name] = &role
+	}
+	for _, featureGateName := range featureGateNames.List() {
+		featureGateList.Items = append(featureGateList.Items, featureGateRoles[featureGateName])
+	}
+
+	testObjects(t, featureGateList, "cluster-roles-featuregates.yaml")
+}
+
 func TestBootstrapClusterRoleBindings(t *testing.T) {
 	list := &api.List{}
 	names := sets.NewString()
@@ -282,6 +307,42 @@ func TestClusterRoleLabel(t *testing.T) {
 		}
 		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
 			t.Errorf("ClusterRoleBinding: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
+	}
+}
+
+func TestNodeRuleVerbsConsistency(t *testing.T) {
+	rules := bootstrappolicy.NodeRules()
+	for _, rule := range rules {
+		verbs := rule.Verbs
+		if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {
+			t.Errorf("The NodeRule has Verb `List` but does not have Verb `Watch`.")
+		}
+	}
+}
+
+func TestClusterRoleVerbsConsistency(t *testing.T) {
+	roles := bootstrappolicy.ClusterRoles()
+	for _, role := range roles {
+		for _, rule := range role.Rules {
+			verbs := rule.Verbs
+			if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {
+				t.Errorf("The ClusterRole %s has Verb `List` but does not have Verb `Watch`.", role.Name)
+			}
+		}
+	}
+}
+
+func TestNamespaceRoleVerbsConsistency(t *testing.T) {
+	namespaceRoles := bootstrappolicy.NamespaceRoles()
+	for namespace, roles := range namespaceRoles {
+		for _, role := range roles {
+			for _, rule := range role.Rules {
+				verbs := rule.Verbs
+				if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {
+					t.Errorf("The Role %s/%s has Verb `List` but does not have Verb `Watch`.", namespace, role.Name)
+				}
+			}
 		}
 	}
 }

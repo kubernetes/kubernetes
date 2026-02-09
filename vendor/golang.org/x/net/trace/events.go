@@ -58,8 +58,8 @@ func RenderEvents(w http.ResponseWriter, req *http.Request, sensitive bool) {
 		Buckets: buckets,
 	}
 
-	data.Families = make([]string, 0, len(families))
 	famMu.RLock()
+	data.Families = make([]string, 0, len(families))
 	for name := range families {
 		data.Families = append(data.Families, name)
 	}
@@ -508,7 +508,7 @@ const eventsHTML = `
 	<tr class="first">
 		<td class="when">{{$el.When}}</td>
 		<td class="elapsed">{{$el.ElapsedTime}}</td>
-		<td>{{$el.Title}}
+		<td>{{$el.Title}}</td>
 	</tr>
 	{{if $.Expanded}}
 	<tr>

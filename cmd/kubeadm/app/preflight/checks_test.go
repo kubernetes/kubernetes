@@ -26,20 +26,22 @@ import (
 	"strings"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
+	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 var (
@@ -424,16 +426,16 @@ func TestRunChecks(t *testing.T) {
 	}{
 		{[]Checker{}, true, ""},
 		{[]Checker{preflightCheckTest{"warning"}}, true, "\t[WARNING preflightCheckTest]: warning\n"}, // should just print warning
-		{[]Checker{preflightCheckTest{"error"}}, false, ""},
-		{[]Checker{preflightCheckTest{"test"}}, false, ""},
+		{[]Checker{preflightCheckTest{"error"}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR preflightCheckTest]: fake error\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
+		{[]Checker{preflightCheckTest{"test"}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR preflightCheckTest]: fake error\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{DirAvailableCheck{Path: "/does/not/exist"}}, true, ""},
-		{[]Checker{DirAvailableCheck{Path: "/"}}, false, ""},
+		{[]Checker{DirAvailableCheck{Path: "/"}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR DirAvailable--]: / is not empty\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{FileAvailableCheck{Path: "/does/not/exist"}}, true, ""},
-		{[]Checker{FileContentCheck{Path: "/does/not/exist"}}, false, ""},
+		{[]Checker{FileContentCheck{Path: "/does/not/exist"}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR FileContent--does-not-exist]: /does/not/exist does not exist\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{FileContentCheck{Path: "/"}}, true, ""},
-		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
+		{[]Checker{FileContentCheck{Path: "/", Content: []byte("content can not be read")}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR FileContent--]: / could not be read\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{InPathCheck{executable: "foobarbaz", exec: exec.New()}}, true, "\t[WARNING FileExisting-foobarbaz]: foobarbaz not found in system path\n"},
-		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, ""},
+		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR FileExisting-foobarbaz]: foobarbaz not found in system path\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{InPathCheck{executable: "foobar", mandatory: false, exec: exec.New(), suggestion: "install foobar"}}, true, "\t[WARNING FileExisting-foobar]: foobar not found in system path\nSuggestion: install foobar\n"},
 	}
 	for _, rt := range tokenTest {
@@ -902,11 +904,6 @@ func TestInitIPCheck(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("unsupported OS")
 	}
-	// should be a privileged user for the `init` command, otherwise just skip it.
-	isPrivileged := IsPrivilegedUserCheck{}
-	if _, err := isPrivileged.Check(); err != nil {
-		t.Skip("not a privileged user")
-	}
 	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
 		t.Fatalf("unexpected failure when defaulting InitConfiguration: %v", err)
@@ -969,11 +966,6 @@ func TestJoinIPCheck(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("unsupported OS")
 	}
-	// should be a privileged user for the `join` command, otherwise just skip it.
-	isPrivileged := IsPrivilegedUserCheck{}
-	if _, err := isPrivileged.Check(); err != nil {
-		t.Skip("not a privileged user")
-	}
 
 	opts := configutil.LoadOrDefaultConfigurationOptions{
 		SkipCRIDetect: true,
@@ -1028,6 +1020,87 @@ func TestJoinIPCheck(t *testing.T) {
 			}
 			if diff := cmp.Diff(checkList, rt.expStr); diff != "" {
 				t.Fatalf("unexpected file content check (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestContainerRuntimeCheck(t *testing.T) {
+	tests := []struct {
+		name           string
+		prepare        func(*utilruntime.FakeImpl)
+		expectErrors   int
+		expectWarnings int
+	}{
+		{
+			name: "ok",
+		},
+		{
+			name: "container runtime is not running",
+			prepare: func(mock *utilruntime.FakeImpl) {
+				mock.StatusReturns(nil, errors.New("not running"))
+			},
+			expectErrors: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mock := &utilruntime.FakeImpl{}
+			if test.prepare != nil {
+				test.prepare(mock)
+			}
+
+			warnings, errors := ContainerRuntimeCheck{impl: mock}.Check()
+			if len(warnings) != test.expectWarnings {
+				t.Errorf("expected %d warning(s) but got %d: %q", test.expectWarnings, len(warnings), warnings)
+			}
+			if len(errors) != test.expectErrors {
+				t.Errorf("expected %d error(s) but got %d: %q", test.expectErrors, len(errors), errors)
+			}
+		})
+	}
+}
+
+func TestContainerRuntimeVersionCheck(t *testing.T) {
+	tests := []struct {
+		name           string
+		prepare        func(*utilruntime.FakeImpl)
+		expectErrors   int
+		expectWarnings int
+	}{
+		{
+			name: "ok",
+		},
+		{
+			name: "runtime config not implemented",
+			prepare: func(mock *utilruntime.FakeImpl) {
+				mock.RuntimeConfigReturns(nil, status.New(codes.Unimplemented, "not implemented").Err())
+			},
+			expectWarnings: 1,
+		},
+		{
+			name: "call RuntimeConfig fails",
+			prepare: func(mock *utilruntime.FakeImpl) {
+				mock.RuntimeConfigReturns(nil, status.New(codes.DeadlineExceeded, "deadline exceeded").Err())
+			},
+			expectErrors: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mock := &utilruntime.FakeImpl{}
+			if test.prepare != nil {
+				test.prepare(mock)
+			}
+
+			warnings, errors := ContainerRuntimeVersionCheck{impl: mock}.Check()
+			if len(warnings) != test.expectWarnings {
+				t.Errorf("expected %d warning(s) but got %d: %q", test.expectWarnings, len(warnings), warnings)
+			}
+			if len(errors) != test.expectErrors {
+				t.Errorf("expected %d error(s) but got %d: %q", test.expectErrors, len(errors), errors)
 			}
 		})
 	}

@@ -76,7 +76,6 @@ func TestStorageReadinessHookTimeout(t *testing.T) {
 	ctx := context.Background()
 	hookCtx := PostStartHookContext{
 		LoopbackClientConfig: nil,
-		StopCh:               ctx.Done(),
 		Context:              ctx,
 	}
 	if err := h.Hook(hookCtx); err != nil {

@@ -16,10 +16,8 @@ reviewers:
   - caesarxuchao
   - mikedanese
   - liggitt
-  - ncdc
   - sttts
   - hzxuzhonghu
-  - logicalhan
   - yue9944882
   - jpbetz
 labels:
@@ -28,3 +26,5 @@ labels:
 emeritus_approvers:
   - nikhiljindal
   - lavalamp
+emeritus_reviewers:
+  - ncdc

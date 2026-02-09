@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -28,11 +27,12 @@ import (
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog/v2/ktesting"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 
 	"k8s.io/mount-utils"
@@ -65,7 +65,8 @@ func fakeContainerMgrMountInt() mount.Interface {
 }
 
 func TestCgroupMountValidationSuccess(t *testing.T) {
-	f, err := validateSystemRequirements(fakeContainerMgrMountInt())
+	logger, _ := ktesting.NewTestContext(t)
+	f, err := validateSystemRequirements(logger, fakeContainerMgrMountInt())
 	assert.NoError(t, err)
 	if cgroups.IsCgroup2UnifiedMode() {
 		assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
@@ -78,6 +79,7 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 	if cgroups.IsCgroup2UnifiedMode() {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	mountInt := mount.NewFakeMounter(
 		[]mount.MountPoint{
 			{
@@ -96,7 +98,7 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 				Opts:   []string{"rw", "relatime", "cpuacct"},
 			},
 		})
-	_, err := validateSystemRequirements(mountInt)
+	_, err := validateSystemRequirements(logger, mountInt)
 	assert.Error(t, err)
 }
 
@@ -104,6 +106,7 @@ func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 	if cgroups.IsCgroup2UnifiedMode() {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	mountInt := mount.NewFakeMounter(
 		[]mount.MountPoint{
 			{
@@ -122,7 +125,7 @@ func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 				Opts:   []string{"rw", "relatime", "cpuacct"},
 			},
 		})
-	_, err := validateSystemRequirements(mountInt)
+	_, err := validateSystemRequirements(logger, mountInt)
 	assert.NoError(t, err)
 }
 
@@ -143,6 +146,7 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	if cgroups.IsCgroup2UnifiedMode() {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	req := require.New(t)
 	tempDir, err := os.MkdirTemp("", "")
 	req.NoError(err)
@@ -168,7 +172,7 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 				Opts:   []string{"rw", "relatime", "cpuacct", "memory"},
 			},
 		})
-	f, err := validateSystemRequirements(mountInt)
+	f, err := validateSystemRequirements(logger, mountInt)
 	assert.NoError(t, err)
 	assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
 }
@@ -257,7 +261,7 @@ func TestGetCapacity(t *testing.T) {
 }
 
 func TestNewPodContainerManager(t *testing.T) {
-
+	logger, _ := ktesting.NewTestContext(t)
 	info := QOSContainersInfo{
 		Guaranteed: CgroupName{"guaranteed"},
 		BestEffort: CgroupName{"besteffort"},
@@ -279,7 +283,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, ""),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, ""),
 				},
 
 				NodeConfig: QosDisabled,
@@ -290,7 +294,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, ""),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, ""),
 				},
 
 				NodeConfig: QosEnabled,
@@ -301,7 +305,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, "systemd"),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, "systemd"),
 				},
 
 				NodeConfig: QosEnabled,
@@ -312,7 +316,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, "systemd"),
+					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, "systemd"),
 				},
 
 				NodeConfig: QosDisabled,

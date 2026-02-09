@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -38,13 +39,16 @@ import (
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	basecompatibility "k8s.io/component-base/compatibility"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
@@ -83,6 +87,34 @@ func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
 	}
 }
 
+func TestAuthorizeClientBearerTokenRequiredGroups(t *testing.T) {
+	fakeAuthenticator := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return &authenticator.Response{User: &user.DefaultInfo{}}, false, nil
+	})
+	fakeAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+		return authorizer.DecisionAllow, "", nil
+	})
+	target := &rest.Config{BearerToken: "secretToken"}
+	authN := &AuthenticationInfo{Authenticator: fakeAuthenticator}
+	authC := &AuthorizationInfo{Authorizer: fakeAuthorizer}
+
+	AuthorizeClientBearerToken(target, authN, authC)
+
+	fakeRequest, err := http.NewRequest("", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakeRequest.Header.Set("Authorization", "bearer secretToken")
+	rsp, _, err := authN.Authenticator.AuthenticateRequest(fakeRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedGroups := []string{user.AllAuthenticated, user.SystemPrivilegedGroup}
+	if !reflect.DeepEqual(expectedGroups, rsp.User.GetGroups()) {
+		t.Fatalf("unexpected groups = %v returned, expected = %v", rsp.User.GetGroups(), expectedGroups)
+	}
+}
+
 func TestNewWithDelegate(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
@@ -92,7 +124,7 @@ func TestNewWithDelegate(t *testing.T) {
 	delegateConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
-	delegateConfig.EffectiveVersion = utilversion.NewEffectiveVersion("")
+	delegateConfig.EffectiveVersion = basecompatibility.NewEffectiveVersionFromString("", "", "")
 	clientset := fake.NewSimpleClientset()
 	if clientset == nil {
 		t.Fatal("unable to create fake client set")
@@ -125,7 +157,7 @@ func TestNewWithDelegate(t *testing.T) {
 	wrappingConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
-	wrappingConfig.EffectiveVersion = utilversion.NewEffectiveVersion("")
+	wrappingConfig.EffectiveVersion = basecompatibility.NewEffectiveVersionFromString("", "", "")
 
 	wrappingConfig.HealthzChecks = append(wrappingConfig.HealthzChecks, healthz.NamedCheck("wrapping-health", func(r *http.Request) error {
 		return fmt.Errorf("wrapping failed healthcheck")
@@ -319,8 +351,8 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		}
 
 		// confirm that we have an audit event
-		ae := audit.AuditEventFrom(r.Context())
-		if ae == nil {
+		ac := audit.AuditContextFrom(r.Context())
+		if ac == nil {
 			t.Error("unexpected nil audit event")
 		}
 
@@ -344,11 +376,15 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 	}
 	// these should all be the same because the handler chain mutates the event in place
 	want := map[string]string{"pandas": "are awesome", "dogs": "are okay"}
+	foundResponseComplete := false
 	for _, event := range backend.events {
+		if event.Stage == auditinternal.StageRequestReceived {
+			continue
+		}
 		if event.Stage != auditinternal.StageResponseComplete {
 			t.Errorf("expected event stage to be complete, got: %s", event.Stage)
 		}
-
+		foundResponseComplete = true
 		for wantK, wantV := range want {
 			gotV, ok := event.Annotations[wantK]
 			if !ok {
@@ -359,6 +395,9 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 				t.Errorf("expected the annotation value to match, key: %q, want: %q got: %q", wantK, wantV, gotV)
 			}
 		}
+	}
+	if !foundResponseComplete {
+		t.Errorf("expected to find %s in events", auditinternal.StageResponseComplete)
 	}
 }
 
@@ -387,6 +426,25 @@ func TestNewErrorForbiddenSerializer(t *testing.T) {
 	if err == nil {
 		t.Error("successfully created a new server configured with cbor support")
 	} else if err.Error() != `refusing to create new apiserver "test" with support for media type "application/cbor" (allowed media types are: application/json, application/yaml, application/vnd.kubernetes.protobuf)` {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestNewFeatureGatedSerializer(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+
+	config := NewConfig(serializer.NewCodecFactory(scheme, serializer.WithSerializer(func(creater runtime.ObjectCreater, typer runtime.ObjectTyper) runtime.SerializerInfo {
+		return runtime.SerializerInfo{
+			MediaType:        "application/cbor",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "cbor",
+		}
+	})))
+	config.ExternalAddress = "192.168.10.4:443"
+	config.EffectiveVersion = basecompatibility.NewEffectiveVersionFromString("", "", "")
+	config.LoopbackClientConfig = &rest.Config{}
+
+	if _, err := config.Complete(nil).New("test", NewEmptyDelegate()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

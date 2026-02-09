@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -38,12 +39,12 @@ import (
 // with one of them containing events and the other all other objects.
 func multiEtcdSetup(ctx context.Context, t *testing.T) (clientset.Interface, framework.TearDownFunc) {
 	etcdArgs := []string{"--experimental-watch-progress-notify-interval", "1s"}
-	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd("etcd_watchcache0", etcdArgs, nil)
+	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd(klog.FromContext(ctx).WithName("etcd0"), "etcd_watchcache0", etcdArgs)
 	if err != nil {
 		t.Fatalf("Couldn't start etcd: %v", err)
 	}
 
-	etcd1URL, stopEtcd1, err := framework.RunCustomEtcd("etcd_watchcache1", etcdArgs, nil)
+	etcd1URL, stopEtcd1, err := framework.RunCustomEtcd(klog.FromContext(ctx).WithName("etcd1"), "etcd_watchcache1", etcdArgs)
 	if err != nil {
 		t.Fatalf("Couldn't start etcd: %v", err)
 	}
@@ -160,7 +161,7 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 			return false, nil
 		}
 		return res.ResourceVersion == se.ResourceVersion, nil
-	}); err == nil || err != wait.ErrWaitTimeout {
+	}); err == nil || !wait.Interrupted(err) {
 		t.Errorf("Events watchcache unexpected synced: %v", err)
 	}
 }
@@ -179,7 +180,7 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 	wg := sync.WaitGroup{}
 
 	errCh := make(chan error, namespaces)
-	for i := 0; i < namespaces; i++ {
+	for i := range namespaces {
 		wg.Add(1)
 		index := i
 		go func() {
@@ -194,7 +195,7 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 				return
 			}
 
-			for j := 0; j < secretsPerNamespace; j++ {
+			for j := range secretsPerNamespace {
 				secret := &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("secret-%d", j),

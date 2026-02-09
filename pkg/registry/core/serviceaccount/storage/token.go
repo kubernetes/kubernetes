@@ -32,7 +32,9 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
@@ -55,19 +57,21 @@ func (r *TokenREST) Destroy() {
 }
 
 type TokenREST struct {
-	svcaccts             rest.Getter
-	pods                 rest.Getter
-	secrets              rest.Getter
-	nodes                rest.Getter
-	issuer               token.TokenGenerator
-	auds                 authenticator.Audiences
-	audsSet              sets.String
-	maxExpirationSeconds int64
-	extendExpiration     bool
+	svcaccts                     rest.Getter
+	pods                         rest.Getter
+	secrets                      rest.Getter
+	nodes                        rest.Getter
+	issuer                       token.TokenGenerator
+	auds                         authenticator.Audiences
+	audsSet                      sets.String
+	maxExpirationSeconds         int64
+	extendExpiration             bool
+	maxExtendedExpirationSeconds int64
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
 var _ = rest.GroupVersionKindProvider(&TokenREST{})
+var _ = rest.SubresourceObjectMetaPreserver(&TokenREST{})
 
 var gvk = schema.GroupVersionKind{
 	Group:   authenticationapiv1.SchemeGroupVersion.Group,
@@ -101,6 +105,14 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 	svcacct := svcacctObj.(*api.ServiceAccount)
 
+	if len(req.UID) > 0 && req.UID != svcacct.UID {
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.TokenRequestServiceAccountUIDValidation) {
+			return nil, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name, fmt.Errorf("the UID in the token request (%s) does not match the UID of the service account (%s)", req.UID, svcacct.UID))
+		} else {
+			audit.AddAuditAnnotation(ctx, "authentication.k8s.io/token-request-uid-mismatch", fmt.Sprintf("the UID in the token request (%s) does not match the UID of the service account (%s)", req.UID, svcacct.UID))
+		}
+	}
+
 	// Default unset spec audiences to API server audiences based on server config
 	if len(req.Spec.Audiences) == 0 {
 		req.Spec.Audiences = r.auds
@@ -111,6 +123,11 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 	if len(req.Namespace) == 0 {
 		req.Namespace = svcacct.Namespace
+	}
+	if len(req.UID) == 0 {
+		req.UID = svcacct.UID
+	} else if req.UID != svcacct.UID {
+		warning.AddWarning(ctx, "", fmt.Sprintf("the UID in the token request (%s) does not match the UID of the service account (%s) but TokenRequestServiceAccountUIDValidation is not enabled. In the future, this will return a conflict error", req.UID, svcacct.UID))
 	}
 
 	// Save current time before building the token, to make sure the expiration
@@ -203,7 +220,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 
 	if r.maxExpirationSeconds > 0 && req.Spec.ExpirationSeconds > r.maxExpirationSeconds {
-		//only positive value is valid
+		// only positive value is valid
 		warning.AddWarning(ctx, "", fmt.Sprintf("requested expiration of %d seconds shortened to %d seconds", req.Spec.ExpirationSeconds, r.maxExpirationSeconds))
 		req.Spec.ExpirationSeconds = r.maxExpirationSeconds
 	}
@@ -216,16 +233,16 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	exp := req.Spec.ExpirationSeconds
 	if r.extendExpiration && pod != nil && req.Spec.ExpirationSeconds == token.WarnOnlyBoundTokenExpirationSeconds && r.isKubeAudiences(req.Spec.Audiences) {
 		warnAfter = exp
-		exp = token.ExpirationExtensionSeconds
+		exp = r.maxExtendedExpirationSeconds
 	}
 
 	sc, pc, err := token.Claims(*svcacct, pod, secret, node, exp, warnAfter, req.Spec.Audiences)
 	if err != nil {
 		return nil, err
 	}
-	tokdata, err := r.issuer.GenerateToken(sc, pc)
+	tokdata, err := r.issuer.GenerateToken(ctx, sc, pc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate token: %v", err)
+		return nil, errors.NewInternalError(fmt.Errorf("failed to generate token: %v", err))
 	}
 
 	// populate status
@@ -235,7 +252,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
-		audit.AddAuditAnnotation(ctx, serviceaccount.IssuedCredentialIDAuditAnnotationKey, serviceaccount.CredentialIDForJTI(sc.ID))
+		audit.AddAuditAnnotation(ctx, serviceaccount.IssuedCredentialIDAuditAnnotationKey, authenticationtokenjwt.CredentialIDForJTI(sc.ID))
 	}
 	return out, nil
 }
@@ -263,4 +280,10 @@ func newContext(ctx context.Context, resource, name, namespace string, gvk schem
 func (r *TokenREST) isKubeAudiences(tokenAudience []string) bool {
 	// tokenAudiences must be a strict subset of apiserver audiences
 	return r.audsSet.HasAll(tokenAudience...)
+}
+
+// PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate indicates that the
+// TokenRequest's UID should be preserved when creating subresources
+func (r *TokenREST) PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() bool {
+	return true
 }

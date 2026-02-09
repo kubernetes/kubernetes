@@ -26,7 +26,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
-	v1 "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota/validation"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -38,7 +37,7 @@ import (
 const PluginName = "ResourceQuota"
 
 var (
-	namespaceGVK          = v1.SchemeGroupVersion.WithKind("Namespace").GroupKind()
+	namespaceGVK          = corev1.SchemeGroupVersion.WithKind("Namespace").GroupKind()
 	stopChUnconfiguredErr = fmt.Errorf("quota configuration configured between stop channel")
 )
 
@@ -114,7 +113,9 @@ func (a *QuotaAdmission) SetExternalKubeClientSet(client kubernetes.Interface) {
 
 // SetExternalKubeInformerFactory registers an informer factory into QuotaAdmission
 func (a *QuotaAdmission) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	a.quotaAccessor.lister = f.Core().V1().ResourceQuotas().Lister()
+	quotas := f.Core().V1().ResourceQuotas()
+	a.quotaAccessor.lister = quotas.Lister()
+	a.quotaAccessor.hasSynced = quotas.Informer().HasSynced
 }
 
 // SetQuotaConfiguration assigns and initializes configuration and evaluator for QuotaAdmission
@@ -144,6 +145,9 @@ func (a *QuotaAdmission) ValidateInitialization() error {
 	if a.quotaAccessor.lister == nil {
 		return fmt.Errorf("missing quotaAccessor.lister")
 	}
+	if a.quotaAccessor.hasSynced == nil {
+		return fmt.Errorf("missing quotaAccessor.hasSynced")
+	}
 	if a.quotaConfiguration == nil {
 		return fmt.Errorf("missing quotaConfiguration")
 	}
@@ -155,10 +159,6 @@ func (a *QuotaAdmission) ValidateInitialization() error {
 
 // Validate makes admission decisions while enforcing quota
 func (a *QuotaAdmission) Validate(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	// ignore all operations that correspond to sub-resource actions
-	if attr.GetSubresource() != "" {
-		return nil
-	}
 	// ignore all operations that are not namespaced or creation of namespaces
 	if attr.GetNamespace() == "" || isNamespaceCreation(attr) {
 		return nil

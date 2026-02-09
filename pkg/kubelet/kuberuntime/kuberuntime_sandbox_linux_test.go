@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -28,11 +27,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 func TestApplySandboxResources(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.cpuCFSQuota = true
+	m.singleProcessOOMKill = ptr.To(false)
 
 	config := &runtimeapi.PodSandboxConfig{
 		Linux: &runtimeapi.LinuxPodSandboxConfig{},
@@ -166,14 +169,16 @@ func TestApplySandboxResources(t *testing.T) {
 	for i, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
 
-		m.applySandboxResources(test.pod, config)
+		err = m.applySandboxResources(tCtx, test.pod, config)
+		require.NoError(t, err)
 		assert.Equal(t, test.expectedResource, config.Linux.Resources, "TestCase[%d]: %s", i, test.description)
 		assert.Equal(t, test.expectedOverhead, config.Linux.Overhead, "TestCase[%d]: %s", i, test.description)
 	}
 }
 
 func TestGeneratePodSandboxConfigWithLinuxSecurityContext(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 	pod := newTestPodWithLinuxSecurityContext()
 
@@ -187,7 +192,7 @@ func TestGeneratePodSandboxConfigWithLinuxSecurityContext(t *testing.T) {
 		},
 	}
 
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 1)
+	podSandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.SelinuxOptions, podSandboxConfig.Linux.SecurityContext.SelinuxOptions)
 	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.RunAsUser, podSandboxConfig.Linux.SecurityContext.RunAsUser)
@@ -220,7 +225,8 @@ func newSupplementalGroupsPolicyPod(supplementalGroupsPolicy *v1.SupplementalGro
 }
 
 func TestGeneratePodSandboxLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -250,7 +256,7 @@ func TestGeneratePodSandboxLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		config, err := m.generatePodSandboxLinuxConfig(test.pod)
+		config, err := m.generatePodSandboxLinuxConfig(tCtx, test.pod)
 		if test.expectedErr {
 			assert.NotEmptyf(t, err, "TestCase[%d]: %s", i, test.description)
 			assert.Emptyf(t, config, "TestCase[%d]: %s", i, test.description)

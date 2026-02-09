@@ -19,6 +19,7 @@ package bootstrap
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -155,19 +156,26 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 
 // Run runs controller loops and returns when they are done
 func (e *Signer) Run(ctx context.Context) {
-	// Shut down queues
 	defer utilruntime.HandleCrash()
-	defer e.syncQueue.ShutDown()
 
-	if !cache.WaitForNamedCacheSync("bootstrap_signer", ctx.Done(), e.configMapSynced, e.secretSynced) {
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Starting")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.V(1).Info("Shutting down")
+		e.syncQueue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, e.configMapSynced, e.secretSynced) {
 		return
 	}
 
-	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Starting workers")
-	go wait.UntilWithContext(ctx, e.serviceConfigMapQueue, 0)
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, e.serviceConfigMapQueue, 0)
+	})
 	<-ctx.Done()
-	logger.V(1).Info("Shutting down")
 }
 
 func (e *Signer) pokeConfigMapSync() {

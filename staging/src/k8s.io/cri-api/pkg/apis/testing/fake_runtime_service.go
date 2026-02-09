@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/proto"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -302,8 +303,8 @@ func (r *FakeRuntimeService) PodSandboxStatus(_ context.Context, podSandboxID st
 		return nil, fmt.Errorf("pod sandbox %q not found", podSandboxID)
 	}
 
-	status := s.PodSandboxStatus
-	return &runtimeapi.PodSandboxStatusResponse{Status: &status}, nil
+	status := proto.Clone(&s.PodSandboxStatus).(*runtimeapi.PodSandboxStatus)
+	return &runtimeapi.PodSandboxStatusResponse{Status: status}, nil
 }
 
 // ListPodSandbox returns the list of pod sandboxes in the FakeRuntimeService.
@@ -511,8 +512,8 @@ func (r *FakeRuntimeService) ContainerStatus(_ context.Context, containerID stri
 		return nil, fmt.Errorf("container %q not found", containerID)
 	}
 
-	status := c.ContainerStatus
-	return &runtimeapi.ContainerStatusResponse{Status: &status}, nil
+	status := proto.Clone(&c.ContainerStatus).(*runtimeapi.ContainerStatus)
+	return &runtimeapi.ContainerStatusResponse{Status: status}, nil
 }
 
 // UpdateContainerResources returns the container resource in the FakeRuntimeService.
@@ -793,4 +794,30 @@ func (r *FakeRuntimeService) RuntimeConfig(_ context.Context) (*runtimeapi.Runti
 	}
 
 	return &runtimeapi.RuntimeConfigResponse{Linux: r.FakeLinuxConfiguration}, nil
+}
+
+// UpdatePodSandboxResources returns the container resource in the FakeRuntimeService.
+func (r *FakeRuntimeService) UpdatePodSandboxResources(context.Context, *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "UpdatePodSandboxResources")
+	if err := r.popError("UpdatePodSandboxResources"); err != nil {
+		return nil, err
+	}
+
+	return &runtimeapi.UpdatePodSandboxResourcesResponse{}, nil
+}
+
+// Close will shutdown the internal gRPC client connection.
+func (r *FakeRuntimeService) Close() error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "Close")
+	if err := r.popError("Close"); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -24,7 +24,9 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/common"
+	"k8s.io/apiserver/pkg/cel/environment"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -90,19 +92,25 @@ func (s basicSchemaValidator) ValidateUpdate(new, old interface{}, options ...Va
 	return s.Validate(new, options...)
 }
 
-// NewSchemaValidator creates an openapi schema validator for the given CRD validation.
+// NewSchemaValidator creates an openapi schema validator for the given CRD validation using environment.DefaultCompatibilityVersion().
+func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps) (SchemaValidator, *spec.Schema, error) {
+	return NewSchemaValidatorForVersion(customResourceValidation, environment.DefaultCompatibilityVersion())
+}
+
+// NewSchemaValidatorForVersion creates an openapi schema validator for the given CRD validation and compatibilityVersion.
 //
-// If feature `CRDValidationRatcheting` is disabled, this returns validator which
+// If feature `CRDValidationRatcheting` is disabled, this returns a validator which
 // validates all `Update`s and `Create`s as a `Create` - without considering old value.
 //
 // If feature `CRDValidationRatcheting` is enabled - the validator returned
 // will support ratcheting unchanged correlatable fields across an update.
-func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps) (SchemaValidator, *spec.Schema, error) {
+func NewSchemaValidatorForVersion(customResourceValidation *apiextensions.JSONSchemaProps, compatibilityVersion *version.Version) (SchemaValidator, *spec.Schema, error) {
 	// Convert CRD schema to openapi schema
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
 		// TODO: replace with NewStructural(...).ToGoOpenAPI
-		if err := ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, StripUnsupportedFormatsPostProcess); err != nil {
+		formatPostProcessor := StripUnsupportedFormatsPostProcessorForVersion(compatibilityVersion)
+		if err := ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, formatPostProcessor); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -182,15 +190,11 @@ func kubeOpenAPIResultToFieldErrors(fldPath *field.Path, result *validate.Result
 				allErrs = append(allErrs, field.NotSupported(errPath, err.Value, values))
 
 			case openapierrors.TooLongFailCode:
-				value := interface{}("")
-				if err.Value != nil {
-					value = err.Value
-				}
 				max := int64(-1)
 				if i, ok := err.Valid.(int64); ok {
 					max = i
 				}
-				allErrs = append(allErrs, field.TooLongMaxLength(errPath, value, int(max)))
+				allErrs = append(allErrs, field.TooLong(errPath, "" /*unused*/, int(max)))
 
 			case openapierrors.MaxItemsFailCode:
 				actual := int64(-1)

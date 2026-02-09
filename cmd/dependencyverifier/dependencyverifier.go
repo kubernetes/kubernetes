@@ -20,14 +20,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 )
 
 type Unwanted struct {
@@ -40,6 +39,13 @@ type Unwanted struct {
 type UnwantedSpec struct {
 	// module names we don't want to depend on, mapped to an optional message about why
 	UnwantedModules map[string]string `json:"unwantedModules"`
+	// module names that should never be updated from their current version, mapped to a struct with version and reason
+	PinnedModules map[string]PinnedModule `json:"pinnedModules"`
+}
+
+type PinnedModule struct {
+	Version string `json:"Version"`
+	Reason  string `json:"Reason"`
 }
 
 type UnwantedStatus struct {
@@ -220,6 +226,25 @@ func main() {
 		}
 	}
 
+	// Check for pinned modules that have been updated
+	pinnedModuleViolations := map[string][]string{}
+	if len(configFromFile.Spec.PinnedModules) > 0 {
+		// Get the current versions of pinned modules
+		for pinnedModule, pinnedInfo := range configFromFile.Spec.PinnedModules {
+			// Check if the module is in effectiveVersions
+			if effectiveModule, ok := effectiveVersions[pinnedModule]; ok {
+				// Compare with the pinned version from the JSON file
+				if effectiveModule.version != pinnedInfo.Version {
+					pinnedModuleViolations[pinnedModule] = []string{
+						fmt.Sprintf("Pinned version: %s", pinnedInfo.Version),
+						fmt.Sprintf("Attempted update to: %s", effectiveModule.version),
+						fmt.Sprintf("Reason for pinning: %s", pinnedInfo.Reason),
+					}
+				}
+			}
+		}
+	}
+
 	unwantedToReferencers := map[string][]module{}
 	for _, mainModule := range mainModules {
 		// visit to find unwanted modules still referenced from the main module
@@ -275,7 +300,7 @@ func main() {
 		}
 	}
 
-	vendorModulesTxt, err := ioutil.ReadFile("vendor/modules.txt")
+	vendorModulesTxt, err := os.ReadFile("vendor/modules.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -363,6 +388,19 @@ func main() {
 	}
 
 	if needUpdate {
+		os.Exit(1)
+	}
+
+	// Check if there are any pinned module violations
+	if len(pinnedModuleViolations) > 0 {
+		log.Printf("ERROR: The following pinned modules have been updated:")
+		for module, details := range pinnedModuleViolations {
+			log.Printf("Module: %s", module)
+			for _, detail := range details {
+				log.Printf("  %s", detail)
+			}
+		}
+		log.Printf("Pinned modules must not be updated. Please revert these changes.")
 		os.Exit(1)
 	}
 }

@@ -16,4 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 
-package testing // import "k8s.io/apiserver/pkg/endpoints/testing"
+package testing

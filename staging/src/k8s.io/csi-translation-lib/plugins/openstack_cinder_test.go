@@ -22,10 +22,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 )
 
 func TestTranslateCinderInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewOpenStackCinderCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 
 	cases := []struct {
 		name   string
@@ -63,7 +66,7 @@ func TestTranslateCinderInTreeStorageClassToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreeStorageClassToCSI(tc.sc)
+		got, err := translator.TranslateInTreeStorageClassToCSI(logger, tc.sc)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}

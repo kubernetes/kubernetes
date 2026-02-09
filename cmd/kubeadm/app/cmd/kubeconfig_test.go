@@ -78,8 +78,7 @@ func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, er
 func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 
 	// Temporary folders for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Adds a pki folder with a ca cert to the temp folder
 	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)

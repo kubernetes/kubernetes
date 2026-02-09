@@ -115,9 +115,6 @@ message PodDisruptionBudgetSpec {
   // Additional policies may be added in the future.
   // Clients making eviction decisions should disallow eviction of unhealthy pods
   // if they encounter an unrecognized policy in this field.
-  //
-  // This field is beta-level. The eviction API uses this field when
-  // the feature gate PDBUnhealthyPodEvictionPolicy is enabled (enabled by default).
   // +optional
   optional string unhealthyPodEvictionPolicy = 4;
 }
@@ -145,15 +142,19 @@ message PodDisruptionBudgetStatus {
   map<string, .k8s.io.apimachinery.pkg.apis.meta.v1.Time> disruptedPods = 2;
 
   // Number of pod disruptions that are currently allowed.
+  // +optional
   optional int32 disruptionsAllowed = 3;
 
   // current number of healthy pods
+  // +optional
   optional int32 currentHealthy = 4;
 
   // minimum desired number of healthy pods
+  // +optional
   optional int32 desiredHealthy = 5;
 
   // total number of pods counted by this disruption budget
+  // +optional
   optional int32 expectedPods = 6;
 
   // Conditions contain conditions for PDB. The disruption controller sets the

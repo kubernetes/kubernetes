@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package ed25519 implements the Ed25519 signature algorithm. See
-// https://ed25519.cr.yp.to/.
+// Package ed25519 implements the Ed25519 signature algorithm.
 //
 // These functions are also compatible with the “Ed25519” function defined in
-// RFC 8032. However, unlike RFC 8032's formulation, this package's private key
+// [RFC 8032]. However, unlike RFC 8032's formulation, this package's private key
 // representation includes a public key suffix to make multiple signing
 // operations with the same key more efficient. This package refers to the RFC
 // 8032 private key as the “seed”.
 //
-// Beginning with Go 1.13, the functionality of this package was moved to the
-// standard library as crypto/ed25519. This package only acts as a compatibility
-// wrapper.
+// The ed25519 package is a wrapper for the Ed25519 implementation in the
+// crypto/ed25519 package. It is [frozen] and is not accepting new features.
+//
+// [RFC 8032]: https://datatracker.ietf.org/doc/html/rfc8032
+// [frozen]: https://go.dev/wiki/Frozen
 package ed25519
 
 import (

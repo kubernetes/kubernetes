@@ -23,12 +23,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 func TestImageLocalityPriority(t *testing.T) {
@@ -87,6 +89,24 @@ func TestImageLocalityPriority(t *testing.T) {
 			},
 			{
 				Image: "gcr.io/40",
+			},
+		},
+	}
+
+	testImageVolume := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image: "gcr.io/30",
+			},
+		},
+		Volumes: []v1.Volume{
+			{
+				Name: "imageVolume",
+				VolumeSource: v1.VolumeSource{
+					Image: &v1.ImageVolumeSource{
+						Reference: "gcr.io/300",
+					},
+				},
 			},
 		},
 	}
@@ -238,7 +258,7 @@ func TestImageLocalityPriority(t *testing.T) {
 		pod          *v1.Pod
 		pods         []*v1.Pod
 		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
+		expectedList fwk.NodeScoreList
 		name         string
 	}{
 		{
@@ -253,7 +273,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 100 * (250M/2 - 23M)/(1000M * 2 - 23M) = 5
 			pod:          &v1.Pod{Spec: test40250},
 			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 5}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 5}},
 			name:         "two images spread on two nodes, prefer the larger image one",
 		},
 		{
@@ -268,7 +288,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 0
 			pod:          &v1.Pod{Spec: test40300},
 			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 7}, {Name: "node2", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 7}, {Name: "node2", Score: 0}},
 			name:         "two images on one node, prefer this node",
 		},
 		{
@@ -283,7 +303,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 0 (10M/2 < 23M, min-threshold)
 			pod:          &v1.Pod{Spec: testMinMax},
 			nodes:        []*v1.Node{makeImageNode("node1", node400030), makeImageNode("node2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: fwk.MaxNodeScore}, {Name: "node2", Score: 0}},
 			name:         "if exceed limit, use limit",
 		},
 		{
@@ -302,7 +322,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 0
 			pod:          &v1.Pod{Spec: testMinMax},
 			nodes:        []*v1.Node{makeImageNode("node1", node400030), makeImageNode("node2", node25010), makeImageNode("node3", nodeWithNoImages)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 66}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 66}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 			name:         "if exceed limit, use limit (with node which has no images present)",
 		},
 		{
@@ -321,7 +341,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 0
 			pod:          &v1.Pod{Spec: test300600900},
 			nodes:        []*v1.Node{makeImageNode("node1", node60040900), makeImageNode("node2", node300600900), makeImageNode("node3", nodeWithNoImages)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 32}, {Name: "node2", Score: 36}, {Name: "node3", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 32}, {Name: "node2", Score: 36}, {Name: "node3", Score: 0}},
 			name:         "pod with multiple large images, node2 is preferred",
 		},
 		{
@@ -336,8 +356,23 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 0
 			pod:          &v1.Pod{Spec: test3040},
 			nodes:        []*v1.Node{makeImageNode("node1", node203040), makeImageNode("node2", node400030)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 1}, {Name: "node2", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 1}, {Name: "node2", Score: 0}},
 			name:         "pod with multiple small images",
+		},
+		{
+			// Pod: gcr.io/300 gcr.io/30
+
+			// Node1
+			// Image: gcr.io/300:latest 300MB
+			// Score: 100 * (300M * 1/2 - 23M) / (1000M - 23M) = 12
+
+			// Node2
+			// Image: gcr.io/30:latest 30MB
+			// Score:  100 * (30M - 23M) / (1000M - 23M) = 0
+			pod:          &v1.Pod{Spec: testImageVolume},
+			nodes:        []*v1.Node{makeImageNode("node1", node300600900), makeImageNode("node2", node400030)},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 12}, {Name: "node2", Score: 0}},
+			name:         "pod with ImageVolume",
 		},
 		{
 			// Pod: gcr.io/30  InitContainers: gcr.io/300
@@ -351,7 +386,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 100 * (30M * 1/2  - 23M) / (1000M * 2 - 23M) = 0
 			pod:          &v1.Pod{Spec: test30Init300},
 			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node203040)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 6}, {Name: "node2", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 6}, {Name: "node2", Score: 0}},
 			name:         "include InitContainers: two images spread on two nodes, prefer the larger image one",
 		},
 	}
@@ -370,14 +405,21 @@ func TestImageLocalityPriority(t *testing.T) {
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
-			var gotList framework.NodeScoreList
+			var gotList fwk.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeName)
+				// Currently, we use the snapshot instead of the tf.BuildNodeInfos to build the nodeInfo since some
+				// fields like ImageStates is essential for the Score plugin but the latter does not construct that.
+				// We should enhance the BuildNodeInfos to achieve feature parity with the core logic.
+				nodeInfo, err := snapshot.NodeInfos().Get(nodeName)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", nodeName, err)
+				}
+				score, status := p.(fwk.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
-				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+				gotList = append(gotList, fwk.NodeScore{Name: nodeName, Score: score})
 			}
 
 			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
@@ -385,6 +427,82 @@ func TestImageLocalityPriority(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestImageSignature(t *testing.T) {
+	tests := []struct {
+		name              string
+		pod               *v1.Pod
+		expectedSignature []fwk.SignFragment
+	}{
+		{
+			name: "no images",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{},
+				},
+			},
+			expectedSignature: []fwk.SignFragment{
+				{
+					Key:   fwk.ImageNamesSignerName,
+					Value: []string{},
+				},
+			},
+		},
+		{
+			name: "one image",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c", Image: "myimage"}},
+				},
+			},
+			expectedSignature: []fwk.SignFragment{
+				{
+					Key:   fwk.ImageNamesSignerName,
+					Value: []string{"myimage:latest"},
+				},
+			},
+		},
+		{
+			name: "two images unsorted",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c", Image: "zmyimage"},
+						{Name: "c2", Image: "myimage"},
+					},
+				},
+			},
+			expectedSignature: []fwk.SignFragment{
+				{
+					Key:   fwk.ImageNamesSignerName,
+					Value: []string{"myimage:latest", "zmyimage:latest"},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			snapshot := cache.NewSnapshot(nil, nil)
+			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+
+			p, err := New(ctx, nil, fh)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
+			signature, _ := p.(*ImageLocality).SignPod(ctx, test.pod)
+
+			if diff := cmp.Diff(test.expectedSignature, signature); diff != "" {
+				t.Fatalf("Diff %s", diff)
+			}
+		})
+	}
+
 }
 
 func TestNormalizedImageName(t *testing.T) {

@@ -19,17 +19,39 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // LeaseSpecApplyConfiguration represents a declarative configuration of the LeaseSpec type for use
 // with apply.
+//
+// LeaseSpec is a specification of a Lease.
 type LeaseSpecApplyConfiguration struct {
-	HolderIdentity       *string       `json:"holderIdentity,omitempty"`
-	LeaseDurationSeconds *int32        `json:"leaseDurationSeconds,omitempty"`
-	AcquireTime          *v1.MicroTime `json:"acquireTime,omitempty"`
-	RenewTime            *v1.MicroTime `json:"renewTime,omitempty"`
-	LeaseTransitions     *int32        `json:"leaseTransitions,omitempty"`
+	// holderIdentity contains the identity of the holder of a current lease.
+	// If Coordinated Leader Election is used, the holder identity must be
+	// equal to the elected LeaseCandidate.metadata.name field.
+	HolderIdentity *string `json:"holderIdentity,omitempty"`
+	// leaseDurationSeconds is a duration that candidates for a lease need
+	// to wait to force acquire it. This is measured against the time of last
+	// observed renewTime.
+	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty"`
+	// acquireTime is a time when the current lease was acquired.
+	AcquireTime *metav1.MicroTime `json:"acquireTime,omitempty"`
+	// renewTime is a time when the current holder of a lease has last
+	// updated the lease.
+	RenewTime *metav1.MicroTime `json:"renewTime,omitempty"`
+	// leaseTransitions is the number of transitions of a lease between
+	// holders.
+	LeaseTransitions *int32 `json:"leaseTransitions,omitempty"`
+	// Strategy indicates the strategy for picking the leader for coordinated leader election.
+	// If the field is not specified, there is no active coordination for this lease.
+	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
+	Strategy *coordinationv1.CoordinatedLeaseStrategy `json:"strategy,omitempty"`
+	// PreferredHolder signals to a lease holder that the lease has a
+	// more optimal holder and should be given up.
+	// This field can only be set if Strategy is also set.
+	PreferredHolder *string `json:"preferredHolder,omitempty"`
 }
 
 // LeaseSpecApplyConfiguration constructs a declarative configuration of the LeaseSpec type for use with
@@ -57,7 +79,7 @@ func (b *LeaseSpecApplyConfiguration) WithLeaseDurationSeconds(value int32) *Lea
 // WithAcquireTime sets the AcquireTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AcquireTime field is set to the value of the last call.
-func (b *LeaseSpecApplyConfiguration) WithAcquireTime(value v1.MicroTime) *LeaseSpecApplyConfiguration {
+func (b *LeaseSpecApplyConfiguration) WithAcquireTime(value metav1.MicroTime) *LeaseSpecApplyConfiguration {
 	b.AcquireTime = &value
 	return b
 }
@@ -65,7 +87,7 @@ func (b *LeaseSpecApplyConfiguration) WithAcquireTime(value v1.MicroTime) *Lease
 // WithRenewTime sets the RenewTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RenewTime field is set to the value of the last call.
-func (b *LeaseSpecApplyConfiguration) WithRenewTime(value v1.MicroTime) *LeaseSpecApplyConfiguration {
+func (b *LeaseSpecApplyConfiguration) WithRenewTime(value metav1.MicroTime) *LeaseSpecApplyConfiguration {
 	b.RenewTime = &value
 	return b
 }
@@ -75,5 +97,21 @@ func (b *LeaseSpecApplyConfiguration) WithRenewTime(value v1.MicroTime) *LeaseSp
 // If called multiple times, the LeaseTransitions field is set to the value of the last call.
 func (b *LeaseSpecApplyConfiguration) WithLeaseTransitions(value int32) *LeaseSpecApplyConfiguration {
 	b.LeaseTransitions = &value
+	return b
+}
+
+// WithStrategy sets the Strategy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Strategy field is set to the value of the last call.
+func (b *LeaseSpecApplyConfiguration) WithStrategy(value coordinationv1.CoordinatedLeaseStrategy) *LeaseSpecApplyConfiguration {
+	b.Strategy = &value
+	return b
+}
+
+// WithPreferredHolder sets the PreferredHolder field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreferredHolder field is set to the value of the last call.
+func (b *LeaseSpecApplyConfiguration) WithPreferredHolder(value string) *LeaseSpecApplyConfiguration {
+	b.PreferredHolder = &value
 	return b
 }

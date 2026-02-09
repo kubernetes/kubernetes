@@ -23,6 +23,7 @@ type (
 		Unmarshal        func(unmarshalInput) (unmarshalOutput, error)
 		Merge            func(mergeInput) mergeOutput
 		CheckInitialized func(checkInitializedInput) (checkInitializedOutput, error)
+		Equal            func(equalInput) equalOutput
 	}
 	supportFlags = uint64
 	sizeInput    = struct {
@@ -74,5 +75,14 @@ type (
 	}
 	checkInitializedOutput = struct {
 		pragma.NoUnkeyedLiterals
+	}
+	equalInput = struct {
+		pragma.NoUnkeyedLiterals
+		MessageA Message
+		MessageB Message
+	}
+	equalOutput = struct {
+		pragma.NoUnkeyedLiterals
+		Equal bool
 	}
 )

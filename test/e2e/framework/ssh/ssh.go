@@ -66,8 +66,11 @@ func GetSigner(provider string) (ssh.Signer, error) {
 	// support.
 	keyfile := ""
 	switch provider {
-	case "gce", "gke", "kubemark":
+	case "gce", "kubemark":
 		keyfile = os.Getenv("GCE_SSH_KEY")
+		if keyfile == "" {
+			keyfile = os.Getenv("GCE_SSH_PRIVATE_KEY_FILE")
+		}
 		if keyfile == "" {
 			keyfile = "google_compute_engine"
 		}
@@ -244,16 +247,12 @@ func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signe
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
-	client, err := ssh.Dial("tcp", host, config)
-	if err != nil {
-		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 20*time.Second, false, func(ctx context.Context) (bool, error) {
-			fmt.Printf("error dialing %s@%s: '%v', retrying\n", user, host, err)
-			if client, err = ssh.Dial("tcp", host, config); err != nil {
-				return false, nil // retrying, error will be logged above
-			}
-			return true, nil
-		})
-	}
+	var client *ssh.Client
+	err := framework.Gomega().Eventually(ctx, func() error {
+		c, err := ssh.Dial("tcp", host, config)
+		client = c
+		return err
+	}).WithPolling(5 * time.Second).WithTimeout(20 * time.Second).Should(gomega.Succeed())
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: %w", user, host, err)
 	}

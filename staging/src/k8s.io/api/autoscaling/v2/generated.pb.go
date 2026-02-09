@@ -24,843 +24,62 @@ import (
 
 	io "io"
 
-	proto "github.com/gogo/protobuf/proto"
-
 	k8s_io_api_core_v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+func (m *ContainerResourceMetricSource) Reset() { *m = ContainerResourceMetricSource{} }
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+func (m *ContainerResourceMetricStatus) Reset() { *m = ContainerResourceMetricStatus{} }
 
-func (m *ContainerResourceMetricSource) Reset()      { *m = ContainerResourceMetricSource{} }
-func (*ContainerResourceMetricSource) ProtoMessage() {}
-func (*ContainerResourceMetricSource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{0}
-}
-func (m *ContainerResourceMetricSource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ContainerResourceMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ContainerResourceMetricSource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ContainerResourceMetricSource.Merge(m, src)
-}
-func (m *ContainerResourceMetricSource) XXX_Size() int {
-	return m.Size()
-}
-func (m *ContainerResourceMetricSource) XXX_DiscardUnknown() {
-	xxx_messageInfo_ContainerResourceMetricSource.DiscardUnknown(m)
-}
+func (m *CrossVersionObjectReference) Reset() { *m = CrossVersionObjectReference{} }
 
-var xxx_messageInfo_ContainerResourceMetricSource proto.InternalMessageInfo
+func (m *ExternalMetricSource) Reset() { *m = ExternalMetricSource{} }
 
-func (m *ContainerResourceMetricStatus) Reset()      { *m = ContainerResourceMetricStatus{} }
-func (*ContainerResourceMetricStatus) ProtoMessage() {}
-func (*ContainerResourceMetricStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{1}
-}
-func (m *ContainerResourceMetricStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ContainerResourceMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ContainerResourceMetricStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ContainerResourceMetricStatus.Merge(m, src)
-}
-func (m *ContainerResourceMetricStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *ContainerResourceMetricStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_ContainerResourceMetricStatus.DiscardUnknown(m)
-}
+func (m *ExternalMetricStatus) Reset() { *m = ExternalMetricStatus{} }
 
-var xxx_messageInfo_ContainerResourceMetricStatus proto.InternalMessageInfo
+func (m *HPAScalingPolicy) Reset() { *m = HPAScalingPolicy{} }
 
-func (m *CrossVersionObjectReference) Reset()      { *m = CrossVersionObjectReference{} }
-func (*CrossVersionObjectReference) ProtoMessage() {}
-func (*CrossVersionObjectReference) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{2}
-}
-func (m *CrossVersionObjectReference) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CrossVersionObjectReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CrossVersionObjectReference) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CrossVersionObjectReference.Merge(m, src)
-}
-func (m *CrossVersionObjectReference) XXX_Size() int {
-	return m.Size()
-}
-func (m *CrossVersionObjectReference) XXX_DiscardUnknown() {
-	xxx_messageInfo_CrossVersionObjectReference.DiscardUnknown(m)
-}
+func (m *HPAScalingRules) Reset() { *m = HPAScalingRules{} }
 
-var xxx_messageInfo_CrossVersionObjectReference proto.InternalMessageInfo
+func (m *HorizontalPodAutoscaler) Reset() { *m = HorizontalPodAutoscaler{} }
 
-func (m *ExternalMetricSource) Reset()      { *m = ExternalMetricSource{} }
-func (*ExternalMetricSource) ProtoMessage() {}
-func (*ExternalMetricSource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{3}
-}
-func (m *ExternalMetricSource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ExternalMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ExternalMetricSource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ExternalMetricSource.Merge(m, src)
-}
-func (m *ExternalMetricSource) XXX_Size() int {
-	return m.Size()
-}
-func (m *ExternalMetricSource) XXX_DiscardUnknown() {
-	xxx_messageInfo_ExternalMetricSource.DiscardUnknown(m)
-}
+func (m *HorizontalPodAutoscalerBehavior) Reset() { *m = HorizontalPodAutoscalerBehavior{} }
 
-var xxx_messageInfo_ExternalMetricSource proto.InternalMessageInfo
+func (m *HorizontalPodAutoscalerCondition) Reset() { *m = HorizontalPodAutoscalerCondition{} }
 
-func (m *ExternalMetricStatus) Reset()      { *m = ExternalMetricStatus{} }
-func (*ExternalMetricStatus) ProtoMessage() {}
-func (*ExternalMetricStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{4}
-}
-func (m *ExternalMetricStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ExternalMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ExternalMetricStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ExternalMetricStatus.Merge(m, src)
-}
-func (m *ExternalMetricStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *ExternalMetricStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_ExternalMetricStatus.DiscardUnknown(m)
-}
+func (m *HorizontalPodAutoscalerList) Reset() { *m = HorizontalPodAutoscalerList{} }
 
-var xxx_messageInfo_ExternalMetricStatus proto.InternalMessageInfo
+func (m *HorizontalPodAutoscalerSpec) Reset() { *m = HorizontalPodAutoscalerSpec{} }
 
-func (m *HPAScalingPolicy) Reset()      { *m = HPAScalingPolicy{} }
-func (*HPAScalingPolicy) ProtoMessage() {}
-func (*HPAScalingPolicy) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{5}
-}
-func (m *HPAScalingPolicy) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *HPAScalingPolicy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *HPAScalingPolicy) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_HPAScalingPolicy.Merge(m, src)
-}
-func (m *HPAScalingPolicy) XXX_Size() int {
-	return m.Size()
-}
-func (m *HPAScalingPolicy) XXX_DiscardUnknown() {
-	xxx_messageInfo_HPAScalingPolicy.DiscardUnknown(m)
-}
+func (m *HorizontalPodAutoscalerStatus) Reset() { *m = HorizontalPodAutoscalerStatus{} }
 
-var xxx_messageInfo_HPAScalingPolicy proto.InternalMessageInfo
+func (m *MetricIdentifier) Reset() { *m = MetricIdentifier{} }
 
-func (m *HPAScalingRules) Reset()      { *m = HPAScalingRules{} }
-func (*HPAScalingRules) ProtoMessage() {}
-func (*HPAScalingRules) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{6}
-}
-func (m *HPAScalingRules) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *HPAScalingRules) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *HPAScalingRules) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_HPAScalingRules.Merge(m, src)
-}
-func (m *HPAScalingRules) XXX_Size() int {
-	return m.Size()
-}
-func (m *HPAScalingRules) XXX_DiscardUnknown() {
-	xxx_messageInfo_HPAScalingRules.DiscardUnknown(m)
-}
+func (m *MetricSpec) Reset() { *m = MetricSpec{} }
 
-var xxx_messageInfo_HPAScalingRules proto.InternalMessageInfo
+func (m *MetricStatus) Reset() { *m = MetricStatus{} }
 
-func (m *HorizontalPodAutoscaler) Reset()      { *m = HorizontalPodAutoscaler{} }
-func (*HorizontalPodAutoscaler) ProtoMessage() {}
-func (*HorizontalPodAutoscaler) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{7}
-}
-func (m *HorizontalPodAutoscaler) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *HorizontalPodAutoscaler) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *HorizontalPodAutoscaler) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_HorizontalPodAutoscaler.Merge(m, src)
-}
-func (m *HorizontalPodAutoscaler) XXX_Size() int {
-	return m.Size()
-}
-func (m *HorizontalPodAutoscaler) XXX_DiscardUnknown() {
-	xxx_messageInfo_HorizontalPodAutoscaler.DiscardUnknown(m)
-}
+func (m *MetricTarget) Reset() { *m = MetricTarget{} }
 
-var xxx_messageInfo_HorizontalPodAutoscaler proto.InternalMessageInfo
+func (m *MetricValueStatus) Reset() { *m = MetricValueStatus{} }
 
-func (m *HorizontalPodAutoscalerBehavior) Reset()      { *m = HorizontalPodAutoscalerBehavior{} }
-func (*HorizontalPodAutoscalerBehavior) ProtoMessage() {}
-func (*HorizontalPodAutoscalerBehavior) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{8}
-}
-func (m *HorizontalPodAutoscalerBehavior) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *HorizontalPodAutoscalerBehavior) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *HorizontalPodAutoscalerBehavior) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_HorizontalPodAutoscalerBehavior.Merge(m, src)
-}
-func (m *HorizontalPodAutoscalerBehavior) XXX_Size() int {
-	return m.Size()
-}
-func (m *HorizontalPodAutoscalerBehavior) XXX_DiscardUnknown() {
-	xxx_messageInfo_HorizontalPodAutoscalerBehavior.DiscardUnknown(m)
-}
+func (m *ObjectMetricSource) Reset() { *m = ObjectMetricSource{} }
 
-var xxx_messageInfo_HorizontalPodAutoscalerBehavior proto.InternalMessageInfo
+func (m *ObjectMetricStatus) Reset() { *m = ObjectMetricStatus{} }
 
-func (m *HorizontalPodAutoscalerCondition) Reset()      { *m = HorizontalPodAutoscalerCondition{} }
-func (*HorizontalPodAutoscalerCondition) ProtoMessage() {}
-func (*HorizontalPodAutoscalerCondition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{9}
-}
-func (m *HorizontalPodAutoscalerCondition) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *HorizontalPodAutoscalerCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *HorizontalPodAutoscalerCondition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_HorizontalPodAutoscalerCondition.Merge(m, src)
-}
-func (m *HorizontalPodAutoscalerCondition) XXX_Size() int {
-	return m.Size()
-}
-func (m *HorizontalPodAutoscalerCondition) XXX_DiscardUnknown() {
-	xxx_messageInfo_HorizontalPodAutoscalerCondition.DiscardUnknown(m)
-}
+func (m *PodsMetricSource) Reset() { *m = PodsMetricSource{} }
 
-var xxx_messageInfo_HorizontalPodAutoscalerCondition proto.InternalMessageInfo
+func (m *PodsMetricStatus) Reset() { *m = PodsMetricStatus{} }
 
-func (m *HorizontalPodAutoscalerList) Reset()      { *m = HorizontalPodAutoscalerList{} }
-func (*HorizontalPodAutoscalerList) ProtoMessage() {}
-func (*HorizontalPodAutoscalerList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{10}
-}
-func (m *HorizontalPodAutoscalerList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *HorizontalPodAutoscalerList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *HorizontalPodAutoscalerList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_HorizontalPodAutoscalerList.Merge(m, src)
-}
-func (m *HorizontalPodAutoscalerList) XXX_Size() int {
-	return m.Size()
-}
-func (m *HorizontalPodAutoscalerList) XXX_DiscardUnknown() {
-	xxx_messageInfo_HorizontalPodAutoscalerList.DiscardUnknown(m)
-}
+func (m *ResourceMetricSource) Reset() { *m = ResourceMetricSource{} }
 
-var xxx_messageInfo_HorizontalPodAutoscalerList proto.InternalMessageInfo
-
-func (m *HorizontalPodAutoscalerSpec) Reset()      { *m = HorizontalPodAutoscalerSpec{} }
-func (*HorizontalPodAutoscalerSpec) ProtoMessage() {}
-func (*HorizontalPodAutoscalerSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{11}
-}
-func (m *HorizontalPodAutoscalerSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *HorizontalPodAutoscalerSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *HorizontalPodAutoscalerSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_HorizontalPodAutoscalerSpec.Merge(m, src)
-}
-func (m *HorizontalPodAutoscalerSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *HorizontalPodAutoscalerSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_HorizontalPodAutoscalerSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_HorizontalPodAutoscalerSpec proto.InternalMessageInfo
-
-func (m *HorizontalPodAutoscalerStatus) Reset()      { *m = HorizontalPodAutoscalerStatus{} }
-func (*HorizontalPodAutoscalerStatus) ProtoMessage() {}
-func (*HorizontalPodAutoscalerStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{12}
-}
-func (m *HorizontalPodAutoscalerStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *HorizontalPodAutoscalerStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *HorizontalPodAutoscalerStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_HorizontalPodAutoscalerStatus.Merge(m, src)
-}
-func (m *HorizontalPodAutoscalerStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *HorizontalPodAutoscalerStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_HorizontalPodAutoscalerStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_HorizontalPodAutoscalerStatus proto.InternalMessageInfo
-
-func (m *MetricIdentifier) Reset()      { *m = MetricIdentifier{} }
-func (*MetricIdentifier) ProtoMessage() {}
-func (*MetricIdentifier) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{13}
-}
-func (m *MetricIdentifier) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *MetricIdentifier) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *MetricIdentifier) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MetricIdentifier.Merge(m, src)
-}
-func (m *MetricIdentifier) XXX_Size() int {
-	return m.Size()
-}
-func (m *MetricIdentifier) XXX_DiscardUnknown() {
-	xxx_messageInfo_MetricIdentifier.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MetricIdentifier proto.InternalMessageInfo
-
-func (m *MetricSpec) Reset()      { *m = MetricSpec{} }
-func (*MetricSpec) ProtoMessage() {}
-func (*MetricSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{14}
-}
-func (m *MetricSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *MetricSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *MetricSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MetricSpec.Merge(m, src)
-}
-func (m *MetricSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *MetricSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_MetricSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MetricSpec proto.InternalMessageInfo
-
-func (m *MetricStatus) Reset()      { *m = MetricStatus{} }
-func (*MetricStatus) ProtoMessage() {}
-func (*MetricStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{15}
-}
-func (m *MetricStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *MetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *MetricStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MetricStatus.Merge(m, src)
-}
-func (m *MetricStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *MetricStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_MetricStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MetricStatus proto.InternalMessageInfo
-
-func (m *MetricTarget) Reset()      { *m = MetricTarget{} }
-func (*MetricTarget) ProtoMessage() {}
-func (*MetricTarget) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{16}
-}
-func (m *MetricTarget) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *MetricTarget) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *MetricTarget) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MetricTarget.Merge(m, src)
-}
-func (m *MetricTarget) XXX_Size() int {
-	return m.Size()
-}
-func (m *MetricTarget) XXX_DiscardUnknown() {
-	xxx_messageInfo_MetricTarget.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MetricTarget proto.InternalMessageInfo
-
-func (m *MetricValueStatus) Reset()      { *m = MetricValueStatus{} }
-func (*MetricValueStatus) ProtoMessage() {}
-func (*MetricValueStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{17}
-}
-func (m *MetricValueStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *MetricValueStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *MetricValueStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MetricValueStatus.Merge(m, src)
-}
-func (m *MetricValueStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *MetricValueStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_MetricValueStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MetricValueStatus proto.InternalMessageInfo
-
-func (m *ObjectMetricSource) Reset()      { *m = ObjectMetricSource{} }
-func (*ObjectMetricSource) ProtoMessage() {}
-func (*ObjectMetricSource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{18}
-}
-func (m *ObjectMetricSource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ObjectMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ObjectMetricSource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ObjectMetricSource.Merge(m, src)
-}
-func (m *ObjectMetricSource) XXX_Size() int {
-	return m.Size()
-}
-func (m *ObjectMetricSource) XXX_DiscardUnknown() {
-	xxx_messageInfo_ObjectMetricSource.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ObjectMetricSource proto.InternalMessageInfo
-
-func (m *ObjectMetricStatus) Reset()      { *m = ObjectMetricStatus{} }
-func (*ObjectMetricStatus) ProtoMessage() {}
-func (*ObjectMetricStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{19}
-}
-func (m *ObjectMetricStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ObjectMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ObjectMetricStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ObjectMetricStatus.Merge(m, src)
-}
-func (m *ObjectMetricStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *ObjectMetricStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_ObjectMetricStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ObjectMetricStatus proto.InternalMessageInfo
-
-func (m *PodsMetricSource) Reset()      { *m = PodsMetricSource{} }
-func (*PodsMetricSource) ProtoMessage() {}
-func (*PodsMetricSource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{20}
-}
-func (m *PodsMetricSource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *PodsMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *PodsMetricSource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PodsMetricSource.Merge(m, src)
-}
-func (m *PodsMetricSource) XXX_Size() int {
-	return m.Size()
-}
-func (m *PodsMetricSource) XXX_DiscardUnknown() {
-	xxx_messageInfo_PodsMetricSource.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_PodsMetricSource proto.InternalMessageInfo
-
-func (m *PodsMetricStatus) Reset()      { *m = PodsMetricStatus{} }
-func (*PodsMetricStatus) ProtoMessage() {}
-func (*PodsMetricStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{21}
-}
-func (m *PodsMetricStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *PodsMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *PodsMetricStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PodsMetricStatus.Merge(m, src)
-}
-func (m *PodsMetricStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *PodsMetricStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_PodsMetricStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_PodsMetricStatus proto.InternalMessageInfo
-
-func (m *ResourceMetricSource) Reset()      { *m = ResourceMetricSource{} }
-func (*ResourceMetricSource) ProtoMessage() {}
-func (*ResourceMetricSource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{22}
-}
-func (m *ResourceMetricSource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ResourceMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ResourceMetricSource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ResourceMetricSource.Merge(m, src)
-}
-func (m *ResourceMetricSource) XXX_Size() int {
-	return m.Size()
-}
-func (m *ResourceMetricSource) XXX_DiscardUnknown() {
-	xxx_messageInfo_ResourceMetricSource.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ResourceMetricSource proto.InternalMessageInfo
-
-func (m *ResourceMetricStatus) Reset()      { *m = ResourceMetricStatus{} }
-func (*ResourceMetricStatus) ProtoMessage() {}
-func (*ResourceMetricStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d5f2c8767749221, []int{23}
-}
-func (m *ResourceMetricStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ResourceMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ResourceMetricStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ResourceMetricStatus.Merge(m, src)
-}
-func (m *ResourceMetricStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *ResourceMetricStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_ResourceMetricStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ResourceMetricStatus proto.InternalMessageInfo
-
-func init() {
-	proto.RegisterType((*ContainerResourceMetricSource)(nil), "k8s.io.api.autoscaling.v2.ContainerResourceMetricSource")
-	proto.RegisterType((*ContainerResourceMetricStatus)(nil), "k8s.io.api.autoscaling.v2.ContainerResourceMetricStatus")
-	proto.RegisterType((*CrossVersionObjectReference)(nil), "k8s.io.api.autoscaling.v2.CrossVersionObjectReference")
-	proto.RegisterType((*ExternalMetricSource)(nil), "k8s.io.api.autoscaling.v2.ExternalMetricSource")
-	proto.RegisterType((*ExternalMetricStatus)(nil), "k8s.io.api.autoscaling.v2.ExternalMetricStatus")
-	proto.RegisterType((*HPAScalingPolicy)(nil), "k8s.io.api.autoscaling.v2.HPAScalingPolicy")
-	proto.RegisterType((*HPAScalingRules)(nil), "k8s.io.api.autoscaling.v2.HPAScalingRules")
-	proto.RegisterType((*HorizontalPodAutoscaler)(nil), "k8s.io.api.autoscaling.v2.HorizontalPodAutoscaler")
-	proto.RegisterType((*HorizontalPodAutoscalerBehavior)(nil), "k8s.io.api.autoscaling.v2.HorizontalPodAutoscalerBehavior")
-	proto.RegisterType((*HorizontalPodAutoscalerCondition)(nil), "k8s.io.api.autoscaling.v2.HorizontalPodAutoscalerCondition")
-	proto.RegisterType((*HorizontalPodAutoscalerList)(nil), "k8s.io.api.autoscaling.v2.HorizontalPodAutoscalerList")
-	proto.RegisterType((*HorizontalPodAutoscalerSpec)(nil), "k8s.io.api.autoscaling.v2.HorizontalPodAutoscalerSpec")
-	proto.RegisterType((*HorizontalPodAutoscalerStatus)(nil), "k8s.io.api.autoscaling.v2.HorizontalPodAutoscalerStatus")
-	proto.RegisterType((*MetricIdentifier)(nil), "k8s.io.api.autoscaling.v2.MetricIdentifier")
-	proto.RegisterType((*MetricSpec)(nil), "k8s.io.api.autoscaling.v2.MetricSpec")
-	proto.RegisterType((*MetricStatus)(nil), "k8s.io.api.autoscaling.v2.MetricStatus")
-	proto.RegisterType((*MetricTarget)(nil), "k8s.io.api.autoscaling.v2.MetricTarget")
-	proto.RegisterType((*MetricValueStatus)(nil), "k8s.io.api.autoscaling.v2.MetricValueStatus")
-	proto.RegisterType((*ObjectMetricSource)(nil), "k8s.io.api.autoscaling.v2.ObjectMetricSource")
-	proto.RegisterType((*ObjectMetricStatus)(nil), "k8s.io.api.autoscaling.v2.ObjectMetricStatus")
-	proto.RegisterType((*PodsMetricSource)(nil), "k8s.io.api.autoscaling.v2.PodsMetricSource")
-	proto.RegisterType((*PodsMetricStatus)(nil), "k8s.io.api.autoscaling.v2.PodsMetricStatus")
-	proto.RegisterType((*ResourceMetricSource)(nil), "k8s.io.api.autoscaling.v2.ResourceMetricSource")
-	proto.RegisterType((*ResourceMetricStatus)(nil), "k8s.io.api.autoscaling.v2.ResourceMetricStatus")
-}
-
-func init() {
-	proto.RegisterFile("k8s.io/api/autoscaling/v2/generated.proto", fileDescriptor_4d5f2c8767749221)
-}
-
-var fileDescriptor_4d5f2c8767749221 = []byte{
-	// 1722 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x59, 0xcb, 0x8f, 0x1b, 0x49,
-	0x19, 0x9f, 0xb6, 0x3d, 0xaf, 0xf2, 0x3c, 0x2b, 0x2f, 0x67, 0xa2, 0xd8, 0xa3, 0x26, 0x90, 0x07,
-	0xa4, 0x4d, 0x4c, 0x88, 0x22, 0x72, 0x40, 0xd3, 0x13, 0x20, 0xa3, 0xcc, 0x30, 0x4e, 0x39, 0xc9,
-	0x00, 0x02, 0x94, 0x72, 0x77, 0x8d, 0xa7, 0x18, 0xbb, 0xdb, 0xea, 0x6e, 0x3b, 0x99, 0x48, 0x48,
-	0x5c, 0xb8, 0x23, 0x50, 0x84, 0xf8, 0x1f, 0x22, 0x4e, 0xa0, 0x70, 0x00, 0x09, 0x69, 0xf7, 0x90,
-	0xcb, 0x4a, 0x39, 0xec, 0x21, 0x27, 0x6b, 0xe3, 0x95, 0xf6, 0xb8, 0x7f, 0x40, 0x4e, 0xab, 0x7a,
-	0xf4, 0xd3, 0xaf, 0x71, 0x76, 0x32, 0xd2, 0xdc, 0x5c, 0x55, 0xdf, 0xf7, 0xfb, 0x1e, 0xf5, 0xbd,
-	0xaa, 0x0d, 0xae, 0xee, 0xdf, 0x76, 0x35, 0x6a, 0x17, 0x71, 0x93, 0x16, 0x71, 0xcb, 0xb3, 0x5d,
-	0x03, 0xd7, 0xa9, 0x55, 0x2b, 0xb6, 0x4b, 0xc5, 0x1a, 0xb1, 0x88, 0x83, 0x3d, 0x62, 0x6a, 0x4d,
-	0xc7, 0xf6, 0x6c, 0x78, 0x5e, 0x90, 0x6a, 0xb8, 0x49, 0xb5, 0x08, 0xa9, 0xd6, 0x2e, 0xad, 0x5c,
-	0xaf, 0x51, 0x6f, 0xaf, 0x55, 0xd5, 0x0c, 0xbb, 0x51, 0xac, 0xd9, 0x35, 0xbb, 0xc8, 0x39, 0xaa,
-	0xad, 0x5d, 0xbe, 0xe2, 0x0b, 0xfe, 0x4b, 0x20, 0xad, 0xa8, 0x11, 0xa1, 0x86, 0xed, 0x90, 0x62,
-	0xfb, 0x46, 0x52, 0xda, 0xca, 0xcd, 0x90, 0xa6, 0x81, 0x8d, 0x3d, 0x6a, 0x11, 0xe7, 0xa0, 0xd8,
-	0xdc, 0xaf, 0x71, 0x26, 0x87, 0xb8, 0x76, 0xcb, 0x31, 0xc8, 0x58, 0x5c, 0x6e, 0xb1, 0x41, 0x3c,
-	0xdc, 0x4f, 0x56, 0x71, 0x10, 0x97, 0xd3, 0xb2, 0x3c, 0xda, 0xe8, 0x15, 0x73, 0x6b, 0x14, 0x83,
-	0x6b, 0xec, 0x91, 0x06, 0x4e, 0xf2, 0xa9, 0x5f, 0x29, 0xe0, 0xe2, 0xba, 0x6d, 0x79, 0x98, 0x71,
-	0x20, 0x69, 0xc4, 0x16, 0xf1, 0x1c, 0x6a, 0x54, 0xf8, 0x6f, 0xb8, 0x0e, 0x32, 0x16, 0x6e, 0x90,
-	0x9c, 0xb2, 0xaa, 0x5c, 0x99, 0xd5, 0x8b, 0xaf, 0x3b, 0x85, 0x89, 0x6e, 0xa7, 0x90, 0xf9, 0x25,
-	0x6e, 0x90, 0xf7, 0x9d, 0x42, 0xa1, 0xd7, 0x71, 0x9a, 0x0f, 0xc3, 0x48, 0x10, 0x67, 0x86, 0xdb,
-	0x60, 0xca, 0xc3, 0x4e, 0x8d, 0x78, 0xb9, 0xd4, 0xaa, 0x72, 0x25, 0x5b, 0xba, 0xac, 0x0d, 0xbc,
-	0x3a, 0x4d, 0x48, 0x7f, 0xc8, 0xc9, 0xf5, 0x05, 0x29, 0x6f, 0x4a, 0xac, 0x91, 0x84, 0x81, 0x45,
-	0x30, 0x6b, 0xf8, 0x6a, 0xe7, 0xd2, 0x5c, 0xb5, 0x65, 0x49, 0x3a, 0x1b, 0xda, 0x13, 0xd2, 0xa8,
-	0x5f, 0x0f, 0x31, 0xd4, 0xc3, 0x5e, 0xcb, 0x3d, 0x1a, 0x43, 0x77, 0xc0, 0xb4, 0xd1, 0x72, 0x1c,
-	0x62, 0xf9, 0x96, 0xfe, 0x60, 0xa4, 0xa5, 0x8f, 0x71, 0xbd, 0x45, 0x84, 0x0e, 0xfa, 0xa2, 0x94,
-	0x3a, 0xbd, 0x2e, 0x40, 0x90, 0x8f, 0x36, 0xbe, 0xc1, 0x2f, 0x14, 0x70, 0x61, 0xdd, 0xb1, 0x5d,
-	0xf7, 0x31, 0x71, 0x5c, 0x6a, 0x5b, 0xdb, 0xd5, 0x3f, 0x10, 0xc3, 0x43, 0x64, 0x97, 0x38, 0xc4,
-	0x32, 0x08, 0x5c, 0x05, 0x99, 0x7d, 0x6a, 0x99, 0xd2, 0xdc, 0x39, 0xdf, 0xdc, 0xfb, 0xd4, 0x32,
-	0x11, 0x3f, 0x61, 0x14, 0xdc, 0x21, 0xa9, 0x38, 0x45, 0xc4, 0xda, 0x12, 0x00, 0xb8, 0x49, 0xa5,
-	0x00, 0xa9, 0x15, 0x94, 0x74, 0x60, 0xad, 0xbc, 0x21, 0x4f, 0x50, 0x84, 0x4a, 0xfd, 0xaf, 0x02,
-	0x4e, 0xff, 0xec, 0x99, 0x47, 0x1c, 0x0b, 0xd7, 0x63, 0x81, 0x56, 0x01, 0x53, 0x0d, 0xbe, 0xe6,
-	0x2a, 0x65, 0x4b, 0xdf, 0x1f, 0xe9, 0xb9, 0x0d, 0x93, 0x58, 0x1e, 0xdd, 0xa5, 0xc4, 0x09, 0xe3,
-	0x44, 0x9c, 0x20, 0x09, 0x75, 0xe4, 0x81, 0xa7, 0x7e, 0xda, 0xab, 0xbe, 0x08, 0x9f, 0x8f, 0xa2,
-	0xfe, 0xc7, 0x0a, 0x27, 0xf5, 0x9f, 0x0a, 0x58, 0xba, 0x57, 0x5e, 0xab, 0x08, 0xee, 0xb2, 0x5d,
-	0xa7, 0xc6, 0x01, 0xbc, 0x0d, 0x32, 0xde, 0x41, 0xd3, 0xcf, 0x80, 0x4b, 0xfe, 0x85, 0x3f, 0x3c,
-	0x68, 0xb2, 0x0c, 0x38, 0x9d, 0xa4, 0x67, 0xfb, 0x88, 0x73, 0xc0, 0xef, 0x80, 0xc9, 0x36, 0x93,
-	0xcb, 0xb5, 0x9c, 0xd4, 0xe7, 0x25, 0xeb, 0x24, 0x57, 0x06, 0x89, 0x33, 0x78, 0x07, 0xcc, 0x37,
-	0x89, 0x43, 0x6d, 0xb3, 0x42, 0x0c, 0xdb, 0x32, 0x5d, 0x1e, 0x30, 0x93, 0xfa, 0x19, 0x49, 0x3c,
-	0x5f, 0x8e, 0x1e, 0xa2, 0x38, 0xad, 0xfa, 0x8f, 0x14, 0x58, 0x0c, 0x15, 0x40, 0xad, 0x3a, 0x71,
-	0xe1, 0xef, 0xc1, 0x8a, 0xeb, 0xe1, 0x2a, 0xad, 0xd3, 0xe7, 0xd8, 0xa3, 0xb6, 0xb5, 0x43, 0x2d,
-	0xd3, 0x7e, 0x1a, 0x47, 0xcf, 0x77, 0x3b, 0x85, 0x95, 0xca, 0x40, 0x2a, 0x34, 0x04, 0x01, 0xde,
-	0x07, 0x73, 0x2e, 0xa9, 0x13, 0xc3, 0x13, 0xf6, 0x4a, 0xbf, 0x5c, 0xee, 0x76, 0x0a, 0x73, 0x95,
-	0xc8, 0xfe, 0xfb, 0x4e, 0xe1, 0x54, 0xcc, 0x31, 0xe2, 0x10, 0xc5, 0x98, 0xe1, 0xaf, 0xc1, 0x4c,
-	0x93, 0xfd, 0xa2, 0xc4, 0xcd, 0xa5, 0x56, 0xd3, 0x23, 0x22, 0x24, 0xe9, 0x6b, 0x7d, 0x49, 0x7a,
-	0x69, 0xa6, 0x2c, 0x41, 0x50, 0x00, 0xa7, 0xbe, 0x4a, 0x81, 0x73, 0xf7, 0x6c, 0x87, 0x3e, 0x67,
-	0xc9, 0x5f, 0x2f, 0xdb, 0xe6, 0x9a, 0x04, 0x23, 0x0e, 0x7c, 0x02, 0x66, 0x58, 0x93, 0x31, 0xb1,
-	0x87, 0x65, 0x60, 0xfe, 0x30, 0x22, 0x36, 0xe8, 0x15, 0x5a, 0x73, 0xbf, 0xc6, 0x36, 0x5c, 0x8d,
-	0x51, 0x6b, 0xed, 0x1b, 0x9a, 0xa8, 0x17, 0x5b, 0xc4, 0xc3, 0x61, 0x4a, 0x87, 0x7b, 0x28, 0x40,
-	0x85, 0xbf, 0x02, 0x19, 0xb7, 0x49, 0x0c, 0x19, 0xa0, 0xb7, 0x86, 0x19, 0xd5, 0x5f, 0xc7, 0x4a,
-	0x93, 0x18, 0x61, 0x79, 0x61, 0x2b, 0xc4, 0x11, 0xe1, 0x13, 0x30, 0xe5, 0xf2, 0x40, 0xe6, 0x77,
-	0x99, 0x2d, 0xdd, 0xfe, 0x00, 0x6c, 0x91, 0x08, 0x41, 0x7e, 0x89, 0x35, 0x92, 0xb8, 0xea, 0x67,
-	0x0a, 0x28, 0x0c, 0xe0, 0xd4, 0xc9, 0x1e, 0x6e, 0x53, 0xdb, 0x81, 0x0f, 0xc0, 0x34, 0xdf, 0x79,
-	0xd4, 0x94, 0x0e, 0xbc, 0x76, 0xa8, 0x7b, 0xe3, 0x21, 0xaa, 0x67, 0x59, 0xf6, 0x55, 0x04, 0x3b,
-	0xf2, 0x71, 0xe0, 0x0e, 0x98, 0xe5, 0x3f, 0xef, 0xda, 0x4f, 0x2d, 0xe9, 0xb7, 0x71, 0x40, 0xe7,
-	0x59, 0xd1, 0xaf, 0xf8, 0x00, 0x28, 0xc4, 0x52, 0xff, 0x9c, 0x06, 0xab, 0x03, 0xec, 0x59, 0xb7,
-	0x2d, 0x93, 0xb2, 0x18, 0x87, 0xf7, 0x62, 0x69, 0x7e, 0x33, 0x91, 0xe6, 0x97, 0x46, 0xf1, 0x47,
-	0xd2, 0x7e, 0x33, 0xb8, 0xa0, 0x54, 0x0c, 0x4b, 0xba, 0xf9, 0x7d, 0xa7, 0xd0, 0x67, 0xb0, 0xd2,
-	0x02, 0xa4, 0xf8, 0x65, 0xc0, 0x36, 0x80, 0x75, 0xec, 0x7a, 0x0f, 0x1d, 0x6c, 0xb9, 0x42, 0x12,
-	0x6d, 0x10, 0x79, 0xf5, 0xd7, 0x0e, 0x17, 0xb4, 0x8c, 0x43, 0x5f, 0x91, 0x5a, 0xc0, 0xcd, 0x1e,
-	0x34, 0xd4, 0x47, 0x02, 0xfc, 0x1e, 0x98, 0x72, 0x08, 0x76, 0x6d, 0x2b, 0x97, 0xe1, 0x56, 0x04,
-	0xc1, 0x82, 0xf8, 0x2e, 0x92, 0xa7, 0xf0, 0x2a, 0x98, 0x6e, 0x10, 0xd7, 0xc5, 0x35, 0x92, 0x9b,
-	0xe4, 0x84, 0x41, 0x79, 0xdd, 0x12, 0xdb, 0xc8, 0x3f, 0x57, 0x3f, 0x57, 0xc0, 0x85, 0x01, 0x7e,
-	0xdc, 0xa4, 0xae, 0x07, 0x7f, 0xdb, 0x93, 0x95, 0xda, 0xe1, 0x0c, 0x64, 0xdc, 0x3c, 0x27, 0x83,
-	0x7a, 0xe0, 0xef, 0x44, 0x32, 0x72, 0x07, 0x4c, 0x52, 0x8f, 0x34, 0xfc, 0x3a, 0x53, 0x1a, 0x3f,
-	0x6d, 0xc2, 0x0a, 0xbe, 0xc1, 0x80, 0x90, 0xc0, 0x53, 0x5f, 0xa5, 0x07, 0x9a, 0xc5, 0xd2, 0x16,
-	0xb6, 0xc1, 0x02, 0x5f, 0xc9, 0x9e, 0x49, 0x76, 0xa5, 0x71, 0xc3, 0x8a, 0xc2, 0x90, 0x19, 0x45,
-	0x3f, 0x2b, 0xb5, 0x58, 0xa8, 0xc4, 0x50, 0x51, 0x42, 0x0a, 0xbc, 0x01, 0xb2, 0x0d, 0x6a, 0x21,
-	0xd2, 0xac, 0x53, 0x03, 0xbb, 0xb2, 0x09, 0x2d, 0x76, 0x3b, 0x85, 0xec, 0x56, 0xb8, 0x8d, 0xa2,
-	0x34, 0xf0, 0xc7, 0x20, 0xdb, 0xc0, 0xcf, 0x02, 0x16, 0xd1, 0x2c, 0x4e, 0x49, 0x79, 0xd9, 0xad,
-	0xf0, 0x08, 0x45, 0xe9, 0x60, 0x99, 0xc5, 0x00, 0x6b, 0xb3, 0x6e, 0x2e, 0xc3, 0x9d, 0xfb, 0xdd,
-	0x91, 0x0d, 0x99, 0x97, 0xb7, 0x48, 0xa8, 0x70, 0x6e, 0xe4, 0xc3, 0x40, 0x13, 0xcc, 0x54, 0x65,
-	0xa9, 0xe1, 0x61, 0x95, 0x2d, 0xfd, 0xe4, 0x03, 0xee, 0x4b, 0x22, 0xe8, 0x73, 0x2c, 0x24, 0xfc,
-	0x15, 0x0a, 0x90, 0xd5, 0x97, 0x19, 0x70, 0x71, 0x68, 0x89, 0x84, 0x3f, 0x07, 0xd0, 0xae, 0xba,
-	0xc4, 0x69, 0x13, 0xf3, 0x17, 0xe2, 0x91, 0xc0, 0x66, 0x3a, 0x76, 0x7f, 0x69, 0xfd, 0x2c, 0xcb,
-	0xa6, 0xed, 0x9e, 0x53, 0xd4, 0x87, 0x03, 0x1a, 0x60, 0x9e, 0xe5, 0x98, 0xb8, 0x31, 0x2a, 0xc7,
-	0xc7, 0xf1, 0x12, 0x78, 0x99, 0x4d, 0x03, 0x9b, 0x51, 0x10, 0x14, 0xc7, 0x84, 0x6b, 0x60, 0x51,
-	0x4e, 0x32, 0x89, 0x1b, 0x3c, 0x27, 0xfd, 0xbc, 0xb8, 0x1e, 0x3f, 0x46, 0x49, 0x7a, 0x06, 0x61,
-	0x12, 0x97, 0x3a, 0xc4, 0x0c, 0x20, 0x32, 0x71, 0x88, 0xbb, 0xf1, 0x63, 0x94, 0xa4, 0x87, 0x35,
-	0xb0, 0x20, 0x51, 0xe5, 0xad, 0xe6, 0x26, 0x79, 0x4c, 0x8c, 0x1e, 0x32, 0x65, 0x5b, 0x0a, 0xe2,
-	0x7b, 0x3d, 0x06, 0x83, 0x12, 0xb0, 0xd0, 0x06, 0xc0, 0xf0, 0x8b, 0xa6, 0x9b, 0x9b, 0xe2, 0x42,
-	0xee, 0x8c, 0x1f, 0x25, 0x41, 0xe1, 0x0d, 0x3b, 0x7a, 0xb0, 0xe5, 0xa2, 0x88, 0x08, 0xf5, 0x6f,
-	0x0a, 0x58, 0x4a, 0x0e, 0xa9, 0xc1, 0x7b, 0x40, 0x19, 0xf8, 0x1e, 0xf8, 0x1d, 0x98, 0x11, 0x33,
-	0x8f, 0xed, 0xc8, 0x6b, 0xff, 0xd1, 0x21, 0xcb, 0x1a, 0xae, 0x92, 0x7a, 0x45, 0xb2, 0x8a, 0x20,
-	0xf6, 0x57, 0x28, 0x80, 0x54, 0x5f, 0x64, 0x00, 0x08, 0x73, 0x0a, 0xde, 0x8c, 0xf5, 0xb1, 0xd5,
-	0x44, 0x1f, 0x5b, 0x8a, 0x3e, 0x2e, 0x22, 0x3d, 0xeb, 0x01, 0x98, 0xb2, 0x79, 0x99, 0x91, 0x1a,
-	0x5e, 0x1f, 0xe2, 0xc7, 0x60, 0xde, 0x09, 0x80, 0x74, 0xc0, 0x1a, 0x83, 0xac, 0x53, 0x12, 0x08,
-	0x6e, 0x80, 0x4c, 0xd3, 0x36, 0xfd, 0x29, 0x65, 0xd8, 0x58, 0x57, 0xb6, 0x4d, 0x37, 0x06, 0x37,
-	0xc3, 0x34, 0x66, 0xbb, 0x88, 0x43, 0xb0, 0x29, 0xd1, 0xff, 0x94, 0xc0, 0xc3, 0x31, 0x5b, 0x2a,
-	0x0e, 0x81, 0xeb, 0xf7, 0x60, 0x17, 0xde, 0xf3, 0x4f, 0x50, 0x00, 0x07, 0xff, 0x08, 0x96, 0x8d,
-	0xe4, 0x03, 0x38, 0x37, 0x3d, 0x72, 0xb0, 0x1a, 0xfa, 0x75, 0x40, 0x3f, 0xd3, 0xed, 0x14, 0x96,
-	0x7b, 0x48, 0x50, 0xaf, 0x24, 0x66, 0x19, 0x91, 0xef, 0x26, 0x59, 0xe7, 0x86, 0x59, 0xd6, 0xef,
-	0x85, 0x28, 0x2c, 0xf3, 0x4f, 0x50, 0x00, 0xa7, 0xfe, 0x3d, 0x03, 0xe6, 0x62, 0x6f, 0xb1, 0x63,
-	0x8e, 0x0c, 0x91, 0xcc, 0x47, 0x16, 0x19, 0x02, 0xee, 0x48, 0x23, 0x43, 0x40, 0x1e, 0x53, 0x64,
-	0x08, 0x61, 0xc7, 0x14, 0x19, 0x11, 0xcb, 0xfa, 0x44, 0xc6, 0x27, 0x29, 0x3f, 0x32, 0xc4, 0xb0,
-	0x70, 0xb8, 0xc8, 0x10, 0xb4, 0x91, 0xc8, 0xd8, 0x8e, 0x3e, 0x6f, 0x47, 0xcc, 0x6a, 0x9a, 0xef,
-	0x56, 0xed, 0x41, 0x0b, 0x5b, 0x1e, 0xf5, 0x0e, 0xf4, 0xd9, 0x9e, 0xa7, 0xb0, 0x09, 0xe6, 0x70,
-	0x9b, 0x38, 0xb8, 0x46, 0xf8, 0xb6, 0x8c, 0x8f, 0x71, 0x71, 0x97, 0xd8, 0x4b, 0x74, 0x2d, 0x82,
-	0x83, 0x62, 0xa8, 0xac, 0xa5, 0xcb, 0xf5, 0x23, 0x2f, 0x78, 0xe2, 0xca, 0x2e, 0xc7, 0x5b, 0xfa,
-	0x5a, 0xcf, 0x29, 0xea, 0xc3, 0xa1, 0xfe, 0x35, 0x05, 0x96, 0x7b, 0x3e, 0x2e, 0x84, 0x4e, 0x51,
-	0x3e, 0x92, 0x53, 0x52, 0xc7, 0xe8, 0x94, 0xf4, 0xd8, 0x4e, 0xf9, 0x77, 0x0a, 0xc0, 0xde, 0xfe,
-	0x00, 0x0f, 0xf8, 0x58, 0x61, 0x38, 0xb4, 0x4a, 0x4c, 0x71, 0xfc, 0x2d, 0x67, 0xe0, 0xe8, 0x38,
-	0x12, 0x85, 0x45, 0x49, 0x39, 0x47, 0xff, 0x91, 0x35, 0xfc, 0xa4, 0x95, 0x3e, 0xb2, 0x4f, 0x5a,
-	0xea, 0xff, 0x92, 0x7e, 0x3b, 0x81, 0x9f, 0xcf, 0xfa, 0xdd, 0x72, 0xfa, 0x78, 0x6e, 0x59, 0xfd,
-	0x8f, 0x02, 0x96, 0x92, 0x63, 0xc4, 0x09, 0xf9, 0x76, 0xfa, 0xff, 0xb8, 0xea, 0x27, 0xf1, 0xbb,
-	0xe9, 0x4b, 0x05, 0x9c, 0x3e, 0x39, 0x7f, 0x93, 0xa8, 0xff, 0xea, 0x55, 0xf7, 0x04, 0xfc, 0xd9,
-	0xa1, 0xff, 0xf4, 0xf5, 0xbb, 0xfc, 0xc4, 0x9b, 0x77, 0xf9, 0x89, 0xb7, 0xef, 0xf2, 0x13, 0x7f,
-	0xea, 0xe6, 0x95, 0xd7, 0xdd, 0xbc, 0xf2, 0xa6, 0x9b, 0x57, 0xde, 0x76, 0xf3, 0xca, 0x17, 0xdd,
-	0xbc, 0xf2, 0x97, 0x2f, 0xf3, 0x13, 0xbf, 0x39, 0x3f, 0xf0, 0x9f, 0xc2, 0x6f, 0x02, 0x00, 0x00,
-	0xff, 0xff, 0xca, 0x8b, 0x47, 0xba, 0x45, 0x1c, 0x00, 0x00,
-}
+func (m *ResourceMetricStatus) Reset() { *m = ResourceMetricStatus{} }
 
 func (m *ContainerResourceMetricSource) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -1126,6 +345,18 @@ func (m *HPAScalingRules) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Tolerance != nil {
+		{
+			size, err := m.Tolerance.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x22
+	}
 	if m.StabilizationWindowSeconds != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.StabilizationWindowSeconds))
 		i--
@@ -2203,6 +1434,10 @@ func (m *HPAScalingRules) Size() (n int) {
 	if m.StabilizationWindowSeconds != nil {
 		n += 1 + sovGenerated(uint64(*m.StabilizationWindowSeconds))
 	}
+	if m.Tolerance != nil {
+		l = m.Tolerance.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -2619,6 +1854,7 @@ func (this *HPAScalingRules) String() string {
 		`SelectPolicy:` + valueToStringGenerated(this.SelectPolicy) + `,`,
 		`Policies:` + repeatedStringForPolicies + `,`,
 		`StabilizationWindowSeconds:` + valueToStringGenerated(this.StabilizationWindowSeconds) + `,`,
+		`Tolerance:` + strings.Replace(fmt.Sprintf("%v", this.Tolerance), "Quantity", "resource.Quantity", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3770,6 +3006,42 @@ func (m *HPAScalingRules) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.StabilizationWindowSeconds = &v
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Tolerance", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Tolerance == nil {
+				m.Tolerance = &resource.Quantity{}
+			}
+			if err := m.Tolerance.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

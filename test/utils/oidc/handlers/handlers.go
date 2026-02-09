@@ -19,7 +19,7 @@ limitations under the License.
 package handlers
 
 import (
-	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/go-jose/go-jose.v2"
 )
 
 type Token struct {

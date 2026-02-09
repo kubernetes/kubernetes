@@ -19,19 +19,32 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PersistentVolumeClaimConditionApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimCondition type for use
 // with apply.
+//
+// PersistentVolumeClaimCondition contains details about state of pvc
 type PersistentVolumeClaimConditionApplyConfiguration struct {
-	Type               *v1.PersistentVolumeClaimConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus                    `json:"status,omitempty"`
-	LastProbeTime      *metav1.Time                           `json:"lastProbeTime,omitempty"`
-	LastTransitionTime *metav1.Time                           `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                `json:"reason,omitempty"`
-	Message            *string                                `json:"message,omitempty"`
+	// Type is the type of the condition.
+	// More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about
+	Type *corev1.PersistentVolumeClaimConditionType `json:"type,omitempty"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	// More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// lastProbeTime is the time we probed the condition.
+	LastProbeTime *metav1.Time `json:"lastProbeTime,omitempty"`
+	// lastTransitionTime is the time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// reason is a unique, this should be a short, machine understandable string that gives the reason
+	// for condition's last transition. If it reports "Resizing" that means the underlying
+	// persistent volume is being resized.
+	Reason *string `json:"reason,omitempty"`
+	// message is the human-readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // PersistentVolumeClaimConditionApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimCondition type for use with
@@ -43,7 +56,7 @@ func PersistentVolumeClaimCondition() *PersistentVolumeClaimConditionApplyConfig
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *PersistentVolumeClaimConditionApplyConfiguration) WithType(value v1.PersistentVolumeClaimConditionType) *PersistentVolumeClaimConditionApplyConfiguration {
+func (b *PersistentVolumeClaimConditionApplyConfiguration) WithType(value corev1.PersistentVolumeClaimConditionType) *PersistentVolumeClaimConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -51,7 +64,7 @@ func (b *PersistentVolumeClaimConditionApplyConfiguration) WithType(value v1.Per
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *PersistentVolumeClaimConditionApplyConfiguration) WithStatus(value v1.ConditionStatus) *PersistentVolumeClaimConditionApplyConfiguration {
+func (b *PersistentVolumeClaimConditionApplyConfiguration) WithStatus(value corev1.ConditionStatus) *PersistentVolumeClaimConditionApplyConfiguration {
 	b.Status = &value
 	return b
 }

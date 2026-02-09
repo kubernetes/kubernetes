@@ -15,6 +15,7 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -32,7 +33,7 @@ func (v FloatString) MarshalJSON() ([]byte, error) {
 
 func (v *FloatString) UnmarshalJSON(b []byte) error {
 	if len(b) < 2 || b[0] != '"' || b[len(b)-1] != '"' {
-		return fmt.Errorf("float value must be a quoted string")
+		return errors.New("float value must be a quoted string")
 	}
 	f, err := strconv.ParseFloat(string(b[1:len(b)-1]), 64)
 	if err != nil {
@@ -85,22 +86,22 @@ func (s *HistogramBucket) Equal(o *HistogramBucket) bool {
 	return s == o || (s.Boundaries == o.Boundaries && s.Lower == o.Lower && s.Upper == o.Upper && s.Count == o.Count)
 }
 
-func (b HistogramBucket) String() string {
+func (s HistogramBucket) String() string {
 	var sb strings.Builder
-	lowerInclusive := b.Boundaries == 1 || b.Boundaries == 3
-	upperInclusive := b.Boundaries == 0 || b.Boundaries == 3
+	lowerInclusive := s.Boundaries == 1 || s.Boundaries == 3
+	upperInclusive := s.Boundaries == 0 || s.Boundaries == 3
 	if lowerInclusive {
 		sb.WriteRune('[')
 	} else {
 		sb.WriteRune('(')
 	}
-	fmt.Fprintf(&sb, "%g,%g", b.Lower, b.Upper)
+	fmt.Fprintf(&sb, "%g,%g", s.Lower, s.Upper)
 	if upperInclusive {
 		sb.WriteRune(']')
 	} else {
 		sb.WriteRune(')')
 	}
-	fmt.Fprintf(&sb, ":%v", b.Count)
+	fmt.Fprintf(&sb, ":%v", s.Count)
 	return sb.String()
 }
 
@@ -141,7 +142,7 @@ type SampleHistogramPair struct {
 
 func (s SampleHistogramPair) MarshalJSON() ([]byte, error) {
 	if s.Histogram == nil {
-		return nil, fmt.Errorf("histogram is nil")
+		return nil, errors.New("histogram is nil")
 	}
 	t, err := json.Marshal(s.Timestamp)
 	if err != nil {
@@ -164,7 +165,7 @@ func (s *SampleHistogramPair) UnmarshalJSON(buf []byte) error {
 		return fmt.Errorf("wrong number of fields: %d != %d", gotLen, wantLen)
 	}
 	if s.Histogram == nil {
-		return fmt.Errorf("histogram is null")
+		return errors.New("histogram is null")
 	}
 	return nil
 }

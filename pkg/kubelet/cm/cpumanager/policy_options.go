@@ -29,20 +29,27 @@ import (
 
 // Names of the options, as part of the user interface.
 const (
-	FullPCPUsOnlyOption            string = "full-pcpus-only"
-	DistributeCPUsAcrossNUMAOption string = "distribute-cpus-across-numa"
-	AlignBySocketOption            string = "align-by-socket"
+	FullPCPUsOnlyOption             string = "full-pcpus-only"
+	DistributeCPUsAcrossNUMAOption  string = "distribute-cpus-across-numa"
+	AlignBySocketOption             string = "align-by-socket"
+	DistributeCPUsAcrossCoresOption string = "distribute-cpus-across-cores"
+	StrictCPUReservationOption      string = "strict-cpu-reservation"
+	PreferAlignByUnCoreCacheOption  string = "prefer-align-cpus-by-uncorecache"
 )
 
 var (
 	alphaOptions = sets.New[string](
-		DistributeCPUsAcrossNUMAOption,
 		AlignBySocketOption,
+		DistributeCPUsAcrossCoresOption,
 	)
 	betaOptions = sets.New[string](
-		FullPCPUsOnlyOption,
+		DistributeCPUsAcrossNUMAOption,
+		PreferAlignByUnCoreCacheOption,
 	)
-	stableOptions = sets.New[string]()
+	stableOptions = sets.New[string](
+		FullPCPUsOnlyOption,
+		StrictCPUReservationOption,
+	)
 )
 
 // CheckPolicyOptionAvailable verifies if the given option can be used depending on the Feature Gate Settings.
@@ -60,6 +67,7 @@ func CheckPolicyOptionAvailable(option string) error {
 		return fmt.Errorf("CPU Manager Policy Beta-level Options not enabled, but option %q provided", option)
 	}
 
+	// if the option is stable, we need no CPUManagerPolicy*Options feature gate check
 	return nil
 }
 
@@ -80,6 +88,15 @@ type StaticPolicyOptions struct {
 	// Flag to ensure CPUs are considered aligned at socket boundary rather than
 	// NUMA boundary
 	AlignBySocket bool
+	// flag to enable extra allocation restrictions to spread
+	// cpus (HT) on different physical core.
+	// This is a preferred policy so do not throw error if they have to packed in one physical core.
+	DistributeCPUsAcrossCores bool
+	// Flag to remove reserved cores from the list of available cores
+	StrictCPUReservation bool
+	// Flag that makes best-effort to align CPUs to a uncorecache boundary
+	// As long as there are CPUs available, pods will be admitted if the condition is not met.
+	PreferAlignByUncoreCacheOption bool
 }
 
 // NewStaticPolicyOptions creates a StaticPolicyOptions struct from the user configuration.
@@ -109,12 +126,48 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.AlignBySocket = optValue
+		case DistributeCPUsAcrossCoresOption:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.DistributeCPUsAcrossCores = optValue
+		case StrictCPUReservationOption:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.StrictCPUReservation = optValue
+		case PreferAlignByUnCoreCacheOption:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.PreferAlignByUncoreCacheOption = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
 			return opts, fmt.Errorf("unsupported cpumanager option: %q (%s)", name, value)
 		}
 	}
+
+	if opts.FullPhysicalCPUsOnly && opts.DistributeCPUsAcrossCores {
+		return opts, fmt.Errorf("static policy options %s and %s can not be used at the same time", FullPCPUsOnlyOption, DistributeCPUsAcrossCoresOption)
+	}
+
+	// TODO(@Jeffwan): Remove this check after more compatibility tests are done.
+	if opts.DistributeCPUsAcrossNUMA && opts.DistributeCPUsAcrossCores {
+		return opts, fmt.Errorf("static policy options %s and %s can not be used at the same time", DistributeCPUsAcrossNUMAOption, DistributeCPUsAcrossCoresOption)
+	}
+
+	if opts.PreferAlignByUncoreCacheOption && opts.DistributeCPUsAcrossCores {
+		return opts, fmt.Errorf("static policy options %s and %s can not be used at the same time", PreferAlignByUnCoreCacheOption, DistributeCPUsAcrossCoresOption)
+	}
+
+	if opts.PreferAlignByUncoreCacheOption && opts.DistributeCPUsAcrossNUMA {
+		return opts, fmt.Errorf("static policy options %s and %s can not be used at the same time", PreferAlignByUnCoreCacheOption, DistributeCPUsAcrossNUMAOption)
+	}
+
 	return opts, nil
 }
 

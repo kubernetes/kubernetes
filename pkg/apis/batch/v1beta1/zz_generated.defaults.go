@@ -22,9 +22,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
@@ -32,13 +33,22 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*v1beta1.CronJob)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*v1beta1.CronJobList)) })
+	scheme.AddTypeDefaultingFunc(&batchv1beta1.CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*batchv1beta1.CronJob)) })
+	scheme.AddTypeDefaultingFunc(&batchv1beta1.CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*batchv1beta1.CronJobList)) })
 	return nil
 }
 
-func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
+func SetObjectDefaults_CronJob(in *batchv1beta1.CronJob) {
 	SetDefaults_CronJob(in)
+	if in.Spec.JobTemplate.Spec.PodFailurePolicy != nil {
+		for i := range in.Spec.JobTemplate.Spec.PodFailurePolicy.Rules {
+			a := &in.Spec.JobTemplate.Spec.PodFailurePolicy.Rules[i]
+			for j := range a.OnPodConditions {
+				b := &a.OnPodConditions[j]
+				batchv1.SetDefaults_PodFailurePolicyOnPodConditionsPattern(b)
+			}
+		}
+	}
 	corev1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
@@ -143,6 +153,12 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 				if b.ValueFrom.FieldRef != nil {
 					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -210,6 +226,12 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -279,6 +301,12 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 				if b.ValueFrom.FieldRef != nil {
 					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
@@ -333,9 +361,13 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Overhead)
+	if in.Spec.JobTemplate.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
-func SetObjectDefaults_CronJobList(in *v1beta1.CronJobList) {
+func SetObjectDefaults_CronJobList(in *batchv1beta1.CronJobList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_CronJob(a)

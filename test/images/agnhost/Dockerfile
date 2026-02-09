@@ -12,8 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASEIMAGE
-FROM $BASEIMAGE
+ARG BASEIMAGE=alpine
+ARG GOLANG_VERSION
+
+FROM golang:$GOLANG_VERSION AS preparer
+
+RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
+    apt-get update && apt-get install -y jq
+
+COPY fakeregistryserver/prepare_registry.sh /prepare_registry.sh
+COPY fakeregistryserver/images.txt /images.txt
+
+RUN chmod +x /prepare_registry.sh
+
+# run the script during the build to create the artifact inside the image
+RUN /prepare_registry.sh
+
+FROM $BASEIMAGE AS main
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
@@ -25,11 +40,12 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 # install necessary packages:
 # - curl, nc: used by a lot of e2e tests
 # - iproute2: includes ss used in NodePort tests
+# - util-linux-misc: includes ipcs used in SELinux tests
 # from iperf image
 # install necessary packages: iperf, bash
-RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash && rm -rf /var/cache/apk/* \
-  && ln -s /usr/bin/iperf /usr/local/bin/iperf \
-  && ls -altrh /usr/local/bin/iperf
+RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash util-linux-misc && rm -rf /var/cache/apk/* \
+    && ln -s /usr/bin/iperf /usr/local/bin/iperf \
+    && ls -altrh /usr/local/bin/iperf
 
 ADD https://github.com/coredns/coredns/releases/download/v1.6.2/coredns_1.6.2_linux_BASEARCH.tgz /coredns.tgz
 RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz
@@ -38,7 +54,7 @@ RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz
 # PORT 8080 needed by: netexec, nettest, resource-consumer, resource-consumer-controller
 # PORT 8081 needed by: netexec
 # PORT 9376 needed by: serve-hostname
-# PORT 5000 needed by: grpc-health-checking
+# PORT 5000 needed by: grpc-health-checking, fake-registry-server
 EXPOSE 80 8080 8081 9376 5000
 
 # from netexec
@@ -49,6 +65,7 @@ ADD porter/localhost.crt localhost.crt
 ADD porter/localhost.key localhost.key
 
 ADD agnhost agnhost
+COPY --from=preparer /registry /var/registry
 
 # needed for the entrypoint-tester related tests. Some of the entrypoint-tester related tests
 # overrides this image's entrypoint with agnhost-2 binary, and will verify that the correct

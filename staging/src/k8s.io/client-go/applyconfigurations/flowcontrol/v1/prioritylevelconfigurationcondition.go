@@ -19,18 +19,28 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/flowcontrol/v1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PriorityLevelConfigurationConditionApplyConfiguration represents a declarative configuration of the PriorityLevelConfigurationCondition type for use
 // with apply.
+//
+// PriorityLevelConfigurationCondition defines the condition of priority level.
 type PriorityLevelConfigurationConditionApplyConfiguration struct {
-	Type               *v1.PriorityLevelConfigurationConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus                         `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                                `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                     `json:"reason,omitempty"`
-	Message            *string                                     `json:"message,omitempty"`
+	// `type` is the type of the condition.
+	// Required.
+	Type *flowcontrolv1.PriorityLevelConfigurationConditionType `json:"type,omitempty"`
+	// `status` is the status of the condition.
+	// Can be True, False, Unknown.
+	// Required.
+	Status *flowcontrolv1.ConditionStatus `json:"status,omitempty"`
+	// `lastTransitionTime` is the last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// `message` is a human-readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // PriorityLevelConfigurationConditionApplyConfiguration constructs a declarative configuration of the PriorityLevelConfigurationCondition type for use with
@@ -42,7 +52,7 @@ func PriorityLevelConfigurationCondition() *PriorityLevelConfigurationConditionA
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *PriorityLevelConfigurationConditionApplyConfiguration) WithType(value v1.PriorityLevelConfigurationConditionType) *PriorityLevelConfigurationConditionApplyConfiguration {
+func (b *PriorityLevelConfigurationConditionApplyConfiguration) WithType(value flowcontrolv1.PriorityLevelConfigurationConditionType) *PriorityLevelConfigurationConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -50,7 +60,7 @@ func (b *PriorityLevelConfigurationConditionApplyConfiguration) WithType(value v
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *PriorityLevelConfigurationConditionApplyConfiguration) WithStatus(value v1.ConditionStatus) *PriorityLevelConfigurationConditionApplyConfiguration {
+func (b *PriorityLevelConfigurationConditionApplyConfiguration) WithStatus(value flowcontrolv1.ConditionStatus) *PriorityLevelConfigurationConditionApplyConfiguration {
 	b.Status = &value
 	return b
 }

@@ -32,7 +32,7 @@ type FakeConfigMap struct {
 
 // Create creates a fake configmap using the provided client
 func (c *FakeConfigMap) Create(client clientset.Interface) error {
-	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+	return apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(metav1.NamespaceSystem), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.Name,
 			Namespace: metav1.NamespaceSystem,

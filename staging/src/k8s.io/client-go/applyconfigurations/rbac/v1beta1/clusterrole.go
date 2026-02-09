@@ -29,11 +29,19 @@ import (
 
 // ClusterRoleApplyConfiguration represents a declarative configuration of the ClusterRole type for use
 // with apply.
+//
+// ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
+// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRole, and will no longer be served in v1.22.
 type ClusterRoleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Rules                            []PolicyRuleApplyConfiguration     `json:"rules,omitempty"`
-	AggregationRule                  *AggregationRuleApplyConfiguration `json:"aggregationRule,omitempty"`
+	// Rules holds all the PolicyRules for this ClusterRole
+	Rules []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
+	// AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
+	// If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be
+	// stomped by the controller.
+	AggregationRule *AggregationRuleApplyConfiguration `json:"aggregationRule,omitempty"`
 }
 
 // ClusterRole constructs a declarative configuration of the ClusterRole type for use with
@@ -46,29 +54,14 @@ func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 	return b
 }
 
-// ExtractClusterRole extracts the applied configuration owned by fieldManager from
-// clusterRole. If no managedFields are found in clusterRole for fieldManager, a
-// ClusterRoleApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractClusterRoleFrom extracts the applied configuration owned by fieldManager from
+// clusterRole for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // clusterRole must be a unmodified ClusterRole API object that was retrieved from the Kubernetes API.
-// ExtractClusterRole provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractClusterRoleFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractClusterRole(clusterRole *rbacv1beta1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
-	return extractClusterRole(clusterRole, fieldManager, "")
-}
-
-// ExtractClusterRoleStatus is the same as ExtractClusterRole except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractClusterRoleStatus(clusterRole *rbacv1beta1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
-	return extractClusterRole(clusterRole, fieldManager, "status")
-}
-
-func extractClusterRole(clusterRole *rbacv1beta1.ClusterRole, fieldManager string, subresource string) (*ClusterRoleApplyConfiguration, error) {
+func ExtractClusterRoleFrom(clusterRole *rbacv1beta1.ClusterRole, fieldManager string, subresource string) (*ClusterRoleApplyConfiguration, error) {
 	b := &ClusterRoleApplyConfiguration{}
 	err := managedfields.ExtractInto(clusterRole, internal.Parser().Type("io.k8s.api.rbac.v1beta1.ClusterRole"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,11 +74,27 @@ func extractClusterRole(clusterRole *rbacv1beta1.ClusterRole, fieldManager strin
 	return b, nil
 }
 
+// ExtractClusterRole extracts the applied configuration owned by fieldManager from
+// clusterRole. If no managedFields are found in clusterRole for fieldManager, a
+// ClusterRoleApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// clusterRole must be a unmodified ClusterRole API object that was retrieved from the Kubernetes API.
+// ExtractClusterRole provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractClusterRole(clusterRole *rbacv1beta1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
+	return ExtractClusterRoleFrom(clusterRole, fieldManager, "")
+}
+
+func (b ClusterRoleApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithKind(value string) *ClusterRoleApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -93,7 +102,7 @@ func (b *ClusterRoleApplyConfiguration) WithKind(value string) *ClusterRoleApply
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithAPIVersion(value string) *ClusterRoleApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -102,7 +111,7 @@ func (b *ClusterRoleApplyConfiguration) WithAPIVersion(value string) *ClusterRol
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithName(value string) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -111,7 +120,7 @@ func (b *ClusterRoleApplyConfiguration) WithName(value string) *ClusterRoleApply
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithGenerateName(value string) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -120,7 +129,7 @@ func (b *ClusterRoleApplyConfiguration) WithGenerateName(value string) *ClusterR
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithNamespace(value string) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -129,7 +138,7 @@ func (b *ClusterRoleApplyConfiguration) WithNamespace(value string) *ClusterRole
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithUID(value types.UID) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -138,7 +147,7 @@ func (b *ClusterRoleApplyConfiguration) WithUID(value types.UID) *ClusterRoleApp
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithResourceVersion(value string) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -147,7 +156,7 @@ func (b *ClusterRoleApplyConfiguration) WithResourceVersion(value string) *Clust
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithGeneration(value int64) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -156,7 +165,7 @@ func (b *ClusterRoleApplyConfiguration) WithGeneration(value int64) *ClusterRole
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -165,7 +174,7 @@ func (b *ClusterRoleApplyConfiguration) WithCreationTimestamp(value metav1.Time)
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -174,7 +183,7 @@ func (b *ClusterRoleApplyConfiguration) WithDeletionTimestamp(value metav1.Time)
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ClusterRoleApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -184,11 +193,11 @@ func (b *ClusterRoleApplyConfiguration) WithDeletionGracePeriodSeconds(value int
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ClusterRoleApplyConfiguration) WithLabels(entries map[string]string) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -199,11 +208,11 @@ func (b *ClusterRoleApplyConfiguration) WithLabels(entries map[string]string) *C
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ClusterRoleApplyConfiguration) WithAnnotations(entries map[string]string) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -217,7 +226,7 @@ func (b *ClusterRoleApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerR
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -228,7 +237,7 @@ func (b *ClusterRoleApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerR
 func (b *ClusterRoleApplyConfiguration) WithFinalizers(values ...string) *ClusterRoleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -260,8 +269,24 @@ func (b *ClusterRoleApplyConfiguration) WithAggregationRule(value *AggregationRu
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ClusterRoleApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ClusterRoleApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ClusterRoleApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ClusterRoleApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

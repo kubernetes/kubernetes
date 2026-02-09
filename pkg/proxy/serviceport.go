@@ -19,6 +19,8 @@ package proxy
 import (
 	"fmt"
 	"net"
+	"slices"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -55,8 +57,6 @@ type ServicePort interface {
 	ExternalPolicyLocal() bool
 	// InternalPolicyLocal returns if a service has only node local endpoints for internal traffic.
 	InternalPolicyLocal() bool
-	// HintsAnnotation returns the value of the v1.DeprecatedAnnotationTopologyAwareHints annotation.
-	HintsAnnotation() string
 	// ExternallyAccessible returns true if the service port is reachable via something
 	// other than ClusterIP (NodePort/ExternalIP/LoadBalancer)
 	ExternallyAccessible() bool
@@ -85,7 +85,6 @@ type BaseServicePortInfo struct {
 	healthCheckNodePort      int
 	externalPolicyLocal      bool
 	internalPolicyLocal      bool
-	hintsAnnotation          string
 }
 
 var _ ServicePort = &BaseServicePortInfo{}
@@ -155,11 +154,6 @@ func (bsvcPortInfo *BaseServicePortInfo) InternalPolicyLocal() bool {
 	return bsvcPortInfo.internalPolicyLocal
 }
 
-// HintsAnnotation is part of ServicePort interface.
-func (bsvcPortInfo *BaseServicePortInfo) HintsAnnotation() string {
-	return bsvcPortInfo.hintsAnnotation
-}
-
 // ExternallyAccessible is part of ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) ExternallyAccessible() bool {
 	return bsvcPortInfo.nodePort != 0 || len(bsvcPortInfo.loadBalancerVIPs) != 0 || len(bsvcPortInfo.externalIPs) != 0
@@ -200,62 +194,38 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 		internalPolicyLocal: internalPolicyLocal,
 	}
 
-	// v1.DeprecatedAnnotationTopologyAwareHints has precedence over v1.AnnotationTopologyMode.
-	var exists bool
-	info.hintsAnnotation, exists = service.Annotations[v1.DeprecatedAnnotationTopologyAwareHints]
-	if !exists {
-		info.hintsAnnotation = service.Annotations[v1.AnnotationTopologyMode]
-	}
-
-	// filter external ips, source ranges and ingress ips
-	// prior to dual stack services, this was considered an error, but with dual stack
-	// services, this is actually expected. Hence we downgraded from reporting by events
-	// to just log lines with high verbosity
+	// Filter ExternalIPs to correct IP family
 	ipFamilyMap := proxyutil.MapIPsByIPFamily(service.Spec.ExternalIPs)
 	info.externalIPs = ipFamilyMap[ipFamily]
 
-	// Log the IPs not matching the ipFamily
-	if ips, ok := ipFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
-		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IP Family",
-			"ipFamily", ipFamily, "externalIPs", ips, "service", klog.KObj(service))
+	// Filter source ranges to correct IP family. Also deal with the fact that
+	// LoadBalancerSourceRanges validation mistakenly allows whitespace padding
+	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))
+	for i, sourceRange := range service.Spec.LoadBalancerSourceRanges {
+		loadBalancerSourceRanges[i] = strings.TrimSpace(sourceRange)
 	}
 
-	cidrFamilyMap := proxyutil.MapCIDRsByIPFamily(service.Spec.LoadBalancerSourceRanges)
-	info.loadBalancerSourceRanges = cidrFamilyMap[ipFamily]
-	// Log the CIDRs not matching the ipFamily
-	if cidrs, ok := cidrFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(cidrs) > 0 {
-		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given Service as they don't match IP Family",
-			"ipFamily", ipFamily, "loadBalancerSourceRanges", cidrs, "service", klog.KObj(service))
+	cidrFamilyMap := proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
+	cidrs := cidrFamilyMap[ipFamily]
+	// zero-masked cidr means "allow any", which same as the empty loadBalancerSourceRanges.
+	if slices.ContainsFunc(cidrs, proxyutil.IsZeroCIDR) {
+		cidrs = []*net.IPNet{}
 	}
+	info.loadBalancerSourceRanges = cidrs
 
-	// Obtain Load Balancer Ingress
-	var invalidIPs []net.IP
+	// Filter Load Balancer Ingress IPs to correct IP family. While proxying load
+	// balancers might choose to proxy connections from an LB IP of one family to a
+	// service IP of another family, that's irrelevant to kube-proxy, which only
+	// creates rules for VIP-style load balancers.
 	for _, ing := range service.Status.LoadBalancer.Ingress {
-		if ing.IP == "" {
+		if ing.IP == "" || !proxyutil.IsVIPMode(ing) {
 			continue
 		}
 
-		// proxy mode load balancers do not need to track the IPs in the service cache
-		// and they can also implement IP family translation, so no need to check if
-		// the status ingress.IP and the ClusterIP belong to the same family.
-		if !proxyutil.IsVIPMode(ing) {
-			klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IP for given Service as it using Proxy mode",
-				"ipFamily", ipFamily, "loadBalancerIngressIP", ing.IP, "service", klog.KObj(service))
-			continue
-		}
-
-		// kube-proxy does not implement IP family translation, skip addresses with
-		// different IP family
 		ip := netutils.ParseIPSloppy(ing.IP) // (already verified as an IP-address)
 		if ingFamily := proxyutil.GetIPFamilyFromIP(ip); ingFamily == ipFamily {
 			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ip)
-		} else {
-			invalidIPs = append(invalidIPs, ip)
 		}
-	}
-	if len(invalidIPs) > 0 {
-		klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IPs for given Service as they don't match the IP Family",
-			"ipFamily", ipFamily, "loadBalancerIngressIPs", invalidIPs, "service", klog.KObj(service))
 	}
 
 	if apiservice.NeedsHealthCheck(service) {

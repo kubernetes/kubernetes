@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,19 +29,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -51,8 +49,6 @@ import (
 // can't reliably simulate periodic sync of volumes/claims - it would be
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
-	// Default enable the HonorPVReclaimPolicy feature gate.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
@@ -315,13 +311,13 @@ func TestControllerSync(t *testing.T) {
 		// Initialize the controller
 		client := &fake.Clientset{}
 
-		fakeVolumeWatch := watch.NewFake()
+		fakeVolumeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 		client.PrependWatchReactor("persistentvolumes", core.DefaultWatchReactor(fakeVolumeWatch, nil))
-		fakeClaimWatch := watch.NewFake()
+		fakeClaimWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 		client.PrependWatchReactor("persistentvolumeclaims", core.DefaultWatchReactor(fakeClaimWatch, nil))
-		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFake(), nil))
-		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFake(), nil))
-		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFake(), nil))
+		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
+		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
+		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		ctrl, err := newTestController(ctx, client, informers, true)
@@ -358,10 +354,17 @@ func TestControllerSync(t *testing.T) {
 		}
 
 		// Start the controller
+		var wg sync.WaitGroup
+		defer wg.Wait()
 		ctx, cancel := context.WithCancel(context.TODO())
+		defer cancel()
+
 		informers.Start(ctx.Done())
 		informers.WaitForCacheSync(ctx.Done())
-		go ctrl.Run(ctx)
+
+		wg.Go(func() {
+			ctrl.Run(ctx)
+		})
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -386,7 +389,6 @@ func TestControllerSync(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to run test %s: %v", test.name, err)
 		}
-		cancel()
 
 		evaluateTestResults(ctx, ctrl, reactor.VolumeReactor, test, t)
 	}
@@ -573,7 +575,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -602,7 +604,6 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	// in-tree plugin is used as migration is disabled. When that plugin is migrated, a different
 	// non-migrated one should be used. If all plugins are migrated this test can be removed. The
 	// gce in-tree plugin is used for a migrated driver as it is feature-locked as of 1.25.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 	const nonmigratedDriver = "rbd.csi.ceph.com"
 	const migratedPlugin = "kubernetes.io/gce-pd"
 	const migratedDriver = "pd.csi.storage.gke.io"
@@ -733,7 +734,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
+	cmpm := csimigration.NewPluginManager(translator)
 	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

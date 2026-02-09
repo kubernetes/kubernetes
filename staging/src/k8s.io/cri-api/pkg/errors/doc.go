@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package errors provides helper functions for use by the kubelet
 // to deal with CRI errors.
-package errors // import "k8s.io/cri-api/pkg/errors"
+package errors

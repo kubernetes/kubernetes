@@ -199,7 +199,7 @@ func TestSplitYAMLDocuments(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			gvkmap, err := SplitYAMLDocuments(rt.fileContents)
+			gvkmap, err := SplitConfigDocuments(rt.fileContents)
 			if (err != nil) != rt.expectedErr {
 				t2.Errorf("expected error: %t, actual: %t", rt.expectedErr, err != nil)
 			}
@@ -439,14 +439,14 @@ func TestGroupVersionKindsHasClusterConfiguration(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "does not have ClusterConfiguraiton",
+			name: "does not have ClusterConfiguration",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
 			},
 			expected: false,
 		},
 		{
-			name: "has ClusterConfiguraiton",
+			name: "has ClusterConfiguration",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
 				{Group: "foo.k8s.io", Version: "v1", Kind: "ClusterConfiguration"},

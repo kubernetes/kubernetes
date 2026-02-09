@@ -41,11 +41,6 @@ type Feature string
 // "Linux" or "Windows".
 type Environment string
 
-// NodeFeature is the name of a feature that a node must support. To be
-// removed, see
-// https://github.com/kubernetes/enhancements/tree/master/keps/sig-testing/3041-node-conformance-and-features#nodefeature.
-type NodeFeature string
-
 type Valid[T comparable] struct {
 	items  sets.Set[T]
 	frozen bool
@@ -76,14 +71,13 @@ func (v *Valid[T]) Freeze() {
 	v.frozen = true
 }
 
-// These variables contain the parameters that [WithFeature], [WithEnvironment]
-// and [WithNodeFeatures] accept. The framework itself has no pre-defined
+// These variables contain the parameters that [WithFeature] and [WithEnvironment] accept.
+// The framework itself has no pre-defined
 // constants. Test suites and tests may define their own and then add them here
 // before calling these With functions.
 var (
 	ValidFeatures     Valid[Feature]
 	ValidEnvironments Valid[Environment]
-	ValidNodeFeatures Valid[NodeFeature]
 )
 
 var errInterface = reflect.TypeOf((*error)(nil)).Elem()
@@ -97,7 +91,12 @@ func IgnoreNotFound(in any) any {
 	inType := reflect.TypeOf(in)
 	inValue := reflect.ValueOf(in)
 	return reflect.MakeFunc(inType, func(args []reflect.Value) []reflect.Value {
-		out := inValue.Call(args)
+		var out []reflect.Value
+		if inType.IsVariadic() {
+			out = inValue.CallSlice(args)
+		} else {
+			out = inValue.Call(args)
+		}
 		if len(out) > 0 {
 			lastValue := out[len(out)-1]
 			last := lastValue.Interface()
@@ -129,10 +128,12 @@ func AnnotatedLocationWithOffset(annotation string, offset int) types.CodeLocati
 // the SIG name as annotation. The parameter should be lowercase with
 // no spaces and no sig- or SIG- prefix.
 func SIGDescribe(sig string) func(...interface{}) bool {
+	ginkgo.GinkgoHelper()
 	if !sigRE.MatchString(sig) || strings.HasPrefix(sig, "sig-") {
-		RecordBug(NewBug(fmt.Sprintf("SIG label must be lowercase, no spaces and no sig- prefix, got instead: %q", sig), 1))
+		RecordBug(NewBug(fmt.Sprintf("SIG label must be lowercase, no spaces and no sig- prefix, got instead: %q", sig), 0))
 	}
 	return func(args ...interface{}) bool {
+		ginkgo.GinkgoHelper()
 		args = append([]interface{}{WithLabel("sig-" + sig)}, args...)
 		return registerInSuite(ginkgo.Describe, args)
 	}
@@ -146,57 +147,126 @@ func ConformanceIt(args ...interface{}) bool {
 	return It(args...)
 }
 
-// It is a wrapper around [ginkgo.It] which supports framework With* labels as
-// optional arguments in addition to those already supported by ginkgo itself,
-// like [ginkgo.Label] and [ginkgo.Offset].
-//
+// It is a wrapper around [ginkgo.It] which removes the requirement
+// to start parameters with a text string.
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
 func It(args ...interface{}) bool {
+	ginkgo.GinkgoHelper()
 	return registerInSuite(ginkgo.It, args)
 }
 
 // It is a shorthand for the corresponding package function.
 func (f *Framework) It(args ...interface{}) bool {
+	ginkgo.GinkgoHelper()
 	return registerInSuite(ginkgo.It, args)
 }
 
-// Describe is a wrapper around [ginkgo.Describe] which supports framework
-// With* labels as optional arguments in addition to those already supported by
-// ginkgo itself, like [ginkgo.Label] and [ginkgo.Offset].
-//
+// Describe is a wrapper around [ginkgo.Describe] which removes the requirement
+// to start parameters with a text string.
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
 func Describe(args ...interface{}) bool {
+	ginkgo.GinkgoHelper()
 	return registerInSuite(ginkgo.Describe, args)
 }
 
 // Describe is a shorthand for the corresponding package function.
 func (f *Framework) Describe(args ...interface{}) bool {
+	ginkgo.GinkgoHelper()
 	return registerInSuite(ginkgo.Describe, args)
 }
 
-// Context is a wrapper around [ginkgo.Context] which supports framework With*
-// labels as optional arguments in addition to those already supported by
-// ginkgo itself, like [ginkgo.Label] and [ginkgo.Offset].
-//
+// Context is a wrapper around [ginkgo.Context] which removes the requirement
+// to start parameters with a text string.
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
 func Context(args ...interface{}) bool {
+	ginkgo.GinkgoHelper()
 	return registerInSuite(ginkgo.Context, args)
 }
 
 // Context is a shorthand for the corresponding package function.
 func (f *Framework) Context(args ...interface{}) bool {
+	ginkgo.GinkgoHelper()
 	return registerInSuite(ginkgo.Context, args)
 }
 
 // registerInSuite is the common implementation of all wrapper functions. It
 // expects to be called through one intermediate wrapper.
 func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interface{}) bool {
-	var ginkgoArgs []interface{}
 	var offset ginkgo.Offset
+	for arg := range allArgs(args) {
+		if o, ok := arg.(ginkgo.Offset); ok {
+			offset = o
+		}
+	}
+	offset += 2 // This function and the top-level wrapper.
+	return ginkgoCall("", args, offset)
+}
+
+// allArgs produces an iterator which handles nesting without flattening the slices.
+func allArgs(args []any) func(yield func(arg any) bool) {
+	return func(yield func(arg any) bool) {
+		iterArgs(args, yield)
+	}
+}
+
+// iterArgs descends recursively into []any and calls yield for all other arguments.
+func iterArgs(args []any, yield func(arg any) bool) bool {
+	for _, arg := range args {
+		switch arg := arg.(type) {
+		case []any:
+			if !iterArgs(arg, yield) {
+				return false
+			}
+		default:
+			if !yield(arg) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// If the framework is used, the user might also use our special test
+// arguments.  To ensure that test registration works we inject our code into
+// the test tree construction. Therefore it doesn't matter anymore whether
+// ginkgo.It or framework.It is used.
+//
+// Code flow is as follows:
+//   - init registers transformGinkgoNodeArgs.
+//     From now on, all ginkgo.Describe/Context/It invocations invoke
+//     transformGinkgoNodeArgs. transformGinkgoNodeArgs replaces
+//     our special arguments with something that Ginkgo can handle.
+//   - Top-level Describe calls register callbacks with more test definitions.
+//     Callbacks are not invoked yet.
+//   - Argument parsing.
+//   - Ginkgo invokes the callbacks recursively to get a complete tree of tests.
+//   - Ginkgo runs those tests.
+//
+// This init is guaranteed to happen before our special argument functions
+// can be called because this is the init code of their package.
+// Code which does not use the framework might call ginkgo.Describe before
+// transformGinkgoNodeArgs is registered. This is not a problem because none of the parameters can be special.
+func init() {
+	ginkgo.AddTreeConstructionNodeArgsTransformer(transformGinkgoNodeArgs)
+}
+
+func transformGinkgoNodeArgs(nodeType types.NodeType, offset ginkgo.Offset, text string, args []any) (string, []any, []error) {
+	text, args = expandGinkgoArgs(offset+1, text, args)
+	return text, args, nil
+}
+
+// expandGinkgoArgs concatenates all strings and translates our custom
+// arguments into something that Ginkgo can handle.
+func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []any) {
+	var ginkgoArgs []interface{}
 	var texts []string
+
+	if text != "" {
+		texts = append(texts, text)
+	}
 
 	addLabel := func(label string) {
 		texts = append(texts, fmt.Sprintf("[%s]", label))
@@ -209,15 +279,28 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 		case label:
 			fullLabel := strings.Join(arg.parts, ":")
 			addLabel(fullLabel)
-			if arg.extraFeature != "" {
-				texts = append(texts, fmt.Sprintf("[%s]", arg.extraFeature))
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:"+arg.extraFeature))
+			if arg.alphaBetaLevel != "" {
+				texts = append(texts, fmt.Sprintf("[%[1]s]", arg.alphaBetaLevel))
+				ginkgoArgs = append(ginkgoArgs, ginkgo.Label(arg.alphaBetaLevel))
 			}
-			if fullLabel == "Serial" {
+			if arg.offByDefault {
+				texts = append(texts, "[Feature:OffByDefault]")
+				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:OffByDefault"))
+				// Alphas are always off by default but we may want to select
+				// betas based on defaulted-ness.
+				if arg.alphaBetaLevel == "Beta" {
+					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
+				}
+			}
+			switch fullLabel {
+			case "Serial":
 				ginkgoArgs = append(ginkgoArgs, ginkgo.Serial)
+			case "Slow":
+				// Start slow tests first. This avoids the risk
+				// that they get started towards the end of a
+				// run and then make the run longer overall.
+				ginkgoArgs = append(ginkgoArgs, ginkgo.SpecPriority(1))
 			}
-		case ginkgo.Offset:
-			offset = arg
 		case string:
 			if arg == "" {
 				haveEmptyStrings = true
@@ -227,9 +310,7 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 			ginkgoArgs = append(ginkgoArgs, arg)
 		}
 	}
-	offset += 2 // This function and its direct caller.
 
-	// Now that we have the final offset, we can record bugs.
 	if haveEmptyStrings {
 		RecordBug(NewBug("empty strings as separators are unnecessary and need to be removed", int(offset)))
 	}
@@ -242,9 +323,8 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 		}
 	}
 
-	ginkgoArgs = append(ginkgoArgs, offset)
-	text := strings.Join(texts, " ")
-	return ginkgoCall(text, ginkgoArgs...)
+	text = strings.Join(texts, " ")
+	return text, ginkgoArgs
 }
 
 var (
@@ -257,6 +337,9 @@ var (
 // validateSpecs checks that the test specs were registered as intended.
 func validateSpecs(specs types.SpecReports) {
 	checked := sets.New[call]()
+
+	// Each full test name should only be used once.
+	specNames := make(map[string][]types.SpecReport)
 
 	for _, spec := range specs {
 		for i, text := range spec.ContainerHierarchyTexts {
@@ -278,6 +361,34 @@ func validateSpecs(specs types.SpecReports) {
 		if !checked.Has(c) {
 			validateText(spec.LeafNodeLocation, spec.LeafNodeText, spec.LeafNodeLabels)
 			checked.Insert(c)
+		}
+
+		// Track what the same name is used for. The empty name is used more
+		// than once for special nodes (e.g. ReportAfterSuite).
+		fullText := spec.FullText()
+		if fullText != "" {
+			specNames[fullText] = append(specNames[fullText], spec)
+		}
+	}
+
+	for fullText, specs := range specNames {
+		if len(specs) > 1 {
+			// The exact same It call might be made twice, in which case full
+			// text and location are the same in two different specs. We show
+			// that as "<location> (2x)"
+			locationCounts := make(map[string]int)
+			for _, spec := range specs {
+				locationCounts[spec.LeafNodeLocation.String()]++
+			}
+			var locationTexts []string
+			for locationText, count := range locationCounts {
+				text := locationText
+				if count > 1 {
+					text += fmt.Sprintf(" (%dx)", count)
+				}
+				locationTexts = append(locationTexts, text)
+			}
+			recordTextBug(specs[0].LeafNodeLocation, fmt.Sprintf("full test name is not unique: %q (%s)", fullText, strings.Join(locationTexts, ", ")))
 		}
 	}
 }
@@ -306,6 +417,12 @@ func validateText(location types.CodeLocation, text string, labels []string) {
 			// Okay, was also set as label.
 			continue
 		}
+		// TODO: we currently only set this as a text value
+		// We should probably reflect it into labels, but that could break some
+		// existing jobs and we're still setting on an exact plan
+		if tag == "Feature:OffByDefault" {
+			continue
+		}
 		if deprecatedTags.Has(tag) {
 			recordTextBug(location, fmt.Sprintf("[%s] in plain text is deprecated and must be added through With%s instead", tag, tag))
 		}
@@ -329,9 +446,9 @@ func recordTextBug(location types.CodeLocation, message string) {
 	RecordBug(Bug{FileName: location.FileName, LineNumber: location.LineNumber, Message: message})
 }
 
-// WithEnvironment specifies that a certain test or group of tests only works
-// with a feature available. The return value must be passed as additional
-// argument to [framework.It], [framework.Describe], [framework.Context].
+// WithFeature specifies that a certain test or group of tests only works
+// with a feature available. The return value may be passed as additional
+// argument to the framework wrappers and the Ginkgo functions directly.
 //
 // The feature must be listed in ValidFeatures.
 func WithFeature(name Feature) interface{} {
@@ -351,8 +468,9 @@ func withFeature(name Feature) interface{} {
 }
 
 // WithFeatureGate specifies that a certain test or group of tests depends on a
-// feature gate being enabled. The return value must be passed as additional
-// argument to [framework.It], [framework.Describe], [framework.Context].
+// feature gate and the corresponding API group (if there is one)
+// being enabled. The return value may be passed as additional
+// argument to the framework wrappers and the Ginkgo functions directly.
 //
 // The feature gate must be listed in
 // [k8s.io/apiserver/pkg/util/feature.DefaultMutableFeatureGate]. Once a
@@ -360,9 +478,21 @@ func withFeature(name Feature) interface{} {
 // also need to be removed.
 //
 // [Alpha] resp. [Beta] get added to the test name automatically depending
-// on the current stability level of the feature. Feature:Alpha resp.
-// Feature:Beta get added to the Ginkgo labels because this is a special
-// requirement for how the cluster needs to be configured.
+// on the current stability level of the feature, to emulate historic
+// usage of those tags.
+//
+// For label filtering, Alpha resp. Beta get added to the Ginkgo labels.
+//
+// [Feature:OffByDefault] gets added to support skipping a test with
+// a dependency on an alpha or beta feature gate in jobs which use the
+// traditional \[Feature:.*\] skip regular expression.
+//
+// Feature:OffByDefault is also available for label filtering.
+//
+// BetaOffByDefault is also added *only as a label* when the feature gate is
+// an off by default beta feature. This can be used to include/exclude based
+// on beta + defaulted-ness. Alpha has no equivalent because all alphas are
+// off by default.
 //
 // If the test can run in any cluster that has alpha resp. beta features and
 // API groups enabled, then annotating it with just WithFeatureGate is
@@ -391,13 +521,14 @@ func withFeatureGate(featureGate featuregate.Feature) interface{} {
 	}
 
 	l := newLabel("FeatureGate", string(featureGate))
-	l.extraFeature = level
+	l.offByDefault = !spec.Default
+	l.alphaBetaLevel = level
 	return l
 }
 
 // WithEnvironment specifies that a certain test or group of tests only works
-// in a certain environment. The return value must be passed as additional
-// argument to [framework.It], [framework.Describe], [framework.Context].
+// in a certain environment. The return value may be passed as additional
+// argument to the framework wrappers and the Ginkgo functions directly.
 //
 // The environment must be listed in ValidEnvironments.
 func WithEnvironment(name Environment) interface{} {
@@ -416,32 +547,9 @@ func withEnvironment(name Environment) interface{} {
 	return newLabel("Environment", string(name))
 }
 
-// WithNodeFeature specifies that a certain test or group of tests only works
-// if the node supports a certain feature. The return value must be passed as
-// additional argument to [framework.It], [framework.Describe],
-// [framework.Context].
-//
-// The environment must be listed in ValidNodeFeatures.
-func WithNodeFeature(name NodeFeature) interface{} {
-	return withNodeFeature(name)
-}
-
-// WithNodeFeature is a shorthand for the corresponding package function.
-func (f *Framework) WithNodeFeature(name NodeFeature) interface{} {
-	return withNodeFeature(name)
-}
-
-func withNodeFeature(name NodeFeature) interface{} {
-	if !ValidNodeFeatures.items.Has(name) {
-		RecordBug(NewBug(fmt.Sprintf("WithNodeFeature: unknown environment %q", name), 2))
-	}
-	return newLabel("NodeFeature", string(name))
-}
-
-// WithConformace specifies that a certain test or group of tests must pass in
-// all conformant Kubernetes clusters. The return value must be passed as
-// additional argument to [framework.It], [framework.Describe],
-// [framework.Context].
+// WithConformance specifies that a certain test or group of tests must pass in
+// all conformant Kubernetes clusters. The return value may be passed as additional
+// argument to the framework wrappers and the Ginkgo functions directly.
 func WithConformance() interface{} {
 	return withConformance()
 }
@@ -457,8 +565,8 @@ func withConformance() interface{} {
 
 // WithNodeConformance specifies that a certain test or group of tests for node
 // functionality that does not depend on runtime or Kubernetes distro specific
-// behavior. The return value must be passed as additional argument to
-// [framework.It], [framework.Describe], [framework.Context].
+// behavior. The return value may be passed as additional
+// argument to the framework wrappers and the Ginkgo functions directly.
 func WithNodeConformance() interface{} {
 	return withNodeConformance()
 }
@@ -490,8 +598,8 @@ func withDisruptive() interface{} {
 }
 
 // WithSerial specifies that a certain test or group of tests must not run in
-// parallel with other tests. The return value must be passed as additional
-// argument to [framework.It], [framework.Describe], [framework.Context].
+// parallel with other tests. The return value may be passed as additional
+// argument to the framework wrappers and the Ginkgo functions directly.
 //
 // Starting with ginkgo v2, serial and parallel tests can be executed in the
 // same invocation. Ginkgo itself will ensure that the serial tests run
@@ -509,9 +617,10 @@ func withSerial() interface{} {
 	return newLabel("Serial")
 }
 
-// WithSlow specifies that a certain test or group of tests must not run in
-// parallel with other tests. The return value must be passed as additional
-// argument to [framework.It], [framework.Describe], [framework.Context].
+// WithSlow specifies that a certain test, or each test within a group of
+// tests, is slow (is expected to take longer than 5 minutes to run in CI).
+// The return value may be passed as additional
+// argument to the framework wrappers and the Ginkgo functions directly.
 func WithSlow() interface{} {
 	return withSlow()
 }
@@ -559,13 +668,19 @@ func withFlaky() interface{} {
 type label struct {
 	// parts get concatenated with ":" to build the full label.
 	parts []string
-	// extra is an optional feature name. It gets added as [<extraFeature>]
-	// to the test name and as Feature:<extraFeature> to the labels.
-	extraFeature string
 	// explanation gets set for each label to help developers
 	// who pass a label to a ginkgo function. They need to use
 	// the corresponding framework function instead.
 	explanation string
+
+	// TODO: the fields below are only used for FeatureGates, we may want to refactor
+
+	// alphaBetaLevel is "Alpha", "Beta" or empty for GA features
+	// It gets added as [<level>] [Feature:<level>]
+	// to the test name and as Feature:<level> to the labels.
+	alphaBetaLevel string
+	// set based on featuregate default state
+	offByDefault bool
 }
 
 func newLabel(parts ...string) label {
@@ -588,7 +703,10 @@ func TagsEqual(a, b interface{}) bool {
 	if !ok {
 		return false
 	}
-	if al.extraFeature != bl.extraFeature {
+	if al.alphaBetaLevel != bl.alphaBetaLevel {
+		return false
+	}
+	if al.offByDefault != bl.offByDefault {
 		return false
 	}
 	return slices.Equal(al.parts, bl.parts)

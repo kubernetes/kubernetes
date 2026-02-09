@@ -20,12 +20,17 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/utils/ptr"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -148,6 +153,70 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 	}
 }
 
+func TestReplicaSetStatusStrategyWithDeploymentReplicaSetTerminatingReplicas(t *testing.T) {
+	tests := []struct {
+		name                                          string
+		enableDeploymentReplicaSetTerminatingReplicas bool
+		terminatingReplicas                           *int32
+		terminatingReplicasUpdate                     *int32
+		expectedTerminatingReplicas                   *int32
+	}{
+		{
+			name: "should not allow updates when feature gate is disabled",
+			enableDeploymentReplicaSetTerminatingReplicas: false,
+			terminatingReplicas:                           nil,
+			terminatingReplicasUpdate:                     ptr.To[int32](2),
+			expectedTerminatingReplicas:                   nil,
+		},
+		{
+			name: "should allow update when the field is in use when feature gate is disabled",
+			enableDeploymentReplicaSetTerminatingReplicas: false,
+			terminatingReplicas:                           ptr.To[int32](2),
+			terminatingReplicasUpdate:                     ptr.To[int32](5),
+			expectedTerminatingReplicas:                   ptr.To[int32](5),
+		},
+		{
+			name: "should allow updates when feature gate is enabled",
+			enableDeploymentReplicaSetTerminatingReplicas: true,
+			terminatingReplicas:                           nil,
+			terminatingReplicasUpdate:                     ptr.To[int32](2),
+			expectedTerminatingReplicas:                   ptr.To[int32](2),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, tc.enableDeploymentReplicaSetTerminatingReplicas)
+
+			ctx := genericapirequest.NewDefaultContext()
+			validSelector := map[string]string{"a": "b"}
+			oldRS := newReplicaSetWithSelectorLabels(validSelector)
+			oldRS.Spec.Replicas = 3
+			oldRS.Status.Replicas = 3
+			oldRS.Status.TerminatingReplicas = tc.terminatingReplicas
+
+			newRS := newReplicaSetWithSelectorLabels(validSelector)
+			newRS.Spec.Replicas = 3
+			newRS.Status.Replicas = 2
+			newRS.Status.TerminatingReplicas = tc.terminatingReplicasUpdate
+
+			StatusStrategy.PrepareForUpdate(ctx, newRS, oldRS)
+			if newRS.Status.Replicas != 2 {
+				t.Errorf("ReplicaSet status updates should allow change of replicas: %v", newRS.Status.Replicas)
+			}
+			if !ptr.Equal(newRS.Status.TerminatingReplicas, tc.expectedTerminatingReplicas) {
+				t.Errorf("ReplicaSet status updates failed, expected terminating pods: %v, got: %v", ptr.Deref(tc.expectedTerminatingReplicas, -1), ptr.Deref(newRS.Status.TerminatingReplicas, -1))
+			}
+
+			errs := StatusStrategy.ValidateUpdate(ctx, newRS, oldRS)
+
+			if len(errs) != 0 {
+				t.Errorf("Unexpected error %v", errs)
+			}
+		})
+	}
+}
+
 func TestSelectorImmutability(t *testing.T) {
 	tests := []struct {
 		requestInfo       genericapirequest.RequestInfo
@@ -177,13 +246,23 @@ func TestSelectorImmutability(t *testing.T) {
 		},
 		{
 			genericapirequest.RequestInfo{
-				APIGroup:   "extensions",
-				APIVersion: "v1beta1",
+				APIGroup:   "apps",
+				APIVersion: "v1",
 				Resource:   "replicasets",
 			},
 			map[string]string{"a": "b"},
-			map[string]string{"c": "d"},
-			nil,
+			map[string]string{"c": "v1"},
+			field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: field.NewPath("spec").Child("selector").String(),
+					BadValue: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"c": "v1"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+					Detail: "field is immutable",
+				},
+			},
 		},
 	}
 

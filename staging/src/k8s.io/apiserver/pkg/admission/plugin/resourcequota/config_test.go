@@ -44,6 +44,34 @@ func TestLoadConfiguration(t *testing.T) {
 			expectErr: `no kind "Unknown" is registered`,
 		},
 		{
+			name: "duplicate field error; strict validation",
+			input: `
+kind: ResourceQuotaConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+limitedResources:
+- apiGroup: ""
+  resource: persistentvolumeclaims
+  resource: persistentvolumeclaims
+  matchContains:
+  - .storageclass.storage.k8s.io/requests.storage
+`,
+			expectErr: `strict decoding error`,
+		},
+		{
+			name: "unknown field error; strict validation",
+			input: `
+kind: ResourceQuotaConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+limitedResources:
+- apiGroup: ""
+  foo:      bar
+  resource: persistentvolumeclaims
+  matchContains:
+  - .storageclass.storage.k8s.io/requests.storage
+`,
+			expectErr: `strict decoding error`,
+		},
+		{
 			name: "valid v1alpha1 config",
 			input: `
 kind: Configuration

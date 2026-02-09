@@ -19,142 +19,31 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
 	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	typedrbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 )
 
-// FakeRoles implements RoleInterface
-type FakeRoles struct {
+// fakeRoles implements RoleInterface
+type fakeRoles struct {
+	*gentype.FakeClientWithListAndApply[*v1alpha1.Role, *v1alpha1.RoleList, *rbacv1alpha1.RoleApplyConfiguration]
 	Fake *FakeRbacV1alpha1
-	ns   string
 }
 
-var rolesResource = v1alpha1.SchemeGroupVersion.WithResource("roles")
-
-var rolesKind = v1alpha1.SchemeGroupVersion.WithKind("Role")
-
-// Get takes name of the role, and returns the corresponding role object, and an error if there is any.
-func (c *FakeRoles) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Role, err error) {
-	emptyResult := &v1alpha1.Role{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(rolesResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeRoles(fake *FakeRbacV1alpha1, namespace string) typedrbacv1alpha1.RoleInterface {
+	return &fakeRoles{
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.Role, *v1alpha1.RoleList, *rbacv1alpha1.RoleApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("roles"),
+			v1alpha1.SchemeGroupVersion.WithKind("Role"),
+			func() *v1alpha1.Role { return &v1alpha1.Role{} },
+			func() *v1alpha1.RoleList { return &v1alpha1.RoleList{} },
+			func(dst, src *v1alpha1.RoleList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.RoleList) []*v1alpha1.Role { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1alpha1.RoleList, items []*v1alpha1.Role) { list.Items = gentype.FromPointerSlice(items) },
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.Role), err
-}
-
-// List takes label and field selectors, and returns the list of Roles that match those selectors.
-func (c *FakeRoles) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.RoleList, err error) {
-	emptyResult := &v1alpha1.RoleList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(rolesResource, rolesKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.RoleList{ListMeta: obj.(*v1alpha1.RoleList).ListMeta}
-	for _, item := range obj.(*v1alpha1.RoleList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested roles.
-func (c *FakeRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(rolesResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
-func (c *FakeRoles) Create(ctx context.Context, role *v1alpha1.Role, opts v1.CreateOptions) (result *v1alpha1.Role, err error) {
-	emptyResult := &v1alpha1.Role{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(rolesResource, c.ns, role, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.Role), err
-}
-
-// Update takes the representation of a role and updates it. Returns the server's representation of the role, and an error, if there is any.
-func (c *FakeRoles) Update(ctx context.Context, role *v1alpha1.Role, opts v1.UpdateOptions) (result *v1alpha1.Role, err error) {
-	emptyResult := &v1alpha1.Role{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(rolesResource, c.ns, role, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.Role), err
-}
-
-// Delete takes name of the role and deletes it. Returns an error if one occurs.
-func (c *FakeRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(rolesResource, c.ns, name, opts), &v1alpha1.Role{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(rolesResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.RoleList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched role.
-func (c *FakeRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Role, err error) {
-	emptyResult := &v1alpha1.Role{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(rolesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.Role), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied role.
-func (c *FakeRoles) Apply(ctx context.Context, role *rbacv1alpha1.RoleApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Role, err error) {
-	if role == nil {
-		return nil, fmt.Errorf("role provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(role)
-	if err != nil {
-		return nil, err
-	}
-	name := role.Name
-	if name == nil {
-		return nil, fmt.Errorf("role.Name must be provided to Apply")
-	}
-	emptyResult := &v1alpha1.Role{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(rolesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.Role), err
 }

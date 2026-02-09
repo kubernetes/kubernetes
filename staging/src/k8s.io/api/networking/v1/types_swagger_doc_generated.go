@@ -47,6 +47,35 @@ func (HTTPIngressRuleValue) SwaggerDoc() map[string]string {
 	return map_HTTPIngressRuleValue
 }
 
+var map_IPAddress = map[string]string{
+	"":         "IPAddress represents a single IP of a single IP Family. The object is designed to be used by APIs that operate on IP addresses. The object is used by the Service core API for allocation of IP addresses. An IP address can be represented in different formats, to guarantee the uniqueness of the IP, the name of the object is the IP address in canonical format, four decimal digits separated by dots suppressing leading zeros for IPv4 and the representation defined by RFC 5952 for IPv6. Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1 Invalid: 10.01.2.3 or 2001:db8:0:0:0::1",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the desired state of the IPAddress. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+}
+
+func (IPAddress) SwaggerDoc() map[string]string {
+	return map_IPAddress
+}
+
+var map_IPAddressList = map[string]string{
+	"":         "IPAddressList contains a list of IPAddress.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items is the list of IPAddresses.",
+}
+
+func (IPAddressList) SwaggerDoc() map[string]string {
+	return map_IPAddressList
+}
+
+var map_IPAddressSpec = map[string]string{
+	"":          "IPAddressSpec describe the attributes in an IP Address.",
+	"parentRef": "ParentRef references the resource that an IPAddress is attached to. An IPAddress must reference a parent object.",
+}
+
+func (IPAddressSpec) SwaggerDoc() map[string]string {
+	return map_IPAddressSpec
+}
+
 var map_IPBlock = map[string]string{
 	"":       "IPBlock describes a particular CIDR (Ex. \"192.168.1.0/24\",\"2001:db8::/64\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
 	"cidr":   "cidr is a string representing the IPBlock Valid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"",
@@ -284,7 +313,7 @@ func (NetworkPolicyPort) SwaggerDoc() map[string]string {
 
 var map_NetworkPolicySpec = map[string]string{
 	"":            "NetworkPolicySpec provides the specification of a NetworkPolicy",
-	"podSelector": "podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.",
+	"podSelector": "podSelector selects the pods to which this NetworkPolicy object applies. The array of rules is applied to any pods selected by this field. An empty selector matches all pods in the policy's namespace. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is optional. If it is not specified, it defaults to an empty selector.",
 	"ingress":     "ingress is a list of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)",
 	"egress":      "egress is a list of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8",
 	"policyTypes": "policyTypes is a list of rule types that the NetworkPolicy relates to. Valid options are [\"Ingress\"], [\"Egress\"], or [\"Ingress\", \"Egress\"]. If this field is not specified, it will default based on the existence of ingress or egress rules; policies that contain an egress section are assumed to affect egress, and all policies (whether or not they contain an ingress section) are assumed to affect ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ \"Egress\" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include \"Egress\" (since such a policy would not include an egress section and would otherwise default to just [ \"Ingress\" ]). This field is beta-level in 1.8",
@@ -292,6 +321,18 @@ var map_NetworkPolicySpec = map[string]string{
 
 func (NetworkPolicySpec) SwaggerDoc() map[string]string {
 	return map_NetworkPolicySpec
+}
+
+var map_ParentReference = map[string]string{
+	"":          "ParentReference describes a reference to a parent object.",
+	"group":     "Group is the group of the object being referenced.",
+	"resource":  "Resource is the resource of the object being referenced.",
+	"namespace": "Namespace is the namespace of the object being referenced.",
+	"name":      "Name is the name of the object being referenced.",
+}
+
+func (ParentReference) SwaggerDoc() map[string]string {
+	return map_ParentReference
 }
 
 var map_ServiceBackendPort = map[string]string{
@@ -302,6 +343,45 @@ var map_ServiceBackendPort = map[string]string{
 
 func (ServiceBackendPort) SwaggerDoc() map[string]string {
 	return map_ServiceBackendPort
+}
+
+var map_ServiceCIDR = map[string]string{
+	"":         "ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64). This range is used to allocate ClusterIPs to Service objects.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the desired state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+	"status":   "status represents the current state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+}
+
+func (ServiceCIDR) SwaggerDoc() map[string]string {
+	return map_ServiceCIDR
+}
+
+var map_ServiceCIDRList = map[string]string{
+	"":         "ServiceCIDRList contains a list of ServiceCIDR objects.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items is the list of ServiceCIDRs.",
+}
+
+func (ServiceCIDRList) SwaggerDoc() map[string]string {
+	return map_ServiceCIDRList
+}
+
+var map_ServiceCIDRSpec = map[string]string{
+	"":      "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
+	"cidrs": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
+}
+
+func (ServiceCIDRSpec) SwaggerDoc() map[string]string {
+	return map_ServiceCIDRSpec
+}
+
+var map_ServiceCIDRStatus = map[string]string{
+	"":           "ServiceCIDRStatus describes the current state of the ServiceCIDR.",
+	"conditions": "conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR. Current service state",
+}
+
+func (ServiceCIDRStatus) SwaggerDoc() map[string]string {
+	return map_ServiceCIDRStatus
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

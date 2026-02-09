@@ -17,59 +17,177 @@ limitations under the License.
 package apiclient
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	v1 "k8s.io/api/core/v1"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestGetControlPlaneComponents(t *testing.T) {
-	testcases := []struct {
-		name     string
-		cfg      *kubeadmapi.ClusterConfiguration
-		expected []controlPlaneComponent
+	getTestPod := func(command []string) *v1.Pod {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{},
+		}
+		if command != nil {
+			pod.Spec.Containers = []v1.Container{{}}
+			if len(command) > 0 {
+				pod.Spec.Containers[0].Command = command
+			}
+		}
+		return pod
+	}
+	testCases := []struct {
+		name          string
+		setup         func() map[string]*v1.Pod
+		expected      []controlPlaneComponent
+		expectedError string
 	}{
 		{
-			name: "port values from config",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				APIServer: kubeadmapi.APIServer{
-					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
-						ExtraArgs: []kubeadmapi.Arg{
-							{Name: "secure-port", Value: "1111"},
-						},
-					},
-				},
-				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: []kubeadmapi.Arg{
-						{Name: "secure-port", Value: "2222"},
-					},
-				},
-				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: []kubeadmapi.Arg{
-						{Name: "secure-port", Value: "3333"},
-					},
-				},
+			name: "valid: all port and addresses from config",
+			setup: func() map[string]*v1.Pod {
+				var (
+					pod    *v1.Pod
+					podMap = map[string]*v1.Pod{}
+				)
+				pod = getTestPod([]string{
+					constants.KubeAPIServer,
+					fmt.Sprintf("--%s=%s", argAdvertiseAddress, "fd00:1::"),
+					fmt.Sprintf("--%s=%s", argPort, "1111"),
+				})
+				podMap[constants.KubeAPIServer] = pod
+				pod = getTestPod([]string{
+					constants.KubeControllerManager,
+					fmt.Sprintf("--%s=%s", argBindAddress, "127.0.0.1"),
+					fmt.Sprintf("--%s=%s", argPort, "2222"),
+				})
+				podMap[constants.KubeControllerManager] = pod
+				pod = getTestPod([]string{
+					constants.KubeScheduler,
+					fmt.Sprintf("--%s=%s", argBindAddress, "127.0.0.1"),
+					fmt.Sprintf("--%s=%s", argPort, "3333"),
+				})
+				podMap[constants.KubeScheduler] = pod
+				return podMap
 			},
 			expected: []controlPlaneComponent{
-				{name: "kube-apiserver", url: "https://127.0.0.1:1111/healthz"},
-				{name: "kube-controller-manager", url: "https://127.0.0.1:2222/healthz"},
-				{name: "kube-scheduler", url: "https://127.0.0.1:3333/healthz"},
+				{name: "kube-apiserver", addressPort: "[fd00:1::]:1111", endpoint: endpointLivez},
+				{name: "kube-controller-manager", addressPort: "127.0.0.1:2222", endpoint: endpointHealthz},
+				{name: "kube-scheduler", addressPort: "127.0.0.1:3333", endpoint: endpointLivez},
 			},
 		},
 		{
-			name: "default ports",
-			cfg:  &kubeadmapi.ClusterConfiguration{},
-			expected: []controlPlaneComponent{
-				{name: "kube-apiserver", url: "https://127.0.0.1:6443/healthz"},
-				{name: "kube-controller-manager", url: "https://127.0.0.1:10257/healthz"},
-				{name: "kube-scheduler", url: "https://127.0.0.1:10259/healthz"},
+			name: "valid: all port and addresses from config (alt. formatting)",
+			setup: func() map[string]*v1.Pod {
+				var (
+					pod    *v1.Pod
+					podMap = map[string]*v1.Pod{}
+				)
+				pod = getTestPod([]string{
+					constants.KubeAPIServer,
+					fmt.Sprintf("-%s=%s", argAdvertiseAddress, "fd00:1::"),
+					fmt.Sprintf("-%s=%s", argPort, "1111"),
+				})
+				podMap[constants.KubeAPIServer] = pod
+				pod = getTestPod([]string{
+					constants.KubeControllerManager,
+					fmt.Sprintf("-%s %s", argBindAddress, "127.0.0.1"),
+					fmt.Sprintf("-%s %s", argPort, "2222"),
+				})
+				podMap[constants.KubeControllerManager] = pod
+				pod = getTestPod([]string{
+					constants.KubeScheduler,
+					fmt.Sprintf("-%s %s", argBindAddress, "127.0.0.1"),
+					fmt.Sprintf("-%s %s", argPort, "3333"),
+				})
+				podMap[constants.KubeScheduler] = pod
+				return podMap
 			},
+			expected: []controlPlaneComponent{
+				{name: "kube-apiserver", addressPort: "[fd00:1::]:1111", endpoint: endpointLivez},
+				{name: "kube-controller-manager", addressPort: "127.0.0.1:2222", endpoint: endpointHealthz},
+				{name: "kube-scheduler", addressPort: "127.0.0.1:3333", endpoint: endpointLivez},
+			},
+		},
+		{
+			name: "valid: default ports and addresses",
+			setup: func() map[string]*v1.Pod {
+				var (
+					pod    *v1.Pod
+					podMap = map[string]*v1.Pod{}
+				)
+				pod = getTestPod([]string{
+					constants.KubeAPIServer,
+				})
+				podMap[constants.KubeAPIServer] = pod
+				pod = getTestPod([]string{
+					constants.KubeControllerManager,
+				})
+				podMap[constants.KubeControllerManager] = pod
+				pod = getTestPod([]string{
+					constants.KubeScheduler,
+				})
+				podMap[constants.KubeScheduler] = pod
+				return podMap
+			},
+			expected: []controlPlaneComponent{
+				{name: "kube-apiserver", addressPort: "192.168.0.1:6443", endpoint: endpointLivez},
+				{name: "kube-controller-manager", addressPort: "127.0.0.1:10257", endpoint: endpointHealthz},
+				{name: "kube-scheduler", addressPort: "127.0.0.1:10259", endpoint: endpointLivez},
+			},
+		},
+		{
+			name: "invalid: nil Pods in map",
+			setup: func() map[string]*v1.Pod {
+				return map[string]*v1.Pod{}
+			},
+			expectedError: `[got nil Pod for component "kube-apiserver", ` +
+				`got nil Pod for component "kube-controller-manager", ` +
+				`got nil Pod for component "kube-scheduler"]`,
+		},
+		{
+			name: "invalid: empty commands in containers",
+			setup: func() map[string]*v1.Pod {
+				podMap := map[string]*v1.Pod{}
+				podMap[constants.KubeAPIServer] = getTestPod([]string{})
+				podMap[constants.KubeControllerManager] = getTestPod([]string{})
+				podMap[constants.KubeScheduler] = getTestPod([]string{})
+				return podMap
+			},
+			expectedError: `[the Pod has no container command starting with "kube-apiserver", ` +
+				`the Pod has no container command starting with "kube-controller-manager", ` +
+				`the Pod has no container command starting with "kube-scheduler"]`,
+		},
+		{
+			name: "invalid: missing commands in containers",
+			setup: func() map[string]*v1.Pod {
+				var (
+					pod    = getTestPod([]string{""})
+					podMap = map[string]*v1.Pod{}
+				)
+				podMap[constants.KubeAPIServer] = pod
+				podMap[constants.KubeControllerManager] = pod
+				podMap[constants.KubeScheduler] = pod
+				return podMap
+			},
+			expectedError: `[the Pod has no container command starting with "kube-apiserver", ` +
+				`the Pod has no container command starting with "kube-controller-manager", ` +
+				`the Pod has no container command starting with "kube-scheduler"]`,
 		},
 	}
 
-	for _, tc := range testcases {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := getControlPlaneComponents(tc.cfg)
+			m := tc.setup()
+			actual, err := getControlPlaneComponents(m, "192.168.0.1")
+			if err != nil {
+				if err.Error() != tc.expectedError {
+					t.Fatalf("expected error:\n%v\ngot:\n%v",
+						tc.expectedError, err)
+				}
+			}
 			if !reflect.DeepEqual(tc.expected, actual) {
 				t.Fatalf("expected result: %+v, got: %+v", tc.expected, actual)
 			}

@@ -24,8 +24,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -42,6 +40,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // LoadOrDefaultConfigurationOptions holds the common LoadOrDefaultConfiguration options.
@@ -94,11 +93,11 @@ func validateSupportedVersion(gvk schema.GroupVersionKind, allowDeprecated, allo
 	gvString := gvk.GroupVersion().String()
 
 	if useKubeadmVersion := oldKnownAPIVersions[gvString]; useKubeadmVersion != "" {
-		return errors.Errorf("your configuration file uses an old API spec: %q (kind: %q). Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind, useKubeadmVersion)
+		return errors.Errorf("your configuration file uses an old API spec: %q (kind: %q). Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old-config-file --new-config new-config-file', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind, useKubeadmVersion)
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
-		klog.Warningf("your configuration file uses a deprecated API spec: %q (kind: %q). Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind)
+		klog.Warningf("your configuration file uses a deprecated API spec: %q (kind: %q). Please use 'kubeadm config migrate --old-config old-config-file --new-config new-config-file', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind)
 	}
 
 	if _, present := experimentalAPIVersions[gvString]; present && !allowExperimental {
@@ -110,7 +109,7 @@ func validateSupportedVersion(gvk schema.GroupVersionKind, allowDeprecated, allo
 
 // NormalizeKubernetesVersion resolves version labels, sets alternative
 // image registry if requested for CI builds, and validates minimal
-// version that kubeadm SetInitDynamicDefaultssupports.
+// version that kubeadm SetInitDynamicDefaults supports.
 func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	isCIVersion := kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion)
 
@@ -256,7 +255,7 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool, mutators migrate
 		mutators = defaultMigrateMutators()
 	}
 
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(oldConfig)
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(oldConfig)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -323,13 +322,29 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool, mutators migrate
 		newConfig = append(newConfig, b)
 	}
 
+	// Migrate UpgradeConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasUpgradeConfiguration(gvks...) {
+		o, err := documentMapToUpgradeConfiguration(gvkmap, true, allowExperimental, true)
+		if err != nil {
+			return []byte{}, err
+		}
+		if err := mutators.mutate([]any{o}); err != nil {
+			return []byte{}, err
+		}
+		b, err := MarshalKubeadmConfigObject(o, gv)
+		if err != nil {
+			return []byte{}, err
+		}
+		newConfig = append(newConfig, b)
+	}
+
 	return bytes.Join(newConfig, []byte(constants.YAMLDocumentSeparator)), nil
 }
 
 // ValidateConfig takes a byte slice containing a kubeadm configuration and performs conversion
 // to internal types and validation.
-func ValidateConfig(config []byte, allowExperimental bool) error {
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(config)
+func ValidateConfig(config []byte, allowDeprecated, allowExperimental bool) error {
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(config)
 	if err != nil {
 		return err
 	}
@@ -345,21 +360,28 @@ func ValidateConfig(config []byte, allowExperimental bool) error {
 
 	// Validate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		if _, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
+		if _, err := documentMapToInitConfiguration(gvkmap, allowDeprecated, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		if _, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
+		if _, err := documentMapToJoinConfiguration(gvkmap, allowDeprecated, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate ResetConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
-		if _, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
+		if _, err := documentMapToResetConfiguration(gvkmap, allowDeprecated, allowExperimental, true, true); err != nil {
+			return err
+		}
+	}
+
+	// Validate UpgradeConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasUpgradeConfiguration(gvks...) {
+		if _, err := documentMapToUpgradeConfiguration(gvkmap, allowDeprecated, allowExperimental, true); err != nil {
 			return err
 		}
 	}
@@ -491,14 +513,4 @@ func defaultEmptyMigrateMutators() migrateMutators {
 	mutators.addEmpty([]any{(*kubeadmapi.ResetConfiguration)(nil)})
 
 	return *mutators
-}
-
-// isKubeadmConfigPresent checks if a kubeadm config type is found in the provided document map
-func isKubeadmConfigPresent(docmap kubeadmapi.DocumentMap) bool {
-	for gvk := range docmap {
-		if gvk.Group == kubeadmapi.GroupName {
-			return true
-		}
-	}
-	return false
 }

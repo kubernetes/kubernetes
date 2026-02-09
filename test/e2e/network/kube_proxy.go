@@ -34,7 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -45,6 +47,18 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	netutils "k8s.io/utils/net"
 )
+
+// expandIPv6ForConntrack expands an IPv6 address to the format used in /proc/net/nf_conntrack.
+// e.g., "fc00:f853:ccd:e793::3" -> "fc00:f853:0ccd:e793:0000:0000:0000:0003"
+func expandIPv6ForConntrack(ipStr string) string {
+	ip := netutils.ParseIPSloppy(ipStr)
+	if !netutils.IsIPv6(ip) {
+		return ipStr
+	}
+	return fmt.Sprintf("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+		ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7],
+		ip[8], ip[9], ip[10], ip[11], ip[12], ip[13], ip[14], ip[15])
+}
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
@@ -205,56 +219,61 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPodSpec)
 
 		ginkgo.By("Checking conntrack entries for the timeout")
-		// These must be synchronized from the default values set in
-		// pkg/apis/../defaults.go ConntrackTCPCloseWaitTimeout. The
-		// current defaults are hidden in the initialization code.
 		const epsilonSeconds = 60
 		const expectedTimeoutSeconds = 60 * 60
-		// the conntrack file uses the IPv6 expanded format
+
+		// Detect conntrack method and build command
 		ip := serverNodeInfo.nodeIP
 		ipFamily := "ipv4"
 		if netutils.IsIPv6String(ip) {
 			ipFamily = "ipv6"
 		}
-		// Obtain the corresponding conntrack entry on the host checking
-		// the nf_conntrack file from the pod e2e-net-exec.
-		// It retries in a loop if the entry is not found.
-		cmd := fmt.Sprintf("conntrack -L -f %s -d %v "+
-			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
-			ipFamily, ip, testDaemonTCPPort)
+
+		var cmd, dumpCmd string
+		var timeoutIdx int
+		if _, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "test -f /proc/net/nf_conntrack"); err == nil {
+			procIP := ip
+			if ipFamily == "ipv6" {
+				procIP = expandIPv6ForConntrack(ip)
+			}
+			cmd = fmt.Sprintf("cat /proc/net/nf_conntrack | grep -m 1 -E 'CLOSE_WAIT.*dst=%s.*dport=%d'", procIP, testDaemonTCPPort)
+			dumpCmd = "cat /proc/net/nf_conntrack"
+			timeoutIdx = 4 // ipv4 2 tcp 6 <timeout> CLOSE_WAIT ...
+		} else if _, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "which conntrack"); err == nil {
+			cmd = fmt.Sprintf("conntrack -L -f %s -d %s 2>/dev/null | grep -m 1 'CLOSE_WAIT.*dport=%d'", ipFamily, ip, testDaemonTCPPort)
+			dumpCmd = "conntrack -L 2>/dev/null"
+			timeoutIdx = 2 // tcp 6 <timeout> CLOSE_WAIT ...
+		} else {
+			e2eskipper.Skipf("Neither /proc/net/nf_conntrack nor conntrack binary available")
+		}
+
 		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {
 			result, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
-			// retry if we can't obtain the conntrack entry
 			if err != nil {
-				framework.Logf("failed to obtain conntrack entry: %v %v", result, err)
+				framework.Logf("failed to obtain conntrack entry: %v", err)
 				return false, nil
 			}
-			framework.Logf("conntrack entry for node %v and port %v:  %v", serverNodeInfo.nodeIP, testDaemonTCPPort, result)
-			// Timeout in seconds is available as the third column of the matched entry
-			line := strings.Fields(result)
-			if len(line) < 3 {
-				return false, fmt.Errorf("conntrack entry does not have a timeout field: %v", line)
+			fields := strings.Fields(result)
+			if len(fields) <= timeoutIdx {
+				return false, nil
 			}
-			timeoutSeconds, err := strconv.Atoi(line[2])
+			timeoutSeconds, err := strconv.Atoi(fields[timeoutIdx])
 			if err != nil {
-				return false, fmt.Errorf("failed to convert matched timeout %s to integer: %w", line[2], err)
+				return false, nil
 			}
+			framework.Logf("conntrack timeout for %v:%v = %v", serverNodeInfo.nodeIP, testDaemonTCPPort, timeoutSeconds)
 			if math.Abs(float64(timeoutSeconds-expectedTimeoutSeconds)) < epsilonSeconds {
 				return true, nil
 			}
 			return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
 		}); err != nil {
-			// Dump all conntrack entries for debugging
-			result, err2 := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
-			if err2 != nil {
-				framework.Logf("failed to obtain conntrack entry: %v %v", result, err2)
-			}
-			framework.Logf("conntrack entries for node %v:  %v", serverNodeInfo.nodeIP, result)
+			result, _ := e2epodoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", dumpCmd)
+			framework.Logf("conntrack entries: %v", result)
 			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
 		}
 	})
 
-	ginkgo.It("should update metric for tracking accepted packets destined for localhost nodeports", func(ctx context.Context) {
+	framework.It("should update metric for tracking accepted packets destined for localhost nodeports", feature.KubeProxyNFAcct, func(ctx context.Context) {
 		if framework.TestContext.ClusterIsIPv6() {
 			e2eskipper.Skipf("test requires IPv4 cluster")
 		}
@@ -284,7 +303,9 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 
 		// get proxyMode
 		stdout, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, hostExecPodName, fmt.Sprintf("curl --silent 127.0.0.1:%d/proxyMode", ports.ProxyStatusPort))
-		framework.ExpectNoError(err)
+		if err != nil {
+			framework.Failf("failed to get proxy mode: err: %v; stdout: %s", stdout, err)
+		}
 		proxyMode := strings.TrimSpace(stdout)
 
 		// get value of route_localnet
@@ -340,7 +361,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 
 		// wait for endpoints update
 		ginkgo.By("waiting for endpoints to be updated")
-		err = framework.WaitForServiceEndpointsNum(ctx, fr.ClientSet, ns, svc.Name, 1, time.Second, wait.ForeverTestTimeout)
+		err = e2eendpointslice.WaitForEndpointCount(ctx, fr.ClientSet, ns, svc.Name, 1)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("accessing endpoint via localhost nodeports 10 times")
@@ -352,19 +373,26 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 				}
 				return true, nil
 			}); err != nil {
-				e2eskipper.Skipf("skipping test as localhost nodeports are not acceesible in this environment")
+				framework.ExpectNoError(err, "failed to access nodeport service on localhost")
 			}
 		}
 
 		// our target metric should be updated by now
 		if err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 2*time.Minute, true, func(_ context.Context) (bool, error) {
 			metrics, err := metricsGrabber.GrabFromKubeProxy(ctx, nodeName)
-			framework.ExpectNoError(err)
+			if err != nil {
+				return false, fmt.Errorf("failed to fetch metrics: %w", err)
+			}
 			targetMetricAfter, err := metrics.GetCounterMetricValue(metricName)
-			framework.ExpectNoError(err)
+			if err != nil {
+				return false, fmt.Errorf("failed to fetch metric: %w", err)
+			}
 			return targetMetricAfter > targetMetricBefore, nil
 		}); err != nil {
-			framework.Failf("expected %s metric to be updated after accessing endpoints via localhost nodeports", metricName)
+			if wait.Interrupted(err) {
+				framework.Failf("expected %s metric to be updated after accessing endpoints via localhost nodeports", metricName)
+			}
+			framework.ExpectNoError(err)
 		}
 	})
 })

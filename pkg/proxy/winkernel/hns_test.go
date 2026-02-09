@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -21,30 +20,33 @@ package winkernel
 
 import (
 	"encoding/json"
-
-	"github.com/Microsoft/hcsshim/hcn"
-	"github.com/stretchr/testify/assert"
-
 	"strings"
 	"testing"
 
+	"github.com/Microsoft/hnslib/hcn"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
-	sourceVip         = "192.168.1.2"
-	serviceVip        = "11.0.0.1"
-	addressPrefix     = "192.168.1.0/24"
-	gatewayAddress    = "192.168.1.1"
-	epMacAddress      = "00-11-22-33-44-55"
-	epIpAddress       = "192.168.1.3"
-	epIpv6Address     = "192::3"
-	epIpAddressB      = "192.168.1.4"
-	epIpAddressRemote = "192.168.2.3"
-	epPaAddress       = "10.0.0.3"
-	protocol          = 6
-	internalPort      = 80
-	externalPort      = 32440
+	sourceVip           = "192.168.1.2"
+	serviceVip          = "11.0.0.1"
+	addressPrefix       = "192.168.1.0/24"
+	gatewayAddress      = "192.168.1.1"
+	epMacAddress        = "00-11-22-33-44-55"
+	epIpAddress         = "192.168.1.3"
+	epIpv6Address       = "192::3"
+	epIpAddressB        = "192.168.1.4"
+	epIpAddressLocal    = "192.168.5.3"
+	epIpAddressLocalv6  = "192::5:3"
+	epIpAddressRemote   = "192.168.2.3"
+	epIpAddressRemotev6 = "192::2:3"
+	epIpAddressLocal1   = "192.168.4.4"
+	epIpAddressLocal2   = "192.168.4.5"
+	epPaAddress         = "10.0.0.3"
+	protocol            = 6
+	internalPort        = 80
+	externalPort        = 32440
 )
 
 func TestGetNetworkByName(t *testing.T) {
@@ -109,6 +111,70 @@ func TestGetAllEndpointsByNetwork(t *testing.T) {
 		t.Error(err)
 	}
 	err = Network.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetAllEndpointsByNetworkWithDupEP(t *testing.T) {
+	hcnMock := getHcnMock("L2Bridge")
+	hns := hns{hcn: hcnMock}
+
+	ipv4Config := &hcn.IpConfig{
+		IpAddress: epIpAddress,
+	}
+	ipv6Config := &hcn.IpConfig{
+		IpAddress: epIpv6Address,
+	}
+	remoteEndpoint := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipv4Config, *ipv6Config},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		Flags: hcn.EndpointFlagsRemoteEndpoint,
+	}
+	Network, _ := hcnMock.GetNetworkByName(testNetwork)
+	remoteEndpoint, err := hns.hcn.CreateEndpoint(Network, remoteEndpoint)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Create a duplicate local endpoint with the same IP address
+	dupLocalEndpoint := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipv4Config, *ipv6Config},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+
+	dupLocalEndpoint, err = hns.hcn.CreateEndpoint(Network, dupLocalEndpoint)
+	if err != nil {
+		t.Error(err)
+	}
+
+	mapEndpointsInfo, err := hns.getAllEndpointsByNetwork(Network.Name)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointIpv4, ipv4EpPresent := mapEndpointsInfo[ipv4Config.IpAddress]
+	assert.True(t, ipv4EpPresent, "IPV4 endpoint is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv4.ip, epIpAddress, "IPV4 IP is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv4.hnsID, remoteEndpoint.Id, "HNS ID is not matching with remote endpoint")
+
+	endpointIpv6, ipv6EpPresent := mapEndpointsInfo[ipv6Config.IpAddress]
+	assert.True(t, ipv6EpPresent, "IPV6 endpoint is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv6.ip, epIpv6Address, "IPV6 IP is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv6.hnsID, remoteEndpoint.Id, "HNS ID is not matching with remote endpoint")
+
+	err = hns.hcn.DeleteEndpoint(remoteEndpoint)
+	if err != nil {
+		t.Error(err)
+	}
+	err = hns.hcn.DeleteEndpoint(dupLocalEndpoint)
 	if err != nil {
 		t.Error(err)
 	}

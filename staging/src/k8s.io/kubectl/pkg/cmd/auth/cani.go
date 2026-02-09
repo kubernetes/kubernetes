@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 	rbacutil "k8s.io/kubectl/pkg/util/rbac"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -83,9 +82,8 @@ var (
 		# Check to see if I can list deployments in my current namespace
 		kubectl auth can-i list deployments.apps
 
-		# Check to see if service account "foo" of namespace "dev" can list pods
-		# in the namespace "prod".
-		# You must be allowed to use impersonation for the global option "--as".
+		# Check to see if service account "foo" of namespace "dev" can list pods in the namespace "prod"
+		# You must be allowed to use impersonation for the global option "--as"
 		kubectl auth can-i list pods --as=system:serviceaccount:dev:foo -n prod
 
 		# Check to see if I can do everything in my current namespace ("*" means all)
@@ -106,10 +104,10 @@ var (
 		# List all allowed actions in namespace "foo"
 		kubectl auth can-i --list --namespace=foo`)
 
-	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*", "approve")
-	nonResourceURLVerbs = sets.NewString("get", "put", "post", "head", "options", "delete", "patch", "*")
+	resourceVerbs       = sets.New[string]("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*", "approve", "sign", "escalate", "attest")
+	nonResourceURLVerbs = sets.New[string]("get", "put", "post", "head", "options", "delete", "patch", "*")
 	// holds all the server-supported resources that cannot be discovered by clients. i.e. users and groups for the impersonate verb
-	nonStandardResourceNames = sets.NewString("users", "groups")
+	nonStandardResourceNames = sets.New[string]("users", "groups")
 )
 
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command
@@ -155,7 +153,7 @@ func NewCmdCanI(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	// Set default WarningPrinter if not already set.
 	if o.WarningPrinter == nil {
-		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(o.ErrOut)})
 	}
 
 	if o.List {

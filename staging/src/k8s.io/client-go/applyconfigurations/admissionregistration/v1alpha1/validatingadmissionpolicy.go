@@ -29,11 +29,19 @@ import (
 
 // ValidatingAdmissionPolicyApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicy type for use
 // with apply.
+//
+// ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 type ValidatingAdmissionPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ValidatingAdmissionPolicySpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ValidatingAdmissionPolicyStatusApplyConfiguration `json:"status,omitempty"`
+	// spec defines the desired behavior of the ValidatingAdmissionPolicy.
+	Spec *ValidatingAdmissionPolicySpecApplyConfiguration `json:"spec,omitempty"`
+	// status represents the current status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+	// behaves in the expected way.
+	// Populated by the system.
+	// Read-only.
+	Status *ValidatingAdmissionPolicyStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ValidatingAdmissionPolicy constructs a declarative configuration of the ValidatingAdmissionPolicy type for use with
@@ -46,29 +54,14 @@ func ValidatingAdmissionPolicy(name string) *ValidatingAdmissionPolicyApplyConfi
 	return b
 }
 
-// ExtractValidatingAdmissionPolicy extracts the applied configuration owned by fieldManager from
-// validatingAdmissionPolicy. If no managedFields are found in validatingAdmissionPolicy for fieldManager, a
-// ValidatingAdmissionPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractValidatingAdmissionPolicyFrom extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicy for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // validatingAdmissionPolicy must be a unmodified ValidatingAdmissionPolicy API object that was retrieved from the Kubernetes API.
-// ExtractValidatingAdmissionPolicy provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractValidatingAdmissionPolicyFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicy(validatingAdmissionPolicy, fieldManager, "")
-}
-
-// ExtractValidatingAdmissionPolicyStatus is the same as ExtractValidatingAdmissionPolicy except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractValidatingAdmissionPolicyStatus(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicy(validatingAdmissionPolicy, fieldManager, "status")
-}
-
-func extractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string, subresource string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string, subresource string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	b := &ValidatingAdmissionPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingAdmissionPolicy, internal.Parser().Type("io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,11 +74,33 @@ func extractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregist
 	return b, nil
 }
 
+// ExtractValidatingAdmissionPolicy extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicy. If no managedFields are found in validatingAdmissionPolicy for fieldManager, a
+// ValidatingAdmissionPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// validatingAdmissionPolicy must be a unmodified ValidatingAdmissionPolicy API object that was retrieved from the Kubernetes API.
+// ExtractValidatingAdmissionPolicy provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+	return ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy, fieldManager, "")
+}
+
+// ExtractValidatingAdmissionPolicyStatus extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicy for the status subresource.
+func ExtractValidatingAdmissionPolicyStatus(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+	return ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy, fieldManager, "status")
+}
+
+func (b ValidatingAdmissionPolicyApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithKind(value string) *ValidatingAdmissionPolicyApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -93,7 +108,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithKind(value string) *Va
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithAPIVersion(value string) *ValidatingAdmissionPolicyApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -102,7 +117,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithAPIVersion(value strin
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithName(value string) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -111,7 +126,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithName(value string) *Va
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithGenerateName(value string) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -120,7 +135,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithGenerateName(value str
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithNamespace(value string) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -129,7 +144,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithNamespace(value string
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithUID(value types.UID) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -138,7 +153,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithUID(value types.UID) *
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithResourceVersion(value string) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -147,7 +162,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithResourceVersion(value 
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithGeneration(value int64) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -156,7 +171,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithGeneration(value int64
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -165,7 +180,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithCreationTimestamp(valu
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -174,7 +189,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithDeletionTimestamp(valu
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -184,11 +199,11 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithDeletionGracePeriodSec
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithLabels(entries map[string]string) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -199,11 +214,11 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithLabels(entries map[str
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithAnnotations(entries map[string]string) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -217,7 +232,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithOwnerReferences(values
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -228,7 +243,7 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithOwnerReferences(values
 func (b *ValidatingAdmissionPolicyApplyConfiguration) WithFinalizers(values ...string) *ValidatingAdmissionPolicyApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -255,8 +270,24 @@ func (b *ValidatingAdmissionPolicyApplyConfiguration) WithStatus(value *Validati
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ValidatingAdmissionPolicyApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ValidatingAdmissionPolicyApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ValidatingAdmissionPolicyApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ValidatingAdmissionPolicyApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

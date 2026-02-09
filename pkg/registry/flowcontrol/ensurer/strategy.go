@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-cmp/cmp"
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
@@ -262,45 +262,45 @@ func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context
 			break
 		}
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to retrieve %s type=%s name=%q error=%w", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, err)
+			return fmt.Errorf("failed to retrieve %T type=%s name=%q error=%w", bootstrap, configurationType, name, err)
 		}
 
 		// we always re-create a missing configuration object
 		if _, err = ops.Create(ctx, ops.DeepCopy(bootstrap), metav1.CreateOptions{FieldManager: fieldManager}); err == nil {
-			klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", bootstrap.GetObjectKind().GroupVersionKind().Kind), "type", configurationType, "name", name)
+			klog.V(2).InfoS(fmt.Sprintf("Successfully created %T", bootstrap), "type", configurationType, "name", name)
 			return nil
 		}
 
 		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, err)
+			return fmt.Errorf("cannot create %T type=%s name=%q error=%w", bootstrap, configurationType, name, err)
 		}
-		klog.V(5).InfoS(fmt.Sprintf("Something created the %s concurrently", bootstrap.GetObjectKind().GroupVersionKind().Kind), "type", configurationType, "name", name)
+		klog.V(5).InfoS(fmt.Sprintf("Something created the %T concurrently", bootstrap), "type", configurationType, "name", name)
 	}
 
-	klog.V(5).InfoS(fmt.Sprintf("The %s already exists, checking whether it is up to date", bootstrap.GetObjectKind().GroupVersionKind().Kind), "type", configurationType, "name", name)
+	klog.V(5).InfoS(fmt.Sprintf("The %T already exists, checking whether it is up to date", bootstrap), "type", configurationType, "name", name)
 	newObject, update, err := strategy.ReviseIfNeeded(ops, current, bootstrap)
 	if err != nil {
-		return fmt.Errorf("failed to determine whether auto-update is required for %s type=%s name=%q error=%w", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, err)
+		return fmt.Errorf("failed to determine whether auto-update is required for %T type=%s name=%q error=%w", bootstrap, configurationType, name, err)
 	}
 	if !update {
 		if klogV := klog.V(5); klogV.Enabled() {
 			klogV.InfoS("No update required", "wrapper", bootstrap.GetObjectKind().GroupVersionKind().Kind, "type", configurationType, "name", name,
-				"diff", cmp.Diff(current, bootstrap))
+				"diff", diff.Diff(current, bootstrap))
 		}
 		return nil
 	}
 
 	if _, err = ops.Update(ctx, newObject, metav1.UpdateOptions{FieldManager: fieldManager}); err == nil {
-		klog.V(2).Infof("Updated the %s type=%s name=%q diff: %s", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, cmp.Diff(current, bootstrap))
+		klog.V(2).Infof("Updated the %T type=%s name=%q diff: %s", bootstrap, configurationType, name, diff.Diff(current, bootstrap))
 		return nil
 	}
 
 	if apierrors.IsConflict(err) {
-		klog.V(2).InfoS(fmt.Sprintf("Something updated the %s concurrently, I will check its spec later", bootstrap.GetObjectKind().GroupVersionKind().Kind), "type", configurationType, "name", name)
+		klog.V(2).InfoS(fmt.Sprintf("Something updated the %T concurrently, I will check its spec later", bootstrap), "type", configurationType, "name", name)
 		return nil
 	}
 
-	return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, err)
+	return fmt.Errorf("failed to update the %T, will retry later type=%s name=%q error=%w", bootstrap, configurationType, name, err)
 }
 
 // RemoveUnwantedObjects attempts to delete the configuration objects

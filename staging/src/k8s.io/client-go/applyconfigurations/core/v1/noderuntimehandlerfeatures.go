@@ -20,8 +20,13 @@ package v1
 
 // NodeRuntimeHandlerFeaturesApplyConfiguration represents a declarative configuration of the NodeRuntimeHandlerFeatures type for use
 // with apply.
+//
+// NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 type NodeRuntimeHandlerFeaturesApplyConfiguration struct {
+	// RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
 	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty"`
+	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
+	UserNamespaces *bool `json:"userNamespaces,omitempty"`
 }
 
 // NodeRuntimeHandlerFeaturesApplyConfiguration constructs a declarative configuration of the NodeRuntimeHandlerFeatures type for use with
@@ -35,5 +40,13 @@ func NodeRuntimeHandlerFeatures() *NodeRuntimeHandlerFeaturesApplyConfiguration 
 // If called multiple times, the RecursiveReadOnlyMounts field is set to the value of the last call.
 func (b *NodeRuntimeHandlerFeaturesApplyConfiguration) WithRecursiveReadOnlyMounts(value bool) *NodeRuntimeHandlerFeaturesApplyConfiguration {
 	b.RecursiveReadOnlyMounts = &value
+	return b
+}
+
+// WithUserNamespaces sets the UserNamespaces field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UserNamespaces field is set to the value of the last call.
+func (b *NodeRuntimeHandlerFeaturesApplyConfiguration) WithUserNamespaces(value bool) *NodeRuntimeHandlerFeaturesApplyConfiguration {
+	b.UserNamespaces = &value
 	return b
 }

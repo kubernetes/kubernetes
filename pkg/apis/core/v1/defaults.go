@@ -19,14 +19,17 @@ package v1
 import (
 	"time"
 
+	"k8s.io/utils/ptr"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/v1/service"
+	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
-	"k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -58,15 +61,21 @@ func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 			obj.Labels = labels
 		}
 	}
-	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = new(int32)
-		*obj.Spec.Replicas = 1
-	}
+	// obj.Spec.Replicas is defaulted declaratively
 }
 func SetDefaults_Volume(obj *v1.Volume) {
-	if pointer.AllPtrFieldsNil(&obj.VolumeSource) {
+	if ptr.AllPtrFieldsNil(&obj.VolumeSource) {
 		obj.VolumeSource = v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) && obj.Image != nil && obj.Image.PullPolicy == "" {
+		// PullPolicy defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+		_, tag, _, _ := parsers.ParseImageName(obj.Image.Reference)
+		if tag == "latest" {
+			obj.Image.PullPolicy = v1.PullAlways
+		} else {
+			obj.Image.PullPolicy = v1.PullIfNotPresent
 		}
 	}
 }
@@ -138,18 +147,15 @@ func SetDefaults_Service(obj *v1.Service) {
 
 	if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
 		if obj.Spec.AllocateLoadBalancerNodePorts == nil {
-			obj.Spec.AllocateLoadBalancerNodePorts = pointer.Bool(true)
+			obj.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		}
 	}
 
 	if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
-		if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
-			ipMode := v1.LoadBalancerIPModeVIP
-
-			for i, ing := range obj.Status.LoadBalancer.Ingress {
-				if ing.IP != "" && ing.IPMode == nil {
-					obj.Status.LoadBalancer.Ingress[i].IPMode = &ipMode
-				}
+		ipMode := v1.LoadBalancerIPModeVIP
+		for i, ing := range obj.Status.LoadBalancer.Ingress {
+			if ing.IP != "" && ing.IPMode == nil {
+				obj.Status.LoadBalancer.Ingress[i].IPMode = &ipMode
 			}
 		}
 	}
@@ -171,29 +177,6 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
-			obj.Spec.Containers[i].Resources.Requests != nil {
-			// For normal containers, set resize restart policy to default value (NotRequired), if not specified.
-			resizePolicySpecified := make(map[v1.ResourceName]bool)
-			for _, p := range obj.Spec.Containers[i].ResizePolicy {
-				resizePolicySpecified[p.ResourceName] = true
-			}
-			setDefaultResizePolicy := func(resourceName v1.ResourceName) {
-				if _, found := resizePolicySpecified[resourceName]; !found {
-					obj.Spec.Containers[i].ResizePolicy = append(obj.Spec.Containers[i].ResizePolicy,
-						v1.ContainerResizePolicy{
-							ResourceName:  resourceName,
-							RestartPolicy: v1.NotRequired,
-						})
-				}
-			}
-			if _, exists := obj.Spec.Containers[i].Resources.Requests[v1.ResourceCPU]; exists {
-				setDefaultResizePolicy(v1.ResourceCPU)
-			}
-			if _, exists := obj.Spec.Containers[i].Resources.Requests[v1.ResourceMemory]; exists {
-				setDefaultResizePolicy(v1.ResourceMemory)
-			}
-		}
 	}
 	for i := range obj.Spec.InitContainers {
 		if obj.Spec.InitContainers[i].Resources.Limits != nil {
@@ -207,6 +190,14 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 		}
 	}
+
+	// Pod Requests default values must be applied after container-level default values
+	// have been populated.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+		defaultHugePagePodLimits(obj)
+		defaultPodRequests(obj)
+	}
+
 	if obj.Spec.EnableServiceLinks == nil {
 		enableServiceLinks := v1.DefaultEnableServiceLinks
 		obj.Spec.EnableServiceLinks = &enableServiceLinks
@@ -418,5 +409,119 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 	typeVol := v1.HostPathUnset
 	if obj.Type == nil {
 		obj.Type = &typeVol
+	}
+}
+
+func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLogsQuerySplitStreams) {
+		if obj.Stream == nil {
+			obj.Stream = ptr.To(v1.LogStreamAll)
+		}
+	}
+}
+
+// defaultPodRequests applies default values for pod-level requests, only when
+// pod-level limits are set, in following scenarios:
+// 1. When at least one container (regular, init or sidecar) has requests set:
+// The pod-level requests become equal to the effective requests of all containers
+// in the pod.
+// 2. When no containers have requests set: The pod-level requests become equal to
+// pod-level limits.
+// This defaulting behavior ensures consistent resource accounting at the pod-level
+// while maintaining compatibility with the container-level specifications, as detailed
+// in KEP-2837: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#proposed-validation--defaulting-rules
+func defaultPodRequests(obj *v1.Pod) {
+	// We only populate defaults when the pod-level resources are partly specified already.
+	if obj.Spec.Resources == nil {
+		return
+	}
+
+	if len(obj.Spec.Resources.Limits) == 0 {
+		return
+	}
+
+	var podReqs v1.ResourceList
+	podReqs = obj.Spec.Resources.Requests
+	if podReqs == nil {
+		podReqs = make(v1.ResourceList)
+	}
+
+	aggrCtrReqs := resourcehelper.AggregateContainerRequests(obj, resourcehelper.PodResourcesOptions{})
+
+	// When containers specify requests for a resource (supported by
+	// PodLevelResources feature) and pod-level requests are not set, the pod-level requests
+	// default to the effective requests of all the containers for that resource.
+	for key, aggrCtrLim := range aggrCtrReqs {
+		// Default pod level requests for overcommittable resources from aggregated container requests.
+		if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && corev1helper.IsOvercommitAllowed(key) {
+			podReqs[key] = aggrCtrLim.DeepCopy()
+		}
+	}
+
+	// When no containers specify requests for a resource, the pod-level requests
+	// will default to match the pod-level limits, if pod-level
+	// limits exist for that resource.
+	// Defaulting for pod level hugepages requests is dependent on defaultHugePagePodLimits,
+	// if defaultHugePagePodLimits defined the limit, the request will be set here.
+	for key, podLim := range obj.Spec.Resources.Limits {
+		if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+			podReqs[key] = podLim.DeepCopy()
+		}
+	}
+
+	// Only set pod-level resource requests in the PodSpec if the requirements map
+	// contains entries after collecting container-level requests and pod-level limits.
+	if len(podReqs) > 0 {
+		obj.Spec.Resources.Requests = podReqs
+	}
+}
+
+// defaultHugePagePodLimits applies default values for pod-level limits, only when
+// container hugepage limits are set, but not at pod level, in following
+// scenario:
+// 1. When at least one container (regular, init or sidecar) has hugepage
+// limits set:
+// The pod-level limit becomes equal to the aggregated hugepages limit of all
+// the containers in the pod.
+func defaultHugePagePodLimits(pod *v1.Pod) {
+	// We only populate hugepage limit defaults when the pod-level resources are partly specified.
+	if pod.Spec.Resources == nil {
+		return
+	}
+
+	if len(pod.Spec.Resources.Limits) == 0 && len(pod.Spec.Resources.Requests) == 0 {
+		return
+	}
+
+	var podLims v1.ResourceList
+	podLims = pod.Spec.Resources.Limits
+	if podLims == nil {
+		podLims = make(v1.ResourceList)
+	}
+
+	aggrCtrLims := resourcehelper.AggregateContainerLimits(pod, resourcehelper.PodResourcesOptions{})
+
+	// When containers specify limits for hugepages and pod-level limits are not
+	// set for that resource, the pod-level limit will default to the aggregated
+	// hugepages limit of all the containers.
+	for key, aggrCtrLim := range aggrCtrLims {
+		if !resourcehelper.IsSupportedPodLevelResource(key) || !corev1helper.IsHugePageResourceName(key) {
+			continue
+		}
+
+		// We do not default pod-level hugepage limits if there is a hugepage request.
+		if _, exists := pod.Spec.Resources.Requests[key]; exists {
+			continue
+		}
+
+		if _, exists := podLims[key]; !exists {
+			podLims[key] = aggrCtrLim.DeepCopy()
+		}
+	}
+
+	// Only set pod-level resource limits in the PodSpec if the requirements map
+	// contains entries after collecting container-level limits and pod-level limits for hugepages.
+	if len(podLims) > 0 {
+		pod.Spec.Resources.Limits = podLims
 	}
 }

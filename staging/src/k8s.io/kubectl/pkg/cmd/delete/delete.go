@@ -17,6 +17,7 @@ limitations under the License.
 package delete
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
 )
 
 var (
@@ -103,7 +103,10 @@ var (
 		kubectl delete pod foo --force
 
 		# Delete all pods
-		kubectl delete pods --all`))
+		kubectl delete pods --all
+
+		# Delete all pods only if the user confirms the deletion
+		kubectl delete pods --all --interactive`))
 )
 
 type DeleteOptions struct {
@@ -202,7 +205,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 
 	// Set default WarningPrinter if not already set.
 	if o.WarningPrinter == nil {
-		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(o.ErrOut)})
 	}
 
 	if len(o.Raw) != 0 {
@@ -464,7 +467,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		ConditionFn: cmdwait.IsDeleted,
 		IOStreams:   o.IOStreams,
 	}
-	err = waitOptions.RunWait()
+	err = waitOptions.RunWaitContext(context.Background())
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
 		// if we're forbidden from waiting, we shouldn't fail.
 		// if the resource doesn't support a verb we need, we shouldn't fail.
@@ -503,6 +506,10 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 		operation = "force deleted"
 	}
 
+	if info.Namespaced() {
+		operation = fmt.Sprintf("%s from %s namespace", operation, info.Namespace)
+	}
+
 	switch o.DryRunStrategy {
 	case cmdutil.DryRunClient:
 		operation = fmt.Sprintf("%s (dry run)", operation)
@@ -521,7 +528,7 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 }
 
 func (o *DeleteOptions) confirmation(infos []*resource.Info) bool {
-	fmt.Fprintf(o.Out, i18n.T("You are about to delete the following %d resource(s):\n"), len(infos))
+	fmt.Fprintf(o.Out, i18n.T("You are about to delete the following %d resource(s):\n"), len(infos)) //nolint:errcheck
 	for _, info := range infos {
 		groupKind := info.Mapping.GroupVersionKind
 		kindString := fmt.Sprintf("%s.%s", strings.ToLower(groupKind.Kind), groupKind.Group)
@@ -529,11 +536,11 @@ func (o *DeleteOptions) confirmation(infos []*resource.Info) bool {
 			kindString = strings.ToLower(groupKind.Kind)
 		}
 
-		fmt.Fprintf(o.Out, "%s/%s\n", kindString, info.Name)
+		fmt.Fprintf(o.Out, "%s/%s\n", kindString, info.Name) //nolint:errcheck
 	}
-	fmt.Fprintf(o.Out, i18n.T("Do you want to continue?")+" (y/n): ")
+	fmt.Fprint(o.Out, i18n.T("Do you want to continue?")+" (y/N): ") //nolint:errcheck
 	var input string
-	_, err := fmt.Fscan(o.In, &input)
+	_, err := fmt.Fscanln(o.In, &input)
 	if err != nil {
 		return false
 	}

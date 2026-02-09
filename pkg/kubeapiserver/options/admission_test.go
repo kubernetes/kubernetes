@@ -111,6 +111,6 @@ func TestAdmissionOptionsAddFlags(t *testing.T) {
 	}
 
 	// using assert because cannot compare neither pointer nor function of underlying GenericAdmission
-	assert.Equal(t, opts.GenericAdmission.ConfigFile, "admission_control_config.yaml")
-	assert.Equal(t, opts.GenericAdmission.EnablePlugins, []string{"foo", "bar", "baz"})
+	assert.Equal(t, "admission_control_config.yaml", opts.GenericAdmission.ConfigFile)
+	assert.Equal(t, []string{"foo", "bar", "baz"}, opts.GenericAdmission.EnablePlugins)
 }

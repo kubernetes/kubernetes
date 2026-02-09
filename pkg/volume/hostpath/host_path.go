@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -118,7 +118,7 @@ func (plugin *hostPathPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	hostPathVolumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 	return &hostPathMounter{
 		hostPath:      &hostPath{path: path, pathType: pathType},
 		readOnly:      readOnly,
-		mounter:       plugin.host.GetMounter(plugin.GetPluginName()),
+		mounter:       plugin.host.GetMounter(),
 		hu:            kvh.GetHostUtil(),
 		noTypeChecker: plugin.noTypeChecker,
 	}, nil
@@ -326,7 +326,7 @@ func (r *hostPathProvisioner) Provision(selectedNode *v1.Node, allowedTopologies
 		return nil, err
 	}
 	if selinux.GetEnabled() {
-		err := selinux.SetFileLabel(pv.Spec.HostPath.Path, config.KubeletContainersSharedSELinuxLabel)
+		err := selinux.SetFileLabel(pv.Spec.HostPath.Path, kubeletconfig.KubeletContainersSharedSELinuxLabel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set selinux label for %q: %v", pv.Spec.HostPath.Path, err)
 		}

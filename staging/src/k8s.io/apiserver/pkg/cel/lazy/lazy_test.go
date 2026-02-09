@@ -60,7 +60,7 @@ func TestLazyMapType(t *testing.T) {
 		evalCounter++
 		v, err := compileAndRun(env, activation, `{"a": "a"}`)
 		if err != nil {
-			return types.NewErr(err.Error())
+			return types.NewErr("%s", err.Error())
 		}
 		return v
 	})
@@ -129,7 +129,7 @@ func compileAndRun(env *cel.Env, activation *testActivation, exp string) (ref.Va
 func buildTestEnv() (*cel.Env, *apiservercel.DeclType, error) {
 	variablesType := apiservercel.NewMapType(apiservercel.StringType, apiservercel.AnyType, 0)
 	variablesType.Fields = make(map[string]*apiservercel.DeclField)
-	envSet, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).Extend(
+	envSet, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Extend(
 		environment.VersionedOptions{
 			IntroducedVersion: version.MajorMinor(1, 28),
 			EnvOptions: []cel.EnvOption{
@@ -142,8 +142,7 @@ func buildTestEnv() (*cel.Env, *apiservercel.DeclType, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	// TODO: change to NewExpressions after 1.28
-	env, err := envSet.Env(environment.StoredExpressions)
+	env, err := envSet.Env(environment.NewExpressions)
 	return env, variablesType, err
 }
 

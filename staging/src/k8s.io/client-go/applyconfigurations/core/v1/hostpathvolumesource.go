@@ -19,14 +19,23 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // HostPathVolumeSourceApplyConfiguration represents a declarative configuration of the HostPathVolumeSource type for use
 // with apply.
+//
+// Represents a host path mapped into a pod.
+// Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSourceApplyConfiguration struct {
-	Path *string          `json:"path,omitempty"`
-	Type *v1.HostPathType `json:"type,omitempty"`
+	// path of the directory on the host.
+	// If the path is a symlink, it will follow the link to the real path.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+	Path *string `json:"path,omitempty"`
+	// type for HostPath Volume
+	// Defaults to ""
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+	Type *corev1.HostPathType `json:"type,omitempty"`
 }
 
 // HostPathVolumeSourceApplyConfiguration constructs a declarative configuration of the HostPathVolumeSource type for use with
@@ -46,7 +55,7 @@ func (b *HostPathVolumeSourceApplyConfiguration) WithPath(value string) *HostPat
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *HostPathVolumeSourceApplyConfiguration) WithType(value v1.HostPathType) *HostPathVolumeSourceApplyConfiguration {
+func (b *HostPathVolumeSourceApplyConfiguration) WithType(value corev1.HostPathType) *HostPathVolumeSourceApplyConfiguration {
 	b.Type = &value
 	return b
 }

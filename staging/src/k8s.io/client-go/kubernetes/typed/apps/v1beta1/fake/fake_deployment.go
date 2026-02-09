@@ -19,179 +19,33 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1beta1 "k8s.io/api/apps/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
 	appsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	typedappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 )
 
-// FakeDeployments implements DeploymentInterface
-type FakeDeployments struct {
+// fakeDeployments implements DeploymentInterface
+type fakeDeployments struct {
+	*gentype.FakeClientWithListAndApply[*v1beta1.Deployment, *v1beta1.DeploymentList, *appsv1beta1.DeploymentApplyConfiguration]
 	Fake *FakeAppsV1beta1
-	ns   string
 }
 
-var deploymentsResource = v1beta1.SchemeGroupVersion.WithResource("deployments")
-
-var deploymentsKind = v1beta1.SchemeGroupVersion.WithKind("Deployment")
-
-// Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
-func (c *FakeDeployments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(deploymentsResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeDeployments(fake *FakeAppsV1beta1, namespace string) typedappsv1beta1.DeploymentInterface {
+	return &fakeDeployments{
+		gentype.NewFakeClientWithListAndApply[*v1beta1.Deployment, *v1beta1.DeploymentList, *appsv1beta1.DeploymentApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1beta1.SchemeGroupVersion.WithResource("deployments"),
+			v1beta1.SchemeGroupVersion.WithKind("Deployment"),
+			func() *v1beta1.Deployment { return &v1beta1.Deployment{} },
+			func() *v1beta1.DeploymentList { return &v1beta1.DeploymentList{} },
+			func(dst, src *v1beta1.DeploymentList) { dst.ListMeta = src.ListMeta },
+			func(list *v1beta1.DeploymentList) []*v1beta1.Deployment { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1beta1.DeploymentList, items []*v1beta1.Deployment) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1beta1.Deployment), err
-}
-
-// List takes label and field selectors, and returns the list of Deployments that match those selectors.
-func (c *FakeDeployments) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
-	emptyResult := &v1beta1.DeploymentList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(deploymentsResource, deploymentsKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.DeploymentList{ListMeta: obj.(*v1beta1.DeploymentList).ListMeta}
-	for _, item := range obj.(*v1beta1.DeploymentList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested deployments.
-func (c *FakeDeployments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(deploymentsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
-func (c *FakeDeployments) Create(ctx context.Context, deployment *v1beta1.Deployment, opts v1.CreateOptions) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(deploymentsResource, c.ns, deployment, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.Deployment), err
-}
-
-// Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
-func (c *FakeDeployments) Update(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(deploymentsResource, c.ns, deployment, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.Deployment), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(deploymentsResource, "status", c.ns, deployment, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.Deployment), err
-}
-
-// Delete takes name of the deployment and deletes it. Returns an error if one occurs.
-func (c *FakeDeployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(deploymentsResource, c.ns, name, opts), &v1beta1.Deployment{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeDeployments) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(deploymentsResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1beta1.DeploymentList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched deployment.
-func (c *FakeDeployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(deploymentsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.Deployment), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied deployment.
-func (c *FakeDeployments) Apply(ctx context.Context, deployment *appsv1beta1.DeploymentApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Deployment, err error) {
-	if deployment == nil {
-		return nil, fmt.Errorf("deployment provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(deployment)
-	if err != nil {
-		return nil, err
-	}
-	name := deployment.Name
-	if name == nil {
-		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
-	}
-	emptyResult := &v1beta1.Deployment{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.Deployment), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeDeployments) ApplyStatus(ctx context.Context, deployment *appsv1beta1.DeploymentApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Deployment, err error) {
-	if deployment == nil {
-		return nil, fmt.Errorf("deployment provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(deployment)
-	if err != nil {
-		return nil, err
-	}
-	name := deployment.Name
-	if name == nil {
-		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
-	}
-	emptyResult := &v1beta1.Deployment{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.Deployment), err
 }

@@ -23,396 +23,36 @@ import (
 	fmt "fmt"
 
 	io "io"
+	"sort"
 
-	proto "github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	v11 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+func (m *CSIStorageCapacity) Reset() { *m = CSIStorageCapacity{} }
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+func (m *CSIStorageCapacityList) Reset() { *m = CSIStorageCapacityList{} }
 
-func (m *CSIStorageCapacity) Reset()      { *m = CSIStorageCapacity{} }
-func (*CSIStorageCapacity) ProtoMessage() {}
-func (*CSIStorageCapacity) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{0}
-}
-func (m *CSIStorageCapacity) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSIStorageCapacity) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSIStorageCapacity) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSIStorageCapacity.Merge(m, src)
-}
-func (m *CSIStorageCapacity) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSIStorageCapacity) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSIStorageCapacity.DiscardUnknown(m)
-}
+func (m *VolumeAttachment) Reset() { *m = VolumeAttachment{} }
 
-var xxx_messageInfo_CSIStorageCapacity proto.InternalMessageInfo
+func (m *VolumeAttachmentList) Reset() { *m = VolumeAttachmentList{} }
 
-func (m *CSIStorageCapacityList) Reset()      { *m = CSIStorageCapacityList{} }
-func (*CSIStorageCapacityList) ProtoMessage() {}
-func (*CSIStorageCapacityList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{1}
-}
-func (m *CSIStorageCapacityList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *CSIStorageCapacityList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *CSIStorageCapacityList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CSIStorageCapacityList.Merge(m, src)
-}
-func (m *CSIStorageCapacityList) XXX_Size() int {
-	return m.Size()
-}
-func (m *CSIStorageCapacityList) XXX_DiscardUnknown() {
-	xxx_messageInfo_CSIStorageCapacityList.DiscardUnknown(m)
-}
+func (m *VolumeAttachmentSource) Reset() { *m = VolumeAttachmentSource{} }
 
-var xxx_messageInfo_CSIStorageCapacityList proto.InternalMessageInfo
+func (m *VolumeAttachmentSpec) Reset() { *m = VolumeAttachmentSpec{} }
 
-func (m *VolumeAttachment) Reset()      { *m = VolumeAttachment{} }
-func (*VolumeAttachment) ProtoMessage() {}
-func (*VolumeAttachment) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{2}
-}
-func (m *VolumeAttachment) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachment) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachment) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachment.Merge(m, src)
-}
-func (m *VolumeAttachment) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachment) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachment.DiscardUnknown(m)
-}
+func (m *VolumeAttachmentStatus) Reset() { *m = VolumeAttachmentStatus{} }
 
-var xxx_messageInfo_VolumeAttachment proto.InternalMessageInfo
+func (m *VolumeAttributesClass) Reset() { *m = VolumeAttributesClass{} }
 
-func (m *VolumeAttachmentList) Reset()      { *m = VolumeAttachmentList{} }
-func (*VolumeAttachmentList) ProtoMessage() {}
-func (*VolumeAttachmentList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{3}
-}
-func (m *VolumeAttachmentList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachmentList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachmentList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachmentList.Merge(m, src)
-}
-func (m *VolumeAttachmentList) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachmentList) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachmentList.DiscardUnknown(m)
-}
+func (m *VolumeAttributesClassList) Reset() { *m = VolumeAttributesClassList{} }
 
-var xxx_messageInfo_VolumeAttachmentList proto.InternalMessageInfo
-
-func (m *VolumeAttachmentSource) Reset()      { *m = VolumeAttachmentSource{} }
-func (*VolumeAttachmentSource) ProtoMessage() {}
-func (*VolumeAttachmentSource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{4}
-}
-func (m *VolumeAttachmentSource) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachmentSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachmentSource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachmentSource.Merge(m, src)
-}
-func (m *VolumeAttachmentSource) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachmentSource) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachmentSource.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttachmentSource proto.InternalMessageInfo
-
-func (m *VolumeAttachmentSpec) Reset()      { *m = VolumeAttachmentSpec{} }
-func (*VolumeAttachmentSpec) ProtoMessage() {}
-func (*VolumeAttachmentSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{5}
-}
-func (m *VolumeAttachmentSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachmentSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachmentSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachmentSpec.Merge(m, src)
-}
-func (m *VolumeAttachmentSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachmentSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachmentSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttachmentSpec proto.InternalMessageInfo
-
-func (m *VolumeAttachmentStatus) Reset()      { *m = VolumeAttachmentStatus{} }
-func (*VolumeAttachmentStatus) ProtoMessage() {}
-func (*VolumeAttachmentStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{6}
-}
-func (m *VolumeAttachmentStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttachmentStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttachmentStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttachmentStatus.Merge(m, src)
-}
-func (m *VolumeAttachmentStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttachmentStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttachmentStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttachmentStatus proto.InternalMessageInfo
-
-func (m *VolumeAttributesClass) Reset()      { *m = VolumeAttributesClass{} }
-func (*VolumeAttributesClass) ProtoMessage() {}
-func (*VolumeAttributesClass) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{7}
-}
-func (m *VolumeAttributesClass) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttributesClass) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttributesClass) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttributesClass.Merge(m, src)
-}
-func (m *VolumeAttributesClass) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttributesClass) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttributesClass.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttributesClass proto.InternalMessageInfo
-
-func (m *VolumeAttributesClassList) Reset()      { *m = VolumeAttributesClassList{} }
-func (*VolumeAttributesClassList) ProtoMessage() {}
-func (*VolumeAttributesClassList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{8}
-}
-func (m *VolumeAttributesClassList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeAttributesClassList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeAttributesClassList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeAttributesClassList.Merge(m, src)
-}
-func (m *VolumeAttributesClassList) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeAttributesClassList) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeAttributesClassList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeAttributesClassList proto.InternalMessageInfo
-
-func (m *VolumeError) Reset()      { *m = VolumeError{} }
-func (*VolumeError) ProtoMessage() {}
-func (*VolumeError) Descriptor() ([]byte, []int) {
-	return fileDescriptor_02e7952e43280c27, []int{9}
-}
-func (m *VolumeError) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *VolumeError) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *VolumeError) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VolumeError.Merge(m, src)
-}
-func (m *VolumeError) XXX_Size() int {
-	return m.Size()
-}
-func (m *VolumeError) XXX_DiscardUnknown() {
-	xxx_messageInfo_VolumeError.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VolumeError proto.InternalMessageInfo
-
-func init() {
-	proto.RegisterType((*CSIStorageCapacity)(nil), "k8s.io.api.storage.v1alpha1.CSIStorageCapacity")
-	proto.RegisterType((*CSIStorageCapacityList)(nil), "k8s.io.api.storage.v1alpha1.CSIStorageCapacityList")
-	proto.RegisterType((*VolumeAttachment)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachment")
-	proto.RegisterType((*VolumeAttachmentList)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachmentList")
-	proto.RegisterType((*VolumeAttachmentSource)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachmentSource")
-	proto.RegisterType((*VolumeAttachmentSpec)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachmentSpec")
-	proto.RegisterType((*VolumeAttachmentStatus)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachmentStatus")
-	proto.RegisterMapType((map[string]string)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachmentStatus.AttachmentMetadataEntry")
-	proto.RegisterType((*VolumeAttributesClass)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttributesClass")
-	proto.RegisterMapType((map[string]string)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttributesClass.ParametersEntry")
-	proto.RegisterType((*VolumeAttributesClassList)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttributesClassList")
-	proto.RegisterType((*VolumeError)(nil), "k8s.io.api.storage.v1alpha1.VolumeError")
-}
-
-func init() {
-	proto.RegisterFile("k8s.io/api/storage/v1alpha1/generated.proto", fileDescriptor_02e7952e43280c27)
-}
-
-var fileDescriptor_02e7952e43280c27 = []byte{
-	// 1009 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x57, 0x3d, 0x6f, 0x23, 0x45,
-	0x18, 0xce, 0xda, 0xce, 0x9d, 0x6f, 0x1c, 0x38, 0xdf, 0xc8, 0x77, 0x18, 0x9f, 0xb4, 0x3e, 0xb9,
-	0x32, 0x1f, 0x37, 0x4b, 0x02, 0x42, 0x27, 0x24, 0x0a, 0x6f, 0x92, 0x22, 0x22, 0x09, 0xc7, 0x38,
-	0x02, 0x04, 0x14, 0x8c, 0xd7, 0x83, 0x3d, 0x89, 0xf7, 0x43, 0x33, 0xb3, 0x16, 0xa6, 0xa2, 0xa2,
-	0xa6, 0xe3, 0x1f, 0xf0, 0x5b, 0x52, 0x20, 0x71, 0xba, 0xea, 0x2a, 0x8b, 0x2c, 0xfc, 0x06, 0x0a,
-	0x1a, 0xd0, 0xce, 0x8e, 0xd7, 0x1b, 0xaf, 0x1d, 0x9c, 0x14, 0xe9, 0x3c, 0x33, 0xef, 0xfb, 0x3c,
-	0xef, 0xc7, 0xf3, 0xbe, 0x9b, 0x80, 0x77, 0xce, 0x9e, 0x09, 0xc4, 0x7c, 0x8b, 0x04, 0xcc, 0x12,
-	0xd2, 0xe7, 0x64, 0x40, 0xad, 0xf1, 0x36, 0x19, 0x05, 0x43, 0xb2, 0x6d, 0x0d, 0xa8, 0x47, 0x39,
-	0x91, 0xb4, 0x8f, 0x02, 0xee, 0x4b, 0x1f, 0x3e, 0x4e, 0x8c, 0x11, 0x09, 0x18, 0xd2, 0xc6, 0x68,
-	0x66, 0xdc, 0x78, 0x3a, 0x60, 0x72, 0x18, 0xf6, 0x90, 0xe3, 0xbb, 0xd6, 0xc0, 0x1f, 0xf8, 0x96,
-	0xf2, 0xe9, 0x85, 0xdf, 0xa9, 0x93, 0x3a, 0xa8, 0x5f, 0x09, 0x56, 0xa3, 0x95, 0x21, 0x76, 0x7c,
-	0x1e, 0xb3, 0x2e, 0xf2, 0x35, 0x3e, 0x98, 0xdb, 0xb8, 0xc4, 0x19, 0x32, 0x8f, 0xf2, 0x89, 0x15,
-	0x9c, 0x0d, 0x94, 0x13, 0xa7, 0xc2, 0x0f, 0xb9, 0x43, 0xaf, 0xe5, 0x25, 0x2c, 0x97, 0x4a, 0xb2,
-	0x8c, 0xcb, 0x5a, 0xe5, 0xc5, 0x43, 0x4f, 0x32, 0x37, 0x4f, 0xf3, 0xe1, 0xff, 0x39, 0x08, 0x67,
-	0x48, 0x5d, 0xb2, 0xe8, 0xd7, 0xfa, 0xbb, 0x08, 0xe0, 0x6e, 0xf7, 0xa0, 0x9b, 0xd4, 0x6f, 0x97,
-	0x04, 0xc4, 0x61, 0x72, 0x02, 0xbf, 0x05, 0xe5, 0x38, 0xb4, 0x3e, 0x91, 0xa4, 0x6e, 0x3c, 0x31,
-	0xda, 0x95, 0x9d, 0xf7, 0xd0, 0xbc, 0xdc, 0x29, 0x03, 0x0a, 0xce, 0x06, 0xf1, 0x85, 0x40, 0xb1,
-	0x35, 0x1a, 0x6f, 0xa3, 0x4f, 0x7b, 0xa7, 0xd4, 0x91, 0x47, 0x54, 0x12, 0x1b, 0x9e, 0x4f, 0x9b,
-	0x1b, 0xd1, 0xb4, 0x09, 0xe6, 0x77, 0x38, 0x45, 0x85, 0x0c, 0x6c, 0x79, 0x7e, 0x9f, 0x9e, 0xf8,
-	0x81, 0x3f, 0xf2, 0x07, 0x93, 0x7a, 0x41, 0xb1, 0xbc, 0xbf, 0x1e, 0xcb, 0x21, 0xe9, 0xd1, 0x51,
-	0x97, 0x8e, 0xa8, 0x23, 0x7d, 0x6e, 0x57, 0xa3, 0x69, 0x73, 0xeb, 0x38, 0x03, 0x86, 0x2f, 0x41,
-	0xc3, 0x3d, 0x50, 0xd5, 0xfa, 0xd8, 0x1d, 0x11, 0x21, 0x8e, 0x89, 0x4b, 0xeb, 0xc5, 0x27, 0x46,
-	0xfb, 0x9e, 0x5d, 0xd7, 0x21, 0x56, 0xbb, 0x0b, 0xef, 0x38, 0xe7, 0x01, 0xbf, 0x04, 0x65, 0x47,
-	0x97, 0xa7, 0x5e, 0x52, 0xc1, 0xa2, 0xab, 0x82, 0x45, 0x33, 0x45, 0xa0, 0xcf, 0x42, 0xe2, 0x49,
-	0x26, 0x27, 0xf6, 0x56, 0x34, 0x6d, 0x96, 0x67, 0x25, 0xc6, 0x29, 0x1a, 0x14, 0xe0, 0x81, 0x4b,
-	0xbe, 0x67, 0x6e, 0xe8, 0x7e, 0xee, 0x8f, 0x42, 0x97, 0x76, 0xd9, 0x0f, 0xb4, 0xbe, 0x79, 0x23,
-	0x8a, 0x87, 0xd1, 0xb4, 0xf9, 0xe0, 0x68, 0x11, 0x0c, 0xe7, 0xf1, 0x5b, 0xbf, 0x19, 0xe0, 0x51,
-	0xbe, 0xf1, 0x87, 0x4c, 0x48, 0xf8, 0x4d, 0xae, 0xf9, 0x68, 0xcd, 0xb6, 0x30, 0x91, 0xb4, 0xbe,
-	0xaa, 0xeb, 0x5a, 0x9e, 0xdd, 0x64, 0x1a, 0x7f, 0x02, 0x36, 0x99, 0xa4, 0xae, 0xa8, 0x17, 0x9e,
-	0x14, 0xdb, 0x95, 0x1d, 0x0b, 0x5d, 0x31, 0xc6, 0x28, 0x1f, 0xa1, 0xfd, 0x9a, 0xc6, 0xde, 0x3c,
-	0x88, 0x51, 0x70, 0x02, 0xd6, 0xfa, 0xb5, 0x00, 0xaa, 0x49, 0x76, 0x1d, 0x29, 0x89, 0x33, 0x74,
-	0xa9, 0x27, 0x6f, 0x41, 0xc5, 0x5d, 0x50, 0x12, 0x01, 0x75, 0xb4, 0x7a, 0xb7, 0xaf, 0xcc, 0x65,
-	0x31, 0xbc, 0x6e, 0x40, 0x1d, 0x7b, 0x4b, 0xc3, 0x97, 0xe2, 0x13, 0x56, 0x60, 0xf0, 0x6b, 0x70,
-	0x47, 0x48, 0x22, 0x43, 0xa1, 0x54, 0x7a, 0x79, 0x28, 0xd6, 0x80, 0x55, 0xae, 0xf6, 0xeb, 0x1a,
-	0xf8, 0x4e, 0x72, 0xc6, 0x1a, 0xb2, 0x75, 0x6e, 0x80, 0xda, 0xa2, 0xcb, 0x2d, 0x74, 0x1d, 0x5f,
-	0xee, 0xfa, 0xd3, 0x6b, 0xa5, 0xb4, 0xa2, 0xe7, 0x2f, 0x0d, 0xf0, 0x28, 0x97, 0xbd, 0x1a, 0x08,
-	0x78, 0x08, 0x6a, 0x01, 0xe5, 0x82, 0x09, 0x49, 0x3d, 0x99, 0xd8, 0xa8, 0xb1, 0x37, 0x92, 0xb1,
-	0x8f, 0xa6, 0xcd, 0xda, 0xf3, 0x25, 0xef, 0x78, 0xa9, 0x17, 0x3c, 0x05, 0x55, 0xe6, 0x8d, 0x98,
-	0x47, 0xf5, 0xfc, 0xcc, 0x3b, 0xde, 0xce, 0xe6, 0x11, 0x7f, 0x38, 0xe2, 0x82, 0x2c, 0x22, 0xab,
-	0x46, 0xd7, 0xe2, 0x35, 0x73, 0xb0, 0x80, 0x82, 0x73, 0xb8, 0xad, 0xdf, 0x97, 0xf4, 0x27, 0x7e,
-	0x80, 0xef, 0x82, 0x32, 0x51, 0x37, 0x94, 0xeb, 0x34, 0xd2, 0x7a, 0x77, 0xf4, 0x3d, 0x4e, 0x2d,
-	0x94, 0x86, 0x54, 0x29, 0x96, 0x2c, 0xd6, 0x35, 0x34, 0xa4, 0x5c, 0x33, 0x1a, 0x52, 0x67, 0xac,
-	0x21, 0xe3, 0x50, 0xe2, 0x05, 0x9b, 0x59, 0xa4, 0x69, 0x28, 0xc7, 0xfa, 0x1e, 0xa7, 0x16, 0xad,
-	0x7f, 0x8b, 0x4b, 0xda, 0xa4, 0xc4, 0x98, 0xc9, 0xa9, 0xaf, 0x72, 0x2a, 0xe7, 0x72, 0xea, 0xa7,
-	0x39, 0xf5, 0xe1, 0x2f, 0x06, 0x80, 0x24, 0x85, 0x38, 0x9a, 0x89, 0x35, 0x51, 0xd4, 0x27, 0x37,
-	0x18, 0x12, 0xd4, 0xc9, 0xa1, 0xed, 0x7b, 0x92, 0x4f, 0xec, 0x86, 0x8e, 0x02, 0xe6, 0x0d, 0xf0,
-	0x92, 0x10, 0xe0, 0x29, 0xa8, 0x24, 0xb7, 0xfb, 0x9c, 0xfb, 0x5c, 0x8f, 0x6d, 0x7b, 0x8d, 0x88,
-	0x94, 0xbd, 0x6d, 0x46, 0xd3, 0x66, 0xa5, 0x33, 0x07, 0xf8, 0x67, 0xda, 0xac, 0x64, 0xde, 0x71,
-	0x16, 0x3c, 0xe6, 0xea, 0xd3, 0x39, 0x57, 0xe9, 0x26, 0x5c, 0x7b, 0x74, 0x35, 0x57, 0x06, 0xbc,
-	0xb1, 0x0f, 0xde, 0x58, 0x51, 0x22, 0x58, 0x05, 0xc5, 0x33, 0x3a, 0x49, 0x94, 0x88, 0xe3, 0x9f,
-	0xb0, 0x06, 0x36, 0xc7, 0x64, 0x14, 0x26, 0x8a, 0xbb, 0x87, 0x93, 0xc3, 0x47, 0x85, 0x67, 0x46,
-	0xeb, 0xaf, 0x02, 0x78, 0x98, 0x76, 0x80, 0xb3, 0x5e, 0x28, 0xa9, 0x50, 0x1f, 0xd6, 0x5b, 0xd8,
-	0xd0, 0x3b, 0x00, 0xf4, 0x39, 0x1b, 0x53, 0xae, 0xd4, 0xaa, 0x42, 0x9b, 0x7b, 0xec, 0xa5, 0x2f,
-	0x38, 0x63, 0x05, 0xc7, 0x00, 0x04, 0x84, 0x13, 0x97, 0x4a, 0xca, 0xe3, 0x25, 0x1c, 0xeb, 0xcb,
-	0x5e, 0x4f, 0x5f, 0xd9, 0xec, 0xd0, 0xf3, 0x14, 0x24, 0x91, 0x55, 0xca, 0x3b, 0x7f, 0xc0, 0x19,
-	0xa6, 0xc6, 0xc7, 0xe0, 0xfe, 0x82, 0xcb, 0xb5, 0xca, 0xfc, 0xd2, 0x00, 0x6f, 0x2e, 0x0d, 0xe4,
-	0x16, 0xf6, 0xfb, 0x17, 0x97, 0xf7, 0xfb, 0xce, 0xf5, 0xab, 0xb5, 0x62, 0xc9, 0xff, 0x64, 0x80,
-	0xac, 0x3e, 0xe1, 0x21, 0x28, 0xc5, 0x7f, 0xcf, 0xea, 0x14, 0xde, 0x5e, 0x2f, 0x85, 0x13, 0xe6,
-	0xd2, 0xf9, 0xa7, 0x36, 0x3e, 0x61, 0x85, 0x02, 0xdf, 0x02, 0x77, 0x5d, 0x2a, 0x04, 0x19, 0xcc,
-	0xa4, 0x71, 0x5f, 0x1b, 0xdd, 0x3d, 0x4a, 0xae, 0xf1, 0xec, 0xdd, 0xee, 0x9c, 0x5f, 0x98, 0x1b,
-	0x2f, 0x2e, 0xcc, 0x8d, 0x57, 0x17, 0xe6, 0xc6, 0x8f, 0x91, 0x69, 0x9c, 0x47, 0xa6, 0xf1, 0x22,
-	0x32, 0x8d, 0x57, 0x91, 0x69, 0xfc, 0x11, 0x99, 0xc6, 0xcf, 0x7f, 0x9a, 0x1b, 0x5f, 0x3d, 0xbe,
-	0xe2, 0x3f, 0x98, 0xff, 0x02, 0x00, 0x00, 0xff, 0xff, 0xd7, 0x19, 0x2c, 0xaa, 0xdf, 0x0c, 0x00,
-	0x00,
-}
+func (m *VolumeError) Reset() { *m = VolumeError{} }
 
 func (m *CSIStorageCapacity) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -769,7 +409,7 @@ func (m *VolumeAttachmentStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 		for k := range m.AttachmentMetadata {
 			keysForAttachmentMetadata = append(keysForAttachmentMetadata, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForAttachmentMetadata)
+		sort.Strings(keysForAttachmentMetadata)
 		for iNdEx := len(keysForAttachmentMetadata) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.AttachmentMetadata[string(keysForAttachmentMetadata[iNdEx])]
 			baseI := i
@@ -824,7 +464,7 @@ func (m *VolumeAttributesClass) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		for k := range m.Parameters {
 			keysForParameters = append(keysForParameters, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForParameters)
+		sort.Strings(keysForParameters)
 		for iNdEx := len(keysForParameters) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.Parameters[string(keysForParameters[iNdEx])]
 			baseI := i
@@ -928,6 +568,11 @@ func (m *VolumeError) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ErrorCode != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.ErrorCode))
+		i--
+		dAtA[i] = 0x18
+	}
 	i -= len(m.Message)
 	copy(dAtA[i:], m.Message)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Message)))
@@ -1137,6 +782,9 @@ func (m *VolumeError) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Message)
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.ErrorCode != nil {
+		n += 1 + sovGenerated(uint64(*m.ErrorCode))
+	}
 	return n
 }
 
@@ -1235,7 +883,7 @@ func (this *VolumeAttachmentStatus) String() string {
 	for k := range this.AttachmentMetadata {
 		keysForAttachmentMetadata = append(keysForAttachmentMetadata, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAttachmentMetadata)
+	sort.Strings(keysForAttachmentMetadata)
 	mapStringForAttachmentMetadata := "map[string]string{"
 	for _, k := range keysForAttachmentMetadata {
 		mapStringForAttachmentMetadata += fmt.Sprintf("%v: %v,", k, this.AttachmentMetadata[k])
@@ -1258,7 +906,7 @@ func (this *VolumeAttributesClass) String() string {
 	for k := range this.Parameters {
 		keysForParameters = append(keysForParameters, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForParameters)
+	sort.Strings(keysForParameters)
 	mapStringForParameters := "map[string]string{"
 	for _, k := range keysForParameters {
 		mapStringForParameters += fmt.Sprintf("%v: %v,", k, this.Parameters[k])
@@ -1295,6 +943,7 @@ func (this *VolumeError) String() string {
 	s := strings.Join([]string{`&VolumeError{`,
 		`Time:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Time), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`ErrorCode:` + valueToStringGenerated(this.ErrorCode) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2901,6 +2550,26 @@ func (m *VolumeError) Unmarshal(dAtA []byte) error {
 			}
 			m.Message = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ErrorCode", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.ErrorCode = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

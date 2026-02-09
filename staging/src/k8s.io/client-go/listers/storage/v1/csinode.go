@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	storagev1 "k8s.io/api/storage/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CSINodeLister helps list CSINodes.
@@ -30,19 +30,19 @@ import (
 type CSINodeLister interface {
 	// List lists all CSINodes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.CSINode, err error)
+	List(selector labels.Selector) (ret []*storagev1.CSINode, err error)
 	// Get retrieves the CSINode from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.CSINode, error)
+	Get(name string) (*storagev1.CSINode, error)
 	CSINodeListerExpansion
 }
 
 // cSINodeLister implements the CSINodeLister interface.
 type cSINodeLister struct {
-	listers.ResourceIndexer[*v1.CSINode]
+	listers.ResourceIndexer[*storagev1.CSINode]
 }
 
 // NewCSINodeLister returns a new CSINodeLister.
 func NewCSINodeLister(indexer cache.Indexer) CSINodeLister {
-	return &cSINodeLister{listers.New[*v1.CSINode](indexer, v1.Resource("csinode"))}
+	return &cSINodeLister{listers.New[*storagev1.CSINode](indexer, storagev1.Resource("csinode"))}
 }

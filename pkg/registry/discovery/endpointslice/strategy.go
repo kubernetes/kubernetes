@@ -21,20 +21,26 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
+	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
+	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -87,8 +93,8 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // Validate validates a new EndpointSlice.
 func (endpointSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	err := validation.ValidateEndpointSliceCreate(endpointSlice)
-	return err
+	allErrs := validation.ValidateEndpointSliceCreate(endpointSlice)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, endpointSlice, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -99,6 +105,7 @@ func (endpointSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.O
 	}
 	var warnings []string
 	warnings = append(warnings, warnOnDeprecatedAddressType(eps.AddressType)...)
+	warnings = append(warnings, warnOnBadIPs(eps)...)
 	return warnings
 }
 
@@ -115,12 +122,19 @@ func (endpointSliceStrategy) AllowCreateOnUpdate() bool {
 func (endpointSliceStrategy) ValidateUpdate(ctx context.Context, new, old runtime.Object) field.ErrorList {
 	newEPS := new.(*discovery.EndpointSlice)
 	oldEPS := old.(*discovery.EndpointSlice)
-	return validation.ValidateEndpointSliceUpdate(newEPS, oldEPS)
+	allErrs := validation.ValidateEndpointSliceUpdate(newEPS, oldEPS)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newEPS, oldEPS, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
 func (endpointSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	eps := obj.(*discovery.EndpointSlice)
+	if eps == nil {
+		return nil
+	}
+	var warnings []string
+	warnings = append(warnings, warnOnBadIPs(eps)...)
+	return warnings
 }
 
 // AllowUnconditionalUpdate is the default update policy for EndpointSlice objects.
@@ -130,13 +144,13 @@ func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
 
 // dropDisabledConditionsOnCreate will drop any fields that are disabled.
 func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
-	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
+		return
+	}
 
-	if dropHints {
-		for i := range endpointSlice.Endpoints {
-			if dropHints {
-				endpointSlice.Endpoints[i].Hints = nil
-			}
+	for i := range endpointSlice.Endpoints {
+		if endpointSlice.Endpoints[i].Hints != nil {
+			endpointSlice.Endpoints[i].Hints.ForNodes = nil
 		}
 	}
 }
@@ -144,21 +158,19 @@ func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
 // dropDisabledFieldsOnUpdate will drop any disable fields that have not already
 // been set on the EndpointSlice.
 func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
-	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
-	if dropHints {
-		for _, ep := range oldEPS.Endpoints {
-			if ep.Hints != nil {
-				dropHints = false
-				break
-			}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
+		return
+	}
+
+	for _, ep := range oldEPS.Endpoints {
+		if ep.Hints != nil && ep.Hints.ForNodes != nil {
+			return
 		}
 	}
 
-	if dropHints {
-		for i := range newEPS.Endpoints {
-			if dropHints {
-				newEPS.Endpoints[i].Hints = nil
-			}
+	for i := range newEPS.Endpoints {
+		if newEPS.Endpoints[i].Hints != nil {
+			newEPS.Endpoints[i].Hints.ForNodes = nil
 		}
 	}
 }
@@ -221,4 +233,24 @@ func warnOnDeprecatedAddressType(addressType discovery.AddressType) []string {
 		return []string{fmt.Sprintf("%s: FQDN endpoints are deprecated", field.NewPath("spec").Child("addressType"))}
 	}
 	return nil
+}
+
+// warnOnBadIPs returns warnings for bad IP address formats
+func warnOnBadIPs(eps *discovery.EndpointSlice) []string {
+	// Save time by not checking for bad IPs if the request is coming from one of our
+	// controllers, since we know they fix up any invalid IPs from their input data
+	// when outputting the EndpointSlices.
+	if eps.Labels[discoveryv1.LabelManagedBy] == endpointslicecontroller.ControllerName ||
+		eps.Labels[discoveryv1.LabelManagedBy] == endpointslicemirroringcontroller.ControllerName {
+		return nil
+	}
+
+	var warnings []string
+	for i := range eps.Endpoints {
+		for j, addr := range eps.Endpoints[i].Addresses {
+			fldPath := field.NewPath("endpoints").Index(i).Child("addresses").Index(j)
+			warnings = append(warnings, utilvalidation.GetWarningsForIP(fldPath, addr)...)
+		}
+	}
+	return warnings
 }

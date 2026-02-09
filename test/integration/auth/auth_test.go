@@ -41,10 +41,9 @@ import (
 	"testing"
 	"time"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/google/go-cmp/cmp"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -57,14 +56,20 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
+	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	unionauthz "k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	resttransport "k8s.io/client-go/transport"
+	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -166,8 +171,7 @@ var aPod = `
   "kind": "Pod",
   "apiVersion": "v1",
   "metadata": {
-    "name": "a",
-    "creationTimestamp": null%s
+    "name": "a"%s
   },
   "spec": {
     "containers": [
@@ -1008,16 +1012,14 @@ func TestImpersonateWithUID(t *testing.T) {
 		client := clientset.NewForConfigOrDie(clientConfig)
 		_, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 
-		if !errors.IsInternalError(err) {
-			t.Fatalf("expected internal error, got %T %v", err, err)
+		if !errors.IsBadRequest(err) {
+			t.Fatalf("expected bad request, got %T %v", err, err)
 		}
 		if diff := cmp.Diff(
-			`an error on the server ("Internal Server Error: \"/api/v1/nodes\": `+
-				`requested [{UID  1234  authentication.k8s.io/v1  }] without impersonating a user") `+
-				`has prevented the request from succeeding (get nodes)`,
+			`requested [{UID  1234  authentication.k8s.io/v1  }] without impersonating a user`,
 			err.Error(),
 		); diff != "" {
-			t.Fatalf("internal error different than expected, -got, +want:\n %s", diff)
+			t.Fatalf("bad request different than expected, -got, +want:\n %s", diff)
 		}
 	})
 
@@ -1051,6 +1053,391 @@ func TestImpersonateWithUID(t *testing.T) {
 			err.Error(),
 		); diff != "" {
 			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
+		}
+	})
+}
+
+// TestConstrainedImpersonation tests the constrained impersonation feature.
+// It ensures that users can only perform actions on behalf of other users
+// if they have the appropriate permissions.
+// This test covers:
+// - A user attempting to impersonate another user.
+// - A user attempting to impersonate a node.
+// - A service account attempting to impersonate a node it is scheduled on.
+// - The fallback to legacy impersonation when the feature is enabled.
+func TestConstrainedImpersonation(t *testing.T) {
+	superUser := "admin/system:masters"
+
+	authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+		superUser: {Name: "admin", Groups: []string{"system:masters"}},
+		"bob":     {Name: "bob"},
+		"alice":   {Name: "alice"},
+		"node1":   {Name: "system:node:node1", Groups: []string{user.NodesGroup}},
+		"serviceaccount1": {Name: "system:serviceaccount:default:sa1", Extra: map[string][]string{
+			"authentication.kubernetes.io/node-name": {"node1"},
+		}},
+		"serviceaccount2": {Name: "system:serviceaccount:default:sa2", Extra: map[string][]string{
+			"authentication.kubernetes.io/node-name": {"node2"},
+		}},
+	})))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	t.Cleanup(cancel)
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConstrainedImpersonation, true)
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.Authorization.Modes = []string{"RBAC"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator
+		},
+	})
+	t.Cleanup(tearDownFn)
+
+	superuserClient, _ := clientsetForToken(superUser, kubeConfig)
+
+	// preset permissions for users to be impersonated
+	authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:node:node1", rbacv1.PolicyRule{
+		Verbs:     []string{"list"},
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+	})
+	authutil.GrantUserAuthorization(t, ctx, superuserClient, "alice", rbacv1.PolicyRule{
+		Verbs:     []string{"list"},
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+	})
+
+	t.Run("bob impersonating alice", func(t *testing.T) {
+		impersonatorClientConfig := rest.CopyConfig(kubeConfig)
+		impersonatorClientConfig.BearerToken = "bob"
+		impersonatorClientConfig.Impersonate = rest.ImpersonationConfig{
+			UserName: "alice",
+		}
+
+		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
+		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if !errors.IsForbidden(err) {
+			t.Fatalf("expected forbidden error, got %T %v", err, err)
+		}
+
+		if diff := cmp.Diff(
+			`pods is forbidden: User "bob" cannot impersonate-on:user-info:list resource "pods" in API group "" at the cluster scope`,
+			err.Error(),
+		); diff != "" {
+			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
+		}
+
+		// with impersonation:user-info permission added, bob still cannot list pods
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "bob", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate:user-info"},
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"users"},
+		})
+
+		_, err = client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if !errors.IsForbidden(err) {
+			t.Fatalf("expected forbidden error, got %T %v", err, err)
+		}
+
+		if diff := cmp.Diff(
+			`pods is forbidden: User "bob" cannot impersonate-on:user-info:list resource "pods" in API group "" at the cluster scope`,
+			err.Error(),
+		); diff != "" {
+			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
+		}
+
+		// with impersonate-on:list permission added, bob can list but not watch pods.
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "bob", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate-on:user-info:list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		})
+
+		_, err = client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("expected no error, got %T %v", err, err)
+		}
+
+		_, err = client.CoreV1().Pods(metav1.NamespaceAll).Watch(ctx, metav1.ListOptions{})
+		if !errors.IsForbidden(err) {
+			t.Fatalf("expected forbidden error, got %T %v", err, err)
+		}
+	})
+
+	t.Run("bob impersonating a node", func(t *testing.T) {
+		impersonatorClientConfig := rest.CopyConfig(kubeConfig)
+		impersonatorClientConfig.BearerToken = "bob"
+		impersonatorClientConfig.Impersonate = rest.ImpersonationConfig{
+			UserName: "system:node:node1",
+		}
+
+		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
+		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if !errors.IsForbidden(err) {
+			t.Fatalf("expected forbidden error, got %T %v", err, err)
+		}
+
+		if diff := cmp.Diff(
+			`pods is forbidden: User "bob" cannot impersonate-on:arbitrary-node:list resource "pods" in API group "" at the cluster scope`,
+			err.Error(),
+		); diff != "" {
+			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
+		}
+
+		// with permissions added, bob still cannot list pods since bob needs
+		// permission to impersonate node.
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "bob", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate:user-info"},
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"users"},
+		})
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "bob", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate-on:arbitrary-node:list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		})
+
+		_, err = client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if !errors.IsForbidden(err) {
+			t.Fatalf("expected forbidden error, got %T %v", err, err)
+		}
+
+		if diff := cmp.Diff(
+			`nodes.authentication.k8s.io "node1" is forbidden: User "bob" cannot impersonate:arbitrary-node resource "nodes" in API group "authentication.k8s.io" at the cluster scope`,
+			err.Error(),
+		); diff != "" {
+			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
+		}
+
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "bob", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate:arbitrary-node"},
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"nodes"},
+		})
+
+		_, err = client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("expected no error, got %T %v", err, err)
+		}
+	})
+
+	t.Run("impersonating scheduled node", func(t *testing.T) {
+		impersonatorClientConfig := rest.CopyConfig(kubeConfig)
+		impersonatorClientConfig.BearerToken = "serviceaccount2"
+		impersonatorClientConfig.Impersonate = rest.ImpersonationConfig{
+			UserName: "system:node:node1",
+		}
+
+		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
+
+		// with permissions added, it cannot list pods since sa on the node2 instead of node1.
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:serviceaccount:default:sa2", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate:associated-node"},
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"nodes"},
+		})
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:serviceaccount:default:sa2", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate-on:associated-node:list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		})
+
+		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if !errors.IsForbidden(err) {
+			t.Fatalf("expected forbidden error, got %T %v", err, err)
+		}
+
+		if diff := cmp.Diff(
+			`pods is forbidden: User "system:serviceaccount:default:sa2" cannot impersonate-on:arbitrary-node:list resource "pods" in API group "" at the cluster scope`,
+			err.Error(),
+		); diff != "" {
+			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
+		}
+
+		// change to service account1 which is at node1
+		impersonatorClientConfig.BearerToken = "serviceaccount1"
+
+		client = clientset.NewForConfigOrDie(impersonatorClientConfig)
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:serviceaccount:default:sa1", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate:associated-node"},
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"nodes"},
+		})
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:serviceaccount:default:sa1", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate-on:associated-node:list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		})
+
+		_, err = client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("expected no error, got %T %v", err, err)
+		}
+	})
+
+	t.Run("fallback to legacy impersonation", func(t *testing.T) {
+		impersonatorClientConfig := rest.CopyConfig(kubeConfig)
+		impersonatorClientConfig.BearerToken = "bob"
+		impersonatorClientConfig.Impersonate = rest.ImpersonationConfig{
+			UserName: "alice",
+		}
+
+		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
+
+		// with legacy impersonation verb, bob can impersonate alice.
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "bob", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate"},
+			APIGroups: []string{""},
+			Resources: []string{"users"},
+		})
+
+		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("expected no error, got %T %v", err, err)
+		}
+	})
+}
+
+// TestConstrainedImpersonationDisabled tests the impersonation behavior when the
+// ConstrainedImpersonation feature gate is disabled. In this mode, the legacy
+// impersonation behavior is expected, where a user only needs the "impersonate"
+// permission on the user, group, or service account they are trying to
+// impersonate.
+func TestConstrainedImpersonationDisabled(t *testing.T) {
+	superUser := "admin/system:masters"
+
+	authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+		superUser: {Name: "admin", Groups: []string{"system:masters"}},
+		"bob":     {Name: "bob"},
+		"alice":   {Name: "alice"},
+		"node1":   {Name: "system:node:node1", Groups: []string{user.NodesGroup}},
+		"serviceaccount1": {Name: "system:serviceaccount:default:sa1", Extra: map[string][]string{
+			"authentication.kubernetes.io/node-name": {"node1"},
+		}},
+	})))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	t.Cleanup(cancel)
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConstrainedImpersonation, false)
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.Authorization.Modes = []string{"RBAC"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator
+		},
+	})
+	t.Cleanup(tearDownFn)
+
+	superuserClient, _ := clientsetForToken(superUser, kubeConfig)
+
+	// preset permissions for users to be impersonated
+	authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:node:node1", rbacv1.PolicyRule{
+		Verbs:     []string{"list"},
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+	})
+	authutil.GrantUserAuthorization(t, ctx, superuserClient, "alice", rbacv1.PolicyRule{
+		Verbs:     []string{"list"},
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+	})
+
+	t.Run("bob impersonating alice", func(t *testing.T) {
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "bob", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate:user-info"},
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"users"},
+		})
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "bob", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate-on:user-info:list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		})
+
+		impersonatorClientConfig := rest.CopyConfig(kubeConfig)
+		impersonatorClientConfig.BearerToken = "bob"
+		impersonatorClientConfig.Impersonate = rest.ImpersonationConfig{
+			UserName: "alice",
+		}
+
+		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
+		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if !errors.IsForbidden(err) {
+			t.Fatalf("expected forbidden error, got %T %v", err, err)
+		}
+
+		if diff := cmp.Diff(
+			`users "alice" is forbidden: User "bob" cannot impersonate resource "users" in API group "" at the cluster scope`,
+			err.Error(),
+		); diff != "" {
+			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
+		}
+
+		// with legacy impersonation permission added, bob can list pods
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "bob", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate"},
+			APIGroups: []string{""},
+			Resources: []string{"users"},
+		})
+
+		_, err = client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("expected no error, got %T %v", err, err)
+		}
+	})
+
+	t.Run("serviceaccount impersonating a node", func(t *testing.T) {
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:serviceaccount:default:sa1", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate:associated-node"},
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"nodes"},
+		})
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:serviceaccount:default:sa1", rbacv1.PolicyRule{
+			Verbs:     []string{"impersonate-on:associated-node:list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		})
+
+		impersonatorClientConfig := rest.CopyConfig(kubeConfig)
+		impersonatorClientConfig.BearerToken = "serviceaccount1"
+		impersonatorClientConfig.Impersonate = rest.ImpersonationConfig{
+			UserName: "system:node:node1",
+		}
+
+		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
+		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if !errors.IsForbidden(err) {
+			t.Fatalf("expected forbidden error, got %T %v", err, err)
+		}
+
+		if diff := cmp.Diff(
+			`users "system:node:node1" is forbidden: User "system:serviceaccount:default:sa1" cannot impersonate resource "users" in API group "" at the cluster scope`,
+			err.Error(),
+		); diff != "" {
+			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
+		}
+
+		// with legacy impersonation permission added, sa can list pods
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:serviceaccount:default:sa1", rbacv1.PolicyRule{
+			Verbs:         []string{"impersonate"},
+			APIGroups:     []string{""},
+			Resources:     []string{"users"},
+			ResourceNames: []string{"system:node:node1"},
+		})
+		authutil.GrantUserAuthorization(t, ctx, superuserClient, "system:serviceaccount:default:sa1", rbacv1.PolicyRule{
+			Verbs:         []string{"impersonate"},
+			APIGroups:     []string{""},
+			Resources:     []string{"groups"},
+			ResourceNames: []string{"system:nodes"},
+		})
+
+		_, err = client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("expected no error, got %T %v", err, err)
 		}
 	})
 }
@@ -1567,4 +1954,49 @@ func newTestWebhookTokenAuthServer() *httptest.Server {
 	server := httptest.NewUnstartedServer(http.HandlerFunc(serveHTTP))
 	server.Start()
 	return server
+}
+
+func TestSloppySANCertificates(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// append to opts.Authentication.ClientCert.ClientCA
+			fmt.Println(opts.Authentication.ClientCert.ClientCA)
+			caData, err := os.ReadFile(opts.Authentication.ClientCert.ClientCA)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sloppyCAData, err := os.ReadFile("testdata/sloppy-san-root.pem")
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = os.WriteFile(opts.Authentication.ClientCert.ClientCA, []byte(string(caData)+"\n"+string(sloppyCAData)), os.FileMode(0644))
+			if err != nil {
+				t.Fatal(err)
+			}
+		},
+	})
+	defer tearDownFn()
+
+	var err error
+	kubeConfig = rest.AnonymousClientConfig(kubeConfig)
+	kubeConfig.CertData, err = os.ReadFile("testdata/sloppy-san-client.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kubeConfig.KeyData, err = os.ReadFile("testdata/sloppy-san-client-key.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := clientset.NewForConfig(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := c.AuthenticationV1().SelfSubjectReviews().Create(tCtx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status.UserInfo.Username != "sloppy-san-client" {
+		t.Fatalf("expected sloppy-san-client, got %#v", r.Status.UserInfo)
+	}
 }

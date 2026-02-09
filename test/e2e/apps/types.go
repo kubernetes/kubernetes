@@ -22,16 +22,12 @@ import (
 
 // NOTE(claudiub): These constants should NOT be used as Pod Container Images.
 const (
-	WebserverImageName = "httpd"
-	AgnhostImageName   = "agnhost"
+	AgnhostImageName = "agnhost"
 )
 
 var (
-	// WebserverImage is the fully qualified URI to the Httpd image
-	WebserverImage = imageutils.GetE2EImage(imageutils.Httpd)
-
-	// NewWebserverImage is the fully qualified URI to the HttpdNew image
-	NewWebserverImage = imageutils.GetE2EImage(imageutils.HttpdNew)
+	// PrevAgnhostImage is the fully qualified URI to the AgnhostPrev image
+	PrevAgnhostImage = imageutils.GetE2EImage(imageutils.AgnhostPrev)
 
 	// AgnhostImage is the fully qualified URI to the Agnhost image
 	AgnhostImage = imageutils.GetE2EImage(imageutils.Agnhost)

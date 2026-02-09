@@ -93,7 +93,7 @@ func (scd *sequentialSignalChannelData) bufferSignals() {
 	var queue []*Signal
 	for {
 		if len(queue) == 0 {
-			signal, ok := <- scd.in
+			signal, ok := <-scd.in
 			if !ok {
 				return
 			}

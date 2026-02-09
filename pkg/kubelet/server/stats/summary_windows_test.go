@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -24,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/randfill"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +54,7 @@ func TestSummaryProvider(t *testing.T) {
 	assert := assert.New(t)
 
 	mockStatsProvider := statstest.NewMockProvider(t)
-	mockStatsProvider.EXPECT().GetNode().Return(node, nil).Maybe()
+	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil).Maybe()
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig).Maybe()
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot).Maybe()
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
@@ -79,27 +78,32 @@ func TestSummaryProvider(t *testing.T) {
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ContainerFs: imageFsStats, ImageFs: imageFsStats})
 
-	assert.Equal(len(summary.Node.SystemContainers), 1)
+	assert.NoError(err)
+	assert.Equal(len(summary.Node.SystemContainers), 2)
 	assert.Equal(summary.Node.SystemContainers[0].Name, "pods")
 	assert.Equal(summary.Node.SystemContainers[0].CPU.UsageCoreNanoSeconds, podStats[0].CPU.UsageCoreNanoSeconds)
 	assert.Equal(summary.Node.SystemContainers[0].CPU.UsageNanoCores, podStats[0].CPU.UsageNanoCores)
 	assert.Equal(summary.Node.SystemContainers[0].Memory.WorkingSetBytes, podStats[0].Memory.WorkingSetBytes)
 	assert.Equal(summary.Node.SystemContainers[0].Memory.UsageBytes, podStats[0].Memory.UsageBytes)
 	assert.Equal(summary.Node.SystemContainers[0].Memory.AvailableBytes, podStats[0].Memory.AvailableBytes)
+	assert.Equal(summary.Node.SystemContainers[1].Name, statsapi.SystemContainerWindowsGlobalCommitMemory)
+	assert.NotEqual(nil, summary.Node.SystemContainers[1].Memory)
+	assert.NotEqual(nil, summary.Node.SystemContainers[1].Memory.AvailableBytes)
+	assert.NotEqual(nil, summary.Node.SystemContainers[1].Memory.UsageBytes)
 	assert.Equal(summary.Pods, podStats)
 }
 
 func getFsStats() *statsapi.FsStats {
-	f := fuzz.New().NilChance(0)
+	f := randfill.New().NilChance(0)
 	v := &statsapi.FsStats{}
-	f.Fuzz(v)
+	f.Fill(v)
 	return v
 }
 
 func getContainerStats() *statsapi.ContainerStats {
-	f := fuzz.New().NilChance(0)
+	f := randfill.New().NilChance(0)
 	v := &statsapi.ContainerStats{}
-	f.Fuzz(v)
+	f.Fill(v)
 	return v
 }
 

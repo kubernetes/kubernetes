@@ -13,8 +13,9 @@ const (
 	SizeofXfrmAlgoAuth       = 0x48
 	SizeofXfrmAlgoAEAD       = 0x48
 	SizeofXfrmEncapTmpl      = 0x18
-	SizeofXfrmUsersaFlush    = 0x8
+	SizeofXfrmUsersaFlush    = 0x1
 	SizeofXfrmReplayStateEsn = 0x18
+	SizeofXfrmReplayState    = 0x0c
 )
 
 const (
@@ -26,6 +27,11 @@ const (
 	XFRM_STATE_AF_UNSPEC  = 32
 	XFRM_STATE_ALIGN4     = 64
 	XFRM_STATE_ESN        = 128
+)
+
+const (
+	XFRM_SA_XFLAG_DONT_ENCAP_DSCP = 1
+	XFRM_SA_XFLAG_OSEQ_MAY_WRAP   = 2
 )
 
 // struct xfrm_usersa_id {
@@ -103,6 +109,7 @@ func (msg *XfrmStats) Serialize() []byte {
 // };
 //
 // #define XFRM_SA_XFLAG_DONT_ENCAP_DSCP 1
+// #define XFRM_SA_XFLAG_OSEQ_MAY_WRAP   2
 //
 
 type XfrmUsersaInfo struct {
@@ -331,4 +338,24 @@ type XfrmReplayStateEsn struct {
 func (msg *XfrmReplayStateEsn) Serialize() []byte {
 	// We deliberately do not pass Bmp, as it gets set by the kernel.
 	return (*(*[SizeofXfrmReplayStateEsn]byte)(unsafe.Pointer(msg)))[:]
+}
+
+// struct xfrm_replay_state {
+//     __u32   oseq;
+//     __u32   seq;
+//     __u32   bitmap;
+// };
+
+type XfrmReplayState struct {
+	OSeq   uint32
+	Seq    uint32
+	BitMap uint32
+}
+
+func DeserializeXfrmReplayState(b []byte) *XfrmReplayState {
+	return (*XfrmReplayState)(unsafe.Pointer(&b[0:SizeofXfrmReplayState][0]))
+}
+
+func (msg *XfrmReplayState) Serialize() []byte {
+	return (*(*[SizeofXfrmReplayState]byte)(unsafe.Pointer(msg)))[:]
 }

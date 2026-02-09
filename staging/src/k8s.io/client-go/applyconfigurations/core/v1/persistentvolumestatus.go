@@ -19,17 +19,26 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PersistentVolumeStatusApplyConfiguration represents a declarative configuration of the PersistentVolumeStatus type for use
 // with apply.
+//
+// PersistentVolumeStatus is the current status of a persistent volume.
 type PersistentVolumeStatusApplyConfiguration struct {
-	Phase                   *v1.PersistentVolumePhase `json:"phase,omitempty"`
-	Message                 *string                   `json:"message,omitempty"`
-	Reason                  *string                   `json:"reason,omitempty"`
-	LastPhaseTransitionTime *metav1.Time              `json:"lastPhaseTransitionTime,omitempty"`
+	// phase indicates if a volume is available, bound to a claim, or released by a claim.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase
+	Phase *corev1.PersistentVolumePhase `json:"phase,omitempty"`
+	// message is a human-readable message indicating details about why the volume is in this state.
+	Message *string `json:"message,omitempty"`
+	// reason is a brief CamelCase string that describes any failure and is meant
+	// for machine parsing and tidy display in the CLI.
+	Reason *string `json:"reason,omitempty"`
+	// lastPhaseTransitionTime is the time the phase transitioned from one to another
+	// and automatically resets to current time everytime a volume phase transitions.
+	LastPhaseTransitionTime *metav1.Time `json:"lastPhaseTransitionTime,omitempty"`
 }
 
 // PersistentVolumeStatusApplyConfiguration constructs a declarative configuration of the PersistentVolumeStatus type for use with
@@ -41,7 +50,7 @@ func PersistentVolumeStatus() *PersistentVolumeStatusApplyConfiguration {
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Phase field is set to the value of the last call.
-func (b *PersistentVolumeStatusApplyConfiguration) WithPhase(value v1.PersistentVolumePhase) *PersistentVolumeStatusApplyConfiguration {
+func (b *PersistentVolumeStatusApplyConfiguration) WithPhase(value corev1.PersistentVolumePhase) *PersistentVolumeStatusApplyConfiguration {
 	b.Phase = &value
 	return b
 }

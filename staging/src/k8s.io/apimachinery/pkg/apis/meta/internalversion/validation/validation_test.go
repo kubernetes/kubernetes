@@ -21,13 +21,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateListOptions(t *testing.T) {
-	boolPtrFn := func(b bool) *bool {
-		return &b
-	}
-
 	cases := []struct {
 		name                    string
 		opts                    internalversion.ListOptions
@@ -65,7 +62,7 @@ func TestValidateListOptions(t *testing.T) {
 	}, {
 		name: "list-sendInitialEvents-forbidden",
 		opts: internalversion.ListOptions{
-			SendInitialEvents: boolPtrFn(true),
+			SendInitialEvents: ptr.To(true),
 		},
 		expectErrors: []string{"sendInitialEvents: Forbidden: sendInitialEvents is forbidden for list"},
 	}, {
@@ -77,7 +74,7 @@ func TestValidateListOptions(t *testing.T) {
 		name: "valid-watch-sendInitialEvents-on",
 		opts: internalversion.ListOptions{
 			Watch:                true,
-			SendInitialEvents:    boolPtrFn(true),
+			SendInitialEvents:    ptr.To(true),
 			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 			AllowWatchBookmarks:  true,
 		},
@@ -86,7 +83,7 @@ func TestValidateListOptions(t *testing.T) {
 		name: "valid-watch-sendInitialEvents-off",
 		opts: internalversion.ListOptions{
 			Watch:                true,
-			SendInitialEvents:    boolPtrFn(false),
+			SendInitialEvents:    ptr.To(false),
 			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 			AllowWatchBookmarks:  true,
 		},
@@ -102,14 +99,14 @@ func TestValidateListOptions(t *testing.T) {
 		name: "watch-sendInitialEvents-without-resourceversionmatch-forbidden",
 		opts: internalversion.ListOptions{
 			Watch:             true,
-			SendInitialEvents: boolPtrFn(true),
+			SendInitialEvents: ptr.To(true),
 		},
 		expectErrors: []string{"resourceVersionMatch: Forbidden: sendInitialEvents requires setting resourceVersionMatch to NotOlderThan", "sendInitialEvents: Forbidden: sendInitialEvents is forbidden for watch unless the WatchList feature gate is enabled"},
 	}, {
 		name: "watch-sendInitialEvents-with-exact-resourceversionmatch-forbidden",
 		opts: internalversion.ListOptions{
 			Watch:                true,
-			SendInitialEvents:    boolPtrFn(true),
+			SendInitialEvents:    ptr.To(true),
 			ResourceVersionMatch: metav1.ResourceVersionMatchExact,
 			AllowWatchBookmarks:  true,
 		},
@@ -119,7 +116,7 @@ func TestValidateListOptions(t *testing.T) {
 		name: "watch-sendInitialEvents-on-with-empty-resourceversionmatch-forbidden",
 		opts: internalversion.ListOptions{
 			Watch:                true,
-			SendInitialEvents:    boolPtrFn(true),
+			SendInitialEvents:    ptr.To(true),
 			ResourceVersionMatch: "",
 		},
 		expectErrors: []string{"resourceVersionMatch: Forbidden: sendInitialEvents requires setting resourceVersionMatch to NotOlderThan", "sendInitialEvents: Forbidden: sendInitialEvents is forbidden for watch unless the WatchList feature gate is enabled"},
@@ -127,7 +124,7 @@ func TestValidateListOptions(t *testing.T) {
 		name: "watch-sendInitialEvents-off-with-empty-resourceversionmatch-forbidden",
 		opts: internalversion.ListOptions{
 			Watch:                true,
-			SendInitialEvents:    boolPtrFn(false),
+			SendInitialEvents:    ptr.To(false),
 			ResourceVersionMatch: "",
 		},
 		expectErrors: []string{"resourceVersionMatch: Forbidden: sendInitialEvents requires setting resourceVersionMatch to NotOlderThan", "sendInitialEvents: Forbidden: sendInitialEvents is forbidden for watch unless the WatchList feature gate is enabled"},
@@ -135,7 +132,7 @@ func TestValidateListOptions(t *testing.T) {
 		name: "watch-sendInitialEvents-with-incorrect-resourceversionmatch-forbidden",
 		opts: internalversion.ListOptions{
 			Watch:                true,
-			SendInitialEvents:    boolPtrFn(true),
+			SendInitialEvents:    ptr.To(true),
 			ResourceVersionMatch: "incorrect",
 			AllowWatchBookmarks:  true,
 		},
@@ -147,7 +144,7 @@ func TestValidateListOptions(t *testing.T) {
 		name: "watch-sendInitialEvents-no-allowWatchBookmark",
 		opts: internalversion.ListOptions{
 			Watch:                true,
-			SendInitialEvents:    boolPtrFn(true),
+			SendInitialEvents:    ptr.To(true),
 			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 		},
 		watchListFeatureEnabled: true,
@@ -155,7 +152,7 @@ func TestValidateListOptions(t *testing.T) {
 		name: "watch-sendInitialEvents-no-watchlist-fg-disabled",
 		opts: internalversion.ListOptions{
 			Watch:                true,
-			SendInitialEvents:    boolPtrFn(true),
+			SendInitialEvents:    ptr.To(true),
 			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 			AllowWatchBookmarks:  true,
 		},
@@ -164,7 +161,7 @@ func TestValidateListOptions(t *testing.T) {
 		name: "watch-sendInitialEvents-no-watchlist-fg-disabled",
 		opts: internalversion.ListOptions{
 			Watch:                true,
-			SendInitialEvents:    boolPtrFn(true),
+			SendInitialEvents:    ptr.To(true),
 			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 			AllowWatchBookmarks:  true,
 			Continue:             "123",

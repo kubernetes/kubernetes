@@ -22,7 +22,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -32,14 +32,14 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*v1beta1.Deployment)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*v1beta1.DeploymentList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*v1beta1.StatefulSet)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*v1beta1.StatefulSetList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta1.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*appsv1beta1.Deployment)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta1.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*appsv1beta1.DeploymentList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta1.StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*appsv1beta1.StatefulSet)) })
+	scheme.AddTypeDefaultingFunc(&appsv1beta1.StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*appsv1beta1.StatefulSetList)) })
 	return nil
 }
 
-func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
+func SetObjectDefaults_Deployment(in *appsv1beta1.Deployment) {
 	SetDefaults_Deployment(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -145,6 +145,12 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 				if b.ValueFrom.FieldRef != nil {
 					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -212,6 +218,12 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -281,6 +293,12 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 				if b.ValueFrom.FieldRef != nil {
 					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
@@ -335,16 +353,20 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
-func SetObjectDefaults_DeploymentList(in *v1beta1.DeploymentList) {
+func SetObjectDefaults_DeploymentList(in *appsv1beta1.DeploymentList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Deployment(a)
 	}
 }
 
-func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
+func SetObjectDefaults_StatefulSet(in *appsv1beta1.StatefulSet) {
 	SetDefaults_StatefulSet(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -450,6 +472,12 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 				if b.ValueFrom.FieldRef != nil {
 					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -517,6 +545,12 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -586,6 +620,12 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 				if b.ValueFrom.FieldRef != nil {
 					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
@@ -640,6 +680,10 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
 		corev1.SetDefaults_PersistentVolumeClaim(a)
@@ -651,7 +695,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 	}
 }
 
-func SetObjectDefaults_StatefulSetList(in *v1beta1.StatefulSetList) {
+func SetObjectDefaults_StatefulSetList(in *appsv1beta1.StatefulSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_StatefulSet(a)

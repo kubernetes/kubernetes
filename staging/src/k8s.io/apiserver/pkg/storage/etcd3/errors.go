@@ -17,7 +17,11 @@ limitations under the License.
 package etcd3
 
 import (
+	goerrors "errors"
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/storage"
 
 	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
@@ -29,6 +33,19 @@ func interpretWatchError(err error) error {
 	case err == etcdrpc.ErrCompacted:
 		return errors.NewResourceExpired("The resourceVersion for the provided watch is too old.")
 	}
+
+	var corruptobjDeletedErr *corruptObjectDeletedError
+	if goerrors.As(err, &corruptobjDeletedErr) {
+		return &errors.StatusError{
+			ErrStatus: metav1.Status{
+				Status:  metav1.StatusFailure,
+				Code:    http.StatusInternalServerError,
+				Reason:  metav1.StatusReasonStoreReadError,
+				Message: corruptobjDeletedErr.Error(),
+			},
+		}
+	}
+
 	return err
 }
 

@@ -23,10 +23,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gopkg.in/square/go-jose.v2/jwt"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	"k8s.io/apiserver/pkg/audit"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -176,7 +177,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	noderef := private.Kubernetes.Node
 	secref := private.Kubernetes.Secret
 	// Make sure service account still exists (name and UID)
-	serviceAccount, err := v.getter.GetServiceAccount(namespace, saref.Name)
+	serviceAccount, err := v.getter.GetServiceAccount(ctx, namespace, saref.Name)
 	if err != nil {
 		klog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, saref.Name, err)
 		return nil, err
@@ -193,7 +194,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 
 	if secref != nil {
 		// Make sure token hasn't been invalidated by deletion of the secret
-		secret, err := v.getter.GetSecret(namespace, secref.Name)
+		secret, err := v.getter.GetSecret(ctx, namespace, secref.Name)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve bound secret %s/%s for service account %s/%s: %v", namespace, secref.Name, namespace, saref.Name, err)
 			return nil, errors.New("service account token has been invalidated")
@@ -211,7 +212,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	var podName, podUID string
 	if podref != nil {
 		// Make sure token hasn't been invalidated by deletion of the pod
-		pod, err := v.getter.GetPod(namespace, podref.Name)
+		pod, err := v.getter.GetPod(ctx, namespace, podref.Name)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve bound pod %s/%s for service account %s/%s: %v", namespace, podref.Name, namespace, saref.Name, err)
 			return nil, errors.New("service account token has been invalidated")
@@ -243,7 +244,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 				return nil, fmt.Errorf("token is bound to a Node object but the %s feature gate is disabled", features.ServiceAccountTokenNodeBindingValidation)
 			}
 
-			node, err := v.getter.GetNode(noderef.Name)
+			node, err := v.getter.GetNode(ctx, noderef.Name)
 			if err != nil {
 				klog.V(4).Infof("Could not retrieve node object %q for service account %s/%s: %v", noderef.Name, namespace, saref.Name, err)
 				return nil, errors.New("service account token has been invalidated")
@@ -286,6 +287,6 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		PodUID:       podUID,
 		NodeName:     nodeName,
 		NodeUID:      nodeUID,
-		CredentialID: apiserverserviceaccount.CredentialIDForJTI(jti),
+		CredentialID: authenticationtokenjwt.CredentialIDForJTI(jti),
 	}, nil
 }

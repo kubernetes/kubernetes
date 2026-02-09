@@ -22,7 +22,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/flowcontrol/v1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,29 +30,29 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.FlowSchema{}, func(obj interface{}) { SetObjectDefaults_FlowSchema(obj.(*v1.FlowSchema)) })
-	scheme.AddTypeDefaultingFunc(&v1.FlowSchemaList{}, func(obj interface{}) { SetObjectDefaults_FlowSchemaList(obj.(*v1.FlowSchemaList)) })
-	scheme.AddTypeDefaultingFunc(&v1.PriorityLevelConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_PriorityLevelConfiguration(obj.(*v1.PriorityLevelConfiguration))
+	scheme.AddTypeDefaultingFunc(&flowcontrolv1.FlowSchema{}, func(obj interface{}) { SetObjectDefaults_FlowSchema(obj.(*flowcontrolv1.FlowSchema)) })
+	scheme.AddTypeDefaultingFunc(&flowcontrolv1.FlowSchemaList{}, func(obj interface{}) { SetObjectDefaults_FlowSchemaList(obj.(*flowcontrolv1.FlowSchemaList)) })
+	scheme.AddTypeDefaultingFunc(&flowcontrolv1.PriorityLevelConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_PriorityLevelConfiguration(obj.(*flowcontrolv1.PriorityLevelConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.PriorityLevelConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_PriorityLevelConfigurationList(obj.(*v1.PriorityLevelConfigurationList))
+	scheme.AddTypeDefaultingFunc(&flowcontrolv1.PriorityLevelConfigurationList{}, func(obj interface{}) {
+		SetObjectDefaults_PriorityLevelConfigurationList(obj.(*flowcontrolv1.PriorityLevelConfigurationList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_FlowSchema(in *v1.FlowSchema) {
+func SetObjectDefaults_FlowSchema(in *flowcontrolv1.FlowSchema) {
 	SetDefaults_FlowSchemaSpec(&in.Spec)
 }
 
-func SetObjectDefaults_FlowSchemaList(in *v1.FlowSchemaList) {
+func SetObjectDefaults_FlowSchemaList(in *flowcontrolv1.FlowSchemaList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_FlowSchema(a)
 	}
 }
 
-func SetObjectDefaults_PriorityLevelConfiguration(in *v1.PriorityLevelConfiguration) {
+func SetObjectDefaults_PriorityLevelConfiguration(in *flowcontrolv1.PriorityLevelConfiguration) {
 	if in.Spec.Limited != nil {
 		SetDefaults_LimitedPriorityLevelConfiguration(in.Spec.Limited)
 		if in.Spec.Limited.LimitResponse.Queuing != nil {
@@ -64,7 +64,7 @@ func SetObjectDefaults_PriorityLevelConfiguration(in *v1.PriorityLevelConfigurat
 	}
 }
 
-func SetObjectDefaults_PriorityLevelConfigurationList(in *v1.PriorityLevelConfigurationList) {
+func SetObjectDefaults_PriorityLevelConfigurationList(in *flowcontrolv1.PriorityLevelConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PriorityLevelConfiguration(a)

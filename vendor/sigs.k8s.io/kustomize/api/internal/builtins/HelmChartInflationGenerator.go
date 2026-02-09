@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"sigs.k8s.io/kustomize/api/resmap"
@@ -61,6 +62,9 @@ func (p *HelmChartInflationGeneratorPlugin) Config(
 	}
 	if len(h.GeneralConfig().HelmConfig.ApiVersions) != 0 {
 		p.HelmChart.ApiVersions = h.GeneralConfig().HelmConfig.ApiVersions
+	}
+	if h.GeneralConfig().HelmConfig.Debug {
+		p.HelmChart.Debug = h.GeneralConfig().HelmConfig.Debug
 	}
 
 	p.h = h
@@ -168,13 +172,18 @@ func (p *HelmChartInflationGeneratorPlugin) runHelmCommand(
 		fmt.Sprintf("HELM_DATA_HOME=%s/.data", p.ConfigHome)}
 	cmd.Env = append(os.Environ(), env...)
 	err := cmd.Run()
+	errorOutput := stderr.String()
+	if slices.Contains(args, "--debug") {
+		errorOutput = " Helm stack trace:\n" + errorOutput + "\nHelm template:\n" + stdout.String() + "\n"
+	}
 	if err != nil {
 		helm := p.h.GeneralConfig().HelmConfig.Command
+		//nolint:govet
 		err = errors.WrapPrefixf(
 			fmt.Errorf(
 				"unable to run: '%s %s' with env=%s (is '%s' installed?): %w",
 				helm, strings.Join(args, " "), env, helm, err),
-			stderr.String(),
+			errorOutput,
 		)
 	}
 	return stdout.Bytes(), err
@@ -292,7 +301,7 @@ func (p *HelmChartInflationGeneratorPlugin) Generate() (rm resmap.ResMap, err er
 	}
 	// try to remove the contents before first "---" because
 	// helm may produce messages to stdout before it
-	r := &kio.ByteReader{Reader: bytes.NewBufferString(string(stdout)), OmitReaderAnnotations: true}
+	r := &kio.ByteReader{Reader: bytes.NewBuffer(stdout), OmitReaderAnnotations: true}
 	nodes, err := r.Read()
 	if err != nil {
 		return nil, fmt.Errorf("error reading helm output: %w", err)
@@ -327,6 +336,9 @@ func (p *HelmChartInflationGeneratorPlugin) pullCommand() []string {
 
 	if p.Version != "" {
 		args = append(args, "--version", p.Version)
+	}
+	if p.Devel {
+		args = append(args, "--devel")
 	}
 	return args
 }

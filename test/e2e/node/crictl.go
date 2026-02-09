@@ -35,7 +35,7 @@ var _ = SIGDescribe("crictl", func() {
 
 	ginkgo.BeforeEach(func() {
 		// `crictl` is not available on all cloud providers.
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 	})
 
 	ginkgo.It("should be able to run crictl on the node", func(ctx context.Context) {

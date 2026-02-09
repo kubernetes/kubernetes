@@ -44,7 +44,7 @@ import (
 	"k8s.io/endpointslice/topologycache"
 	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -189,12 +189,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       pointer.Bool(true),
-							Serving:     pointer.Bool(true),
-							Terminating: pointer.Bool(false),
+							Ready:       ptr.To(true),
+							Serving:     ptr.To(true),
+							Terminating: ptr.To(false),
 						},
-						Zone:     pointer.String("us-central1-a"),
-						NodeName: pointer.String("node-1"),
+						Zone:     ptr.To("us-central1-a"),
+						NodeName: ptr.To("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -215,12 +215,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       pointer.Bool(true),
-							Serving:     pointer.Bool(true),
-							Terminating: pointer.Bool(false),
+							Ready:       ptr.To(true),
+							Serving:     ptr.To(true),
+							Terminating: ptr.To(false),
 						},
-						Zone:     pointer.String("us-central1-a"),
-						NodeName: pointer.String("node-1"),
+						Zone:     ptr.To("us-central1-a"),
+						NodeName: ptr.To("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -242,12 +242,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       pointer.Bool(true),
-							Serving:     pointer.Bool(true),
-							Terminating: pointer.Bool(false),
+							Ready:       ptr.To(true),
+							Serving:     ptr.To(true),
+							Terminating: ptr.To(false),
 						},
-						Zone:     pointer.String("us-central1-a"),
-						NodeName: pointer.String("node-1"),
+						Zone:     ptr.To("us-central1-a"),
+						NodeName: ptr.To("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -260,12 +260,12 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
-				Zone:     pointer.String("us-central1-a"),
-				NodeName: pointer.String("node-1"),
+				Zone:     ptr.To("us-central1-a"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -284,12 +284,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       pointer.Bool(true),
-							Serving:     pointer.Bool(true),
-							Terminating: pointer.Bool(false),
+							Ready:       ptr.To(true),
+							Serving:     ptr.To(true),
+							Terminating: ptr.To(false),
 						},
-						Zone:     pointer.String("us-central1-a"),
-						NodeName: pointer.String("node-1"),
+						Zone:     ptr.To("us-central1-a"),
+						NodeName: ptr.To("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -302,12 +302,12 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
-				Zone:     pointer.String("us-central1-a"),
-				NodeName: pointer.String("node-1"),
+				Zone:     ptr.To("us-central1-a"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -328,12 +328,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       pointer.Bool(true),
-							Serving:     pointer.Bool(true),
-							Terminating: pointer.Bool(false),
+							Ready:       ptr.To(true),
+							Serving:     ptr.To(true),
+							Terminating: ptr.To(false),
 						},
-						Zone:     pointer.String("us-central1-a"),
-						NodeName: pointer.String("node-1"),
+						Zone:     ptr.To("us-central1-a"),
+						NodeName: ptr.To("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -346,12 +346,12 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
-				Zone:     pointer.String("us-central1-a"),
-				NodeName: pointer.String("node-1"),
+				Zone:     ptr.To("us-central1-a"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -370,14 +370,14 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv6: {
 					{
-						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
+						Addresses: []string{"1234::5678:0:0:9abc:def0"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       pointer.Bool(true),
-							Serving:     pointer.Bool(true),
-							Terminating: pointer.Bool(false),
+							Ready:       ptr.To(true),
+							Serving:     ptr.To(true),
+							Terminating: ptr.To(false),
 						},
-						Zone:     pointer.String("us-central1-a"),
-						NodeName: pointer.String("node-1"),
+						Zone:     ptr.To("us-central1-a"),
+						NodeName: ptr.To("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -398,14 +398,14 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv6: {
 					{
-						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
+						Addresses: []string{"1234::5678:0:0:9abc:def0"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       pointer.Bool(true),
-							Serving:     pointer.Bool(true),
-							Terminating: pointer.Bool(false),
+							Ready:       ptr.To(true),
+							Serving:     ptr.To(true),
+							Terminating: ptr.To(false),
 						},
-						Zone:     pointer.String("us-central1-a"),
-						NodeName: pointer.String("node-1"),
+						Zone:     ptr.To("us-central1-a"),
+						NodeName: ptr.To("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -425,14 +425,14 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv6: {
 					{
-						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
+						Addresses: []string{"1234::5678:0:0:9abc:def0"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       pointer.Bool(true),
-							Serving:     pointer.Bool(true),
-							Terminating: pointer.Bool(false),
+							Ready:       ptr.To(true),
+							Serving:     ptr.To(true),
+							Terminating: ptr.To(false),
 						},
-						Zone:     pointer.String("us-central1-a"),
-						NodeName: pointer.String("node-1"),
+						Zone:     ptr.To("us-central1-a"),
+						NodeName: ptr.To("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -444,12 +444,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       pointer.Bool(true),
-							Serving:     pointer.Bool(true),
-							Terminating: pointer.Bool(false),
+							Ready:       ptr.To(true),
+							Serving:     ptr.To(true),
+							Terminating: ptr.To(false),
 						},
-						Zone:     pointer.String("us-central1-a"),
-						NodeName: pointer.String("node-1"),
+						Zone:     ptr.To("us-central1-a"),
+						NodeName: ptr.To("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -580,7 +580,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 			if tc.existing != nil {
 				existingSlices = append(existingSlices, tc.existing)
 				_, createErr := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), tc.existing, metav1.CreateOptions{})
-				assert.Nil(t, createErr, "Expected no error creating endpoint slice")
+				assert.NoError(t, createErr, "Expected no error creating endpoint slice")
 			}
 
 			numActionsBefore := len(client.Actions())
@@ -700,7 +700,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 	// start with 50 pods, 1/3 not ready
 	pods := []*corev1.Pod{}
 	for i := 0; i < 50; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -734,7 +734,7 @@ func TestReconcileManyPods(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -767,7 +767,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -823,7 +823,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	// start with 300 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 300; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -869,7 +869,7 @@ func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -902,7 +902,7 @@ func TestReconcileEndpointSlicesServicesLabelsUpdating(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -946,7 +946,7 @@ func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -980,7 +980,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	// start with 300 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 300; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -1227,7 +1227,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	// start with 300 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 300; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		portOffset := i % 5
 		pod := newPod(i, namespace, ready, 1, false)
 		pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{
@@ -1252,14 +1252,13 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	expectUnorderedSlicesWithLengths(t, fetchedSlices, []int{60, 60, 60, 60, 60})
 
 	// generate data structures for expected slice ports and address types
-	protoTCP := corev1.ProtocolTCP
 	expectedSlices := []discovery.EndpointSlice{}
 	for i := range fetchedSlices {
 		expectedSlices = append(expectedSlices, discovery.EndpointSlice{
 			Ports: []discovery.EndpointPort{{
-				Name:     pointer.String(""),
-				Protocol: &protoTCP,
-				Port:     pointer.Int32(int32(8080 + i)),
+				Name:     ptr.To(""),
+				Protocol: ptr.To(corev1.ProtocolTCP),
+				Port:     ptr.To[int32](int32(8080 + i)),
 			}},
 			AddressType: discovery.AddressTypeIPv4,
 		})
@@ -1278,7 +1277,7 @@ func TestReconcileMaxEndpointsPerSlice(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -2017,23 +2016,23 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		name string
 		desc string
 
-		trafficDistributionFeatureGateEnabled bool
-		trafficDistribution                   string
-		topologyAnnotation                    string
+		preferSameFeatureGateEnabled bool
+		trafficDistribution          *string
+		topologyAnnotation           string
 
-		// Defines how many hints belong to a particular zone.
+		// Defines how many hints belong to a particular zone/node
 		wantHintsDistributionByZone map[string]int
+		wantHintsDistributionByNode map[string]int
 		// Number of endpoints where the zone hints are different from the zone of
 		// the endpoint itself.
 		wantEndpointsWithCrossZoneHints int
 		wantMetrics                     expectedMetrics
 	}{
 		{
-			name:                                  "trafficDistribution=PreferClose, topologyAnnotation=Disabled",
-			desc:                                  "When trafficDistribution is enabled and topologyAnnotation is disabled, hints should be distributed as per the trafficDistribution field",
-			trafficDistributionFeatureGateEnabled: true,
-			trafficDistribution:                   corev1.ServiceTrafficDistributionPreferClose,
-			topologyAnnotation:                    "Disabled",
+			name:                "trafficDistribution=PreferClose, topologyAnnotation=Disabled",
+			desc:                "When trafficDistribution is enabled and topologyAnnotation is disabled, hints should be distributed as per the trafficDistribution field",
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
+			topologyAnnotation:  "Disabled",
 			wantHintsDistributionByZone: map[string]int{
 				"zone-a": 1, // {pod-0}
 				"zone-b": 3, // {pod-1, pod-2, pod-3}
@@ -2057,32 +2056,10 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "feature gate disabled; trafficDistribution=PreferClose, topologyAnnotation=Disabled",
-			desc:                                  "When feature gate is disabled, trafficDistribution should be ignored",
-			trafficDistributionFeatureGateEnabled: false,
-			trafficDistribution:                   corev1.ServiceTrafficDistributionPreferClose,
-			topologyAnnotation:                    "Disabled",
-			wantHintsDistributionByZone:           map[string]int{"": 6}, // Equivalent to no hints.
-			wantMetrics: expectedMetrics{
-				desiredSlices:                   1,
-				actualSlices:                    1,
-				desiredEndpoints:                6,
-				addedPerSync:                    6,
-				removedPerSync:                  0,
-				numCreated:                      1,
-				numUpdated:                      0,
-				numDeleted:                      0,
-				slicesChangedPerSync:            1, // 1 means both topologyAnnotation and trafficDistribution were not used.
-				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
-				slicesChangedPerSyncTrafficDist: 0, // 0 means trafficDistribution was not used.
-			},
-		},
-		{
-			name:                                  "trafficDistribution=PreferClose, topologyAnnotation=Auto",
-			desc:                                  "When trafficDistribution and topologyAnnotation are both enabled, precedence should be given to topologyAnnotation",
-			trafficDistributionFeatureGateEnabled: true,
-			trafficDistribution:                   corev1.ServiceTrafficDistributionPreferClose,
-			topologyAnnotation:                    "Auto",
+			name:                "trafficDistribution=PreferClose, topologyAnnotation=Auto",
+			desc:                "When trafficDistribution and topologyAnnotation are both enabled, precedence should be given to topologyAnnotation",
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
+			topologyAnnotation:  "Auto",
 			wantHintsDistributionByZone: map[string]int{
 				"zone-a": 2, // {pod-0, pod-3} (pod-3 is just an example, it could have also been either of the other two)
 				"zone-b": 2, // {pod-1, pod-2}
@@ -2104,12 +2081,11 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "trafficDistribution=<empty>, topologyAnnotation=<empty>",
-			desc:                                  "When trafficDistribution and topologyAnnotation are both disabled, no hints should be added, but the servicesCountByTrafficDistribution metric should reflect this",
-			trafficDistributionFeatureGateEnabled: true,
-			trafficDistribution:                   "",
-			topologyAnnotation:                    "",
-			wantHintsDistributionByZone:           map[string]int{"": 6}, // Equivalent to no hints.
+			name:                        "trafficDistribution=nil, topologyAnnotation=<empty>",
+			desc:                        "When trafficDistribution and topologyAnnotation are both disabled, no hints should be added",
+			trafficDistribution:         nil,
+			topologyAnnotation:          "",
+			wantHintsDistributionByZone: map[string]int{"": 6}, // Equivalent to no hints.
 			wantMetrics: expectedMetrics{
 				desiredSlices:                   1,
 				actualSlices:                    1,
@@ -2122,9 +2098,60 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 				slicesChangedPerSync:            1, // 1 means both topologyAnnotation and trafficDistribution were not used.
 				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
 				slicesChangedPerSyncTrafficDist: 0, // 0 means trafficDistribution was not used.
+			},
+		},
+		{
+			name:                         "trafficDistribution=PreferSameNode, PSTD enabled",
+			desc:                         "When trafficDistribution is PreferSameNode and PreferSameTrafficDistribution is enabled, both zone and node hints should be filled out",
+			preferSameFeatureGateEnabled: true,
+			trafficDistribution:          ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
+			topologyAnnotation:           "Disabled",
+			wantHintsDistributionByZone: map[string]int{
+				"zone-a": 1, // {pod-0}
+				"zone-b": 3, // {pod-1, pod-2, pod-3}
+				"zone-c": 2, // {pod-4, pod-5}
+			},
+			wantHintsDistributionByNode: map[string]int{
+				"node-0": 1, // {pod-0}
+				"node-1": 3, // {pod-1, pod-2, pod-3}
+				"node-2": 2, // {pod-4, pod-5}
+			},
+			wantMetrics: expectedMetrics{
+				desiredSlices:                   1,
+				actualSlices:                    1,
+				desiredEndpoints:                6,
+				addedPerSync:                    6,
+				removedPerSync:                  0,
+				numCreated:                      1,
+				numUpdated:                      0,
+				numDeleted:                      0,
+				slicesChangedPerSync:            0, // 0 means either topologyAnnotation or trafficDistribution was used.
+				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
+				slicesChangedPerSyncTrafficDist: 1, // 1 EPS configured using trafficDistribution.
 				servicesCountByTrafficDistribution: map[string]int{
-					"ImplementationSpecific": 1,
+					"PreferSameNode": 1,
 				},
+			},
+		},
+		{
+			name:                         "trafficDistribution=PreferSameZone, PSTD disabled",
+			desc:                         "When trafficDistribution is PreferSameZone and PreferSameTrafficDistribution is disabled, no hints should be set",
+			preferSameFeatureGateEnabled: false,
+			trafficDistribution:          ptr.To(corev1.ServiceTrafficDistributionPreferSameZone),
+			topologyAnnotation:           "Disabled",
+			wantHintsDistributionByZone:  map[string]int{"": 6}, // Equivalent to no hints.
+			wantMetrics: expectedMetrics{
+				desiredSlices:                   1,
+				actualSlices:                    1,
+				desiredEndpoints:                6,
+				addedPerSync:                    6,
+				removedPerSync:                  0,
+				numCreated:                      1,
+				numUpdated:                      0,
+				numDeleted:                      0,
+				slicesChangedPerSync:            1, // 1 means both topologyAnnotation and trafficDistribution were not used.
+				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
+				slicesChangedPerSyncTrafficDist: 0, // 0 means trafficDistribution was not used.
 			},
 		},
 	}
@@ -2138,12 +2165,12 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			setupMetrics()
 
 			r := newReconciler(client, nodes, defaultMaxEndpointsPerSlice)
-			r.trafficDistributionEnabled = tc.trafficDistributionFeatureGateEnabled
+			r.preferSameTrafficDistribution = tc.preferSameFeatureGateEnabled
 			r.topologyCache = topologycache.NewTopologyCache()
 			r.topologyCache.SetNodes(logger, nodes)
 
 			service := svc.DeepCopy()
-			service.Spec.TrafficDistribution = &tc.trafficDistribution
+			service.Spec.TrafficDistribution = tc.trafficDistribution
 			service.Annotations = map[string]string{
 				corev1.DeprecatedAnnotationTopologyAwareHints: tc.topologyAnnotation,
 			}
@@ -2180,6 +2207,49 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			expectMetrics(t, tc.wantMetrics)
 		})
 	}
+}
+
+// TestReconcileHeadlessServiceNoPorts verifies that headless services with no ports
+// don't cause EndpointSlice churn. Validates fix for https://github.com/kubernetes/kubernetes/issues/133474
+func TestReconcileHeadlessServiceNoPorts(t *testing.T) {
+	namespace := "test"
+	client := newClientset()
+	setupMetrics()
+
+	svc := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "headless-no-ports",
+			Namespace: namespace,
+			UID:       "test-uid",
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP:  corev1.ClusterIPNone,
+			Selector:   map[string]string{"foo": "bar"},
+			IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
+		},
+	}
+
+	pod := newPod(1, namespace, true, 1, false)
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: pod.Spec.NodeName}}}, defaultMaxEndpointsPerSlice)
+
+	reconcileHelper(t, r, &svc, []*corev1.Pod{pod}, []*discovery.EndpointSlice{}, time.Now())
+	assert.Len(t, client.Actions(), 1, "Expected 1 additional clientset action")
+	expectActions(t, client.Actions(), 1, "create", "endpointslices")
+
+	var existingSlices []*discovery.EndpointSlice
+	for _, slice := range fetchEndpointSlices(t, client, namespace) {
+		copy := slice.DeepCopy()
+		// replicate API server behavior which serializes this empty slice as nil
+		copy.Ports = nil
+		existingSlices = append(existingSlices, copy)
+	}
+	assert.Len(t, existingSlices, 1, "Expected 1 endpoint slices")
+
+	reconcileHelper(t, r, &svc, []*corev1.Pod{pod}, existingSlices, time.Now())
+
+	assert.Len(t, client.Actions(), 2, "Expected second reconcile to only list")
+	expectActions(t, client.Actions(), 1, "list", "endpointslices")
 }
 
 // Test Helpers
@@ -2401,8 +2471,13 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 		t.Errorf("Expected slicesChangedPerSyncTopology to be %d, got %v", em.slicesChangedPerSyncTopology, actualSlicesChangedPerSyncTopology)
 	}
 
-	actualSlicesChangedPerSyncTrafficDist, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferClose"))
-	handleErr(t, err, "slicesChangedPerSyncTrafficDist")
+	actualSlicesChangedPreferClose, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferClose"))
+	handleErr(t, err, "slicesChangedPreferClose")
+	actualSlicesChangedPreferSameZone, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferSameZone"))
+	handleErr(t, err, "slicesChangedPreferSameZone")
+	actualSlicesChangedPreferSameNode, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferSameNode"))
+	handleErr(t, err, "slicesChangedPreferSameNode")
+	actualSlicesChangedPerSyncTrafficDist := actualSlicesChangedPreferClose + actualSlicesChangedPreferSameZone + actualSlicesChangedPreferSameNode
 	if actualSlicesChangedPerSyncTrafficDist != float64(em.slicesChangedPerSyncTrafficDist) {
 		t.Errorf("Expected slicesChangedPerSyncTrafficDist to be %d, got %v", em.slicesChangedPerSyncTrafficDist, actualSlicesChangedPerSyncTopology)
 	}

@@ -1,3 +1,8 @@
+> ⚠️ **This is an automatically published [staged repository](https://git.k8s.io/kubernetes/staging#external-repository-staging-area) for Kubernetes**.   
+> Contributions, including issues and pull requests, should be made to the main Kubernetes repository: [https://github.com/kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).  
+> This repository is read-only for importing, and not used for direct contributions.  
+> See [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
+
 # cri-client
 
 Container Runtime Interface client implementation
@@ -9,7 +14,7 @@ CRI is a plugin interface which enables kubelet to use a wide variety of contain
 without the need to recompile. CRI consists of a protocol buffers and gRPC API.
 Read more about CRI at [kubernetes docs](https://kubernetes.io/docs/concepts/architecture/cri/).
 
-The repository [kubernetes/cri-client](https://github.com/kubernetes/cri-api) is a mirror of https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cri-client.
+The repository [kubernetes/cri-client](https://github.com/kubernetes/cri-client) is a mirror of https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cri-client.
 Please do **not** file issues or submit PRs against the [kubernetes/cri-client](https://github.com/kubernetes/cri-client)
 repository as it is readonly, all development is done in [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).
 
@@ -34,7 +39,7 @@ You can reach the maintainers of this repository at:
 - Slack: #sig-node (on https://kubernetes.slack.com -- get an
   invite at [slack.kubernetes.io](https://slack.kubernetes.io))
 - Mailing List:
-  https://groups.google.com/forum/#!forum/kubernetes-sig-node
+  https://groups.google.com/a/kubernetes.io/g/sig-node
 
 ### Code of Conduct
 

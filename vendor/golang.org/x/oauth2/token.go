@@ -44,14 +44,21 @@ type Token struct {
 
 	// Expiry is the optional expiration time of the access token.
 	//
-	// If zero, TokenSource implementations will reuse the same
+	// If zero, [TokenSource] implementations will reuse the same
 	// token forever and RefreshToken or equivalent
 	// mechanisms for that TokenSource will not be used.
 	Expiry time.Time `json:"expiry,omitempty"`
 
+	// ExpiresIn is the OAuth2 wire format "expires_in" field,
+	// which specifies how many seconds later the token expires,
+	// relative to an unknown time base approximately around "now".
+	// It is the application's responsibility to populate
+	// `Expiry` from `ExpiresIn` when required.
+	ExpiresIn int64 `json:"expires_in,omitempty"`
+
 	// raw optionally contains extra metadata from the server
 	// when updating a token.
-	raw interface{}
+	raw any
 
 	// expiryDelta is used to calculate when a token is considered
 	// expired, by subtracting from Expiry. If zero, defaultExpiryDelta
@@ -79,16 +86,16 @@ func (t *Token) Type() string {
 // SetAuthHeader sets the Authorization header to r using the access
 // token in t.
 //
-// This method is unnecessary when using Transport or an HTTP Client
+// This method is unnecessary when using [Transport] or an HTTP Client
 // returned by this package.
 func (t *Token) SetAuthHeader(r *http.Request) {
 	r.Header.Set("Authorization", t.Type()+" "+t.AccessToken)
 }
 
-// WithExtra returns a new Token that's a clone of t, but using the
+// WithExtra returns a new [Token] that's a clone of t, but using the
 // provided raw extra map. This is only intended for use by packages
 // implementing derivative OAuth2 flows.
-func (t *Token) WithExtra(extra interface{}) *Token {
+func (t *Token) WithExtra(extra any) *Token {
 	t2 := new(Token)
 	*t2 = *t
 	t2.raw = extra
@@ -96,10 +103,10 @@ func (t *Token) WithExtra(extra interface{}) *Token {
 }
 
 // Extra returns an extra field.
-// Extra fields are key-value pairs returned by the server as a
+// Extra fields are key-value pairs returned by the server as
 // part of the token retrieval response.
-func (t *Token) Extra(key string) interface{} {
-	if raw, ok := t.raw.(map[string]interface{}); ok {
+func (t *Token) Extra(key string) any {
+	if raw, ok := t.raw.(map[string]any); ok {
 		return raw[key]
 	}
 
@@ -156,13 +163,14 @@ func tokenFromInternal(t *internal.Token) *Token {
 		TokenType:    t.TokenType,
 		RefreshToken: t.RefreshToken,
 		Expiry:       t.Expiry,
+		ExpiresIn:    t.ExpiresIn,
 		raw:          t.Raw,
 	}
 }
 
 // retrieveToken takes a *Config and uses that to retrieve an *internal.Token.
 // This token is then mapped from *internal.Token into an *oauth2.Token which is returned along
-// with an error..
+// with an error.
 func retrieveToken(ctx context.Context, c *Config, v url.Values) (*Token, error) {
 	tk, err := internal.RetrieveToken(ctx, c.ClientID, c.ClientSecret, c.Endpoint.TokenURL, v, internal.AuthStyle(c.Endpoint.AuthStyle), c.authStyleCache.Get())
 	if err != nil {

@@ -23,7 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 // waitingPodsMap a thread-safe map used to maintain pods waiting in the permit phase.
@@ -61,7 +61,7 @@ func (m *waitingPodsMap) get(uid types.UID) *waitingPod {
 }
 
 // iterate acquires a read lock and iterates over the WaitingPods map.
-func (m *waitingPodsMap) iterate(callback func(framework.WaitingPod)) {
+func (m *waitingPodsMap) iterate(callback func(fwk.WaitingPod)) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for _, v := range m.pods {
@@ -73,11 +73,12 @@ func (m *waitingPodsMap) iterate(callback func(framework.WaitingPod)) {
 type waitingPod struct {
 	pod            *v1.Pod
 	pendingPlugins map[string]*time.Timer
-	s              chan *framework.Status
+	s              chan *fwk.Status
 	mu             sync.RWMutex
+	done           bool
 }
 
-var _ framework.WaitingPod = &waitingPod{}
+var _ fwk.WaitingPod = &waitingPod{}
 
 // newWaitingPod returns a new waitingPod instance.
 func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *waitingPod {
@@ -87,7 +88,7 @@ func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *wa
 		// by using non-blocking send to this channel. This channel has a buffer of size 1
 		// to ensure that non-blocking send will not be ignored - possible situation when
 		// receiving from this channel happens after non-blocking send.
-		s: make(chan *framework.Status, 1),
+		s: make(chan *fwk.Status, 1),
 	}
 
 	wp.pendingPlugins = make(map[string]*time.Timer, len(pluginsMaxWaitTime))
@@ -141,15 +142,26 @@ func (w *waitingPod) Allow(pluginName string) {
 	}
 
 	// The select clause works as a non-blocking send.
-	// If there is no receiver, it's a no-op (default case).
+	// If there is no place in the buffer, it's a no-op (default case).
 	select {
-	case w.s <- framework.NewStatus(framework.Success, ""):
+	case w.s <- fwk.NewStatus(fwk.Success, ""):
 	default:
 	}
+	w.done = true
 }
 
 // Reject declares the waiting pod unschedulable.
-func (w *waitingPod) Reject(pluginName, msg string) {
+func (w *waitingPod) Reject(pluginName, msg string) bool {
+	return w.stopWithStatus(fwk.Unschedulable, pluginName, msg)
+}
+
+// Preempt declares the waiting pod is preempted. Compared to reject it does not mark the pod as unschedulable,
+// allowing it to be rescheduled.
+func (w *waitingPod) Preempt(pluginName, msg string) bool {
+	return w.stopWithStatus(fwk.Error, pluginName, msg)
+}
+
+func (w *waitingPod) stopWithStatus(status fwk.Code, pluginName, msg string) bool {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	for _, timer := range w.pendingPlugins {
@@ -157,9 +169,14 @@ func (w *waitingPod) Reject(pluginName, msg string) {
 	}
 
 	// The select clause works as a non-blocking send.
-	// If there is no receiver, it's a no-op (default case).
+	// If there is no place in the buffer, it's a no-op (default case).
 	select {
-	case w.s <- framework.NewStatus(framework.Unschedulable, msg).WithPlugin(pluginName):
+	case w.s <- fwk.NewStatus(status, msg).WithPlugin(pluginName):
 	default:
 	}
+	if w.done {
+		return false
+	}
+	w.done = true
+	return true
 }

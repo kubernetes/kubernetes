@@ -28,8 +28,10 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 	versioned "k8s.io/code-generator/examples/crd/clientset/versioned"
+	conflicting "k8s.io/code-generator/examples/crd/informers/externalversions/conflicting"
 	example "k8s.io/code-generator/examples/crd/informers/externalversions/example"
 	example2 "k8s.io/code-generator/examples/crd/informers/externalversions/example2"
+	extensions "k8s.io/code-generator/examples/crd/informers/externalversions/extensions"
 	internalinterfaces "k8s.io/code-generator/examples/crd/informers/externalversions/internalinterfaces"
 )
 
@@ -44,6 +46,7 @@ type sharedInformerFactory struct {
 	defaultResync    time.Duration
 	customResync     map[reflect.Type]time.Duration
 	transform        cache.TransformFunc
+	informerName     *cache.InformerName
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
@@ -90,6 +93,21 @@ func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 	}
 }
 
+// WithInformerName sets the InformerName for informer identity used in metrics.
+// The InformerName must be created via cache.NewInformerName() at startup,
+// which validates global uniqueness. Each informer type will register its
+// GVR under this name.
+func WithInformerName(informerName *cache.InformerName) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.informerName = informerName
+		return factory
+	}
+}
+
+func (f *sharedInformerFactory) InformerName() *cache.InformerName {
+	return f.informerName
+}
+
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
 func NewSharedInformerFactory(client versioned.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return NewSharedInformerFactoryWithOptions(client, defaultResync)
@@ -98,6 +116,7 @@ func NewSharedInformerFactory(client versioned.Interface, defaultResync time.Dur
 // NewFilteredSharedInformerFactory constructs a new instance of sharedInformerFactory.
 // Listers obtained via this SharedInformerFactory will be subject to the same filters
 // as specified here.
+//
 // Deprecated: Please use NewSharedInformerFactoryWithOptions instead
 func NewFilteredSharedInformerFactory(client versioned.Interface, defaultResync time.Duration, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerFactory {
 	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions))
@@ -153,6 +172,7 @@ func (f *sharedInformerFactory) Shutdown() {
 
 	// Will return immediately if there is nothing to wait for.
 	f.wg.Wait()
+	f.informerName.Release()
 }
 
 func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
@@ -205,7 +225,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 //
 // It is typically used like this:
 //
-//	ctx, cancel := context.Background()
+//	ctx, cancel := context.WithCancel(context.Background())
 //	defer cancel()
 //	factory := NewSharedInformerFactory(client, resyncPeriod)
 //	defer factory.WaitForStop()    // Returns immediately if nothing was started.
@@ -229,6 +249,7 @@ type SharedInformerFactory interface {
 
 	// Start initializes all requested informers. They are handled in goroutines
 	// which run until the stop channel gets closed.
+	// Warning: Start does not block. When run in a go-routine, it will race with a later WaitForCacheSync.
 	Start(stopCh <-chan struct{})
 
 	// Shutdown marks a factory as shutting down. At that point no new
@@ -254,8 +275,14 @@ type SharedInformerFactory interface {
 	// client.
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
 
+	ConflictingExample() conflicting.Interface
 	Example() example.Interface
 	SecondExample() example2.Interface
+	ExtensionsExample() extensions.Interface
+}
+
+func (f *sharedInformerFactory) ConflictingExample() conflicting.Interface {
+	return conflicting.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Example() example.Interface {
@@ -264,4 +291,8 @@ func (f *sharedInformerFactory) Example() example.Interface {
 
 func (f *sharedInformerFactory) SecondExample() example2.Interface {
 	return example2.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) ExtensionsExample() extensions.Interface {
+	return extensions.New(f, f.namespace, f.tweakListOptions)
 }

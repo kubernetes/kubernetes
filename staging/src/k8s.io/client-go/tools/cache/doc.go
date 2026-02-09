@@ -21,4 +21,4 @@ limitations under the License.
 // list currently available nodes), and one that additionally acts as
 // a FIFO queue (for example, to allow a scheduler to process incoming
 // pods).
-package cache // import "k8s.io/client-go/tools/cache"
+package cache

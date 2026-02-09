@@ -17,11 +17,12 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +41,7 @@ type testGenerator struct {
 	Err   error
 }
 
-func (t *testGenerator) GenerateToken(sc *jwt.Claims, pc interface{}) (string, error) {
+func (t *testGenerator) GenerateToken(ctx context.Context, sc *jwt.Claims, pc interface{}) (string, error) {
 	return t.Token, t.Err
 }
 
@@ -179,7 +180,6 @@ func TestTokenCreation(t *testing.T) {
 		UpdatedServiceAccount *v1.ServiceAccount
 		DeletedServiceAccount *v1.ServiceAccount
 		AddedSecret           *v1.Secret
-		AddedSecretLocal      *v1.Secret
 		UpdatedSecret         *v1.Secret
 		DeletedSecret         *v1.Secret
 
@@ -195,13 +195,6 @@ func TestTokenCreation(t *testing.T) {
 			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences())},
 
 			AddedServiceAccount: serviceAccount(missingSecretReferences()),
-			ExpectedActions:     []core.Action{},
-		},
-		"new serviceaccount with missing secrets and a local secret in the cache": {
-			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences())},
-
-			AddedServiceAccount: serviceAccount(tokenSecretReferences()),
-			AddedSecretLocal:    serviceAccountTokenSecret(),
 			ExpectedActions:     []core.Action{},
 		},
 		"new serviceaccount with non-token secrets": {
@@ -439,7 +432,7 @@ func TestTokenCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 
 			// Re-seed to reset name generation
 			utilrand.Seed(1)
@@ -454,7 +447,7 @@ func TestTokenCreation(t *testing.T) {
 			secretInformer := informers.Core().V1().Secrets().Informer()
 			secrets := secretInformer.GetStore()
 			serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-			controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+			controller, err := NewTokensController(logger, informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
 			if err != nil {
 				t.Fatalf("error creating Tokens controller: %v", err)
 			}
@@ -481,9 +474,6 @@ func TestTokenCreation(t *testing.T) {
 			if tc.AddedSecret != nil {
 				secrets.Add(tc.AddedSecret)
 				controller.queueSecretSync(tc.AddedSecret)
-			}
-			if tc.AddedSecretLocal != nil {
-				controller.updatedSecrets.Mutation(tc.AddedSecretLocal)
 			}
 			if tc.UpdatedSecret != nil {
 				secrets.Add(tc.UpdatedSecret)

@@ -17,4 +17,4 @@ limitations under the License.
 // Package object defines the utilities that are used by the webhook plugin to
 // decide if a webhook should run, as long as either the old object or the new
 // object has labels matching the webhook config's objectSelector.
-package object // import "k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
+package object

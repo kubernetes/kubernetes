@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -80,7 +82,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring at least two running jobs exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to list jobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
 		gomega.Expect(len(activeJobs)).To(gomega.BeNumerically(">=", 2))
 
@@ -109,7 +111,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring no job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to list jobs in namespace %s", f.Namespace.Name)
 		gomega.Expect(jobs.Items).To(gomega.BeEmpty())
 
 		ginkgo.By("Removing cronjob")
@@ -140,7 +142,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to list jobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
 		gomega.Expect(activeJobs).To(gomega.HaveLen(1))
 
@@ -213,7 +215,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring at least one running jobs exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to list jobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
 		gomega.Expect(activeJobs).ToNot(gomega.BeEmpty())
 
@@ -255,6 +257,31 @@ var _ = SIGDescribe("CronJob", func() {
 			}
 			return nil, nil
 		}))
+
+		ginkgo.By("Removing cronjob")
+		err = deleteCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name)
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
+	})
+
+	ginkgo.It("should set the cronjob-scheduled-timestamp annotation on a job", func(ctx context.Context) {
+		ginkgo.By("Creating a cronjob")
+		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1.AllowConcurrent,
+			nil, nil, nil)
+		cronJob, err := createCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob)
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring CronJobsScheduledAnnotation annotation exists on the newely created job")
+		err = waitForJobsAtLeast(ctx, f.ClientSet, f.Namespace.Name, 1)
+		framework.ExpectNoError(err, "Failed to ensure a job exists in namespace %s", f.Namespace.Name)
+
+		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err, "Failed to list jobs in namespace %s", f.Namespace.Name)
+		gomega.Expect(jobs.Items[0].Annotations).Should(gomega.HaveKey(batchv1.CronJobScheduledTimestampAnnotation),
+			"missing cronjob-scheduled-timestamp annotation")
+		ginkgo.By("Ensuring CronJobsScheduledAnnotation annotation parses to RFC3339")
+		timeAnnotation := jobs.Items[0].Annotations[batchv1.CronJobScheduledTimestampAnnotation]
+		_, err = time.Parse(time.RFC3339, timeAnnotation)
+		framework.ExpectNoError(err, "Failed to parse cronjob-scheduled-timestamp annotation: %q", timeAnnotation)
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -355,6 +382,7 @@ var _ = SIGDescribe("CronJob", func() {
 		ginkgo.By("creating")
 		createdCronJob, err := cjClient.Create(ctx, cjTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
+		gomega.Expect(createdCronJob).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("getting")
 		gottenCronJob, err := cjClient.Get(ctx, createdCronJob.Name, metav1.GetOptions{})
@@ -388,6 +416,7 @@ var _ = SIGDescribe("CronJob", func() {
 			[]byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(patchedCronJob.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdCronJob.ResourceVersion, patchedCronJob.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var cjToUpdate, updatedCronJob *batchv1.CronJob

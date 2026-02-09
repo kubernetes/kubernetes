@@ -16,6 +16,7 @@ package strfmt
 
 import (
 	"encoding"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"sync"
@@ -230,4 +231,27 @@ func (f *defaultFormats) Parse(name, data string) (interface{}, error) {
 		}
 	}
 	return nil, errors.InvalidTypeName(name)
+}
+
+// unmarshalJSON provides a generic implementation of json.Unmarshaler interface's UnmarshalJSON function for basic string formats.
+func unmarshalJSON[T ~string](r *T, data []byte) error {
+	if string(data) == jsonNull {
+		return nil
+	}
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*r = T(ustr)
+	return nil
+}
+
+// deepCopy provides a generic implementation of DeepCopy for basic string formats.
+func deepCopy[T ~string](r *T) *T {
+	if r == nil {
+		return nil
+	}
+	out := new(T)
+	*out = *r
+	return out
 }

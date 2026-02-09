@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -25,7 +24,7 @@ import (
 	"github.com/prometheus/procfs"
 )
 
-func getProcessStart() (float64, error) {
+func GetProcessStart() (float64, error) {
 	pid := os.Getpid()
 	p, err := procfs.NewProc(pid)
 	if err != nil {

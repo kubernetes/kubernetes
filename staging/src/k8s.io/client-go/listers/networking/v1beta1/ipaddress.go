@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/networking/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // IPAddressLister helps list IPAddresses.
@@ -30,19 +30,19 @@ import (
 type IPAddressLister interface {
 	// List lists all IPAddresses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.IPAddress, err error)
+	List(selector labels.Selector) (ret []*networkingv1beta1.IPAddress, err error)
 	// Get retrieves the IPAddress from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.IPAddress, error)
+	Get(name string) (*networkingv1beta1.IPAddress, error)
 	IPAddressListerExpansion
 }
 
 // iPAddressLister implements the IPAddressLister interface.
 type iPAddressLister struct {
-	listers.ResourceIndexer[*v1beta1.IPAddress]
+	listers.ResourceIndexer[*networkingv1beta1.IPAddress]
 }
 
 // NewIPAddressLister returns a new IPAddressLister.
 func NewIPAddressLister(indexer cache.Indexer) IPAddressLister {
-	return &iPAddressLister{listers.New[*v1beta1.IPAddress](indexer, v1beta1.Resource("ipaddress"))}
+	return &iPAddressLister{listers.New[*networkingv1beta1.IPAddress](indexer, networkingv1beta1.Resource("ipaddress"))}
 }

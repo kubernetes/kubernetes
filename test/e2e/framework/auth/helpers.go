@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +42,30 @@ type bindingsGetter interface {
 	v1rbac.RoleBindingsGetter
 	v1rbac.ClusterRoleBindingsGetter
 	v1rbac.ClusterRolesGetter
+}
+
+// WaitForAuthzUpdate checks if the give user can perform named verb and action
+// on a resource or subresource.
+func WaitForAuthzUpdate(ctx context.Context, c v1authorization.SubjectAccessReviewsGetter, user string, groups []string, ra *authorizationv1.ResourceAttributes, allowed bool) error {
+	review := &authorizationv1.SubjectAccessReview{
+		Spec: authorizationv1.SubjectAccessReviewSpec{
+			ResourceAttributes: ra,
+			User:               user,
+			Groups:             groups,
+		},
+	}
+
+	err := wait.PollUntilContextTimeout(ctx, policyCachePollInterval, policyCachePollTimeout, false, func(ctx context.Context) (bool, error) {
+		response, err := c.SubjectAccessReviews().Create(ctx, review, metav1.CreateOptions{})
+		if err != nil {
+			return false, err
+		}
+		if response.Status.Allowed != allowed {
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
 }
 
 // WaitForAuthorizationUpdate checks if the given user can perform the named verb and action.
@@ -80,13 +105,13 @@ func WaitForNamedAuthorizationUpdate(ctx context.Context, c v1authorization.Subj
 
 // BindClusterRole binds the cluster role at the cluster scope. If RBAC is not enabled, nil
 // is returned with no action.
-func BindClusterRole(ctx context.Context, c bindingsGetter, clusterRole, ns string, subjects ...rbacv1.Subject) error {
+func BindClusterRole(ctx context.Context, c bindingsGetter, clusterRole, ns string, subjects ...rbacv1.Subject) (func(ctx context.Context), error) {
 	if !IsRBACEnabled(ctx, c) {
-		return nil
+		return func(ctx context.Context) {}, nil
 	}
 
 	// Since the namespace names are unique, we can leave this lying around so we don't have to race any caches
-	_, err := c.ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
+	clusterRoleBinding, err := c.ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ns + "--" + clusterRole,
 		},
@@ -99,10 +124,15 @@ func BindClusterRole(ctx context.Context, c bindingsGetter, clusterRole, ns stri
 	}, metav1.CreateOptions{})
 
 	if err != nil {
-		return fmt.Errorf("binding clusterrole/%s for %q for %v: %w", clusterRole, ns, subjects, err)
+		return nil, fmt.Errorf("binding clusterrole/%s for %q for %v: %w", clusterRole, ns, subjects, err)
 	}
 
-	return nil
+	cleanupFunc := func(ctx context.Context) {
+		ginkgo.By(fmt.Sprintf("Destroying ClusterRoleBindings %q for this suite.", clusterRoleBinding.Name))
+		framework.ExpectNoError(c.ClusterRoleBindings().Delete(ctx, clusterRoleBinding.Name, metav1.DeleteOptions{}))
+	}
+
+	return cleanupFunc, nil
 }
 
 // BindClusterRoleInNamespace binds the cluster role at the namespace scope. If RBAC is not enabled, nil

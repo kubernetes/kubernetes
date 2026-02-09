@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	pkgversion "k8s.io/apimachinery/pkg/version"
@@ -30,7 +28,9 @@ import (
 	"k8s.io/component-base/version"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/image"
 )
 
@@ -47,6 +47,8 @@ type VersionGetter interface {
 	KubeletVersions() (map[string][]string, error)
 	// ComponentVersions should return a map with a version and a list of node names that describes how many a given control-plane components there are for that version
 	ComponentVersions(string) (map[string][]string, error)
+	// DNSAddonVersion returns, if deployed, the CoreDNS image tag
+	DNSAddonVersion() (string, error)
 }
 
 // KubeVersionGetter handles the version-fetching mechanism from external sources
@@ -72,7 +74,7 @@ func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, erro
 	// common.go#getClient()
 	// The problem here is that during upgrade dry-run client reactors are backed by a dynamic client
 	// via NewClientBackedDryRunGetterFromKubeconfig() and for GetActions there seems to be no analog to
-	// Discovery().Serverversion() resource for a dynamic client(?).
+	// Discovery().ServerVersion() resource for a dynamic client(?).
 	fakeclientDiscovery, ok := g.client.Discovery().(*fakediscovery.FakeDiscovery)
 	if ok {
 		clusterVersionInfo = fakeclientDiscovery.FakedServerVersion
@@ -129,6 +131,11 @@ func (g *KubeVersionGetter) KubeletVersions() (map[string][]string, error) {
 		kubeletVersions[kver] = append(kubeletVersions[kver], node.Name)
 	}
 	return kubeletVersions, nil
+}
+
+// DNSAddonVersion returns the CoreDNS image deployed in the cluster, or an error in case of multiple instances.
+func (g *KubeVersionGetter) DNSAddonVersion() (string, error) {
+	return dns.DeployedDNSAddon(g.client)
 }
 
 // ComponentVersions gets the versions of the control-plane components in the cluster.

@@ -50,14 +50,6 @@
         {
           "groupVersion": "authentication.k8s.io/v1",
           "version": "v1"
-        },
-        {
-          "groupVersion": "authentication.k8s.io/v1beta1",
-          "version": "v1beta1"
-        },
-        {
-          "groupVersion": "authentication.k8s.io/v1alpha1",
-          "version": "v1alpha1"
         }
       ]
     },
@@ -114,6 +106,10 @@
         {
           "groupVersion": "certificates.k8s.io/v1",
           "version": "v1"
+        },
+        {
+          "groupVersion": "certificates.k8s.io/v1beta1",
+          "version": "v1beta1"
         },
         {
           "groupVersion": "certificates.k8s.io/v1alpha1",
@@ -176,8 +172,8 @@
           "version": "v1"
         },
         {
-          "groupVersion": "storage.k8s.io/v1alpha1",
-          "version": "v1alpha1"
+          "groupVersion": "storage.k8s.io/v1beta1",
+          "version": "v1beta1"
         }
       ]
     },
@@ -225,6 +221,10 @@
         {
           "groupVersion": "scheduling.k8s.io/v1",
           "version": "v1"
+        },
+        {
+          "groupVersion": "scheduling.k8s.io/v1alpha1",
+          "version": "v1alpha1"
         }
       ]
     },
@@ -238,6 +238,14 @@
         {
           "groupVersion": "coordination.k8s.io/v1",
           "version": "v1"
+        },
+        {
+          "groupVersion": "coordination.k8s.io/v1beta1",
+          "version": "v1beta1"
+        },
+        {
+          "groupVersion": "coordination.k8s.io/v1alpha2",
+          "version": "v1alpha2"
         }
       ]
     },
@@ -268,6 +276,31 @@
       ]
     },
     {
+      "name": "resource.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "resource.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "resource.k8s.io/v1",
+          "version": "v1"
+        },
+        {
+          "groupVersion": "resource.k8s.io/v1beta2",
+          "version": "v1beta2"
+        },
+        {
+          "groupVersion": "resource.k8s.io/v1beta1",
+          "version": "v1beta1"
+        },
+        {
+          "groupVersion": "resource.k8s.io/v1alpha3",
+          "version": "v1alpha3"
+        }
+      ]
+    },
+    {
       "name": "flowcontrol.apiserver.k8s.io",
       "preferredVersion": {
         "groupVersion": "flowcontrol.apiserver.k8s.io/v1",
@@ -277,10 +310,6 @@
         {
           "groupVersion": "flowcontrol.apiserver.k8s.io/v1",
           "version": "v1"
-        },
-        {
-          "groupVersion": "flowcontrol.apiserver.k8s.io/v1beta3",
-          "version": "v1beta3"
         }
       ]
     },
@@ -298,28 +327,15 @@
       ]
     },
     {
-      "name": "resource.k8s.io",
-      "preferredVersion": {
-        "groupVersion": "resource.k8s.io/v1alpha2",
-        "version": "v1alpha2"
-      },
-      "versions": [
-        {
-          "groupVersion": "resource.k8s.io/v1alpha2",
-          "version": "v1alpha2"
-        }
-      ]
-    },
-    {
       "name": "storagemigration.k8s.io",
       "preferredVersion": {
-        "groupVersion": "storagemigration.k8s.io/v1alpha1",
-        "version": "v1alpha1"
+        "groupVersion": "storagemigration.k8s.io/v1beta1",
+        "version": "v1beta1"
       },
       "versions": [
         {
-          "groupVersion": "storagemigration.k8s.io/v1alpha1",
-          "version": "v1alpha1"
+          "groupVersion": "storagemigration.k8s.io/v1beta1",
+          "version": "v1beta1"
         }
       ]
     }

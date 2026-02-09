@@ -20,10 +20,15 @@ package v1beta1
 
 // IngressLoadBalancerIngressApplyConfiguration represents a declarative configuration of the IngressLoadBalancerIngress type for use
 // with apply.
+//
+// IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
 type IngressLoadBalancerIngressApplyConfiguration struct {
-	IP       *string                               `json:"ip,omitempty"`
-	Hostname *string                               `json:"hostname,omitempty"`
-	Ports    []IngressPortStatusApplyConfiguration `json:"ports,omitempty"`
+	// ip is set for load-balancer ingress points that are IP based.
+	IP *string `json:"ip,omitempty"`
+	// hostname is set for load-balancer ingress points that are DNS based.
+	Hostname *string `json:"hostname,omitempty"`
+	// ports provides information about the ports exposed by this LoadBalancer.
+	Ports []IngressPortStatusApplyConfiguration `json:"ports,omitempty"`
 }
 
 // IngressLoadBalancerIngressApplyConfiguration constructs a declarative configuration of the IngressLoadBalancerIngress type for use with

@@ -53,6 +53,8 @@ type Core struct {
 	Caches       []Cache `json:"caches"`
 	UncoreCaches []Cache `json:"uncore_caches"`
 	SocketID     int     `json:"socket_id"`
+	BookID       string  `json:"book_id,omitempty"`
+	DrawerID     string  `json:"drawer_id,omitempty"`
 }
 
 type Cache struct {
@@ -191,6 +193,12 @@ type MachineInfo struct {
 	// The number of cpu sockets in this machine.
 	NumSockets int `json:"num_sockets"`
 
+	// The number of cpu books in this machine.
+	NumBooks int `json:"num_books,omitempty"`
+
+	// The number of cpu drawers in this machine.
+	NumDrawers int `json:"num_drawers,omitempty"`
+
 	// Maximum clock speed for the cores, in KHz.
 	CpuFrequency uint64 `json:"cpu_frequency_khz"`
 
@@ -261,6 +269,8 @@ func (m *MachineInfo) Clone() *MachineInfo {
 		NumCores:         m.NumCores,
 		NumPhysicalCores: m.NumPhysicalCores,
 		NumSockets:       m.NumSockets,
+		NumBooks:         m.NumBooks,
+		NumDrawers:       m.NumDrawers,
 		CpuFrequency:     m.CpuFrequency,
 		MemoryCapacity:   m.MemoryCapacity,
 		SwapCapacity:     m.SwapCapacity,

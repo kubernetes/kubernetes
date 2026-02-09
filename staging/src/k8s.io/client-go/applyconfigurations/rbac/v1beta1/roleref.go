@@ -20,10 +20,15 @@ package v1beta1
 
 // RoleRefApplyConfiguration represents a declarative configuration of the RoleRef type for use
 // with apply.
+//
+// RoleRef contains information that points to the role being used
 type RoleRefApplyConfiguration struct {
+	// APIGroup is the group for the resource being referenced
 	APIGroup *string `json:"apiGroup,omitempty"`
-	Kind     *string `json:"kind,omitempty"`
-	Name     *string `json:"name,omitempty"`
+	// Kind is the type of resource being referenced
+	Kind *string `json:"kind,omitempty"`
+	// Name is the name of resource being referenced
+	Name *string `json:"name,omitempty"`
 }
 
 // RoleRefApplyConfiguration constructs a declarative configuration of the RoleRef type for use with

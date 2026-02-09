@@ -36,7 +36,6 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -53,12 +52,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	netutils "k8s.io/utils/net"
-)
-
-const (
-	// TODO(justinsb): Avoid hardcoding this.
-	awsMasterIP = "172.20.0.9"
 )
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
@@ -128,11 +121,14 @@ const (
 
 	// SnapshotDeleteTimeout is how long for snapshot to delete snapshotContent.
 	SnapshotDeleteTimeout = 5 * time.Minute
+
+	// ControlPlaneLabel is valid label for kubeadm based clusters like kops ONLY
+	ControlPlaneLabel = "node-role.kubernetes.io/control-plane"
 )
 
 var (
 	// ProvidersWithSSH are those providers where each node is accessible with SSH
-	ProvidersWithSSH = []string{"gce", "gke", "aws", "local", "azure"}
+	ProvidersWithSSH = []string{"gce", "aws", "local", "azure"}
 )
 
 // RunID is a unique identifier of the e2e run.
@@ -413,87 +409,6 @@ func CheckTestingNSDeletedExcept(ctx context.Context, c clientset.Interface, ski
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
 }
 
-// WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
-// Some components use EndpointSlices other Endpoints, we must verify that both objects meet the requirements.
-func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
-	return wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
-		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
-		endpoint, err := c.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-		if err != nil {
-			Logf("Unexpected error trying to get Endpoints for %s : %v", serviceName, err)
-			return false, nil
-		}
-
-		if countEndpointsNum(endpoint) != expectNum {
-			Logf("Unexpected number of Endpoints, got %d, expected %d", countEndpointsNum(endpoint), expectNum)
-			return false, nil
-		}
-
-		// Endpoints are single family but EndpointSlices can have dual stack addresses,
-		// so we verify the number of addresses that matches the same family on both.
-		addressType := discoveryv1.AddressTypeIPv4
-		if isIPv6Endpoint(endpoint) {
-			addressType = discoveryv1.AddressTypeIPv6
-		}
-
-		esList, err := c.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName)})
-		if err != nil {
-			Logf("Unexpected error trying to get EndpointSlices for %s : %v", serviceName, err)
-			return false, nil
-		}
-
-		if len(esList.Items) == 0 {
-			Logf("Waiting for at least 1 EndpointSlice to exist")
-			return false, nil
-		}
-
-		if countEndpointsSlicesNum(esList, addressType) != expectNum {
-			Logf("Unexpected number of Endpoints on Slices, got %d, expected %d", countEndpointsSlicesNum(esList, addressType), expectNum)
-			return false, nil
-		}
-		return true, nil
-	})
-}
-
-func countEndpointsNum(e *v1.Endpoints) int {
-	num := 0
-	for _, sub := range e.Subsets {
-		num += len(sub.Addresses)
-	}
-	return num
-}
-
-// isIPv6Endpoint returns true if the Endpoint uses IPv6 addresses
-func isIPv6Endpoint(e *v1.Endpoints) bool {
-	for _, sub := range e.Subsets {
-		for _, addr := range sub.Addresses {
-			if len(addr.IP) == 0 {
-				continue
-			}
-			// Endpoints are single family, so it is enough to check only one address
-			return netutils.IsIPv6String(addr.IP)
-		}
-	}
-	// default to IPv4 an Endpoint without IP addresses
-	return false
-}
-
-func countEndpointsSlicesNum(epList *discoveryv1.EndpointSliceList, addressType discoveryv1.AddressType) int {
-	// EndpointSlices can contain the same address on multiple Slices
-	addresses := sets.Set[string]{}
-	for _, epSlice := range epList.Items {
-		if epSlice.AddressType != addressType {
-			continue
-		}
-		for _, ep := range epSlice.Endpoints {
-			if len(ep.Addresses) > 0 {
-				addresses.Insert(ep.Addresses[0])
-			}
-		}
-	}
-	return addresses.Len()
-}
-
 // restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
 func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
@@ -582,7 +497,9 @@ func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err e
 	if err != nil {
 		return
 	}
-	Logf("Asynchronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	// cmd.Args contains command itself as 0th argument, so it's sufficient to
+	// print 1st and latter arguments
+	Logf("Asynchronously running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " "))
 	err = cmd.Start()
 	return
 }
@@ -662,60 +579,42 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
-// getControlPlaneAddresses returns the externalIP, internalIP and hostname fields of control plane nodes.
-// If any of these is unavailable, empty slices are returned.
-func getControlPlaneAddresses(ctx context.Context, c clientset.Interface) ([]string, []string, []string) {
-	var externalIPs, internalIPs, hostnames []string
-
-	// Populate the internal IPs.
-	eps, err := c.CoreV1().Endpoints(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
-	if err != nil {
-		Failf("Failed to get kubernetes endpoints: %v", err)
+// GetNodeExternalIPs returns a list of external ip address(es) if any for a node
+func GetNodeExternalIPs(node *v1.Node) (ips []string) {
+	for j := range node.Status.Addresses {
+		nodeAddress := &node.Status.Addresses[j]
+		if nodeAddress.Type == v1.NodeExternalIP && nodeAddress.Address != "" {
+			ips = append(ips, nodeAddress.Address)
+		}
 	}
-	for _, subset := range eps.Subsets {
-		for _, address := range subset.Addresses {
-			if address.IP != "" {
-				internalIPs = append(internalIPs, address.IP)
+	return
+}
+
+// GetControlPlaneNodes returns a list of control plane nodes
+func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeList {
+	allNodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	ExpectNoError(err, "error reading all nodes")
+
+	var cpNodes v1.NodeList
+
+	for _, node := range allNodes.Items {
+		// Check for the control plane label
+		if _, hasLabel := node.Labels[ControlPlaneLabel]; hasLabel {
+			cpNodes.Items = append(cpNodes.Items, node)
+			continue
+		}
+
+		// Check for the specific taint
+		for _, taint := range node.Spec.Taints {
+			// NOTE the taint key is the same as the control plane label
+			if taint.Key == ControlPlaneLabel && taint.Effect == v1.TaintEffectNoSchedule {
+				cpNodes.Items = append(cpNodes.Items, node)
+				continue
 			}
 		}
 	}
 
-	// Populate the external IP/hostname.
-	hostURL, err := url.Parse(TestContext.Host)
-	if err != nil {
-		Failf("Failed to parse hostname: %v", err)
-	}
-	if netutils.ParseIPSloppy(hostURL.Host) != nil {
-		externalIPs = append(externalIPs, hostURL.Host)
-	} else {
-		hostnames = append(hostnames, hostURL.Host)
-	}
-
-	return externalIPs, internalIPs, hostnames
-}
-
-// GetControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.
-// It may return internal and external IPs, even if we expect for
-// e.g. internal IPs to be used (issue #56787), so that we can be
-// sure to block the control plane fully during tests.
-func GetControlPlaneAddresses(ctx context.Context, c clientset.Interface) []string {
-	externalIPs, internalIPs, _ := getControlPlaneAddresses(ctx, c)
-
-	ips := sets.NewString()
-	switch TestContext.Provider {
-	case "gce", "gke":
-		for _, ip := range externalIPs {
-			ips.Insert(ip)
-		}
-		for _, ip := range internalIPs {
-			ips.Insert(ip)
-		}
-	case "aws":
-		ips.Insert(awsMasterIP)
-	default:
-		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
-	}
-	return ips.List()
+	return &cpNodes
 }
 
 // PrettyPrintJSON converts metrics to JSON format.

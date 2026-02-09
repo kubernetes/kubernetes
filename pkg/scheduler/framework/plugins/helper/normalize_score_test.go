@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 func TestDefaultNormalizeScore(t *testing.T) {
@@ -74,17 +74,17 @@ func TestDefaultNormalizeScore(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			scores := framework.NodeScoreList{}
+			scores := fwk.NodeScoreList{}
 			for _, score := range test.scores {
-				scores = append(scores, framework.NodeScore{Score: score})
+				scores = append(scores, fwk.NodeScore{Score: score})
 			}
 
-			expectedScores := framework.NodeScoreList{}
+			expectedScores := fwk.NodeScoreList{}
 			for _, score := range test.expectedScores {
-				expectedScores = append(expectedScores, framework.NodeScore{Score: score})
+				expectedScores = append(expectedScores, fwk.NodeScore{Score: score})
 			}
 
-			DefaultNormalizeScore(framework.MaxNodeScore, test.reverse, scores)
+			DefaultNormalizeScore(fwk.MaxNodeScore, test.reverse, scores)
 			if diff := cmp.Diff(expectedScores, scores); diff != "" {
 				t.Errorf("Unexpected scores (-want, +got):\n%s", diff)
 			}

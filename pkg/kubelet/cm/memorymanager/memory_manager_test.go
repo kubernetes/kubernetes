@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
-	"k8s.io/klog/v2"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -71,17 +72,17 @@ type testMemoryManager struct {
 	activePods                 []*v1.Pod
 }
 
-func returnPolicyByName(testCase testMemoryManager) Policy {
+func returnPolicyByName(logger klog.Logger, testCase testMemoryManager) Policy {
 	switch testCase.policyName {
 	case policyTypeMock:
 		return &mockPolicy{
 			err: fmt.Errorf("fake reg error"),
 		}
-	case policyTypeStatic:
-		policy, _ := NewPolicyStatic(&testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager())
+	case PolicyTypeStatic:
+		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager())
 		return policy
 	case policyTypeNone:
-		return NewPolicyNone()
+		return NewPolicyNone(logger)
 	}
 	return nil
 }
@@ -94,27 +95,27 @@ func (p *mockPolicy) Name() string {
 	return string(policyTypeMock)
 }
 
-func (p *mockPolicy) Start(s state.State) error {
+func (p *mockPolicy) Start(klog.Logger, state.State) error {
 	return p.err
 }
 
-func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *mockPolicy) Allocate(klog.Logger, state.State, *v1.Pod, *v1.Container) error {
 	return p.err
 }
 
-func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName string) {
+func (p *mockPolicy) RemoveContainer(klog.Logger, state.State, string, string) {
 }
 
-func (p *mockPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetTopologyHints(klog.Logger, state.State, *v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *mockPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetPodTopologyHints(klog.Logger, state.State, *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-func (p *mockPolicy) GetAllocatableMemory(s state.State) []state.Block {
+func (p *mockPolicy) GetAllocatableMemory(state.State) []state.Block {
 	return []state.Block{}
 }
 
@@ -149,6 +150,13 @@ func getPod(podUID string, containerName string, requirements *v1.ResourceRequir
 			},
 		},
 	}
+}
+
+func getPodWithPodLevelResources(podUID string, podRequirements *v1.ResourceRequirements, containerName string, containerRequirements *v1.ResourceRequirements) *v1.Pod {
+	pod := getPod(podUID, containerName, containerRequirements)
+	pod.Spec.Resources = podRequirements
+
+	return pod
 }
 
 func getPodWithInitContainers(podUID string, containers []v1.Container, initContainers []v1.Container) *v1.Pod {
@@ -484,6 +492,7 @@ func TestGetSystemReservedMemory(t *testing.T) {
 }
 
 func TestRemoveStaleState(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	testCases := []testMemoryManager{
 		{
@@ -641,7 +650,7 @@ func TestRemoveStaleState(t *testing.T) {
 		},
 		{
 			description: "Stale state successfully removed, without multi NUMA assignments",
-			policyName:  policyTypeStatic,
+			policyName:  PolicyTypeStatic,
 			machineInfo: machineInfo,
 			reserved: systemReservedMemory{
 				0: map[v1.ResourceName]uint64{
@@ -767,7 +776,7 @@ func TestRemoveStaleState(t *testing.T) {
 		},
 		{
 			description: "Stale state successfully removed, with multi NUMA assignments",
-			policyName:  policyTypeStatic,
+			policyName:  PolicyTypeStatic,
 			machineInfo: machineInfo,
 			reserved: systemReservedMemory{
 				0: map[v1.ResourceName]uint64{
@@ -895,8 +904,8 @@ func TestRemoveStaleState(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			mgr := &manager{
-				policy:       returnPolicyByName(testCase),
-				state:        state.NewMemoryState(),
+				policy:       returnPolicyByName(logger, testCase),
+				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
 					err: nil,
@@ -908,13 +917,13 @@ func TestRemoveStaleState(t *testing.T) {
 			mgr.state.SetMemoryAssignments(testCase.assignments)
 			mgr.state.SetMachineState(testCase.machineState)
 
-			mgr.removeStaleState()
+			mgr.removeStaleState(logger)
 
 			if !areContainerMemoryAssignmentsEqual(t, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
 				t.Errorf("Memory Manager removeStaleState() error, expected assignments %v, but got: %v",
 					testCase.expectedAssignments, mgr.state.GetMemoryAssignments())
 			}
-			if !areMachineStatesEqual(mgr.state.GetMachineState(), testCase.expectedMachineState) {
+			if !areMachineStatesEqual(logger, mgr.state.GetMachineState(), testCase.expectedMachineState) {
 				t.Fatalf("The actual machine state: %v is different from the expected one: %v", mgr.state.GetMachineState(), testCase.expectedMachineState)
 			}
 		})
@@ -923,6 +932,7 @@ func TestRemoveStaleState(t *testing.T) {
 }
 
 func TestAddContainer(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	reserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -936,7 +946,7 @@ func TestAddContainer(t *testing.T) {
 	testCases := []testMemoryManager{
 		{
 			description: "Correct allocation and adding container on NUMA 0",
-			policyName:  policyTypeStatic,
+			policyName:  PolicyTypeStatic,
 			machineInfo: machineInfo,
 			reserved:    reserved,
 			machineState: state.NUMANodeMap{
@@ -1142,7 +1152,7 @@ func TestAddContainer(t *testing.T) {
 		},
 		{
 			description: "Correct allocation of container requiring amount of memory higher than capacity of one NUMA node",
-			policyName:  policyTypeStatic,
+			policyName:  PolicyTypeStatic,
 			machineInfo: machineInfo,
 			reserved:    reserved,
 			machineState: state.NUMANodeMap{
@@ -1248,7 +1258,7 @@ func TestAddContainer(t *testing.T) {
 		},
 		{
 			description: "Should fail if try to allocate container requiring amount of memory higher than capacity of one NUMA node but a small pod is already allocated",
-			policyName:  policyTypeStatic,
+			policyName:  PolicyTypeStatic,
 			machineInfo: machineInfo,
 			firstPod:    pod,
 			reserved:    reserved,
@@ -1387,8 +1397,8 @@ func TestAddContainer(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			mgr := &manager{
-				policy:       returnPolicyByName(testCase),
-				state:        state.NewMemoryState(),
+				policy:       returnPolicyByName(logger, testCase),
+				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
 					err: testCase.updateError,
@@ -1409,14 +1419,14 @@ func TestAddContainer(t *testing.T) {
 				t.Errorf("Memory Manager Allocate() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAllocateError, err)
 			}
-			mgr.AddContainer(pod, container, "fakeID")
+			mgr.AddContainer(logger, pod, container, "fakeID")
 			_, _, err = mgr.containerMap.GetContainerRef("fakeID")
 			if !reflect.DeepEqual(err, testCase.expectedAddContainerError) {
 				t.Errorf("Memory Manager AddContainer() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAddContainerError, err)
 			}
 
-			if !areMachineStatesEqual(mgr.state.GetMachineState(), testCase.expectedMachineState) {
+			if !areMachineStatesEqual(logger, mgr.state.GetMachineState(), testCase.expectedMachineState) {
 				t.Errorf("[test] %+v", mgr.state.GetMemoryAssignments())
 				t.Fatalf("The actual machine state: %v is different from the expected one: %v", mgr.state.GetMachineState(), testCase.expectedMachineState)
 			}
@@ -1426,6 +1436,7 @@ func TestAddContainer(t *testing.T) {
 }
 
 func TestRemoveContainer(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	reserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -1439,7 +1450,7 @@ func TestRemoveContainer(t *testing.T) {
 		{
 			description:       "Correct removing of a container",
 			removeContainerID: "fakeID2",
-			policyName:        policyTypeStatic,
+			policyName:        PolicyTypeStatic,
 			machineInfo:       machineInfo,
 			reserved:          reserved,
 			assignments: state.ContainerMemoryAssignments{
@@ -1575,7 +1586,7 @@ func TestRemoveContainer(t *testing.T) {
 		{
 			description:       "Correct removing of a multi NUMA container",
 			removeContainerID: "fakeID2",
-			policyName:        policyTypeStatic,
+			policyName:        PolicyTypeStatic,
 			machineInfo:       machineInfo,
 			reserved:          reserved,
 			assignments: state.ContainerMemoryAssignments{
@@ -1711,7 +1722,7 @@ func TestRemoveContainer(t *testing.T) {
 		{
 			description:       "Should do nothing if container is not in containerMap",
 			removeContainerID: "fakeID3",
-			policyName:        policyTypeStatic,
+			policyName:        PolicyTypeStatic,
 			machineInfo:       machineInfo,
 			reserved:          reserved,
 			assignments: state.ContainerMemoryAssignments{
@@ -1863,8 +1874,8 @@ func TestRemoveContainer(t *testing.T) {
 			iniContainerMap.Add("fakePod1", "fakeContainer1", "fakeID1")
 			iniContainerMap.Add("fakePod1", "fakeContainer2", "fakeID2")
 			mgr := &manager{
-				policy:       returnPolicyByName(testCase),
-				state:        state.NewMemoryState(),
+				policy:       returnPolicyByName(logger, testCase),
+				state:        state.NewMemoryState(logger),
 				containerMap: iniContainerMap,
 				containerRuntime: mockRuntimeService{
 					err: testCase.expectedError,
@@ -1876,7 +1887,7 @@ func TestRemoveContainer(t *testing.T) {
 			mgr.state.SetMemoryAssignments(testCase.assignments)
 			mgr.state.SetMachineState(testCase.machineState)
 
-			err := mgr.RemoveContainer(testCase.removeContainerID)
+			err := mgr.RemoveContainer(logger, testCase.removeContainerID)
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Errorf("Memory Manager RemoveContainer() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedError, err)
@@ -1887,7 +1898,7 @@ func TestRemoveContainer(t *testing.T) {
 					testCase.expectedAssignments, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments)
 			}
 
-			if !areMachineStatesEqual(mgr.state.GetMachineState(), testCase.expectedMachineState) {
+			if !areMachineStatesEqual(logger, mgr.state.GetMachineState(), testCase.expectedMachineState) {
 				t.Errorf("[test] %+v", mgr.state.GetMemoryAssignments())
 				t.Errorf("[test] %+v, %+v", mgr.state.GetMachineState()[0].MemoryMap["memory"], mgr.state.GetMachineState()[1].MemoryMap["memory"])
 				t.Fatalf("The actual machine state: %v is different from the expected one: %v", mgr.state.GetMachineState(), testCase.expectedMachineState)
@@ -1896,7 +1907,15 @@ func TestRemoveContainer(t *testing.T) {
 	}
 }
 
+func getPolicyNameForOs() policyType {
+	if goruntime.GOOS == "windows" {
+		return policyTypeBestEffort
+	}
+	return PolicyTypeStatic
+}
+
 func TestNewManager(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	expectedReserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -1909,7 +1928,7 @@ func TestNewManager(t *testing.T) {
 	testCases := []testMemoryManager{
 		{
 			description:                "Successful creation of Memory Manager instance",
-			policyName:                 policyTypeStatic,
+			policyName:                 getPolicyNameForOs(),
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI)},
 			systemReservedMemory: []kubeletconfig.MemoryReservation{
@@ -1928,7 +1947,7 @@ func TestNewManager(t *testing.T) {
 		},
 		{
 			description:                "Should return an error when systemReservedMemory (configured with kubelet flag) does not comply with Node Allocatable feature values",
-			policyName:                 policyTypeStatic,
+			policyName:                 getPolicyNameForOs(),
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI)},
 			systemReservedMemory: []kubeletconfig.MemoryReservation{
@@ -1951,7 +1970,7 @@ func TestNewManager(t *testing.T) {
 		},
 		{
 			description:                "Should return an error when memory reserved for system is empty (systemReservedMemory)",
-			policyName:                 policyTypeStatic,
+			policyName:                 getPolicyNameForOs(),
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
 			systemReservedMemory:       []kubeletconfig.MemoryReservation{},
@@ -1988,7 +2007,7 @@ func TestNewManager(t *testing.T) {
 			}
 			defer os.RemoveAll(stateFileDirectory)
 
-			mgr, err := NewManager(string(testCase.policyName), &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
+			mgr, err := NewManager(logger, string(testCase.policyName), &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
 
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Errorf("Could not create the Memory Manager. Expected error: '%v', but got: '%v'",
@@ -2002,7 +2021,7 @@ func TestNewManager(t *testing.T) {
 						t.Errorf("Could not create the Memory Manager. Expected policy name: %v, but got: %v",
 							testCase.policyName, rawMgr.policy.Name())
 					}
-					if testCase.policyName == policyTypeStatic {
+					if testCase.policyName == PolicyTypeStatic {
 						if !reflect.DeepEqual(rawMgr.policy.(*staticPolicy).systemReserved, testCase.expectedReserved) {
 							t.Errorf("Could not create the Memory Manager. Expected system reserved: %+v, but got: %+v",
 								testCase.expectedReserved, rawMgr.policy.(*staticPolicy).systemReserved)
@@ -2018,133 +2037,11 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestGetTopologyHints(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []testMemoryManager{
 		{
 			description: "Successful hint generation",
-			policyName:  policyTypeStatic,
-			machineInfo: returnMachineInfo(),
-			reserved: systemReservedMemory{
-				0: map[v1.ResourceName]uint64{
-					v1.ResourceMemory: 1 * gb,
-				},
-				1: map[v1.ResourceName]uint64{
-					v1.ResourceMemory: 1 * gb,
-				},
-			},
-			assignments: state.ContainerMemoryAssignments{
-				"fakePod1": map[string][]state.Block{
-					"fakeContainer1": {
-						{
-							NUMAAffinity: []int{0},
-							Type:         v1.ResourceMemory,
-							Size:         1 * gb,
-						},
-						{
-							NUMAAffinity: []int{0},
-							Type:         hugepages1Gi,
-							Size:         1 * gb,
-						},
-					},
-					"fakeContainer2": {
-						{
-							NUMAAffinity: []int{0},
-							Type:         v1.ResourceMemory,
-							Size:         1 * gb,
-						},
-						{
-							NUMAAffinity: []int{0},
-							Type:         hugepages1Gi,
-							Size:         1 * gb,
-						},
-					},
-				},
-			},
-			machineState: state.NUMANodeMap{
-				0: &state.NUMANodeState{
-					Cells:               []int{0},
-					NumberOfAssignments: 4,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           7 * gb,
-							Reserved:       2 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           3 * gb,
-							Reserved:       2 * gb,
-							SystemReserved: 0 * gb,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-				1: &state.NUMANodeState{
-					Cells:               []int{1},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-			},
-			expectedError: nil,
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				string(v1.ResourceMemory): {
-					{
-						NUMANodeAffinity: newNUMAAffinity(0),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: newNUMAAffinity(1),
-						Preferred:        true,
-					},
-				},
-				string(hugepages1Gi): {
-					{
-						NUMANodeAffinity: newNUMAAffinity(0),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: newNUMAAffinity(1),
-						Preferred:        true,
-					},
-				},
-			},
-			activePods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						UID: "fakePod1",
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Name: "fakeContainer1",
-							},
-							{
-								Name: "fakeContainer2",
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			description: "Successful hint generation",
-			policyName:  policyTypeStatic,
+			policyName:  PolicyTypeStatic,
 			machineInfo: returnMachineInfo(),
 			reserved: systemReservedMemory{
 				0: map[v1.ResourceName]uint64{
@@ -2255,27 +2152,26 @@ func TestGetTopologyHints(t *testing.T) {
 					},
 				},
 			},
-			activePods: []*v1.Pod{},
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			mgr := &manager{
-				policy:       returnPolicyByName(testCase),
-				state:        state.NewMemoryState(),
+				policy:       returnPolicyByName(logger, testCase),
+				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
 					err: nil,
 				},
-				activePods:        func() []*v1.Pod { return testCase.activePods },
+				activePods:        func() []*v1.Pod { return nil },
 				podStatusProvider: mockPodStatusProvider{},
 			}
 			mgr.sourcesReady = &sourcesReadyStub{}
 			mgr.state.SetMachineState(testCase.machineState.Clone())
 			mgr.state.SetMemoryAssignments(testCase.assignments.Clone())
 
-			pod := getPod("fakePod2", "fakeContainer1", requirementsGuaranteed)
+			pod := getPod("fakePod1", "fakeContainer1", requirementsGuaranteed)
 			container := &pod.Spec.Containers[0]
 			hints := mgr.GetTopologyHints(pod, container)
 			if !reflect.DeepEqual(hints, testCase.expectedHints) {
@@ -2287,10 +2183,11 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []testMemoryManager{
 		{
 			description: "should remove init containers from the state file, once app container started",
-			policyName:  policyTypeStatic,
+			policyName:  PolicyTypeStatic,
 			machineInfo: returnMachineInfo(),
 			assignments: state.ContainerMemoryAssignments{},
 			expectedAssignments: state.ContainerMemoryAssignments{
@@ -2437,10 +2334,10 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
+			logger.Info("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
 			mgr := &manager{
-				policy:       returnPolicyByName(testCase),
-				state:        state.NewMemoryState(),
+				policy:       returnPolicyByName(logger, testCase),
+				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
 					err: nil,
@@ -2470,12 +2367,12 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 			// Calls AddContainer for init containers
 			for i, initContainer := range testCase.podAllocate.Spec.InitContainers {
-				mgr.AddContainer(testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i], initContainer.Name)
+				mgr.AddContainer(logger, testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i], initContainer.Name)
 			}
 
 			// Calls AddContainer for apps containers
 			for i, appContainer := range testCase.podAllocate.Spec.Containers {
-				mgr.AddContainer(testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i], appContainer.Name)
+				mgr.AddContainer(logger, testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i], appContainer.Name)
 			}
 
 			assignments := mgr.state.GetMemoryAssignments()
@@ -2484,7 +2381,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 			}
 
 			machineState := mgr.state.GetMachineState()
-			if !areMachineStatesEqual(machineState, testCase.expectedMachineState) {
+			if !areMachineStatesEqual(logger, machineState, testCase.expectedMachineState) {
 				t.Fatalf("The actual machine state %v is different from the expected %v", machineState, testCase.expectedMachineState)
 			}
 		})

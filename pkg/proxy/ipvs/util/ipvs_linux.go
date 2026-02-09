@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -28,8 +27,8 @@ import (
 	"time"
 
 	libipvs "github.com/moby/ipvs"
-
 	"golang.org/x/sys/unix"
+
 	"k8s.io/klog/v2"
 )
 

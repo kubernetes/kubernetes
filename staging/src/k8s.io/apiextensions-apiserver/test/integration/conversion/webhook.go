@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -63,9 +64,9 @@ func StartConversionWebhookServer(handler http.Handler) (func(), *apiextensionsv
 	}
 
 	// StartTLS returns immediately, there is a small chance of a race to avoid.
-	if err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := webhookServer.Client().Get(webhookServer.URL) // even a 404 is fine
-		return err == nil, nil
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
+		_, getErr := webhookServer.Client().Get(webhookServer.URL) // even a 404 is fine
+		return getErr == nil, nil
 	}); err != nil {
 		webhookServer.Close()
 		return nil, nil, err

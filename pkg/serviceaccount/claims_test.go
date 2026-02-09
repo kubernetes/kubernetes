@@ -23,16 +23,13 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func init() {
@@ -88,8 +85,6 @@ func TestClaims(t *testing.T) {
 		// desired
 		sc *jwt.Claims
 		pc *privateClaims
-
-		featureJTI, featurePodNodeInfo, featureNodeBinding bool
 	}{
 		{
 			// pod and secret
@@ -115,6 +110,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+100, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -138,6 +134,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+100, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -160,6 +157,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+100, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -182,6 +180,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+60*60*24, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -193,45 +192,9 @@ func TestClaims(t *testing.T) {
 			},
 		},
 		{
-			// node with feature gate disabled
-			sa:   sa,
-			node: node,
-			// really fast
-			exp: 0,
-			// nil audience
-			aud: nil,
-			err: "token bound to Node object requested, but \"ServiceAccountTokenNodeBinding\" feature gate is disabled",
-		},
-		{
-			// node & pod with feature gate disabled
-			sa:   sa,
-			node: node,
-			pod:  pod,
-			// really fast
-			exp: 0,
-			// nil audience
-			aud: nil,
-
-			sc: &jwt.Claims{
-				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
-				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
-				Expiry:    jwt.NewNumericDate(time.Unix(1514764800, 0)),
-			},
-			pc: &privateClaims{
-				Kubernetes: kubernetes{
-					Namespace: "myns",
-					Pod:       &ref{Name: "mypod", UID: "mypod-uid"},
-					Svcacct:   ref{Name: "mysvcacct", UID: "mysvcacct-uid"},
-				},
-			},
-		},
-		{
 			// node alone
 			sa:   sa,
 			node: node,
-			// enable node binding feature
-			featureNodeBinding: true,
 			// really fast
 			exp: 0,
 			// nil audience
@@ -242,6 +205,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -256,8 +220,6 @@ func TestClaims(t *testing.T) {
 			sa:   sa,
 			pod:  pod,
 			node: node,
-			// enable embedding pod node info feature
-			featurePodNodeInfo: true,
 			// really fast
 			exp: 0,
 			// nil audience
@@ -268,6 +230,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -283,8 +246,6 @@ func TestClaims(t *testing.T) {
 			sa:   sa,
 			sec:  sec,
 			node: node,
-			// enable embedding node info feature
-			featureNodeBinding: true,
 			// really fast
 			exp: 0,
 			// nil audience
@@ -294,8 +255,6 @@ func TestClaims(t *testing.T) {
 		{
 			// ensure JTI is set
 			sa: sa,
-			// enable setting JTI feature
-			featureJTI: true,
 			// really fast
 			exp: 0,
 			// nil audience
@@ -315,18 +274,6 @@ func TestClaims(t *testing.T) {
 				},
 			},
 		},
-		{
-			// ensure it fails if node binding gate is disabled
-			sa:                 sa,
-			node:               node,
-			featureNodeBinding: false,
-			// really fast
-			exp: 0,
-			// nil audience
-			aud: nil,
-
-			err: "token bound to Node object requested, but \"ServiceAccountTokenNodeBinding\" feature gate is disabled",
-		},
 	}
 	for i, c := range cs {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
@@ -340,11 +287,6 @@ func TestClaims(t *testing.T) {
 				}
 				return string(b)
 			}
-
-			// set feature flags for the duration of the test case
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenJTI, c.featureJTI)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, c.featureNodeBinding)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, c.featurePodNodeInfo)
 
 			sc, pc, err := Claims(c.sa, c.pod, c.sec, c.node, c.exp, c.warnafter, c.aud)
 			if err != nil && err.Error() != c.err {
@@ -376,8 +318,6 @@ type claimTestCase struct {
 	expiry    jwt.NumericDate
 	notBefore jwt.NumericDate
 	expectErr string
-
-	featureNodeBindingValidation bool
 }
 
 func TestValidatePrivateClaims(t *testing.T) {
@@ -458,11 +398,10 @@ func TestValidatePrivateClaims(t *testing.T) {
 			expectErr: "service account token has been invalidated",
 		},
 		{
-			name:                         "missing node",
-			getter:                       fakeGetter{serviceAccount, nil, nil, nil},
-			private:                      &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Node: &ref{Name: "nodename", UID: "nodeuid"}, Namespace: "ns"}},
-			expectErr:                    "service account token has been invalidated",
-			featureNodeBindingValidation: true,
+			name:      "missing node",
+			getter:    fakeGetter{serviceAccount, nil, nil, nil},
+			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Node: &ref{Name: "nodename", UID: "nodeuid"}, Namespace: "ns"}},
+			expectErr: "service account token has been invalidated",
 		},
 		{
 			name:      "different uid serviceaccount",
@@ -522,11 +461,10 @@ func TestValidatePrivateClaims(t *testing.T) {
 				expectErr: deletedErr,
 			},
 			claimTestCase{
-				name:                         deletionTestCase.name + " node",
-				getter:                       fakeGetter{serviceAccount, nil, nil, deletedNode},
-				private:                      &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Node: &ref{Name: "nodename", UID: "nodeuid"}, Namespace: "ns"}},
-				expectErr:                    deletedErr,
-				featureNodeBindingValidation: true,
+				name:      deletionTestCase.name + " node",
+				getter:    fakeGetter{serviceAccount, nil, nil, deletedNode},
+				private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Node: &ref{Name: "nodename", UID: "nodeuid"}, Namespace: "ns"}},
+				expectErr: deletedErr,
 			},
 		)
 	}
@@ -538,8 +476,6 @@ func TestValidatePrivateClaims(t *testing.T) {
 			if tc.expiry != 0 {
 				expiry = tc.expiry
 			}
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBindingValidation, tc.featureNodeBindingValidation)
 
 			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: &expiry, NotBefore: &tc.notBefore}, tc.private)
 			if len(tc.expectErr) > 0 {
@@ -568,25 +504,25 @@ type fakeGetter struct {
 	node           *v1.Node
 }
 
-func (f fakeGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
+func (f fakeGetter) GetServiceAccount(ctx context.Context, namespace, name string) (*v1.ServiceAccount, error) {
 	if f.serviceAccount == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "serviceaccounts"}, name)
 	}
 	return f.serviceAccount, nil
 }
-func (f fakeGetter) GetPod(namespace, name string) (*v1.Pod, error) {
+func (f fakeGetter) GetPod(ctx context.Context, namespace, name string) (*v1.Pod, error) {
 	if f.pod == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "pods"}, name)
 	}
 	return f.pod, nil
 }
-func (f fakeGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
+func (f fakeGetter) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	if f.secret == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "secrets"}, name)
 	}
 	return f.secret, nil
 }
-func (f fakeGetter) GetNode(name string) (*v1.Node, error) {
+func (f fakeGetter) GetNode(ctx context.Context, name string) (*v1.Node, error) {
 	if f.node == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "nodes"}, name)
 	}

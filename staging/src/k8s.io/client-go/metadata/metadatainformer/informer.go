@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/metadata"
@@ -117,8 +118,15 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 	return informer
 }
 
-// Start initializes all requested informers.
+// Start is a legacy wrapper that initializes all requested informers.
+//
+//logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
 func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
+	f.StartWithContext(wait.ContextForChannel(stopCh))
+}
+
+// StartWithContext initializes all requested informers.
+func (f *metadataSharedInformerFactory) StartWithContext(ctx context.Context) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -135,7 +143,7 @@ func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
 			informer := informer.Informer()
 			go func() {
 				defer f.wg.Done()
-				informer.Run(stopCh)
+				informer.RunWithContext(ctx)
 			}()
 			f.startedInformers[informerType] = true
 		}
@@ -178,20 +186,32 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 	return &metadataInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformer(
-			&cache.ListWatch{
+			cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
 					}
-					return client.Resource(gvr).Namespace(namespace).List(context.TODO(), options)
+					return client.Resource(gvr).Namespace(namespace).List(context.Background(), options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
 					}
-					return client.Resource(gvr).Namespace(namespace).Watch(context.TODO(), options)
+					return client.Resource(gvr).Namespace(namespace).Watch(context.Background(), options)
 				},
-			},
+				ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+					if tweakListOptions != nil {
+						tweakListOptions(&options)
+					}
+					return client.Resource(gvr).Namespace(namespace).List(ctx, options)
+				},
+				WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+					if tweakListOptions != nil {
+						tweakListOptions(&options)
+					}
+					return client.Resource(gvr).Namespace(namespace).Watch(ctx, options)
+				},
+			}, client),
 			&metav1.PartialObjectMetadata{},
 			resyncPeriod,
 			indexers,

@@ -19,6 +19,8 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/admissionregistration/v1alpha1
 // +groupName=admissionregistration.k8s.io
+// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen-input=k8s.io/api/admissionregistration/v1alpha1
 
 // Package v1alpha1 is the v1alpha1 version of the API.
-package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
+package v1alpha1

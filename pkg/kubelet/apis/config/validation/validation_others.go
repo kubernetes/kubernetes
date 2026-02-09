@@ -1,5 +1,4 @@
-//go:build !windows
-// +build !windows
+//go:build !windows && !linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -20,10 +19,20 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
 func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
+	if kc.SingleProcessOOMKill != nil {
+		return fmt.Errorf("invalid configuration: singleProcessOOMKill is only supported on linux")
+	}
+
+	if kc.UserNamespaces != nil {
+		return fmt.Errorf("invalid configuration: userNamespaces is only supported on linux")
+	}
+
 	return nil
 }

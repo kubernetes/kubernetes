@@ -76,12 +76,7 @@ var supportedLimitResponseType = sets.NewString(
 )
 
 // PriorityLevelValidationOptions holds the validation options for a priority level object
-type PriorityLevelValidationOptions struct {
-	// AllowZeroLimitedNominalConcurrencyShares, if true, indicates that we allow
-	// a zero value for the 'nominalConcurrencyShares' field of the 'limited'
-	// section of a priority level.
-	AllowZeroLimitedNominalConcurrencyShares bool
-}
+type PriorityLevelValidationOptions struct{}
 
 // ValidateFlowSchema validates the content of flow-schema
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
@@ -343,7 +338,7 @@ func ValidateFlowSchemaStatusUpdate(old, fs *flowcontrol.FlowSchema) field.Error
 func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(condition.Type) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 	return allErrs
 }
@@ -400,7 +395,7 @@ func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.Priorit
 func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, requestGV schema.GroupVersion, name string, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if (name == flowcontrol.PriorityLevelConfigurationNameExempt) != (spec.Type == flowcontrol.PriorityLevelEnablementExempt) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "type must be 'Exempt' if and only if name is 'exempt'"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "must be 'Exempt' if and only if `name` is 'exempt'"))
 	}
 	switch spec.Type {
 	case flowcontrol.PriorityLevelEnablementExempt:
@@ -429,14 +424,8 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 // ValidateLimitedPriorityLevelConfiguration validates the configuration for an execution-limited priority level
 func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, requestGV schema.GroupVersion, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
-	if opts.AllowZeroLimitedNominalConcurrencyShares {
-		if lplc.NominalConcurrencyShares < 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be a non-negative integer"))
-		}
-	} else {
-		if lplc.NominalConcurrencyShares <= 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be positive"))
-		}
+	if lplc.NominalConcurrencyShares < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be a non-negative integer"))
 	}
 	allErrs = append(allErrs, ValidateLimitResponse(lplc.LimitResponse, fldPath.Child("limitResponse"))...)
 
@@ -541,7 +530,7 @@ func ValidatePriorityLevelConfigurationStatusUpdate(old, pl *flowcontrol.Priorit
 func ValidatePriorityLevelConfigurationCondition(condition *flowcontrol.PriorityLevelConfigurationCondition, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(condition.Type) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 	return allErrs
 }

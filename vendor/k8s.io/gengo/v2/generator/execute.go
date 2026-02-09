@@ -22,10 +22,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"golang.org/x/tools/imports"
+
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
@@ -113,13 +115,53 @@ func assembleGoFile(w io.Writer, f *File) {
 	w.Write(f.Body.Bytes())
 }
 
+func formatCode(src []byte) ([]byte, error) {
+	// We call goimports because it formats imports better than gofmt, but also
+	// call gofmt because it has the "simplify" logic.  If a gofmt binary is
+	// not found, we will skip it.
+	src, err := importsWrapper(src)
+	if err != nil {
+		return nil, err
+	}
+	return gofmtWrapper(src)
+}
+
 func importsWrapper(src []byte) ([]byte, error) {
-	return imports.Process("", src, nil)
+	opt := imports.Options{
+		Comments:   true,
+		TabIndent:  true,
+		TabWidth:   8,
+		FormatOnly: true, // Disable the insertion and deletion of imports (slow!)
+	}
+	return imports.Process("", src, &opt)
+}
+
+func gofmtWrapper(src []byte) ([]byte, error) {
+	const gofmt = "gofmt"
+
+	if _, err := exec.LookPath(gofmt); err != nil {
+		klog.Errorf("WARNING: skipping output simplification: %v", err)
+		return src, nil
+	}
+
+	cmd := exec.Command(gofmt, "-s")
+	cmd.Stdin = bytes.NewReader(src)
+	stdout := &bytes.Buffer{}
+	cmd.Stdout = stdout
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		if stderr.Len() > 0 {
+			return nil, fmt.Errorf("%s failed: %v: %s", gofmt, err, strings.TrimSpace(stderr.String()))
+		}
+		return nil, fmt.Errorf("%s failed: %v", gofmt, err)
+	}
+	return stdout.Bytes(), nil
 }
 
 func NewGoFile() *DefaultFileType {
 	return &DefaultFileType{
-		Format:   importsWrapper,
+		Format:   formatCode,
 		Assemble: assembleGoFile,
 	}
 }

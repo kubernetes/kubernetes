@@ -28,9 +28,9 @@ import (
 	"unicode"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"github.com/spf13/pflag"
 	inf "gopkg.in/inf.v0"
+	"sigs.k8s.io/randfill"
 
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
@@ -827,12 +827,12 @@ func TestQuantityParseEmit(t *testing.T) {
 	}
 }
 
-var fuzzer = fuzz.New().Funcs(
-	func(q *Quantity, c fuzz.Continue) {
+var fuzzer = randfill.New().Funcs(
+	func(q *Quantity, c randfill.Continue) {
 		q.i = Zero
-		if c.RandBool() {
+		if c.Bool() {
 			q.Format = BinarySI
-			if c.RandBool() {
+			if c.Bool() {
 				dec := &inf.Dec{}
 				q.d = infDecAmount{Dec: dec}
 				dec.SetScale(0)
@@ -846,12 +846,12 @@ var fuzzer = fuzz.New().Funcs(
 			dec.SetUnscaled(c.Int63n(1024) << uint(10*c.Intn(5)))
 			return
 		}
-		if c.RandBool() {
+		if c.Bool() {
 			q.Format = DecimalSI
 		} else {
 			q.Format = DecimalExponent
 		}
-		if c.RandBool() {
+		if c.Bool() {
 			dec := &inf.Dec{}
 			q.d = infDecAmount{Dec: dec}
 			dec.SetScale(inf.Scale(c.Intn(4)))
@@ -897,7 +897,7 @@ func TestQuantityDeepCopy(t *testing.T) {
 func TestJSON(t *testing.T) {
 	for i := 0; i < 500; i++ {
 		q := &Quantity{}
-		fuzzer.Fuzz(q)
+		fuzzer.Fill(q)
 		b, err := json.Marshal(q)
 		if err != nil {
 			t.Errorf("error encoding %v: %v", q, err)
@@ -1294,6 +1294,7 @@ func TestNegateRoundTrip(t *testing.T) {
 }
 
 func TestQuantityAsApproximateFloat64(t *testing.T) {
+	// NOTE: this table should be kept in sync with TestQuantityAsFloat64Slow
 	table := []struct {
 		in  Quantity
 		out float64
@@ -1344,16 +1345,87 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{decQuantity(-12, 500, DecimalSI), math.Inf(-1)},
 	}
 
-	for _, item := range table {
+	for i, item := range table {
 		t.Run(fmt.Sprintf("%s %s", item.in.Format, item.in.String()), func(t *testing.T) {
 			out := item.in.AsApproximateFloat64()
 			if out != item.out {
-				t.Fatalf("expected %v, got %v", item.out, out)
+				t.Fatalf("test %d expected %v, got %v", i+1, item.out, out)
 			}
 			if item.in.d.Dec != nil {
 				if i, ok := item.in.AsInt64(); ok {
 					q := intQuantity(i, 0, item.in.Format)
 					out := q.AsApproximateFloat64()
+					if out != item.out {
+						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestQuantityAsFloat64Slow(t *testing.T) {
+	// NOTE: this table should be kept in sync with TestQuantityAsApproximateFloat64
+	table := []struct {
+		in  Quantity
+		out float64
+	}{
+		{decQuantity(0, 0, DecimalSI), 0.0},
+		{decQuantity(0, 0, DecimalExponent), 0.0},
+		{decQuantity(0, 0, BinarySI), 0.0},
+
+		{decQuantity(1, 0, DecimalSI), 1},
+		{decQuantity(1, 0, DecimalExponent), 1},
+		{decQuantity(1, 0, BinarySI), 1},
+
+		// Binary suffixes
+		{decQuantity(1024, 0, BinarySI), 1024},
+		{decQuantity(8*1024, 0, BinarySI), 8 * 1024},
+		{decQuantity(7*1024*1024, 0, BinarySI), 7 * 1024 * 1024},
+		{decQuantity(7*1024*1024, 1, BinarySI), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, BinarySI), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, BinarySI), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, BinarySI), (7 * 1024 * 1024) / float64(10)},
+		{decQuantity(7*1024*1024, -8, BinarySI), (7 * 1024 * 1024) / float64(100000000)},
+
+		{decQuantity(1024, 0, DecimalSI), 1024},
+		{decQuantity(8*1024, 0, DecimalSI), 8 * 1024},
+		{decQuantity(7*1024*1024, 0, DecimalSI), 7 * 1024 * 1024},
+		{decQuantity(7*1024*1024, 1, DecimalSI), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, DecimalSI), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, DecimalSI), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, DecimalSI), (7 * 1024 * 1024) / float64(10)},
+		{decQuantity(7*1024*1024, -8, DecimalSI), (7 * 1024 * 1024) / float64(100000000)},
+
+		{decQuantity(1024, 0, DecimalExponent), 1024},
+		{decQuantity(8*1024, 0, DecimalExponent), 8 * 1024},
+		{decQuantity(7*1024*1024, 0, DecimalExponent), 7 * 1024 * 1024},
+		{decQuantity(7*1024*1024, 1, DecimalExponent), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, DecimalExponent), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, DecimalExponent), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, DecimalExponent), (7 * 1024 * 1024) / float64(10)},
+		{decQuantity(7*1024*1024, -8, DecimalExponent), (7 * 1024 * 1024) / float64(100000000)},
+
+		// very large numbers
+		{Quantity{d: maxAllowed, Format: DecimalSI}, math.MaxInt64},
+		{Quantity{d: maxAllowed, Format: BinarySI}, math.MaxInt64},
+		{decQuantity(12, 18, DecimalSI), 1.2e19},
+
+		// infinities caused due to float64 overflow
+		{decQuantity(12, 500, DecimalSI), math.Inf(0)},
+		{decQuantity(-12, 500, DecimalSI), math.Inf(-1)},
+	}
+
+	for i, item := range table {
+		t.Run(fmt.Sprintf("%s %s", item.in.Format, item.in.String()), func(t *testing.T) {
+			out := item.in.AsFloat64Slow()
+			if out != item.out {
+				t.Fatalf("test %d expected %v, got %v", i+1, item.out, out)
+			}
+			if item.in.d.Dec != nil {
+				if i, ok := item.in.AsInt64(); ok {
+					q := intQuantity(i, 0, item.in.Format)
+					out := q.AsFloat64Slow()
 					if out != item.out {
 						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)
 					}
@@ -1388,6 +1460,40 @@ func TestStringQuantityAsApproximateFloat64(t *testing.T) {
 				if i, ok := in.AsInt64(); ok {
 					q := intQuantity(i, 0, in.Format)
 					out := q.AsApproximateFloat64()
+					if out != item.out {
+						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestStringQuantityAsFloat64Slow(t *testing.T) {
+	table := []struct {
+		in  string
+		out float64
+	}{
+		{"2Ki", 2048},
+		{"1.1Ki", 1126.4e+0},
+		{"1Mi", 1.048576e+06},
+		{"2Gi", 2.147483648e+09},
+	}
+
+	for _, item := range table {
+		t.Run(item.in, func(t *testing.T) {
+			in, err := ParseQuantity(item.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := in.AsFloat64Slow()
+			if out != item.out {
+				t.Fatalf("expected %v, got %v", item.out, out)
+			}
+			if in.d.Dec != nil {
+				if i, ok := in.AsInt64(); ok {
+					q := intQuantity(i, 0, in.Format)
+					out := q.AsFloat64Slow()
 					if out != item.out {
 						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)
 					}
@@ -1579,6 +1685,18 @@ func BenchmarkQuantityAsApproximateFloat64(b *testing.B) {
 	b.StopTimer()
 }
 
+func BenchmarkQuantityAsFloat64Slow(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		q := values[i%len(values)]
+		if q.AsFloat64Slow() == -1 {
+			b.Fatal(q)
+		}
+	}
+	b.StopTimer()
+}
+
 var _ pflag.Value = &QuantityValue{}
 
 func TestQuantityValueSet(t *testing.T) {
@@ -1683,7 +1801,7 @@ func TestQuantityUnmarshalCBOR(t *testing.T) {
 func TestQuantityRoundtripCBOR(t *testing.T) {
 	for i := 0; i < 500; i++ {
 		var initial, final Quantity
-		fuzzer.Fuzz(&initial)
+		fuzzer.Fill(&initial)
 		b, err := cbor.Marshal(initial)
 		if err != nil {
 			t.Errorf("error encoding %v: %v", initial, err)

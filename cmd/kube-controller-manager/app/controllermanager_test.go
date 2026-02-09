@@ -21,15 +21,17 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	controllermanagercontroller "k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/features"
@@ -71,6 +73,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.CertificateSigningRequestSigningController,
 		names.CertificateSigningRequestApprovingController,
 		names.CertificateSigningRequestCleanerController,
+		names.PodCertificateRequestCleanerController,
 		names.TTLController,
 		names.BootstrapSignerController,
 		names.TokenCleanerController,
@@ -86,15 +89,19 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.ClusterRoleAggregationController,
 		names.PersistentVolumeClaimProtectionController,
 		names.PersistentVolumeProtectionController,
+		names.VolumeAttributesClassProtectionController,
 		names.TTLAfterFinishedController,
 		names.RootCACertificatePublisherController,
+		names.KubeAPIServerClusterTrustBundlePublisherController,
 		names.EphemeralVolumeController,
 		names.StorageVersionGarbageCollectorController,
 		names.ResourceClaimController,
+		names.DeviceTaintEvictionController,
 		names.LegacyServiceAccountTokenCleanerController,
 		names.ValidatingAdmissionPolicyStatusController,
 		names.ServiceCIDRController,
 		names.StorageVersionMigratorController,
+		names.SELinuxWarningController,
 	)
 
 	for _, name := range KnownControllers() {
@@ -109,13 +116,18 @@ func TestNewControllerDescriptorsShouldNotPanic(t *testing.T) {
 }
 
 func TestNewControllerDescriptorsAlwaysReturnsDescriptorsForAllControllers(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", false)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", false)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": false,
+		"AllBeta":  false,
+	})
 
 	controllersWithoutFeatureGates := KnownControllers()
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
+	// AllBeta must be enabled before AllAlpha to resolve dependencies.
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllBeta":  true,
+		"AllAlpha": true,
+	})
 
 	controllersWithFeatureGates := KnownControllers()
 
@@ -188,6 +200,7 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableFeatureGate)
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -199,23 +212,121 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 			initFuncCalled := false
 
 			taintEvictionControllerDescriptor := NewControllerDescriptors()[names.TaintEvictionController]
-			taintEvictionControllerDescriptor.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller controllermanagercontroller.Interface, enabled bool, err error) {
+			taintEvictionControllerDescriptor.constructor = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 				initFuncCalled = true
-				return nil, true, nil
+				return newControllerLoop(func(ctx context.Context) {}, controllerName), nil
 			}
 
-			healthCheck, err := StartController(ctx, controllerCtx, taintEvictionControllerDescriptor, nil)
-			if err != nil {
+			var healthChecks mockHealthCheckAdder
+			if err := runControllers(ctx, controllerCtx, map[string]*ControllerDescriptor{
+				names.TaintEvictionController: taintEvictionControllerDescriptor,
+			}, &healthChecks); err != nil {
 				t.Errorf("starting a TaintEvictionController controller should not return an error")
 			}
 			if test.expectInitFuncCall != initFuncCalled {
 				t.Errorf("TaintEvictionController init call check failed: expected=%v, got=%v", test.expectInitFuncCall, initFuncCalled)
 			}
-			hasHealthCheck := healthCheck != nil
+			hasHealthCheck := len(healthChecks.Checks) > 0
 			expectHealthCheck := test.expectInitFuncCall
 			if expectHealthCheck != hasHealthCheck {
 				t.Errorf("TaintEvictionController healthCheck check failed: expected=%v, got=%v", expectHealthCheck, hasHealthCheck)
 			}
 		})
 	}
+}
+
+func TestNoCloudProviderControllerStarted(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	controllerCtx := ControllerContext{}
+	controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
+	cpControllerDescriptors := make(map[string]*ControllerDescriptor)
+	for controllerName, controller := range NewControllerDescriptors() {
+		if !controller.IsCloudProviderController() {
+			continue
+		}
+
+		controller.constructor = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+			return newControllerLoop(func(ctx context.Context) {
+				t.Error("Controller should not be started:", controllerName)
+			}, controllerName), nil
+		}
+
+		cpControllerDescriptors[controllerName] = controller
+	}
+
+	var healthChecks mockHealthCheckAdder
+	if err := runControllers(ctx, controllerCtx, cpControllerDescriptors, &healthChecks); err != nil {
+		t.Error("Failed to start controllers:", err)
+	}
+}
+
+func TestRunControllers(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		newController            func(ctx context.Context) Controller
+		shutdownTimeout          time.Duration
+		expectedCleanTermination bool
+	}{
+		{
+			name: "clean shutdown",
+			newController: func(testCtx context.Context) Controller {
+				return newControllerLoop(func(ctx context.Context) {
+					<-ctx.Done()
+				}, "controller-A")
+			},
+			shutdownTimeout:          10 * time.Second,
+			expectedCleanTermination: true,
+		},
+		{
+			name: "shutdown timeout",
+			newController: func(testCtx context.Context) Controller {
+				return newControllerLoop(func(ctx context.Context) {
+					<-testCtx.Done()
+				}, "controller-A")
+			},
+			shutdownTimeout:          50 * time.Millisecond,
+			expectedCleanTermination: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			controllerCtx := ControllerContext{}
+
+			// testCtx is used to make sure the controller failing to shut down can exit after the test is finished.
+			testCtx, cancelTest := context.WithCancel(ctx)
+			defer cancelTest()
+
+			// ctx is used to wait in the controller for shutdown and also to start the shutdown timeout in RunControllers.
+			// To start the shutdown timeout immediately, we start with a cancelled context already.
+			ctx, cancelController := context.WithCancel(ctx)
+			cancelController()
+
+			cleanShutdown := RunControllers(ctx, controllerCtx, []Controller{tc.newController(testCtx)}, 0, tc.shutdownTimeout)
+			if cleanShutdown != tc.expectedCleanTermination {
+				t.Errorf("expected clean shutdown %v, got %v", tc.expectedCleanTermination, cleanShutdown)
+			}
+		})
+	}
+}
+
+type mockHealthCheckAdder struct {
+	Checks []healthz.HealthChecker
+}
+
+func (m *mockHealthCheckAdder) AddHealthChecker(checks ...healthz.HealthChecker) {
+	m.Checks = append(m.Checks, checks...)
+}
+
+func runControllers(
+	ctx context.Context, controllerCtx ControllerContext,
+	controllerDescriptors map[string]*ControllerDescriptor, healthzChecks HealthCheckAdder,
+) error {
+	controllers, err := BuildControllers(ctx, controllerCtx, controllerDescriptors, nil, healthzChecks)
+	if err != nil {
+		return err
+	}
+	RunControllers(ctx, controllerCtx, controllers, 0, 0)
+	return nil
 }

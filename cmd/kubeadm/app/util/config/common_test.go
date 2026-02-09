@@ -29,8 +29,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"sigs.k8s.io/yaml"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -40,6 +42,14 @@ import (
 )
 
 const KubeadmGroupName = "kubeadm.k8s.io"
+
+var formats = []struct {
+	name    string
+	marshal func(interface{}) ([]byte, error)
+}{
+	{name: "JSON", marshal: json.Marshal},
+	{name: "YAML", marshal: yaml.Marshal},
+}
 
 func TestValidateSupportedVersion(t *testing.T) {
 	tests := []struct {
@@ -716,7 +726,7 @@ func TestValidateConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateConfig([]byte(test.cfg), test.allowExperimental)
+			err := ValidateConfig([]byte(test.cfg), true, test.allowExperimental)
 			if (err != nil) != test.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", test.expectedError, (err != nil), err)
 			}
@@ -968,55 +978,6 @@ func TestDefaultMigrateMutators(t *testing.T) {
 			diff := cmp.Diff(tc.expected, tc.input)
 			if (len(diff) > 0) != tc.expectedDiff {
 				t.Fatalf("got a diff with the expected config (-want,+got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestIsKubeadmConfigPresent(t *testing.T) {
-	var tcases = []struct {
-		name     string
-		gvkmap   kubeadmapi.DocumentMap
-		expected bool
-	}{
-		{
-			name: " Wrong Group value",
-			gvkmap: kubeadmapi.DocumentMap{
-				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: []byte(`kind: Foo`),
-			},
-			expected: false,
-		},
-		{
-			name: "Empty Group value",
-			gvkmap: kubeadmapi.DocumentMap{
-				{Group: "", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
-			},
-			expected: false,
-		},
-		{
-			name:     "Nil value",
-			gvkmap:   nil,
-			expected: false,
-		},
-		{
-			name: "Correct Group value 1",
-			gvkmap: kubeadmapi.DocumentMap{
-				{Group: "kubeadm.k8s.io", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
-			},
-			expected: true,
-		},
-		{
-			name: "Correct Group value 2",
-			gvkmap: kubeadmapi.DocumentMap{
-				{Group: kubeadmapi.GroupName, Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
-			},
-			expected: true,
-		},
-	}
-	for _, tt := range tcases {
-		t.Run(tt.name, func(t *testing.T) {
-			if isKubeadmConfigPresent(tt.gvkmap) != tt.expected {
-				t.Error("unexpected result")
 			}
 		})
 	}

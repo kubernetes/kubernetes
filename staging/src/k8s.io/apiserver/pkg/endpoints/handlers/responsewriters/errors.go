@@ -17,12 +17,12 @@ limitations under the License.
 package responsewriters
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -33,19 +33,28 @@ import (
 var sanitizer = strings.NewReplacer(`&`, "&amp;", `<`, "&lt;", `>`, "&gt;")
 
 // Forbidden renders a simple forbidden error
-func Forbidden(ctx context.Context, attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
-	msg := sanitizer.Replace(forbiddenMessage(attributes))
-	w.Header().Set("X-Content-Type-Options", "nosniff")
+func Forbidden(attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
+	RespondWithError(w, req, ForbiddenStatusError(attributes, reason), s)
+}
 
-	var errMsg string
+func RespondWithError(w http.ResponseWriter, req *http.Request, err error, s runtime.NegotiatedSerializer) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	ErrorNegotiated(err, s, metav1.Unversioned, w, req)
+}
+
+func ForbiddenStatusError(attributes authorizer.Attributes, reason string) *apierrors.StatusError {
+	msg := sanitizer.Replace(forbiddenMessage(attributes))
+
+	var errMsg error
 	if len(reason) == 0 {
-		errMsg = fmt.Sprintf("%s", msg)
+		errMsg = fmt.Errorf("%s", msg)
 	} else {
-		errMsg = fmt.Sprintf("%s: %s", msg, reason)
+		errMsg = fmt.Errorf("%s: %s", msg, reason)
 	}
-	gv := schema.GroupVersion{Group: attributes.GetAPIGroup(), Version: attributes.GetAPIVersion()}
+
 	gr := schema.GroupResource{Group: attributes.GetAPIGroup(), Resource: attributes.GetResource()}
-	ErrorNegotiated(apierrors.NewForbidden(gr, attributes.GetName(), fmt.Errorf(errMsg)), s, gv, w, req)
+
+	return apierrors.NewForbidden(gr, attributes.GetName(), errMsg)
 }
 
 func forbiddenMessage(attributes authorizer.Attributes) string {

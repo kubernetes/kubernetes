@@ -70,7 +70,7 @@ func TestGenerate(t *testing.T) {
 				require.NoError(t, err, "expand template")
 				require.Equal(t, tt.expected, out.String())
 			} else {
-				require.Contains(t, err.Error(), tt.expectedErr)
+				require.ErrorContains(t, err, tt.expectedErr)
 			}
 		})
 	}

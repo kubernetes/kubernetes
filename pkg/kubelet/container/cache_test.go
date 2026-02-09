@@ -35,7 +35,7 @@ func TestCacheNotInitialized(t *testing.T) {
 	cache := newTestCache()
 	// If the global timestamp is not set, always return nil.
 	d := cache.getIfNewerThan(types.UID("1234"), time.Time{})
-	assert.True(t, d == nil, "should return nil since cache is not initialized")
+	assert.Nil(t, d, "should return nil since cache is not initialized")
 }
 
 func getTestPodIDAndStatus(numContainers int) (types.UID, *PodStatus) {
@@ -157,7 +157,7 @@ func TestCacheGetPodDoesNotExist(t *testing.T) {
 	// object with id filled.
 	actualStatus, actualErr := cache.Get(podID)
 	assert.Equal(t, status, actualStatus)
-	assert.Equal(t, nil, actualErr)
+	assert.NoError(t, actualErr)
 }
 
 func TestDelete(t *testing.T) {
@@ -167,20 +167,20 @@ func TestDelete(t *testing.T) {
 	cache.Set(podID, status, nil, time.Time{})
 	actualStatus, actualErr := cache.Get(podID)
 	assert.Equal(t, status, actualStatus)
-	assert.Equal(t, nil, actualErr)
+	assert.NoError(t, actualErr)
 	// Delete the pod from cache, and verify that we get an empty status.
 	cache.Delete(podID)
 	expectedStatus := &PodStatus{ID: podID}
 	actualStatus, actualErr = cache.Get(podID)
 	assert.Equal(t, expectedStatus, actualStatus)
-	assert.Equal(t, nil, actualErr)
+	assert.NoError(t, actualErr)
 }
 
 func verifyNotification(t *testing.T, ch chan *data, expectNotification bool) {
 	if expectNotification {
-		assert.True(t, len(ch) > 0, "Did not receive notification")
+		assert.NotEmpty(t, ch, "Did not receive notification")
 	} else {
-		assert.True(t, len(ch) < 1, "Should not have triggered the notification")
+		assert.Empty(t, ch, "Should not have triggered the notification")
 	}
 	// Drain the channel.
 	for i := 0; i < len(ch); i++ {

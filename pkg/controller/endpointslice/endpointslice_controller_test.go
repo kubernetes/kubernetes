@@ -397,7 +397,7 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   ControllerName,
 			},
 			DeletionTimestamp: &deletedTs,
 		},
@@ -442,7 +442,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   ControllerName,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
@@ -453,7 +453,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   ControllerName,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
@@ -472,7 +472,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 			Namespace: ns,
 			Labels: map[string]string{
 				discovery.LabelServiceName: "something-else",
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   ControllerName,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
@@ -529,7 +529,7 @@ func TestOnEndpointSliceUpdate(t *testing.T) {
 			Namespace: ns,
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   ControllerName,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
@@ -782,7 +782,7 @@ func TestSyncService(t *testing.T) {
 						Serving:     ptr.To(true),
 						Terminating: ptr.To(false),
 					},
-					Addresses: []string{"fd08::5678:0000:0000:9abc:def0"},
+					Addresses: []string{"fd08::5678:0:0:9abc:def0"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
 					NodeName:  ptr.To("node-1"),
 				},
@@ -1410,7 +1410,7 @@ func TestPodAddsBatching(t *testing.T) {
 
 				p := newPod(i, ns, true, 0, false)
 				esController.podStore.Add(p)
-				esController.addPod(p)
+				esController.onPodUpdate(nil, p)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -1559,7 +1559,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				resourceVersion++
 
 				esController.podStore.Update(newPod)
-				esController.updatePod(oldPod, newPod)
+				esController.onPodUpdate(oldPod, newPod)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -1687,7 +1687,7 @@ func TestPodDeleteBatching(t *testing.T) {
 				require.NoError(t, err, "error while retrieving old value of %q: %v", update.podName, err)
 				assert.True(t, exists, "pod should exist")
 				esController.podStore.Delete(old)
-				esController.deletePod(old)
+				esController.onPodUpdate(old, nil)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -1750,7 +1750,7 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 					Generation: testcase.informerGenerationNumber,
 					Labels: map[string]string{
 						discovery.LabelServiceName: serviceName,
-						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelManagedBy:   ControllerName,
 					},
 				},
 				AddressType: discovery.AddressTypeIPv4,
@@ -1977,7 +1977,7 @@ func TestUpdateNode(t *testing.T) {
 					Namespace: "ns",
 					Labels: map[string]string{
 						discovery.LabelServiceName: "svc",
-						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelManagedBy:   ControllerName,
 					},
 				},
 				Endpoints: []discovery.Endpoint{

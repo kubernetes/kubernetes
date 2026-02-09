@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package x509 provides a request authenticator that validates and
 // extracts user information from client certificates
-package x509 // import "k8s.io/apiserver/pkg/authentication/request/x509"
+package x509

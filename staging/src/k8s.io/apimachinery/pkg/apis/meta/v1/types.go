@@ -185,7 +185,7 @@ type ObjectMeta struct {
 	// Null for lists.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
-	CreationTimestamp Time `json:"creationTimestamp,omitempty" protobuf:"bytes,8,opt,name=creationTimestamp"`
+	CreationTimestamp Time `json:"creationTimestamp,omitempty,omitzero" protobuf:"bytes,8,opt,name=creationTimestamp"`
 
 	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
@@ -546,6 +546,21 @@ type DeleteOptions struct {
 	// +optional
 	// +listType=atomic
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
+
+	// if set to true, it will trigger an unsafe deletion of the resource in
+	// case the normal deletion flow fails with a corrupt object error.
+	// A resource is considered corrupt if it can not be retrieved from
+	// the underlying storage successfully because of a) its data can
+	// not be transformed e.g. decryption failure, or b) it fails
+	// to decode into an object.
+	// NOTE: unsafe deletion ignores finalizer constraints, skips
+	// precondition checks, and removes the object from the storage.
+	// WARNING: This may potentially break the cluster if the workload
+	// associated with the resource being unsafe-deleted relies on normal
+	// deletion flow. Use only if you REALLY know what you are doing.
+	// The default value is false, and the user must opt in to enable it
+	// +optional
+	IgnoreStoreReadErrorWithClusterBreakingPotential *bool `json:"ignoreStoreReadErrorWithClusterBreakingPotential,omitempty" protobuf:"varint,6,opt,name=ignoreStoreReadErrorWithClusterBreakingPotential"`
 }
 
 const (
@@ -769,7 +784,6 @@ type Status struct {
 	// is not guaranteed to conform to any schema except that defined by
 	// the reason type.
 	// +optional
-	// +listType=atomic
 	Details *StatusDetails `json:"details,omitempty" protobuf:"bytes,5,opt,name=details"`
 	// Suggested HTTP return code for this status, 0 if not set.
 	// +optional
@@ -901,6 +915,22 @@ const (
 	//   "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
 	// Status code 500
 	StatusReasonServerTimeout StatusReason = "ServerTimeout"
+
+	// StatusReasonStoreReadError means that the server encountered an error while
+	// retrieving resources from the backend object store.
+	// This may be due to backend database error, or because processing of the read
+	// resource failed.
+	// Details:
+	//   "kind" string - the kind attribute of the resource being acted on.
+	//   "name" string - the prefix where the reading error(s) occurred
+	//   "causes" []StatusCause
+	//      - (optional):
+	//        - "type" CauseType - CauseTypeUnexpectedServerResponse
+	//        - "message" string - the error message from the store backend
+	//        - "field" string - the full path with the key of the resource that failed reading
+	//
+	// Status code 500
+	StatusReasonStoreReadError StatusReason = "StorageReadError"
 
 	// StatusReasonTimeout means that the request could not be completed within the given time.
 	// Clients can get this response only when they specified a timeout param in the request,
@@ -1276,6 +1306,33 @@ const (
 	LabelSelectorOpNotIn        LabelSelectorOperator = "NotIn"
 	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
+)
+
+// FieldSelectorRequirement is a selector that contains values, a key, and an operator that
+// relates the key and values.
+type FieldSelectorRequirement struct {
+	// key is the field selector key that the requirement applies to.
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
+	// operator represents a key's relationship to a set of values.
+	// Valid operators are In, NotIn, Exists, DoesNotExist.
+	// The list of operators may grow in the future.
+	Operator FieldSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=FieldSelectorOperator"`
+	// values is an array of string values.
+	// If the operator is In or NotIn, the values array must be non-empty.
+	// If the operator is Exists or DoesNotExist, the values array must be empty.
+	// +optional
+	// +listType=atomic
+	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
+}
+
+// A field selector operator is the set of operators that can be used in a selector requirement.
+type FieldSelectorOperator string
+
+const (
+	FieldSelectorOpIn           FieldSelectorOperator = "In"
+	FieldSelectorOpNotIn        FieldSelectorOperator = "NotIn"
+	FieldSelectorOpExists       FieldSelectorOperator = "Exists"
+	FieldSelectorOpDoesNotExist FieldSelectorOperator = "DoesNotExist"
 )
 
 // ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource

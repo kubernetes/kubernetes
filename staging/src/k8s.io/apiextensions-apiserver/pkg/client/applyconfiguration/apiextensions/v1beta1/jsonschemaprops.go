@@ -19,56 +19,147 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
 // JSONSchemaPropsApplyConfiguration represents a declarative configuration of the JSONSchemaProps type for use
 // with apply.
+//
+// JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).
 type JSONSchemaPropsApplyConfiguration struct {
-	ID                     *string                                      `json:"id,omitempty"`
-	Schema                 *v1beta1.JSONSchemaURL                       `json:"$schema,omitempty"`
-	Ref                    *string                                      `json:"$ref,omitempty"`
-	Description            *string                                      `json:"description,omitempty"`
-	Type                   *string                                      `json:"type,omitempty"`
-	Format                 *string                                      `json:"format,omitempty"`
-	Title                  *string                                      `json:"title,omitempty"`
-	Default                *v1beta1.JSON                                `json:"default,omitempty"`
-	Maximum                *float64                                     `json:"maximum,omitempty"`
-	ExclusiveMaximum       *bool                                        `json:"exclusiveMaximum,omitempty"`
-	Minimum                *float64                                     `json:"minimum,omitempty"`
-	ExclusiveMinimum       *bool                                        `json:"exclusiveMinimum,omitempty"`
-	MaxLength              *int64                                       `json:"maxLength,omitempty"`
-	MinLength              *int64                                       `json:"minLength,omitempty"`
-	Pattern                *string                                      `json:"pattern,omitempty"`
-	MaxItems               *int64                                       `json:"maxItems,omitempty"`
-	MinItems               *int64                                       `json:"minItems,omitempty"`
-	UniqueItems            *bool                                        `json:"uniqueItems,omitempty"`
-	MultipleOf             *float64                                     `json:"multipleOf,omitempty"`
-	Enum                   []v1beta1.JSON                               `json:"enum,omitempty"`
-	MaxProperties          *int64                                       `json:"maxProperties,omitempty"`
-	MinProperties          *int64                                       `json:"minProperties,omitempty"`
-	Required               []string                                     `json:"required,omitempty"`
-	Items                  *v1beta1.JSONSchemaPropsOrArray              `json:"items,omitempty"`
-	AllOf                  []JSONSchemaPropsApplyConfiguration          `json:"allOf,omitempty"`
-	OneOf                  []JSONSchemaPropsApplyConfiguration          `json:"oneOf,omitempty"`
-	AnyOf                  []JSONSchemaPropsApplyConfiguration          `json:"anyOf,omitempty"`
-	Not                    *JSONSchemaPropsApplyConfiguration           `json:"not,omitempty"`
-	Properties             map[string]JSONSchemaPropsApplyConfiguration `json:"properties,omitempty"`
-	AdditionalProperties   *v1beta1.JSONSchemaPropsOrBool               `json:"additionalProperties,omitempty"`
-	PatternProperties      map[string]JSONSchemaPropsApplyConfiguration `json:"patternProperties,omitempty"`
-	Dependencies           *v1beta1.JSONSchemaDependencies              `json:"dependencies,omitempty"`
-	AdditionalItems        *v1beta1.JSONSchemaPropsOrBool               `json:"additionalItems,omitempty"`
-	Definitions            *v1beta1.JSONSchemaDefinitions               `json:"definitions,omitempty"`
-	ExternalDocs           *ExternalDocumentationApplyConfiguration     `json:"externalDocs,omitempty"`
-	Example                *v1beta1.JSON                                `json:"example,omitempty"`
-	Nullable               *bool                                        `json:"nullable,omitempty"`
-	XPreserveUnknownFields *bool                                        `json:"x-kubernetes-preserve-unknown-fields,omitempty"`
-	XEmbeddedResource      *bool                                        `json:"x-kubernetes-embedded-resource,omitempty"`
-	XIntOrString           *bool                                        `json:"x-kubernetes-int-or-string,omitempty"`
-	XListMapKeys           []string                                     `json:"x-kubernetes-list-map-keys,omitempty"`
-	XListType              *string                                      `json:"x-kubernetes-list-type,omitempty"`
-	XMapType               *string                                      `json:"x-kubernetes-map-type,omitempty"`
-	XValidations           *v1beta1.ValidationRules                     `json:"x-kubernetes-validations,omitempty"`
+	ID          *string                             `json:"id,omitempty"`
+	Schema      *apiextensionsv1beta1.JSONSchemaURL `json:"$schema,omitempty"`
+	Ref         *string                             `json:"$ref,omitempty"`
+	Description *string                             `json:"description,omitempty"`
+	Type        *string                             `json:"type,omitempty"`
+	// format is an OpenAPI v3 format string. Unknown formats are ignored. The following formats are validated:
+	//
+	// - bsonobjectid: a bson object ID, i.e. a 24 characters hex string
+	// - uri: an URI as parsed by Golang net/url.ParseRequestURI
+	// - email: an email address as parsed by Golang net/mail.ParseAddress
+	// - hostname: a valid representation for an Internet host name, as defined by RFC 1034, section 3.1 [RFC1034].
+	// - ipv4: an IPv4 IP as parsed by Golang net.ParseIP
+	// - ipv6: an IPv6 IP as parsed by Golang net.ParseIP
+	// - cidr: a CIDR as parsed by Golang net.ParseCIDR
+	// - mac: a MAC address as parsed by Golang net.ParseMAC
+	// - uuid: an UUID that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$
+	// - uuid3: an UUID3 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?3[0-9a-f]{3}-?[0-9a-f]{4}-?[0-9a-f]{12}$
+	// - uuid4: an UUID4 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?4[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$
+	// - uuid5: an UUID5 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?5[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$
+	// - isbn: an ISBN10 or ISBN13 number string like "0321751043" or "978-0321751041"
+	// - isbn10: an ISBN10 number string like "0321751043"
+	// - isbn13: an ISBN13 number string like "978-0321751041"
+	// - creditcard: a credit card number defined by the regex ^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\\d{3})\\d{11})$ with any non digit characters mixed in
+	// - ssn: a U.S. social security number following the regex ^\\d{3}[- ]?\\d{2}[- ]?\\d{4}$
+	// - hexcolor: an hexadecimal color code like "#FFFFFF: following the regex ^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$
+	// - rgbcolor: an RGB color code like rgb like "rgb(255,255,2559"
+	// - byte: base64 encoded binary data
+	// - password: any kind of string
+	// - date: a date string like "2006-01-02" as defined by full-date in RFC3339
+	// - duration: a duration string like "22 ns" as parsed by Golang time.ParseDuration or compatible with Scala duration format
+	// - datetime: a date time string like "2014-12-15T19:30:20.000Z" as defined by date-time in RFC3339.
+	Format *string `json:"format,omitempty"`
+	Title  *string `json:"title,omitempty"`
+	// default is a default value for undefined object fields.
+	// Defaulting is a beta feature under the CustomResourceDefaulting feature gate.
+	// CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API.
+	Default              *apiextensionsv1beta1.JSON                   `json:"default,omitempty"`
+	Maximum              *float64                                     `json:"maximum,omitempty"`
+	ExclusiveMaximum     *bool                                        `json:"exclusiveMaximum,omitempty"`
+	Minimum              *float64                                     `json:"minimum,omitempty"`
+	ExclusiveMinimum     *bool                                        `json:"exclusiveMinimum,omitempty"`
+	MaxLength            *int64                                       `json:"maxLength,omitempty"`
+	MinLength            *int64                                       `json:"minLength,omitempty"`
+	Pattern              *string                                      `json:"pattern,omitempty"`
+	MaxItems             *int64                                       `json:"maxItems,omitempty"`
+	MinItems             *int64                                       `json:"minItems,omitempty"`
+	UniqueItems          *bool                                        `json:"uniqueItems,omitempty"`
+	MultipleOf           *float64                                     `json:"multipleOf,omitempty"`
+	Enum                 []apiextensionsv1beta1.JSON                  `json:"enum,omitempty"`
+	MaxProperties        *int64                                       `json:"maxProperties,omitempty"`
+	MinProperties        *int64                                       `json:"minProperties,omitempty"`
+	Required             []string                                     `json:"required,omitempty"`
+	Items                *apiextensionsv1beta1.JSONSchemaPropsOrArray `json:"items,omitempty"`
+	AllOf                []JSONSchemaPropsApplyConfiguration          `json:"allOf,omitempty"`
+	OneOf                []JSONSchemaPropsApplyConfiguration          `json:"oneOf,omitempty"`
+	AnyOf                []JSONSchemaPropsApplyConfiguration          `json:"anyOf,omitempty"`
+	Not                  *JSONSchemaPropsApplyConfiguration           `json:"not,omitempty"`
+	Properties           map[string]JSONSchemaPropsApplyConfiguration `json:"properties,omitempty"`
+	AdditionalProperties *apiextensionsv1beta1.JSONSchemaPropsOrBool  `json:"additionalProperties,omitempty"`
+	PatternProperties    map[string]JSONSchemaPropsApplyConfiguration `json:"patternProperties,omitempty"`
+	Dependencies         *apiextensionsv1beta1.JSONSchemaDependencies `json:"dependencies,omitempty"`
+	AdditionalItems      *apiextensionsv1beta1.JSONSchemaPropsOrBool  `json:"additionalItems,omitempty"`
+	Definitions          *apiextensionsv1beta1.JSONSchemaDefinitions  `json:"definitions,omitempty"`
+	ExternalDocs         *ExternalDocumentationApplyConfiguration     `json:"externalDocs,omitempty"`
+	Example              *apiextensionsv1beta1.JSON                   `json:"example,omitempty"`
+	Nullable             *bool                                        `json:"nullable,omitempty"`
+	// x-kubernetes-preserve-unknown-fields stops the API server
+	// decoding step from pruning fields which are not specified
+	// in the validation schema. This affects fields recursively,
+	// but switches back to normal pruning behaviour if nested
+	// properties or additionalProperties are specified in the schema.
+	// This can either be true or undefined. False is forbidden.
+	XPreserveUnknownFields *bool `json:"x-kubernetes-preserve-unknown-fields,omitempty"`
+	// x-kubernetes-embedded-resource defines that the value is an
+	// embedded Kubernetes runtime.Object, with TypeMeta and
+	// ObjectMeta. The type must be object. It is allowed to further
+	// restrict the embedded object. kind, apiVersion and metadata
+	// are validated automatically. x-kubernetes-preserve-unknown-fields
+	// is allowed to be true, but does not have to be if the object
+	// is fully specified (up to kind, apiVersion, metadata).
+	XEmbeddedResource *bool `json:"x-kubernetes-embedded-resource,omitempty"`
+	// x-kubernetes-int-or-string specifies that this value is
+	// either an integer or a string. If this is true, an empty
+	// type is allowed and type as child of anyOf is permitted
+	// if following one of the following patterns:
+	//
+	// 1) anyOf:
+	// - type: integer
+	// - type: string
+	// 2) allOf:
+	// - anyOf:
+	// - type: integer
+	// - type: string
+	// - ... zero or more
+	XIntOrString *bool `json:"x-kubernetes-int-or-string,omitempty"`
+	// x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used
+	// as the index of the map.
+	//
+	// This tag MUST only be used on lists that have the "x-kubernetes-list-type"
+	// extension set to "map". Also, the values specified for this attribute must
+	// be a scalar typed field of the child structure (no nesting is supported).
+	//
+	// The properties specified must either be required or have a default value,
+	// to ensure those properties are present for all list items.
+	XListMapKeys []string `json:"x-kubernetes-list-map-keys,omitempty"`
+	// x-kubernetes-list-type annotates an array to further describe its topology.
+	// This extension must only be used on lists and may have 3 possible values:
+	//
+	// 1) `atomic`: the list is treated as a single entity, like a scalar.
+	// Atomic lists will be entirely replaced when updated. This extension
+	// may be used on any type of list (struct, scalar, ...).
+	// 2) `set`:
+	// Sets are lists that must not have multiple items with the same value. Each
+	// value must be a scalar, an object with x-kubernetes-map-type `atomic` or an
+	// array with x-kubernetes-list-type `atomic`.
+	// 3) `map`:
+	// These lists are like maps in that their elements have a non-index key
+	// used to identify them. Order is preserved upon merge. The map tag
+	// must only be used on a list with elements of type object.
+	// Defaults to atomic for arrays.
+	XListType *string `json:"x-kubernetes-list-type,omitempty"`
+	// x-kubernetes-map-type annotates an object to further describe its topology.
+	// This extension must only be used when type is object and may have 2 possible values:
+	//
+	// 1) `granular`:
+	// These maps are actual maps (key-value pairs) and each fields are independent
+	// from each other (they can each be manipulated by separate actors). This is
+	// the default behaviour for all maps.
+	// 2) `atomic`: the list is treated as a single entity, like a scalar.
+	// Atomic maps will be entirely replaced when updated.
+	XMapType *string `json:"x-kubernetes-map-type,omitempty"`
+	// x-kubernetes-validations describes a list of validation rules written in the CEL expression language.
+	XValidations *apiextensionsv1beta1.ValidationRules `json:"x-kubernetes-validations,omitempty"`
 }
 
 // JSONSchemaPropsApplyConfiguration constructs a declarative configuration of the JSONSchemaProps type for use with
@@ -88,7 +179,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithID(value string) *JSONSchemaProp
 // WithSchema sets the Schema field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Schema field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithSchema(value v1beta1.JSONSchemaURL) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithSchema(value apiextensionsv1beta1.JSONSchemaURL) *JSONSchemaPropsApplyConfiguration {
 	b.Schema = &value
 	return b
 }
@@ -136,7 +227,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithTitle(value string) *JSONSchemaP
 // WithDefault sets the Default field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Default field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithDefault(value v1beta1.JSON) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithDefault(value apiextensionsv1beta1.JSON) *JSONSchemaPropsApplyConfiguration {
 	b.Default = &value
 	return b
 }
@@ -232,7 +323,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithMultipleOf(value float64) *JSONS
 // WithEnum adds the given value to the Enum field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Enum field.
-func (b *JSONSchemaPropsApplyConfiguration) WithEnum(values ...v1beta1.JSON) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithEnum(values ...apiextensionsv1beta1.JSON) *JSONSchemaPropsApplyConfiguration {
 	for i := range values {
 		b.Enum = append(b.Enum, values[i])
 	}
@@ -268,7 +359,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithRequired(values ...string) *JSON
 // WithItems sets the Items field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Items field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithItems(value v1beta1.JSONSchemaPropsOrArray) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithItems(value apiextensionsv1beta1.JSONSchemaPropsOrArray) *JSONSchemaPropsApplyConfiguration {
 	b.Items = &value
 	return b
 }
@@ -337,7 +428,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithProperties(entries map[string]JS
 // WithAdditionalProperties sets the AdditionalProperties field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AdditionalProperties field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalProperties(value v1beta1.JSONSchemaPropsOrBool) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalProperties(value apiextensionsv1beta1.JSONSchemaPropsOrBool) *JSONSchemaPropsApplyConfiguration {
 	b.AdditionalProperties = &value
 	return b
 }
@@ -359,7 +450,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithPatternProperties(entries map[st
 // WithDependencies sets the Dependencies field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Dependencies field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithDependencies(value v1beta1.JSONSchemaDependencies) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithDependencies(value apiextensionsv1beta1.JSONSchemaDependencies) *JSONSchemaPropsApplyConfiguration {
 	b.Dependencies = &value
 	return b
 }
@@ -367,7 +458,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithDependencies(value v1beta1.JSONS
 // WithAdditionalItems sets the AdditionalItems field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AdditionalItems field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalItems(value v1beta1.JSONSchemaPropsOrBool) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalItems(value apiextensionsv1beta1.JSONSchemaPropsOrBool) *JSONSchemaPropsApplyConfiguration {
 	b.AdditionalItems = &value
 	return b
 }
@@ -375,7 +466,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithAdditionalItems(value v1beta1.JS
 // WithDefinitions sets the Definitions field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Definitions field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithDefinitions(value v1beta1.JSONSchemaDefinitions) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithDefinitions(value apiextensionsv1beta1.JSONSchemaDefinitions) *JSONSchemaPropsApplyConfiguration {
 	b.Definitions = &value
 	return b
 }
@@ -391,7 +482,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithExternalDocs(value *ExternalDocu
 // WithExample sets the Example field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Example field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithExample(value v1beta1.JSON) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithExample(value apiextensionsv1beta1.JSON) *JSONSchemaPropsApplyConfiguration {
 	b.Example = &value
 	return b
 }
@@ -457,7 +548,7 @@ func (b *JSONSchemaPropsApplyConfiguration) WithXMapType(value string) *JSONSche
 // WithXValidations sets the XValidations field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the XValidations field is set to the value of the last call.
-func (b *JSONSchemaPropsApplyConfiguration) WithXValidations(value v1beta1.ValidationRules) *JSONSchemaPropsApplyConfiguration {
+func (b *JSONSchemaPropsApplyConfiguration) WithXValidations(value apiextensionsv1beta1.ValidationRules) *JSONSchemaPropsApplyConfiguration {
 	b.XValidations = &value
 	return b
 }

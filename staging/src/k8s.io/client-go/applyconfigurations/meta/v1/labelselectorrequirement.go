@@ -19,15 +19,25 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // LabelSelectorRequirementApplyConfiguration represents a declarative configuration of the LabelSelectorRequirement type for use
 // with apply.
+//
+// A label selector requirement is a selector that contains values, a key, and an operator that
+// relates the key and values.
 type LabelSelectorRequirementApplyConfiguration struct {
-	Key      *string                   `json:"key,omitempty"`
-	Operator *v1.LabelSelectorOperator `json:"operator,omitempty"`
-	Values   []string                  `json:"values,omitempty"`
+	// key is the label key that the selector applies to.
+	Key *string `json:"key,omitempty"`
+	// operator represents a key's relationship to a set of values.
+	// Valid operators are In, NotIn, Exists and DoesNotExist.
+	Operator *metav1.LabelSelectorOperator `json:"operator,omitempty"`
+	// values is an array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty. This array is replaced during a strategic
+	// merge patch.
+	Values []string `json:"values,omitempty"`
 }
 
 // LabelSelectorRequirementApplyConfiguration constructs a declarative configuration of the LabelSelectorRequirement type for use with
@@ -47,7 +57,7 @@ func (b *LabelSelectorRequirementApplyConfiguration) WithKey(value string) *Labe
 // WithOperator sets the Operator field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Operator field is set to the value of the last call.
-func (b *LabelSelectorRequirementApplyConfiguration) WithOperator(value v1.LabelSelectorOperator) *LabelSelectorRequirementApplyConfiguration {
+func (b *LabelSelectorRequirementApplyConfiguration) WithOperator(value metav1.LabelSelectorOperator) *LabelSelectorRequirementApplyConfiguration {
 	b.Operator = &value
 	return b
 }

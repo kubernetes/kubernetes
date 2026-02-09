@@ -2938,6 +2938,13 @@ func testFinalizerValidationApplyCreateAndUpdateCRD(t *testing.T, rest rest.Inte
 			finalizer: []string{"kubernetes.io/valid-finalizer"},
 		},
 		{
+			name:      "create-crd-with-fqdn-like-finalizer-without-path",
+			finalizer: []string{"finalizer.without.valid-path.io"},
+			expectCreateWarnings: []string{
+				`metadata.finalizers: "finalizer.without.valid-path.io": prefer a domain-qualified finalizer name including a path (/) to avoid accidental conflicts with other finalizer writers`,
+			},
+		},
+		{
 			name:             "update-crd-with-invalid-finalizer",
 			finalizer:        []string{"invalid-finalizer"},
 			updatedFinalizer: []string{"another-invalid-finalizer"},

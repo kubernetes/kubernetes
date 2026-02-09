@@ -31,18 +31,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/ptr"
 )
 
 func TestReflectorWatchListFallback(t *testing.T) {
-	ctx := context.TODO()
+	logger, ctx := ktesting.NewTestContext(t)
 
 	t.Log("Starting etcd that will be used by two different instances of kube-apiserver")
-	etcdURL, etcdTearDownFn, err := framework.RunCustomEtcd("etcd_watchlist", []string{"--experimental-watch-progress-notify-interval", "1s"}, nil)
+	etcdURL, etcdTearDownFn, err := framework.RunCustomEtcd(logger, "etcd_watchlist", []string{"--experimental-watch-progress-notify-interval", "1s"})
 	require.NoError(t, err)
 	defer etcdTearDownFn()
 	etcdOptions := framework.DefaultEtcdOptions()
@@ -67,8 +69,15 @@ func TestReflectorWatchListFallback(t *testing.T) {
 	store := &wrappedStore{Store: cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)}
 	lw := &wrappedListWatch{&cache.ListWatch{}}
 	lw.SetClient(ctx, clientSet, ns)
-	target := cache.NewReflector(lw, &v1.Secret{}, store, time.Duration(0))
-	target.UseWatchList = ptr.To(true)
+	var target *cache.Reflector
+	func() {
+		// Enable ListWatchClient only for this reflector.
+		// We rely on the fact that instantiation of whether watchlist is used or not is done once
+		// during reflector creation in NewReflectorWithOptions
+		clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+		defer clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, false)
+		target = cache.NewReflector(lw, &v1.Secret{}, store, time.Duration(0))
+	}()
 
 	t.Log("Waiting until the secret reflector synchronises to the store (call to the Replace method)")
 	reflectorCtx, reflectorCtxCancel := context.WithCancel(context.Background())

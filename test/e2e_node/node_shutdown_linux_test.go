@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -40,10 +39,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 
 	"github.com/godbus/dbus/v5"
 	v1 "k8s.io/api/core/v1"
@@ -57,7 +56,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.GracefulNodeShutdown, nodefeature.GracefulNodeShutdownBasedOnPodPriority, func() {
+var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.GracefulNodeShutdown, feature.GracefulNodeShutdownBasedOnPodPriority, func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -93,10 +92,11 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 		)
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.GracefulNodeShutdown):                   true,
-				string(features.GracefulNodeShutdownBasedOnPodPriority): false,
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
 			}
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdown)] = true
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdownBasedOnPodPriority)] = false
 			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
 		})
 
@@ -195,11 +195,13 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 		)
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.GracefulNodeShutdown):                   true,
-				string(features.GracefulNodeShutdownBasedOnPodPriority): false,
-				string(features.PodReadyToStartContainersCondition):     true,
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
 			}
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdown)] = true
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdownBasedOnPodPriority)] = false
+			initialConfig.FeatureGates[string(features.PodReadyToStartContainersCondition)] = true
+
 			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
 			initialConfig.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: nodeShutdownGracePeriodCriticalPods}
 		})
@@ -261,7 +263,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 				})
 
 				// Ignore timeout error since the context will be explicitly cancelled and the watch will never return true
-				if err != nil && err != wait.ErrWaitTimeout {
+				if err != nil && !wait.Interrupted(err) {
 					framework.Failf("watch for invalid pod status failed: %v", err.Error())
 				}
 			}()
@@ -341,7 +343,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 					if !isPodReadyToStartConditionSetToFalse(&pod) {
 						framework.Logf("Expecting pod (%v/%v) 's ready to start condition set to false, "+
 							"but it's not currently: Pod Condition %+v", pod.Namespace, pod.Name, pod.Status.Conditions)
-						return fmt.Errorf("pod (%v/%v) 's ready to start condition should be false, condition: %s, phase: %s",
+						return fmt.Errorf("pod (%v/%v) 's ready to start condition should be false, condition: %v, phase: %s",
 							pod.Namespace, pod.Name, pod.Status.Conditions, pod.Status.Phase)
 					}
 				}
@@ -390,10 +392,12 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 		)
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.GracefulNodeShutdown):                   true,
-				string(features.GracefulNodeShutdownBasedOnPodPriority): true,
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
 			}
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdown)] = true
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdownBasedOnPodPriority)] = true
+
 			initialConfig.ShutdownGracePeriodByPodPriority = []kubeletconfig.ShutdownGracePeriodByPodPriority{
 				{
 					Priority:                   scheduling.SystemCriticalPriority,
@@ -640,14 +644,6 @@ func emitSignalPrepareForShutdown(b bool) error {
 	}
 	defer conn.Close()
 	return conn.Emit("/org/freedesktop/login1", "org.freedesktop.login1.Manager.PrepareForShutdown", b)
-}
-
-func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
-	// Assuming that there is only one node, because this is a node e2e test.
-	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "the number of nodes is not as expected")
-	return isNodeReady(&nodeList.Items[0])
 }
 
 const (

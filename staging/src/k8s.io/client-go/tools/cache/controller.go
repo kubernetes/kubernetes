@@ -17,13 +17,16 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/utils/clock"
 )
 
@@ -46,8 +49,19 @@ type Config struct {
 	// Something that can list and watch your objects.
 	ListerWatcher
 
-	// Something that can process a popped Deltas.
+	// Process can process a popped Deltas.
 	Process ProcessFunc
+
+	// ProcessBatch can process a batch of popped Deltas, which should return `TransactionError` if not all items
+	// in the batch were successfully processed.
+	//
+	// For batch processing to be used:
+	// * ProcessBatch must be non-nil
+	// * Queue must implement QueueWithBatch
+	// * The client InOrderInformersBatchProcess feature gate must be enabled
+	//
+	// If any of those are false, Process is used and no batch processing is done.
+	ProcessBatch ProcessBatchFunc
 
 	// ObjectType is an example object of the type this controller is
 	// expected to handle.
@@ -71,15 +85,14 @@ type Config struct {
 	// resync.
 	ShouldResync ShouldResyncFunc
 
-	// If true, when Process() returns an error, re-enqueue the object.
-	// TODO: add interface to let you inject a delay/backoff or drop
-	//       the object completely if desired. Pass the object in
-	//       question to this interface as a parameter.  This is probably moot
-	//       now that this functionality appears at a higher level.
-	RetryOnError bool
-
 	// Called whenever the ListAndWatch drops the connection with an error.
+	//
+	// Contextual logging: WatchErrorHandlerWithContext should be used instead of WatchErrorHandler in code which supports contextual logging.
 	WatchErrorHandler WatchErrorHandler
+
+	// Called whenever the ListAndWatch drops the connection with an error
+	// and WatchErrorHandler is not set.
+	WatchErrorHandlerWithContext WatchErrorHandlerWithContext
 
 	// WatchListPageSize is the requested chunk size of initial and relist watch lists.
 	WatchListPageSize int64
@@ -93,6 +106,10 @@ type ShouldResyncFunc func() bool
 // ProcessFunc processes a single object.
 type ProcessFunc func(obj interface{}, isInInitialList bool) error
 
+// ProcessBatchFunc processes multiple objects in batch.
+// The deltas must not contain multiple entries for the same object.
+type ProcessBatchFunc func(deltas []Delta, isInInitialList bool) error
+
 // `*controller` implements Controller
 type controller struct {
 	config         Config
@@ -104,12 +121,21 @@ type controller struct {
 // Controller is a low-level controller that is parameterized by a
 // Config and used in sharedIndexInformer.
 type Controller interface {
-	// Run does two things.  One is to construct and run a Reflector
+	// RunWithContext does two things.  One is to construct and run a Reflector
 	// to pump objects/notifications from the Config's ListerWatcher
 	// to the Config's Queue and possibly invoke the occasional Resync
 	// on that Queue.  The other is to repeatedly Pop from the Queue
 	// and process with the Config's ProcessFunc.  Both of these
-	// continue until `stopCh` is closed.
+	// continue until the context is canceled.
+	//
+	// It's an error to call RunWithContext more than once.
+	// RunWithContext blocks; call via go.
+	RunWithContext(ctx context.Context)
+
+	// Run does the same as RunWithContext with a stop channel instead of
+	// a context.
+	//
+	// Contextual logging: RunWithcontext should be used instead of Run in code which supports contextual logging.
 	Run(stopCh <-chan struct{})
 
 	// HasSynced delegates to the Config's Queue
@@ -129,13 +155,16 @@ func New(c *Config) Controller {
 	return ctlr
 }
 
-// Run begins processing items, and will continue until a value is sent down stopCh or it is closed.
-// It's an error to call Run more than once.
-// Run blocks; call via go.
+// Run implements [Controller.Run].
 func (c *controller) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
+	c.RunWithContext(wait.ContextForChannel(stopCh))
+}
+
+// RunWithContext implements [Controller.RunWithContext].
+func (c *controller) RunWithContext(ctx context.Context) {
+	defer utilruntime.HandleCrashWithContext(ctx)
 	go func() {
-		<-stopCh
+		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
 	r := NewReflectorWithOptions(
@@ -152,7 +181,11 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 	r.ShouldResync = c.config.ShouldResync
 	r.WatchListPageSize = c.config.WatchListPageSize
 	if c.config.WatchErrorHandler != nil {
-		r.watchErrorHandler = c.config.WatchErrorHandler
+		r.watchErrorHandler = func(_ context.Context, r *Reflector, err error) {
+			c.config.WatchErrorHandler(r, err)
+		}
+	} else if c.config.WatchErrorHandlerWithContext != nil {
+		r.watchErrorHandler = c.config.WatchErrorHandlerWithContext
 	}
 
 	c.reflectorMutex.Lock()
@@ -161,9 +194,9 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 
 	var wg wait.Group
 
-	wg.StartWithChannel(stopCh, r.Run)
+	wg.StartWithContext(ctx, r.RunWithContext)
 
-	wait.Until(c.processLoop, time.Second, stopCh)
+	wait.UntilWithContext(ctx, c.processLoop, time.Second)
 	wg.Wait()
 }
 
@@ -185,21 +218,28 @@ func (c *controller) LastSyncResourceVersion() string {
 // TODO: Consider doing the processing in parallel. This will require a little thought
 // to make sure that we don't end up processing the same object multiple times
 // concurrently.
-//
-// TODO: Plumb through the stopCh here (and down to the queue) so that this can
-// actually exit when the controller is stopped. Or just give up on this stuff
-// ever being stoppable. Converting this whole package to use Context would
-// also be helpful.
-func (c *controller) processLoop() {
+func (c *controller) processLoop(ctx context.Context) {
+	useBatchProcess := false
+	batchQueue, ok := c.config.Queue.(QueueWithBatch)
+	if ok && c.config.ProcessBatch != nil && clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformersBatchProcess) {
+		useBatchProcess = true
+	}
 	for {
-		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
-		if err != nil {
-			if err == ErrFIFOClosed {
-				return
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			var err error
+			if useBatchProcess {
+				err = batchQueue.PopBatch(c.config.ProcessBatch, PopProcessFunc(c.config.Process))
+			} else {
+				// otherwise fallback to non-batch process behavior
+				_, err = c.config.Pop(PopProcessFunc(c.config.Process))
 			}
-			if c.config.RetryOnError {
-				// This is the safe way to re-enqueue.
-				c.config.Queue.AddIfNotPresent(obj)
+			if err != nil {
+				if errors.Is(err, ErrFIFOClosed) {
+					return
+				}
 			}
 		}
 	}
@@ -389,6 +429,14 @@ type InformerOptions struct {
 	// for them.
 	// Optional - if unset no additional transforming is happening.
 	Transform TransformFunc
+
+	// Identifier is used to identify the FIFO for metrics and logging purposes.
+	// If not set, metrics will not be published.
+	Identifier InformerNameAndResource
+
+	// FIFOMetricsProvider is the metrics provider for the FIFO queue.
+	// If not set, metrics will be no-ops.
+	FIFOMetricsProvider FIFOMetricsProvider
 }
 
 // NewInformerWithOptions returns a Store and a controller for populating the store
@@ -402,7 +450,7 @@ func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
 	} else {
 		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers)
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewInformer returns a Store and a controller for populating the store
@@ -436,7 +484,7 @@ func NewInformer(
 		Handler:       h,
 		ResyncPeriod:  resyncPeriod,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewIndexerInformer returns an Indexer and a Controller for populating the index
@@ -473,7 +521,7 @@ func NewIndexerInformer(
 		ResyncPeriod:  resyncPeriod,
 		Indexers:      indexers,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingInformer returns a Store and a controller for populating
@@ -502,7 +550,7 @@ func NewTransformingInformer(
 		ResyncPeriod:  resyncPeriod,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingIndexerInformer returns an Indexer and a controller for
@@ -533,7 +581,7 @@ func NewTransformingIndexerInformer(
 		Indexers:      indexers,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // Multiplexes updates in the form of a list of Deltas into a Store, and informs
@@ -544,12 +592,31 @@ func processDeltas(
 	clientState Store,
 	deltas Deltas,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
 		obj := d.Object
 
 		switch d.Type {
+		case ReplacedAll:
+			info, ok := obj.(ReplacedAllInfo)
+			if !ok {
+				return fmt.Errorf("ReplacedAll did not contain ReplacedAllInfo: %T", obj)
+			}
+			if err := processReplacedAllInfo(handler, info, clientState, isInInitialList, keyFunc); err != nil {
+				return err
+			}
+		case SyncAll:
+			_, ok := obj.(SyncAllInfo)
+			if !ok {
+				return fmt.Errorf("SyncAll did not contain SyncAllInfo: %T", obj)
+			}
+			objs := clientState.List()
+			for _, obj := range objs {
+				handler.OnUpdate(obj, obj)
+			}
+			return nil
 		case Sync, Replaced, Added, Updated:
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				if err := clientState.Update(obj); err != nil {
@@ -572,21 +639,152 @@ func processDeltas(
 	return nil
 }
 
+// processDeltasInBatch applies a batch of Delta objects to the given Store and
+// notifies the ResourceEventHandler of add, update, or delete events.
+//
+// If the Store supports transactions (TransactionStore), all Deltas are applied
+// atomically in a single transaction and corresponding handler callbacks are
+// executed afterward. Otherwise, each Delta is processed individually.
+//
+// Returns an error if any Delta or transaction fails. For TransactionError,
+// only successful operations trigger callbacks.
+func processDeltasInBatch(
+	handler ResourceEventHandler,
+	clientState Store,
+	deltas []Delta,
+	isInInitialList bool,
+	keyFunc KeyFunc,
+) error {
+	// from oldest to newest
+	txns := make([]Transaction, 0)
+	callbacks := make([]func(), 0)
+	txnStore, txnSupported := clientState.(TransactionStore)
+	if !txnSupported {
+		var errs []error
+		for _, delta := range deltas {
+			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList, keyFunc); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		if len(errs) > 0 {
+			return fmt.Errorf("unexpected error when handling deltas: %v", errs)
+		}
+		return nil
+	}
+	// deltasList is a list of unique objects
+	for _, d := range deltas {
+		obj := d.Object
+		switch d.Type {
+		case Sync, Replaced, Added, Updated:
+			// it will only return one old object for each because items are unique
+			if old, exists, err := clientState.Get(obj); err == nil && exists {
+				txn := Transaction{
+					Type:   TransactionTypeUpdate,
+					Object: obj,
+				}
+				txns = append(txns, txn)
+				callbacks = append(callbacks, func() {
+					handler.OnUpdate(old, obj)
+				})
+			} else {
+				txn := Transaction{
+					Type:   TransactionTypeAdd,
+					Object: obj,
+				}
+				txns = append(txns, txn)
+				callbacks = append(callbacks, func() {
+					handler.OnAdd(obj, isInInitialList)
+				})
+			}
+		case Deleted:
+			txn := Transaction{
+				Type:   TransactionTypeDelete,
+				Object: obj,
+			}
+			txns = append(txns, txn)
+			callbacks = append(callbacks, func() {
+				handler.OnDelete(obj)
+			})
+		default:
+			return fmt.Errorf("Delta type %s is not supported in batch processing", d.Type)
+		}
+	}
+
+	err := txnStore.Transaction(txns...)
+	if err != nil {
+		// if txn had error, only execute the callbacks for the successful ones
+		for _, i := range err.SuccessfulIndices {
+			if i < len(callbacks) {
+				callbacks[i]()
+			}
+		}
+		// formatting the error so txns doesn't escape and keeps allocated in the stack.
+		return fmt.Errorf("not all items in the batch successfully processed: %s", err.Error())
+	}
+	for _, callback := range callbacks {
+		callback()
+	}
+	return nil
+}
+
+func processReplacedAllInfo(handler ResourceEventHandler, info ReplacedAllInfo, clientState Store, isInInitialList bool, keyFunc KeyFunc) error {
+	var deletions []DeletedFinalStateUnknown
+	type replacement struct {
+		oldObj interface{}
+		newObj interface{}
+	}
+	replacements := make([]replacement, 0, len(info.Objects))
+
+	err := reconcileReplacement(nil, clientState, info.Objects, keyFunc,
+		func(obj DeletedFinalStateUnknown) error {
+			deletions = append(deletions, obj)
+			return nil
+		},
+		func(obj interface{}) error {
+			// This behavior matches processDeltas handling of Replace deltas
+			if old, exists, err := clientState.Get(obj); err == nil && exists {
+				replacements = append(replacements, replacement{newObj: obj, oldObj: old})
+			} else {
+				replacements = append(replacements, replacement{newObj: obj})
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Replace the client state first so the store reflects the events handlers are given
+	if err := clientState.Replace(info.Objects, info.ResourceVersion); err != nil {
+		return err
+	}
+	// Processing all deletions first matches behavior of RealFIFO#Replace
+	for _, objToDelete := range deletions {
+		handler.OnDelete(objToDelete)
+	}
+	// Processing adds/updates in order observed by reconcileReplacement matches behavior of RealFIFO#Replace
+	for _, r := range replacements {
+		if r.oldObj != nil {
+			handler.OnUpdate(r.oldObj, r.newObj)
+		} else {
+			handler.OnAdd(r.newObj, isInInitialList)
+		}
+	}
+	return nil
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
 // Parameters
 //   - clientState is the store you want to populate
 //   - options contain the options to configure the controller
-func newInformer(clientState Store, options InformerOptions) Controller {
+func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KnownObjects:          clientState,
-		EmitDeltaTypeReplaced: true,
-		Transformer:           options.Transform,
-	})
+
+	fifo := newQueueFIFO(clientState, options.Transform, options.Identifier, options.FIFOMetricsProvider)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -594,14 +792,41 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 		ObjectType:       options.ObjectType,
 		FullResyncPeriod: options.ResyncPeriod,
 		MinWatchTimeout:  options.MinWatchTimeout,
-		RetryOnError:     false,
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
+				return processDeltas(options.Handler, clientState, deltas, isInInitialList, keyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
+		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
+			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList, keyFunc)
+		},
 	}
 	return New(cfg)
+}
+
+func newQueueFIFO(clientState Store, transform TransformFunc, identifier InformerNameAndResource, metricsProvider FIFOMetricsProvider) Queue {
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
+		options := RealFIFOOptions{
+			KeyFunction:     MetaNamespaceKeyFunc,
+			Transformer:     transform,
+			Identifier:      identifier,
+			MetricsProvider: metricsProvider,
+		}
+		// If atomic events are enabled, unset clientState in the case of atomic events as we cannot pass a
+		// store to an atomic fifo.
+		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO) {
+			options.AtomicEvents = true
+		} else {
+			options.KnownObjects = clientState
+		}
+		return NewRealFIFOWithOptions(options)
+	} else {
+		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			KnownObjects:          clientState,
+			EmitDeltaTypeReplaced: true,
+			Transformer:           transform,
+		})
+	}
 }

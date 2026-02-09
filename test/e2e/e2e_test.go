@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	"gopkg.in/yaml.v2"
+	yaml "go.yaml.in/yaml/v2"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -43,7 +43,6 @@ import (
 
 	// define and freeze constants
 	_ "k8s.io/kubernetes/test/e2e/feature"
-	_ "k8s.io/kubernetes/test/e2e/nodefeature"
 
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
@@ -55,6 +54,8 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/common"
 	_ "k8s.io/kubernetes/test/e2e/dra"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation"
+	_ "k8s.io/kubernetes/test/e2e/invariants"
+	"k8s.io/kubernetes/test/e2e/invariants/logcheck"
 	_ "k8s.io/kubernetes/test/e2e/kubectl"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
@@ -78,6 +79,7 @@ func handleFlags() {
 	config.CopyFlags(config.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
 	framework.RegisterClusterFlags(flag.CommandLine)
+	logcheck.RegisterFlags(flag.CommandLine)
 	flag.Parse()
 }
 

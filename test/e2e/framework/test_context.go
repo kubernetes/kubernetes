@@ -277,6 +277,8 @@ type NodeTestContextType struct {
 	ExtraEnvs map[string]string
 	// StandaloneMode indicates whether the test is running kubelet in a standalone mode.
 	StandaloneMode bool
+	// CriProxyEnabled indicates whether enable CRI API proxy for failure injection.
+	CriProxyEnabled bool
 }
 
 // CloudConfig holds the cloud configuration for e2e test suites.
@@ -508,6 +510,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	gomega.SetDefaultConsistentlyPollingInterval(t.timeouts.Poll)
 	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
 	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
+	gomega.EnforceDefaultTimeoutsWhenUsingContexts()
 
 	// ginkgo.PreviewSpecs will expand all nodes and thus may find new bugs.
 	report := ginkgo.PreviewSpecs("Kubernetes e2e test statistics")

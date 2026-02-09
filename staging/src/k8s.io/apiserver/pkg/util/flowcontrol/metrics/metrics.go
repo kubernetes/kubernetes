@@ -326,7 +326,7 @@ var (
 			Help:      "Number of estimated seats (maximum of initial and final seats) associated with requests in API Priority and Fairness",
 			// the upper bound comes from the maximum number of seats a request
 			// can occupy which is currently set at 10.
-			Buckets:        []float64{1, 2, 4, 10},
+			Buckets:        []float64{1, 2, 4, 8, 16, 32, 64, 100},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},

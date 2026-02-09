@@ -176,7 +176,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
-		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.String()).Inc()
+		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely, we simply terminate it.
 
@@ -434,7 +434,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 }
 
 func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
 	defer c.Stop()
 
@@ -453,6 +453,13 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	// consider increase size of result buffer in those cases.
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
+
+	// cacheInterval may be created from a version being more fresh than requested
+	// (e.g. for NotOlderThan semantic). In such a case, we need to prevent watch event
+	// with lower resourceVersion from being delivered to ensure watch contract.
+	if cacheInterval.resourceVersion > resourceVersion {
+		resourceVersion = cacheInterval.resourceVersion
+	}
 
 	initEventCount := 0
 	for {
@@ -496,13 +503,17 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	}
 
 	if initEventCount > 0 {
-		metrics.InitCounter.WithLabelValues(c.groupResource.String()).Add(float64(initEventCount))
+		metrics.InitCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Add(float64(initEventCount))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
 	}
 
+	// send bookmark after sending all events in cacheInterval for watchlist request
+	if cacheInterval.initialEventsEndBookmark != nil {
+		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+	}
 	c.process(ctx, resourceVersion)
 }
 

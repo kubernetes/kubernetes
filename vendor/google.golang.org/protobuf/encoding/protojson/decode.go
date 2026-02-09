@@ -192,11 +192,6 @@ func (d decoder) unmarshalMessage(m protoreflect.Message, skipTypeURL bool) erro
 				fd = fieldDescs.ByTextName(name)
 			}
 		}
-		if flags.ProtoLegacy {
-			if fd != nil && fd.IsWeak() && fd.Message().IsPlaceholder() {
-				fd = nil // reset since the weak reference is not linked in
-			}
-		}
 
 		if fd == nil {
 			// Field is unknown.
@@ -351,7 +346,7 @@ func (d decoder) unmarshalScalar(fd protoreflect.FieldDescriptor) (protoreflect.
 		panic(fmt.Sprintf("unmarshalScalar: invalid scalar kind %v", kind))
 	}
 
-	return protoreflect.Value{}, d.newError(tok.Pos(), "invalid value for %v type: %v", kind, tok.RawString())
+	return protoreflect.Value{}, d.newError(tok.Pos(), "invalid value for %v field %v: %v", kind, fd.JSONName(), tok.RawString())
 }
 
 func unmarshalInt(tok json.Token, bitSize int) (protoreflect.Value, bool) {

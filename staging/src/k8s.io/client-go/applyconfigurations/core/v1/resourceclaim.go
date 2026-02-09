@@ -20,8 +20,17 @@ package v1
 
 // ResourceClaimApplyConfiguration represents a declarative configuration of the ResourceClaim type for use
 // with apply.
+//
+// ResourceClaim references one entry in PodSpec.ResourceClaims.
 type ResourceClaimApplyConfiguration struct {
+	// Name must match the name of one entry in pod.spec.resourceClaims of
+	// the Pod where this field is used. It makes that resource available
+	// inside a container.
 	Name *string `json:"name,omitempty"`
+	// Request is the name chosen for a request in the referenced claim.
+	// If empty, everything from the claim is made available, otherwise
+	// only the result of this request.
+	Request *string `json:"request,omitempty"`
 }
 
 // ResourceClaimApplyConfiguration constructs a declarative configuration of the ResourceClaim type for use with
@@ -35,5 +44,13 @@ func ResourceClaim() *ResourceClaimApplyConfiguration {
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ResourceClaimApplyConfiguration) WithName(value string) *ResourceClaimApplyConfiguration {
 	b.Name = &value
+	return b
+}
+
+// WithRequest sets the Request field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Request field is set to the value of the last call.
+func (b *ResourceClaimApplyConfiguration) WithRequest(value string) *ResourceClaimApplyConfiguration {
+	b.Request = &value
 	return b
 }

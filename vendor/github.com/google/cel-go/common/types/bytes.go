@@ -19,6 +19,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"reflect"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/google/cel-go/common/types/ref"
@@ -58,7 +59,17 @@ func (b Bytes) Compare(other ref.Val) ref.Val {
 // ConvertToNative implements the ref.Val interface method.
 func (b Bytes) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	switch typeDesc.Kind() {
-	case reflect.Array, reflect.Slice:
+	case reflect.Array:
+		if len(b) != typeDesc.Len() {
+			return nil, fmt.Errorf("[%d]byte not assignable to [%d]byte array", len(b), typeDesc.Len())
+		}
+		refArrPtr := reflect.New(reflect.ArrayOf(len(b), typeDesc.Elem()))
+		refArr := refArrPtr.Elem()
+		for i, byt := range b {
+			refArr.Index(i).Set(reflect.ValueOf(byt).Convert(typeDesc.Elem()))
+		}
+		return refArr.Interface(), nil
+	case reflect.Slice:
 		return reflect.ValueOf(b).Convert(typeDesc).Interface(), nil
 	case reflect.Ptr:
 		switch typeDesc {
@@ -127,4 +138,18 @@ func (b Bytes) Type() ref.Type {
 // Value implements the ref.Val interface method.
 func (b Bytes) Value() any {
 	return []byte(b)
+}
+
+func (b Bytes) format(sb *strings.Builder) {
+	fmt.Fprintf(sb, "b\"%s\"", bytesToOctets([]byte(b)))
+}
+
+// bytesToOctets converts byte sequences to a string using a three digit octal encoded value
+// per byte.
+func bytesToOctets(byteVal []byte) string {
+	var b strings.Builder
+	for _, c := range byteVal {
+		fmt.Fprintf(&b, "\\%03o", c)
+	}
+	return b.String()
 }

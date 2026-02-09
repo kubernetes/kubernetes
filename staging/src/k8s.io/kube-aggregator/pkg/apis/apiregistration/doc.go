@@ -18,4 +18,4 @@ limitations under the License.
 // +groupName=apiregistration.k8s.io
 
 // Package apiregistration is the internal version of the API.
-package apiregistration // import "k8s.io/kube-aggregator/pkg/apis/apiregistration"
+package apiregistration

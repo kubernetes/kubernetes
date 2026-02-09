@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
@@ -269,8 +270,12 @@ func TestDataSourceFilter(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, test.xnsEnabled)
+			// TODO: this will be removed in 1.36
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.AnyVolumeDataSource:            test.anyEnabled,
+				features.CrossNamespaceVolumeDataSource: test.xnsEnabled,
+			})
 			DropDisabledFields(&test.spec, &test.oldSpec)
 			if test.spec.DataSource != test.want {
 				t.Errorf("expected condition was not met, test: %s, anyEnabled: %v, xnsEnabled: %v, spec: %+v, expected DataSource: %+v",
@@ -367,8 +372,10 @@ func TestDataSourceRef(t *testing.T) {
 		},
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.AnyVolumeDataSource:            true,
+		features.CrossNamespaceVolumeDataSource: true,
+	})
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
@@ -435,6 +442,9 @@ func TestDropDisabledVolumeAttributesClass(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
+			if !test.vacEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.vacEnabled)
 			DropDisabledFields(&test.spec, &test.oldSpec)
 			if test.spec.VolumeAttributesClassName != test.wantVAC {
@@ -446,6 +456,7 @@ func TestDropDisabledVolumeAttributesClass(t *testing.T) {
 }
 
 func TestDropDisabledFieldsFromStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	tests := []struct {
 		name                                string
 		enableRecoverVolumeExpansionFailure bool
@@ -498,7 +509,7 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 			name:                                "for:newPVC=hasResizeStatus,oldPVC=nil, featuregate=false should drop field",
 			enableRecoverVolumeExpansionFailure: false,
 			enableVolumeAttributesClass:         false,
-			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
 			oldPVC:                              nil,
 			expected:                            getPVC(),
 		},
@@ -506,25 +517,25 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 			name:                                "for:newPVC=hasResizeStatus,oldPVC=doesnot,featuregate=RecoverVolumeExpansionFailure=true; should keep field",
 			enableRecoverVolumeExpansionFailure: true,
 			enableVolumeAttributesClass:         false,
-			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
 			oldPVC:                              getPVC(),
-			expected:                            withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			expected:                            withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
 		},
 		{
 			name:                                "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=RecoverVolumeExpansionFailure=true; should keep field",
 			enableRecoverVolumeExpansionFailure: true,
 			enableVolumeAttributesClass:         false,
-			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
-			oldPVC:                              withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
-			expected:                            withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			oldPVC:                              withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			expected:                            withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
 		},
 		{
 			name:                                "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=false; should keep field",
 			enableRecoverVolumeExpansionFailure: false,
 			enableVolumeAttributesClass:         false,
-			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
-			oldPVC:                              withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
-			expected:                            withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			pvc:                                 withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			oldPVC:                              withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
+			expected:                            withResizeStatus(core.PersistentVolumeClaimNodeResizeInfeasible),
 		},
 		{
 			name:                                "for:newPVC=hasVolumeAttributeClass,oldPVC=nil, featuregate=false should drop field",
@@ -594,8 +605,10 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.enableRecoverVolumeExpansionFailure)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.enableVolumeAttributesClass)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.RecoverVolumeExpansionFailure: test.enableRecoverVolumeExpansionFailure,
+				features.VolumeAttributesClass:         test.enableVolumeAttributesClass,
+			})
 
 			DropDisabledFieldsFromStatus(test.pvc, test.oldPVC)
 

@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -27,6 +26,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -34,16 +34,16 @@ const contentionLockFile = "/var/run/kubelet.lock"
 
 // Kubelet Lock contention tests the lock contention feature.
 // Disruptive because the kubelet is restarted in the test.
-// NodeSpecialFeature:LockContention because we don't want the test to be picked up by any other
+// Feature:LockContention because we don't want the test to be picked up by any other
 // test suite, hence the unique name "LockContention".
-var _ = SIGDescribe("Lock contention", framework.WithSlow(), framework.WithDisruptive(), "[NodeSpecialFeature:LockContention]", func() {
+var _ = SIGDescribe("Lock contention", framework.WithSlow(), framework.WithDisruptive(), feature.LockContention, func() {
 
 	// Requires `--lock-file` & `--exit-on-lock-contention` flags to be set on the Kubelet.
 	ginkgo.It("Kubelet should stop when the test acquires the lock on lock file and restart once the lock is released", func(ctx context.Context) {
 
 		ginkgo.By("perform kubelet health check to check if kubelet is healthy and running.")
 		// Precautionary check that kubelet is healthy before running the test.
-		gomega.Expect(kubeletHealthCheck(kubeletHealthCheckURL)).To(gomega.BeTrue())
+		gomega.Expect(kubeletHealthCheck(kubeletHealthCheckURL)).To(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 		ginkgo.By("acquiring the lock on lock file i.e /var/run/kubelet.lock")
 		// Open the file with the intention to acquire the lock, this would imitate the behaviour
@@ -71,6 +71,6 @@ var _ = SIGDescribe("Lock contention", framework.WithSlow(), framework.WithDisru
 		// It should not be as the lock contention forces the kubelet to stop.
 		gomega.Eventually(ctx, func() bool {
 			return kubeletHealthCheck(kubeletHealthCheckURL)
-		}, 10*time.Second, time.Second).Should(gomega.BeFalse())
+		}, 10*time.Second, time.Second).Should(gomega.BeFalseBecause("expected kubelet to not be in healthy state"))
 	})
 })

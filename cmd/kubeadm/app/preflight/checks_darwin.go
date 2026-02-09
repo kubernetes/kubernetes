@@ -1,5 +1,4 @@
 //go:build darwin
-// +build darwin
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -19,10 +18,18 @@ limitations under the License.
 
 package preflight
 
+import utilsexec "k8s.io/utils/exec"
+
 // This is a MacOS stub
 
 // Check number of memory required by kubeadm
 // No-op for Darwin (MacOS).
 func (mc MemCheck) Check() (warnings, errorList []error) {
 	return nil, nil
+}
+
+// addExecChecks adds checks that verify if certain binaries are in PATH
+// No-op for Darwin (MacOS).
+func addExecChecks(checks []Checker, _ utilsexec.Interface, _ string) []Checker {
+	return checks
 }

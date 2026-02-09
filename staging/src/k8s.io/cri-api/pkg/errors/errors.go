@@ -32,6 +32,9 @@ var (
 
 	// ErrRROUnsupported - Unable to enforce recursive readonly mounts
 	ErrRROUnsupported = errors.New("RROUnsupported")
+
+	// ErrImageVolumeMountFailed - Unable to mount an image volume.
+	ErrImageVolumeMountFailed = errors.New("ImageVolumeMountFailed")
 )
 
 // IsNotFound returns a boolean indicating whether the error

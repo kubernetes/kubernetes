@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -24,13 +23,20 @@ import (
 	"time"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 )
 
-func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.PodSandboxStats,
-	ps *statsapi.PodStats, fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
+func (p *criStatsProvider) addCRIPodContainerStats(
+	logger klog.Logger,
+	criSandboxStat *runtimeapi.PodSandboxStats,
+	ps *statsapi.PodStats,
+	fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
 	rootFsInfo *cadvisorapiv2.FsInfo, updateCPUNanoCoreUsage bool) error {
@@ -40,7 +46,7 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 			continue
 		}
 		// Fill available stats for full set of required pod stats
-		cs, err := p.makeContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(),
+		cs, err := p.makeContainerStats(logger, criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(),
 			updateCPUNanoCoreUsage)
 		if err != nil {
 			return fmt.Errorf("make container stats: %w", err)
@@ -48,6 +54,27 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 		ps.Containers = append(ps.Containers, *cs)
 	}
 	return nil
+}
+
+// addCRIPodContainerCPUAndMemoryStats adds container CPU and memory stats from CRI to the PodStats.
+// This is a lighter-weight version of addCRIPodContainerStats that only populates CPU and memory
+// stats needed for the resource metrics endpoint.
+func (p *criStatsProvider) addCRIPodContainerCPUAndMemoryStats(
+	criSandboxStat *runtimeapi.PodSandboxStats,
+	ps *statsapi.PodStats,
+	containerMap map[string]*runtimeapi.Container) {
+	if criSandboxStat == nil || criSandboxStat.Linux == nil {
+		return
+	}
+	for _, criContainerStat := range criSandboxStat.Linux.Containers {
+		container, found := containerMap[criContainerStat.Attributes.Id]
+		if !found {
+			continue
+		}
+		// Fill available CPU and memory stats for resource metrics
+		cs := p.makeContainerCPUAndMemoryStats(criContainerStat, time.Unix(0, container.CreatedAt), true)
+		ps.Containers = append(ps.Containers, *cs)
+	}
 }
 
 func addCRIPodNetworkStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
@@ -79,6 +106,7 @@ func addCRIPodMemoryStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandb
 		RSSBytes:        valueOfUInt64Value(criMemory.RssBytes),
 		PageFaults:      valueOfUInt64Value(criMemory.PageFaults),
 		MajorPageFaults: valueOfUInt64Value(criMemory.MajorPageFaults),
+		PSI:             makePSIStats(criMemory.Psi),
 	}
 }
 
@@ -91,6 +119,21 @@ func addCRIPodCPUStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxS
 		Time:                 metav1.NewTime(time.Unix(0, criCPU.Timestamp)),
 		UsageNanoCores:       valueOfUInt64Value(criCPU.UsageNanoCores),
 		UsageCoreNanoSeconds: valueOfUInt64Value(criCPU.UsageCoreNanoSeconds),
+		PSI:                  makePSIStats(criCPU.Psi),
+	}
+}
+
+func addCRIPodIOStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		return
+	}
+	if criPodStat == nil || criPodStat.Linux == nil || criPodStat.Linux.Io == nil {
+		return
+	}
+	criIO := criPodStat.Linux.Io
+	ps.IO = &statsapi.IOStats{
+		Time: metav1.NewTime(time.Unix(0, criIO.Timestamp)),
+		PSI:  makePSIStats(criIO.Psi),
 	}
 }
 
@@ -105,6 +148,6 @@ func addCRIPodProcessStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSand
 
 // listContainerNetworkStats returns the network stats of all the running containers.
 // It should return (nil, nil) for platforms other than Windows.
-func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.NetworkStats, error) {
+func (p *criStatsProvider) listContainerNetworkStats(klog.Logger) (map[string]*statsapi.NetworkStats, error) {
 	return nil, nil
 }

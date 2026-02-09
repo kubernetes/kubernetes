@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,12 +27,23 @@ import (
 // CertificateSigningRequestConditionApplyConfiguration represents a declarative configuration of the CertificateSigningRequestCondition type for use
 // with apply.
 type CertificateSigningRequestConditionApplyConfiguration struct {
-	Type               *v1beta1.RequestConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus           `json:"status,omitempty"`
-	Reason             *string                       `json:"reason,omitempty"`
-	Message            *string                       `json:"message,omitempty"`
-	LastUpdateTime     *metav1.Time                  `json:"lastUpdateTime,omitempty"`
-	LastTransitionTime *metav1.Time                  `json:"lastTransitionTime,omitempty"`
+	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
+	Type *certificatesv1beta1.RequestConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
+	// Defaults to "True".
+	// If unset, should be treated as "True".
+	Status *v1.ConditionStatus `json:"status,omitempty"`
+	// brief reason for the request state
+	Reason *string `json:"reason,omitempty"`
+	// human readable message with details about the request state
+	Message *string `json:"message,omitempty"`
+	// timestamp for the last update to this condition
+	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
+	// lastTransitionTime is the time the condition last transitioned from one status to another.
+	// If unset, when a new condition type is added or an existing condition's status is changed,
+	// the server defaults this to the current time.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
 }
 
 // CertificateSigningRequestConditionApplyConfiguration constructs a declarative configuration of the CertificateSigningRequestCondition type for use with
@@ -44,7 +55,7 @@ func CertificateSigningRequestCondition() *CertificateSigningRequestConditionApp
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *CertificateSigningRequestConditionApplyConfiguration) WithType(value v1beta1.RequestConditionType) *CertificateSigningRequestConditionApplyConfiguration {
+func (b *CertificateSigningRequestConditionApplyConfiguration) WithType(value certificatesv1beta1.RequestConditionType) *CertificateSigningRequestConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

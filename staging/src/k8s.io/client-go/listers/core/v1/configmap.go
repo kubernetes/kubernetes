@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ConfigMapLister helps list ConfigMaps.
@@ -30,7 +30,7 @@ import (
 type ConfigMapLister interface {
 	// List lists all ConfigMaps in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ConfigMap, err error)
+	List(selector labels.Selector) (ret []*corev1.ConfigMap, err error)
 	// ConfigMaps returns an object that can list and get ConfigMaps.
 	ConfigMaps(namespace string) ConfigMapNamespaceLister
 	ConfigMapListerExpansion
@@ -38,17 +38,17 @@ type ConfigMapLister interface {
 
 // configMapLister implements the ConfigMapLister interface.
 type configMapLister struct {
-	listers.ResourceIndexer[*v1.ConfigMap]
+	listers.ResourceIndexer[*corev1.ConfigMap]
 }
 
 // NewConfigMapLister returns a new ConfigMapLister.
 func NewConfigMapLister(indexer cache.Indexer) ConfigMapLister {
-	return &configMapLister{listers.New[*v1.ConfigMap](indexer, v1.Resource("configmap"))}
+	return &configMapLister{listers.New[*corev1.ConfigMap](indexer, corev1.Resource("configmap"))}
 }
 
 // ConfigMaps returns an object that can list and get ConfigMaps.
 func (s *configMapLister) ConfigMaps(namespace string) ConfigMapNamespaceLister {
-	return configMapNamespaceLister{listers.NewNamespaced[*v1.ConfigMap](s.ResourceIndexer, namespace)}
+	return configMapNamespaceLister{listers.NewNamespaced[*corev1.ConfigMap](s.ResourceIndexer, namespace)}
 }
 
 // ConfigMapNamespaceLister helps list and get ConfigMaps.
@@ -56,15 +56,15 @@ func (s *configMapLister) ConfigMaps(namespace string) ConfigMapNamespaceLister 
 type ConfigMapNamespaceLister interface {
 	// List lists all ConfigMaps in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ConfigMap, err error)
+	List(selector labels.Selector) (ret []*corev1.ConfigMap, err error)
 	// Get retrieves the ConfigMap from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ConfigMap, error)
+	Get(name string) (*corev1.ConfigMap, error)
 	ConfigMapNamespaceListerExpansion
 }
 
 // configMapNamespaceLister implements the ConfigMapNamespaceLister
 // interface.
 type configMapNamespaceLister struct {
-	listers.ResourceIndexer[*v1.ConfigMap]
+	listers.ResourceIndexer[*corev1.ConfigMap]
 }

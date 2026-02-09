@@ -26,13 +26,13 @@ var byteType = reflect.TypeOf(byte(0))
 // The type is the underlying field type (e.g., a repeated field may be
 // represented by []T, but the Go type passed in is just T).
 // A list of enum value descriptors must be provided for enum fields.
-// This does not populate the Enum or Message (except for weak message).
+// This does not populate the Enum or Message.
 //
 // This function is a best effort attempt; parsing errors are ignored.
 func Unmarshal(tag string, goType reflect.Type, evs protoreflect.EnumValueDescriptors) protoreflect.FieldDescriptor {
 	f := new(filedesc.Field)
 	f.L0.ParentFile = filedesc.SurrogateProto2
-	f.L1.EditionFeatures = f.L0.ParentFile.L1.EditionFeatures
+	packed := false
 	for len(tag) > 0 {
 		i := strings.IndexByte(tag, ',')
 		if i < 0 {
@@ -108,10 +108,7 @@ func Unmarshal(tag string, goType reflect.Type, evs protoreflect.EnumValueDescri
 				f.L1.StringName.InitJSON(jsonName)
 			}
 		case s == "packed":
-			f.L1.EditionFeatures.IsPacked = true
-		case strings.HasPrefix(s, "weak="):
-			f.L1.IsWeak = true
-			f.L1.Message = filedesc.PlaceholderMessage(protoreflect.FullName(s[len("weak="):]))
+			packed = true
 		case strings.HasPrefix(s, "def="):
 			// The default tag is special in that everything afterwards is the
 			// default regardless of the presence of commas.
@@ -122,6 +119,13 @@ func Unmarshal(tag string, goType reflect.Type, evs protoreflect.EnumValueDescri
 			f.L0.ParentFile = filedesc.SurrogateProto3
 		}
 		tag = strings.TrimPrefix(tag[i:], ",")
+	}
+
+	// Update EditionFeatures after the loop and after we know whether this is
+	// a proto2 or proto3 field.
+	f.L1.EditionFeatures = f.L0.ParentFile.L1.EditionFeatures
+	if packed {
+		f.L1.EditionFeatures.IsPacked = true
 	}
 
 	// The generator uses the group message name instead of the field name.
@@ -182,9 +186,6 @@ func Marshal(fd protoreflect.FieldDescriptor, enumName string) string {
 		// NOTE: The jsonName != name condition is suspect, but it preserve
 		// the exact same semantics from the previous generator.
 		tag = append(tag, "json="+jsonName)
-	}
-	if fd.IsWeak() {
-		tag = append(tag, "weak="+string(fd.Message().FullName()))
 	}
 	// The previous implementation does not tag extension fields as proto3,
 	// even when the field is defined in a proto3 file. Match that behavior

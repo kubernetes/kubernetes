@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -29,7 +30,7 @@ import (
 )
 
 const (
-	// maxAllowableNUMANodes specifies the maximum number of NUMA Nodes that
+	// defaultMaxAllowableNUMANodes specifies the maximum number of NUMA Nodes that
 	// the TopologyManager supports on the underlying machine.
 	//
 	// At present, having more than this number of NUMA Nodes will result in a
@@ -37,7 +38,7 @@ const (
 	// generate hints for them. As such, if more NUMA Nodes than this are
 	// present on a machine and the TopologyManager is enabled, an error will
 	// be returned and the TopologyManager will not be loaded.
-	maxAllowableNUMANodes = 8
+	defaultMaxAllowableNUMANodes = 8
 	// ErrorTopologyAffinity represents the type for a TopologyAffinityError
 	ErrorTopologyAffinity = "TopologyAffinityError"
 )
@@ -59,7 +60,7 @@ type Manager interface {
 	lifecycle.PodAdmitHandler
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consulted with when making topology hints
-	AddHintProvider(HintProvider)
+	AddHintProvider(logger klog.Logger, h HintProvider)
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
@@ -133,26 +134,30 @@ var _ Manager = &manager{}
 
 // NewManager creates a new TopologyManager based on provided policy and scope
 func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+
 	// When policy is none, the scope is not relevant, so we can short circuit here.
 	if topologyPolicyName == PolicyNone {
-		klog.InfoS("Creating topology manager with none policy")
+		logger.Info("Creating topology manager with none policy")
 		return &manager{scope: NewNoneScope()}, nil
 	}
 
-	opts, err := NewPolicyOptions(topologyPolicyOptions)
+	opts, err := NewPolicyOptions(logger, topologyPolicyOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.InfoS("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName, "topologyPolicyOptions", opts)
+	logger.Info("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName, "topologyPolicyOptions", opts)
 
 	numaInfo, err := NewNUMAInfo(topology, opts)
 	if err != nil {
 		return nil, fmt.Errorf("cannot discover NUMA topology: %w", err)
 	}
 
-	if topologyPolicyName != PolicyNone && len(numaInfo.Nodes) > maxAllowableNUMANodes {
-		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
+	if topologyPolicyName != PolicyNone && len(numaInfo.Nodes) > opts.MaxAllowableNUMANodes {
+		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", opts.MaxAllowableNUMANodes)
 	}
 
 	var policy Policy
@@ -188,7 +193,17 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 		scope: scope,
 	}
 
+	manager.initializeMetrics()
+
 	return manager, nil
+}
+
+func (m *manager) initializeMetrics() {
+	// ensure the values exist
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
 }
 
 func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint {
@@ -199,7 +214,7 @@ func (m *manager) GetPolicy() Policy {
 	return m.scope.GetPolicy()
 }
 
-func (m *manager) AddHintProvider(h HintProvider) {
+func (m *manager) AddHintProvider(_ klog.Logger, h HintProvider) {
 	m.scope.AddHintProvider(h)
 }
 
@@ -212,11 +227,17 @@ func (m *manager) RemoveContainer(containerID string) error {
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	// TODO: create context here as changing interface https://github.com/kubernetes/kubernetes/blob/09aaf7226056a7964adcb176d789de5507313d00/pkg/kubelet/lifecycle/interfaces.go#L43
+	// requires changes in too many other components
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Topology manager admission check", "pod", klog.KObj(attrs.Pod))
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(attrs.Pod)
+	podAdmitResult := m.scope.Admit(ctx, attrs.Pod)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
 
+	logger.V(4).Info("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
 	return podAdmitResult
 }

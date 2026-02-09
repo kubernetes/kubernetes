@@ -29,7 +29,7 @@ type FakeWardleV1beta1 struct {
 }
 
 func (c *FakeWardleV1beta1) Flunders(namespace string) v1beta1.FlunderInterface {
-	return &FakeFlunders{c, namespace}
+	return newFakeFlunders(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

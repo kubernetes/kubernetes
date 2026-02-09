@@ -18,21 +18,24 @@ package environment
 
 import (
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/google/cel-go/cel"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/cel/library"
 )
 
 // BenchmarkLoadBaseEnv is expected to be very fast, because a
 // a cached environment is loaded for each MustBaseEnvSet call.
 func BenchmarkLoadBaseEnv(b *testing.B) {
 	ver := DefaultCompatibilityVersion()
-	MustBaseEnvSet(ver, true)
+	MustBaseEnvSet(ver)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		MustBaseEnvSet(ver, true)
+		MustBaseEnvSet(ver)
 	}
 }
 
@@ -41,7 +44,7 @@ func BenchmarkLoadBaseEnv(b *testing.B) {
 func BenchmarkLoadBaseEnvDifferentVersions(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		MustBaseEnvSet(version.MajorMinor(1, uint(i)), true)
+		MustBaseEnvSet(version.MajorMinor(1, uint(i)))
 	}
 }
 
@@ -109,6 +112,29 @@ func TestLibraryCoverage(t *testing.T) {
 			t.Errorf("Unexpected RemovedVersion of %v for library %s without replacement. "+
 				"For backward compatibility, libraries should not be removed without being replaced by a new version.", lib.removed, name)
 		}
+	}
+}
+
+// TestKnownLibraries ensures that all libraries used in the base environment are also registered with
+// KnownLibraries.  Other tests rely on KnownLibraries to provide an up-to-date list of CEL libraries.
+func TestKnownLibraries(t *testing.T) {
+	known := sets.New[string]()
+	used := sets.New[string]()
+
+	for _, lib := range library.KnownLibraries() {
+		known.Insert(lib.LibraryName())
+	}
+	for _, libName := range MustBaseEnvSet(version.MajorMinor(1, 0)).storedExpressions.Libraries() {
+		if strings.HasPrefix(libName, "cel.lib") { // ignore core libs
+			continue
+		}
+		used.Insert(libName)
+	}
+
+	unexpected := used.Difference(known)
+
+	if len(unexpected) != 0 {
+		t.Errorf("Expected all libraries in the base environment to be included in k8s.io/apiserver/pkg/cel/library's KnownLibraries, but found missing libraries: %v", unexpected)
 	}
 }
 

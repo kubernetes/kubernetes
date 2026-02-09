@@ -23,11 +23,11 @@ import (
 	"sync"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/buffer"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/scheduler/util/queue"
 )
 
 // Informer is the subset of [cache.SharedInformer] that NewAssumeCache depends upon.
@@ -124,6 +124,9 @@ type AssumeCache struct {
 	// Synchronizes updates to all fields below.
 	rwMutex sync.RWMutex
 
+	// cond is used by emitEvents.
+	cond *sync.Cond
+
 	// All registered event handlers.
 	eventHandlers       []cache.ResourceEventHandler
 	handlerRegistration cache.ResourceEventHandlerRegistration
@@ -147,7 +150,10 @@ type AssumeCache struct {
 	// which tries to lock the rwMutex). Writing into such a channel
 	// while not holding the rwMutex doesn't work because in-order delivery
 	// of events would no longer be guaranteed.
-	eventQueue queue.FIFO[func()]
+	eventQueue buffer.Ring[func()]
+
+	// emittingEvents is true while one emitEvents call is actively emitting events.
+	emittingEvents bool
 
 	// describes the object stored
 	description string
@@ -194,7 +200,9 @@ func NewAssumeCache(logger klog.Logger, informer Informer, description, indexNam
 		description: description,
 		indexFunc:   indexFunc,
 		indexName:   indexName,
+		eventQueue:  *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),
 	}
+	c.cond = sync.NewCond(&c.rwMutex)
 	indexers := cache.Indexers{}
 	if indexName != "" && indexFunc != nil {
 		indexers[indexName] = c.objInfoIndexFunc
@@ -222,7 +230,7 @@ func (c *AssumeCache) add(obj interface{}) {
 
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		c.logger.Error(&ObjectNameError{err}, "Add failed")
+		utilruntime.HandleErrorWithLogger(c.logger, &ObjectNameError{err}, "Add failed")
 		return
 	}
 
@@ -234,13 +242,13 @@ func (c *AssumeCache) add(obj interface{}) {
 	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
 		newVersion, err := c.getObjVersion(name, obj)
 		if err != nil {
-			c.logger.Error(err, "Add failed: couldn't get object version")
+			utilruntime.HandleErrorWithLogger(c.logger, err, "Add failed: couldn't get object version")
 			return
 		}
 
 		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
 		if err != nil {
-			c.logger.Error(err, "Add failed: couldn't get stored object version")
+			utilruntime.HandleErrorWithLogger(c.logger, err, "Add failed: couldn't get stored object version")
 			return
 		}
 
@@ -273,7 +281,7 @@ func (c *AssumeCache) delete(obj interface{}) {
 
 	name, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		c.logger.Error(&ObjectNameError{err}, "Failed to delete")
+		utilruntime.HandleErrorWithLogger(c.logger, &ObjectNameError{err}, "Failed to delete")
 		return
 	}
 
@@ -291,7 +299,7 @@ func (c *AssumeCache) delete(obj interface{}) {
 	objInfo := &objInfo{name: name}
 	err = c.store.Delete(objInfo)
 	if err != nil {
-		c.logger.Error(err, "Failed to delete", "description", c.description, "cacheKey", name)
+		utilruntime.HandleErrorWithLogger(c.logger, err, "Failed to delete", "description", c.description, "cacheKey", name)
 	}
 
 	c.pushEvent(oldObj, nil)
@@ -308,15 +316,15 @@ func (c *AssumeCache) pushEvent(oldObj, newObj interface{}) {
 	for _, handler := range c.eventHandlers {
 		handler := handler
 		if oldObj == nil {
-			c.eventQueue.Push(func() {
+			c.eventQueue.WriteOne(func() {
 				handler.OnAdd(newObj, false)
 			})
 		} else if newObj == nil {
-			c.eventQueue.Push(func() {
+			c.eventQueue.WriteOne(func() {
 				handler.OnDelete(oldObj)
 			})
 		} else {
-			c.eventQueue.Push(func() {
+			c.eventQueue.WriteOne(func() {
 				handler.OnUpdate(oldObj, newObj)
 			})
 		}
@@ -391,7 +399,7 @@ func (c *AssumeCache) listLocked(indexObj interface{}) []interface{} {
 	if c.indexName != "" {
 		o, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
 		if err != nil {
-			c.logger.Error(err, "List index error")
+			utilruntime.HandleErrorWithLogger(c.logger, err, "List index error")
 			return nil
 		}
 		objs = o
@@ -402,7 +410,7 @@ func (c *AssumeCache) listLocked(indexObj interface{}) []interface{} {
 	for _, obj := range objs {
 		objInfo, ok := obj.(*objInfo)
 		if !ok {
-			c.logger.Error(&WrongTypeError{TypeName: "objInfo", Object: obj}, "List error")
+			utilruntime.HandleErrorWithLogger(c.logger, &WrongTypeError{TypeName: "objInfo", Object: obj}, "List error")
 			continue
 		}
 		allObjs = append(allObjs, objInfo.latestObj)
@@ -493,7 +501,7 @@ func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) cache.
 	c.eventHandlers = append(c.eventHandlers, handler)
 	allObjs := c.listLocked(nil)
 	for _, obj := range allObjs {
-		c.eventQueue.Push(func() {
+		c.eventQueue.WriteOne(func() {
 			handler.OnAdd(obj, true)
 		})
 	}
@@ -507,11 +515,34 @@ func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) cache.
 }
 
 // emitEvents delivers all pending events that are in the queue, in the order
-// in which they were stored there (FIFO).
+// in which they were stored there (FIFO). Only one goroutine at a time is
+// delivering events, to ensure correct order.
 func (c *AssumeCache) emitEvents() {
+	c.rwMutex.Lock()
+	for c.emittingEvents {
+		// Wait for the active caller of emitEvents to finish.
+		// When it is done, it may or may not have drained
+		// the events pushed by our caller.
+		// We'll check below ourselves.
+		c.cond.Wait()
+	}
+	c.emittingEvents = true
+	c.rwMutex.Unlock()
+
+	defer func() {
+		c.rwMutex.Lock()
+		c.emittingEvents = false
+		// Hand over the batton to one other goroutine, if there is one.
+		// We don't need to wake up more than one because only one of
+		// them would be able to grab the "emittingEvents" responsibility.
+		c.cond.Signal()
+		c.rwMutex.Unlock()
+	}()
+
+	// When we get here, this instance of emitEvents is the active one.
 	for {
 		c.rwMutex.Lock()
-		deliver, ok := c.eventQueue.Pop()
+		deliver, ok := c.eventQueue.ReadOne()
 		c.rwMutex.Unlock()
 
 		if !ok {

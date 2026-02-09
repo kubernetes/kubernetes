@@ -19,20 +19,26 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ComponentStatusApplyConfiguration represents a declarative configuration of the ComponentStatus type for use
 // with apply.
+//
+// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+// Deprecated: This API is deprecated in v1.19+
 type ComponentStatusApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Conditions                       []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	// List of component conditions observed
+	Conditions []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // ComponentStatus constructs a declarative configuration of the ComponentStatus type for use with
@@ -45,29 +51,14 @@ func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 	return b
 }
 
-// ExtractComponentStatus extracts the applied configuration owned by fieldManager from
-// componentStatus. If no managedFields are found in componentStatus for fieldManager, a
-// ComponentStatusApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractComponentStatusFrom extracts the applied configuration owned by fieldManager from
+// componentStatus for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // componentStatus must be a unmodified ComponentStatus API object that was retrieved from the Kubernetes API.
-// ExtractComponentStatus provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractComponentStatusFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
-	return extractComponentStatus(componentStatus, fieldManager, "")
-}
-
-// ExtractComponentStatusStatus is the same as ExtractComponentStatus except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractComponentStatusStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
-	return extractComponentStatus(componentStatus, fieldManager, "status")
-}
-
-func extractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
+func ExtractComponentStatusFrom(componentStatus *corev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
 	b := &ComponentStatusApplyConfiguration{}
 	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,11 +71,27 @@ func extractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldMan
 	return b, nil
 }
 
+// ExtractComponentStatus extracts the applied configuration owned by fieldManager from
+// componentStatus. If no managedFields are found in componentStatus for fieldManager, a
+// ComponentStatusApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// componentStatus must be a unmodified ComponentStatus API object that was retrieved from the Kubernetes API.
+// ExtractComponentStatus provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractComponentStatus(componentStatus *corev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
+	return ExtractComponentStatusFrom(componentStatus, fieldManager, "")
+}
+
+func (b ComponentStatusApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ComponentStatusApplyConfiguration) WithKind(value string) *ComponentStatusApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -92,7 +99,7 @@ func (b *ComponentStatusApplyConfiguration) WithKind(value string) *ComponentSta
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ComponentStatusApplyConfiguration) WithAPIVersion(value string) *ComponentStatusApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -101,7 +108,7 @@ func (b *ComponentStatusApplyConfiguration) WithAPIVersion(value string) *Compon
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ComponentStatusApplyConfiguration) WithName(value string) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -110,7 +117,7 @@ func (b *ComponentStatusApplyConfiguration) WithName(value string) *ComponentSta
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ComponentStatusApplyConfiguration) WithGenerateName(value string) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -119,7 +126,7 @@ func (b *ComponentStatusApplyConfiguration) WithGenerateName(value string) *Comp
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ComponentStatusApplyConfiguration) WithNamespace(value string) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -128,7 +135,7 @@ func (b *ComponentStatusApplyConfiguration) WithNamespace(value string) *Compone
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ComponentStatusApplyConfiguration) WithUID(value types.UID) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -137,7 +144,7 @@ func (b *ComponentStatusApplyConfiguration) WithUID(value types.UID) *ComponentS
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ComponentStatusApplyConfiguration) WithResourceVersion(value string) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -146,25 +153,25 @@ func (b *ComponentStatusApplyConfiguration) WithResourceVersion(value string) *C
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ComponentStatusApplyConfiguration) WithGeneration(value int64) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ComponentStatusApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ComponentStatusApplyConfiguration {
+func (b *ComponentStatusApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ComponentStatusApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ComponentStatusApplyConfiguration {
+func (b *ComponentStatusApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -173,7 +180,7 @@ func (b *ComponentStatusApplyConfiguration) WithDeletionTimestamp(value metav1.T
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ComponentStatusApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -183,11 +190,11 @@ func (b *ComponentStatusApplyConfiguration) WithDeletionGracePeriodSeconds(value
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ComponentStatusApplyConfiguration) WithLabels(entries map[string]string) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -198,11 +205,11 @@ func (b *ComponentStatusApplyConfiguration) WithLabels(entries map[string]string
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ComponentStatusApplyConfiguration) WithAnnotations(entries map[string]string) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -210,13 +217,13 @@ func (b *ComponentStatusApplyConfiguration) WithAnnotations(entries map[string]s
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ComponentStatusApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ComponentStatusApplyConfiguration {
+func (b *ComponentStatusApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -227,14 +234,14 @@ func (b *ComponentStatusApplyConfiguration) WithOwnerReferences(values ...*v1.Ow
 func (b *ComponentStatusApplyConfiguration) WithFinalizers(values ...string) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *ComponentStatusApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -251,8 +258,24 @@ func (b *ComponentStatusApplyConfiguration) WithConditions(values ...*ComponentC
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ComponentStatusApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ComponentStatusApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ComponentStatusApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ComponentStatusApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

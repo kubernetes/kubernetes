@@ -28,10 +28,13 @@ import (
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega/gcustom"
+	gomegatypes "github.com/onsi/gomega/types"
 	"google.golang.org/grpc/codes"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -56,6 +59,9 @@ const (
 	csiPodUnschedulableTimeout = 5 * time.Minute
 	csiResizeWaitPeriod        = 5 * time.Minute
 	csiVolumeAttachmentTimeout = 7 * time.Minute
+	csiDriverTimeout           = 2 * time.Minute
+	// how long to wait for GetVolumeStats
+	csiNodeVolumeStatWaitPeriod = 2 * time.Minute
 	// how long to wait for Resizing Condition on PVC to appear
 	csiResizingConditionWait = 2 * time.Minute
 
@@ -93,18 +99,19 @@ type testParameters struct {
 	enableResizing      bool   // enable resizing for both CSI mock driver and storageClass.
 	enableNodeExpansion bool   // enable node expansion for CSI mock driver
 	// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
-	disableResizingOnDriver       bool
-	enableSnapshot                bool
-	enableVolumeMountGroup        bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
-	hooks                         *drivers.Hooks
-	tokenRequests                 []storagev1.TokenRequest
-	requiresRepublish             *bool
-	fsGroupPolicy                 *storagev1.FSGroupPolicy
-	enableSELinuxMount            *bool
-	enableRecoverExpansionFailure bool
-	enableHonorPVReclaimPolicy    bool
-	enableCSINodeExpandSecret     bool
-	reclaimPolicy                 *v1.PersistentVolumeReclaimPolicy
+	disableResizingOnDriver      bool
+	disableControllerExpansion   bool
+	enableSnapshot               bool
+	enableVolumeMountGroup       bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
+	enableNodeVolumeCondition    bool
+	hooks                        *drivers.Hooks
+	tokenRequests                []storagev1.TokenRequest
+	serviceAccountTokenInSecrets *bool // if true, the service account token should be passed only via secrets
+	requiresRepublish            *bool
+	fsGroupPolicy                *storagev1.FSGroupPolicy
+	enableSELinuxMount           *bool
+	enableCSINodeExpandSecret    bool
+	reclaimPolicy                *v1.PersistentVolumeReclaimPolicy
 }
 
 type mockDriverSetup struct {
@@ -113,6 +120,7 @@ type mockDriverSetup struct {
 	pods        []*v1.Pod
 	pvcs        []*v1.PersistentVolumeClaim
 	pvs         []*v1.PersistentVolume
+	quotas      []*v1.ResourceQuota
 	sc          map[string]*storagev1.StorageClass
 	vsc         map[string]*unstructured.Unstructured
 	driver      drivers.MockCSITestDriver
@@ -143,6 +151,7 @@ const (
 var (
 	errPodCompleted   = fmt.Errorf("pod ran to completion")
 	errNotEnoughSpace = errors.New(errReasonNotEnoughSpace)
+	sleepCommand      = []string{"sleep", "infinity"}
 )
 
 func newMockDriverSetup(f *framework.Framework) *mockDriverSetup {
@@ -160,22 +169,23 @@ func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 
 	var err error
 	driverOpts := drivers.CSIMockDriverOpts{
-		RegisterDriver:                tp.registerDriver,
-		PodInfo:                       tp.podInfo,
-		StorageCapacity:               tp.storageCapacity,
-		EnableTopology:                tp.enableTopology,
-		AttachLimit:                   tp.attachLimit,
-		DisableAttach:                 tp.disableAttach,
-		EnableResizing:                tp.enableResizing,
-		EnableNodeExpansion:           tp.enableNodeExpansion,
-		EnableSnapshot:                tp.enableSnapshot,
-		EnableVolumeMountGroup:        tp.enableVolumeMountGroup,
-		TokenRequests:                 tp.tokenRequests,
-		RequiresRepublish:             tp.requiresRepublish,
-		FSGroupPolicy:                 tp.fsGroupPolicy,
-		EnableSELinuxMount:            tp.enableSELinuxMount,
-		EnableRecoverExpansionFailure: tp.enableRecoverExpansionFailure,
-		EnableHonorPVReclaimPolicy:    tp.enableHonorPVReclaimPolicy,
+		RegisterDriver:               tp.registerDriver,
+		PodInfo:                      tp.podInfo,
+		StorageCapacity:              tp.storageCapacity,
+		EnableTopology:               tp.enableTopology,
+		AttachLimit:                  tp.attachLimit,
+		DisableAttach:                tp.disableAttach,
+		EnableResizing:               tp.enableResizing,
+		EnableNodeExpansion:          tp.enableNodeExpansion,
+		EnableNodeVolumeCondition:    tp.enableNodeVolumeCondition,
+		DisableControllerExpansion:   tp.disableControllerExpansion,
+		EnableSnapshot:               tp.enableSnapshot,
+		EnableVolumeMountGroup:       tp.enableVolumeMountGroup,
+		TokenRequests:                tp.tokenRequests,
+		RequiresRepublish:            tp.requiresRepublish,
+		FSGroupPolicy:                tp.fsGroupPolicy,
+		EnableSELinuxMount:           tp.enableSELinuxMount,
+		ServiceAccountTokenInSecrets: tp.serviceAccountTokenInSecrets,
 	}
 
 	// At the moment, only tests which need hooks are
@@ -253,6 +263,15 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 	for _, vsc := range m.vsc {
 		ginkgo.By(fmt.Sprintf("Deleting volumesnapshotclass %s", vsc.GetName()))
 		m.config.Framework.DynamicClient.Resource(utils.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
+	}
+
+	for _, quota := range m.quotas {
+		ginkgo.By(fmt.Sprintf("Deleting quota %s", quota.Name))
+		if err := cs.CoreV1().ResourceQuotas(quota.Namespace).Delete(ctx, quota.Name, metav1.DeleteOptions{}); err != nil {
+			if !apierrors.IsNotFound(err) {
+				errs = append(errs, err)
+			}
+		}
 	}
 
 	err := utilerrors.NewAggregate(errs)
@@ -459,7 +478,15 @@ func (m *mockDriverSetup) createPodWithFSGroup(ctx context.Context, fsGroup *int
 	return class, claim, pod
 }
 
-func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes []v1.PersistentVolumeAccessMode, mountOptions []string, seLinuxOpts *v1.SELinuxOptions) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func (m *mockDriverSetup) createPodWithSELinux(
+	ctx context.Context,
+	accessModes []v1.PersistentVolumeAccessMode,
+	mountOptions []string,
+	seLinuxOpts *v1.SELinuxOptions,
+	policy *v1.PodSELinuxChangePolicy,
+	privileged bool,
+	command []string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+
 	ginkgo.By("Creating pod with SELinux context")
 	f := m.f
 	nodeSelection := m.config.ClientNodeSelection
@@ -476,7 +503,7 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 		ReclaimPolicy:        m.tp.reclaimPolicy,
 	}
 	class, claim := createClaim(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, accessModes)
-	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts)
+	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts, policy, privileged, command)
 	framework.ExpectNoError(err, "Failed to create pause pod with SELinux context %s: %v", seLinuxOpts, err)
 
 	if class != nil {
@@ -491,6 +518,59 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 	}
 
 	return class, claim, pod
+}
+
+func (m *mockDriverSetup) createResourceQuota(ctx context.Context, quota *v1.ResourceQuota) *v1.ResourceQuota {
+	ginkgo.By("Creating Resource Quota")
+	f := m.f
+
+	quota.ObjectMeta = metav1.ObjectMeta{
+		Name:      f.UniqueName + "-quota",
+		Namespace: f.Namespace.Name,
+	}
+	var err error
+
+	quota, err = f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, quota, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Failed to create resourceQuota")
+	m.quotas = append(m.quotas, quota)
+	usedResources := v1.ResourceList{}
+	usedResources[pvcSizeQuotaKey] = resource.MustParse("0")
+	usedResources[pvcCountQuotaKey] = resource.MustParse("0")
+	err = m.waitForResourceQuota(ctx, f.Namespace.Name, quota.Name, usedResources)
+	framework.ExpectNoError(err, "Failed to wait for resourcequota creation")
+	return quota
+}
+
+func (m *mockDriverSetup) waitForResourceQuota(ctx context.Context, ns, quotaName string, used v1.ResourceList) error {
+	var lastResourceQuota *v1.ResourceQuota
+	f := m.f
+	err := framework.Gomega().Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).Should(haveUsedResources(used, &lastResourceQuota))
+	if lastResourceQuota != nil && err == nil {
+		framework.Logf("Got expected ResourceQuota:\n%s", format.Object(lastResourceQuota, 1))
+	}
+	return err
+}
+
+func haveUsedResources(used v1.ResourceList, lastResourceQuota **v1.ResourceQuota) gomegatypes.GomegaMatcher {
+	// The template emits the actual ResourceQuota object as YAML.
+	// In particular the ManagedFields are interesting because both
+	// kube-apiserver and kube-controller-manager set the status.
+	return gcustom.MakeMatcher(func(resourceQuota *v1.ResourceQuota) (bool, error) {
+		if lastResourceQuota != nil {
+			*lastResourceQuota = resourceQuota
+		}
+		// used may not yet be calculated
+		if resourceQuota.Status.Used == nil {
+			return false, nil
+		}
+		// verify that the quota shows the expected used resource values
+		for k, v := range used {
+			if actualValue, found := resourceQuota.Status.Used[k]; !found || (actualValue.Cmp(v) != 0) {
+				return false, nil
+			}
+		}
+		return true, nil
+	}).WithTemplate("Expected:\n{{.FormattedActual}}\n{{.To}} have the following .status.used entries:\n{{range $key, $value := .Data}}    {{$key}}: \"{{$value.ToUnstructured}}\"\n{{end}}").WithTemplateData(used /* Formatting of the map is done inside the template. */)
 }
 
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {
@@ -578,7 +658,7 @@ func getStorageClass(
 
 func getDefaultPluginName() string {
 	switch {
-	case framework.ProviderIs("gke"), framework.ProviderIs("gce"):
+	case framework.ProviderIs("gce"):
 		return "kubernetes.io/gce-pd"
 	case framework.ProviderIs("aws"):
 		return "kubernetes.io/aws-ebs"
@@ -798,19 +878,36 @@ func startBusyBoxPodWithVolumeSource(cs clientset.Interface, volumeSource v1.Vol
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
-func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string, seLinuxOpts *v1.SELinuxOptions) (*v1.Pod, error) {
+func startPausePodWithSELinuxOptions(
+	cs clientset.Interface,
+	pvc *v1.PersistentVolumeClaim,
+	node e2epod.NodeSelection,
+	ns string,
+	seLinuxOpts *v1.SELinuxOptions,
+	policy *v1.PodSELinuxChangePolicy,
+	privileged bool,
+	command []string) (*v1.Pod, error) {
+
+	if len(command) == 0 {
+		command = sleepCommand
+	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",
 		},
 		Spec: v1.PodSpec{
 			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: seLinuxOpts,
+				SELinuxOptions:      seLinuxOpts,
+				SELinuxChangePolicy: policy,
 			},
 			Containers: []v1.Container{
 				{
-					Name:  "volume-tester",
-					Image: imageutils.GetE2EImage(imageutils.Pause),
+					Name:    "volume-tester",
+					Image:   e2epod.GetDefaultTestImage(),
+					Command: command,
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privileged,
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",
@@ -842,11 +939,39 @@ func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentV
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
-// checkNodePublishVolume goes through all calls to the mock driver and checks that at least one NodePublishVolume call had expected attributes.
-// If a matched call is found but it has unexpected attributes, checkNodePublishVolume skips it and continues searching.
-func checkNodePublishVolume(ctx context.Context, getCalls func(ctx context.Context) ([]drivers.MockCSICall, error), pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled, csiServiceAccountTokenEnabled bool) error {
+// checkExpectedValues checks if all expected key-value pairs are present in the actual map
+// and returns the set of keys that were found matching.
+func checkExpectedValues(expected map[string]string, actual map[string]string) sets.Set[string] {
+	found := sets.New[string]()
+	for k, v := range expected {
+		vv, exists := actual[k]
+		if exists && (v == vv || (v == "<nonempty>" && len(vv) != 0)) {
+			found.Insert(k)
+		}
+	}
+	return found
+}
+
+// checkUnexpectedValues checks if any unexpected keys are present in the actual map
+// and returns a map of unexpected key-value pairs.
+func checkUnexpectedValues(unexpectedKeys sets.Set[string], actual map[string]string) map[string]string {
+	unexpected := make(map[string]string)
+	for k := range actual {
+		if unexpectedKeys.Has(k) {
+			unexpected[k] = actual[k]
+		}
+	}
+	return unexpected
+}
+
+// checkNodePublishVolume goes through all calls to the mock driver and checks that at least one NodePublishVolume call had expected attributes and secrets.
+// If a matched call is found but it has unexpected attributes or secrets, checkNodePublishVolume skips it and continues searching.
+func checkNodePublishVolume(ctx context.Context, getCalls func(ctx context.Context) ([]drivers.MockCSICall, error), pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled, csiServiceAccountTokenEnabled, serviceAccountTokenInSecrets bool) error {
 	expectedAttributes := map[string]string{}
 	unexpectedAttributeKeys := sets.New[string]()
+	expectedSecrets := map[string]string{}
+	unexpectedSecretKeys := sets.New[string]()
+
 	if expectPodInfo {
 		expectedAttributes["csi.storage.k8s.io/pod.name"] = pod.Name
 		expectedAttributes["csi.storage.k8s.io/pod.namespace"] = pod.Namespace
@@ -865,10 +990,20 @@ func checkNodePublishVolume(ctx context.Context, getCalls func(ctx context.Conte
 		unexpectedAttributeKeys.Insert("csi.storage.k8s.io/ephemeral")
 	}
 
-	if csiServiceAccountTokenEnabled {
-		expectedAttributes["csi.storage.k8s.io/serviceAccount.tokens"] = "<nonempty>"
-	} else {
-		unexpectedAttributeKeys.Insert("csi.storage.k8s.io/serviceAccount.tokens")
+	tokenKey := "csi.storage.k8s.io/serviceAccount.tokens"
+	switch {
+	case csiServiceAccountTokenEnabled && serviceAccountTokenInSecrets:
+		// Token should be in secrets field (if opted in by CSI driver)
+		expectedSecrets[tokenKey] = "<nonempty>"
+		unexpectedAttributeKeys.Insert(tokenKey)
+	case csiServiceAccountTokenEnabled:
+		// Token should be in attributes (legacy behavior)
+		expectedAttributes[tokenKey] = "<nonempty>"
+		unexpectedSecretKeys.Insert(tokenKey)
+	default:
+		// Token should not be present anywhere
+		unexpectedAttributeKeys.Insert(tokenKey)
+		unexpectedSecretKeys.Insert(tokenKey)
 	}
 
 	calls, err := getCalls(ctx)
@@ -876,47 +1011,53 @@ func checkNodePublishVolume(ctx context.Context, getCalls func(ctx context.Conte
 		return err
 	}
 
-	var volumeContexts []map[string]string
+	nodePublishCallCount := 0
 	for _, call := range calls {
 		if call.Method != "NodePublishVolume" {
 			continue
 		}
+		nodePublishCallCount++
 
 		volumeCtx := call.Request.VolumeContext
 
 		// Check that NodePublish had expected attributes
-		foundAttributes := sets.NewString()
-		for k, v := range expectedAttributes {
-			vv, found := volumeCtx[k]
-			if found && (v == vv || (v == "<nonempty>" && len(vv) != 0)) {
-				foundAttributes.Insert(k)
-			}
-		}
+		foundAttributes := checkExpectedValues(expectedAttributes, volumeCtx)
 		if foundAttributes.Len() != len(expectedAttributes) {
 			framework.Logf("Skipping the NodePublishVolume call: expected attribute %+v, got %+v", format.Object(expectedAttributes, 1), format.Object(volumeCtx, 1))
 			continue
 		}
 
 		// Check that NodePublish had no unexpected attributes
-		unexpectedAttributes := make(map[string]string)
-		for k := range volumeCtx {
-			if unexpectedAttributeKeys.Has(k) {
-				unexpectedAttributes[k] = volumeCtx[k]
-			}
-		}
+		unexpectedAttributes := checkUnexpectedValues(unexpectedAttributeKeys, volumeCtx)
 		if len(unexpectedAttributes) != 0 {
 			framework.Logf("Skipping the NodePublishVolume call because it contains unexpected attributes %+v", format.Object(unexpectedAttributes, 1))
+			continue
+		}
+
+		secrets := call.Request.Secrets
+
+		// Check that NodePublish had expected secrets
+		foundSecrets := checkExpectedValues(expectedSecrets, secrets)
+		if foundSecrets.Len() != len(expectedSecrets) {
+			framework.Logf("Skipping the NodePublishVolume call: expected secret %+v, got %+v", format.Object(expectedSecrets, 1), format.Object(secrets, 1))
+			continue
+		}
+
+		// Check that NodePublish had no unexpected secrets
+		unexpectedSecrets := checkUnexpectedValues(unexpectedSecretKeys, secrets)
+		if len(unexpectedSecrets) != 0 {
+			framework.Logf("Skipping the NodePublishVolume call because it contains unexpected secrets %+v", format.Object(unexpectedSecrets, 1))
 			continue
 		}
 
 		return nil
 	}
 
-	if len(volumeContexts) == 0 {
+	if nodePublishCallCount == 0 {
 		return fmt.Errorf("NodePublishVolume was never called")
 	}
 
-	return fmt.Errorf("NodePublishVolume was called %d times, but no call had expected attributes %s or calls have unwanted attributes key %+v", len(volumeContexts), format.Object(expectedAttributes, 1), unexpectedAttributeKeys.UnsortedList())
+	return fmt.Errorf("NodePublishVolume was called %d times, but no call had expected attributes %s and secrets %s, or calls have unwanted attributes keys %+v or secret keys %+v", nodePublishCallCount, format.Object(expectedAttributes, 1), format.Object(expectedSecrets, 1), unexpectedAttributeKeys.UnsortedList(), unexpectedSecretKeys.UnsortedList())
 }
 
 // createFSGroupRequestPreHook creates a hook that records the fsGroup passed in
@@ -945,13 +1086,13 @@ func createFSGroupRequestPreHook(nodeStageFsGroup, nodePublishFsGroup *string) *
 
 // createPreHook counts invocations of a certain method (identified by a substring in the full gRPC method name).
 func createPreHook(method string, callback func(counter int64) error) *drivers.Hooks {
-	var counter int64
+	var counter atomic.Int64
 
 	return &drivers.Hooks{
 		Pre: func() func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
 			return func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
 				if strings.Contains(fullMethod, method) {
-					counter := atomic.AddInt64(&counter, 1)
+					counter := counter.Add(1)
 					return nil, callback(counter)
 				}
 				return nil, nil
@@ -1126,6 +1267,23 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 	})
 	if waitErr != nil {
 		return fmt.Errorf("error waiting for pod %s/%s to have max volume condition: %v", pod.Namespace, pod.Name, waitErr)
+	}
+	return nil
+}
+
+func waitForCSIDriverDeleted(ctx context.Context, cs clientset.Interface, driverName string, interval, timeout time.Duration) error {
+	waitErr := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		_, err := cs.StorageV1().CSIDrivers().Get(ctx, driverName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for CSIDriver %s to be deleted: %w", driverName, waitErr)
 	}
 	return nil
 }

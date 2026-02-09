@@ -23,7 +23,7 @@ type Filter struct {
 // Filter replaces values of targets with values from sources
 func (f Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 	for i, r := range f.Replacements {
-		if r.Source == nil || r.Targets == nil {
+		if (r.SourceValue == nil && r.Source == nil) || r.Targets == nil {
 			return nil, fmt.Errorf("replacements must specify a source and at least one target")
 		}
 		value, err := getReplacement(nodes, &f.Replacements[i])
@@ -39,6 +39,13 @@ func (f Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 }
 
 func getReplacement(nodes []*yaml.RNode, r *types.Replacement) (*yaml.RNode, error) {
+	if r.SourceValue != nil && r.Source != nil {
+		return nil, fmt.Errorf("value and resource selectors are mutually exclusive")
+	}
+	if r.SourceValue != nil {
+		return yaml.NewScalarRNode(*r.SourceValue), nil
+	}
+
 	source, err := selectSourceNode(nodes, r.Source)
 	if err != nil {
 		return nil, err
@@ -192,14 +199,14 @@ func copyValueToTarget(target *yaml.RNode, value *yaml.RNode, selector *types.Ta
 			Path:   kyaml_utils.SmarterPathSplitter(fp, "."),
 			Create: createKind})
 		if err != nil {
-			return errors.WrapPrefixf(err, fieldRetrievalError(fp, createKind != 0))
+			return errors.WrapPrefixf(err, fieldRetrievalError(fp, createKind != 0)) //nolint:govet
 		}
 		targetFields, err := targetFieldList.Elements()
 		if err != nil {
-			return errors.WrapPrefixf(err, fieldRetrievalError(fp, createKind != 0))
+			return errors.WrapPrefixf(err, fieldRetrievalError(fp, createKind != 0)) //nolint:govet
 		}
 		if len(targetFields) == 0 {
-			return errors.Errorf(fieldRetrievalError(fp, createKind != 0))
+			return errors.Errorf(fieldRetrievalError(fp, createKind != 0)) //nolint:govet
 		}
 
 		for _, t := range targetFields {

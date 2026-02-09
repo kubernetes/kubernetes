@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-
 	"k8s.io/apiserver/pkg/admission/plugin/policy/internal/generic"
 
 	clienttesting "k8s.io/client-go/testing"
@@ -113,14 +112,14 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 
 	// Set up fake informers that return instances of mock Policy definitoins
 	// and mock policy bindings
-	informer = &testInformer{SharedIndexInformer: cache.NewSharedIndexInformer(&cache.ListWatch{
+	informer = &testInformer{SharedIndexInformer: cache.NewSharedIndexInformer(cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return tracker.List(fakeGVR, fakeGVK, "")
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return tracker.Watch(fakeGVR, "")
+			return tracker.Watch(fakeGVR, "", options)
 		},
-	}, &unstructured.Unstructured{}, 30*time.Second, nil)}
+	}, tracker), &unstructured.Unstructured{}, 30*time.Second, nil)}
 
 	reconciler := func(namespace, name string, newObj *unstructured.Unstructured) error {
 		var err error
@@ -199,7 +198,9 @@ func TestReconcile(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.Canceled)
+		if !errors.Is(stopReason, context.Canceled) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// The controller is blocked because the reconcile function sends on an
@@ -255,7 +256,9 @@ func TestShutdown(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.Canceled)
+		if !errors.Is(stopReason, context.Canceled) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// Wait for controller and informer to start up
@@ -287,7 +290,9 @@ func TestInformerNeverStarts(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.DeadlineExceeded)
+		if !errors.Is(stopReason, context.DeadlineExceeded) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// Wait for deadline to pass without syncing the cache
@@ -335,7 +340,9 @@ func TestIgnoredUpdate(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.Canceled)
+		if !errors.Is(stopReason, context.Canceled) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// The controller is blocked because the reconcile function sends on an
@@ -363,7 +370,7 @@ func TestIgnoredUpdate(t *testing.T) {
 
 // Shows that an object which fails reconciliation will retry
 func TestReconcileRetry(t *testing.T) {
-	testContext, testCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	testContext, testCancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
 	defer testCancel()
 
 	calls := atomic.Uint64{}
@@ -392,7 +399,9 @@ func TestReconcileRetry(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.Canceled)
+		if !errors.Is(stopReason, context.Canceled) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// Add object to informer

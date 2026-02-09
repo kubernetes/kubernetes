@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
@@ -37,10 +38,8 @@ type PodOperation int
 
 // These constants identify the PodOperations that can be made on a pod configuration.
 const (
-	// SET is the current pod configuration.
-	SET PodOperation = iota
 	// ADD signifies pods that are new to this source.
-	ADD
+	ADD PodOperation = iota
 	// DELETE signifies pods that are gracefully deleted from this source.
 	DELETE
 	// REMOVE signifies pods that have been removed from this source.
@@ -193,12 +192,13 @@ func IsNodeCriticalPod(pod *v1.Pod) bool {
 	return IsCriticalPod(pod) && (pod.Spec.PriorityClassName == scheduling.SystemNodeCritical)
 }
 
-// IsRestartableInitContainer returns true if the initContainer has
-// ContainerRestartPolicyAlways.
-func IsRestartableInitContainer(initContainer *v1.Container) bool {
-	if initContainer.RestartPolicy == nil {
-		return false
+// HasRestartableInitContainer returns true if the pod has any restartable init
+// container
+func HasRestartableInitContainer(pod *v1.Pod) bool {
+	for _, container := range pod.Spec.InitContainers {
+		if podutil.IsRestartableInitContainer(&container) {
+			return true
+		}
 	}
-
-	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
+	return false
 }

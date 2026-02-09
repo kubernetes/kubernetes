@@ -145,6 +145,17 @@ func (c *checker) checkSelect(e ast.Expr) {
 func (c *checker) checkOptSelect(e ast.Expr) {
 	// Collect metadata related to the opt select call packaged by the parser.
 	call := e.AsCall()
+	if len(call.Args()) != 2 || call.IsMemberFunction() {
+		t := ""
+		if call.IsMemberFunction() {
+			t = " member call with"
+		}
+		c.errors.notAnOptionalFieldSelectionCall(e.ID(), c.location(e),
+			fmt.Sprintf(
+				"incorrect signature.%s argument count: %d", t, len(call.Args())))
+		return
+	}
+
 	operand := call.Args()[0]
 	field := call.Args()[1]
 	fieldName, isString := maybeUnwrapString(field)
@@ -496,16 +507,32 @@ func (c *checker) checkComprehension(e ast.Expr) {
 	comp := e.AsComprehension()
 	c.check(comp.IterRange())
 	c.check(comp.AccuInit())
-	accuType := c.getType(comp.AccuInit())
 	rangeType := substitute(c.mappings, c.getType(comp.IterRange()), false)
-	var varType *types.Type
 
+	// Create a scope for the comprehension since it has a local accumulation variable.
+	// This scope will contain the accumulation variable used to compute the result.
+	accuType := c.getType(comp.AccuInit())
+	c.env = c.env.enterScope()
+	c.env.AddIdents(decls.NewVariable(comp.AccuVar(), accuType))
+
+	var varType, var2Type *types.Type
 	switch rangeType.Kind() {
 	case types.ListKind:
+		// varType represents the list element type for one-variable comprehensions.
 		varType = rangeType.Parameters()[0]
+		if comp.HasIterVar2() {
+			// varType represents the list index (int) for two-variable comprehensions,
+			// and var2Type represents the list element type.
+			var2Type = varType
+			varType = types.IntType
+		}
 	case types.MapKind:
-		// Ranges over the keys.
+		// varType represents the map entry key for all comprehension types.
 		varType = rangeType.Parameters()[0]
+		if comp.HasIterVar2() {
+			// var2Type represents the map entry value for two-variable comprehensions.
+			var2Type = rangeType.Parameters()[1]
+		}
 	case types.DynKind, types.ErrorKind, types.TypeParamKind:
 		// Set the range type to DYN to prevent assignment to a potentially incorrect type
 		// at a later point in type-checking. The isAssignable call will update the type
@@ -513,18 +540,23 @@ func (c *checker) checkComprehension(e ast.Expr) {
 		c.isAssignable(types.DynType, rangeType)
 		// Set the range iteration variable to type DYN as well.
 		varType = types.DynType
+		if comp.HasIterVar2() {
+			var2Type = types.DynType
+		}
 	default:
 		c.errors.notAComprehensionRange(comp.IterRange().ID(), c.location(comp.IterRange()), rangeType)
 		varType = types.ErrorType
+		if comp.HasIterVar2() {
+			var2Type = types.ErrorType
+		}
 	}
 
-	// Create a scope for the comprehension since it has a local accumulation variable.
-	// This scope will contain the accumulation variable used to compute the result.
-	c.env = c.env.enterScope()
-	c.env.AddIdents(decls.NewVariable(comp.AccuVar(), accuType))
 	// Create a block scope for the loop.
 	c.env = c.env.enterScope()
 	c.env.AddIdents(decls.NewVariable(comp.IterVar(), varType))
+	if comp.HasIterVar2() {
+		c.env.AddIdents(decls.NewVariable(comp.IterVar2(), var2Type))
+	}
 	// Check the variable references in the condition and step.
 	c.check(comp.LoopCondition())
 	c.assertType(comp.LoopCondition(), types.BoolType)

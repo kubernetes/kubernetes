@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/admission/v1beta1"
+	v1 "k8s.io/api/admission/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -56,19 +56,26 @@ const (
 
 	mutation   = "mutation"
 	validation = "validation"
+
+	// Last emulatable version for VAP v1beta1. VAP v1beta1 has been
+	// removed in 1.34+ but since clusters may still emulate 1.33,
+	// we must still keep testing this emulation scenario.
+	// Remove in v1.37
+	vapV1beta1LastEmulatableVersion = "1.33"
 )
 
 // DIFF: Added interface to replace direct *holder usage in testContext to be
 // able to inject a policy-specific holder
 type admissionTestExpectationHolder interface {
 	reset(t *testing.T)
-	expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool)
+	expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1.Operation, name, namespace string, object, oldObject, options bool)
 	verify(t *testing.T)
 }
 
 type testContext struct {
 	t *testing.T
 
+	emulateV1beta1Version bool
 	// DIFF: Changed from *holder to interface
 	admissionHolder admissionTestExpectationHolder
 
@@ -137,15 +144,19 @@ var (
 		// gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"):     true,
 		// gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"):            true,
 		// gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"):          true,
-		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"):        true,
-		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies/status"): true,
-		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"):  true,
-		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):         true,
-		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies/status"):  true,
-		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicybindings"):   true,
-		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):              true,
-		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies/status"):       true,
-		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicybindings"):        true,
+		// gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"):        true,
+		// gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies/status"): true,
+		// gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"):  true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):        true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies/status"): true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicybindings"):  true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):             true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies/status"):      true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicybindings"):       true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"):         true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"):   true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicies"):          true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicybindings"):    true,
 		// transient resource exemption
 		gvr("authentication.k8s.io", "v1", "selfsubjectreviews"):       true,
 		gvr("authentication.k8s.io", "v1beta1", "selfsubjectreviews"):  true,
@@ -198,6 +209,7 @@ type holder struct {
 
 	t *testing.T
 
+	supportedVersions []string
 	// DIFF: Warning handler removed in policy test.
 	// warningHandler *warningHandler
 
@@ -242,13 +254,13 @@ func (h *holder) reset(t *testing.T) {
 	h.recorded = map[webhookOptions]*admissionRequest{}
 	for _, phase := range []string{mutation, validation} {
 		for _, converted := range []bool{true, false} {
-			for _, version := range []string{"v1", "v1beta1"} {
+			for _, version := range h.supportedVersions {
 				h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = nil
 			}
 		}
 	}
 }
-func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool) {
+func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1.Operation, name, namespace string, object, oldObject, options bool) {
 	// Special-case namespaces, since the object name shows up in request attributes
 	if len(namespace) == 0 && gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace" {
 		namespace = name
@@ -272,7 +284,7 @@ func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.
 	h.recorded = map[webhookOptions]*admissionRequest{}
 	for _, phase := range []string{mutation, validation} {
 		for _, converted := range []bool{true, false} {
-			for _, version := range []string{"v1", "v1beta1"} {
+			for _, version := range h.supportedVersions {
 				h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = nil
 			}
 		}
@@ -447,10 +459,17 @@ func getTestFunc(gvr schema.GroupVersionResource, verb string) testFunc {
 	return unimplemented
 }
 
-func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource) (*unstructured.Unstructured, error) {
+func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource, emulateV1Beta1Version bool) (*unstructured.Unstructured, error) {
 	stub := ""
-	if data, ok := etcd.GetEtcdStorageDataForNamespace(testNamespace)[gvr]; ok {
-		stub = data.Stub
+	if emulateV1Beta1Version {
+		// This should be removed once TestPolicyAdmissionV1beta1 is removed in v1.37
+		if data, ok := etcd.GetEtcdStorageDataForNamespaceServedAt(testNamespace, vapV1beta1LastEmulatableVersion, false)[gvr]; ok {
+			stub = data.Stub
+		}
+	} else {
+		if data, ok := etcd.GetEtcdStorageDataForNamespace(testNamespace)[gvr]; ok {
+			stub = data.Stub
+		}
 	}
 	if data, ok := stubDataOverrides[gvr]; ok {
 		stub = data
@@ -466,8 +485,8 @@ func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource) (*
 	return stubObj, nil
 }
 
-func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResource, resource metav1.APIResource) (*unstructured.Unstructured, error) {
-	stubObj, err := getStubObj(gvr, resource)
+func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResource, resource metav1.APIResource, emulateV1Beta1Version bool) (*unstructured.Unstructured, error) {
+	stubObj, err := getStubObj(gvr, resource, emulateV1Beta1Version)
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +530,7 @@ func shouldTestResourceVerb(gvr schema.GroupVersionResource, resource metav1.API
 //
 
 func testResourceCreate(c *testContext) {
-	stubObj, err := getStubObj(c.gvr, c.resource)
+	stubObj, err := getStubObj(c.gvr, c.resource, c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -520,7 +539,7 @@ func testResourceCreate(c *testContext) {
 	if c.resource.Namespaced {
 		ns = testNamespace
 	}
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1beta1.Create, stubObj.GetName(), ns, true, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1.Create, stubObj.GetName(), ns, true, false, true)
 	_, err = c.client.Resource(c.gvr).Namespace(ns).Create(context.TODO(), stubObj, metav1.CreateOptions{})
 	if err != nil {
 		c.t.Error(err)
@@ -530,12 +549,12 @@ func testResourceCreate(c *testContext) {
 
 func testResourceUpdate(c *testContext) {
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		obj, err := createOrGetResource(c.client, c.gvr, c.resource)
+		obj, err := createOrGetResource(c.client, c.gvr, c.resource, c.emulateV1beta1Version)
 		if err != nil {
 			return err
 		}
 		obj.SetAnnotations(map[string]string{"update": "true"})
-		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1beta1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
 		_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Update(context.TODO(), obj, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
@@ -545,12 +564,12 @@ func testResourceUpdate(c *testContext) {
 }
 
 func testResourcePatch(c *testContext) {
-	obj, err := createOrGetResource(c.client, c.gvr, c.resource)
+	obj, err := createOrGetResource(c.client, c.gvr, c.resource, c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
 	}
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1beta1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
 	_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Patch(
 		context.TODO(),
 		obj.GetName(),
@@ -565,14 +584,14 @@ func testResourcePatch(c *testContext) {
 
 func testResourceDelete(c *testContext) {
 	// Verify that an immediate delete triggers the webhook and populates the admisssionRequest.oldObject.
-	obj, err := createOrGetResource(c.client, c.gvr, c.resource)
+	obj, err := createOrGetResource(c.client, c.gvr, c.resource, c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
 	}
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
@@ -598,7 +617,7 @@ func testResourceDelete(c *testContext) {
 	}
 
 	// Verify that an update-on-delete triggers the webhook and populates the admisssionRequest.oldObject.
-	obj, err = createOrGetResource(c.client, c.gvr, c.resource)
+	obj, err = createOrGetResource(c.client, c.gvr, c.resource, c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -617,7 +636,7 @@ func testResourceDelete(c *testContext) {
 		c.t.Error(err)
 		return
 	}
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
@@ -676,7 +695,7 @@ func testResourceDelete(c *testContext) {
 }
 
 func testResourceDeletecollection(c *testContext) {
-	obj, err := createOrGetResource(c.client, c.gvr, c.resource)
+	obj, err := createOrGetResource(c.client, c.gvr, c.resource, c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -697,7 +716,7 @@ func testResourceDeletecollection(c *testContext) {
 	}
 
 	// set expectations
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, "", obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1.Delete, "", obj.GetNamespace(), false, true, true)
 
 	// delete
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}, metav1.ListOptions{LabelSelector: "webhooktest=true"})
@@ -736,13 +755,13 @@ func getParentGVR(gvr schema.GroupVersionResource) schema.GroupVersionResource {
 
 func testTokenCreate(c *testContext) {
 	saGVR := gvr("", "v1", "serviceaccounts")
-	sa, err := createOrGetResource(c.client, saGVR, c.resources[saGVR])
+	sa, err := createOrGetResource(c.client, saGVR, c.resources[saGVR], c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
 	}
 
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1beta1.Create, sa.GetName(), sa.GetNamespace(), true, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1.Create, sa.GetName(), sa.GetNamespace(), true, false, true)
 	if err = c.clientset.CoreV1().RESTClient().Post().Namespace(sa.GetNamespace()).Resource("serviceaccounts").Name(sa.GetName()).SubResource("token").Body(&authenticationv1.TokenRequest{
 		ObjectMeta: metav1.ObjectMeta{Name: sa.GetName()},
 		Spec: authenticationv1.TokenRequestSpec{
@@ -759,7 +778,7 @@ func testSubresourceUpdate(c *testContext) {
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		parentGVR := getParentGVR(c.gvr)
 		parentResource := c.resources[parentGVR]
-		obj, err := createOrGetResource(c.client, parentGVR, parentResource)
+		obj, err := createOrGetResource(c.client, parentGVR, parentResource, c.emulateV1beta1Version)
 		if err != nil {
 			return err
 		}
@@ -783,7 +802,7 @@ func testSubresourceUpdate(c *testContext) {
 		submitObj.SetAnnotations(map[string]string{"subresourceupdate": "true"})
 
 		// set expectations
-		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1beta1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
 
 		_, err = c.client.Resource(gvrWithoutSubresources).Namespace(obj.GetNamespace()).Update(
 			context.TODO(),
@@ -800,7 +819,7 @@ func testSubresourceUpdate(c *testContext) {
 func testSubresourcePatch(c *testContext) {
 	parentGVR := getParentGVR(c.gvr)
 	parentResource := c.resources[parentGVR]
-	obj, err := createOrGetResource(c.client, parentGVR, parentResource)
+	obj, err := createOrGetResource(c.client, parentGVR, parentResource, c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -811,7 +830,7 @@ func testSubresourcePatch(c *testContext) {
 	subresources := strings.Split(c.gvr.Resource, "/")[1:]
 
 	// set expectations
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1beta1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
 
 	_, err = c.client.Resource(gvrWithoutSubresources).Namespace(obj.GetNamespace()).Patch(
 		context.TODO(),
@@ -840,7 +859,7 @@ func unimplemented(c *testContext) {
 // - removes finalizer from namespace
 // - ensures admission is called on final delete once finalizers are removed
 func testNamespaceDelete(c *testContext) {
-	obj, err := createOrGetResource(c.client, c.gvr, c.resource)
+	obj, err := createOrGetResource(c.client, c.gvr, c.resource, c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -848,7 +867,7 @@ func testNamespaceDelete(c *testContext) {
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
 
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
@@ -884,7 +903,7 @@ func testNamespaceDelete(c *testContext) {
 // - creates a rollback object and posts it
 func testDeploymentRollback(c *testContext) {
 	deploymentGVR := gvr("apps", "v1", "deployments")
-	obj, err := createOrGetResource(c.client, deploymentGVR, c.resources[deploymentGVR])
+	obj, err := createOrGetResource(c.client, deploymentGVR, c.resources[deploymentGVR], c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -894,7 +913,7 @@ func testDeploymentRollback(c *testContext) {
 	gvrWithoutSubresources.Resource = strings.Split(gvrWithoutSubresources.Resource, "/")[0]
 	subresources := strings.Split(c.gvr.Resource, "/")[1:]
 
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1beta1.Create, obj.GetName(), obj.GetNamespace(), true, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1.Create, obj.GetName(), obj.GetNamespace(), true, false, true)
 
 	var rollbackObj runtime.Object
 	switch c.gvr {
@@ -933,7 +952,7 @@ func testDeploymentRollback(c *testContext) {
 // testPodConnectSubresource verifies connect subresources
 func testPodConnectSubresource(c *testContext) {
 	podGVR := gvr("", "v1", "pods")
-	pod, err := createOrGetResource(c.client, podGVR, c.resources[podGVR])
+	pod, err := createOrGetResource(c.client, podGVR, c.resources[podGVR], c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -943,7 +962,7 @@ func testPodConnectSubresource(c *testContext) {
 	for _, httpMethod := range []string{"GET", "POST"} {
 		c.t.Logf("verifying %v", httpMethod)
 
-		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, v1beta1.Connect, pod.GetName(), pod.GetNamespace(), true, false, false)
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, v1.Connect, pod.GetName(), pod.GetNamespace(), true, false, false)
 		var err error
 		switch c.gvr {
 		case gvr("", "v1", "pods/exec"):
@@ -968,7 +987,7 @@ func testPodConnectSubresource(c *testContext) {
 // testPodBindingEviction verifies pod binding and eviction admission
 func testPodBindingEviction(c *testContext) {
 	podGVR := gvr("", "v1", "pods")
-	pod, err := createOrGetResource(c.client, podGVR, c.resources[podGVR])
+	pod, err := createOrGetResource(c.client, podGVR, c.resources[podGVR], c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -985,7 +1004,7 @@ func testPodBindingEviction(c *testContext) {
 		}
 	}()
 
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1beta1.Create, pod.GetName(), pod.GetNamespace(), true, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1.Create, pod.GetName(), pod.GetNamespace(), true, false, true)
 
 	switch c.gvr {
 	case gvr("", "v1", "bindings"):
@@ -1021,7 +1040,7 @@ func testPodBindingEviction(c *testContext) {
 func testSubresourceProxy(c *testContext) {
 	parentGVR := getParentGVR(c.gvr)
 	parentResource := c.resources[parentGVR]
-	obj, err := createOrGetResource(c.client, parentGVR, parentResource)
+	obj, err := createOrGetResource(c.client, parentGVR, parentResource, c.emulateV1beta1Version)
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -1053,7 +1072,7 @@ func testSubresourceProxy(c *testContext) {
 		}
 
 		// set expectations
-		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, v1beta1.Connect, obj.GetName(), obj.GetNamespace(), true, false, false)
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, v1.Connect, obj.GetName(), obj.GetNamespace(), true, false, false)
 		// run the request. we don't actually care if the request is successful, just that admission gets called as expected
 		err = request.Resource(gvrWithoutSubresources.Resource).Name(obj.GetName()).SubResource(subresources...).Do(context.TODO()).Error()
 		if err != nil {

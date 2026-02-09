@@ -1367,8 +1367,8 @@ func TestSingleResourceType(t *testing.T) {
 		SingleResourceType().
 		ResourceTypeOrNameArgs(true, "pods,services")
 
-	if b.Do().Err() == nil {
-		t.Errorf("unexpected non-error")
+	if err := b.Do().Err(); !errors.Is(err, ErrMultipleResourceTypes) {
+		t.Errorf("unexpected error: %s", err)
 	}
 }
 
@@ -1873,7 +1873,7 @@ func TestHasNames(t *testing.T) {
 			name:            "test8",
 			args:            []string{"rc/foo", "bar"},
 			expectedHasName: false,
-			expectedError:   fmt.Errorf("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. '" + basename + " get resource/<resource_name>' instead of '" + basename + " get resource resource/<resource_name>'"),
+			expectedError:   errors.New("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. '" + basename + " get resource/<resource_name>' instead of '" + basename + " get resource resource/<resource_name>'"),
 		},
 	}
 	for _, tt := range tests {

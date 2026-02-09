@@ -20,8 +20,13 @@ package v1
 
 // HTTPHeaderApplyConfiguration represents a declarative configuration of the HTTPHeader type for use
 // with apply.
+//
+// HTTPHeader describes a custom header to be used in HTTP probes
 type HTTPHeaderApplyConfiguration struct {
-	Name  *string `json:"name,omitempty"`
+	// The header field name.
+	// This will be canonicalized upon output, so case-variant names will be understood as the same header.
+	Name *string `json:"name,omitempty"`
+	// The header field value
 	Value *string `json:"value,omitempty"`
 }
 

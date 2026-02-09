@@ -2,8 +2,9 @@
 
 approvers:
   - sig-instrumentation-approvers
-  - logicalhan
   - RainbowMango
+emeritus_approvers:
+  - logicalhan
 reviewers:
   - sig-instrumentation-reviewers
   - YoyinZyc

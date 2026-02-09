@@ -17,25 +17,39 @@ limitations under the License.
 package generic_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
 
-func makeTestDispatcher(authorizer.Authorizer, *matching.Matcher) generic.Dispatcher[generic.PolicyHook[*FakePolicy, *FakeBinding, generic.Evaluator]] {
+type fakeDispatcher struct{}
+
+func (fd *fakeDispatcher) Dispatch(context.Context, admission.Attributes, admission.ObjectInterfaces, []generic.PolicyHook[*FakePolicy, *FakeBinding, generic.Evaluator]) error {
 	return nil
+}
+func (fd *fakeDispatcher) Start(context.Context) error {
+	return nil
+}
+
+func makeTestDispatcher(authorizer.Authorizer, *matching.Matcher, kubernetes.Interface) generic.Dispatcher[generic.PolicyHook[*FakePolicy, *FakeBinding, generic.Evaluator]] {
+	return &fakeDispatcher{}
 }
 
 func TestPolicySourceHasSyncedEmpty(t *testing.T) {
 	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
 		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },
@@ -68,6 +82,7 @@ func TestPolicySourceHasSyncedInitialList(t *testing.T) {
 	}
 
 	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
 		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },
@@ -137,6 +152,7 @@ func TestPolicySourceBindsToPolicies(t *testing.T) {
 	}
 
 	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
 		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },
@@ -204,6 +220,10 @@ func (fp *FakePolicy) GetParamKind() *v1.ParamKind {
 }
 
 func (fb *FakePolicy) GetMatchConstraints() *v1.MatchResources {
+	return nil
+}
+
+func (fb *FakePolicy) GetFailurePolicy() *v1.FailurePolicyType {
 	return nil
 }
 

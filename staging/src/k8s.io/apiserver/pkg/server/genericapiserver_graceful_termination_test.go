@@ -39,10 +39,13 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/http2"
@@ -1024,6 +1027,12 @@ func newClient(useNewConnection bool) *http.Client {
 	}
 }
 
+func getOpenAPIDefinitionsForTest(_ kubeopenapi.ReferenceCallback) map[string]kubeopenapi.OpenAPIDefinition {
+	return map[string]kubeopenapi.OpenAPIDefinition{
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList": {},
+	}
+}
+
 func newGenericAPIServer(t *testing.T, fAudit *fakeAudit, keepListening bool) *GenericAPIServer {
 	config, _ := setUp(t)
 	config.ShutdownDelayDuration = 100 * time.Millisecond
@@ -1032,6 +1041,9 @@ func newGenericAPIServer(t *testing.T, fAudit *fakeAudit, keepListening bool) *G
 	config.ShutdownWatchTerminationGracePeriod = 2 * time.Second
 	config.AuditPolicyRuleEvaluator = fAudit
 	config.AuditBackend = fAudit
+	namer := openapi.NewDefinitionNamer(clientscheme.Scheme)
+	config.OpenAPIConfig = DefaultOpenAPIConfig(getOpenAPIDefinitionsForTest, namer)
+	config.OpenAPIV3Config = DefaultOpenAPIV3Config(getOpenAPIDefinitionsForTest, namer)
 
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {

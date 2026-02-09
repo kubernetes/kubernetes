@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func init() {
@@ -54,7 +55,7 @@ func (o testObject) GetObjectKind() schema.ObjectKind { return schema.EmptyObjec
 func (o testObject) DeepCopyObject() runtime.Object   { return o }
 func (o testObject) GetResourceVersion() string       { return o.resourceVersion }
 
-func withCounter(w cache.Watcher) (*uint32, cache.Watcher) {
+func withCounter(w cache.Watcher) (*uint32, cache.WatcherWithContext) {
 	var counter uint32
 	return &counter, &cache.ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
@@ -289,6 +290,42 @@ func TestRetryWatcher(t *testing.T) {
 			},
 		},
 		{
+			name:      "fails on Forbidden",
+			initialRV: "5",
+			watchClient: &cache.ListWatch{
+				WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
+					return func(options metav1.ListOptions) (watch.Interface, error) {
+						return nil, apierrors.NewForbidden(schema.GroupResource{}, "", errors.New("unknown"))
+					}
+				}(),
+			},
+			watchCount: 1,
+			expected: []watch.Event{
+				{
+					Type:   watch.Error,
+					Object: &apierrors.NewForbidden(schema.GroupResource{}, "", errors.New("unknown")).ErrStatus,
+				},
+			},
+		},
+		{
+			name:      "fails on Unauthorized",
+			initialRV: "5",
+			watchClient: &cache.ListWatch{
+				WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
+					return func(options metav1.ListOptions) (watch.Interface, error) {
+						return nil, apierrors.NewUnauthorized("")
+					}
+				}(),
+			},
+			watchCount: 1,
+			expected: []watch.Event{
+				{
+					Type:   watch.Error,
+					Object: &apierrors.NewUnauthorized("").ErrStatus,
+				},
+			},
+		},
+		{
 			name:      "recovers from timeout error",
 			initialRV: "5",
 			watchClient: &cache.ListWatch{
@@ -513,10 +550,11 @@ func TestRetryWatcher(t *testing.T) {
 	for _, tc := range tt {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			t.Parallel()
 
 			atomicCounter, watchFunc := withCounter(tc.watchClient)
-			watcher, err := newRetryWatcher(tc.initialRV, watchFunc, time.Duration(0))
+			watcher, err := newRetryWatcher(ctx, tc.initialRV, watchFunc, time.Duration(0))
 			if err != nil {
 				t.Fatalf("failed to create a RetryWatcher: %v", err)
 			}
@@ -557,7 +595,7 @@ func TestRetryWatcher(t *testing.T) {
 				counter = atomic.LoadUint32(atomicCounter)
 				return counter == tc.watchCount, nil
 			})
-			if err == wait.ErrWaitTimeout {
+			if wait.Interrupted(err) {
 				t.Errorf("expected %d watcher starts, but it has started %d times", tc.watchCount, counter)
 			} else if err != nil {
 				t.Fatal(err)
@@ -585,6 +623,8 @@ func TestRetryWatcherToFinishWithUnreadEvents(t *testing.T) {
 	// Give the watcher a chance to get to sending events (blocking)
 	time.Sleep(10 * time.Millisecond)
 
+	watcher.Stop()
+	// Verify a second stop does not cause a panic
 	watcher.Stop()
 
 	maxTime := time.Second

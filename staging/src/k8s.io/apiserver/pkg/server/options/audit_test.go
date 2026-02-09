@@ -19,7 +19,6 @@ package options
 import (
 	stdjson "encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,10 +38,10 @@ func TestAuditValidOptions(t *testing.T) {
 	auditPath := filepath.Join(tmpDir, "audit")
 
 	webhookConfig := makeTmpWebhookConfig(t)
-	defer os.Remove(webhookConfig)
+	defer func() { _ = os.Remove(webhookConfig) }()
 
 	policy := makeTmpPolicy(t)
-	defer os.Remove(policy)
+	defer func() { _ = os.Remove(policy) }()
 
 	testCases := []struct {
 		name     string
@@ -178,12 +177,44 @@ func TestAuditValidOptions(t *testing.T) {
 			if options.LogOptions.Path == "-" {
 				assert.Equal(t, os.Stdout, w)
 				assert.NoFileExists(t, options.LogOptions.Path)
-			} else {
-				assert.IsType(t, (*lumberjack.Logger)(nil), w)
+			} else if options.LogOptions.MaxSize == 0 {
+				// When MaxSize is 0, we return a raw file writer (os.File) for unlimited size
+				file, ok := w.(*os.File)
+				assert.True(t, ok, "Writer should be of type *os.File when MaxSize is 0")
 				assert.FileExists(t, options.LogOptions.Path)
+				assert.NoError(t, file.Close())
+			} else {
+				logger, ok := w.(*lumberjack.Logger)
+				assert.True(t, ok, "Writer should be of type *lumberjack.Logger")
+				assert.FileExists(t, options.LogOptions.Path)
+				assert.Equal(t, options.LogOptions.MaxSize, logger.MaxSize)
 			}
 		})
 	}
+}
+
+func TestAuditLogMaxSizeZero(t *testing.T) {
+	tmpDir := t.TempDir()
+	auditPath := filepath.Join(tmpDir, "audit")
+	policy := makeTmpPolicy(t)
+	defer func() { _ = os.Remove(policy) }()
+
+	o := NewAuditOptions()
+	o.LogOptions.Path = auditPath
+	o.PolicyFile = policy
+	o.LogOptions.MaxSize = 0
+
+	w, err := o.LogOptions.getWriter()
+	require.NoError(t, err)
+	require.NotNil(t, w)
+
+	// When MaxSize is 0, we return a raw file writer (os.File) for unlimited size
+	file, ok := w.(*os.File)
+	require.True(t, ok, "Should be an os.File when MaxSize is 0")
+
+	// Verify that the file was opened correctly
+	require.NotNil(t, file)
+	require.NoError(t, file.Close())
 }
 
 func TestAuditInvalidOptions(t *testing.T) {
@@ -271,7 +302,7 @@ func makeTmpWebhookConfig(t *testing.T) string {
 			{Cluster: v1.Cluster{Server: "localhost", InsecureSkipTLSVerify: true}},
 		},
 	}
-	f, err := ioutil.TempFile("", "k8s_audit_webhook_test_")
+	f, err := os.CreateTemp("", "k8s_audit_webhook_test_")
 	require.NoError(t, err, "creating temp file")
 	require.NoError(t, stdjson.NewEncoder(f).Encode(config), "writing webhook kubeconfig")
 	require.NoError(t, f.Close())
@@ -289,7 +320,7 @@ func makeTmpPolicy(t *testing.T) string {
 			},
 		},
 	}
-	f, err := ioutil.TempFile("", "k8s_audit_policy_test_")
+	f, err := os.CreateTemp("", "k8s_audit_policy_test_")
 	require.NoError(t, err, "creating temp file")
 	require.NoError(t, stdjson.NewEncoder(f).Encode(pol), "writing policy file")
 	require.NoError(t, f.Close())

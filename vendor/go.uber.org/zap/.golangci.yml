@@ -17,7 +17,7 @@ linters:
     - unused
 
     # Our own extras:
-    - gofmt
+    - gofumpt
     - nolintlint # lints nolint directives
     - revive
 
@@ -25,7 +25,7 @@ linters-settings:
   govet:
     # These govet checks are disabled by default, but they're useful.
     enable:
-      - niliness
+      - nilness
       - reflectvaluecompare
       - sortslice
       - unusedwrite

@@ -8,13 +8,14 @@ package gocommand
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/exec"
-	"reflect"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -27,7 +28,7 @@ import (
 	"golang.org/x/tools/internal/event/label"
 )
 
-// An Runner will run go command invocations and serialize
+// A Runner will run go command invocations and serialize
 // them if it sees a concurrency error.
 type Runner struct {
 	// once guards the runner initialization.
@@ -140,7 +141,7 @@ func (runner *Runner) runPiped(ctx context.Context, inv Invocation, stdout, stde
 
 	// Wait for all in-progress go commands to return before proceeding,
 	// to avoid load concurrency errors.
-	for i := 0; i < maxInFlight; i++ {
+	for range maxInFlight {
 		select {
 		case <-ctx.Done():
 			return ctx.Err(), ctx.Err()
@@ -167,7 +168,9 @@ type Invocation struct {
 	// TODO(rfindley): remove, in favor of Args.
 	ModFile string
 
-	// If Overlay is set, the go command is invoked with -overlay=Overlay.
+	// Overlay is the name of the JSON overlay file that describes
+	// unsaved editor buffers; see [WriteOverlays].
+	// If set, the go command is invoked with -overlay=Overlay.
 	// TODO(rfindley): remove, in favor of Args.
 	Overlay string
 
@@ -176,7 +179,7 @@ type Invocation struct {
 	CleanEnv   bool
 	Env        []string
 	WorkingDir string
-	Logf       func(format string, args ...interface{})
+	Logf       func(format string, args ...any)
 }
 
 // Postcondition: both error results have same nilness.
@@ -196,12 +199,14 @@ func (i *Invocation) runWithFriendlyError(ctx context.Context, stdout, stderr io
 	return
 }
 
-func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
-	log := i.Logf
-	if log == nil {
-		log = func(string, ...interface{}) {}
+// logf logs if i.Logf is non-nil.
+func (i *Invocation) logf(format string, args ...any) {
+	if i.Logf != nil {
+		i.Logf(format, args...)
 	}
+}
 
+func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
 	goArgs := []string{i.Verb}
 
 	appendModFile := func() {
@@ -244,23 +249,23 @@ func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
-	// cmd.WaitDelay was added only in go1.20 (see #50436).
-	if waitDelay := reflect.ValueOf(cmd).Elem().FieldByName("WaitDelay"); waitDelay.IsValid() {
-		// https://go.dev/issue/59541: don't wait forever copying stderr
-		// after the command has exited.
-		// After CL 484741 we copy stdout manually, so we we'll stop reading that as
-		// soon as ctx is done. However, we also don't want to wait around forever
-		// for stderr. Give a much-longer-than-reasonable delay and then assume that
-		// something has wedged in the kernel or runtime.
-		waitDelay.Set(reflect.ValueOf(30 * time.Second))
-	}
+	// https://go.dev/issue/59541: don't wait forever copying stderr
+	// after the command has exited.
+	// After CL 484741 we copy stdout manually, so we we'll stop reading that as
+	// soon as ctx is done. However, we also don't want to wait around forever
+	// for stderr. Give a much-longer-than-reasonable delay and then assume that
+	// something has wedged in the kernel or runtime.
+	cmd.WaitDelay = 30 * time.Second
 
-	// On darwin the cwd gets resolved to the real path, which breaks anything that
-	// expects the working directory to keep the original path, including the
+	// The cwd gets resolved to the real path. On Darwin, where
+	// /tmp is a symlink, this breaks anything that expects the
+	// working directory to keep the original path, including the
 	// go command when dealing with modules.
-	// The Go stdlib has a special feature where if the cwd and the PWD are the
-	// same node then it trusts the PWD, so by setting it in the env for the child
-	// process we fix up all the paths returned by the go command.
+	//
+	// os.Getwd has a special feature where if the cwd and the PWD
+	// are the same node then it trusts the PWD, so by setting it
+	// in the env for the child process we fix up all the paths
+	// returned by the go command.
 	if !i.CleanEnv {
 		cmd.Env = os.Environ()
 	}
@@ -270,7 +275,12 @@ func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
 		cmd.Dir = i.WorkingDir
 	}
 
-	defer func(start time.Time) { log("%s for %v", time.Since(start), cmdDebugStr(cmd)) }(time.Now())
+	debugStr := cmdDebugStr(cmd)
+	i.logf("starting %v", debugStr)
+	start := time.Now()
+	defer func() {
+		i.logf("%s for %v", time.Since(start), debugStr)
+	}()
 
 	return runCmdContext(ctx, cmd)
 }
@@ -351,6 +361,7 @@ func runCmdContext(ctx context.Context, cmd *exec.Cmd) (err error) {
 		}
 	}
 
+	startTime := time.Now()
 	err = cmd.Start()
 	if stdoutW != nil {
 		// The child process has inherited the pipe file,
@@ -377,7 +388,9 @@ func runCmdContext(ctx context.Context, cmd *exec.Cmd) (err error) {
 		case err := <-resChan:
 			return err
 		case <-timer.C:
-			HandleHangingGoCommand(cmd.Process)
+			// HandleHangingGoCommand terminates this process.
+			// Pass off resChan in case we can collect the command error.
+			handleHangingGoCommand(startTime, cmd, resChan)
 		case <-ctx.Done():
 		}
 	} else {
@@ -402,8 +415,6 @@ func runCmdContext(ctx context.Context, cmd *exec.Cmd) (err error) {
 	}
 
 	// Didn't shut down in response to interrupt. Kill it hard.
-	// TODO(rfindley): per advice from bcmills@, it may be better to send SIGQUIT
-	// on certain platforms, such as unix.
 	if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) && debug {
 		log.Printf("error killing the Go command: %v", err)
 	}
@@ -411,15 +422,17 @@ func runCmdContext(ctx context.Context, cmd *exec.Cmd) (err error) {
 	return <-resChan
 }
 
-func HandleHangingGoCommand(proc *os.Process) {
+// handleHangingGoCommand outputs debugging information to help diagnose the
+// cause of a hanging Go command, and then exits with log.Fatalf.
+func handleHangingGoCommand(start time.Time, cmd *exec.Cmd, resChan chan error) {
 	switch runtime.GOOS {
-	case "linux", "darwin", "freebsd", "netbsd":
+	case "linux", "darwin", "freebsd", "netbsd", "openbsd":
 		fmt.Fprintln(os.Stderr, `DETECTED A HANGING GO COMMAND
 
-The gopls test runner has detected a hanging go command. In order to debug
-this, the output of ps and lsof/fstat is printed below.
+			The gopls test runner has detected a hanging go command. In order to debug
+			this, the output of ps and lsof/fstat is printed below.
 
-See golang/go#54461 for more details.`)
+			See golang/go#54461 for more details.`)
 
 		fmt.Fprintln(os.Stderr, "\nps axo ppid,pid,command:")
 		fmt.Fprintln(os.Stderr, "-------------------------")
@@ -427,7 +440,7 @@ See golang/go#54461 for more details.`)
 		psCmd.Stdout = os.Stderr
 		psCmd.Stderr = os.Stderr
 		if err := psCmd.Run(); err != nil {
-			panic(fmt.Sprintf("running ps: %v", err))
+			log.Printf("Handling hanging Go command: running ps: %v", err)
 		}
 
 		listFiles := "lsof"
@@ -441,10 +454,24 @@ See golang/go#54461 for more details.`)
 		listFilesCmd.Stdout = os.Stderr
 		listFilesCmd.Stderr = os.Stderr
 		if err := listFilesCmd.Run(); err != nil {
-			panic(fmt.Sprintf("running %s: %v", listFiles, err))
+			log.Printf("Handling hanging Go command: running %s: %v", listFiles, err)
+		}
+		// Try to extract information about the slow go process by issuing a SIGQUIT.
+		if err := cmd.Process.Signal(sigStuckProcess); err == nil {
+			select {
+			case err := <-resChan:
+				stderr := "not a bytes.Buffer"
+				if buf, _ := cmd.Stderr.(*bytes.Buffer); buf != nil {
+					stderr = buf.String()
+				}
+				log.Printf("Quit hanging go command:\n\terr:%v\n\tstderr:\n%v\n\n", err, stderr)
+			case <-time.After(5 * time.Second):
+			}
+		} else {
+			log.Printf("Sending signal %d to hanging go command: %v", sigStuckProcess, err)
 		}
 	}
-	panic(fmt.Sprintf("detected hanging go command (pid %d): see golang/go#54461 for more details", proc.Pid))
+	log.Fatalf("detected hanging go command (golang/go#54461); waited %s\n\tcommand:%s\n\tpid:%d", time.Since(start), cmd, cmd.Process.Pid)
 }
 
 func cmdDebugStr(cmd *exec.Cmd) string {
@@ -467,4 +494,74 @@ func cmdDebugStr(cmd *exec.Cmd) string {
 		}
 	}
 	return fmt.Sprintf("GOROOT=%v GOPATH=%v GO111MODULE=%v GOPROXY=%v PWD=%v %v", env["GOROOT"], env["GOPATH"], env["GO111MODULE"], env["GOPROXY"], env["PWD"], strings.Join(args, " "))
+}
+
+// WriteOverlays writes each value in the overlay (see the Overlay
+// field of go/packages.Config) to a temporary file and returns the name
+// of a JSON file describing the mapping that is suitable for the "go
+// list -overlay" flag.
+//
+// On success, the caller must call the cleanup function exactly once
+// when the files are no longer needed.
+func WriteOverlays(overlay map[string][]byte) (filename string, cleanup func(), err error) {
+	// Do nothing if there are no overlays in the config.
+	if len(overlay) == 0 {
+		return "", func() {}, nil
+	}
+
+	dir, err := os.MkdirTemp("", "gocommand-*")
+	if err != nil {
+		return "", nil, err
+	}
+
+	// The caller must clean up this directory,
+	// unless this function returns an error.
+	// (The cleanup operand of each return
+	// statement below is ignored.)
+	defer func() {
+		cleanup = func() {
+			os.RemoveAll(dir)
+		}
+		if err != nil {
+			cleanup()
+			cleanup = nil
+		}
+	}()
+
+	// Write each map entry to a temporary file.
+	overlays := make(map[string]string)
+	for k, v := range overlay {
+		// Use a unique basename for each file (001-foo.go),
+		// to avoid creating nested directories.
+		base := fmt.Sprintf("%d-%s", 1+len(overlays), filepath.Base(k))
+		filename := filepath.Join(dir, base)
+		err := os.WriteFile(filename, v, 0666)
+		if err != nil {
+			return "", nil, err
+		}
+		overlays[k] = filename
+	}
+
+	// Write the JSON overlay file that maps logical file names to temp files.
+	//
+	// OverlayJSON is the format overlay files are expected to be in.
+	// The Replace map maps from overlaid paths to replacement paths:
+	// the Go command will forward all reads trying to open
+	// each overlaid path to its replacement path, or consider the overlaid
+	// path not to exist if the replacement path is empty.
+	//
+	// From golang/go#39958.
+	type OverlayJSON struct {
+		Replace map[string]string `json:"replace,omitempty"`
+	}
+	b, err := json.Marshal(OverlayJSON{Replace: overlays})
+	if err != nil {
+		return "", nil, err
+	}
+	filename = filepath.Join(dir, "overlay.json")
+	if err := os.WriteFile(filename, b, 0666); err != nil {
+		return "", nil, err
+	}
+
+	return filename, nil, nil
 }

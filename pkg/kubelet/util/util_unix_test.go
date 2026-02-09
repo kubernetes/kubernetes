@@ -1,5 +1,4 @@
 //go:build freebsd || linux || darwin
-// +build freebsd linux darwin
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -42,10 +41,10 @@ func TestLocalEndpoint(t *testing.T) {
 	for _, test := range tests {
 		fullPath, err := LocalEndpoint(test.path, test.file)
 		if test.expectError {
-			assert.NotNil(t, err, "expected error")
+			assert.Error(t, err, "expected error")
 			continue
 		}
-		assert.Nil(t, err, "expected no error")
+		assert.NoError(t, err, "expected no error")
 		assert.Equal(t, test.expectedFullPath, fullPath)
 	}
 }

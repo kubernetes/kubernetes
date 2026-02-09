@@ -7,11 +7,13 @@ package ssh
 // Message authentication support
 
 import (
+	"crypto/fips140"
 	"crypto/hmac"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"hash"
+	"slices"
 )
 
 type macMode struct {
@@ -46,23 +48,37 @@ func (t truncatingMAC) Size() int {
 
 func (t truncatingMAC) BlockSize() int { return t.hmac.BlockSize() }
 
-var macModes = map[string]*macMode{
-	"hmac-sha2-512-etm@openssh.com": {64, true, func(key []byte) hash.Hash {
+// macModes defines the supported MACs. MACs not included are not supported
+// and will not be negotiated, even if explicitly configured. When FIPS mode is
+// enabled, only FIPS-approved algorithms are included.
+var macModes = map[string]*macMode{}
+
+func init() {
+	macModes[HMACSHA512ETM] = &macMode{64, true, func(key []byte) hash.Hash {
 		return hmac.New(sha512.New, key)
-	}},
-	"hmac-sha2-256-etm@openssh.com": {32, true, func(key []byte) hash.Hash {
+	}}
+	macModes[HMACSHA256ETM] = &macMode{32, true, func(key []byte) hash.Hash {
 		return hmac.New(sha256.New, key)
-	}},
-	"hmac-sha2-512": {64, false, func(key []byte) hash.Hash {
+	}}
+	macModes[HMACSHA512] = &macMode{64, false, func(key []byte) hash.Hash {
 		return hmac.New(sha512.New, key)
-	}},
-	"hmac-sha2-256": {32, false, func(key []byte) hash.Hash {
+	}}
+	macModes[HMACSHA256] = &macMode{32, false, func(key []byte) hash.Hash {
 		return hmac.New(sha256.New, key)
-	}},
-	"hmac-sha1": {20, false, func(key []byte) hash.Hash {
+	}}
+
+	if fips140.Enabled() {
+		defaultMACs = slices.DeleteFunc(defaultMACs, func(algo string) bool {
+			_, ok := macModes[algo]
+			return !ok
+		})
+		return
+	}
+
+	macModes[HMACSHA1] = &macMode{20, false, func(key []byte) hash.Hash {
 		return hmac.New(sha1.New, key)
-	}},
-	"hmac-sha1-96": {20, false, func(key []byte) hash.Hash {
+	}}
+	macModes[InsecureHMACSHA196] = &macMode{20, false, func(key []byte) hash.Hash {
 		return truncatingMAC{12, hmac.New(sha1.New, key)}
-	}},
+	}}
 }

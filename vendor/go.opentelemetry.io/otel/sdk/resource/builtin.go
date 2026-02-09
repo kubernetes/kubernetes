@@ -13,22 +13,20 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 )
 
 type (
 	// telemetrySDK is a Detector that provides information about
 	// the OpenTelemetry SDK used.  This Detector is included as a
 	// builtin. If these resource attributes are not wanted, use
-	// the WithTelemetrySDK(nil) or WithoutBuiltin() options to
-	// explicitly disable them.
+	// resource.New() to explicitly disable them.
 	telemetrySDK struct{}
 
 	// host is a Detector that provides information about the host
 	// being run on. This Detector is included as a builtin. If
 	// these resource attributes are not wanted, use the
-	// WithHost(nil) or WithoutBuiltin() options to explicitly
-	// disable them.
+	// resource.New() to explicitly disable them.
 	host struct{}
 
 	stringDetector struct {
@@ -74,7 +72,7 @@ func StringDetector(schemaURL string, k attribute.Key, f func() (string, error))
 
 // Detect returns a *Resource that describes the string as a value
 // corresponding to attribute.Key as well as the specific schemaURL.
-func (sd stringDetector) Detect(ctx context.Context) (*Resource, error) {
+func (sd stringDetector) Detect(context.Context) (*Resource, error) {
 	value, err := sd.F()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", string(sd.K), err)

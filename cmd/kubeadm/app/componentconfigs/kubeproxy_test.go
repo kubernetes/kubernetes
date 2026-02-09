@@ -118,7 +118,7 @@ func TestKubeProxyDefault(t *testing.T) {
 			}
 			got.Default(&test.clusterCfg, &test.endpoint, &kubeadmapi.NodeRegistrationOptions{})
 			if !reflect.DeepEqual(got, &expected) {
-				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, got)
+				t.Fatalf("Mismatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, got)
 			}
 		})
 	}
@@ -159,7 +159,7 @@ func TestKubeProxyFromDocumentMap(t *testing.T) {
 
 func TestKubeProxyFromCluster(t *testing.T) {
 	runKubeProxyFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
-		client := clientsetfake.NewSimpleClientset(
+		client := clientsetfake.NewClientset(
 			testKubeProxyConfigMap(yaml),
 		)
 

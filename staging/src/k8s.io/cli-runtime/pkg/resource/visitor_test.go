@@ -153,7 +153,7 @@ func TestVisitorHttpGet(t *testing.T) {
 			actualBytes, actualErr := readHttpWithRetries(tt.httpRetries, tt.args.duration, tt.args.u, tt.args.attempts)
 
 			if tt.isNotNil {
-				assert.Nil(t, actualErr)
+				assert.NoError(t, actualErr)
 				assert.NotNil(t, actualBytes)
 			} else {
 				if tt.expectedErr != nil {

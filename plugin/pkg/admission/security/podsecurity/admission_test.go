@@ -19,9 +19,11 @@ package podsecurity
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
+
+	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -39,8 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
-	"k8s.io/utils/pointer"
-	"sigs.k8s.io/yaml"
+	"k8s.io/utils/ptr"
 )
 
 func TestConvert(t *testing.T) {
@@ -81,7 +82,7 @@ func BenchmarkVerifyPod(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	p.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+	p.InspectEffectiveVersion(compatibility.DefaultBuildEffectiveVersion())
 
 	enforceImplicitPrivilegedNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "enforce-implicit", Labels: map[string]string{}}}
 	enforcePrivilegedNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "enforce-privileged", Labels: map[string]string{"pod-security.kubernetes.io/enforce": "privileged"}}}
@@ -116,7 +117,7 @@ func BenchmarkVerifyPod(b *testing.B) {
 
 	corePod := &core.Pod{}
 	v1Pod := &corev1.Pod{}
-	data, err := ioutil.ReadFile("testdata/pod_restricted.yaml")
+	data, err := os.ReadFile("testdata/pod_restricted.yaml")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -189,7 +190,7 @@ func BenchmarkVerifyNamespace(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	p.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+	p.InspectEffectiveVersion(compatibility.DefaultBuildEffectiveVersion())
 
 	namespace := "enforce"
 	enforceNamespaceBaselineV1 := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace, Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"}}}
@@ -205,7 +206,7 @@ func BenchmarkVerifyNamespace(b *testing.B) {
 	}
 
 	v1Pod := &corev1.Pod{}
-	data, err := ioutil.ReadFile("testdata/pod_baseline.yaml")
+	data, err := os.ReadFile("testdata/pod_baseline.yaml")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -219,14 +220,14 @@ func BenchmarkVerifyNamespace(b *testing.B) {
 		Kind:       "ReplicaSet",
 		Name:       "myapp-123123",
 		UID:        types.UID("7610a7f4-8f80-4f88-95b5-6cefdd8e9dbd"),
-		Controller: pointer.Bool(true),
+		Controller: ptr.To(true),
 	}
 	ownerB := metav1.OwnerReference{
 		APIVersion: "apps/v1",
 		Kind:       "ReplicaSet",
 		Name:       "myapp-234234",
 		UID:        types.UID("7610a7f4-8f80-4f88-95b5-as765as76f55"),
-		Controller: pointer.Bool(true),
+		Controller: ptr.To(true),
 	}
 
 	// number of warnings printed for the entire namespace

@@ -139,6 +139,9 @@ func newAPILinter() *apiLinter {
 			&rules.NamesMatch{},
 			&rules.OmitEmptyMatchCase{},
 			&rules.ListTypeMissing{},
+			&rules.StreamingListTypeFieldOrder{},
+			&rules.StreamingListTypeJSONTags{},
+			&rules.StreamingListTypeProtoTags{},
 		},
 	}
 }

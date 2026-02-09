@@ -1,4 +1,4 @@
-// Copyright 2018 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -37,9 +37,9 @@ type Proc struct {
 type Procs []Proc
 
 var (
-	ErrFileParse  = errors.New("Error Parsing File")
-	ErrFileRead   = errors.New("Error Reading File")
-	ErrMountPoint = errors.New("Error Accessing Mount point")
+	ErrFileParse  = errors.New("error parsing file")
+	ErrFileRead   = errors.New("error reading file")
+	ErrMountPoint = errors.New("error accessing mount point")
 )
 
 func (p Procs) Len() int           { return len(p) }
@@ -49,7 +49,7 @@ func (p Procs) Less(i, j int) bool { return p[i].PID < p[j].PID }
 // Self returns a process for the current process read via /proc/self.
 func Self() (Proc, error) {
 	fs, err := NewFS(DefaultMountPoint)
-	if err != nil || errors.Unwrap(err) == ErrMountPoint {
+	if err != nil || errors.Is(err, ErrMountPoint) {
 		return Proc{}, err
 	}
 	return fs.Self()
@@ -79,7 +79,7 @@ func (fs FS) Self() (Proc, error) {
 	if err != nil {
 		return Proc{}, err
 	}
-	pid, err := strconv.Atoi(strings.Replace(p, string(fs.proc), "", -1))
+	pid, err := strconv.Atoi(strings.ReplaceAll(p, string(fs.proc), ""))
 	if err != nil {
 		return Proc{}, err
 	}

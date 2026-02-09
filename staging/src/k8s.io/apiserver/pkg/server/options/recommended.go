@@ -105,7 +105,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.Traces.ApplyTo(config.Config.EgressSelector, &config.Config); err != nil {
 		return err
 	}
-	if err := o.SecureServing.ApplyTo(&config.Config.SecureServing, &config.Config.LoopbackClientConfig); err != nil {
+	if err := o.SecureServing.ApplyToConfig(&config.Config); err != nil {
 		return err
 	}
 	if err := o.Authentication.ApplyTo(&config.Config.Authentication, config.SecureServing, config.OpenAPIConfig); err != nil {
@@ -120,8 +120,8 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
-	var kubeClient *kubernetes.Clientset
-	var dynamicClient *dynamic.DynamicClient
+	var kubeClient kubernetes.Interface
+	var dynamicClient dynamic.Interface
 	if config.ClientConfig != nil {
 		var err error
 		kubeClient, err = kubernetes.NewForConfig(config.ClientConfig)
@@ -141,6 +141,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		return err
 	}
 	if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, kubeClient, dynamicClient, o.FeatureGate,
+		config.EffectiveVersion,
 		initializers...); err != nil {
 		return err
 	}

@@ -62,6 +62,7 @@ if [ ${#errors_expect_no_error[@]} -ne 0 ]; then
     echo 'The above files need to use framework.ExpectNoError(err) instead of '
     echo 'Expect(err).NotTo(HaveOccurred()) or gomega.Expect(err).NotTo(gomega.HaveOccurred())'
     echo
+    echo 'See https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/writing-good-e2e-tests.md for more guidance'
   } >&2
   exit 1
 fi

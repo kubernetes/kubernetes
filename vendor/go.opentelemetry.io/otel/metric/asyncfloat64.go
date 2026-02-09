@@ -106,7 +106,9 @@ type Float64ObservableUpDownCounterConfig struct {
 
 // NewFloat64ObservableUpDownCounterConfig returns a new
 // [Float64ObservableUpDownCounterConfig] with all opts applied.
-func NewFloat64ObservableUpDownCounterConfig(opts ...Float64ObservableUpDownCounterOption) Float64ObservableUpDownCounterConfig {
+func NewFloat64ObservableUpDownCounterConfig(
+	opts ...Float64ObservableUpDownCounterOption,
+) Float64ObservableUpDownCounterConfig {
 	var config Float64ObservableUpDownCounterConfig
 	for _, o := range opts {
 		config = o.applyFloat64ObservableUpDownCounter(config)
@@ -213,7 +215,7 @@ type Float64Observer interface {
 }
 
 // Float64Callback is a function registered with a Meter that makes
-// observations for a Float64Observerable instrument it is registered with.
+// observations for a Float64Observable instrument it is registered with.
 // Calls to the Float64Observer record measurement values for the
 // Float64Observable.
 //
@@ -239,12 +241,16 @@ type float64CallbackOpt struct {
 	cback Float64Callback
 }
 
-func (o float64CallbackOpt) applyFloat64ObservableCounter(cfg Float64ObservableCounterConfig) Float64ObservableCounterConfig {
+func (o float64CallbackOpt) applyFloat64ObservableCounter(
+	cfg Float64ObservableCounterConfig,
+) Float64ObservableCounterConfig {
 	cfg.callbacks = append(cfg.callbacks, o.cback)
 	return cfg
 }
 
-func (o float64CallbackOpt) applyFloat64ObservableUpDownCounter(cfg Float64ObservableUpDownCounterConfig) Float64ObservableUpDownCounterConfig {
+func (o float64CallbackOpt) applyFloat64ObservableUpDownCounter(
+	cfg Float64ObservableUpDownCounterConfig,
+) Float64ObservableUpDownCounterConfig {
 	cfg.callbacks = append(cfg.callbacks, o.cback)
 	return cfg
 }

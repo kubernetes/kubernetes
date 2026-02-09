@@ -46,7 +46,8 @@ type IPerfCSVResult struct {
 	server        string
 	servPort      int64
 	id            string
-	interval      string
+	intervalStart string
+	intervalEnd   string
 	transferBits  int64
 	bandwidthBits int64
 }
@@ -80,12 +81,13 @@ func (i *IPerfResults) ToTSV() string {
 // NewIPerf parses an IPerf CSV output line into an IPerfCSVResult.
 func NewIPerf(csvLine string) (*IPerfCSVResult, error) {
 	if len(csvLine) == 0 {
-		return nil, fmt.Errorf("No iperf output received in csv line")
+		return nil, fmt.Errorf("no iperf output received in csv line")
 	}
 	csvLine = strings.Trim(csvLine, "\n")
 	slice := StrSlice(strings.Split(csvLine, ","))
-	if len(slice) != 9 {
-		return nil, fmt.Errorf("Incorrect fields in the output: %v (%v out of 9)", slice, len(slice))
+	// iperf 2.2.0+ reports 17 fields, before it was just 15
+	if len(slice) != 17 {
+		return nil, fmt.Errorf("incorrect fields in the output: %v (%v out of 17)", slice, len(slice))
 	}
 	i := IPerfCSVResult{}
 	i.date = slice.get(0)
@@ -94,9 +96,10 @@ func NewIPerf(csvLine string) (*IPerfCSVResult, error) {
 	i.server = slice.get(3)
 	i.servPort = intOrFail("server port", slice.get(4))
 	i.id = slice.get(5)
-	i.interval = slice.get(6)
-	i.transferBits = intOrFail("transfer port", slice.get(7))
-	i.bandwidthBits = intOrFail("bandwidth port", slice.get(8))
+	i.intervalStart = slice.get(6)
+	i.intervalEnd = slice.get(7)
+	i.transferBits = intOrFail("transfer port", slice.get(8))
+	i.bandwidthBits = intOrFail("bandwidth port", slice.get(9))
 	return &i, nil
 }
 
@@ -127,27 +130,32 @@ type IPerf2EnhancedCSVResults struct {
 
 // ParseIPerf2EnhancedResultsFromCSV parses results from iperf2 when given the -e (--enhancedreports)
 // and `--reportstyle C` options.
-// Example output:
+// Example output for version < 2.1.9 (agnhost < 2.53):
 // 20201210141800.884,10.244.2.24,47880,10.96.114.79,6789,3,0.0-1.0,1677852672,13422821376
 // 20201210141801.881,10.244.2.24,47880,10.96.114.79,6789,3,1.0-2.0,1980760064,15846080512
 // 20201210141802.883,10.244.2.24,47880,10.96.114.79,6789,3,2.0-3.0,1886650368,15093202944
-// 20201210141803.882,10.244.2.24,47880,10.96.114.79,6789,3,3.0-4.0,2035417088,16283336704
-// 20201210141804.879,10.244.2.24,47880,10.96.114.79,6789,3,4.0-5.0,1922957312,15383658496
-// 20201210141805.881,10.244.2.24,47880,10.96.114.79,6789,3,5.0-6.0,2095316992,16762535936
-// 20201210141806.882,10.244.2.24,47880,10.96.114.79,6789,3,6.0-7.0,1741291520,13930332160
-// 20201210141807.879,10.244.2.24,47880,10.96.114.79,6789,3,7.0-8.0,1862926336,14903410688
-// 20201210141808.878,10.244.2.24,47880,10.96.114.79,6789,3,8.0-9.0,1821245440,14569963520
-// 20201210141809.849,10.244.2.24,47880,10.96.114.79,6789,3,0.0-10.0,18752208896,15052492511
+// Example output with version >= 2.1.9 (agnhost >= 2.53)
+// +0000:20240908113035.128,192.168.9.3,58256,192.168.9.4,5001,1,0.0-1.0,5220466748,41763733984,-1,-1,-1,-1,0,0
+// +0000:20240908113036.128,192.168.9.3,58256,192.168.9.4,5001,1,1.0-2.0,5127667712,41021341696,-1,-1,-1,-1,0,0
+// Example output with version >= 2.2.0 (agnhost >= 2.55)
+// time,srcaddress,srcport,dstaddr,dstport,transferid,istart,iend,bytes,speed,writecnt,writeerr,tcpretry,tcpcwnd,tcppcwnd,tcprtt,tcprttvar
+// +0000:20250605191028.955,10.244.2.64,43380,10.96.223.154,6789,1,0.0,1.0,7817396288,62539170304,-1,-1,4294967295,-1,4294967295,0,0
+// +0000:20250605191029.955,10.244.2.64,43380,10.96.223.154,6789,1,1.0,2.0,7550795776,60406366208,-1,-1,4294967295,-1,4294967295,0,0
+// +0000:20250605191030.955,10.244.2.64,43380,10.96.223.154,6789,1,2.0,3.0,8703574016,69628592128,-1,-1,4294967295,-1,4294967295,0,0
 func ParseIPerf2EnhancedResultsFromCSV(output string) (*IPerf2EnhancedCSVResults, error) {
 	var parsedResults []*IPerfCSVResult
-	for _, line := range strings.Split(output, "\n") {
+	for i, line := range strings.Split(output, "\n") {
+		if i == 0 {
+			// we skip the first line, iperf 2.2.0+ returns headers as first line in output
+			continue
+		}
 		parsed, err := NewIPerf(line)
 		if err != nil {
 			return nil, err
 		}
 		parsedResults = append(parsedResults, parsed)
 	}
-	if parsedResults == nil || len(parsedResults) == 0 {
+	if len(parsedResults) == 0 {
 		return nil, fmt.Errorf("no results parsed from iperf2 output")
 	}
 	// format:

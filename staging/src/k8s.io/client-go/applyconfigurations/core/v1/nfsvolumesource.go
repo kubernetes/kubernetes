@@ -20,10 +20,20 @@ package v1
 
 // NFSVolumeSourceApplyConfiguration represents a declarative configuration of the NFSVolumeSource type for use
 // with apply.
+//
+// Represents an NFS mount that lasts the lifetime of a pod.
+// NFS volumes do not support ownership management or SELinux relabeling.
 type NFSVolumeSourceApplyConfiguration struct {
-	Server   *string `json:"server,omitempty"`
-	Path     *string `json:"path,omitempty"`
-	ReadOnly *bool   `json:"readOnly,omitempty"`
+	// server is the hostname or IP address of the NFS server.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+	Server *string `json:"server,omitempty"`
+	// path that is exported by the NFS server.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+	Path *string `json:"path,omitempty"`
+	// readOnly here will force the NFS export to be mounted with read-only permissions.
+	// Defaults to false.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // NFSVolumeSourceApplyConfiguration constructs a declarative configuration of the NFSVolumeSource type for use with

@@ -27,10 +27,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -48,6 +48,8 @@ const (
 	nodeConditionMessageFmt = "The node had condition: %v. "
 	// containerMessageFmt provides additional information for containers exceeding requests
 	containerMessageFmt = "Container %s was using %s, request is %s, has larger consumption of %v. "
+	// podMessageFmt provides additional information for pods exceeding requests
+	podMessageFmt = "Pod %s was using %s, request is %s, has larger consumption of %v. "
 	// containerEphemeralStorageMessageFmt provides additional information for containers which have exceeded their ES limit
 	containerEphemeralStorageMessageFmt = "Container %s exceeded its local ephemeral storage limit %q. "
 	// podEphemeralStorageMessageFmt provides additional information for pods which have exceeded their ES limit
@@ -62,6 +64,10 @@ const (
 	OffendingContainersKey = "offending_containers"
 	// OffendingContainersUsageKey is the key in eviction event annotations for the list of usage of containers which exceeded their requests
 	OffendingContainersUsageKey = "offending_containers_usage"
+	// OffendingPodKey is the key in eviction event annotations for the pod name which exceeded its requests
+	OffendingPodKey = "offending_pod"
+	// OffendingPodUsageKey is the key in eviction event annotations for the pod usage which exceeded its requests
+	OffendingPodUsageKey = "offending_pod_usage"
 	// StarvedResourceKey is the key for the starved resource in eviction event annotations
 	StarvedResourceKey = "starved_resource"
 	// thresholdMetMessageFmt is the message for evictions due to resource pressure.
@@ -108,12 +114,12 @@ func validSignal(signal evictionapi.Signal) bool {
 }
 
 // getReclaimableThreshold finds the threshold and resource to reclaim
-func getReclaimableThreshold(thresholds []evictionapi.Threshold) (evictionapi.Threshold, v1.ResourceName, bool) {
+func getReclaimableThreshold(logger klog.Logger, thresholds []evictionapi.Threshold) (evictionapi.Threshold, v1.ResourceName, bool) {
 	for _, thresholdToReclaim := range thresholds {
 		if resourceToReclaim, ok := signalToResource[thresholdToReclaim.Signal]; ok {
 			return thresholdToReclaim, resourceToReclaim, true
 		}
-		klog.V(3).InfoS("Eviction manager: threshold was crossed, but reclaim is not implemented for this threshold.", "threshold", thresholdToReclaim.Signal)
+		logger.V(3).Info("Eviction manager: threshold was crossed, but reclaim is not implemented for this threshold.", "threshold", thresholdToReclaim.Signal)
 	}
 	return evictionapi.Threshold{}, "", false
 }
@@ -738,7 +744,6 @@ func process(stats statsFunc) cmpFunc {
 
 		p1Process := processUsage(p1Stats.ProcessStats)
 		p2Process := processUsage(p2Stats.ProcessStats)
-		// prioritize evicting the pod which has the larger consumption of process
 		return int(p2Process - p1Process)
 	}
 }
@@ -840,21 +845,19 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summary *statsapi.Summary) (signalObservations, statsFunc) {
+func makeSignalObservations(logger klog.Logger, summary *statsapi.Summary) (signalObservations, statsFunc) {
 	// build the function to work against for pod stats
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
 	result := signalObservations{}
 
-	if memory := summary.Node.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
-		result[evictionapi.SignalMemoryAvailable] = signalObservation{
-			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
-			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
-			time:      memory.Time,
-		}
+	memoryAvailableSignal := makeMemoryAvailableSignalObservation(logger, summary)
+	if memoryAvailableSignal != nil {
+		result[evictionapi.SignalMemoryAvailable] = *memoryAvailableSignal
 	}
+
 	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
-		klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalAllocatableMemoryAvailable)
+		logger.Error(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalAllocatableMemoryAvailable)
 	} else {
 		if memory := allocatableContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
 			result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
@@ -937,13 +940,13 @@ func getSysContainer(sysContainers []statsapi.ContainerStats, name string) (*sta
 }
 
 // thresholdsMet returns the set of thresholds that were met independent of grace period
-func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObservations, enforceMinReclaim bool) []evictionapi.Threshold {
+func thresholdsMet(logger klog.Logger, thresholds []evictionapi.Threshold, observations signalObservations, enforceMinReclaim bool) []evictionapi.Threshold {
 	results := []evictionapi.Threshold{}
 	for i := range thresholds {
 		threshold := thresholds[i]
 		observed, found := observations[threshold.Signal]
 		if !found {
-			klog.InfoS("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
+			logger.Info("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
 			continue
 		}
 		// determine if we have met the specified threshold
@@ -965,23 +968,21 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 	return results
 }
 
-func debugLogObservations(logPrefix string, observations signalObservations) {
-	klogV := klog.V(3)
-	if !klogV.Enabled() {
+func debugLogObservations(logger klog.Logger, logPrefix string, observations signalObservations) {
+	if !logger.V(3).Enabled() {
 		return
 	}
 	for k, v := range observations {
 		if !v.time.IsZero() {
-			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity, "time", v.time)
+			logger.V(3).Info("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity, "time", v.time)
 		} else {
-			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity)
+			logger.V(3).Info("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity)
 		}
 	}
 }
 
-func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
-	klogV := klog.V(3)
-	if !klogV.Enabled() {
+func debugLogThresholdsWithObservation(logger klog.Logger, logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
+	if !logger.V(3).Enabled() {
 		return
 	}
 	for i := range thresholds {
@@ -989,20 +990,20 @@ func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionap
 		observed, found := observations[threshold.Signal]
 		if found {
 			quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
-			klogV.InfoS("Eviction manager: threshold observed resource", "log", logPrefix, "signal", threshold.Signal, "resourceName", signalToResource[threshold.Signal], "quantity", quantity, "available", observed.available)
+			logger.V(3).Info("Eviction manager: threshold observed resource", "log", logPrefix, "signal", threshold.Signal, "resourceName", signalToResource[threshold.Signal], "quantity", quantity, "available", observed.available)
 		} else {
-			klogV.InfoS("Eviction manager: threshold had no observation", "log", logPrefix, "signal", threshold.Signal)
+			logger.V(3).Info("Eviction manager: threshold had no observation", "log", logPrefix, "signal", threshold.Signal)
 		}
 	}
 }
 
-func thresholdsUpdatedStats(thresholds []evictionapi.Threshold, observations, lastObservations signalObservations) []evictionapi.Threshold {
+func thresholdsUpdatedStats(logger klog.Logger, thresholds []evictionapi.Threshold, observations, lastObservations signalObservations) []evictionapi.Threshold {
 	results := []evictionapi.Threshold{}
 	for i := range thresholds {
 		threshold := thresholds[i]
 		observed, found := observations[threshold.Signal]
 		if !found {
-			klog.InfoS("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
+			logger.Info("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
 			continue
 		}
 		last, found := lastObservations[threshold.Signal]
@@ -1027,12 +1028,12 @@ func thresholdsFirstObservedAt(thresholds []evictionapi.Threshold, lastObservedA
 }
 
 // thresholdsMetGracePeriod returns the set of thresholds that have satisfied associated grace period
-func thresholdsMetGracePeriod(observedAt thresholdsObservedAt, now time.Time) []evictionapi.Threshold {
+func thresholdsMetGracePeriod(logger klog.Logger, observedAt thresholdsObservedAt, now time.Time) []evictionapi.Threshold {
 	results := []evictionapi.Threshold{}
 	for threshold, at := range observedAt {
 		duration := now.Sub(at)
 		if duration < threshold.GracePeriod {
-			klog.V(2).InfoS("Eviction manager: eviction criteria not yet met", "threshold", formatThreshold(threshold), "duration", duration)
+			logger.V(2).Info("Eviction manager: eviction criteria not yet met", "threshold", formatThreshold(threshold), "duration", duration)
 			continue
 		}
 		results = append(results, threshold)
@@ -1208,6 +1209,8 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 		// with an imagefs, imagefs pressure should delete unused images
 		signalToReclaimFunc[evictionapi.SignalImageFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalImageFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		signalToReclaimFunc[evictionapi.SignalContainerFsAvailable] = signalToReclaimFunc[evictionapi.SignalImageFsAvailable]
+		signalToReclaimFunc[evictionapi.SignalContainerFsInodesFree] = signalToReclaimFunc[evictionapi.SignalImageFsInodesFree]
 		// usage of imagefs and container fs on separate disks
 		// containers gc on containerfs pressure
 		// image gc on imagefs pressure
@@ -1218,6 +1221,8 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 		// with an split fs and imagefs, containerfs pressure should delete unused containers
 		signalToReclaimFunc[evictionapi.SignalNodeFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers}
 		signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers}
+		signalToReclaimFunc[evictionapi.SignalContainerFsAvailable] = signalToReclaimFunc[evictionapi.SignalNodeFsAvailable]
+		signalToReclaimFunc[evictionapi.SignalContainerFsInodesFree] = signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree]
 	} else {
 		// without an imagefs, nodefs pressure should delete logs, and unused images
 		// since imagefs, containerfs and nodefs share a common device, they share common reclaim functions
@@ -1225,6 +1230,8 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 		signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalImageFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalImageFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		signalToReclaimFunc[evictionapi.SignalContainerFsAvailable] = signalToReclaimFunc[evictionapi.SignalNodeFsAvailable]
+		signalToReclaimFunc[evictionapi.SignalContainerFsInodesFree] = signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree]
 	}
 	return signalToReclaimFunc
 }
@@ -1237,22 +1244,36 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	if quantity != nil && available != nil {
 		message += fmt.Sprintf(thresholdMetMessageFmt, quantity, available)
 	}
-	containers := []string{}
+	exceededContainers := []string{}
 	containerUsage := []string{}
 	podStats, ok := stats(pod)
 	if !ok {
 		return
 	}
+
+	// Pod level resources will be included in eviction message, along container resources
+	if resourceToReclaim == v1.ResourceMemory && utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		if podRequest, ok := pod.Spec.Resources.Requests[resourceToReclaim]; ok && podStats.Memory != nil {
+			podUsage := memoryUsage(podStats.Memory)
+			message += fmt.Sprintf(podMessageFmt, pod.Name, podUsage.String(), podRequest.String(), resourceToReclaim)
+
+			annotations[OffendingPodKey] = pod.Name
+			annotations[OffendingPodUsageKey] = podUsage.String()
+		}
+	}
+
+	// Since the resources field cannot be specified for ephemeral containers,
+	// they will always be blamed for resource overuse when an eviction occurs.
+	// That’s why only regular, init and restartable init containers are considered
+	// for the eviction message.
+	containers := pod.Spec.Containers
+	if len(pod.Spec.InitContainers) != 0 {
+		containers = append(containers, pod.Spec.InitContainers...)
+	}
 	for _, containerStats := range podStats.Containers {
-		for _, container := range pod.Spec.Containers {
+		for _, container := range containers {
 			if container.Name == containerStats.Name {
 				requests := container.Resources.Requests[resourceToReclaim]
-				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
-					(resourceToReclaim == v1.ResourceMemory || resourceToReclaim == v1.ResourceCPU) {
-					if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-						requests = cs.AllocatedResources[resourceToReclaim]
-					}
-				}
 				var usage *resource.Quantity
 				switch resourceToReclaim {
 				case v1.ResourceEphemeralStorage:
@@ -1266,13 +1287,16 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 				}
 				if usage != nil && usage.Cmp(requests) > 0 {
 					message += fmt.Sprintf(containerMessageFmt, container.Name, usage.String(), requests.String(), resourceToReclaim)
-					containers = append(containers, container.Name)
+					exceededContainers = append(exceededContainers, container.Name)
 					containerUsage = append(containerUsage, usage.String())
 				}
+				// Found the container to compare resource usage with,
+				// so it's safe to break out of the containers loop here.
+				break
 			}
 		}
 	}
-	annotations[OffendingContainersKey] = strings.Join(containers, ",")
+	annotations[OffendingContainersKey] = strings.Join(exceededContainers, ",")
 	annotations[OffendingContainersUsageKey] = strings.Join(containerUsage, ",")
 	annotations[StarvedResourceKey] = string(resourceToReclaim)
 	return

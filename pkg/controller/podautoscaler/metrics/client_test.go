@@ -241,7 +241,7 @@ func (tc *restClientTestCase) runTest(t *testing.T) {
 	isResource := len(tc.resourceName) > 0
 	isExternal := tc.metricSelector != nil
 	if isResource {
-		info, timestamp, err := metricsClient.GetResourceMetric(context.TODO(), v1.ResourceName(tc.resourceName), tc.namespace, tc.selector, tc.container)
+		info, timestamp, err := metricsClient.GetResourceMetric(context.TODO(), tc.resourceName, tc.namespace, tc.selector, tc.container)
 		tc.verifyResults(t, info, timestamp, err)
 	} else if isExternal {
 		tc.metricLabelSelector, err = metav1.LabelSelectorAsSelector(tc.metricSelector)
@@ -429,7 +429,22 @@ func TestRESTClientContainerCPUEmptyMetricsForOnePod(t *testing.T) {
 		container:          "test-1",
 		targetTimestamp:    targetTimestamp,
 		window:             window,
-		desiredError:       fmt.Errorf("failed to get container metrics"),
+		reportedPodMetrics: []map[string]int64{{"test-1": 100}, {"test-1": 300, "test-2": 400}, {}},
+	}
+	tc.runTest(t)
+}
+
+func TestRESTClientContainerCPUEmptyMetricsForOnePodReturnsOnlyFoundContainer(t *testing.T) {
+	targetTimestamp := 1
+	window := 30 * time.Second
+	tc := restClientTestCase{
+		resourceName: v1.ResourceCPU,
+		desiredMetricValues: PodMetricsInfo{
+			"test-pod-1": {Value: 400, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
+		},
+		container:          "test-2",
+		targetTimestamp:    targetTimestamp,
+		window:             window,
 		reportedPodMetrics: []map[string]int64{{"test-1": 100}, {"test-1": 300, "test-2": 400}, {}},
 	}
 	tc.runTest(t)

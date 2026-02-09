@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/aliases"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/builtins"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/interfaces"
@@ -44,7 +44,7 @@ func TestWithValueFuzzer(t *testing.T) {
 		structs.Ttest{},
 	}
 
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 	fuzzer.NilChance(0.5)
 	fuzzer.NumElements(0, 2)
 	fuzzer.Funcs(interfaceFuzzers...)
@@ -55,24 +55,24 @@ func TestWithValueFuzzer(t *testing.T) {
 			for i := 0; i < N; i++ {
 				original := reflect.New(reflect.TypeOf(test)).Interface()
 
-				fuzzer.Fuzz(original)
+				fuzzer.Fill(original)
 
 				reflectCopy := ReflectDeepCopy(original)
 
 				if !reflect.DeepEqual(original, reflectCopy) {
-					t.Errorf("original and reflectCopy are different:\n\n  original = %s\n\n  jsonCopy = %s", spew.Sdump(original), spew.Sdump(reflectCopy))
+					t.Errorf("original and reflectCopy are different:\n\n  original = %s\n\n  jsonCopy = %s", dump.Pretty(original), dump.Pretty(reflectCopy))
 				}
 
 				deepCopy := reflect.ValueOf(original).MethodByName("DeepCopy").Call(nil)[0].Interface()
 
 				if !reflect.DeepEqual(original, deepCopy) {
-					t.Fatalf("original and deepCopy are different:\n\n  original = %s\n\n  deepCopy() = %s", spew.Sdump(original), spew.Sdump(deepCopy))
+					t.Fatalf("original and deepCopy are different:\n\n  original = %s\n\n  deepCopy() = %s", dump.Pretty(original), dump.Pretty(deepCopy))
 				}
 
 				ValueFuzz(original)
 
 				if !reflect.DeepEqual(reflectCopy, deepCopy) {
-					t.Fatalf("reflectCopy and deepCopy are different:\n\n  origin = %s\n\n  jsonCopy() = %s", spew.Sdump(original), spew.Sdump(deepCopy))
+					t.Fatalf("reflectCopy and deepCopy are different:\n\n  origin = %s\n\n  jsonCopy() = %s", dump.Pretty(original), dump.Pretty(deepCopy))
 				}
 			}
 		})
@@ -149,7 +149,7 @@ func BenchmarkReflectDeepCopy(b *testing.B) {
 		},
 	}
 
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 	fuzzer.NilChance(0.5)
 	fuzzer.NumElements(0, 2)
 	fuzzer.Funcs(interfaceFuzzers...)

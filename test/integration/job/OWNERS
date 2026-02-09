@@ -2,9 +2,10 @@
 
 approvers:
   - sig-apps-approvers
-  - alculquicondor
+  - mimowo
 reviewers:
   - sig-apps-reviewers
   - mimowo
+  - tenzen-y
 labels:
   - sig/apps

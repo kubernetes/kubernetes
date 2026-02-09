@@ -18,4 +18,4 @@ limitations under the License.
 // and updating Scale for any resource which implements the `scale` subresource,
 // as long as that subresource operates on a version of scale convertable to
 // autoscaling.Scale.
-package scale // import "k8s.io/client-go/scale"
+package scale

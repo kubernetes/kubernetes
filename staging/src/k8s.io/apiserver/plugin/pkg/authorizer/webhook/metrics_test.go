@@ -107,9 +107,16 @@ func TestAuthorizerMetrics(t *testing.T) {
 			if service.statusCode == 0 {
 				service.statusCode = 200
 			}
-			service.reviewHook = func(*authorizationv1.SubjectAccessReview) {
-				if scenario.canceledRequest {
+
+			testFinishedCtx, testFinishedCancel := context.WithCancel(context.Background())
+			defer testFinishedCancel()
+			if scenario.canceledRequest {
+				service.reviewHook = func(*authorizationv1.SubjectAccessReview) {
 					cancel()
+					// net/http transport still attempts to use a response if it's
+					// available right when it's handling context cancellation,
+					// we need to delay the response.
+					<-testFinishedCtx.Done()
 				}
 			}
 			service.allow = !scenario.authFakeServiceDeny
@@ -120,9 +127,12 @@ func TestAuthorizerMetrics(t *testing.T) {
 				return
 			}
 			defer server.Close()
+			// testFinishedCtx must be cancelled before we close the server, otherwise
+			// closing the server hangs on an active connection from the listener.
+			defer testFinishedCancel()
 
 			fakeAuthzMetrics := &fakeAuthorizerMetrics{}
-			wh, err := newV1Authorizer(server.URL, scenario.clientCert, scenario.clientKey, scenario.clientCA, 0, fakeAuthzMetrics, []apiserver.WebhookMatchCondition{}, "")
+			wh, err := newV1Authorizer(server.URL, scenario.clientCert, scenario.clientKey, scenario.clientCA, 0, fakeAuthzMetrics, cel.NewDefaultCompiler(), []apiserver.WebhookMatchCondition{}, "")
 			if err != nil {
 				t.Error("failed to create client")
 				return

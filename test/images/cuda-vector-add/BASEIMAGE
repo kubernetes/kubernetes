@@ -1,2 +1,0 @@
-linux/amd64=nvidia/cuda:11.4.3-devel-ubuntu20.04
-linux/arm64=nvidia/cuda:11.4.3-devel-ubuntu20.04

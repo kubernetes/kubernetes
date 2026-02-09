@@ -1,7 +1,7 @@
 /*
 Package restful , a lean package for creating REST-style WebServices without magic.
 
-WebServices and Routes
+### WebServices and Routes
 
 A WebService has a collection of Route objects that dispatch incoming Http Requests to a function calls.
 Typically, a WebService has a root path (e.g. /users) and defines common MIME types for its routes.
@@ -30,14 +30,14 @@ The (*Request, *Response) arguments provide functions for reading information fr
 
 See the example https://github.com/emicklei/go-restful/blob/v3/examples/user-resource/restful-user-resource.go with a full implementation.
 
-Regular expression matching Routes
+### Regular expression matching Routes
 
 A Route parameter can be specified using the format "uri/{var[:regexp]}" or the special version "uri/{var:*}" for matching the tail of the path.
 For example, /persons/{name:[A-Z][A-Z]} can be used to restrict values for the parameter "name" to only contain capital alphabetic characters.
 Regular expressions must use the standard Go syntax as described in the regexp package. (https://code.google.com/p/re2/wiki/Syntax)
 This feature requires the use of a CurlyRouter.
 
-Containers
+### Containers
 
 A Container holds a collection of WebServices, Filters and a http.ServeMux for multiplexing http requests.
 Using the statements "restful.Add(...) and restful.Filter(...)" will register WebServices and Filters to the Default Container.
@@ -47,7 +47,7 @@ You can create your own Container and create a new http.Server for that particul
 	container := restful.NewContainer()
 	server := &http.Server{Addr: ":8081", Handler: container}
 
-Filters
+### Filters
 
 A filter dynamically intercepts requests and responses to transform or use the information contained in the requests or responses.
 You can use filters to perform generic logging, measurement, authentication, redirect, set response headers etc.
@@ -60,22 +60,21 @@ Use the following statement to pass the request,response pair to the next filter
 
 	chain.ProcessFilter(req, resp)
 
-Container Filters
+### Container Filters
 
 These are processed before any registered WebService.
 
 	// install a (global) filter for the default container (processed before any webservice)
 	restful.Filter(globalLogging)
 
-WebService Filters
+### WebService Filters
 
 These are processed before any Route of a WebService.
 
 	// install a webservice filter (processed before any route)
 	ws.Filter(webserviceLogging).Filter(measureTime)
 
-
-Route Filters
+### Route Filters
 
 These are processed before calling the function associated with the Route.
 
@@ -84,7 +83,7 @@ These are processed before calling the function associated with the Route.
 
 See the example https://github.com/emicklei/go-restful/blob/v3/examples/filters/restful-filters.go with full implementations.
 
-Response Encoding
+### Response Encoding
 
 Two encodings are supported: gzip and deflate. To enable this for all responses:
 
@@ -95,20 +94,20 @@ Alternatively, you can create a Filter that performs the encoding and install it
 
 See the example https://github.com/emicklei/go-restful/blob/v3/examples/encoding/restful-encoding-filter.go
 
-OPTIONS support
+### OPTIONS support
 
 By installing a pre-defined container filter, your Webservice(s) can respond to the OPTIONS Http request.
 
 	Filter(OPTIONSFilter())
 
-CORS
+### CORS
 
 By installing the filter of a CrossOriginResourceSharing (CORS), your WebService(s) can handle CORS requests.
 
 	cors := CrossOriginResourceSharing{ExposeHeaders: []string{"X-My-Header"}, CookiesAllowed: false, Container: DefaultContainer}
 	Filter(cors.Filter)
 
-Error Handling
+### Error Handling
 
 Unexpected things happen. If a request cannot be processed because of a failure, your service needs to tell via the response what happened and why.
 For this reason HTTP status codes exist and it is important to use the correct code in every exceptional situation.
@@ -137,11 +136,11 @@ The request does not have or has an unknown Accept Header set for this operation
 
 The request does not have or has an unknown Content-Type Header set for this operation.
 
-ServiceError
+### ServiceError
 
 In addition to setting the correct (error) Http status code, you can choose to write a ServiceError message on the response.
 
-Performance options
+### Performance options
 
 This package has several options that affect the performance of your service. It is important to understand them and how you can change it.
 
@@ -156,30 +155,27 @@ Default value is true
 If content encoding is enabled then the default strategy for getting new gzip/zlib writers and readers is to use a sync.Pool.
 Because writers are expensive structures, performance is even more improved when using a preloaded cache. You can also inject your own implementation.
 
-Trouble shooting
+### Trouble shooting
 
 This package has the means to produce detail logging of the complete Http request matching process and filter invocation.
 Enabling this feature requires you to set an implementation of restful.StdLogger (e.g. log.Logger) instance such as:
 
 	restful.TraceLogger(log.New(os.Stdout, "[restful] ", log.LstdFlags|log.Lshortfile))
 
-Logging
+### Logging
 
 The restful.SetLogger() method allows you to override the logger used by the package. By default restful
 uses the standard library `log` package and logs to stdout. Different logging packages are supported as
 long as they conform to `StdLogger` interface defined in the `log` sub-package, writing an adapter for your
 preferred package is simple.
 
-Resources
+### Resources
+
+(c) 2012-2025, http://ernestmicklei.com. MIT License
 
 [project]: https://github.com/emicklei/go-restful
-
 [examples]: https://github.com/emicklei/go-restful/blob/master/examples
-
-[design]:  http://ernestmicklei.com/2012/11/11/go-restful-api-design/
-
+[design]: http://ernestmicklei.com/2012/11/11/go-restful-api-design/
 [showcases]: https://github.com/emicklei/mora, https://github.com/emicklei/landskape
-
-(c) 2012-2015, http://ernestmicklei.com. MIT License
 */
 package restful

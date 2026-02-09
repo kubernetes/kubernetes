@@ -23,14 +23,18 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -98,30 +102,87 @@ func TestIsInitContainerFailed(t *testing.T) {
 	}
 }
 
-func TestStableKey(t *testing.T) {
-	container := &v1.Container{
-		Name:  "test_container",
-		Image: "foo/image:v1",
-	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test_pod",
-			Namespace: "test_pod_namespace",
-			UID:       "test_pod_uid",
+func TestGetBackoffKey(t *testing.T) {
+	testSpecs := map[string]v1.PodSpec{
+		"empty resources": {
+			Containers: []v1.Container{{
+				Name:  "test_container",
+				Image: "foo/image:v1",
+			}},
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{*container},
+		"with resources": {
+			Containers: []v1.Container{{
+				Name:  "test_container",
+				Image: "foo/image:v1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			}},
 		},
 	}
-	oldKey := getStableKey(pod, container)
 
-	// Updating the container image should change the key.
-	container.Image = "foo/image:v2"
-	newKey := getStableKey(pod, container)
-	assert.NotEqual(t, oldKey, newKey)
+	for name, spec := range testSpecs {
+		t.Run(name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test_pod",
+					Namespace: "test_pod_namespace",
+					UID:       "test_pod_uid",
+				},
+				Spec: spec,
+			}
+			secondContainer := v1.Container{
+				Name:  "second_container",
+				Image: "registry.k8s.io/pause",
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, secondContainer)
+			originalKey := GetBackoffKey(pod, &pod.Spec.Containers[0])
+
+			podCopy := pod.DeepCopy()
+			podCopy.Spec.ActiveDeadlineSeconds = ptr.To[int64](1)
+			assert.Equal(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Unrelated change should not change the key")
+
+			podCopy = pod.DeepCopy()
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[1]),
+				"Different container change should change the key")
+
+			podCopy = pod.DeepCopy()
+			podCopy.Name = "other-pod"
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Different pod name should change the key")
+
+			podCopy = pod.DeepCopy()
+			podCopy.Namespace = "other-namespace"
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Different pod namespace should change the key")
+
+			podCopy = pod.DeepCopy()
+			podCopy.Spec.Containers[0].Image = "foo/image:v2"
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Updating the container image should change the key")
+
+			podCopy = pod.DeepCopy()
+			c := &podCopy.Spec.Containers[0]
+			if c.Resources.Requests == nil {
+				c.Resources.Requests = v1.ResourceList{}
+			}
+			c.Resources.Requests[v1.ResourceCPU] = resource.MustParse("200m")
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Updating the resources should change the key")
+		})
+	}
 }
 
 func TestToKubeContainer(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	c := &runtimeapi.Container{
 		Id: "test-id",
 		Metadata: &runtimeapi.ContainerMetadata{
@@ -150,14 +211,14 @@ func TestToKubeContainer(t *testing.T) {
 		State:               kubecontainer.ContainerStateRunning,
 	}
 
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
-	got, err := m.toKubeContainer(c)
+	got, err := m.toKubeContainer(tCtx, c)
 	assert.NoError(t, err)
 	assert.Equal(t, expect, got)
 
 	// unable to convert a nil pointer to a runtime container
-	_, err = m.toKubeContainer(nil)
+	_, err = m.toKubeContainer(tCtx, nil)
 	assert.Error(t, err)
 	_, err = m.sandboxToKubeContainer(nil)
 	assert.Error(t, err)
@@ -165,6 +226,7 @@ func TestToKubeContainer(t *testing.T) {
 
 func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
+	tCtx := ktesting.Init(t)
 	c := &runtimeapi.Container{
 		Id: "test-id",
 		Metadata: &runtimeapi.ContainerMetadata{
@@ -193,21 +255,22 @@ func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
 		State:               kubecontainer.ContainerStateRunning,
 	}
 
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
-	got, err := m.toKubeContainer(c)
+	got, err := m.toKubeContainer(tCtx, c)
 	assert.NoError(t, err)
 	assert.Equal(t, expect, got)
 
 	// unable to convert a nil pointer to a runtime container
-	_, err = m.toKubeContainer(nil)
+	_, err = m.toKubeContainer(tCtx, nil)
 	assert.Error(t, err)
 	_, err = m.sandboxToKubeContainer(nil)
 	assert.Error(t, err)
 }
 
 func TestGetImageUser(t *testing.T) {
-	_, i, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, i, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	type image struct {
@@ -274,11 +337,11 @@ func TestGetImageUser(t *testing.T) {
 
 	i.SetFakeImages([]string{"test-image-ref1", "test-image-ref2", "test-image-ref3"})
 	for j, test := range tests {
-		ctx := context.Background()
+		tCtx := ktesting.Init(t)
 		i.Images[test.originalImage.name].Username = test.originalImage.username
 		i.Images[test.originalImage.name].Uid = test.originalImage.uid
 
-		uid, username, err := m.getImageUser(ctx, test.originalImage.name)
+		uid, username, err := m.getImageUser(tCtx, test.originalImage.name)
 		assert.NoError(t, err, "TestCase[%d]", j)
 
 		if test.expectedImageUserValues.uid == (*int64)(nil) {
@@ -291,6 +354,8 @@ func TestGetImageUser(t *testing.T) {
 }
 
 func TestToRuntimeProtocol(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
 	for _, test := range []struct {
 		name     string
 		protocol string
@@ -318,7 +383,7 @@ func TestToRuntimeProtocol(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if result := toRuntimeProtocol(v1.Protocol(test.protocol)); result != test.expected {
+			if result := toRuntimeProtocol(logger, v1.Protocol(test.protocol)); result != test.expected {
 				t.Errorf("expected %d but got %d", test.expected, result)
 			}
 		})
@@ -440,4 +505,84 @@ func TestGetAppArmorProfile(t *testing.T) {
 			assert.Equal(t, test.expectedOldProfile, actualOld, "old (deprecated) profile string")
 		})
 	}
+}
+
+func TestMergeResourceConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   *cm.ResourceConfig
+		update   *cm.ResourceConfig
+		expected *cm.ResourceConfig
+	}{
+		{
+			name:   "merge all fields",
+			source: &cm.ResourceConfig{Memory: ptr.To[int64](1024), CPUShares: ptr.To[uint64](2)},
+			update: &cm.ResourceConfig{Memory: ptr.To[int64](2048), CPUQuota: ptr.To[int64](5000)},
+			expected: &cm.ResourceConfig{
+				Memory:    ptr.To[int64](2048),
+				CPUShares: ptr.To[uint64](2),
+				CPUQuota:  ptr.To[int64](5000),
+			},
+		},
+		{
+			name:   "merge HugePageLimit and Unified",
+			source: &cm.ResourceConfig{HugePageLimit: map[int64]int64{2048: 1024}, Unified: map[string]string{"key1": "value1"}},
+			update: &cm.ResourceConfig{HugePageLimit: map[int64]int64{4096: 2048}, Unified: map[string]string{"key1": "newValue1", "key2": "value2"}},
+			expected: &cm.ResourceConfig{
+				HugePageLimit: map[int64]int64{2048: 1024, 4096: 2048},
+				Unified:       map[string]string{"key1": "newValue1", "key2": "value2"},
+			},
+		},
+		{
+			name:   "update nil source",
+			source: nil,
+			update: &cm.ResourceConfig{Memory: ptr.To[int64](4096)},
+			expected: &cm.ResourceConfig{
+				Memory: ptr.To[int64](4096),
+			},
+		},
+		{
+			name:   "update nil update",
+			source: &cm.ResourceConfig{Memory: ptr.To[int64](1024)},
+			update: nil,
+			expected: &cm.ResourceConfig{
+				Memory: ptr.To[int64](1024),
+			},
+		},
+		{
+			name:   "update empty source",
+			source: &cm.ResourceConfig{},
+			update: &cm.ResourceConfig{Memory: ptr.To[int64](8192)},
+			expected: &cm.ResourceConfig{
+				Memory: ptr.To[int64](8192),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			merged := mergeResourceConfig(tt.source, tt.update)
+
+			assert.Equal(t, tt.expected, merged)
+		})
+	}
+}
+
+func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
+	resCfg := &cm.ResourceConfig{
+		Memory:        ptr.To[int64](2048),
+		CPUShares:     ptr.To[uint64](2),
+		CPUPeriod:     ptr.To[uint64](10000),
+		CPUQuota:      ptr.To[int64](5000),
+		HugePageLimit: map[int64]int64{4096: 2048},
+		Unified:       map[string]string{"key1": "value1"},
+	}
+
+	lcr := convertResourceConfigToLinuxContainerResources(resCfg)
+
+	assert.Equal(t, int64(*resCfg.CPUPeriod), lcr.CpuPeriod)
+	assert.Equal(t, *resCfg.CPUQuota, lcr.CpuQuota)
+	assert.Equal(t, int64(*resCfg.CPUShares), lcr.CpuShares)
+	assert.Equal(t, *resCfg.Memory, lcr.MemoryLimitInBytes)
+	assert.Equal(t, resCfg.Unified, lcr.Unified)
 }

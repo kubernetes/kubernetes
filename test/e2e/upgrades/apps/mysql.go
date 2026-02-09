@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -194,7 +195,7 @@ func (t *MySQLUpgradeTest) addName(name string) error {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf(string(b))
+		return errors.New(string(b))
 	}
 	return nil
 }
@@ -212,7 +213,7 @@ func (t *MySQLUpgradeTest) countNames() (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		return 0, fmt.Errorf(string(b))
+		return 0, errors.New(string(b))
 	}
 	var count int
 	if err := json.NewDecoder(r.Body).Decode(&count); err != nil {

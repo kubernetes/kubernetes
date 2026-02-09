@@ -19,16 +19,47 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // EndpointPortApplyConfiguration represents a declarative configuration of the EndpointPort type for use
 // with apply.
+//
+// EndpointPort represents a Port used by an EndpointSlice
 type EndpointPortApplyConfiguration struct {
-	Name        *string      `json:"name,omitempty"`
-	Protocol    *v1.Protocol `json:"protocol,omitempty"`
-	Port        *int32       `json:"port,omitempty"`
-	AppProtocol *string      `json:"appProtocol,omitempty"`
+	// name represents the name of this port. All ports in an EndpointSlice must have a unique name.
+	// If the EndpointSlice is derived from a Kubernetes service, this corresponds to the Service.ports[].name.
+	// Name must either be an empty string or pass DNS_LABEL validation:
+	// * must be no more than 63 characters long.
+	// * must consist of lower case alphanumeric characters or '-'.
+	// * must start and end with an alphanumeric character.
+	// Default is empty string.
+	Name *string `json:"name,omitempty"`
+	// protocol represents the IP protocol for this port.
+	// Must be UDP, TCP, or SCTP.
+	// Default is TCP.
+	Protocol *corev1.Protocol `json:"protocol,omitempty"`
+	// port represents the port number of the endpoint.
+	// If the EndpointSlice is derived from a Kubernetes service, this must be set
+	// to the service's target port. EndpointSlices used for other purposes may have
+	// a nil port.
+	Port *int32 `json:"port,omitempty"`
+	// The application protocol for this port.
+	// This is used as a hint for implementations to offer richer behavior for protocols that they understand.
+	// This field follows standard Kubernetes label syntax.
+	// Valid values are either:
+	//
+	// * Un-prefixed protocol names - reserved for IANA standard service names (as per
+	// RFC-6335 and https://www.iana.org/assignments/service-names).
+	//
+	// * Kubernetes-defined prefixed names:
+	// * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
+	// * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
+	// * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
+	//
+	// * Other protocols should use implementation-defined prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	AppProtocol *string `json:"appProtocol,omitempty"`
 }
 
 // EndpointPortApplyConfiguration constructs a declarative configuration of the EndpointPort type for use with
@@ -48,7 +79,7 @@ func (b *EndpointPortApplyConfiguration) WithName(value string) *EndpointPortApp
 // WithProtocol sets the Protocol field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Protocol field is set to the value of the last call.
-func (b *EndpointPortApplyConfiguration) WithProtocol(value v1.Protocol) *EndpointPortApplyConfiguration {
+func (b *EndpointPortApplyConfiguration) WithProtocol(value corev1.Protocol) *EndpointPortApplyConfiguration {
 	b.Protocol = &value
 	return b
 }

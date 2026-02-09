@@ -248,6 +248,11 @@ spec:
             fieldRef:
               apiVersion: apiVersionValue
               fieldPath: fieldPathValue
+            fileKeyRef:
+              key: keyValue
+              optional: true
+              path: pathValue
+              volumeName: volumeNameValue
             resourceFieldRef:
               containerName: containerNameValue
               divisor: "0"
@@ -301,6 +306,7 @@ spec:
             tcpSocket:
               host: hostValue
               port: portValue
+          stopSignal: stopSignalValue
         livenessProbe:
           exec:
             command:
@@ -362,11 +368,18 @@ spec:
         resources:
           claims:
           - name: nameValue
+            request: requestValue
           limits:
             limitsKey: "0"
           requests:
             requestsKey: "0"
         restartPolicy: restartPolicyValue
+        restartPolicyRules:
+        - action: actionValue
+          exitCodes:
+            operator: operatorValue
+            values:
+            - 2
         securityContext:
           allowPrivilegeEscalation: true
           appArmorProfile:
@@ -463,6 +476,11 @@ spec:
             fieldRef:
               apiVersion: apiVersionValue
               fieldPath: fieldPathValue
+            fileKeyRef:
+              key: keyValue
+              optional: true
+              path: pathValue
+              volumeName: volumeNameValue
             resourceFieldRef:
               containerName: containerNameValue
               divisor: "0"
@@ -516,6 +534,7 @@ spec:
             tcpSocket:
               host: hostValue
               port: portValue
+          stopSignal: stopSignalValue
         livenessProbe:
           exec:
             command:
@@ -577,11 +596,18 @@ spec:
         resources:
           claims:
           - name: nameValue
+            request: requestValue
           limits:
             limitsKey: "0"
           requests:
             requestsKey: "0"
         restartPolicy: restartPolicyValue
+        restartPolicyRules:
+        - action: actionValue
+          exitCodes:
+            operator: operatorValue
+            values:
+            - 2
         securityContext:
           allowPrivilegeEscalation: true
           appArmorProfile:
@@ -662,6 +688,7 @@ spec:
       hostPID: true
       hostUsers: true
       hostname: hostnameValue
+      hostnameOverride: hostnameOverrideValue
       imagePullSecrets:
       - name: nameValue
       initContainers:
@@ -680,6 +707,11 @@ spec:
             fieldRef:
               apiVersion: apiVersionValue
               fieldPath: fieldPathValue
+            fileKeyRef:
+              key: keyValue
+              optional: true
+              path: pathValue
+              volumeName: volumeNameValue
             resourceFieldRef:
               containerName: containerNameValue
               divisor: "0"
@@ -733,6 +765,7 @@ spec:
             tcpSocket:
               host: hostValue
               port: portValue
+          stopSignal: stopSignalValue
         livenessProbe:
           exec:
             command:
@@ -794,11 +827,18 @@ spec:
         resources:
           claims:
           - name: nameValue
+            request: requestValue
           limits:
             limitsKey: "0"
           requests:
             requestsKey: "0"
         restartPolicy: restartPolicyValue
+        restartPolicyRules:
+        - action: actionValue
+          exitCodes:
+            operator: operatorValue
+            values:
+            - 2
         securityContext:
           allowPrivilegeEscalation: true
           appArmorProfile:
@@ -885,6 +925,14 @@ spec:
       - name: nameValue
         resourceClaimName: resourceClaimNameValue
         resourceClaimTemplateName: resourceClaimTemplateNameValue
+      resources:
+        claims:
+        - name: nameValue
+          request: requestValue
+        limits:
+          limitsKey: "0"
+        requests:
+          requestsKey: "0"
       restartPolicy: restartPolicyValue
       runtimeClassName: runtimeClassNameValue
       schedulerName: schedulerNameValue
@@ -899,6 +947,7 @@ spec:
         runAsGroup: 6
         runAsNonRoot: true
         runAsUser: 2
+        seLinuxChangePolicy: seLinuxChangePolicyValue
         seLinuxOptions:
           level: levelValue
           role: roleValue
@@ -1108,6 +1157,9 @@ spec:
         hostPath:
           path: pathValue
           type: typeValue
+        image:
+          pullPolicy: pullPolicyValue
+          reference: referenceValue
         iscsi:
           chapAuthDiscovery: true
           chapAuthSession: true
@@ -1171,6 +1223,15 @@ spec:
                   containerName: containerNameValue
                   divisor: "0"
                   resource: resourceValue
+            podCertificate:
+              certificateChainPath: certificateChainPathValue
+              credentialBundlePath: credentialBundlePathValue
+              keyPath: keyPathValue
+              keyType: keyTypeValue
+              maxExpirationSeconds: 3
+              signerName: signerNameValue
+              userAnnotations:
+                userAnnotationsKey: userAnnotationsValue
             secret:
               items:
               - key: keyValue
@@ -1232,6 +1293,10 @@ spec:
           storagePolicyID: storagePolicyIDValue
           storagePolicyName: storagePolicyNameValue
           volumePath: volumePathValue
+      workloadRef:
+        name: nameValue
+        podGroup: podGroupValue
+        podGroupReplicaKey: podGroupReplicaKeyValue
   ttlSecondsAfterFinished: 8
 status:
   active: 4

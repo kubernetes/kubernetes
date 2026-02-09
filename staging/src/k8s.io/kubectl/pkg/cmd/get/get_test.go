@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"net/http"
 	"reflect"
 	"strings"
@@ -711,7 +712,7 @@ func TestGetEmptyTable(t *testing.T) {
 	}
 }
 
-func TestGetObjectIgnoreNotFound(t *testing.T) {
+func TestGetNonExistObject(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 
 	ns := &corev1.NamespaceList{
@@ -745,6 +746,63 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 		}),
 	}
 
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		expectedErr := "Error from server (NotFound): the server could not find the requested resource (get pods nonexistentpod)"
+		if str != expectedErr {
+			t.Errorf("unexpected error: %s\nexpected: %s", str, expectedErr)
+		}
+	})
+
+	// Get nonexistentpod fails with above error message
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.Run(cmd, []string{"pods", "nonexistentpod"})
+}
+
+func TestGetNonExistObjectIgnoreNotFound(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	ns := &corev1.NamespaceList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "1",
+		},
+		Items: []corev1.Namespace{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "testns", Namespace: "test", ResourceVersion: "11"},
+				Spec:       corev1.NamespaceSpec{},
+			},
+		},
+	}
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods/nonexistentpod" && m == "GET":
+				return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, nil
+			case p == "/api/v1/namespaces/test" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ns.Items[0])}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		expectedErr := ""
+		if str != expectedErr {
+			t.Errorf("unexpected error: %s\nexpected: %s", str, expectedErr)
+		}
+	})
+
+	// Get nonexistentpod passes without error when setting ignore-not-found to true
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOut(buf)
@@ -1438,7 +1496,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "apiVersion": "v1",
             "kind": "Pod",
             "metadata": {
-                "creationTimestamp": null,
                 "name": "foo",
                 "namespace": "test",
                 "resourceVersion": "10"
@@ -1457,7 +1514,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "apiVersion": "v1",
             "kind": "Pod",
             "metadata": {
-                "creationTimestamp": null,
                 "name": "bar",
                 "namespace": "test",
                 "resourceVersion": "11"
@@ -1476,7 +1532,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
-                "creationTimestamp": null,
                 "name": "baz",
                 "namespace": "test",
                 "resourceVersion": "12"
@@ -2129,6 +2184,93 @@ foo    <unknown>
 	}
 }
 
+func TestWatchNonExistObject(t *testing.T) {
+	pods, _ := watchTestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods/nonexistentpod" && m == "GET":
+				return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, nil
+			case p == "/api/v1/namespaces/test" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		expectedErr := "Error from server (NotFound): the server could not find the requested resource (get pods nonexistentpod)"
+		if str != expectedErr {
+			t.Errorf("unexpected error: %s\nexpected: %s", str, expectedErr)
+		}
+	})
+
+	// Get nonexistentpod fails with above error message
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.Flags().Set("watch", "true")  //nolint:errcheck
+	cmd.Flags().Set("output", "yaml") //nolint:errcheck
+	cmd.Run(cmd, []string{"pods", "nonexistentpod"})
+
+	if buf.String() != "" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestWatchNonExistObjectIgnoreNotFound(t *testing.T) {
+	pods, _ := watchTestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods/nonexistentpod" && m == "GET":
+				return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, nil
+			case p == "/api/v1/namespaces/test" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		expectedErr := ""
+		if str != expectedErr {
+			t.Errorf("unexpected error: %s\nexpected: %s", str, expectedErr)
+		}
+	})
+
+	// Get nonexistentpod passes without error when setting ignore-not-found to true
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.Flags().Set("ignore-not-found", "true") //nolint:errcheck
+	cmd.Flags().Set("watch", "true")            //nolint:errcheck
+	cmd.Flags().Set("output", "yaml")           //nolint:errcheck
+	cmd.Run(cmd, []string{"pods", "nonexistentpod"})
+
+	if buf.String() != "" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
 func TestWatchStatus(t *testing.T) {
 	pods, events := watchTestData()
 	events = append(events, watch.Event{Type: "ERROR", Object: &metav1.Status{Status: "Failure", Reason: "InternalServerError", Message: "Something happened"}})
@@ -2367,10 +2509,10 @@ DELETED    test        pod/foo   0/0              0          <unknown>   <none> 
 		},
 		{
 			format: "json",
-			expected: `{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"bar","namespace":"test","resourceVersion":"9"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
-{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"10"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
-{"type":"MODIFIED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"11"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
-{"type":"DELETED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"12"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+			expected: `{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"bar","namespace":"test","resourceVersion":"9"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo","namespace":"test","resourceVersion":"10"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"MODIFIED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo","namespace":"test","resourceVersion":"11"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"DELETED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo","namespace":"test","resourceVersion":"12"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
 `,
 		},
 		{
@@ -2379,7 +2521,6 @@ DELETED    test        pod/foo   0/0              0          <unknown>   <none> 
   apiVersion: v1
   kind: Pod
   metadata:
-    creationTimestamp: null
     name: bar
     namespace: test
     resourceVersion: "9"
@@ -2397,7 +2538,6 @@ object:
   apiVersion: v1
   kind: Pod
   metadata:
-    creationTimestamp: null
     name: foo
     namespace: test
     resourceVersion: "10"
@@ -2415,7 +2555,6 @@ object:
   apiVersion: v1
   kind: Pod
   metadata:
-    creationTimestamp: null
     name: foo
     namespace: test
     resourceVersion: "11"
@@ -2433,7 +2572,6 @@ object:
   apiVersion: v1
   kind: Pod
   metadata:
-    creationTimestamp: null
     name: foo
     namespace: test
     resourceVersion: "12"
@@ -2446,6 +2584,98 @@ object:
     terminationGracePeriodSeconds: 30
   status: {}
 type: DELETED
+`,
+		},
+		{
+			format: "kyaml",
+			expected: `---
+{
+  type: "ADDED",
+  object: {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: {
+      name: "bar",
+      namespace: "test",
+      resourceVersion: "9",
+    },
+    spec: {
+      containers: null,
+      dnsPolicy: "ClusterFirst",
+      enableServiceLinks: true,
+      restartPolicy: "Always",
+      securityContext: {},
+      terminationGracePeriodSeconds: 30,
+    },
+    status: {},
+  },
+}
+---
+{
+  type: "ADDED",
+  object: {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: {
+      name: "foo",
+      namespace: "test",
+      resourceVersion: "10",
+    },
+    spec: {
+      containers: null,
+      dnsPolicy: "ClusterFirst",
+      enableServiceLinks: true,
+      restartPolicy: "Always",
+      securityContext: {},
+      terminationGracePeriodSeconds: 30,
+    },
+    status: {},
+  },
+}
+---
+{
+  type: "MODIFIED",
+  object: {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: {
+      name: "foo",
+      namespace: "test",
+      resourceVersion: "11",
+    },
+    spec: {
+      containers: null,
+      dnsPolicy: "ClusterFirst",
+      enableServiceLinks: true,
+      restartPolicy: "Always",
+      securityContext: {},
+      terminationGracePeriodSeconds: 30,
+    },
+    status: {},
+  },
+}
+---
+{
+  type: "DELETED",
+  object: {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: {
+      name: "foo",
+      namespace: "test",
+      resourceVersion: "12",
+    },
+    spec: {
+      containers: null,
+      dnsPolicy: "ClusterFirst",
+      enableServiceLinks: true,
+      restartPolicy: "Always",
+      securityContext: {},
+      terminationGracePeriodSeconds: 30,
+    },
+    status: {},
+  },
+}
 `,
 		},
 		{

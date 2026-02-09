@@ -19,12 +19,21 @@ var (
 	// During a release, this will be set to the release tag, e.g. "kustomize/v4.5.7"
 	version = developmentVersion
 	// build date in ISO8601 format, output of $(date -u +'%Y-%m-%dT%H:%M:%SZ')
-	buildDate = "unknown"
+	buildDate = unknown
 )
 
-// This default value, (devel), matches
-// the value debug.BuildInfo uses for an unset main module version.
-const developmentVersion = "(devel)"
+const (
+	// This default value, (devel), matches
+	// the value debug.BuildInfo uses for an unset main module version.
+	developmentVersion = "(devel)"
+
+	// ModulePath is kustomize module path, defined in kustomize/go.mod
+	ModulePath = "sigs.k8s.io/kustomize/kustomize/v5"
+
+	// This is default value, unknown, substituted when
+	// the value can't be determined from debug.BuildInfo.
+	unknown = "unknown"
+)
 
 // Provenance holds information about the build of an executable.
 type Provenance struct {
@@ -47,7 +56,7 @@ func GetProvenance() Provenance {
 	p := Provenance{
 		BuildDate: buildDate,
 		Version:   version,
-		GitCommit: "unknown",
+		GitCommit: unknown,
 		GoOs:      runtime.GOOS,
 		GoArch:    runtime.GOARCH,
 		GoVersion: runtime.Version(),
@@ -62,12 +71,20 @@ func GetProvenance() Provenance {
 		// We could consider adding other info such as the commit date in the future.
 		if setting.Key == "vcs.revision" {
 			p.GitCommit = setting.Value
+			break
 		}
 	}
+	p.Version = FindVersion(info, p.Version)
 
+	return p
+}
+
+// FindVersion searches for a version in the depth of dependencies including replacements,
+// otherwise, it tries to get version from debug.BuildInfo Main.
+func FindVersion(info *debug.BuildInfo, version string) string {
 	for _, dep := range info.Deps {
-		if dep != nil && dep.Path == "sigs.k8s.io/kustomize/kustomize/v5" {
-			if dep.Version != "devel" {
+		if dep != nil && dep.Path == ModulePath {
+			if dep.Version == developmentVersion {
 				continue
 			}
 			v, err := GetMostRecentTag(*dep)
@@ -75,11 +92,16 @@ func GetProvenance() Provenance {
 				fmt.Printf("failed to get most recent tag for %s: %v\n", dep.Path, err)
 				continue
 			}
-			p.Version = v
+
+			return v
 		}
 	}
 
-	return p
+	if version == developmentVersion && info.Main.Version != "" {
+		return info.Main.Version
+	}
+
+	return version
 }
 
 func GetMostRecentTag(m debug.Module) (string, error) {

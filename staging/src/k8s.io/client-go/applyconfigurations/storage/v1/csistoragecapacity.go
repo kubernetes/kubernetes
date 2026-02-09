@@ -21,22 +21,85 @@ package v1
 import (
 	storagev1 "k8s.io/api/storage/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // CSIStorageCapacityApplyConfiguration represents a declarative configuration of the CSIStorageCapacity type for use
 // with apply.
+//
+// CSIStorageCapacity stores the result of one CSI GetCapacity call.
+// For a given StorageClass, this describes the available capacity in a
+// particular topology segment.  This can be used when considering where to
+// instantiate new PersistentVolumes.
+//
+// For example this can express things like:
+// - StorageClass "standard" has "1234 GiB" available in "topology.kubernetes.io/zone=us-east1"
+// - StorageClass "localssd" has "10 GiB" available in "kubernetes.io/hostname=knode-abc123"
+//
+// The following three cases all imply that no capacity is available for
+// a certain combination:
+// - no object exists with suitable topology and storage class name
+// - such an object exists, but the capacity is unset
+// - such an object exists, but the capacity is zero
+//
+// The producer of these objects can decide which approach is more suitable.
+//
+// They are consumed by the kube-scheduler when a CSI driver opts into
+// capacity-aware scheduling with CSIDriverSpec.StorageCapacity. The scheduler
+// compares the MaximumVolumeSize against the requested size of pending volumes
+// to filter out unsuitable nodes. If MaximumVolumeSize is unset, it falls back
+// to a comparison against the less precise Capacity. If that is also unset,
+// the scheduler assumes that capacity is insufficient and tries some other
+// node.
 type CSIStorageCapacityApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	NodeTopology                     *v1.LabelSelectorApplyConfiguration `json:"nodeTopology,omitempty"`
-	StorageClassName                 *string                             `json:"storageClassName,omitempty"`
-	Capacity                         *resource.Quantity                  `json:"capacity,omitempty"`
-	MaximumVolumeSize                *resource.Quantity                  `json:"maximumVolumeSize,omitempty"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// The name has no particular meaning. It must be a DNS subdomain (dots allowed, 253 characters).
+	// To ensure that there are no conflicts with other CSI drivers on the cluster,
+	// the recommendation is to use csisc-<uuid>, a generated name, or a reverse-domain name
+	// which ends with the unique CSI driver name.
+	//
+	// Objects are namespaced.
+	//
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	// nodeTopology defines which nodes have access to the storage
+	// for which capacity was reported. If not set, the storage is
+	// not accessible from any node in the cluster. If empty, the
+	// storage is accessible from all nodes. This field is
+	// immutable.
+	NodeTopology *metav1.LabelSelectorApplyConfiguration `json:"nodeTopology,omitempty"`
+	// storageClassName represents the name of the StorageClass that the reported capacity applies to.
+	// It must meet the same requirements as the name of a StorageClass
+	// object (non-empty, DNS subdomain). If that object no longer exists,
+	// the CSIStorageCapacity object is obsolete and should be removed by its
+	// creator.
+	// This field is immutable.
+	StorageClassName *string `json:"storageClassName,omitempty"`
+	// capacity is the value reported by the CSI driver in its GetCapacityResponse
+	// for a GetCapacityRequest with topology and parameters that match the
+	// previous fields.
+	//
+	// The semantic is currently (CSI spec 1.2) defined as:
+	// The available capacity, in bytes, of the storage that can be used
+	// to provision volumes. If not set, that information is currently
+	// unavailable.
+	Capacity *resource.Quantity `json:"capacity,omitempty"`
+	// maximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
+	// for a GetCapacityRequest with topology and parameters that match the
+	// previous fields.
+	//
+	// This is defined since CSI spec 1.4.0 as the largest size
+	// that may be used in a
+	// CreateVolumeRequest.capacity_range.required_bytes field to
+	// create a volume with the same parameters as those in
+	// GetCapacityRequest. The corresponding value in the Kubernetes
+	// API is ResourceRequirements.Requests in a volume claim.
+	MaximumVolumeSize *resource.Quantity `json:"maximumVolumeSize,omitempty"`
 }
 
 // CSIStorageCapacity constructs a declarative configuration of the CSIStorageCapacity type for use with
@@ -50,29 +113,14 @@ func CSIStorageCapacity(name, namespace string) *CSIStorageCapacityApplyConfigur
 	return b
 }
 
-// ExtractCSIStorageCapacity extracts the applied configuration owned by fieldManager from
-// cSIStorageCapacity. If no managedFields are found in cSIStorageCapacity for fieldManager, a
-// CSIStorageCapacityApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractCSIStorageCapacityFrom extracts the applied configuration owned by fieldManager from
+// cSIStorageCapacity for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // cSIStorageCapacity must be a unmodified CSIStorageCapacity API object that was retrieved from the Kubernetes API.
-// ExtractCSIStorageCapacity provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractCSIStorageCapacityFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractCSIStorageCapacity(cSIStorageCapacity *storagev1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
-	return extractCSIStorageCapacity(cSIStorageCapacity, fieldManager, "")
-}
-
-// ExtractCSIStorageCapacityStatus is the same as ExtractCSIStorageCapacity except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractCSIStorageCapacityStatus(cSIStorageCapacity *storagev1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
-	return extractCSIStorageCapacity(cSIStorageCapacity, fieldManager, "status")
-}
-
-func extractCSIStorageCapacity(cSIStorageCapacity *storagev1.CSIStorageCapacity, fieldManager string, subresource string) (*CSIStorageCapacityApplyConfiguration, error) {
+func ExtractCSIStorageCapacityFrom(cSIStorageCapacity *storagev1.CSIStorageCapacity, fieldManager string, subresource string) (*CSIStorageCapacityApplyConfiguration, error) {
 	b := &CSIStorageCapacityApplyConfiguration{}
 	err := managedfields.ExtractInto(cSIStorageCapacity, internal.Parser().Type("io.k8s.api.storage.v1.CSIStorageCapacity"), fieldManager, b, subresource)
 	if err != nil {
@@ -86,11 +134,27 @@ func extractCSIStorageCapacity(cSIStorageCapacity *storagev1.CSIStorageCapacity,
 	return b, nil
 }
 
+// ExtractCSIStorageCapacity extracts the applied configuration owned by fieldManager from
+// cSIStorageCapacity. If no managedFields are found in cSIStorageCapacity for fieldManager, a
+// CSIStorageCapacityApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// cSIStorageCapacity must be a unmodified CSIStorageCapacity API object that was retrieved from the Kubernetes API.
+// ExtractCSIStorageCapacity provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractCSIStorageCapacity(cSIStorageCapacity *storagev1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
+	return ExtractCSIStorageCapacityFrom(cSIStorageCapacity, fieldManager, "")
+}
+
+func (b CSIStorageCapacityApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithKind(value string) *CSIStorageCapacityApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -98,7 +162,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithKind(value string) *CSIStorag
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithAPIVersion(value string) *CSIStorageCapacityApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -107,7 +171,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithAPIVersion(value string) *CSI
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithName(value string) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -116,7 +180,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithName(value string) *CSIStorag
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithGenerateName(value string) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -125,7 +189,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithGenerateName(value string) *C
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithNamespace(value string) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -134,7 +198,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithNamespace(value string) *CSIS
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithUID(value types.UID) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -143,7 +207,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithUID(value types.UID) *CSIStor
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithResourceVersion(value string) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -152,25 +216,25 @@ func (b *CSIStorageCapacityApplyConfiguration) WithResourceVersion(value string)
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithGeneration(value int64) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *CSIStorageCapacityApplyConfiguration) WithCreationTimestamp(value metav1.Time) *CSIStorageCapacityApplyConfiguration {
+func (b *CSIStorageCapacityApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *CSIStorageCapacityApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *CSIStorageCapacityApplyConfiguration {
+func (b *CSIStorageCapacityApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -179,7 +243,7 @@ func (b *CSIStorageCapacityApplyConfiguration) WithDeletionTimestamp(value metav
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -189,11 +253,11 @@ func (b *CSIStorageCapacityApplyConfiguration) WithDeletionGracePeriodSeconds(va
 // overwriting an existing map entries in Labels field with the same key.
 func (b *CSIStorageCapacityApplyConfiguration) WithLabels(entries map[string]string) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -204,11 +268,11 @@ func (b *CSIStorageCapacityApplyConfiguration) WithLabels(entries map[string]str
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *CSIStorageCapacityApplyConfiguration) WithAnnotations(entries map[string]string) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -216,13 +280,13 @@ func (b *CSIStorageCapacityApplyConfiguration) WithAnnotations(entries map[strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *CSIStorageCapacityApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *CSIStorageCapacityApplyConfiguration {
+func (b *CSIStorageCapacityApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -233,21 +297,21 @@ func (b *CSIStorageCapacityApplyConfiguration) WithOwnerReferences(values ...*v1
 func (b *CSIStorageCapacityApplyConfiguration) WithFinalizers(values ...string) *CSIStorageCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *CSIStorageCapacityApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
 // WithNodeTopology sets the NodeTopology field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NodeTopology field is set to the value of the last call.
-func (b *CSIStorageCapacityApplyConfiguration) WithNodeTopology(value *v1.LabelSelectorApplyConfiguration) *CSIStorageCapacityApplyConfiguration {
+func (b *CSIStorageCapacityApplyConfiguration) WithNodeTopology(value *metav1.LabelSelectorApplyConfiguration) *CSIStorageCapacityApplyConfiguration {
 	b.NodeTopology = value
 	return b
 }
@@ -276,8 +340,24 @@ func (b *CSIStorageCapacityApplyConfiguration) WithMaximumVolumeSize(value resou
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *CSIStorageCapacityApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *CSIStorageCapacityApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *CSIStorageCapacityApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *CSIStorageCapacityApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

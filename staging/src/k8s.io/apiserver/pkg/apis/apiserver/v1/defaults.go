@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -46,5 +47,20 @@ func SetDefaults_KMSConfiguration(obj *KMSConfiguration) {
 	// cacheSize is relevant only for kms v1
 	if obj.CacheSize == nil && obj.APIVersion == "v1" {
 		obj.CacheSize = &defaultCacheSize
+	}
+}
+
+func SetDefaults_WebhookConfiguration(obj *WebhookConfiguration) {
+	if obj.AuthorizedTTL.Duration == 0 {
+		obj.AuthorizedTTL.Duration = 5 * time.Minute
+	}
+	if obj.CacheAuthorizedRequests == nil {
+		obj.CacheAuthorizedRequests = ptr.To(true)
+	}
+	if obj.UnauthorizedTTL.Duration == 0 {
+		obj.UnauthorizedTTL.Duration = 30 * time.Second
+	}
+	if obj.CacheUnauthorizedRequests == nil {
+		obj.CacheUnauthorizedRequests = ptr.To(true)
 	}
 }

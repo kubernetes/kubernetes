@@ -23,7 +23,7 @@ const (
 	// webhook backend fails.
 	ImagePolicyFailedOpenKey string = "alpha.image-policy.k8s.io/failed-open"
 
-	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
+	// MirrorPodAnnotationKey represents the annotation key set by kubelets when creating mirror pods
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
 
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
@@ -80,7 +80,7 @@ const (
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 
-	// annotation key prefix used to identify non-convertible json paths.
+	// NonConvertibleAnnotationPrefix is the annotation key prefix used to identify non-convertible json paths.
 	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
 
 	kubectlPrefix = "kubectl.kubernetes.io/"

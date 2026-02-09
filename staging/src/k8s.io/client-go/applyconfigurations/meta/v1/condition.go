@@ -19,18 +19,52 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ConditionApplyConfiguration represents a declarative configuration of the Condition type for use
 // with apply.
+//
+// Condition contains details for one aspect of the current state of this API Resource.
+// ---
+// This struct is intended for direct use as an array at the field path .status.conditions.  For example,
+//
+// type FooStatus struct{
+// // Represents the observations of a foo's current state.
+// // Known .status.conditions.type are: "Available", "Progressing", and "Degraded"
+// // +patchMergeKey=type
+// // +patchStrategy=merge
+// // +listType=map
+// // +listMapKey=type
+// Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+//
+// // other fields
+// }
 type ConditionApplyConfiguration struct {
-	Type               *string             `json:"type,omitempty"`
-	Status             *v1.ConditionStatus `json:"status,omitempty"`
-	ObservedGeneration *int64              `json:"observedGeneration,omitempty"`
-	LastTransitionTime *v1.Time            `json:"lastTransitionTime,omitempty"`
-	Reason             *string             `json:"reason,omitempty"`
-	Message            *string             `json:"message,omitempty"`
+	// type of condition in CamelCase or in foo.example.com/CamelCase.
+	// ---
+	// Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+	// useful (see .node.status.conditions), the ability to deconflict is important.
+	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+	Type *string `json:"type,omitempty"`
+	// status of the condition, one of True, False, Unknown.
+	Status *metav1.ConditionStatus `json:"status,omitempty"`
+	// observedGeneration represents the .metadata.generation that the condition was set based upon.
+	// For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+	// with respect to the current state of the instance.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
+	// This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// reason contains a programmatic identifier indicating the reason for the condition's last transition.
+	// Producers of specific condition types may define expected values and meanings for this field,
+	// and whether the values are considered a guaranteed API.
+	// The value should be a CamelCase string.
+	// This field may not be empty.
+	Reason *string `json:"reason,omitempty"`
+	// message is a human readable message indicating details about the transition.
+	// This may be an empty string.
+	Message *string `json:"message,omitempty"`
 }
 
 // ConditionApplyConfiguration constructs a declarative configuration of the Condition type for use with
@@ -50,7 +84,7 @@ func (b *ConditionApplyConfiguration) WithType(value string) *ConditionApplyConf
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *ConditionApplyConfiguration) WithStatus(value v1.ConditionStatus) *ConditionApplyConfiguration {
+func (b *ConditionApplyConfiguration) WithStatus(value metav1.ConditionStatus) *ConditionApplyConfiguration {
 	b.Status = &value
 	return b
 }
@@ -66,7 +100,7 @@ func (b *ConditionApplyConfiguration) WithObservedGeneration(value int64) *Condi
 // WithLastTransitionTime sets the LastTransitionTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LastTransitionTime field is set to the value of the last call.
-func (b *ConditionApplyConfiguration) WithLastTransitionTime(value v1.Time) *ConditionApplyConfiguration {
+func (b *ConditionApplyConfiguration) WithLastTransitionTime(value metav1.Time) *ConditionApplyConfiguration {
 	b.LastTransitionTime = &value
 	return b
 }

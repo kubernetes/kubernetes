@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	ct "github.com/daviddengcn/go-colortext"
 	"github.com/spf13/cobra"
 )
 
@@ -156,12 +155,8 @@ func (o *ClusterInfoOptions) Run() error {
 }
 
 func printService(out io.Writer, name, link string) {
-	ct.ChangeColor(ct.Green, false, ct.None, false)
 	fmt.Fprint(out, name)
-	ct.ResetColor()
 	fmt.Fprint(out, " is running at ")
-	ct.ChangeColor(ct.Yellow, false, ct.None, false)
 	fmt.Fprint(out, link)
-	ct.ResetColor()
 	fmt.Fprintln(out, "")
 }

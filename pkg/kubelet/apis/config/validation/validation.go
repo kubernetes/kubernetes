@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/featuregate"
@@ -31,6 +32,7 @@ import (
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	imagepullmanager "k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
@@ -45,18 +47,24 @@ var (
 func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
 	allErrors := []error{}
 
+	// TODO(lauralorenz): Reasses / confirm interpretation of feature gates
+	// depending on where we are in merging dynamic KubeletConfiguration when
+	// this is called. Here we copy the gates to a local var, and unilaterally
+	// merge it with the current gate config to test. See also defaults.go which
+	// intersects with this assumption.
+
 	// Make a local copy of the feature gates and combine it with the gates set by this configuration.
 	// This allows us to validate the config against the set of gates it will actually run against.
 	localFeatureGate := featureGate.DeepCopy()
 	if err := localFeatureGate.SetFromMap(kc.FeatureGates); err != nil {
 		return err
 	}
+	if errs := localFeatureGate.Validate(); len(errs) > 0 {
+		allErrors = append(allErrors, errs...)
+	}
 
 	if kc.NodeLeaseDurationSeconds <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: nodeLeaseDurationSeconds must be greater than 0"))
-	}
-	if !kc.CgroupsPerQOS && len(kc.EnforceNodeAllocatable) > 0 {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: enforceNodeAllocatable (--enforce-node-allocatable) is not supported unless cgroupsPerQOS (--cgroups-per-qos) is set to true"))
 	}
 	if kc.SystemCgroups != "" && kc.CgroupRoot == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemCgroups (--system-cgroups) was specified and cgroupRoot (--cgroup-root) was not specified"))
@@ -87,6 +95,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if kc.ImageMaximumGCAge.Duration != 0 && !localFeatureGate.Enabled(features.ImageMaximumGCAge) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option imageMaximumGCAge"))
+	}
+	if kc.ImageMinimumGCAge.Duration < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMinimumGCAge %v must not be negative", kc.ImageMinimumGCAge.Duration))
 	}
 	if kc.ImageMaximumGCAge.Duration < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMaximumGCAge %v must not be negative", kc.ImageMaximumGCAge.Duration))
@@ -142,6 +153,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
+	if kc.RunOnce {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: runOnce (--runOnce) %v, Runonce mode has been deprecated and should not be set", kc.RunOnce))
+	}
 
 	for _, nodeTaint := range kc.RegisterWithTaints {
 		if err := utiltaints.CheckTaintValidation(nodeTaint); err != nil {
@@ -195,8 +209,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if localFeatureGate.Enabled(features.NodeSwap) {
 		switch kc.MemorySwap.SwapBehavior {
 		case "":
-		case kubetypes.NoSwap:
-		case kubetypes.LimitedSwap:
+		case string(kubetypes.NoSwap):
+		case string(kubetypes.LimitedSwap):
 		default:
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap))
 		}
@@ -205,24 +219,70 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled"))
 	}
 
+	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
+		if kc.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax is enabled, CrashLoopBackOff.MaxContainerRestartPeriod must be set"))
+		}
+		if kc.CrashLoopBackOff.MaxContainerRestartPeriod != nil && utilvalidation.IsInRange(int(kc.CrashLoopBackOff.MaxContainerRestartPeriod.Duration.Milliseconds()), 1000, 300000) != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: CrashLoopBackOff.MaxContainerRestartPeriod (got: %v seconds) must be set between 1s and 300s", kc.CrashLoopBackOff.MaxContainerRestartPeriod.Seconds()))
+		}
+	} else if kc.CrashLoopBackOff.MaxContainerRestartPeriod != nil {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax not enabled, CrashLoopBackOff.MaxContainerRestartPeriod must not be set"))
+	}
+
+	// Check for mutually exclusive keys before the main validation loop
+	reservedKeys := map[string]bool{
+		kubetypes.SystemReservedEnforcementKey:             false,
+		kubetypes.SystemReservedCompressibleEnforcementKey: false,
+		kubetypes.KubeReservedEnforcementKey:               false,
+		kubetypes.KubeReservedCompressibleEnforcementKey:   false,
+	}
+
 	for _, val := range kc.EnforceNodeAllocatable {
+		reservedKeys[val] = true
+	}
+
+	if reservedKeys[kubetypes.SystemReservedCompressibleEnforcementKey] && reservedKeys[kubetypes.SystemReservedEnforcementKey] {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: both %q and %q cannot be specified together in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey))
+	}
+
+	if reservedKeys[kubetypes.KubeReservedCompressibleEnforcementKey] && reservedKeys[kubetypes.KubeReservedEnforcementKey] {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: both %q and %q cannot be specified together in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey))
+	}
+
+	uniqueEnforcements := sets.Set[string]{}
+	for _, val := range kc.EnforceNodeAllocatable {
+		if uniqueEnforcements.Has(val) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: duplicated enforcements %q in enforceNodeAllocatable (--enforce-node-allocatable)", val))
+			continue
+		}
+		uniqueEnforcements.Insert(val)
+
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:
-		case kubetypes.SystemReservedEnforcementKey:
+		case kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey:
 			if kc.SystemReservedCgroup == "" {
-				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemReservedCgroup (--system-reserved-cgroup) must be specified when %q contained in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey))
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemReservedCgroup (--system-reserved-cgroup) must be specified when %q or %q included in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey))
 			}
-		case kubetypes.KubeReservedEnforcementKey:
+		case kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey:
 			if kc.KubeReservedCgroup == "" {
-				allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeReservedCgroup (--kube-reserved-cgroup) must be specified when %q contained in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey))
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeReservedCgroup (--kube-reserved-cgroup) must be specified when %q or %q included in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey))
 			}
 		case kubetypes.NodeAllocatableNoneKey:
 			if len(kc.EnforceNodeAllocatable) > 1 {
 				allErrors = append(allErrors, fmt.Errorf("invalid configuration: enforceNodeAllocatable (--enforce-node-allocatable) may not contain additional enforcements when %q is specified", kubetypes.NodeAllocatableNoneKey))
 			}
+			// skip all further checks when this is explicitly "none"
+			continue
 		default:
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for enforceNodeAllocatable (--enforce-node-allocatable). Valid options are %q, %q, %q, or %q",
-				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.KubeReservedEnforcementKey, kubetypes.NodeAllocatableNoneKey))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for enforceNodeAllocatable (--enforce-node-allocatable). Valid options are %q, %q, %q, %q, %q or %q",
+				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey,
+				kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey, kubetypes.NodeAllocatableNoneKey))
+			continue
+		}
+
+		if !kc.CgroupsPerQOS {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: cgroupsPerQOS (--cgroups-per-qos) must be set to true when %q contained in enforceNodeAllocatable (--enforce-node-allocatable)", val))
 		}
 	}
 	switch kc.HairpinMode {
@@ -233,6 +293,32 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for hairpinMode (--hairpin-mode). Valid options are %q, %q or %q",
 			kc.HairpinMode, kubeletconfig.HairpinNone, kubeletconfig.HairpinVeth, kubeletconfig.PromiscuousBridge))
 	}
+
+	if localFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		switch kc.ImagePullCredentialsVerificationPolicy {
+		case string(kubeletconfig.NeverVerify),
+			string(kubeletconfig.NeverVerifyPreloadedImages),
+			string(kubeletconfig.NeverVerifyAllowlistedImages),
+			string(kubeletconfig.AlwaysVerify):
+		default:
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for imagePullCredentialsVerificationPolicy. Valid options are %q, %q, %q or %q",
+				kc.ImagePullCredentialsVerificationPolicy, kubeletconfig.NeverVerify, kubeletconfig.NeverVerifyPreloadedImages, kubeletconfig.NeverVerifyAllowlistedImages, kubeletconfig.AlwaysVerify))
+		}
+
+		if len(kc.PreloadedImagesVerificationAllowlist) > 0 && kc.ImagePullCredentialsVerificationPolicy != string(kubeletconfig.NeverVerifyAllowlistedImages) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: can't set `preloadedImagesVerificationAllowlist` if `imagePullCredentialsVertificationPolicy` is not \"NeverVerifyAllowlistedImages\""))
+		} else if err := imagepullmanager.ValidateAllowlistImagesPatterns(kc.PreloadedImagesVerificationAllowlist); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: invalid image pattern in `preloadedImagesVerificationAllowlist`: %w", err))
+		}
+	} else {
+		if len(kc.ImagePullCredentialsVerificationPolicy) > 0 {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: `imagePullCredentialsVerificationPolicy` must not be set if KubeletEnsureSecretPulledImages feature gate is not enabled"))
+		}
+		if len(kc.PreloadedImagesVerificationAllowlist) > 0 {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: `preloadedImagesVerificationAllowlist` must not be set if KubeletEnsureSecretPulledImages feature gate is not enabled"))
+		}
+	}
+
 	if kc.ReservedSystemCPUs != "" {
 		// --reserved-cpus does not support --system-reserved-cgroup or --kube-reserved-cgroup
 		if kc.SystemReservedCgroup != "" || kc.KubeReservedCgroup != "" {
@@ -254,12 +340,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 
-	if localFeatureGate.Enabled(features.KubeletTracing) {
-		if errs := tracingapi.ValidateTracingConfiguration(kc.Tracing, localFeatureGate, field.NewPath("tracing")); len(errs) > 0 {
-			allErrors = append(allErrors, errs.ToAggregate().Errors()...)
-		}
-	} else if kc.Tracing != nil {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: tracing should not be configured if KubeletTracing feature flag is disabled."))
+	if errs := tracingapi.ValidateTracingConfiguration(kc.Tracing, localFeatureGate, field.NewPath("tracing")); len(errs) > 0 {
+		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 
 	if localFeatureGate.Enabled(features.MemoryQoS) && kc.MemoryThrottlingFactor == nil {
@@ -274,7 +356,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 
 	if kc.EnableSystemLogQuery && !localFeatureGate.Enabled(features.NodeLogQuery) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler"))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery"))
 	}
 	if kc.EnableSystemLogQuery && !kc.EnableSystemLogHandler {
 		allErrors = append(allErrors,
@@ -287,6 +369,10 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 
 	if kc.ContainerLogMonitorInterval.Duration.Seconds() < 3 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerLogMonitorInterval must be a positive time duration greater than or equal to 3s"))
+	}
+
+	if kc.ContainerLogMaxFiles <= 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerLogMaxFiles must be greater than 1"))
 	}
 
 	if kc.PodLogsDir == "" {

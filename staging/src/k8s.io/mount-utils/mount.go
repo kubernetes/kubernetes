@@ -100,7 +100,7 @@ type MounterForceUnmounter interface {
 }
 
 // MountPoint represents a single line in /proc/mounts or /etc/fstab.
-type MountPoint struct { // nolint: golint
+type MountPoint struct {
 	Device string
 	Path   string
 	Type   string
@@ -109,7 +109,7 @@ type MountPoint struct { // nolint: golint
 	Pass   int
 }
 
-type MountErrorType string // nolint: golint
+type MountErrorType string
 
 const (
 	FilesystemMismatch  MountErrorType = "FilesystemMismatch"
@@ -120,7 +120,7 @@ const (
 	UnknownMountError   MountErrorType = "UnknownMountError"
 )
 
-type MountError struct { // nolint: golint
+type MountError struct {
 	Type    MountErrorType
 	Message string
 }

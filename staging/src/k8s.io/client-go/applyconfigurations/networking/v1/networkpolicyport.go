@@ -19,16 +19,28 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // NetworkPolicyPortApplyConfiguration represents a declarative configuration of the NetworkPolicyPort type for use
 // with apply.
+//
+// NetworkPolicyPort describes a port to allow traffic on
 type NetworkPolicyPortApplyConfiguration struct {
-	Protocol *v1.Protocol        `json:"protocol,omitempty"`
-	Port     *intstr.IntOrString `json:"port,omitempty"`
-	EndPort  *int32              `json:"endPort,omitempty"`
+	// protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
+	// If not specified, this field defaults to TCP.
+	Protocol *corev1.Protocol `json:"protocol,omitempty"`
+	// port represents the port on the given protocol. This can either be a numerical or named
+	// port on a pod. If this field is not provided, this matches all port names and
+	// numbers.
+	// If present, only traffic on the specified protocol AND port will be matched.
+	Port *intstr.IntOrString `json:"port,omitempty"`
+	// endPort indicates that the range of ports from port to endPort if set, inclusive,
+	// should be allowed by the policy. This field cannot be defined if the port field
+	// is not defined or if the port field is defined as a named (string) port.
+	// The endPort must be equal or greater than port.
+	EndPort *int32 `json:"endPort,omitempty"`
 }
 
 // NetworkPolicyPortApplyConfiguration constructs a declarative configuration of the NetworkPolicyPort type for use with
@@ -40,7 +52,7 @@ func NetworkPolicyPort() *NetworkPolicyPortApplyConfiguration {
 // WithProtocol sets the Protocol field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Protocol field is set to the value of the last call.
-func (b *NetworkPolicyPortApplyConfiguration) WithProtocol(value v1.Protocol) *NetworkPolicyPortApplyConfiguration {
+func (b *NetworkPolicyPortApplyConfiguration) WithProtocol(value corev1.Protocol) *NetworkPolicyPortApplyConfiguration {
 	b.Protocol = &value
 	return b
 }

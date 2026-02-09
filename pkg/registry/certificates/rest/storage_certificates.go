@@ -17,8 +17,12 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
+
 	certificatesapiv1 "k8s.io/api/certificates/v1"
 	certificatesapiv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -30,11 +34,19 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	certificatestore "k8s.io/kubernetes/pkg/registry/certificates/certificates/storage"
 	clustertrustbundlestore "k8s.io/kubernetes/pkg/registry/certificates/clustertrustbundle/storage"
+	podcertificaterequeststore "k8s.io/kubernetes/pkg/registry/certificates/podcertificaterequest/storage"
+	"k8s.io/utils/clock"
 )
 
-type RESTStorageProvider struct{}
+type RESTStorageProvider struct {
+	Authorizer authorizer.Authorizer
+}
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
+	if p.Authorizer == nil {
+		return genericapiserver.APIGroupInfo{}, fmt.Errorf("certificates REST storage requires an authorizer")
+	}
+
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(certificates.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
@@ -43,6 +55,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[certificatesapiv1.SchemeGroupVersion.Version] = storageMap
+	}
+
+	if storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[certificatesapiv1beta1.SchemeGroupVersion.Version] = storageMap
 	}
 
 	if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
@@ -65,6 +83,37 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource] = csrStorage
 		storage[resource+"/status"] = csrStatusStorage
 		storage[resource+"/approval"] = csrApprovalStorage
+	}
+
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	if resource := "clustertrustbundles"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+			bundleStorage, err := clustertrustbundlestore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = bundleStorage
+		} else {
+			klog.Warning("ClusterTrustBundle storage is disabled because the ClusterTrustBundle feature gate is disabled")
+		}
+	}
+
+	if resource := "podcertificaterequests"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+			pcrStorage, pcrStatusStorage, err := podcertificaterequeststore.NewREST(restOptionsGetter, p.Authorizer, clock.RealClock{})
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = pcrStorage
+			storage[resource+"/status"] = pcrStatusStorage
+		} else {
+			klog.Warning("PodCertificateRequest storage is disabled because the PodCertificateRequest feature gate is disabled")
+		}
 	}
 
 	return storage, nil

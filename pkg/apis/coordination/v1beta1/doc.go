@@ -21,4 +21,4 @@ limitations under the License.
 
 // +groupName=coordination.k8s.io
 
-package v1beta1 // import "k8s.io/kubernetes/pkg/apis/coordination/v1beta1"
+package v1beta1

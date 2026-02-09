@@ -19,19 +19,27 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // StorageVersionConditionApplyConfiguration represents a declarative configuration of the StorageVersionCondition type for use
 // with apply.
+//
+// Describes the state of the storageVersion at a certain point.
 type StorageVersionConditionApplyConfiguration struct {
-	Type               *v1alpha1.StorageVersionConditionType `json:"type,omitempty"`
-	Status             *v1alpha1.ConditionStatus             `json:"status,omitempty"`
-	ObservedGeneration *int64                                `json:"observedGeneration,omitempty"`
-	LastTransitionTime *v1.Time                              `json:"lastTransitionTime,omitempty"`
-	Reason             *string                               `json:"reason,omitempty"`
-	Message            *string                               `json:"message,omitempty"`
+	// Type of the condition.
+	Type *apiserverinternalv1alpha1.StorageVersionConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *apiserverinternalv1alpha1.ConditionStatus `json:"status,omitempty"`
+	// If set, this represents the .metadata.generation that the condition was set based upon.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime *v1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // StorageVersionConditionApplyConfiguration constructs a declarative configuration of the StorageVersionCondition type for use with
@@ -43,7 +51,7 @@ func StorageVersionCondition() *StorageVersionConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *StorageVersionConditionApplyConfiguration) WithType(value v1alpha1.StorageVersionConditionType) *StorageVersionConditionApplyConfiguration {
+func (b *StorageVersionConditionApplyConfiguration) WithType(value apiserverinternalv1alpha1.StorageVersionConditionType) *StorageVersionConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -51,7 +59,7 @@ func (b *StorageVersionConditionApplyConfiguration) WithType(value v1alpha1.Stor
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *StorageVersionConditionApplyConfiguration) WithStatus(value v1alpha1.ConditionStatus) *StorageVersionConditionApplyConfiguration {
+func (b *StorageVersionConditionApplyConfiguration) WithStatus(value apiserverinternalv1alpha1.ConditionStatus) *StorageVersionConditionApplyConfiguration {
 	b.Status = &value
 	return b
 }

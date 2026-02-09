@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/v3"
-	"github.com/google/go-cmp/cmp"
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -91,7 +91,7 @@ func (f *fakeResourceManager) Validate() error {
 	defer f.expect.lock.RUnlock()
 
 	if !reflect.DeepEqual(f.expect.Actions, f.Actions) {
-		return errors.New(cmp.Diff(f.expect.Actions, f.Actions))
+		return errors.New(diff.Diff(f.expect.Actions, f.Actions))
 	}
 	return nil
 }
@@ -119,6 +119,18 @@ func (f *recorderResourceManager) SetGroupVersionPriority(gv metav1.GroupVersion
 		Group:   gv.Group,
 		Version: gv.Version,
 		Value:   versionpriority,
+	})
+}
+
+func (f *recorderResourceManager) SetPeerDiscoveryProvider(provider PeerDiscoveryProvider) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	f.Actions = append(f.Actions, recorderResourceManagerAction{
+		Type:    "SetPeerDiscoveryProvider",
+		Group:   "",
+		Version: "",
+		Value:   provider,
 	})
 }
 
@@ -171,5 +183,9 @@ func (f *recorderResourceManager) ServeHTTP(http.ResponseWriter, *http.Request) 
 }
 
 func (f *recorderResourceManager) WithSource(source Source) ResourceManager {
+	panic("unimplemented")
+}
+
+func (f *recorderResourceManager) AddInvalidationCallback(callback func()) {
 	panic("unimplemented")
 }

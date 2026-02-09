@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ const (
 // The routing header consists of one or multiple key-value pairs. Every key
 // and value must be percent-encoded, and joined together in the format of
 // `key1=value1&key2=value2`.
-// In the examples below I am skipping the percent-encoding for readablity.
+// The examples below skip the percent-encoding for readability.
 //
 // # Example 1
 //

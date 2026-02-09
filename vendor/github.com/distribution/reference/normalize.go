@@ -123,20 +123,51 @@ func ParseDockerRef(ref string) (Named, error) {
 // splitDockerDomain splits a repository name to domain and remote-name.
 // If no valid domain is found, the default domain is used. Repository name
 // needs to be already validated before.
-func splitDockerDomain(name string) (domain, remainder string) {
-	i := strings.IndexRune(name, '/')
-	if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != localhost && strings.ToLower(name[:i]) == name[:i]) {
-		domain, remainder = defaultDomain, name
-	} else {
-		domain, remainder = name[:i], name[i+1:]
+func splitDockerDomain(name string) (domain, remoteName string) {
+	maybeDomain, maybeRemoteName, ok := strings.Cut(name, "/")
+	if !ok {
+		// Fast-path for single element ("familiar" names), such as "ubuntu"
+		// or "ubuntu:latest". Familiar names must be handled separately, to
+		// prevent them from being handled as "hostname:port".
+		//
+		// Canonicalize them as "docker.io/library/name[:tag]"
+
+		// FIXME(thaJeztah): account for bare "localhost" or "example.com" names, which SHOULD be considered a domain.
+		return defaultDomain, officialRepoPrefix + name
 	}
-	if domain == legacyDefaultDomain {
-		domain = defaultDomain
+
+	switch {
+	case maybeDomain == localhost:
+		// localhost is a reserved namespace and always considered a domain.
+		domain, remoteName = maybeDomain, maybeRemoteName
+	case maybeDomain == legacyDefaultDomain:
+		// canonicalize the Docker Hub and legacy "Docker Index" domains.
+		domain, remoteName = defaultDomain, maybeRemoteName
+	case strings.ContainsAny(maybeDomain, ".:"):
+		// Likely a domain or IP-address:
+		//
+		// - contains a "." (e.g., "example.com" or "127.0.0.1")
+		// - contains a ":" (e.g., "example:5000", "::1", or "[::1]:5000")
+		domain, remoteName = maybeDomain, maybeRemoteName
+	case strings.ToLower(maybeDomain) != maybeDomain:
+		// Uppercase namespaces are not allowed, so if the first element
+		// is not lowercase, we assume it to be a domain-name.
+		domain, remoteName = maybeDomain, maybeRemoteName
+	default:
+		// None of the above: it's not a domain, so use the default, and
+		// use the name input the remote-name.
+		domain, remoteName = defaultDomain, name
 	}
-	if domain == defaultDomain && !strings.ContainsRune(remainder, '/') {
-		remainder = officialRepoPrefix + remainder
+
+	if domain == defaultDomain && !strings.ContainsRune(remoteName, '/') {
+		// Canonicalize "familiar" names, but only on Docker Hub, not
+		// on other domains:
+		//
+		// "docker.io/ubuntu[:tag]" => "docker.io/library/ubuntu[:tag]"
+		remoteName = officialRepoPrefix + remoteName
 	}
-	return
+
+	return domain, remoteName
 }
 
 // familiarizeName returns a shortened version of the name familiar

@@ -29,14 +29,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
+
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
 // verifies the cacheWatcher.process goroutine is properly cleaned up even if
@@ -247,7 +249,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 }
 
 func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -259,7 +261,7 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
-	w, err := cacher.Watch(context.Background(), "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	w, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -288,19 +290,15 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 }
 
 func TestResourceVersionAfterInitEvents(t *testing.T) {
-	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
-		return nil, nil, nil
-	}
-
 	const numObjects = 10
-	store := cache.NewIndexer(storeElementKey, storeElementIndexers(nil))
+	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
 
 	for i := 0; i < numObjects; i++ {
 		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)))
 		store.Add(elem)
 	}
 
-	wci, err := newCacheIntervalFromStore(numObjects, store, getAttrsFunc, "", false)
+	wci, err := newCacheIntervalFromStore(numObjects, store, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}

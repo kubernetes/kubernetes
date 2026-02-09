@@ -17,13 +17,13 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -112,7 +112,7 @@ func (s *service) CreateVolume(
 	}
 
 	if hookVal, hookMsg := s.execHook("CreateVolumeEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return &csi.CreateVolumeResponse{Volume: &v}, nil
@@ -132,7 +132,7 @@ func (s *service) DeleteVolume(
 	}
 
 	if hookVal, hookMsg := s.execHook("DeleteVolumeStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	// If the volume does not exist then return an idempotent response.
@@ -150,7 +150,7 @@ func (s *service) DeleteVolume(
 	klog.V(5).InfoS("mock delete volume", "volumeID", req.VolumeId)
 
 	if hookVal, hookMsg := s.execHook("DeleteVolumeEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 	return &csi.DeleteVolumeResponse{}, nil
 }
@@ -179,7 +179,7 @@ func (s *service) ControllerPublishVolume(
 	}
 
 	if hookVal, hookMsg := s.execHook("ControllerPublishVolumeStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	s.volsRWL.Lock()
@@ -246,7 +246,7 @@ func (s *service) ControllerPublishVolume(
 	}
 
 	if hookVal, hookMsg := s.execHook("ControllerPublishVolumeEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return &csi.ControllerPublishVolumeResponse{
@@ -280,7 +280,7 @@ func (s *service) ControllerUnpublishVolume(
 	}
 
 	if hookVal, hookMsg := s.execHook("ControllerUnpublishVolumeStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	s.volsRWL.Lock()
@@ -309,7 +309,7 @@ func (s *service) ControllerUnpublishVolume(
 	s.vols[i] = v
 
 	if hookVal, hookMsg := s.execHook("ControllerUnpublishVolumeEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -332,7 +332,7 @@ func (s *service) ValidateVolumeCapabilities(
 	}
 
 	if hookVal, hookMsg := s.execHook("ValidateVolumeCapabilities"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return &csi.ValidateVolumeCapabilitiesResponse{
@@ -350,7 +350,7 @@ func (s *service) ControllerGetVolume(
 	*csi.ControllerGetVolumeResponse, error) {
 
 	if hookVal, hookMsg := s.execHook("GetVolumeStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	resp := &csi.ControllerGetVolumeResponse{
@@ -373,7 +373,7 @@ func (s *service) ControllerGetVolume(
 	}
 
 	if hookVal, hookMsg := s.execHook("GetVolumeEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return resp, nil
@@ -385,7 +385,7 @@ func (s *service) ListVolumes(
 	*csi.ListVolumesResponse, error) {
 
 	if hookVal, hookMsg := s.execHook("ListVolumesStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	// Copy the mock volumes into a new slice in order to avoid
@@ -464,7 +464,7 @@ func (s *service) ListVolumes(
 	}
 
 	if hookVal, hookMsg := s.execHook("ListVolumesEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return &csi.ListVolumesResponse{
@@ -479,7 +479,7 @@ func (s *service) GetCapacity(
 	*csi.GetCapacityResponse, error) {
 
 	if hookVal, hookMsg := s.execHook("GetCapacity"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return &csi.GetCapacityResponse{
@@ -493,7 +493,7 @@ func (s *service) ControllerGetCapabilities(
 	*csi.ControllerGetCapabilitiesResponse, error) {
 
 	if hookVal, hookMsg := s.execHook("ControllerGetCapabilitiesStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	caps := []*csi.ControllerServiceCapability{
@@ -597,7 +597,7 @@ func (s *service) ControllerGetCapabilities(
 	}
 
 	if hookVal, hookMsg := s.execHook("ControllerGetCapabilitiesEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return &csi.ControllerGetCapabilitiesResponse{
@@ -630,7 +630,7 @@ func (s *service) CreateSnapshot(ctx context.Context,
 	s.snapshots.Add(snapshot)
 
 	if hookVal, hookMsg := s.execHook("CreateSnapshotEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return &csi.CreateSnapshotResponse{Snapshot: &snapshot.SnapshotCSI}, nil
@@ -645,7 +645,7 @@ func (s *service) DeleteSnapshot(ctx context.Context,
 	}
 
 	if hookVal, hookMsg := s.execHook("DeleteSnapshotStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	// If the snapshot does not exist then return an idempotent response.
@@ -661,7 +661,7 @@ func (s *service) DeleteSnapshot(ctx context.Context,
 	klog.V(5).InfoS("mock delete snapshot", "snapshotId", req.SnapshotId)
 
 	if hookVal, hookMsg := s.execHook("DeleteSnapshotEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return &csi.DeleteSnapshotResponse{}, nil
@@ -671,7 +671,7 @@ func (s *service) ListSnapshots(ctx context.Context,
 	req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 
 	if hookVal, hookMsg := s.execHook("ListSnapshots"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	// case 1: SnapshotId is not empty, return snapshots that match the snapshot id.
@@ -700,7 +700,7 @@ func (s *service) ControllerExpandVolume(
 	}
 
 	if hookVal, hookMsg := s.execHook("ControllerExpandVolumeStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	s.volsRWL.Lock()
@@ -737,7 +737,7 @@ func (s *service) ControllerExpandVolume(
 	s.vols[i] = v
 
 	if hookVal, hookMsg := s.execHook("ControllerExpandVolumeEnd"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
+		return nil, status.Error(hookVal, hookMsg)
 	}
 
 	return resp, nil

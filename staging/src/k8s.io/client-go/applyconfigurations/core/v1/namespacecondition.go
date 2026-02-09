@@ -19,18 +19,25 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NamespaceConditionApplyConfiguration represents a declarative configuration of the NamespaceCondition type for use
 // with apply.
+//
+// NamespaceCondition contains details about state of namespace.
 type NamespaceConditionApplyConfiguration struct {
-	Type               *v1.NamespaceConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus        `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time               `json:"lastTransitionTime,omitempty"`
-	Reason             *string                    `json:"reason,omitempty"`
-	Message            *string                    `json:"message,omitempty"`
+	// Type of namespace controller condition.
+	Type *corev1.NamespaceConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // NamespaceConditionApplyConfiguration constructs a declarative configuration of the NamespaceCondition type for use with
@@ -42,7 +49,7 @@ func NamespaceCondition() *NamespaceConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *NamespaceConditionApplyConfiguration) WithType(value v1.NamespaceConditionType) *NamespaceConditionApplyConfiguration {
+func (b *NamespaceConditionApplyConfiguration) WithType(value corev1.NamespaceConditionType) *NamespaceConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -50,7 +57,7 @@ func (b *NamespaceConditionApplyConfiguration) WithType(value v1.NamespaceCondit
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *NamespaceConditionApplyConfiguration) WithStatus(value v1.ConditionStatus) *NamespaceConditionApplyConfiguration {
+func (b *NamespaceConditionApplyConfiguration) WithStatus(value corev1.ConditionStatus) *NamespaceConditionApplyConfiguration {
 	b.Status = &value
 	return b
 }

@@ -75,10 +75,7 @@ func (c *resourceMetricsClient) GetResourceMetric(ctx context.Context, resource 
 	}
 	var res PodMetricsInfo
 	if container != "" {
-		res, err = getContainerMetrics(metrics.Items, resource, container)
-		if err != nil {
-			return nil, time.Time{}, fmt.Errorf("failed to get container metrics: %v", err)
-		}
+		res = getContainerMetrics(ctx, metrics.Items, resource, container)
 	} else {
 		res = getPodMetrics(ctx, metrics.Items, resource)
 	}
@@ -86,7 +83,7 @@ func (c *resourceMetricsClient) GetResourceMetric(ctx context.Context, resource 
 	return res, timestamp, nil
 }
 
-func getContainerMetrics(rawMetrics []metricsapi.PodMetrics, resource v1.ResourceName, container string) (PodMetricsInfo, error) {
+func getContainerMetrics(ctx context.Context, rawMetrics []metricsapi.PodMetrics, resource v1.ResourceName, container string) PodMetricsInfo {
 	res := make(PodMetricsInfo, len(rawMetrics))
 	for _, m := range rawMetrics {
 		containerFound := false
@@ -104,10 +101,10 @@ func getContainerMetrics(rawMetrics []metricsapi.PodMetrics, resource v1.Resourc
 			}
 		}
 		if !containerFound {
-			return nil, fmt.Errorf("container %s not present in metrics for pod %s/%s", container, m.Namespace, m.Name)
+			klog.FromContext(ctx).V(2).Info("Missing container metric", "container", container, "pod", klog.KRef(m.Namespace, m.Name))
 		}
 	}
-	return res, nil
+	return res
 }
 
 func getPodMetrics(ctx context.Context, rawMetrics []metricsapi.PodMetrics, resource v1.ResourceName) PodMetricsInfo {
@@ -162,10 +159,8 @@ func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, 
 		res[m.DescribedObject.Name] = PodMetric{
 			Timestamp: m.Timestamp.Time,
 			Window:    window,
-			Value:     int64(m.Value.MilliValue()),
+			Value:     m.Value.MilliValue(),
 		}
-
-		m.Value.MilliValue()
 	}
 
 	timestamp := metrics.Items[0].Timestamp.Time

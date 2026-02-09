@@ -24,7 +24,7 @@ import (
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add field conversion funcs.
-	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("CertificateSigningRequest"),
+	err := scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("CertificateSigningRequest"),
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -35,4 +35,39 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 			}
 		},
 	)
+	if err != nil {
+		return err
+	}
+
+	err = scheme.AddFieldLabelConversionFunc(
+		SchemeGroupVersion.WithKind("ClusterTrustBundle"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "spec.signerName":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("while adding ClusterTrustBundle field label conversion func: %w", err)
+	}
+
+	err = scheme.AddFieldLabelConversionFunc(
+		SchemeGroupVersion.WithKind("PodCertificateRequest"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "spec.signerName", "spec.podName", "spec.nodeName":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("while adding PodCertificateRequest field label conversion func: %w", err)
+	}
+
+	return nil
 }

@@ -18,6 +18,7 @@ package validating
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -40,19 +41,23 @@ import (
 // validator implements the Validator interface
 type validator struct {
 	celMatcher            matchconditions.Matcher
-	validationFilter      cel.Filter
-	auditAnnotationFilter cel.Filter
-	messageFilter         cel.Filter
+	validationFilter      cel.ConditionEvaluator
+	auditAnnotationFilter cel.ConditionEvaluator
+	messageFilter         cel.ConditionEvaluator
 	failPolicy            *v1.FailurePolicyType
+	// compileError holds any compilation error from the CEL expressions.
+	// If non-nil, the validator will return an error result based on the failPolicy.
+	compileError error
 }
 
-func NewValidator(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, failPolicy *v1.FailurePolicyType) Validator {
+func NewValidator(validationFilter cel.ConditionEvaluator, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.ConditionEvaluator, failPolicy *v1.FailurePolicyType, err error) Validator {
 	return &validator{
 		celMatcher:            celMatcher,
 		validationFilter:      validationFilter,
 		auditAnnotationFilter: auditAnnotationFilter,
 		messageFilter:         messageFilter,
 		failPolicy:            failPolicy,
+		compileError:          err,
 	}
 }
 
@@ -79,6 +84,17 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 		f = v1.Fail
 	} else {
 		f = *v.failPolicy
+	}
+	if v.compileError != nil {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:     policyDecisionActionForError(f),
+					Evaluation: EvalError,
+					Message:    v.compileError.Error(),
+				},
+			},
+		}
 	}
 	if v.celMatcher != nil {
 		matchResults := v.celMatcher.Match(ctx, versionedAttr, versionedParams, authz)
@@ -121,6 +137,7 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 	messageResults, _, err := v.messageFilter.ForInput(ctx, versionedAttr, admissionRequest, expressionOptionalVars, ns, remainingBudget)
 	for i, evalResult := range evalResults {
 		var decision = &decisions[i]
+		decision.Elapsed = evalResult.Elapsed
 		// TODO: move this to generics
 		validation, ok := evalResult.ExpressionAccessor.(*ValidationCondition)
 		if !ok {
@@ -132,24 +149,20 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 		}
 
 		var messageResult *cel.EvaluationResult
-		var messageError *apiservercel.Error
 		if len(messageResults) > i {
 			messageResult = &messageResults[i]
 		}
-		messageError, _ = err.(*apiservercel.Error)
 		if evalResult.Error != nil {
 			decision.Action = policyDecisionActionForError(f)
 			decision.Evaluation = EvalError
 			decision.Message = evalResult.Error.Error()
-		} else if messageError != nil &&
-			(messageError.Type == apiservercel.ErrorTypeInternal ||
-				(messageError.Type == apiservercel.ErrorTypeInvalid &&
-					strings.HasPrefix(messageError.Detail, "validation failed due to running out of cost budget"))) {
+		} else if errors.Is(err, apiservercel.ErrInternal) || errors.Is(err, apiservercel.ErrOutOfBudget) {
 			decision.Action = policyDecisionActionForError(f)
 			decision.Evaluation = EvalError
 			decision.Message = fmt.Sprintf("failed messageExpression: %s", err)
 		} else if evalResult.EvalResult != celtypes.True {
 			decision.Action = ActionDeny
+			decision.Evaluation = EvalDeny
 			if validation.Reason == nil {
 				decision.Reason = metav1.StatusReasonInvalid
 			} else {
@@ -214,6 +227,7 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 			continue
 		}
 		var auditAnnotationResult = &auditAnnotationResults[i]
+		auditAnnotationResult.Elapsed = evalResult.Elapsed
 		// TODO: move this to generics
 		validation, ok := evalResult.ExpressionAccessor.(*AuditAnnotationCondition)
 		if !ok {

@@ -279,7 +279,7 @@ func TestConfigBaseMarshal(t *testing.T) {
 		`, kubeadmapiv1.SchemeGroupVersion.String())))
 
 		if expected != got {
-			t.Fatalf("Missmatch between expected and got:\nExpected:\n%s\n---\nGot:\n%s", expected, got)
+			t.Fatalf("Mismatch between expected and got:\nExpected:\n%s\n---\nGot:\n%s", expected, got)
 		}
 	})
 }
@@ -293,9 +293,9 @@ func TestConfigBaseUnmarshal(t *testing.T) {
 			config: validUnmarshallableClusterConfig.obj,
 		}
 
-		gvkmap, err := kubeadmutil.SplitYAMLDocuments([]byte(validUnmarshallableClusterConfig.yaml))
+		gvkmap, err := kubeadmutil.SplitConfigDocuments([]byte(validUnmarshallableClusterConfig.yaml))
 		if err != nil {
-			t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
+			t.Fatalf("unexpected failure of SplitConfigDocuments: %v", err)
 		}
 
 		got := &clusterConfig{
@@ -332,7 +332,7 @@ func TestGeneratedConfigFromCluster(t *testing.T) {
 				hash: testYAMLHash,
 			},
 			{
-				name:         "Missmatching hash means user supplied config",
+				name:         "Mismatching hash means user supplied config",
 				hash:         mismatchHash,
 				userSupplied: true,
 			},
@@ -350,7 +350,7 @@ func TestGeneratedConfigFromCluster(t *testing.T) {
 					}
 				}
 
-				client := clientsetfake.NewSimpleClientset(configMap)
+				client := clientsetfake.NewClientset(configMap)
 				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg())
 				if err != nil {
 					t.Fatalf("unexpected failure of FromCluster: %v", err)
@@ -461,9 +461,9 @@ func runClusterConfigFromTest(t *testing.T, perform func(t *testing.T, in string
 
 func TestLoadingFromDocumentMap(t *testing.T) {
 	runClusterConfigFromTest(t, func(t *testing.T, in string) (kubeadmapi.ComponentConfig, error) {
-		gvkmap, err := kubeadmutil.SplitYAMLDocuments([]byte(in))
+		gvkmap, err := kubeadmutil.SplitConfigDocuments([]byte(in))
 		if err != nil {
-			t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
+			t.Fatalf("unexpected failure of SplitConfigDocuments: %v", err)
 		}
 
 		return clusterConfigHandler.FromDocumentMap(gvkmap)
@@ -472,7 +472,7 @@ func TestLoadingFromDocumentMap(t *testing.T) {
 
 func TestLoadingFromCluster(t *testing.T) {
 	runClusterConfigFromTest(t, func(t *testing.T, in string) (kubeadmapi.ComponentConfig, error) {
-		client := clientsetfake.NewSimpleClientset(
+		client := clientsetfake.NewClientset(
 			testClusterConfigMap(in, false),
 		)
 
@@ -522,7 +522,7 @@ func TestGetVersionStates(t *testing.T) {
 
 		for _, test := range cases {
 			t.Run(test.desc, func(t *testing.T) {
-				client := clientsetfake.NewSimpleClientset(test.obj)
+				client := clientsetfake.NewClientset(test.obj)
 
 				clusterCfg := testClusterCfg()
 

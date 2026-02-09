@@ -18,24 +18,37 @@ package metrics
 
 import (
 	"bytes"
+	"context"
+	"sync"
 	"testing"
 
-	"github.com/blang/semver/v4"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace"
+	tracenoop "go.opentelemetry.io/otel/trace/noop"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestCounter(t *testing.T) {
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*CounterOpts
+		currentVersion      apimachineryversion.Info
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			CounterOpts: &CounterOpts{
 				Namespace:      "namespace",
 				Name:           "metric_test_name",
@@ -47,7 +60,32 @@ func TestCounter(t *testing.T) {
 			expectedHelp:        "[ALPHA] counter help",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Help:           "counter help",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] counter help",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "counter help",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] counter help",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -56,30 +94,78 @@ func TestCounter(t *testing.T) {
 				StabilityLevel:    ALPHA,
 				DeprecatedVersion: "1.15.0",
 			},
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) counter help",
+			expectedMetricCount: 0,
+			expectedHelp:        "counter help",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.15.0",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) counter help",
+		},
+		{
+			desc: "STABLE metric deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.14.0",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.14.0) counter help",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
 			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "counter help",
 				StabilityLevel:    ALPHA,
-				DeprecatedVersion: "1.14.0",
+				DeprecatedVersion: "1.15.0",
 			},
 			expectedMetricCount: 0,
+			expectedHelp:        "counter help",
+		},
+		{
+			desc: "BETA metric hidden",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.14.0",
+			},
+			expectedMetricCount: 0},
+		{
+			desc: "STABLE metric hidden",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.12.0",
+			},
+			expectedMetricCount: 0,
+			expectedHelp:        "counter help",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			// c is a pointer to a Counter
 			c := NewCounter(test.CounterOpts)
 			registry.MustRegister(c)
@@ -88,10 +174,10 @@ func TestCounter(t *testing.T) {
 			var buf bytes.Buffer
 			enc := expfmt.NewEncoder(&buf, "text/plain; version=0.0.4; charset=utf-8")
 			assert.Lenf(t, mfs, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(mfs), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 			for _, metric := range mfs {
 				err := enc.Encode(metric)
-				assert.Nil(t, err, "Unexpected err %v in encoding the metric", err)
+				require.NoError(t, err, "Unexpected err %v in encoding the metric", err)
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
 			}
 
@@ -101,7 +187,7 @@ func TestCounter(t *testing.T) {
 				c.Inc()
 			}
 			mfs, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				mfMetric := mf.GetMetric()
@@ -114,45 +200,110 @@ func TestCounter(t *testing.T) {
 }
 
 func TestCounterVec(t *testing.T) {
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*CounterOpts
 		labels                    []string
-		registryVersion           *semver.Version
 		expectedMetricFamilyCount int
 		expectedHelp              string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			CounterOpts: &CounterOpts{
-				Namespace: "namespace",
-				Name:      "metric_test_name",
-				Subsystem: "subsystem",
-				Help:      "counter help",
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: ALPHA,
+				Help:           "counter help",
 			},
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 1,
 			expectedHelp:              "[ALPHA] counter help",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Help:           "counter help",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 1,
+			expectedHelp:              "[BETA] counter help",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "counter help",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 1,
+			expectedHelp:              "[STABLE] counter help",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
+				Help:              "counter help",
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 0,
+			expectedHelp:              "counter help",
+		},
+		{
+			desc: "BETA metric deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
 				Help:              "counter help",
 				DeprecatedVersion: "1.15.0",
 			},
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 1,
-			expectedHelp:              "[ALPHA] (Deprecated since 1.15.0) counter help",
+			expectedHelp:              "[BETA] (Deprecated since 1.15.0) counter help",
 		},
 		{
-			desc: "Test hidden",
+			desc: "STABLE metric deprecated",
 			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "counter help",
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 1,
+			expectedHelp:              "[STABLE] (Deprecated since 1.15.0) counter help",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "counter help",
 				DeprecatedVersion: "1.14.0",
 			},
@@ -161,33 +312,44 @@ func TestCounterVec(t *testing.T) {
 			expectedHelp:              "counter help",
 		},
 		{
-			desc: "Test alpha",
+			desc: "BETA metric hidden",
 			CounterOpts: &CounterOpts{
-				StabilityLevel: ALPHA,
-				Namespace:      "namespace",
-				Name:           "metric_test_name",
-				Subsystem:      "subsystem",
-				Help:           "counter help",
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "counter help",
+				DeprecatedVersion: "1.14.0",
 			},
 			labels:                    []string{"label_a", "label_b"},
-			expectedMetricFamilyCount: 1,
-			expectedHelp:              "[ALPHA] counter help",
+			expectedMetricFamilyCount: 0,
+			expectedHelp:              "counter help",
+		},
+		{
+			desc: "STABLE metric hidden",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "counter help",
+				DeprecatedVersion: "1.12.0",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 0,
+			expectedHelp:              "counter help",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			c := NewCounterVec(test.CounterOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Inc()
 			mfs, err := registry.Gather()
 			assert.Lenf(t, mfs, test.expectedMetricFamilyCount, "Got %v metric families, Want: %v metric families", len(mfs), test.expectedMetricFamilyCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
@@ -199,7 +361,7 @@ func TestCounterVec(t *testing.T) {
 			c.WithLabelValues("1", "3").Inc()
 			c.WithLabelValues("2", "3").Inc()
 			mfs, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
@@ -244,7 +406,8 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			SetLabelAllowListFromCLI(labelAllowValues)
+			labelValueAllowLists = map[string]*MetricLabelAllowList{}
+
 			registry := newKubeRegistry(apimachineryversion.Info{
 				Major:      "1",
 				Minor:      "15",
@@ -252,12 +415,12 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 			})
 			c := NewCounterVec(opts, labels)
 			registry.MustRegister(c)
-
+			SetLabelAllowListFromCLI(labelAllowValues)
 			for _, lv := range test.labelValues {
 				c.WithLabelValues(lv...).Inc()
 			}
 			mfs, err := registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
@@ -284,4 +447,210 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCounterWithExemplar(t *testing.T) {
+	// Set exemplar.
+	fn := func(offset int) []byte {
+		arr := make([]byte, 16)
+		for i := 0; i < 16; i++ {
+			arr[i] = byte(2<<7 - i - offset)
+		}
+		return arr
+	}
+	traceID := trace.TraceID(fn(1))
+	spanID := trace.SpanID(fn(2))
+	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		SpanID:     spanID,
+		TraceID:    traceID,
+		TraceFlags: trace.FlagsSampled,
+	}))
+	toAdd := float64(40)
+
+	// Create contextual counter.
+	counter := NewCounter(&CounterOpts{
+		Name: "metric_exemplar_test",
+		Help: "helpless",
+	})
+
+	// Register counter.
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.MustRegister(counter)
+
+	// Call underlying exemplar methods.
+	counter.WithContext(ctxForSpanCtx).Add(toAdd)
+	counter.WithContext(ctxForSpanCtx).Inc()
+	counter.WithContext(ctxForSpanCtx).Inc()
+
+	// Gather.
+	mfs, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather failed %v", err)
+	}
+	if len(mfs) != 1 {
+		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
+	}
+
+	// Verify metric type.
+	mf := mfs[0]
+	var m *dto.Metric
+	switch mf.GetType() {
+	case dto.MetricType_COUNTER:
+		m = mfs[0].GetMetric()[0]
+	default:
+		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_COUNTER)
+	}
+
+	// Verify value.
+	want := toAdd + 2
+	got := m.GetCounter().GetValue()
+	if got != want {
+		t.Fatalf("Got %f, wanted %f as the count", got, want)
+	}
+
+	// Verify exemplars.
+	e := m.GetCounter().GetExemplar()
+	if e == nil {
+		t.Fatalf("Got nil exemplar, wanted an exemplar")
+	}
+	eLabels := e.GetLabel()
+	if eLabels == nil {
+		t.Fatalf("Got nil exemplar label, wanted an exemplar label")
+	}
+	if len(eLabels) != 2 {
+		t.Fatalf("Got %v exemplar labels, wanted 2 exemplar labels", len(eLabels))
+	}
+	for _, l := range eLabels {
+		switch *l.Name {
+		case "trace_id":
+			if *l.Value != traceID.String() {
+				t.Fatalf("Got %s as traceID, wanted %s", *l.Value, traceID.String())
+			}
+		case "span_id":
+			if *l.Value != spanID.String() {
+				t.Fatalf("Got %s as spanID, wanted %s", *l.Value, spanID.String())
+			}
+		default:
+			t.Fatalf("Got unexpected label %s", *l.Name)
+		}
+	}
+}
+
+// TestCounterConcurrentWithContextRace reproduces the race condition in Counter.WithContext
+// where c.ctx is written concurrently with reads in withExemplar method.
+// This test simulates the real authentication flow that triggers the race:
+// x509.AuthenticateRequest -> union.AuthenticateRequest -> group.AuthenticateRequest
+func TestCounterConcurrentWithContextRace(t *testing.T) {
+	opts := &CounterOpts{
+		Namespace: "apiserver",
+		Subsystem: "authentication",
+		Name:      "requests_total",
+		Help:      "Authentication requests counter for race condition testing",
+	}
+
+	c := NewCounter(opts)
+
+	// Force initialization by calling initializeMetric directly
+	c.initializeMetric()
+
+	// Create contexts with trace spans to trigger exemplar code path
+	ctx1, span1 := createContextWithSpanCounter("x509-auth", "authenticate-request")
+	defer span1.End()
+	ctx2, span2 := createContextWithSpanCounter("union-auth", "union-authenticate")
+	defer span2.End()
+
+	var wg sync.WaitGroup
+	iterations := 10000 // Increase iterations to make race more likely
+
+	// Goroutine 1: Simulate x509 Authenticator calling WithContext
+	// This matches: x509.(*Authenticator).AuthenticateRequest() calling WithContext
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Simulate authentication request processing
+			simulateX509AuthenticateRequestCounter(c, ctx1, i)
+		}
+	}()
+
+	// Goroutine 2: Simulate concurrent Add/Inc calls (metrics collection)
+	// This matches the withExemplar/Add path that reads c.ctx
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			c.Add(float64(i % 10))
+			if i%2 == 0 {
+				c.Inc()
+			}
+		}
+	}()
+
+	// Goroutine 3: Simulate union AuthenticateRequest calling WithContext
+	// This matches: union.(*unionAuthRequestHandler).AuthenticateRequest()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Simulate union authentication processing
+			simulateUnionAuthenticateRequestCounter(c, ctx2, i)
+		}
+	}()
+
+	// Goroutine 4: Simulate group AuthenticateRequest calling WithContext
+	// This matches: group.(*AuthenticatedGroupAdder).AuthenticateRequest()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Simulate group authentication processing
+			simulateGroupAuthenticateRequestCounter(c, ctx1, ctx2, i)
+		}
+	}()
+
+	wg.Wait()
+}
+
+// simulateX509AuthenticateRequestCounter simulates the call path from x509 authenticator
+func simulateX509AuthenticateRequestCounter(c CounterMetric, ctx context.Context, iteration int) {
+	// Simulate the authentication request processing that calls WithContext
+	if cWithCtx, ok := c.(*Counter); ok {
+		cWithCtx.WithContext(ctx)
+	}
+}
+
+// simulateUnionAuthenticateRequestCounter simulates the call path from union authenticator
+func simulateUnionAuthenticateRequestCounter(c CounterMetric, ctx context.Context, iteration int) {
+	// Simulate union authentication processing
+	if cWithCtx, ok := c.(*Counter); ok {
+		cWithCtx.WithContext(ctx)
+	}
+}
+
+// simulateGroupAuthenticateRequestCounter simulates the call path from group authenticator
+func simulateGroupAuthenticateRequestCounter(c CounterMetric, ctx1, ctx2 context.Context, iteration int) {
+	// Alternate between contexts to simulate different authentication scenarios
+	ctx := ctx1
+	if iteration%3 == 0 {
+		ctx = ctx2
+	}
+
+	if cWithCtx, ok := c.(*Counter); ok {
+		cWithCtx.WithContext(ctx)
+	}
+}
+
+// Helper function to create a context with a valid trace span
+func createContextWithSpanCounter(traceID, spanID string) (context.Context, trace.Span) {
+	ctx := context.Background()
+
+	// Create a noop tracer and span for testing
+	tracer := tracenoop.NewTracerProvider().Tracer("test")
+	ctx, span := tracer.Start(ctx, "test-span")
+
+	return ctx, span
 }

@@ -20,20 +20,11 @@ import (
 	"k8s.io/component-base/featuregate"
 )
 
-const (
-	// owner: @logicalhan
-	// kep: https://kep.k8s.io/3466
-	// alpha: v1.26
-	ComponentSLIs featuregate.Feature = "ComponentSLIs"
-)
-
-func featureGates() map[featuregate.Feature]featuregate.FeatureSpec {
-	return map[featuregate.Feature]featuregate.FeatureSpec{
-		ComponentSLIs: {Default: true, PreRelease: featuregate.Beta},
-	}
+func featureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
+	return map[featuregate.Feature]featuregate.VersionedSpecs{}
 }
 
 // AddFeatureGates adds all feature gates used by this package.
-func AddFeatureGates(mutableFeatureGate featuregate.MutableFeatureGate) error {
-	return mutableFeatureGate.Add(featureGates())
+func AddFeatureGates(mutableFeatureGate featuregate.MutableVersionedFeatureGate) error {
+	return mutableFeatureGate.AddVersioned(featureGates())
 }

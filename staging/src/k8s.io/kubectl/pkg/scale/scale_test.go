@@ -17,6 +17,7 @@ limitations under the License.
 package scale
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -69,7 +70,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 	namespace := metav1.NamespaceDefault
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, rcgvr, false)
-	pass, err := scaleFunc()
+	pass, err := scaleFunc(context.Background())
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
@@ -78,7 +79,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 	}
 	preconditions := ScalePrecondition{3, ""}
 	scaleFunc = ScaleCondition(scaler, &preconditions, namespace, name, count, nil, rcgvr, false)
-	_, err = scaleFunc()
+	_, err = scaleFunc(context.Background())
 	if err == nil {
 		t.Errorf("Expected error on precondition failure")
 	}
@@ -105,7 +106,7 @@ func TestReplicationControllerScaleInvalid(t *testing.T) {
 	namespace := "default"
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, rcgvr, false)
-	pass, err := scaleFunc()
+	pass, err := scaleFunc(context.Background())
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
@@ -179,7 +180,7 @@ func TestDeploymentScaleRetry(t *testing.T) {
 	namespace := "default"
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, deploygvr, false)
-	pass, err := scaleFunc()
+	pass, err := scaleFunc(context.Background())
 	if pass != false {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
@@ -188,7 +189,7 @@ func TestDeploymentScaleRetry(t *testing.T) {
 	}
 	preconditions := &ScalePrecondition{3, ""}
 	scaleFunc = ScaleCondition(scaler, preconditions, namespace, name, count, nil, deploygvr, false)
-	_, err = scaleFunc()
+	_, err = scaleFunc(context.Background())
 	if err == nil {
 		t.Error("Expected error on precondition failure")
 	}
@@ -236,7 +237,7 @@ func TestDeploymentScaleInvalid(t *testing.T) {
 	namespace := "default"
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, deploygvr, false)
-	pass, err := scaleFunc()
+	pass, err := scaleFunc(context.Background())
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
@@ -309,7 +310,7 @@ func TestStatefulSetScaleRetry(t *testing.T) {
 	namespace := "default"
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, stsgvr, false)
-	pass, err := scaleFunc()
+	pass, err := scaleFunc(context.Background())
 	if pass != false {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
@@ -318,7 +319,7 @@ func TestStatefulSetScaleRetry(t *testing.T) {
 	}
 	preconditions := &ScalePrecondition{3, ""}
 	scaleFunc = ScaleCondition(scaler, preconditions, namespace, name, count, nil, stsgvr, false)
-	_, err = scaleFunc()
+	_, err = scaleFunc(context.Background())
 	if err == nil {
 		t.Error("Expected error on precondition failure")
 	}
@@ -345,7 +346,7 @@ func TestStatefulSetScaleInvalid(t *testing.T) {
 	namespace := "default"
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, stsgvr, false)
-	pass, err := scaleFunc()
+	pass, err := scaleFunc(context.Background())
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
@@ -418,7 +419,7 @@ func TestReplicaSetScaleRetry(t *testing.T) {
 	namespace := "default"
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, rsgvr, false)
-	pass, err := scaleFunc()
+	pass, err := scaleFunc(context.Background())
 	if pass != false {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
@@ -427,7 +428,7 @@ func TestReplicaSetScaleRetry(t *testing.T) {
 	}
 	preconditions := &ScalePrecondition{3, ""}
 	scaleFunc = ScaleCondition(scaler, preconditions, namespace, name, count, nil, rsgvr, false)
-	_, err = scaleFunc()
+	_, err = scaleFunc(context.Background())
 	if err == nil {
 		t.Error("Expected error on precondition failure")
 	}
@@ -454,7 +455,7 @@ func TestReplicaSetScaleInvalid(t *testing.T) {
 	namespace := "default"
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, rsgvr, false)
-	pass, err := scaleFunc()
+	pass, err := scaleFunc(context.Background())
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}

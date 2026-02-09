@@ -19,14 +19,21 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
 // CustomResourceSubresourcesApplyConfiguration represents a declarative configuration of the CustomResourceSubresources type for use
 // with apply.
+//
+// CustomResourceSubresources defines the status and scale subresources for CustomResources.
 type CustomResourceSubresourcesApplyConfiguration struct {
-	Status *v1beta1.CustomResourceSubresourceStatus          `json:"status,omitempty"`
-	Scale  *CustomResourceSubresourceScaleApplyConfiguration `json:"scale,omitempty"`
+	// status indicates the custom resource should serve a `/status` subresource.
+	// When enabled:
+	// 1. requests to the custom resource primary endpoint ignore changes to the `status` stanza of the object.
+	// 2. requests to the custom resource `/status` subresource ignore changes to anything other than the `status` stanza of the object.
+	Status *apiextensionsv1beta1.CustomResourceSubresourceStatus `json:"status,omitempty"`
+	// scale indicates the custom resource should serve a `/scale` subresource that returns an `autoscaling/v1` Scale object.
+	Scale *CustomResourceSubresourceScaleApplyConfiguration `json:"scale,omitempty"`
 }
 
 // CustomResourceSubresourcesApplyConfiguration constructs a declarative configuration of the CustomResourceSubresources type for use with
@@ -38,7 +45,7 @@ func CustomResourceSubresources() *CustomResourceSubresourcesApplyConfiguration 
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *CustomResourceSubresourcesApplyConfiguration) WithStatus(value v1beta1.CustomResourceSubresourceStatus) *CustomResourceSubresourcesApplyConfiguration {
+func (b *CustomResourceSubresourcesApplyConfiguration) WithStatus(value apiextensionsv1beta1.CustomResourceSubresourceStatus) *CustomResourceSubresourcesApplyConfiguration {
 	b.Status = &value
 	return b
 }

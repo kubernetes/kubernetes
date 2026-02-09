@@ -37,8 +37,6 @@ const (
 	DefaultClusterDNSIP = "10.96.0.10"
 	// DefaultKubernetesVersion defines default kubernetes version
 	DefaultKubernetesVersion = "stable-1"
-	// DefaultAPIBindPort defines default API port
-	DefaultAPIBindPort = 6443
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
@@ -132,6 +130,19 @@ func SetDefaults_Etcd(obj *ClusterConfiguration) {
 			obj.Etcd.Local.DataDir = DefaultEtcdDataDir
 		}
 	}
+	if obj.Etcd.External != nil {
+		SetDefaults_ExternalEtcd(obj.Etcd.External)
+	}
+}
+
+// SetDefaults_ExternalEtcd assigns default values for the external etcd
+func SetDefaults_ExternalEtcd(obj *ExternalEtcd) {
+	// If HTTPEndpoints is not set, default it to Endpoints
+	// This allows HTTP traffic (metrics, health checks) to use the same endpoints as gRPC traffic
+	if len(obj.HTTPEndpoints) == 0 && len(obj.Endpoints) > 0 {
+		obj.HTTPEndpoints = make([]string, len(obj.Endpoints))
+		copy(obj.HTTPEndpoints, obj.Endpoints)
+	}
 }
 
 // SetDefaults_JoinConfiguration assigns default values to a regular node
@@ -185,7 +196,7 @@ func SetDefaults_FileDiscovery(obj *FileDiscovery) {
 // layer, but set to a random value later at runtime if not set before.
 func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 
-	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
+	if len(obj.BootstrapTokens) == 0 {
 		obj.BootstrapTokens = []bootstraptokenv1.BootstrapToken{{}}
 	}
 
@@ -197,7 +208,7 @@ func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 // SetDefaults_APIEndpoint sets the defaults for the API server instance deployed on a node.
 func SetDefaults_APIEndpoint(obj *APIEndpoint) {
 	if obj.BindPort == 0 {
-		obj.BindPort = DefaultAPIBindPort
+		obj.BindPort = constants.KubeAPIServerPort
 	}
 }
 
@@ -299,6 +310,10 @@ func SetDefaults_UpgradeConfiguration(obj *UpgradeConfiguration) {
 	}
 	if obj.Apply.ImagePullSerial == nil {
 		obj.Apply.ImagePullSerial = ptr.To(true)
+	}
+
+	if obj.Plan.EtcdUpgrade == nil {
+		obj.Plan.EtcdUpgrade = ptr.To(true)
 	}
 
 	if obj.Timeouts == nil {

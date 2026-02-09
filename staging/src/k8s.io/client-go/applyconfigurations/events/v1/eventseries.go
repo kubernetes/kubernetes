@@ -19,14 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EventSeriesApplyConfiguration represents a declarative configuration of the EventSeries type for use
 // with apply.
+//
+// EventSeries contain information on series of events, i.e. thing that was/is happening
+// continuously for some time. How often to update the EventSeries is up to the event reporters.
+// The default event reporter in "k8s.io/client-go/tools/events/event_broadcaster.go" shows
+// how this struct is updated on heartbeats and can guide customized reporter implementations.
 type EventSeriesApplyConfiguration struct {
-	Count            *int32        `json:"count,omitempty"`
-	LastObservedTime *v1.MicroTime `json:"lastObservedTime,omitempty"`
+	// count is the number of occurrences in this series up to the last heartbeat time.
+	Count *int32 `json:"count,omitempty"`
+	// lastObservedTime is the time when last Event from the series was seen before last heartbeat.
+	LastObservedTime *metav1.MicroTime `json:"lastObservedTime,omitempty"`
 }
 
 // EventSeriesApplyConfiguration constructs a declarative configuration of the EventSeries type for use with
@@ -46,7 +53,7 @@ func (b *EventSeriesApplyConfiguration) WithCount(value int32) *EventSeriesApply
 // WithLastObservedTime sets the LastObservedTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LastObservedTime field is set to the value of the last call.
-func (b *EventSeriesApplyConfiguration) WithLastObservedTime(value v1.MicroTime) *EventSeriesApplyConfiguration {
+func (b *EventSeriesApplyConfiguration) WithLastObservedTime(value metav1.MicroTime) *EventSeriesApplyConfiguration {
 	b.LastObservedTime = &value
 	return b
 }

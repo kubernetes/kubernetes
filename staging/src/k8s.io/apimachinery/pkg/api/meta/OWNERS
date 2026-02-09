@@ -10,5 +10,6 @@ reviewers:
   - mikedanese
   - liggitt
   - janetkuo
-  - ncdc
   - dims
+emeritus_reviewers:
+  - ncdc

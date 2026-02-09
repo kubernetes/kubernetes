@@ -20,7 +20,11 @@ package v1beta3
 
 // PriorityLevelConfigurationReferenceApplyConfiguration represents a declarative configuration of the PriorityLevelConfigurationReference type for use
 // with apply.
+//
+// PriorityLevelConfigurationReference contains information that points to the "request-priority" being used.
 type PriorityLevelConfigurationReferenceApplyConfiguration struct {
+	// `name` is the name of the priority level configuration being referenced
+	// Required.
 	Name *string `json:"name,omitempty"`
 }
 

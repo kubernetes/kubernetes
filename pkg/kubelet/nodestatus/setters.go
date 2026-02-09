@@ -23,6 +23,7 @@ import (
 	"net"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
@@ -31,11 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
-	cloudprovidernodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -44,6 +42,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
 )
@@ -58,14 +57,15 @@ const (
 // Setters may partially mutate the node before returning an error.
 type Setter func(ctx context.Context, node *v1.Node) error
 
+// Only emit one reboot event
+var rebootEvent sync.Once
+
 // NodeAddress returns a Setter that updates address-related information on the node.
 func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 	validateNodeIPFunc func(net.IP) error, // typically Kubelet.nodeIPValidator
 	hostname string, // typically Kubelet.hostname
-	hostnameOverridden bool, // was the hostname force set?
 	externalCloudProvider bool, // typically Kubelet.externalCloudProvider
-	cloud cloudprovider.Interface, // typically Kubelet.cloud
-	nodeAddressesFunc func() ([]v1.NodeAddress, error), // typically Kubelet.cloudResourceSyncManager.NodeAddresses
+	resolveAddressFunc func(net.IP) (net.IP, error), // typically k8s.io/apimachinery/pkg/util/net.ResolveBindAddress
 ) Setter {
 	var nodeIP, secondaryNodeIP net.IP
 	if len(nodeIPs) > 0 {
@@ -81,28 +81,22 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 	secondaryNodeIPSpecified := secondaryNodeIP != nil && !secondaryNodeIP.IsUnspecified()
 
 	return func(ctx context.Context, node *v1.Node) error {
+		logger := klog.FromContext(ctx)
 		if nodeIPSpecified {
 			if err := validateNodeIPFunc(nodeIP); err != nil {
 				return fmt.Errorf("failed to validate nodeIP: %v", err)
 			}
-			klog.V(4).InfoS("Using node IP", "IP", nodeIP.String())
+			logger.V(4).Info("Using node IP", "IP", nodeIP.String())
 		}
 		if secondaryNodeIPSpecified {
 			if err := validateNodeIPFunc(secondaryNodeIP); err != nil {
 				return fmt.Errorf("failed to validate secondaryNodeIP: %v", err)
 			}
-			klog.V(4).InfoS("Using secondary node IP", "IP", secondaryNodeIP.String())
+			logger.V(4).Info("Using secondary node IP", "IP", secondaryNodeIP.String())
 		}
 
-		if (externalCloudProvider || cloud != nil) && nodeIPSpecified {
+		if externalCloudProvider && nodeIPSpecified {
 			// Annotate the Node object with nodeIP for external cloud provider.
-			//
-			// We do this even when external CCM is not configured to cover a situation
-			// during migration from legacy to external CCM: when CCM is running the
-			// node controller in the cluster but kubelet is still running the in-tree
-			// provider. Adding this annotation in all cases ensures that while
-			// Addresses flap between the competing controllers, they at least flap
-			// consistently.
 			//
 			// We do not add the annotation in the case where there is no cloud
 			// controller at all, as we don't expect to migrate these clusters to use an
@@ -129,64 +123,22 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			if len(node.Status.Addresses) > 0 {
 				return nil
 			}
-			// If nodeIPs are not specified wait for the external cloud-provider to set the node addresses.
+			// If nodeIPs are not set wait for the external cloud-provider to set the node addresses.
+			// If the nodeIP is the unspecified address 0.0.0.0 or ::, then use the IP of the default gateway of
+			// the corresponding IP family to bootstrap the node until the out-of-tree provider overrides it later.
+			// xref: https://github.com/kubernetes/kubernetes/issues/125348
 			// Otherwise uses them on the assumption that the installer/administrator has the previous knowledge
 			// required to ensure the external cloud provider will use the same addresses to avoid the issues explained
 			// in https://github.com/kubernetes/kubernetes/issues/120720.
 			// We are already hinting the external cloud provider via the annotation AnnotationAlphaProvidedIPAddr.
-			if !nodeIPSpecified {
+			if nodeIP == nil {
 				node.Status.Addresses = []v1.NodeAddress{
 					{Type: v1.NodeHostName, Address: hostname},
 				}
 				return nil
 			}
 		}
-		if cloud != nil {
-			cloudNodeAddresses, err := nodeAddressesFunc()
-			if err != nil {
-				return err
-			}
-
-			nodeAddresses, err := cloudprovidernodeutil.GetNodeAddressesFromNodeIPLegacy(nodeIP, cloudNodeAddresses)
-			if err != nil {
-				return err
-			}
-
-			switch {
-			case len(cloudNodeAddresses) == 0:
-				// the cloud provider didn't specify any addresses
-				nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
-
-			case !hasAddressType(cloudNodeAddresses, v1.NodeHostName) && hasAddressValue(cloudNodeAddresses, hostname):
-				// the cloud provider didn't specify an address of type Hostname,
-				// but the auto-detected hostname matched an address reported by the cloud provider,
-				// so we can add it and count on the value being verifiable via cloud provider metadata
-				nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
-
-			case hostnameOverridden:
-				// the hostname was force-set via flag/config.
-				// this means the hostname might not be able to be validated via cloud provider metadata,
-				// but was a choice by the kubelet deployer we should honor
-				var existingHostnameAddress *v1.NodeAddress
-				for i := range nodeAddresses {
-					if nodeAddresses[i].Type == v1.NodeHostName {
-						existingHostnameAddress = &nodeAddresses[i]
-						break
-					}
-				}
-
-				if existingHostnameAddress == nil {
-					// no existing Hostname address found, add it
-					klog.InfoS("Adding overridden hostname to cloudprovider-reported addresses", "hostname", hostname)
-					nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
-				} else if existingHostnameAddress.Address != hostname {
-					// override the Hostname address reported by the cloud provider
-					klog.InfoS("Replacing cloudprovider-reported hostname with overridden hostname", "cloudProviderHostname", existingHostnameAddress.Address, "overriddenHostname", hostname)
-					existingHostnameAddress.Address = hostname
-				}
-			}
-			node.Status.Addresses = nodeAddresses
-		} else if nodeIPSpecified && secondaryNodeIPSpecified {
+		if nodeIPSpecified && secondaryNodeIPSpecified {
 			node.Status.Addresses = []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: nodeIP.String()},
 				{Type: v1.NodeInternalIP, Address: secondaryNodeIP.String()},
@@ -222,7 +174,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 				}
 
 				if ipAddr == nil {
-					ipAddr, err = utilnet.ResolveBindAddress(nodeIP)
+					ipAddr, err = resolveAddressFunc(nodeIP)
 				}
 			}
 
@@ -239,23 +191,6 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 	}
 }
 
-func hasAddressType(addresses []v1.NodeAddress, addressType v1.NodeAddressType) bool {
-	for _, address := range addresses {
-		if address.Type == addressType {
-			return true
-		}
-	}
-	return false
-}
-func hasAddressValue(addresses []v1.NodeAddress, addressValue string) bool {
-	for _, address := range addresses {
-		if address.Address == addressValue {
-			return true
-		}
-	}
-	return false
-}
-
 // MachineInfo returns a Setter that updates machine-related information on the node.
 func MachineInfo(nodeName string,
 	maxPods int,
@@ -268,6 +203,7 @@ func MachineInfo(nodeName string,
 	localStorageCapacityIsolation bool,
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
+		logger := klog.FromContext(ctx)
 		// Note: avoid blindly overwriting the capacity in case opaque
 		//       resources are being advertised.
 		if node.Status.Capacity == nil {
@@ -287,7 +223,7 @@ func MachineInfo(nodeName string,
 			node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
 			node.Status.Capacity[v1.ResourceMemory] = resource.MustParse("0Gi")
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(int64(maxPods), resource.DecimalSI)
-			klog.ErrorS(err, "Error getting machine info")
+			logger.Error(err, "Error getting machine info")
 		} else {
 			node.Status.NodeInfo.MachineID = info.MachineID
 			node.Status.NodeInfo.SystemUUID = info.SystemUUID
@@ -308,8 +244,12 @@ func MachineInfo(nodeName string,
 				node.Status.NodeInfo.BootID != info.BootID {
 				// TODO: This requires a transaction, either both node status is updated
 				// and event is recorded or neither should happen, see issue #6055.
-				recordEventFunc(v1.EventTypeWarning, events.NodeRebooted,
-					fmt.Sprintf("Node %s has been rebooted, boot id: %s", nodeName, info.BootID))
+				//
+				// Only emit one reboot event. recordEventFunc queues events and can emit many superfluous reboot events
+				rebootEvent.Do(func() {
+					recordEventFunc(v1.EventTypeWarning, events.NodeRebooted,
+						fmt.Sprintf("Node %s has been rebooted, boot id: %s", nodeName, info.BootID))
+				})
 			}
 			node.Status.NodeInfo.BootID = info.BootID
 
@@ -321,18 +261,17 @@ func MachineInfo(nodeName string,
 					node.Status.Capacity[v1.ResourceEphemeralStorage] = v
 				}
 			}
-			//}
 
 			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc()
 			for k, v := range devicePluginCapacity {
 				if old, ok := node.Status.Capacity[k]; !ok || old.Value() != v.Value() {
-					klog.V(2).InfoS("Updated capacity for device plugin", "plugin", k, "capacity", v.Value())
+					logger.V(2).Info("Updated capacity for device plugin", "plugin", k, "capacity", v.Value())
 				}
 				node.Status.Capacity[k] = v
 			}
 
 			for _, removedResource := range removedDevicePlugins {
-				klog.V(2).InfoS("Set capacity for removed resource to 0 on device removal", "device", removedResource)
+				logger.V(2).Info("Set capacity for removed resource to 0 on device removal", "device", removedResource)
 				// Set the capacity of the removed resource to 0 instead of
 				// removing the resource from the node status. This is to indicate
 				// that the resource is managed by device plugin and had been
@@ -342,6 +281,12 @@ func MachineInfo(nodeName string,
 				// resources and the cluster-level resources, which are absent in
 				// node status.
 				node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) && info.SwapCapacity != 0 {
+				node.Status.NodeInfo.Swap = &v1.NodeSwapStatus{
+					Capacity: ptr.To(int64(info.SwapCapacity)),
+				}
 			}
 		}
 
@@ -372,7 +317,7 @@ func MachineInfo(nodeName string,
 
 		for k, v := range devicePluginAllocatable {
 			if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {
-				klog.V(2).InfoS("Updated allocatable", "device", k, "allocatable", v.Value())
+				logger.V(2).Info("Updated allocatable", "device", k, "allocatable", v.Value())
 			}
 			node.Status.Allocatable[k] = v
 		}
@@ -482,10 +427,27 @@ func GoRuntime() Setter {
 	}
 }
 
+// NodeFeatures returns a Setter that sets NodeFeatures on the node.
+func NodeFeatures(featuresGetter func() *kubecontainer.RuntimeFeatures) Setter {
+	return func(ctx context.Context, node *v1.Node) error {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
+			return nil
+		}
+		features := featuresGetter()
+		if features == nil {
+			return nil
+		}
+		node.Status.Features = &v1.NodeFeatures{
+			SupplementalGroupsPolicy: &features.SupplementalGroupsPolicy,
+		}
+		return nil
+	}
+}
+
 // RuntimeHandlers returns a Setter that sets RuntimeHandlers on the node.
 func RuntimeHandlers(fn func() []kubecontainer.RuntimeHandler) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 			return nil
 		}
 		handlers := fn()
@@ -495,6 +457,7 @@ func RuntimeHandlers(fn func() []kubecontainer.RuntimeHandler) Setter {
 				Name: h.Name,
 				Features: &v1.NodeRuntimeHandlerFeatures{
 					RecursiveReadOnlyMounts: &h.SupportsRecursiveReadOnlyMounts,
+					UserNamespaces:          &h.SupportsUserNamespaces,
 				},
 			}
 		}
@@ -579,7 +542,8 @@ func ReadyCondition(
 				recordEventFunc(v1.EventTypeNormal, events.NodeReady)
 			} else {
 				recordEventFunc(v1.EventTypeNormal, events.NodeNotReady)
-				klog.InfoS("Node became not ready", "node", klog.KObj(node), "condition", newNodeReadyCondition)
+				logger := klog.FromContext(ctx)
+				logger.Info("Node became not ready", "node", klog.KObj(node), "condition", newNodeReadyCondition)
 			}
 		}
 		return nil

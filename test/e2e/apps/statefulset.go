@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -49,6 +50,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/features"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -60,14 +63,12 @@ import (
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
 const (
 	zookeeperManifestPath   = "test/e2e/testing-manifests/statefulset/zookeeper"
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/statefulset/mysql-galera"
-	redisManifestPath       = "test/e2e/testing-manifests/statefulset/redis"
 	cockroachDBManifestPath = "test/e2e/testing-manifests/statefulset/cockroachdb"
 	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
 	restartCluster = true
@@ -75,8 +76,6 @@ const (
 	// Timeout for reads from databases running on stateful pods.
 	readTimeout = 60 * time.Second
 
-	// statefulSetPoll is a poll interval for StatefulSet tests
-	statefulSetPoll = 10 * time.Second
 	// statefulSetTimeout is a timeout interval for StatefulSet operations
 	statefulSetTimeout = 10 * time.Minute
 	// statefulPodTimeout is a timeout for stateful pods to change state
@@ -88,7 +87,7 @@ const (
 var httpProbe = &v1.Probe{
 	ProbeHandler: v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
-			Path: "/index.html",
+			Path: "/localhost.crt",
 			Port: intstr.IntOrString{IntVal: 80},
 		},
 	},
@@ -162,6 +161,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Verifying statefulset set proper service name")
 			framework.ExpectNoError(e2estatefulset.CheckServiceName(ss, headlessSvcName))
 
+			ginkgo.By("checking the index label and value of all pods")
+			framework.ExpectNoError(e2estatefulset.CheckPodIndexLabel(ctx, c, ss))
+
 			cmd := "echo $(hostname) | dd of=/data/hostname conv=fsync"
 			ginkgo.By("Running " + cmd + " in all stateful pods")
 			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd))
@@ -203,7 +205,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
 			e2estatefulset.Saturate(ctx, c, ss)
-			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			gomega.Expect(pods.Items).To(gomega.HaveLen(int(*ss.Spec.Replicas)))
 
 			ginkgo.By("Checking that stateful set pods are created with ControllerRef")
@@ -340,7 +344,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 					return &appsv1.RollingUpdateStatefulSetStrategy{
-						Partition: pointer.Int32(3),
+						Partition: ptr.To[int32](3),
 					}
 				}(),
 			}
@@ -351,7 +355,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision)
-			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to currentRevision %s",
 					pods.Items[i].Namespace,
@@ -359,7 +365,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 					currentRevision)
 			}
-			newImage := NewWebserverImage
+			newImage := AgnhostImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -393,7 +399,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 					return &appsv1.RollingUpdateStatefulSetStrategy{
-						Partition: pointer.Int32(2),
+						Partition: ptr.To[int32](2),
 					}
 				}(),
 			}
@@ -402,7 +408,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Type: appsv1.RollingUpdateStatefulSetStrategyType,
 					RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 						return &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition: pointer.Int32(2),
+							Partition: ptr.To[int32](2),
 						}
 					}(),
 				}
@@ -440,7 +446,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deleteStatefulPodAtIndex(ctx, c, 2, ss)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, 3, ss)
 			ss = getStatefulSet(ctx, c, ss.Namespace, ss.Name)
-			pods = e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			for i := range pods.Items {
 				if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
 					gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage), "Pod %s/%s has image %s not equal to current image %s",
@@ -561,6 +569,74 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deletingPodForRollingUpdatePartitionTest(ctx, f, c, ns, ss)
 		})
 
+		f.It("should perform rolling updates with maxUnavailable", framework.WithFeatureGate(features.MaxUnavailableStatefulSet), func(ctx context.Context) {
+			ginkgo.By("Creating a new StatefulSet")
+			ss := e2estatefulset.NewStatefulSet("ss-maxunavailable", ns, headlessSvcName, 5, nil, nil, labels)
+			setHTTPProbe(ss)
+			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+					MaxUnavailable: ptr.To(intstr.IntOrString{IntVal: 2}),
+				},
+			}
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+			ss = waitForStatus(ctx, c, ss)
+			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+				ss.Namespace, ss.Name, updateRevision, currentRevision)
+			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to currentRevision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision)
+			}
+			newImage := AgnhostImage
+			oldImage := ss.Spec.Template.Spec.Containers[0].Image
+
+			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
+			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = newImage
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Creating a new revision")
+			ss = waitForStatus(ctx, c, ss)
+
+			ginkgo.By("Performing rolling update with maxUnavailable=2 and continuously monitoring constraint")
+			ss, pods = waitForMaxUnavailableRollingUpdate(ctx, c, ss, 2)
+
+			ginkgo.By("Verifying StatefulSet status reflects completed update")
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage), "Pod %s/%s has image %s not equal to the new image %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Spec.Containers[0].Image,
+					oldImage)
+				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, ss.Status.CurrentRevision), "Pod %s/%s has revision %s not equal to current revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					ss.Status.CurrentRevision)
+			}
+			gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(ss.Status.UpdateRevision), "StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
+				ss.Namespace,
+				ss.Name,
+				ss.Status.CurrentRevision,
+				ss.Status.UpdateRevision)
+			gomega.Expect(ss.Status.UpdatedReplicas).To(gomega.Equal(*ss.Spec.Replicas), "StatefulSet %s/%s updated replicas %d does not equal desired replicas %d",
+				ss.Namespace,
+				ss.Name,
+				ss.Status.UpdatedReplicas,
+				*ss.Spec.Replicas)
+		})
+
 		// Do not mark this as Conformance.
 		// The legacy OnDelete strategy only exists for backward compatibility with pre-v1 APIs.
 		ginkgo.It("should implement legacy replacement when the update strategy is OnDelete", func(ctx context.Context) {
@@ -577,7 +653,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision)
-			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to current revision %s",
 					pods.Items[i].Namespace,
@@ -592,7 +670,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deleteStatefulPodAtIndex(ctx, c, 2, ss)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, 3, ss)
 			ss = getStatefulSet(ctx, c, ss.Namespace, ss.Name)
-			pods = e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to current revision %s",
 					pods.Items[i].Namespace,
@@ -600,7 +680,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 					currentRevision)
 			}
-			newImage := NewWebserverImage
+			newImage := AgnhostImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -621,7 +701,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deleteStatefulPodAtIndex(ctx, c, 2, ss)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, 3, ss)
 			ss = getStatefulSet(ctx, c, ss.Namespace, ss.Name)
-			pods = e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage), "Pod %s/%s has image %s not equal to new image %s",
 					pods.Items[i].Namespace,
@@ -809,8 +891,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "webserver",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							Name:  "agnhost",
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
 							Ports: []v1.ContainerPort{conflictingPort},
 						},
 					},
@@ -972,12 +1054,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Define StatefulSet Labels
 			ssPodLabels := map[string]string{
 				"name": "sample-pod",
-				"pod":  WebserverImageName,
+				"pod":  AgnhostImageName,
 			}
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
+			gomega.Expect(ss).To(apimachineryutils.HaveValidResourceVersion())
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			waitForStatus(ctx, c, ss)
 
@@ -1000,8 +1083,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 				},
 			})
 			framework.ExpectNoError(err, "failed to Marshal StatefulSet JSON patch")
-			_, err = f.ClientSet.AppsV1().StatefulSets(ns).Patch(ctx, ssName, types.StrategicMergePatchType, []byte(ssPatch), metav1.PatchOptions{})
+			patchedSs, err := f.ClientSet.AppsV1().StatefulSets(ns).Patch(ctx, ssName, types.StrategicMergePatchType, []byte(ssPatch), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "failed to patch Set")
+			gomega.Expect(resourceversion.CompareResourceVersion(ss.ResourceVersion, patchedSs.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 			ss, err = c.AppsV1().StatefulSets(ns).Get(ctx, ssName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Failed to get statefulset resource: %v", err)
 			gomega.Expect(*(ss.Spec.Replicas)).To(gomega.Equal(ssPatchReplicas), "statefulset should have 2 replicas")
@@ -1183,14 +1267,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working redis cluster", func(ctx context.Context) {
-			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
-			appTester.statefulPod = &redisTester{client: c}
-			appTester.run(ctx)
-		})
-
-		// Do not mark this as Conformance.
-		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working mysql cluster", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 			appTester.statefulPod = &mysqlGaleraTester{client: c}
@@ -1214,7 +1290,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Define StatefulSet Labels
 		ssPodLabels := map[string]string{
 			"name": "sample-pod",
-			"pod":  WebserverImageName,
+			"pod":  AgnhostImageName,
 		}
 		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
 		setHTTPProbe(ss)
@@ -1229,7 +1305,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Define StatefulSet Labels
 		ssPodLabels := map[string]string{
 			"name": "sample-pod",
-			"pod":  WebserverImageName,
+			"pod":  AgnhostImageName,
 		}
 		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, ssPodLabels)
 		ss.Spec.MinReadySeconds = 30
@@ -1464,6 +1540,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Confirming all 3 PVCs exist")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2})
 			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all pods are running and ready")
+			e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, ss, 3)
 
 			ginkgo.By("Orphaning the 3rd pod")
 			patch, err := json.Marshal(metav1.ObjectMeta{
@@ -1813,7 +1892,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 0")
-			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			err = expectPodNames(pods, []string{"ss-0", "ss-1"})
 			framework.ExpectNoError(err)
 
@@ -1848,7 +1929,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 2")
-			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			err = expectPodNames(pods, []string{"ss-2", "ss-3"})
 			framework.ExpectNoError(err)
 
@@ -1882,7 +1965,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 3")
-			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			err = expectPodNames(pods, []string{"ss-3", "ss-4"})
 			framework.ExpectNoError(err)
 
@@ -1915,7 +2000,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 3")
-			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
 			err = expectPodNames(pods, []string{"ss-3", "ss-4"})
 			framework.ExpectNoError(err)
 
@@ -2012,7 +2099,7 @@ func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
+		framework.Logf("%s", e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
@@ -2047,7 +2134,7 @@ func (m *mysqlGaleraTester) deploy(ctx context.Context, ns string) *appsv1.State
 		"create database statefulset;",
 		"use statefulset; create table foo (k varchar(20), v varchar(20));",
 	} {
-		framework.Logf(m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
+		framework.Logf("%s", m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
 	}
 	return m.ss
 }
@@ -2056,44 +2143,13 @@ func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
-		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
+		framework.Logf(cmd, m.mysqlExec(cmd, m.ss.Namespace, name))
 	}
 }
 
 func (m *mysqlGaleraTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	return lastLine(m.mysqlExec(fmt.Sprintf("use statefulset; select v from foo where k=\"%v\";", key), m.ss.Namespace, name))
-}
-
-type redisTester struct {
-	ss     *appsv1.StatefulSet
-	client clientset.Interface
-}
-
-func (m *redisTester) name() string {
-	return "redis: master/slave"
-}
-
-func (m *redisTester) redisExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-	return e2ekubectl.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
-}
-
-func (m *redisTester) deploy(ctx context.Context, ns string) *appsv1.StatefulSet {
-	m.ss = e2estatefulset.CreateStatefulSet(ctx, m.client, redisManifestPath, ns)
-	return m.ss
-}
-
-func (m *redisTester) write(statefulPodIndex int, kv map[string]string) {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	for k, v := range kv {
-		framework.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
-	}
-}
-
-func (m *redisTester) read(statefulPodIndex int, key string) string {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	return lastLine(m.redisExec(fmt.Sprintf("GET %v", key), m.ss.Namespace, name))
 }
 
 type cockroachDBTester struct {
@@ -2117,7 +2173,7 @@ func (c *cockroachDBTester) deploy(ctx context.Context, ns string) *appsv1.State
 		"CREATE DATABASE IF NOT EXISTS foo;",
 		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
 	} {
-		framework.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
+		framework.Logf("%s", c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
 	}
 	return c.ss
 }
@@ -2126,7 +2182,7 @@ func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
-		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
+		framework.Logf("%s", c.cockroachDBExec(cmd, c.ss.Namespace, name))
 	}
 }
 func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
@@ -2167,7 +2223,9 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 		ss.Namespace, ss.Name, updateRevision, currentRevision)
-	pods := e2estatefulset.GetPodList(ctx, c, ss)
+	pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+	framework.ExpectNoError(err)
+
 	for i := range pods.Items {
 		gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to current revision %s",
 			pods.Items[i].Namespace,
@@ -2179,7 +2237,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	err = breakPodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
 	ss, _ = waitForPodNotReady(ctx, c, ss, pods.Items[1].Name)
-	newImage := NewWebserverImage
+	newImage := AgnhostImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 	ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
@@ -2195,7 +2253,9 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
 
 	ginkgo.By("Updating Pods in reverse ordinal order")
-	pods = e2estatefulset.GetPodList(ctx, c, ss)
+	pods, err = e2estatefulset.GetPodList(ctx, c, ss)
+	framework.ExpectNoError(err)
+
 	e2estatefulset.SortStatefulPods(pods)
 	err = restorePodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
@@ -2234,7 +2294,9 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during roll back")
 
 	ginkgo.By("Rolling back update in reverse ordinal order")
-	pods = e2estatefulset.GetPodList(ctx, c, ss)
+	pods, err = e2estatefulset.GetPodList(ctx, c, ss)
+	framework.ExpectNoError(err)
+
 	e2estatefulset.SortStatefulPods(pods)
 	restorePodHTTPProbe(ss, &pods.Items[1])
 	ss, _ = e2estatefulset.WaitForPodReady(ctx, c, ss, pods.Items[1].Name)
@@ -2266,7 +2328,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 		Type: appsv1.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 			return &appsv1.RollingUpdateStatefulSetStrategy{
-				Partition: pointer.Int32(1),
+				Partition: ptr.To[int32](1),
 			}
 		}(),
 	}
@@ -2277,7 +2339,9 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 		ss.Namespace, ss.Name, updateRevision, currentRevision))
-	pods := e2estatefulset.GetPodList(ctx, c, ss)
+	pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+	framework.ExpectNoError(err)
+
 	for i := range pods.Items {
 		gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision), fmt.Sprintf("Pod %s/%s revision %s is not equal to currentRevision %s",
 			pods.Items[i].Namespace,
@@ -2297,7 +2361,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	defer e2epod.NewPodClient(f).RemoveFinalizer(ctx, pod0.Name, testFinalizer)
 
 	ginkgo.By("Updating image on StatefulSet")
-	newImage := NewWebserverImage
+	newImage := AgnhostImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 	ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
 	gomega.Expect(oldImage).ToNot(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
@@ -2312,7 +2376,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	gomega.Expect(currentRevision).ToNot(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
 
 	ginkgo.By("Await for all replicas running, all are updated but pod-0")
-	e2estatefulset.WaitForState(ctx, c, ss, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		ss = set2
 		pods = pods2
 		if ss.Status.UpdatedReplicas == *ss.Spec.Replicas-1 && ss.Status.Replicas == *ss.Spec.Replicas && ss.Status.ReadyReplicas == *ss.Spec.Replicas {
@@ -2352,7 +2416,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	ginkgo.By("Deleting the pod-0 so that kubelet terminates it and StatefulSet controller recreates it")
 	deleteStatefulPodAtIndex(ctx, c, 0, ss)
 	ginkgo.By("Await for two replicas to be updated, while the pod-0 is not running")
-	e2estatefulset.WaitForState(ctx, c, ss, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		ss = set2
 		pods = pods2
 		return ss.Status.ReadyReplicas == *ss.Spec.Replicas-1, nil
@@ -2362,14 +2426,16 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	e2epod.NewPodClient(f).RemoveFinalizer(ctx, pod0.Name, testFinalizer)
 
 	ginkgo.By("Await for recreation of pod-0, so that all replicas are running")
-	e2estatefulset.WaitForState(ctx, c, ss, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		ss = set2
 		pods = pods2
 		return ss.Status.ReadyReplicas == *ss.Spec.Replicas, nil
 	})
 
 	ginkgo.By("Verify pod images after pod-0 deletion and recreation")
-	pods = e2estatefulset.GetPodList(ctx, c, ss)
+	pods, err = e2estatefulset.GetPodList(ctx, c, ss)
+	framework.ExpectNoError(err)
+
 	for i := range pods.Items {
 		if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
 			gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage), fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
@@ -2403,7 +2469,9 @@ func confirmStatefulPodCount(ctx context.Context, c clientset.Interface, count i
 	start := time.Now()
 	deadline := start.Add(timeout)
 	for t := time.Now(); t.Before(deadline) && ctx.Err() == nil; t = time.Now() {
-		podList := e2estatefulset.GetPodList(ctx, c, ss)
+		podList, err := e2estatefulset.GetPodList(ctx, c, ss)
+		framework.ExpectNoError(err)
+
 		statefulPodCount := len(podList.Items)
 		if statefulPodCount != count {
 			e2epod.LogPodStates(podList.Items)
@@ -2434,7 +2502,7 @@ func breakHTTPProbe(ctx context.Context, c clientset.Interface, ss *appsv1.State
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
+	cmd := fmt.Sprintf("mv -v %v /tmp/ || true", path)
 	return e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)
 }
 
@@ -2444,9 +2512,8 @@ func breakPodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	if path == "" {
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
-	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
-	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
+	cmd := fmt.Sprintf("mv -v %v /tmp/ || true", path)
+	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, e2estatefulset.StatefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
@@ -2458,7 +2525,7 @@ func restoreHTTPProbe(ctx context.Context, c clientset.Interface, ss *appsv1.Sta
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
+	cmd := fmt.Sprintf("mv -v /tmp%v / || true", path)
 	return e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)
 }
 
@@ -2469,8 +2536,8 @@ func restorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
-	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
+	cmd := fmt.Sprintf("mv -v /tmp%v / || true", path)
+	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, e2estatefulset.StatefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }

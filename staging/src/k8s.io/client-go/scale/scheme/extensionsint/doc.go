@@ -19,4 +19,4 @@ limitations under the License.
 // It doesn't have any of its own types -- it's just necessary to
 // get the expected behavior out of runtime.Scheme.ConvertToVersion
 // and associated methods.
-package extensionsint // import "k8s.io/client-go/scale/scheme/extensionsint"
+package extensionsint

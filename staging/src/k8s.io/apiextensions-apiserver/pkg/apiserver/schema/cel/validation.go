@@ -95,14 +95,20 @@ func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64
 func validator(validationSchema, nodeSchema *schema.Structural, isResourceRoot bool, declType *cel.DeclType, perCallLimit uint64) *Validator {
 	compilationSchema := *nodeSchema
 	compilationSchema.XValidations = validationSchema.XValidations
-	compiledRules, err := Compile(&compilationSchema, declType, perCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true), StoredExpressionsEnvLoader())
+	compiledRules, err := Compile(&compilationSchema, declType, perCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()), StoredExpressionsEnvLoader())
 
 	var itemsValidator, additionalPropertiesValidator *Validator
 	var propertiesValidators map[string]Validator
 	var allOfValidators []*Validator
+	var elemType *cel.DeclType
+	if declType != nil {
+		elemType = declType.ElemType
+	} else {
+		elemType = declType
+	}
 
 	if validationSchema.Items != nil && nodeSchema.Items != nil {
-		itemsValidator = validator(validationSchema.Items, nodeSchema.Items, nodeSchema.Items.XEmbeddedResource, declType.ElemType, perCallLimit)
+		itemsValidator = validator(validationSchema.Items, nodeSchema.Items, nodeSchema.Items.XEmbeddedResource, elemType, perCallLimit)
 	}
 
 	if len(validationSchema.Properties) > 0 {
@@ -117,6 +123,9 @@ func validator(validationSchema, nodeSchema *schema.Structural, isResourceRoot b
 
 			var fieldType *cel.DeclType
 			if escapedPropName, ok := cel.Escape(k); ok {
+				if declType == nil {
+					continue
+				}
 				if f, ok := declType.Fields[escapedPropName]; ok {
 					fieldType = f.Type
 				} else {
@@ -138,7 +147,7 @@ func validator(validationSchema, nodeSchema *schema.Structural, isResourceRoot b
 	}
 	if validationSchema.AdditionalProperties != nil && validationSchema.AdditionalProperties.Structural != nil &&
 		nodeSchema.AdditionalProperties != nil && nodeSchema.AdditionalProperties.Structural != nil {
-		additionalPropertiesValidator = validator(validationSchema.AdditionalProperties.Structural, nodeSchema.AdditionalProperties.Structural, nodeSchema.AdditionalProperties.Structural.XEmbeddedResource, declType.ElemType, perCallLimit)
+		additionalPropertiesValidator = validator(validationSchema.AdditionalProperties.Structural, nodeSchema.AdditionalProperties.Structural, nodeSchema.AdditionalProperties.Structural.XEmbeddedResource, elemType, perCallLimit)
 	}
 
 	if validationSchema.ValueValidation != nil && len(validationSchema.ValueValidation.AllOf) > 0 {
@@ -442,42 +451,54 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			}
 			continue
 		}
-		if evalResult != types.True {
-			currentFldPath := fldPath
-			if len(compiled.NormalizedRuleFieldPath) > 0 {
-				currentFldPath = currentFldPath.Child(compiled.NormalizedRuleFieldPath)
-			}
 
-			addErr := func(e *field.Error) {
-				if !compiled.UsesOldSelf && correlation.shouldRatchetError() {
-					warning.AddWarning(ctx, "", e.Error())
-				} else {
-					errs = append(errs, e)
-				}
-			}
+		if evalResult == types.True {
+			continue
+		}
 
-			if compiled.MessageExpression != nil {
-				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
-				if msgErr != nil {
-					if msgErr.Type == cel.ErrorTypeInternal {
-						addErr(field.InternalError(currentFldPath, msgErr))
-						return errs, -1
-					} else if msgErr.Type == cel.ErrorTypeInvalid {
-						addErr(field.Invalid(currentFldPath, sts.Type, msgErr.Error()))
-						return errs, -1
-					} else {
-						klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
-						addErr(fieldErrorForReason(currentFldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
-						remainingBudget = newRemainingBudget
-					}
-				} else {
-					addErr(fieldErrorForReason(currentFldPath, sts.Type, messageExpression, rule.Reason))
-					remainingBudget = newRemainingBudget
-				}
+		// Prepare a field error describing why the expression evaluated to False.
+		// Its detail may come from another expression that might fail to evaluate or exceed the budget.
+
+		currentFldPath := fldPath
+		if len(compiled.NormalizedRuleFieldPath) > 0 {
+			currentFldPath = currentFldPath.Child(compiled.NormalizedRuleFieldPath)
+		}
+
+		addErr := func(e *field.Error) {
+			if !compiled.UsesOldSelf && correlation.shouldRatchetError() {
+				warning.AddWarning(ctx, "", e.Error())
 			} else {
-				addErr(fieldErrorForReason(currentFldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
+				errs = append(errs, e)
 			}
 		}
+
+		detail, ok := "", false
+		if compiled.MessageExpression != nil {
+			messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
+			if msgErr == nil {
+				detail, ok = messageExpression, true
+				remainingBudget = newRemainingBudget
+			} else if msgErr.Type == cel.ErrorTypeInternal {
+				addErr(field.InternalError(currentFldPath, msgErr))
+				return errs, -1
+			} else if msgErr.Type == cel.ErrorTypeInvalid {
+				addErr(field.Invalid(currentFldPath, sts.Type, msgErr.Error()))
+				return errs, -1
+			} else {
+				klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
+				remainingBudget = newRemainingBudget
+			}
+		}
+		if !ok {
+			detail = ruleMessageOrDefault(rule)
+		}
+
+		value := obj
+		if sts.Type == "object" || sts.Type == "array" {
+			value = field.OmitValueType{}
+		}
+
+		addErr(fieldErrorForReason(currentFldPath, value, detail, rule.Reason))
 	}
 	return errs, remainingBudget
 }

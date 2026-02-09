@@ -19,4 +19,4 @@ limitations under the License.
 
 // package example contains an example API used to demonstrate how to create api groups. Moreover, this is
 // used within tests.
-package example // import "k8s.io/apiserver/pkg/apis/example"
+package example

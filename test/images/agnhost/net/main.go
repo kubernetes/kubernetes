@@ -178,5 +178,5 @@ func handleRunRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "ok\noutput:\n\n"+output.b.String())
+	fmt.Fprint(w, "ok\noutput:\n\n"+output.b.String())
 }

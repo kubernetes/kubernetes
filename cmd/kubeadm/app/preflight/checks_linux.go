@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -22,10 +21,11 @@ package preflight
 import (
 	"syscall"
 
-	"github.com/pkg/errors"
-
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	system "k8s.io/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // Check number of memory required by kubeadm
@@ -45,8 +45,11 @@ func (mc MemCheck) Check() (warnings, errorList []error) {
 }
 
 // addOSValidator adds a new OSValidator
-func addOSValidator(validators []system.Validator, reporter *system.StreamReporter) []system.Validator {
-	validators = append(validators, &system.OSValidator{Reporter: reporter}, &system.CgroupsValidator{Reporter: reporter})
+func addOSValidator(validators []system.Validator, reporter *system.StreamReporter, kubeletVersion string) []system.Validator {
+	validators = append(validators,
+		&system.OSValidator{Reporter: reporter},
+		&system.CgroupsValidator{Reporter: reporter, KubeletVersion: kubeletVersion},
+	)
 	return validators
 }
 
@@ -72,18 +75,23 @@ func addSwapCheck(checks []Checker) []Checker {
 }
 
 // addExecChecks adds checks that verify if certain binaries are in PATH
-func addExecChecks(checks []Checker, execer utilsexec.Interface) []Checker {
-	checks = append(checks,
-		InPathCheck{executable: "crictl", mandatory: false, exec: execer},
-		InPathCheck{executable: "conntrack", mandatory: true, exec: execer},
-		InPathCheck{executable: "ip", mandatory: true, exec: execer},
-		InPathCheck{executable: "iptables", mandatory: true, exec: execer},
-		InPathCheck{executable: "mount", mandatory: true, exec: execer},
-		InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
-		InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
-		InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
-		InPathCheck{executable: "socat", mandatory: false, exec: execer},
-		InPathCheck{executable: "tc", mandatory: false, exec: execer},
-		InPathCheck{executable: "touch", mandatory: false, exec: execer})
+func addExecChecks(checks []Checker, execer utilsexec.Interface, k8sVersion string) []Checker {
+	// For k8s >= 1.32.0, kube-proxy no longer depends on conntrack to be present in PATH
+	// (ref: https://github.com/kubernetes/kubernetes/pull/126952)
+	if v, err := utilversion.ParseSemantic(k8sVersion); err == nil {
+		if v.LessThan(utilversion.MustParseSemantic("1.32.0")) {
+			checks = append(checks, InPathCheck{executable: "conntrack", mandatory: true, exec: execer})
+		}
+	}
+
+	// kubelet requires losetup to be present in PATH for block volume support since 1.9.0.
+	// (ref: https://github.com/kubernetes/kubernetes/pull/51494)
+	checks = append(checks, InPathCheck{executable: "losetup", mandatory: true, exec: execer})
+
+	// kubelet requires mount to be present in PATH for in-tree volume plugins.
+	checks = append(checks, InPathCheck{executable: "mount", mandatory: true, exec: execer})
+
+	// kubeadm requires cp to be present in PATH for copying etcd directories.
+	checks = append(checks, InPathCheck{executable: "cp", mandatory: true, exec: execer})
 	return checks
 }

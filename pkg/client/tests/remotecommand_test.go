@@ -22,15 +22,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -125,7 +122,10 @@ func fakeServer(t *testing.T, requestReceived chan struct{}, testName string, ex
 		}
 
 		opts, err := remotecommand.NewOptions(req)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+			return
+		}
 		if exec {
 			cmd := req.URL.Query()[api.ExecCommandParam]
 			remotecommand.ServeExec(w, req, executor, "pod", "uid", "container", cmd, opts, 0, 10*time.Second, serverProtocols)
@@ -336,7 +336,7 @@ func TestDial(t *testing.T) {
 		conn:          &fakeConnection{},
 		resp: &http.Response{
 			StatusCode: http.StatusSwitchingProtocols,
-			Body:       ioutil.NopCloser(&bytes.Buffer{}),
+			Body:       io.NopCloser(&bytes.Buffer{}),
 		},
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: upgrader}, "POST", &url.URL{Host: "something.com", Scheme: "https"})

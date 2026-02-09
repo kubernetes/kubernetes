@@ -12,6 +12,8 @@ const (
 	SEG6_LOCAL_NH6
 	SEG6_LOCAL_IIF
 	SEG6_LOCAL_OIF
+	SEG6_LOCAL_BPF
+	SEG6_LOCAL_VRFTABLE
 	__SEG6_LOCAL_MAX
 )
 const (
@@ -34,6 +36,7 @@ const (
 	SEG6_LOCAL_ACTION_END_S                    // 12
 	SEG6_LOCAL_ACTION_END_AS                   // 13
 	SEG6_LOCAL_ACTION_END_AM                   // 14
+	SEG6_LOCAL_ACTION_END_BPF                  // 15
 	__SEG6_LOCAL_ACTION_MAX
 )
 const (
@@ -71,6 +74,8 @@ func SEG6LocalActionString(action int) string {
 		return "End.AS"
 	case SEG6_LOCAL_ACTION_END_AM:
 		return "End.AM"
+	case SEG6_LOCAL_ACTION_END_BPF:
+		return "End.BPF"
 	}
 	return "unknown"
 }

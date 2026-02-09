@@ -23,14 +23,12 @@ import (
 	fmt "fmt"
 
 	io "io"
+	"sort"
 
-	proto "github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	k8s_io_api_core_v1 "k8s.io/api/core/v1"
 	v11 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
@@ -38,1133 +36,73 @@ import (
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+func (m *ControllerRevision) Reset() { *m = ControllerRevision{} }
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+func (m *ControllerRevisionList) Reset() { *m = ControllerRevisionList{} }
 
-func (m *ControllerRevision) Reset()      { *m = ControllerRevision{} }
-func (*ControllerRevision) ProtoMessage() {}
-func (*ControllerRevision) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{0}
-}
-func (m *ControllerRevision) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ControllerRevision) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ControllerRevision) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ControllerRevision.Merge(m, src)
-}
-func (m *ControllerRevision) XXX_Size() int {
-	return m.Size()
-}
-func (m *ControllerRevision) XXX_DiscardUnknown() {
-	xxx_messageInfo_ControllerRevision.DiscardUnknown(m)
-}
+func (m *DaemonSet) Reset() { *m = DaemonSet{} }
 
-var xxx_messageInfo_ControllerRevision proto.InternalMessageInfo
+func (m *DaemonSetCondition) Reset() { *m = DaemonSetCondition{} }
 
-func (m *ControllerRevisionList) Reset()      { *m = ControllerRevisionList{} }
-func (*ControllerRevisionList) ProtoMessage() {}
-func (*ControllerRevisionList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{1}
-}
-func (m *ControllerRevisionList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ControllerRevisionList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ControllerRevisionList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ControllerRevisionList.Merge(m, src)
-}
-func (m *ControllerRevisionList) XXX_Size() int {
-	return m.Size()
-}
-func (m *ControllerRevisionList) XXX_DiscardUnknown() {
-	xxx_messageInfo_ControllerRevisionList.DiscardUnknown(m)
-}
+func (m *DaemonSetList) Reset() { *m = DaemonSetList{} }
 
-var xxx_messageInfo_ControllerRevisionList proto.InternalMessageInfo
+func (m *DaemonSetSpec) Reset() { *m = DaemonSetSpec{} }
 
-func (m *DaemonSet) Reset()      { *m = DaemonSet{} }
-func (*DaemonSet) ProtoMessage() {}
-func (*DaemonSet) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{2}
-}
-func (m *DaemonSet) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DaemonSet) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DaemonSet) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DaemonSet.Merge(m, src)
-}
-func (m *DaemonSet) XXX_Size() int {
-	return m.Size()
-}
-func (m *DaemonSet) XXX_DiscardUnknown() {
-	xxx_messageInfo_DaemonSet.DiscardUnknown(m)
-}
+func (m *DaemonSetStatus) Reset() { *m = DaemonSetStatus{} }
 
-var xxx_messageInfo_DaemonSet proto.InternalMessageInfo
+func (m *DaemonSetUpdateStrategy) Reset() { *m = DaemonSetUpdateStrategy{} }
 
-func (m *DaemonSetCondition) Reset()      { *m = DaemonSetCondition{} }
-func (*DaemonSetCondition) ProtoMessage() {}
-func (*DaemonSetCondition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{3}
-}
-func (m *DaemonSetCondition) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DaemonSetCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DaemonSetCondition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DaemonSetCondition.Merge(m, src)
-}
-func (m *DaemonSetCondition) XXX_Size() int {
-	return m.Size()
-}
-func (m *DaemonSetCondition) XXX_DiscardUnknown() {
-	xxx_messageInfo_DaemonSetCondition.DiscardUnknown(m)
-}
+func (m *Deployment) Reset() { *m = Deployment{} }
 
-var xxx_messageInfo_DaemonSetCondition proto.InternalMessageInfo
+func (m *DeploymentCondition) Reset() { *m = DeploymentCondition{} }
 
-func (m *DaemonSetList) Reset()      { *m = DaemonSetList{} }
-func (*DaemonSetList) ProtoMessage() {}
-func (*DaemonSetList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{4}
-}
-func (m *DaemonSetList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DaemonSetList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DaemonSetList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DaemonSetList.Merge(m, src)
-}
-func (m *DaemonSetList) XXX_Size() int {
-	return m.Size()
-}
-func (m *DaemonSetList) XXX_DiscardUnknown() {
-	xxx_messageInfo_DaemonSetList.DiscardUnknown(m)
-}
+func (m *DeploymentList) Reset() { *m = DeploymentList{} }
 
-var xxx_messageInfo_DaemonSetList proto.InternalMessageInfo
+func (m *DeploymentSpec) Reset() { *m = DeploymentSpec{} }
 
-func (m *DaemonSetSpec) Reset()      { *m = DaemonSetSpec{} }
-func (*DaemonSetSpec) ProtoMessage() {}
-func (*DaemonSetSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{5}
-}
-func (m *DaemonSetSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DaemonSetSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DaemonSetSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DaemonSetSpec.Merge(m, src)
-}
-func (m *DaemonSetSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *DaemonSetSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_DaemonSetSpec.DiscardUnknown(m)
-}
+func (m *DeploymentStatus) Reset() { *m = DeploymentStatus{} }
 
-var xxx_messageInfo_DaemonSetSpec proto.InternalMessageInfo
+func (m *DeploymentStrategy) Reset() { *m = DeploymentStrategy{} }
 
-func (m *DaemonSetStatus) Reset()      { *m = DaemonSetStatus{} }
-func (*DaemonSetStatus) ProtoMessage() {}
-func (*DaemonSetStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{6}
-}
-func (m *DaemonSetStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DaemonSetStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DaemonSetStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DaemonSetStatus.Merge(m, src)
-}
-func (m *DaemonSetStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *DaemonSetStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_DaemonSetStatus.DiscardUnknown(m)
-}
+func (m *ReplicaSet) Reset() { *m = ReplicaSet{} }
 
-var xxx_messageInfo_DaemonSetStatus proto.InternalMessageInfo
+func (m *ReplicaSetCondition) Reset() { *m = ReplicaSetCondition{} }
 
-func (m *DaemonSetUpdateStrategy) Reset()      { *m = DaemonSetUpdateStrategy{} }
-func (*DaemonSetUpdateStrategy) ProtoMessage() {}
-func (*DaemonSetUpdateStrategy) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{7}
-}
-func (m *DaemonSetUpdateStrategy) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DaemonSetUpdateStrategy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DaemonSetUpdateStrategy) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DaemonSetUpdateStrategy.Merge(m, src)
-}
-func (m *DaemonSetUpdateStrategy) XXX_Size() int {
-	return m.Size()
-}
-func (m *DaemonSetUpdateStrategy) XXX_DiscardUnknown() {
-	xxx_messageInfo_DaemonSetUpdateStrategy.DiscardUnknown(m)
-}
+func (m *ReplicaSetList) Reset() { *m = ReplicaSetList{} }
 
-var xxx_messageInfo_DaemonSetUpdateStrategy proto.InternalMessageInfo
+func (m *ReplicaSetSpec) Reset() { *m = ReplicaSetSpec{} }
 
-func (m *Deployment) Reset()      { *m = Deployment{} }
-func (*Deployment) ProtoMessage() {}
-func (*Deployment) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{8}
-}
-func (m *Deployment) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Deployment) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Deployment) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Deployment.Merge(m, src)
-}
-func (m *Deployment) XXX_Size() int {
-	return m.Size()
-}
-func (m *Deployment) XXX_DiscardUnknown() {
-	xxx_messageInfo_Deployment.DiscardUnknown(m)
-}
+func (m *ReplicaSetStatus) Reset() { *m = ReplicaSetStatus{} }
 
-var xxx_messageInfo_Deployment proto.InternalMessageInfo
+func (m *RollingUpdateDaemonSet) Reset() { *m = RollingUpdateDaemonSet{} }
 
-func (m *DeploymentCondition) Reset()      { *m = DeploymentCondition{} }
-func (*DeploymentCondition) ProtoMessage() {}
-func (*DeploymentCondition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{9}
-}
-func (m *DeploymentCondition) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeploymentCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeploymentCondition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeploymentCondition.Merge(m, src)
-}
-func (m *DeploymentCondition) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeploymentCondition) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeploymentCondition.DiscardUnknown(m)
-}
+func (m *RollingUpdateDeployment) Reset() { *m = RollingUpdateDeployment{} }
 
-var xxx_messageInfo_DeploymentCondition proto.InternalMessageInfo
+func (m *RollingUpdateStatefulSetStrategy) Reset() { *m = RollingUpdateStatefulSetStrategy{} }
 
-func (m *DeploymentList) Reset()      { *m = DeploymentList{} }
-func (*DeploymentList) ProtoMessage() {}
-func (*DeploymentList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{10}
-}
-func (m *DeploymentList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeploymentList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeploymentList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeploymentList.Merge(m, src)
-}
-func (m *DeploymentList) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeploymentList) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeploymentList.DiscardUnknown(m)
-}
+func (m *Scale) Reset() { *m = Scale{} }
 
-var xxx_messageInfo_DeploymentList proto.InternalMessageInfo
+func (m *ScaleSpec) Reset() { *m = ScaleSpec{} }
 
-func (m *DeploymentSpec) Reset()      { *m = DeploymentSpec{} }
-func (*DeploymentSpec) ProtoMessage() {}
-func (*DeploymentSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{11}
-}
-func (m *DeploymentSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeploymentSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeploymentSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeploymentSpec.Merge(m, src)
-}
-func (m *DeploymentSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeploymentSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeploymentSpec.DiscardUnknown(m)
-}
+func (m *ScaleStatus) Reset() { *m = ScaleStatus{} }
 
-var xxx_messageInfo_DeploymentSpec proto.InternalMessageInfo
+func (m *StatefulSet) Reset() { *m = StatefulSet{} }
 
-func (m *DeploymentStatus) Reset()      { *m = DeploymentStatus{} }
-func (*DeploymentStatus) ProtoMessage() {}
-func (*DeploymentStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{12}
-}
-func (m *DeploymentStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeploymentStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeploymentStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeploymentStatus.Merge(m, src)
-}
-func (m *DeploymentStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeploymentStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeploymentStatus.DiscardUnknown(m)
-}
+func (m *StatefulSetCondition) Reset() { *m = StatefulSetCondition{} }
 
-var xxx_messageInfo_DeploymentStatus proto.InternalMessageInfo
+func (m *StatefulSetList) Reset() { *m = StatefulSetList{} }
 
-func (m *DeploymentStrategy) Reset()      { *m = DeploymentStrategy{} }
-func (*DeploymentStrategy) ProtoMessage() {}
-func (*DeploymentStrategy) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{13}
-}
-func (m *DeploymentStrategy) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *DeploymentStrategy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *DeploymentStrategy) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeploymentStrategy.Merge(m, src)
-}
-func (m *DeploymentStrategy) XXX_Size() int {
-	return m.Size()
-}
-func (m *DeploymentStrategy) XXX_DiscardUnknown() {
-	xxx_messageInfo_DeploymentStrategy.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_DeploymentStrategy proto.InternalMessageInfo
-
-func (m *ReplicaSet) Reset()      { *m = ReplicaSet{} }
-func (*ReplicaSet) ProtoMessage() {}
-func (*ReplicaSet) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{14}
-}
-func (m *ReplicaSet) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ReplicaSet) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ReplicaSet) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ReplicaSet.Merge(m, src)
-}
-func (m *ReplicaSet) XXX_Size() int {
-	return m.Size()
-}
-func (m *ReplicaSet) XXX_DiscardUnknown() {
-	xxx_messageInfo_ReplicaSet.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ReplicaSet proto.InternalMessageInfo
-
-func (m *ReplicaSetCondition) Reset()      { *m = ReplicaSetCondition{} }
-func (*ReplicaSetCondition) ProtoMessage() {}
-func (*ReplicaSetCondition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{15}
-}
-func (m *ReplicaSetCondition) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ReplicaSetCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ReplicaSetCondition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ReplicaSetCondition.Merge(m, src)
-}
-func (m *ReplicaSetCondition) XXX_Size() int {
-	return m.Size()
-}
-func (m *ReplicaSetCondition) XXX_DiscardUnknown() {
-	xxx_messageInfo_ReplicaSetCondition.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ReplicaSetCondition proto.InternalMessageInfo
-
-func (m *ReplicaSetList) Reset()      { *m = ReplicaSetList{} }
-func (*ReplicaSetList) ProtoMessage() {}
-func (*ReplicaSetList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{16}
-}
-func (m *ReplicaSetList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ReplicaSetList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ReplicaSetList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ReplicaSetList.Merge(m, src)
-}
-func (m *ReplicaSetList) XXX_Size() int {
-	return m.Size()
-}
-func (m *ReplicaSetList) XXX_DiscardUnknown() {
-	xxx_messageInfo_ReplicaSetList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ReplicaSetList proto.InternalMessageInfo
-
-func (m *ReplicaSetSpec) Reset()      { *m = ReplicaSetSpec{} }
-func (*ReplicaSetSpec) ProtoMessage() {}
-func (*ReplicaSetSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{17}
-}
-func (m *ReplicaSetSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ReplicaSetSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ReplicaSetSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ReplicaSetSpec.Merge(m, src)
-}
-func (m *ReplicaSetSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *ReplicaSetSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_ReplicaSetSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ReplicaSetSpec proto.InternalMessageInfo
-
-func (m *ReplicaSetStatus) Reset()      { *m = ReplicaSetStatus{} }
-func (*ReplicaSetStatus) ProtoMessage() {}
-func (*ReplicaSetStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{18}
-}
-func (m *ReplicaSetStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ReplicaSetStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ReplicaSetStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ReplicaSetStatus.Merge(m, src)
-}
-func (m *ReplicaSetStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *ReplicaSetStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_ReplicaSetStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ReplicaSetStatus proto.InternalMessageInfo
-
-func (m *RollingUpdateDaemonSet) Reset()      { *m = RollingUpdateDaemonSet{} }
-func (*RollingUpdateDaemonSet) ProtoMessage() {}
-func (*RollingUpdateDaemonSet) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{19}
-}
-func (m *RollingUpdateDaemonSet) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *RollingUpdateDaemonSet) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *RollingUpdateDaemonSet) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RollingUpdateDaemonSet.Merge(m, src)
-}
-func (m *RollingUpdateDaemonSet) XXX_Size() int {
-	return m.Size()
-}
-func (m *RollingUpdateDaemonSet) XXX_DiscardUnknown() {
-	xxx_messageInfo_RollingUpdateDaemonSet.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_RollingUpdateDaemonSet proto.InternalMessageInfo
-
-func (m *RollingUpdateDeployment) Reset()      { *m = RollingUpdateDeployment{} }
-func (*RollingUpdateDeployment) ProtoMessage() {}
-func (*RollingUpdateDeployment) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{20}
-}
-func (m *RollingUpdateDeployment) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *RollingUpdateDeployment) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *RollingUpdateDeployment) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RollingUpdateDeployment.Merge(m, src)
-}
-func (m *RollingUpdateDeployment) XXX_Size() int {
-	return m.Size()
-}
-func (m *RollingUpdateDeployment) XXX_DiscardUnknown() {
-	xxx_messageInfo_RollingUpdateDeployment.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_RollingUpdateDeployment proto.InternalMessageInfo
-
-func (m *RollingUpdateStatefulSetStrategy) Reset()      { *m = RollingUpdateStatefulSetStrategy{} }
-func (*RollingUpdateStatefulSetStrategy) ProtoMessage() {}
-func (*RollingUpdateStatefulSetStrategy) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{21}
-}
-func (m *RollingUpdateStatefulSetStrategy) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *RollingUpdateStatefulSetStrategy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *RollingUpdateStatefulSetStrategy) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RollingUpdateStatefulSetStrategy.Merge(m, src)
-}
-func (m *RollingUpdateStatefulSetStrategy) XXX_Size() int {
-	return m.Size()
-}
-func (m *RollingUpdateStatefulSetStrategy) XXX_DiscardUnknown() {
-	xxx_messageInfo_RollingUpdateStatefulSetStrategy.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_RollingUpdateStatefulSetStrategy proto.InternalMessageInfo
-
-func (m *Scale) Reset()      { *m = Scale{} }
-func (*Scale) ProtoMessage() {}
-func (*Scale) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{22}
-}
-func (m *Scale) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Scale) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *Scale) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Scale.Merge(m, src)
-}
-func (m *Scale) XXX_Size() int {
-	return m.Size()
-}
-func (m *Scale) XXX_DiscardUnknown() {
-	xxx_messageInfo_Scale.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Scale proto.InternalMessageInfo
-
-func (m *ScaleSpec) Reset()      { *m = ScaleSpec{} }
-func (*ScaleSpec) ProtoMessage() {}
-func (*ScaleSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{23}
-}
-func (m *ScaleSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ScaleSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ScaleSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ScaleSpec.Merge(m, src)
-}
-func (m *ScaleSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *ScaleSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_ScaleSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ScaleSpec proto.InternalMessageInfo
-
-func (m *ScaleStatus) Reset()      { *m = ScaleStatus{} }
-func (*ScaleStatus) ProtoMessage() {}
-func (*ScaleStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{24}
-}
-func (m *ScaleStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ScaleStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ScaleStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ScaleStatus.Merge(m, src)
-}
-func (m *ScaleStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *ScaleStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_ScaleStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ScaleStatus proto.InternalMessageInfo
-
-func (m *StatefulSet) Reset()      { *m = StatefulSet{} }
-func (*StatefulSet) ProtoMessage() {}
-func (*StatefulSet) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{25}
-}
-func (m *StatefulSet) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatefulSet) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatefulSet) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatefulSet.Merge(m, src)
-}
-func (m *StatefulSet) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatefulSet) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatefulSet.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StatefulSet proto.InternalMessageInfo
-
-func (m *StatefulSetCondition) Reset()      { *m = StatefulSetCondition{} }
-func (*StatefulSetCondition) ProtoMessage() {}
-func (*StatefulSetCondition) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{26}
-}
-func (m *StatefulSetCondition) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatefulSetCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatefulSetCondition) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatefulSetCondition.Merge(m, src)
-}
-func (m *StatefulSetCondition) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatefulSetCondition) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatefulSetCondition.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StatefulSetCondition proto.InternalMessageInfo
-
-func (m *StatefulSetList) Reset()      { *m = StatefulSetList{} }
-func (*StatefulSetList) ProtoMessage() {}
-func (*StatefulSetList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{27}
-}
-func (m *StatefulSetList) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatefulSetList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatefulSetList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatefulSetList.Merge(m, src)
-}
-func (m *StatefulSetList) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatefulSetList) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatefulSetList.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StatefulSetList proto.InternalMessageInfo
-
-func (m *StatefulSetOrdinals) Reset()      { *m = StatefulSetOrdinals{} }
-func (*StatefulSetOrdinals) ProtoMessage() {}
-func (*StatefulSetOrdinals) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{28}
-}
-func (m *StatefulSetOrdinals) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatefulSetOrdinals) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatefulSetOrdinals) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatefulSetOrdinals.Merge(m, src)
-}
-func (m *StatefulSetOrdinals) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatefulSetOrdinals) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatefulSetOrdinals.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StatefulSetOrdinals proto.InternalMessageInfo
+func (m *StatefulSetOrdinals) Reset() { *m = StatefulSetOrdinals{} }
 
 func (m *StatefulSetPersistentVolumeClaimRetentionPolicy) Reset() {
 	*m = StatefulSetPersistentVolumeClaimRetentionPolicy{}
 }
-func (*StatefulSetPersistentVolumeClaimRetentionPolicy) ProtoMessage() {}
-func (*StatefulSetPersistentVolumeClaimRetentionPolicy) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{29}
-}
-func (m *StatefulSetPersistentVolumeClaimRetentionPolicy) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatefulSetPersistentVolumeClaimRetentionPolicy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatefulSetPersistentVolumeClaimRetentionPolicy) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatefulSetPersistentVolumeClaimRetentionPolicy.Merge(m, src)
-}
-func (m *StatefulSetPersistentVolumeClaimRetentionPolicy) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatefulSetPersistentVolumeClaimRetentionPolicy) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatefulSetPersistentVolumeClaimRetentionPolicy.DiscardUnknown(m)
-}
 
-var xxx_messageInfo_StatefulSetPersistentVolumeClaimRetentionPolicy proto.InternalMessageInfo
+func (m *StatefulSetSpec) Reset() { *m = StatefulSetSpec{} }
 
-func (m *StatefulSetSpec) Reset()      { *m = StatefulSetSpec{} }
-func (*StatefulSetSpec) ProtoMessage() {}
-func (*StatefulSetSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{30}
-}
-func (m *StatefulSetSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatefulSetSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatefulSetSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatefulSetSpec.Merge(m, src)
-}
-func (m *StatefulSetSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatefulSetSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatefulSetSpec.DiscardUnknown(m)
-}
+func (m *StatefulSetStatus) Reset() { *m = StatefulSetStatus{} }
 
-var xxx_messageInfo_StatefulSetSpec proto.InternalMessageInfo
-
-func (m *StatefulSetStatus) Reset()      { *m = StatefulSetStatus{} }
-func (*StatefulSetStatus) ProtoMessage() {}
-func (*StatefulSetStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{31}
-}
-func (m *StatefulSetStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatefulSetStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatefulSetStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatefulSetStatus.Merge(m, src)
-}
-func (m *StatefulSetStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatefulSetStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatefulSetStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StatefulSetStatus proto.InternalMessageInfo
-
-func (m *StatefulSetUpdateStrategy) Reset()      { *m = StatefulSetUpdateStrategy{} }
-func (*StatefulSetUpdateStrategy) ProtoMessage() {}
-func (*StatefulSetUpdateStrategy) Descriptor() ([]byte, []int) {
-	return fileDescriptor_c423c016abf485d4, []int{32}
-}
-func (m *StatefulSetUpdateStrategy) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StatefulSetUpdateStrategy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *StatefulSetUpdateStrategy) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StatefulSetUpdateStrategy.Merge(m, src)
-}
-func (m *StatefulSetUpdateStrategy) XXX_Size() int {
-	return m.Size()
-}
-func (m *StatefulSetUpdateStrategy) XXX_DiscardUnknown() {
-	xxx_messageInfo_StatefulSetUpdateStrategy.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StatefulSetUpdateStrategy proto.InternalMessageInfo
-
-func init() {
-	proto.RegisterType((*ControllerRevision)(nil), "k8s.io.api.apps.v1beta2.ControllerRevision")
-	proto.RegisterType((*ControllerRevisionList)(nil), "k8s.io.api.apps.v1beta2.ControllerRevisionList")
-	proto.RegisterType((*DaemonSet)(nil), "k8s.io.api.apps.v1beta2.DaemonSet")
-	proto.RegisterType((*DaemonSetCondition)(nil), "k8s.io.api.apps.v1beta2.DaemonSetCondition")
-	proto.RegisterType((*DaemonSetList)(nil), "k8s.io.api.apps.v1beta2.DaemonSetList")
-	proto.RegisterType((*DaemonSetSpec)(nil), "k8s.io.api.apps.v1beta2.DaemonSetSpec")
-	proto.RegisterType((*DaemonSetStatus)(nil), "k8s.io.api.apps.v1beta2.DaemonSetStatus")
-	proto.RegisterType((*DaemonSetUpdateStrategy)(nil), "k8s.io.api.apps.v1beta2.DaemonSetUpdateStrategy")
-	proto.RegisterType((*Deployment)(nil), "k8s.io.api.apps.v1beta2.Deployment")
-	proto.RegisterType((*DeploymentCondition)(nil), "k8s.io.api.apps.v1beta2.DeploymentCondition")
-	proto.RegisterType((*DeploymentList)(nil), "k8s.io.api.apps.v1beta2.DeploymentList")
-	proto.RegisterType((*DeploymentSpec)(nil), "k8s.io.api.apps.v1beta2.DeploymentSpec")
-	proto.RegisterType((*DeploymentStatus)(nil), "k8s.io.api.apps.v1beta2.DeploymentStatus")
-	proto.RegisterType((*DeploymentStrategy)(nil), "k8s.io.api.apps.v1beta2.DeploymentStrategy")
-	proto.RegisterType((*ReplicaSet)(nil), "k8s.io.api.apps.v1beta2.ReplicaSet")
-	proto.RegisterType((*ReplicaSetCondition)(nil), "k8s.io.api.apps.v1beta2.ReplicaSetCondition")
-	proto.RegisterType((*ReplicaSetList)(nil), "k8s.io.api.apps.v1beta2.ReplicaSetList")
-	proto.RegisterType((*ReplicaSetSpec)(nil), "k8s.io.api.apps.v1beta2.ReplicaSetSpec")
-	proto.RegisterType((*ReplicaSetStatus)(nil), "k8s.io.api.apps.v1beta2.ReplicaSetStatus")
-	proto.RegisterType((*RollingUpdateDaemonSet)(nil), "k8s.io.api.apps.v1beta2.RollingUpdateDaemonSet")
-	proto.RegisterType((*RollingUpdateDeployment)(nil), "k8s.io.api.apps.v1beta2.RollingUpdateDeployment")
-	proto.RegisterType((*RollingUpdateStatefulSetStrategy)(nil), "k8s.io.api.apps.v1beta2.RollingUpdateStatefulSetStrategy")
-	proto.RegisterType((*Scale)(nil), "k8s.io.api.apps.v1beta2.Scale")
-	proto.RegisterType((*ScaleSpec)(nil), "k8s.io.api.apps.v1beta2.ScaleSpec")
-	proto.RegisterType((*ScaleStatus)(nil), "k8s.io.api.apps.v1beta2.ScaleStatus")
-	proto.RegisterMapType((map[string]string)(nil), "k8s.io.api.apps.v1beta2.ScaleStatus.SelectorEntry")
-	proto.RegisterType((*StatefulSet)(nil), "k8s.io.api.apps.v1beta2.StatefulSet")
-	proto.RegisterType((*StatefulSetCondition)(nil), "k8s.io.api.apps.v1beta2.StatefulSetCondition")
-	proto.RegisterType((*StatefulSetList)(nil), "k8s.io.api.apps.v1beta2.StatefulSetList")
-	proto.RegisterType((*StatefulSetOrdinals)(nil), "k8s.io.api.apps.v1beta2.StatefulSetOrdinals")
-	proto.RegisterType((*StatefulSetPersistentVolumeClaimRetentionPolicy)(nil), "k8s.io.api.apps.v1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy")
-	proto.RegisterType((*StatefulSetSpec)(nil), "k8s.io.api.apps.v1beta2.StatefulSetSpec")
-	proto.RegisterType((*StatefulSetStatus)(nil), "k8s.io.api.apps.v1beta2.StatefulSetStatus")
-	proto.RegisterType((*StatefulSetUpdateStrategy)(nil), "k8s.io.api.apps.v1beta2.StatefulSetUpdateStrategy")
-}
-
-func init() {
-	proto.RegisterFile("k8s.io/api/apps/v1beta2/generated.proto", fileDescriptor_c423c016abf485d4)
-}
-
-var fileDescriptor_c423c016abf485d4 = []byte{
-	// 2328 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x5a, 0xcd, 0x6f, 0x1b, 0xc7,
-	0x15, 0xf7, 0xf2, 0x43, 0x26, 0x87, 0x96, 0x64, 0x8f, 0x54, 0x89, 0xb1, 0x5b, 0xd2, 0x58, 0x1b,
-	0xb6, 0x12, 0xdb, 0xa4, 0xad, 0x7c, 0x20, 0xb1, 0xdb, 0x04, 0xa2, 0x94, 0xda, 0x0e, 0xf4, 0xc1,
-	0x0c, 0x2d, 0x07, 0x0d, 0xfa, 0xe1, 0x11, 0x39, 0xa6, 0x36, 0xde, 0x2f, 0xec, 0x0e, 0x15, 0x13,
-	0xbd, 0xf4, 0x5a, 0xa0, 0x40, 0xdb, 0x6b, 0xff, 0x89, 0xa2, 0x97, 0xa2, 0x68, 0xd0, 0x4b, 0x11,
-	0x04, 0x3e, 0x06, 0xbd, 0x24, 0x27, 0xa2, 0x66, 0x4e, 0x45, 0xd1, 0x5b, 0x7b, 0x31, 0x50, 0xa0,
-	0x98, 0xd9, 0xd9, 0xef, 0x5d, 0x73, 0xa9, 0xd8, 0x4a, 0x13, 0xe4, 0xc6, 0x9d, 0xf7, 0xde, 0x6f,
-	0xde, 0xcc, 0xbc, 0x37, 0xef, 0x37, 0x33, 0x04, 0x17, 0x1f, 0xbc, 0x6e, 0x37, 0x14, 0xa3, 0x89,
-	0x4d, 0xa5, 0x89, 0x4d, 0xd3, 0x6e, 0x1e, 0x5c, 0xdb, 0x23, 0x14, 0xaf, 0x36, 0xfb, 0x44, 0x27,
-	0x16, 0xa6, 0xa4, 0xd7, 0x30, 0x2d, 0x83, 0x1a, 0x70, 0xd9, 0x51, 0x6c, 0x60, 0x53, 0x69, 0x30,
-	0xc5, 0x86, 0x50, 0x3c, 0x7d, 0xa5, 0xaf, 0xd0, 0xfd, 0xc1, 0x5e, 0xa3, 0x6b, 0x68, 0xcd, 0xbe,
-	0xd1, 0x37, 0x9a, 0x5c, 0x7f, 0x6f, 0x70, 0x9f, 0x7f, 0xf1, 0x0f, 0xfe, 0xcb, 0xc1, 0x39, 0x2d,
-	0x07, 0x3a, 0xec, 0x1a, 0x16, 0x69, 0x1e, 0x5c, 0x8b, 0xf6, 0x75, 0xfa, 0x15, 0x5f, 0x47, 0xc3,
-	0xdd, 0x7d, 0x45, 0x27, 0xd6, 0xb0, 0x69, 0x3e, 0xe8, 0xb3, 0x06, 0xbb, 0xa9, 0x11, 0x8a, 0x93,
-	0xac, 0x9a, 0x69, 0x56, 0xd6, 0x40, 0xa7, 0x8a, 0x46, 0x62, 0x06, 0xaf, 0x4d, 0x32, 0xb0, 0xbb,
-	0xfb, 0x44, 0xc3, 0x31, 0xbb, 0x97, 0xd3, 0xec, 0x06, 0x54, 0x51, 0x9b, 0x8a, 0x4e, 0x6d, 0x6a,
-	0x45, 0x8d, 0xe4, 0xff, 0x48, 0x00, 0xae, 0x1b, 0x3a, 0xb5, 0x0c, 0x55, 0x25, 0x16, 0x22, 0x07,
-	0x8a, 0xad, 0x18, 0x3a, 0xbc, 0x07, 0x4a, 0x6c, 0x3c, 0x3d, 0x4c, 0x71, 0x55, 0x3a, 0x2b, 0xad,
-	0x54, 0x56, 0xaf, 0x36, 0xfc, 0x99, 0xf6, 0xe0, 0x1b, 0xe6, 0x83, 0x3e, 0x6b, 0xb0, 0x1b, 0x4c,
-	0xbb, 0x71, 0x70, 0xad, 0xb1, 0xb3, 0xf7, 0x01, 0xe9, 0xd2, 0x2d, 0x42, 0x71, 0x0b, 0x3e, 0x1a,
-	0xd5, 0x8f, 0x8d, 0x47, 0x75, 0xe0, 0xb7, 0x21, 0x0f, 0x15, 0xee, 0x80, 0x02, 0x47, 0xcf, 0x71,
-	0xf4, 0x2b, 0xa9, 0xe8, 0x62, 0xd0, 0x0d, 0x84, 0x3f, 0x7c, 0xfb, 0x21, 0x25, 0x3a, 0x73, 0xaf,
-	0x75, 0x42, 0x40, 0x17, 0x36, 0x30, 0xc5, 0x88, 0x03, 0xc1, 0xcb, 0xa0, 0x64, 0x09, 0xf7, 0xab,
-	0xf9, 0xb3, 0xd2, 0x4a, 0xbe, 0x75, 0x52, 0x68, 0x95, 0xdc, 0x61, 0x21, 0x4f, 0x43, 0x7e, 0x24,
-	0x81, 0xa5, 0xf8, 0xb8, 0x37, 0x15, 0x9b, 0xc2, 0x1f, 0xc7, 0xc6, 0xde, 0xc8, 0x36, 0x76, 0x66,
-	0xcd, 0x47, 0xee, 0x75, 0xec, 0xb6, 0x04, 0xc6, 0xdd, 0x06, 0x45, 0x85, 0x12, 0xcd, 0xae, 0xe6,
-	0xce, 0xe6, 0x57, 0x2a, 0xab, 0x97, 0x1a, 0x29, 0x01, 0xdc, 0x88, 0x7b, 0xd7, 0x9a, 0x15, 0xb8,
-	0xc5, 0xdb, 0x0c, 0x01, 0x39, 0x40, 0xf2, 0x2f, 0x73, 0xa0, 0xbc, 0x81, 0x89, 0x66, 0xe8, 0x1d,
-	0x42, 0x8f, 0x60, 0xe5, 0x6e, 0x81, 0x82, 0x6d, 0x92, 0xae, 0x58, 0xb9, 0x0b, 0xa9, 0x03, 0xf0,
-	0x7c, 0xea, 0x98, 0xa4, 0xeb, 0x2f, 0x19, 0xfb, 0x42, 0x1c, 0x01, 0xb6, 0xc1, 0x8c, 0x4d, 0x31,
-	0x1d, 0xd8, 0x7c, 0xc1, 0x2a, 0xab, 0x2b, 0x19, 0xb0, 0xb8, 0x7e, 0x6b, 0x4e, 0xa0, 0xcd, 0x38,
-	0xdf, 0x48, 0xe0, 0xc8, 0xff, 0xc8, 0x01, 0xe8, 0xe9, 0xae, 0x1b, 0x7a, 0x4f, 0xa1, 0x2c, 0x9c,
-	0xaf, 0x83, 0x02, 0x1d, 0x9a, 0x84, 0x4f, 0x48, 0xb9, 0x75, 0xc1, 0x75, 0xe5, 0xce, 0xd0, 0x24,
-	0x4f, 0x46, 0xf5, 0xa5, 0xb8, 0x05, 0x93, 0x20, 0x6e, 0x03, 0x37, 0x3d, 0x27, 0x73, 0xdc, 0xfa,
-	0x95, 0x70, 0xd7, 0x4f, 0x46, 0xf5, 0x84, 0xbd, 0xa3, 0xe1, 0x21, 0x85, 0x1d, 0x84, 0x07, 0x00,
-	0xaa, 0xd8, 0xa6, 0x77, 0x2c, 0xac, 0xdb, 0x4e, 0x4f, 0x8a, 0x46, 0xc4, 0xf0, 0x5f, 0xca, 0xb6,
-	0x50, 0xcc, 0xa2, 0x75, 0x5a, 0x78, 0x01, 0x37, 0x63, 0x68, 0x28, 0xa1, 0x07, 0x78, 0x01, 0xcc,
-	0x58, 0x04, 0xdb, 0x86, 0x5e, 0x2d, 0xf0, 0x51, 0x78, 0x13, 0x88, 0x78, 0x2b, 0x12, 0x52, 0xf8,
-	0x22, 0x38, 0xae, 0x11, 0xdb, 0xc6, 0x7d, 0x52, 0x2d, 0x72, 0xc5, 0x79, 0xa1, 0x78, 0x7c, 0xcb,
-	0x69, 0x46, 0xae, 0x5c, 0xfe, 0xa3, 0x04, 0x66, 0xbd, 0x99, 0x3b, 0x82, 0xcc, 0xb9, 0x19, 0xce,
-	0x1c, 0x79, 0x72, 0xb0, 0xa4, 0x24, 0xcc, 0xc7, 0xf9, 0x80, 0xe3, 0x2c, 0x1c, 0xe1, 0x4f, 0x40,
-	0xc9, 0x26, 0x2a, 0xe9, 0x52, 0xc3, 0x12, 0x8e, 0xbf, 0x9c, 0xd1, 0x71, 0xbc, 0x47, 0xd4, 0x8e,
-	0x30, 0x6d, 0x9d, 0x60, 0x9e, 0xbb, 0x5f, 0xc8, 0x83, 0x84, 0xef, 0x82, 0x12, 0x25, 0x9a, 0xa9,
-	0x62, 0x4a, 0x44, 0xd6, 0x9c, 0x0b, 0x3a, 0xcf, 0x62, 0x86, 0x81, 0xb5, 0x8d, 0xde, 0x1d, 0xa1,
-	0xc6, 0x53, 0xc6, 0x9b, 0x0c, 0xb7, 0x15, 0x79, 0x30, 0xd0, 0x04, 0x73, 0x03, 0xb3, 0xc7, 0x34,
-	0x29, 0xdb, 0xce, 0xfb, 0x43, 0x11, 0x43, 0x57, 0x27, 0xcf, 0xca, 0x6e, 0xc8, 0xae, 0xb5, 0x24,
-	0x7a, 0x99, 0x0b, 0xb7, 0xa3, 0x08, 0x3e, 0x5c, 0x03, 0xf3, 0x9a, 0xa2, 0x23, 0x82, 0x7b, 0xc3,
-	0x0e, 0xe9, 0x1a, 0x7a, 0xcf, 0xe6, 0xa1, 0x54, 0x6c, 0x2d, 0x0b, 0x80, 0xf9, 0xad, 0xb0, 0x18,
-	0x45, 0xf5, 0xe1, 0x26, 0x58, 0x74, 0x37, 0xe0, 0x5b, 0x8a, 0x4d, 0x0d, 0x6b, 0xb8, 0xa9, 0x68,
-	0x0a, 0xad, 0xce, 0x70, 0x9c, 0xea, 0x78, 0x54, 0x5f, 0x44, 0x09, 0x72, 0x94, 0x68, 0x25, 0xff,
-	0x76, 0x06, 0xcc, 0x47, 0xf6, 0x05, 0x78, 0x17, 0x2c, 0x75, 0x07, 0x96, 0x45, 0x74, 0xba, 0x3d,
-	0xd0, 0xf6, 0x88, 0xd5, 0xe9, 0xee, 0x93, 0xde, 0x40, 0x25, 0x3d, 0xbe, 0xac, 0xc5, 0x56, 0x4d,
-	0xf8, 0xba, 0xb4, 0x9e, 0xa8, 0x85, 0x52, 0xac, 0xe1, 0x3b, 0x00, 0xea, 0xbc, 0x69, 0x4b, 0xb1,
-	0x6d, 0x0f, 0x33, 0xc7, 0x31, 0xbd, 0x54, 0xdc, 0x8e, 0x69, 0xa0, 0x04, 0x2b, 0xe6, 0x63, 0x8f,
-	0xd8, 0x8a, 0x45, 0x7a, 0x51, 0x1f, 0xf3, 0x61, 0x1f, 0x37, 0x12, 0xb5, 0x50, 0x8a, 0x35, 0x7c,
-	0x15, 0x54, 0x9c, 0xde, 0xf8, 0x9c, 0x8b, 0xc5, 0x59, 0x10, 0x60, 0x95, 0x6d, 0x5f, 0x84, 0x82,
-	0x7a, 0x6c, 0x68, 0xc6, 0x9e, 0x4d, 0xac, 0x03, 0xd2, 0xbb, 0xe9, 0x90, 0x03, 0x56, 0x41, 0x8b,
-	0xbc, 0x82, 0x7a, 0x43, 0xdb, 0x89, 0x69, 0xa0, 0x04, 0x2b, 0x36, 0x34, 0x27, 0x6a, 0x62, 0x43,
-	0x9b, 0x09, 0x0f, 0x6d, 0x37, 0x51, 0x0b, 0xa5, 0x58, 0xb3, 0xd8, 0x73, 0x5c, 0x5e, 0x3b, 0xc0,
-	0x8a, 0x8a, 0xf7, 0x54, 0x52, 0x3d, 0x1e, 0x8e, 0xbd, 0xed, 0xb0, 0x18, 0x45, 0xf5, 0xe1, 0x4d,
-	0x70, 0xca, 0x69, 0xda, 0xd5, 0xb1, 0x07, 0x52, 0xe2, 0x20, 0x2f, 0x08, 0x90, 0x53, 0xdb, 0x51,
-	0x05, 0x14, 0xb7, 0x81, 0xd7, 0xc1, 0x5c, 0xd7, 0x50, 0x55, 0x1e, 0x8f, 0xeb, 0xc6, 0x40, 0xa7,
-	0xd5, 0x32, 0x47, 0x81, 0x2c, 0x87, 0xd6, 0x43, 0x12, 0x14, 0xd1, 0x84, 0x3f, 0x03, 0xa0, 0xeb,
-	0x16, 0x06, 0xbb, 0x0a, 0x26, 0x30, 0x80, 0x78, 0x59, 0xf2, 0x2b, 0xb3, 0xd7, 0x64, 0xa3, 0x00,
-	0xa4, 0xfc, 0xb1, 0x04, 0x96, 0x53, 0x12, 0x1d, 0xbe, 0x15, 0x2a, 0x82, 0x97, 0x22, 0x45, 0xf0,
-	0x4c, 0x8a, 0x59, 0xa0, 0x12, 0xee, 0x83, 0x59, 0x46, 0x48, 0x14, 0xbd, 0xef, 0xa8, 0x88, 0xbd,
-	0xac, 0x99, 0x3a, 0x00, 0x14, 0xd4, 0xf6, 0x77, 0xe5, 0x53, 0xe3, 0x51, 0x7d, 0x36, 0x24, 0x43,
-	0x61, 0x60, 0xf9, 0x57, 0x39, 0x00, 0x36, 0x88, 0xa9, 0x1a, 0x43, 0x8d, 0xe8, 0x47, 0xc1, 0x69,
-	0x6e, 0x87, 0x38, 0xcd, 0xc5, 0xf4, 0x25, 0xf1, 0x9c, 0x4a, 0x25, 0x35, 0xef, 0x46, 0x48, 0xcd,
-	0x8b, 0x59, 0xc0, 0x9e, 0xce, 0x6a, 0x3e, 0xcb, 0x83, 0x05, 0x5f, 0xd9, 0xa7, 0x35, 0x37, 0x42,
-	0x2b, 0x7a, 0x31, 0xb2, 0xa2, 0xcb, 0x09, 0x26, 0xcf, 0x8d, 0xd7, 0x7c, 0x00, 0xe6, 0x18, 0xeb,
-	0x70, 0xd6, 0x8f, 0x73, 0x9a, 0x99, 0xa9, 0x39, 0x8d, 0x57, 0x89, 0x36, 0x43, 0x48, 0x28, 0x82,
-	0x9c, 0xc2, 0xa1, 0x8e, 0x7f, 0x1d, 0x39, 0xd4, 0x9f, 0x24, 0x30, 0xe7, 0x2f, 0xd3, 0x11, 0x90,
-	0xa8, 0x5b, 0x61, 0x12, 0x75, 0x2e, 0x43, 0x70, 0xa6, 0xb0, 0xa8, 0xcf, 0x0a, 0x41, 0xd7, 0x39,
-	0x8d, 0x5a, 0x61, 0x47, 0x30, 0x53, 0x55, 0xba, 0xd8, 0x16, 0xf5, 0xf6, 0x84, 0x73, 0xfc, 0x72,
-	0xda, 0x90, 0x27, 0x0d, 0x11, 0xae, 0xdc, 0xf3, 0x25, 0x5c, 0xf9, 0x67, 0x43, 0xb8, 0x7e, 0x04,
-	0x4a, 0xb6, 0x4b, 0xb5, 0x0a, 0x1c, 0xf2, 0x52, 0xa6, 0xc4, 0x16, 0x2c, 0xcb, 0x83, 0xf6, 0xf8,
-	0x95, 0x07, 0x97, 0xc4, 0xac, 0x8a, 0x5f, 0x25, 0xb3, 0x62, 0x81, 0x6e, 0xe2, 0x81, 0x4d, 0x7a,
-	0x3c, 0xa9, 0x4a, 0x7e, 0xa0, 0xb7, 0x79, 0x2b, 0x12, 0x52, 0xb8, 0x0b, 0x96, 0x4d, 0xcb, 0xe8,
-	0x5b, 0xc4, 0xb6, 0x37, 0x08, 0xee, 0xa9, 0x8a, 0x4e, 0xdc, 0x01, 0x38, 0x35, 0xf1, 0xcc, 0x78,
-	0x54, 0x5f, 0x6e, 0x27, 0xab, 0xa0, 0x34, 0x5b, 0xf9, 0xaf, 0x05, 0x70, 0x32, 0xba, 0x37, 0xa6,
-	0xd0, 0x14, 0xe9, 0x50, 0x34, 0xe5, 0x72, 0x20, 0x4e, 0x1d, 0x0e, 0x17, 0xb8, 0x2a, 0x88, 0xc5,
-	0xea, 0x1a, 0x98, 0x17, 0xb4, 0xc4, 0x15, 0x0a, 0xa2, 0xe6, 0x2d, 0xcf, 0x6e, 0x58, 0x8c, 0xa2,
-	0xfa, 0xf0, 0x06, 0x98, 0xb5, 0x38, 0xf3, 0x72, 0x01, 0x1c, 0xf6, 0xf2, 0x1d, 0x01, 0x30, 0x8b,
-	0x82, 0x42, 0x14, 0xd6, 0x65, 0xcc, 0xc5, 0x27, 0x24, 0x2e, 0x40, 0x21, 0xcc, 0x5c, 0xd6, 0xa2,
-	0x0a, 0x28, 0x6e, 0x03, 0xb7, 0xc0, 0xc2, 0x40, 0x8f, 0x43, 0x39, 0xb1, 0x76, 0x46, 0x40, 0x2d,
-	0xec, 0xc6, 0x55, 0x50, 0x92, 0x1d, 0xbc, 0x17, 0x22, 0x33, 0x33, 0x7c, 0x3f, 0xb9, 0x9c, 0x21,
-	0x27, 0x32, 0xb3, 0x99, 0x04, 0xaa, 0x55, 0xca, 0x4a, 0xb5, 0xe4, 0x8f, 0x24, 0x00, 0xe3, 0x79,
-	0x38, 0xf1, 0x26, 0x20, 0x66, 0x11, 0xa8, 0x98, 0x4a, 0x32, 0xff, 0xb9, 0x9a, 0x91, 0xff, 0xf8,
-	0x1b, 0x6a, 0x36, 0x02, 0x24, 0x26, 0xfa, 0x68, 0x2e, 0x75, 0xb2, 0x12, 0x20, 0xdf, 0xa9, 0x67,
-	0x40, 0x80, 0x02, 0x60, 0x4f, 0x27, 0x40, 0xff, 0xcc, 0x81, 0x05, 0x5f, 0x39, 0x33, 0x01, 0x4a,
-	0x30, 0xf9, 0xf6, 0x62, 0x27, 0x1b, 0x29, 0xf1, 0xa7, 0xee, 0xff, 0x89, 0x94, 0xf8, 0x5e, 0xa5,
-	0x90, 0x92, 0xdf, 0xe7, 0x82, 0xae, 0x4f, 0x49, 0x4a, 0x9e, 0xc1, 0x0d, 0xc7, 0xd7, 0x8e, 0xd7,
-	0xc8, 0x9f, 0xe4, 0xc1, 0xc9, 0x68, 0x1e, 0x86, 0x0a, 0xa4, 0x34, 0xb1, 0x40, 0xb6, 0xc1, 0xe2,
-	0xfd, 0x81, 0xaa, 0x0e, 0xf9, 0x18, 0x02, 0x55, 0xd2, 0x29, 0xad, 0xdf, 0x15, 0x96, 0x8b, 0x3f,
-	0x4c, 0xd0, 0x41, 0x89, 0x96, 0xf1, 0x7a, 0x59, 0xf8, 0xb2, 0xf5, 0xb2, 0x78, 0x88, 0x7a, 0x99,
-	0x4c, 0x39, 0xf2, 0x87, 0xa2, 0x1c, 0xd3, 0x15, 0xcb, 0x84, 0x8d, 0x6b, 0xe2, 0xd1, 0x7f, 0x2c,
-	0x81, 0xa5, 0xe4, 0x03, 0x37, 0x54, 0xc1, 0x9c, 0x86, 0x1f, 0x06, 0x2f, 0x3e, 0x26, 0x15, 0x91,
-	0x01, 0x55, 0xd4, 0x86, 0xf3, 0x64, 0xd4, 0xb8, 0xad, 0xd3, 0x1d, 0xab, 0x43, 0x2d, 0x45, 0xef,
-	0x3b, 0x95, 0x77, 0x2b, 0x84, 0x85, 0x22, 0xd8, 0xf0, 0x7d, 0x50, 0xd2, 0xf0, 0xc3, 0xce, 0xc0,
-	0xea, 0x27, 0x55, 0xc8, 0x6c, 0xfd, 0xf0, 0x04, 0xd8, 0x12, 0x28, 0xc8, 0xc3, 0x93, 0xbf, 0x90,
-	0xc0, 0x72, 0x4a, 0x55, 0xfd, 0x06, 0x8d, 0xf2, 0x2f, 0x12, 0x38, 0x1b, 0x1a, 0x25, 0x4b, 0x4b,
-	0x72, 0x7f, 0xa0, 0xf2, 0x0c, 0x15, 0x4c, 0xe6, 0x12, 0x28, 0x9b, 0xd8, 0xa2, 0x8a, 0xc7, 0x83,
-	0x8b, 0xad, 0xd9, 0xf1, 0xa8, 0x5e, 0x6e, 0xbb, 0x8d, 0xc8, 0x97, 0x27, 0xcc, 0x4d, 0xee, 0xf9,
-	0xcd, 0x8d, 0xfc, 0x5f, 0x09, 0x14, 0x3b, 0x5d, 0xac, 0x92, 0x23, 0x20, 0x2e, 0x1b, 0x21, 0xe2,
-	0x92, 0xfe, 0x28, 0xc0, 0xfd, 0x49, 0xe5, 0x2c, 0x9b, 0x11, 0xce, 0x72, 0x7e, 0x02, 0xce, 0xd3,
-	0xe9, 0xca, 0x1b, 0xa0, 0xec, 0x75, 0x37, 0xdd, 0x5e, 0x2a, 0xff, 0x2e, 0x07, 0x2a, 0x81, 0x2e,
-	0xa6, 0xdc, 0x89, 0xef, 0x85, 0xca, 0x0f, 0xdb, 0x63, 0x56, 0xb3, 0x0c, 0xa4, 0xe1, 0x96, 0x9a,
-	0xb7, 0x75, 0x6a, 0x05, 0xcf, 0xaa, 0xf1, 0x0a, 0xf4, 0x26, 0x98, 0xa3, 0xd8, 0xea, 0x13, 0xea,
-	0xca, 0xf8, 0x84, 0x95, 0xfd, 0xbb, 0x9b, 0x3b, 0x21, 0x29, 0x8a, 0x68, 0x9f, 0xbe, 0x01, 0x66,
-	0x43, 0x9d, 0xc1, 0x93, 0x20, 0xff, 0x80, 0x0c, 0x1d, 0x06, 0x87, 0xd8, 0x4f, 0xb8, 0x08, 0x8a,
-	0x07, 0x58, 0x1d, 0x38, 0x21, 0x5a, 0x46, 0xce, 0xc7, 0xf5, 0xdc, 0xeb, 0x92, 0xfc, 0x6b, 0x36,
-	0x39, 0x7e, 0x2a, 0x1c, 0x41, 0x74, 0xbd, 0x13, 0x8a, 0xae, 0xf4, 0xf7, 0xc9, 0x60, 0x82, 0xa6,
-	0xc5, 0x18, 0x8a, 0xc4, 0xd8, 0x4b, 0x99, 0xd0, 0x9e, 0x1e, 0x69, 0xff, 0xca, 0x81, 0xc5, 0x80,
-	0xb6, 0xcf, 0x8c, 0xbf, 0x1f, 0x62, 0xc6, 0x2b, 0x11, 0x66, 0x5c, 0x4d, 0xb2, 0xf9, 0x96, 0x1a,
-	0x4f, 0xa6, 0xc6, 0x7f, 0x96, 0xc0, 0x7c, 0x60, 0xee, 0x8e, 0x80, 0x1b, 0xdf, 0x0e, 0x73, 0xe3,
-	0xf3, 0x59, 0x82, 0x26, 0x85, 0x1c, 0x5f, 0x07, 0x0b, 0x01, 0xa5, 0x1d, 0xab, 0xa7, 0xe8, 0x58,
-	0xb5, 0xe1, 0x39, 0x50, 0xb4, 0x29, 0xb6, 0xa8, 0x5b, 0x44, 0x5c, 0xdb, 0x0e, 0x6b, 0x44, 0x8e,
-	0x4c, 0xfe, 0xb7, 0x04, 0x9a, 0x01, 0xe3, 0x36, 0xb1, 0x6c, 0xc5, 0xa6, 0x44, 0xa7, 0x77, 0x0d,
-	0x75, 0xa0, 0x91, 0x75, 0x15, 0x2b, 0x1a, 0x22, 0xac, 0x41, 0x31, 0xf4, 0xb6, 0xa1, 0x2a, 0xdd,
-	0x21, 0xc4, 0xa0, 0xf2, 0xe1, 0x3e, 0xd1, 0x37, 0x88, 0x4a, 0xa8, 0x78, 0x81, 0x2b, 0xb7, 0xde,
-	0x72, 0x1f, 0xa4, 0xde, 0xf3, 0x45, 0x4f, 0x46, 0xf5, 0x95, 0x2c, 0x88, 0x3c, 0x42, 0x83, 0x98,
-	0xf0, 0xa7, 0x00, 0xb0, 0x4f, 0xbe, 0x97, 0xf5, 0x44, 0xb0, 0xbe, 0xe9, 0x66, 0xf4, 0x7b, 0x9e,
-	0x64, 0xaa, 0x0e, 0x02, 0x88, 0xf2, 0x1f, 0x4a, 0xa1, 0xf5, 0xfe, 0xc6, 0xdf, 0x72, 0xfe, 0x1c,
-	0x2c, 0x1e, 0xf8, 0xb3, 0xe3, 0x2a, 0x30, 0xfe, 0x9d, 0x8f, 0x9e, 0xe4, 0x3d, 0xf8, 0xa4, 0x79,
-	0xf5, 0x59, 0xff, 0xdd, 0x04, 0x38, 0x94, 0xd8, 0x09, 0x7c, 0x15, 0x54, 0x18, 0x6f, 0x56, 0xba,
-	0x64, 0x1b, 0x6b, 0x6e, 0x2e, 0x7a, 0x0f, 0x98, 0x1d, 0x5f, 0x84, 0x82, 0x7a, 0x70, 0x1f, 0x2c,
-	0x98, 0x46, 0x6f, 0x0b, 0xeb, 0xb8, 0x4f, 0x18, 0x11, 0x74, 0x96, 0x92, 0x5f, 0x7d, 0x96, 0x5b,
-	0xaf, 0xb9, 0xd7, 0x5a, 0xed, 0xb8, 0xca, 0x93, 0x51, 0x7d, 0x39, 0xa1, 0x99, 0x07, 0x41, 0x12,
-	0x24, 0xb4, 0x62, 0x8f, 0xee, 0xce, 0xa3, 0xc3, 0x6a, 0x96, 0xa4, 0x3c, 0xe4, 0xb3, 0x7b, 0xda,
-	0xcd, 0x6e, 0xe9, 0x50, 0x37, 0xbb, 0x09, 0x47, 0xdc, 0xf2, 0x94, 0x47, 0xdc, 0x4f, 0x24, 0x70,
-	0xde, 0xcc, 0x90, 0x4b, 0x55, 0xc0, 0xe7, 0xe6, 0x56, 0x96, 0xb9, 0xc9, 0x92, 0x9b, 0xad, 0x95,
-	0xf1, 0xa8, 0x7e, 0x3e, 0x8b, 0x26, 0xca, 0xe4, 0x1f, 0xbc, 0x0b, 0x4a, 0x86, 0xd8, 0x03, 0xab,
-	0x15, 0xee, 0xeb, 0xe5, 0x2c, 0xbe, 0xba, 0xfb, 0xa6, 0x93, 0x96, 0xee, 0x17, 0xf2, 0xb0, 0xe4,
-	0x8f, 0x8a, 0xe0, 0x54, 0xac, 0x82, 0x7f, 0x85, 0xf7, 0xd7, 0xb1, 0xc3, 0x74, 0x7e, 0x8a, 0xc3,
-	0xf4, 0x1a, 0x98, 0x17, 0x7f, 0x89, 0x88, 0x9c, 0xc5, 0xbd, 0x80, 0x59, 0x0f, 0x8b, 0x51, 0x54,
-	0x3f, 0xe9, 0xfe, 0xbc, 0x38, 0xe5, 0xfd, 0x79, 0xd0, 0x0b, 0xf1, 0x17, 0x3f, 0x27, 0xbd, 0xe3,
-	0x5e, 0x88, 0x7f, 0xfa, 0x45, 0xf5, 0x19, 0x71, 0x75, 0x50, 0x3d, 0x84, 0xe3, 0x61, 0xe2, 0xba,
-	0x1b, 0x92, 0xa2, 0x88, 0xf6, 0x97, 0x7a, 0xf6, 0xc7, 0x09, 0xcf, 0xfe, 0x57, 0xb2, 0xc4, 0x5a,
-	0xf6, 0xab, 0xf2, 0xc4, 0x4b, 0x8f, 0xca, 0xf4, 0x97, 0x1e, 0xf2, 0xdf, 0x24, 0xf0, 0x42, 0xea,
-	0xae, 0x05, 0xd7, 0x42, 0xb4, 0xf2, 0x4a, 0x84, 0x56, 0x7e, 0x2f, 0xd5, 0x30, 0xc0, 0x2d, 0xad,
-	0xe4, 0x5b, 0xf4, 0x37, 0xb2, 0xdd, 0xa2, 0x27, 0x9c, 0x84, 0x27, 0x5f, 0xa7, 0xb7, 0x7e, 0xf0,
-	0xe8, 0x71, 0xed, 0xd8, 0xa7, 0x8f, 0x6b, 0xc7, 0x3e, 0x7f, 0x5c, 0x3b, 0xf6, 0x8b, 0x71, 0x4d,
-	0x7a, 0x34, 0xae, 0x49, 0x9f, 0x8e, 0x6b, 0xd2, 0xe7, 0xe3, 0x9a, 0xf4, 0xf7, 0x71, 0x4d, 0xfa,
-	0xcd, 0x17, 0xb5, 0x63, 0xef, 0x2f, 0xa7, 0xfc, 0xe9, 0xf8, 0x7f, 0x01, 0x00, 0x00, 0xff, 0xff,
-	0xa4, 0x79, 0xcd, 0x52, 0x8e, 0x2c, 0x00, 0x00,
-}
+func (m *StatefulSetUpdateStrategy) Reset() { *m = StatefulSetUpdateStrategy{} }
 
 func (m *ControllerRevision) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -1845,6 +783,11 @@ func (m *DeploymentStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.TerminatingReplicas != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.TerminatingReplicas))
+		i--
+		dAtA[i] = 0x48
+	}
 	if m.CollisionCount != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.CollisionCount))
 		i--
@@ -2151,6 +1094,11 @@ func (m *ReplicaSetStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.TerminatingReplicas != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.TerminatingReplicas))
+		i--
+		dAtA[i] = 0x38
+	}
 	if len(m.Conditions) > 0 {
 		for iNdEx := len(m.Conditions) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -2426,7 +1374,7 @@ func (m *ScaleStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		for k := range m.Selector {
 			keysForSelector = append(keysForSelector, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForSelector)
+		sort.Strings(keysForSelector)
 		for iNdEx := len(keysForSelector) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.Selector[string(keysForSelector[iNdEx])]
 			baseI := i
@@ -3146,6 +2094,9 @@ func (m *DeploymentStatus) Size() (n int) {
 	if m.CollisionCount != nil {
 		n += 1 + sovGenerated(uint64(*m.CollisionCount))
 	}
+	if m.TerminatingReplicas != nil {
+		n += 1 + sovGenerated(uint64(*m.TerminatingReplicas))
+	}
 	return n
 }
 
@@ -3250,6 +2201,9 @@ func (m *ReplicaSetStatus) Size() (n int) {
 			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
+	}
+	if m.TerminatingReplicas != nil {
+		n += 1 + sovGenerated(uint64(*m.TerminatingReplicas))
 	}
 	return n
 }
@@ -3711,6 +2665,7 @@ func (this *DeploymentStatus) String() string {
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`ReadyReplicas:` + fmt.Sprintf("%v", this.ReadyReplicas) + `,`,
 		`CollisionCount:` + valueToStringGenerated(this.CollisionCount) + `,`,
+		`TerminatingReplicas:` + valueToStringGenerated(this.TerminatingReplicas) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3797,6 +2752,7 @@ func (this *ReplicaSetStatus) String() string {
 		`ReadyReplicas:` + fmt.Sprintf("%v", this.ReadyReplicas) + `,`,
 		`AvailableReplicas:` + fmt.Sprintf("%v", this.AvailableReplicas) + `,`,
 		`Conditions:` + repeatedStringForConditions + `,`,
+		`TerminatingReplicas:` + valueToStringGenerated(this.TerminatingReplicas) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3864,7 +2820,7 @@ func (this *ScaleStatus) String() string {
 	for k := range this.Selector {
 		keysForSelector = append(keysForSelector, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForSelector)
+	sort.Strings(keysForSelector)
 	mapStringForSelector := "map[string]string{"
 	for _, k := range keysForSelector {
 		mapStringForSelector += fmt.Sprintf("%v: %v,", k, this.Selector[k])
@@ -6261,6 +5217,26 @@ func (m *DeploymentStatus) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.CollisionCount = &v
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TerminatingReplicas", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.TerminatingReplicas = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -7193,6 +6169,26 @@ func (m *ReplicaSetStatus) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TerminatingReplicas", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.TerminatingReplicas = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

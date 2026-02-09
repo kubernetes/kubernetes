@@ -68,7 +68,7 @@ type Descriptor interface {
 	// dependency is not resolved, in which case only name information is known.
 	//
 	// Placeholder types may only be returned by the following accessors
-	// as a result of unresolved dependencies or weak imports:
+	// as a result of unresolved dependencies:
 	//
 	//	╔═══════════════════════════════════╤═════════════════════╗
 	//	║ Accessor                          │ Descriptor          ║
@@ -168,11 +168,7 @@ type FileImport struct {
 	// The current file and the imported file must be within proto package.
 	IsPublic bool
 
-	// IsWeak reports whether this is a weak import, which does not impose
-	// a direct dependency on the target file.
-	//
-	// Weak imports are a legacy proto1 feature. Equivalent behavior is
-	// achieved using proto2 extension fields or proto3 Any messages.
+	// Deprecated: support for weak fields has been removed.
 	IsWeak bool
 }
 
@@ -325,9 +321,7 @@ type FieldDescriptor interface {
 	// specified in the source .proto file.
 	HasOptionalKeyword() bool
 
-	// IsWeak reports whether this is a weak field, which does not impose a
-	// direct dependency on the target type.
-	// If true, then Message returns a placeholder type.
+	// Deprecated: support for weak fields has been removed.
 	IsWeak() bool
 
 	// IsPacked reports whether repeated primitive numeric kinds should be

@@ -20,17 +20,21 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
 )
 
 var deprecatedNodeLabels = map[string]string{
-	`beta.kubernetes.io/arch`:                  `deprecated since v1.14; use "kubernetes.io/arch" instead`,
-	`beta.kubernetes.io/os`:                    `deprecated since v1.14; use "kubernetes.io/os" instead`,
-	`failure-domain.beta.kubernetes.io/region`: `deprecated since v1.17; use "topology.kubernetes.io/region" instead`,
-	`failure-domain.beta.kubernetes.io/zone`:   `deprecated since v1.17; use "topology.kubernetes.io/zone" instead`,
-	`beta.kubernetes.io/instance-type`:         `deprecated since v1.17; use "node.kubernetes.io/instance-type" instead`,
+	`beta.kubernetes.io/arch`:                       `deprecated since v1.14; use "kubernetes.io/arch" instead`,
+	`beta.kubernetes.io/os`:                         `deprecated since v1.14; use "kubernetes.io/os" instead`,
+	`failure-domain.beta.kubernetes.io/region`:      `deprecated since v1.17; use "topology.kubernetes.io/region" instead`,
+	`failure-domain.beta.kubernetes.io/zone`:        `deprecated since v1.17; use "topology.kubernetes.io/zone" instead`,
+	`beta.kubernetes.io/instance-type`:              `deprecated since v1.17; use "node.kubernetes.io/instance-type" instead`,
+	`app.kubernetes.io/created-by`:                  `deprecated since v1.9`,
+	`scheduler.alpha.kubernetes.io/preferAvoidPods`: `deprecated since v1.22; use Taints and Tolerations instead`,
+	`node-role.kubernetes.io/master`:                `use "node-role.kubernetes.io/control-plane" instead`,
 }
 
 // GetNodeLabelDeprecatedMessage returns the message for the deprecated node label
@@ -88,7 +92,7 @@ func GetWarningsForNodeSelector(nodeSelector *metav1.LabelSelector, fieldPath *f
 }
 
 // GetWarningsForNodeSelectorTerm checks match expressions of node selector term
-func GetWarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, fieldPath *field.Path) []string {
+func GetWarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, checkLabelValue bool, fieldPath *field.Path) []string {
 	var warnings []string
 	// use of deprecated node labels in matchLabelExpressions
 	for i, expression := range nodeSelectorTerm.MatchExpressions {
@@ -102,6 +106,19 @@ func GetWarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, field
 					msg,
 				),
 			)
+		}
+		if checkLabelValue {
+			for index, value := range expression.Values {
+				for _, msg := range validation.IsValidLabelValue(value) {
+					warnings = append(warnings,
+						fmt.Sprintf(
+							"%s: %s is invalid, %s",
+							fieldPath.Child("matchExpressions").Index(i).Child("values").Index(index),
+							value,
+							msg,
+						))
+				}
+			}
 		}
 	}
 	return warnings

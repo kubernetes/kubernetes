@@ -17,6 +17,7 @@ limitations under the License.
 package healthcheck
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -51,13 +52,12 @@ type ServiceHealthServer interface {
 	SyncEndpoints(newEndpoints map[types.NamespacedName]int) error
 }
 
-type proxierHealthChecker interface {
-	// IsHealthy returns the proxier's health state, following the same
-	// definition the HTTP server defines.
-	IsHealthy() bool
+type proxyHealthChecker interface {
+	// Health returns the proxy's health state and last updated time.
+	Health() ProxyHealth
 }
 
-func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
+func newServiceHealthServer(nodeName string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
 	// It doesn't matter whether we listen on "0.0.0.0", "::", or ""; go
 	// treats them all the same.
 	nodeIPs := []net.IP{net.IPv4zero}
@@ -72,7 +72,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 	}
 
 	return &server{
-		hostname:      hostname,
+		nodeName:      nodeName,
 		recorder:      recorder,
 		listener:      listener,
 		httpFactory:   factory,
@@ -83,19 +83,19 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
-	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
+func NewServiceHealthServer(nodeName string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
+	return newServiceHealthServer(nodeName, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
 }
 
 type server struct {
-	hostname string
+	nodeName string
 	// node addresses where health check port will listen on
 	nodeIPs     []net.IP
 	recorder    events.EventRecorder // can be nil
 	listener    listener
 	httpFactory httpServerFactory
 
-	healthzServer proxierHealthChecker
+	healthzServer proxyHealthChecker
 
 	lock     sync.RWMutex
 	services map[types.NamespacedName]*hcInstance
@@ -131,18 +131,18 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 		err := svc.listenAndServeAll(hcs)
 
 		if err != nil {
-			msg := fmt.Sprintf("node %s failed to start healthcheck %q on port %d: %v", hcs.hostname, nsn.String(), port, err)
+			msg := fmt.Sprintf("node %s failed to start healthcheck %q on port %d: %v", hcs.nodeName, nsn.String(), port, err)
 
 			if hcs.recorder != nil {
 				hcs.recorder.Eventf(
 					&v1.ObjectReference{
-						Kind:      "Service",
-						Namespace: nsn.Namespace,
-						Name:      nsn.Name,
-						UID:       types.UID(nsn.String()),
+						APIVersion: "v1",
+						Kind:       "Service",
+						Namespace:  nsn.Namespace,
+						Name:       nsn.Name,
 					}, nil, api.EventTypeWarning, "FailedToStartServiceHealthcheck", "Listen", msg)
 			}
-			klog.ErrorS(err, "Failed to start healthcheck", "node", hcs.hostname, "service", nsn, "port", port)
+			klog.ErrorS(err, "Failed to start healthcheck", "node", hcs.nodeName, "service", nsn, "port", port)
 			continue
 		}
 		hcs.services[nsn] = svc
@@ -170,9 +170,9 @@ func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 	for _, ip := range hcs.nodeIPs {
 		addr := net.JoinHostPort(ip.String(), fmt.Sprint(hcI.port))
 		// create http server
-		httpSrv := hcs.httpFactory.New(addr, hcHandler{name: hcI.nsn, hcs: hcs})
+		httpSrv := hcs.httpFactory.New(hcHandler{name: hcI.nsn, hcs: hcs})
 		// start listener
-		listener, err = hcs.listener.Listen(addr)
+		listener, err = hcs.listener.Listen(context.TODO(), addr)
 		if err != nil {
 			// must close whatever have been previously opened
 			// to allow a retry/or port ownership change as needed
@@ -230,7 +230,7 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 	count := svc.endpoints
 	h.hcs.lock.RUnlock()
-	kubeProxyHealthy := h.hcs.healthzServer.IsHealthy()
+	kubeProxyHealthy := h.hcs.healthzServer.Health().Healthy
 
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")

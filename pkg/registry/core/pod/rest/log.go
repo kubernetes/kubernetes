@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
+	"k8s.io/utils/ptr"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -86,7 +89,14 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 
 	countSkipTLSMetric(logOpts.InsecureSkipTLSVerifyBackend)
 
-	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLogsQuerySplitStreams) {
+		// Even with defaulters, logOpts.Stream can be nil if no arguments are provided at all.
+		if logOpts.Stream == nil {
+			// Default to "All" to maintain backward compatibility.
+			logOpts.Stream = ptr.To(api.LogStreamAll)
+		}
+	}
+	if errs := validation.ValidatePodLogOptions(logOpts, utilfeature.DefaultFeatureGate.Enabled(features.PodLogsQuerySplitStreams)); len(errs) > 0 {
 		return nil, errors.NewInvalid(api.Kind("PodLogOptions"), name, errs)
 	}
 	location, transport, err := pod.LogLocation(ctx, r.Store, r.KubeletConn, name, logOpts)

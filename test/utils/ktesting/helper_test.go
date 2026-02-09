@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -30,40 +31,30 @@ import (
 // errors and log output. Those get compared.
 type testcase struct {
 	cb             func(TContext)
-	expectNoFail   bool
-	expectError    string
 	expectDuration time.Duration
-	expectLog      string
+	expectTrace    string
 }
 
 func (tc testcase) run(t *testing.T) {
-	bufferT := &logBufferT{T: t}
-	tCtx := Init(bufferT)
-	var err error
-	tCtx, finalize := WithError(tCtx, &err)
-	start := time.Now()
-	func() {
-		defer finalize()
-		tc.cb(tCtx)
-	}()
+	synctest.Test(t, func(t *testing.T) {
+		buffer := &mockTB{}
+		tCtx := Init(buffer)
+		start := time.Now()
+		func() {
+			defer func() {
+				if r := recover(); r != nil && r != logBufferStop {
+					panic(r)
+				}
+			}()
+			tc.cb(tCtx)
+		}()
+		duration := time.Since(start)
 
-	log := bufferT.log.String()
-	t.Logf("Log output:\n%s\n", log)
-	if tc.expectLog != "" {
-		assert.Equal(t, tc.expectLog, normalize(log))
-	} else if log != "" {
-		t.Error("Expected no log output.")
-	}
-
-	duration := time.Since(start)
-	assert.InDelta(t, tc.expectDuration.Seconds(), duration.Seconds(), 0.1, "callback invocation duration %s", duration)
-	assert.Equal(t, !tc.expectNoFail, tCtx.Failed(), "Failed()")
-	if tc.expectError == "" {
-		assert.NoError(t, err)
-	} else if assert.Error(t, err) {
-		t.Logf("Result:\n%s", err.Error())
-		assert.Equal(t, tc.expectError, normalize(err.Error()))
-	}
+		trace := buffer.log.String()
+		t.Logf("Trace:\n%s\n", trace)
+		assert.Equal(t, tc.expectDuration, duration, "callback invocation duration %s")
+		assert.Equal(t, tc.expectTrace, normalize(trace))
+	})
 }
 
 // normalize replaces parts of message texts which may vary with constant strings.
@@ -77,16 +68,111 @@ func normalize(msg string) string {
 	return msg
 }
 
-type logBufferT struct {
-	*testing.T
+// mockTB records which calls were made (type and parameters)
+//
+// The final string looks similar to the output visible in `go test -v`,
+// except that it is visible how the sausage was made (Fatal vs Log + FailNow).
+// Log+FailNow and Fatal are equivalent with testing.T, but not
+// with Ginkgo as underlying TB because it can only properly
+// capture the failure message if Fatal is used.
+type mockTB struct {
 	log strings.Builder
 }
 
-func (l *logBufferT) Log(args ...any) {
-	l.log.WriteString(fmt.Sprintln(args...))
+func (m *mockTB) Attr(key, value string) {
+	m.log.WriteString(fmt.Sprintf("(ATTR) %q %q\n", key, value))
 }
 
-func (l *logBufferT) Logf(format string, args ...any) {
-	l.log.WriteString(fmt.Sprintf(format, args...))
-	l.log.WriteRune('\n')
+func (m *mockTB) Chdir(dir string) {
+	m.log.WriteString(fmt.Sprintf("(CHDIR) %q\n", dir))
 }
+
+func (m *mockTB) Cleanup(func()) {
+	// Gets called by Init all the time, not logged because it's distracting.
+	// m.log.WriteString("(CLEANUP)\n")
+}
+
+func (m *mockTB) Error(args ...any) {
+	m.log.WriteString(fmt.Sprintln(append([]any{"(ERROR)"}, args...)...))
+}
+
+func (m *mockTB) Errorf(format string, args ...any) {
+	m.log.WriteString(fmt.Sprintf("(ERRORF) "+format+"\n", args))
+}
+
+func (m *mockTB) Fail() {
+	m.log.WriteString("(FAIL)\n")
+}
+
+func (m *mockTB) FailNow() {
+	m.log.WriteString("(FAILNOW)\n")
+	panic(logBufferStop)
+}
+
+func (m *mockTB) Failed() bool {
+	m.log.WriteString("(FAILED)\n")
+	return false
+}
+
+func (m *mockTB) Fatal(args ...any) {
+	m.log.WriteString(fmt.Sprintln(append([]any{"(FATAL)"}, args...)...))
+	panic(logBufferStop)
+}
+
+func (m *mockTB) Fatalf(format string, args ...any) {
+	m.log.WriteString(fmt.Sprintf("(FATALF) "+format+"\n", args))
+	panic(logBufferStop)
+}
+
+func (m *mockTB) Helper() {
+	// TODO: include stack unwinding to verify that Helper is called in the right places.
+	// Merely logging it is not sufficient.
+	// m.log.WriteString("HELPER\n")
+}
+
+func (m *mockTB) Log(args ...any) {
+	m.log.WriteString(fmt.Sprintln(append([]any{"(LOG)"}, args...)...))
+}
+
+func (m *mockTB) Logf(format string, args ...any) {
+	m.log.WriteString(fmt.Sprintf("(LOGF) "+format+"\n", args))
+}
+
+func (m *mockTB) Name() string {
+	// Gets called by Init all the time, not logged because its distracting.
+	// m.log.WriteString("(NAME)\n")
+	return "logBufferT"
+}
+
+func (m *mockTB) Setenv(key, value string) {
+	m.log.WriteString("(SETENV)\n")
+}
+
+func (m *mockTB) Skip(args ...any) {
+	m.log.WriteString(fmt.Sprintln(append([]any{"(SKIP)"}, args...)...))
+	panic(logBufferStop)
+}
+
+func (m *mockTB) SkipNow() {
+	m.log.WriteString("(SKIPNOW)\n")
+	panic(logBufferStop)
+}
+
+func (m *mockTB) Skipf(format string, args ...any) {
+	m.log.WriteString(fmt.Sprintf("(SKIPF) "+format+"\n", args...))
+	panic(logBufferStop)
+}
+
+func (m *mockTB) Skipped() bool {
+	m.log.WriteString("(SKIPPED)\n")
+	return false
+}
+
+func (m *mockTB) TempDir() string {
+	m.log.WriteString("(TEMPDIR)\n")
+	return "/no-such-dir"
+}
+
+var (
+	logBufferStop = "STOP"
+)

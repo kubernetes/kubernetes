@@ -33,6 +33,12 @@ type Args struct {
 	// by API linter. If specified, API rule violations will be printed to report file.
 	// Otherwise default value "-" will be used which indicates stdout.
 	ReportFilename string
+
+	// OutputModelNameFile is the name of the file to be generated for OpenAPI schema name
+	// accessor functions. If empty, no model name accessor functions are generated.
+	// When this is specified, the OpenAPI spec generator will use the function names
+	// instead of Go type names for schema names.
+	OutputModelNameFile string
 }
 
 // New returns default arguments for the generator. Returning the arguments instead
@@ -54,6 +60,13 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"the base Go import-path under which to generate results")
 	fs.StringVar(&args.OutputFile, "output-file", "generated.openapi.go",
 		"the name of the file to be generated")
+	fs.StringVar(&args.OutputModelNameFile, "output-model-name-file", "",
+		`The filename for generated model name accessor functions.
+If specified, a file with this name will be created in each package containing
+a "+k8s:openapi-model-package" tag. The generated functions return fully qualified
+model names, which are used in the OpenAPI spec as schema references instead of
+Go type names. If empty, no model name accessor functions are generated and names
+are inferred from Go type names.`)
 	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.StringVarP(&args.ReportFilename, "report-filename", "r", args.ReportFilename,

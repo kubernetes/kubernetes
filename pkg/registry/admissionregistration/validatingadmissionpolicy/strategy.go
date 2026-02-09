@@ -19,7 +19,7 @@ package validatingadmissionpolicy
 import (
 	"context"
 
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -100,7 +100,7 @@ func (v *validatingAdmissionPolicyStrategy) WarningsOnCreate(ctx context.Context
 func (v *validatingAdmissionPolicyStrategy) Canonicalize(obj runtime.Object) {
 }
 
-// AllowCreateOnUpdate is true for validatingAdmissionPolicy; this means you may create one with a PUT request.
+// AllowCreateOnUpdate is false for validatingAdmissionPolicy; this means you may not create one with a PUT request.
 func (v *validatingAdmissionPolicyStrategy) AllowCreateOnUpdate() bool {
 	return false
 }

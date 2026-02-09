@@ -14,6 +14,8 @@ import (
 )
 
 // Change or set the namespace of non-cluster level resources.
+//
+//nolint:tagalign
 type NamespaceTransformerPlugin struct {
 	types.ObjectMeta       `json:"metadata,omitempty" yaml:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	FieldSpecs             []types.FieldSpec                `json:"fieldSpecs,omitempty" yaml:"fieldSpecs,omitempty"`

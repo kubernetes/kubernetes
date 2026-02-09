@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -31,14 +30,14 @@ import (
 func main() {
 	err := output()
 	if err != nil {
-		os.Stderr.WriteString(fmt.Sprintf("Failed: %v", err))
+		os.Stderr.WriteString(fmt.Sprintf("Failed: %v", err)) // nolint:errcheck
 		os.Exit(1)
 	}
 }
 
 func output() error {
 	refFunc := func(name string) spec.Ref {
-		return spec.MustCreateRef(fmt.Sprintf("#/definitions/%s", friendlyName(name)))
+		return spec.MustCreateRef(fmt.Sprintf("#/definitions/%s", name))
 	}
 	defs := openapi.GetOpenAPIDefinitions(refFunc)
 	schemaDefs := make(map[string]spec.Schema, len(defs))
@@ -50,12 +49,12 @@ func output() error {
 		// the type.
 		if schema, ok := v.Schema.Extensions[common.ExtensionV2Schema]; ok {
 			if v2Schema, isOpenAPISchema := schema.(spec.Schema); isOpenAPISchema {
-				schemaDefs[friendlyName(k)] = v2Schema
+				schemaDefs[k] = v2Schema
 				continue
 			}
 		}
 
-		schemaDefs[friendlyName(k)] = v.Schema
+		schemaDefs[k] = v.Schema
 	}
 	data, err := json.Marshal(&spec.Swagger{
 		SwaggerProps: spec.SwaggerProps{
@@ -72,20 +71,6 @@ func output() error {
 	if err != nil {
 		return fmt.Errorf("error serializing api definitions: %w", err)
 	}
-	os.Stdout.Write(data)
+	os.Stdout.Write(data) // nolint:errcheck
 	return nil
-}
-
-// From k8s.io/apiserver/pkg/endpoints/openapi/openapi.go
-func friendlyName(name string) string {
-	nameParts := strings.Split(name, "/")
-	// Reverse first part. e.g., io.k8s... instead of k8s.io...
-	if len(nameParts) > 0 && strings.Contains(nameParts[0], ".") {
-		parts := strings.Split(nameParts[0], ".")
-		for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
-			parts[i], parts[j] = parts[j], parts[i]
-		}
-		nameParts[0] = strings.Join(parts, ".")
-	}
-	return strings.Join(nameParts, ".")
 }

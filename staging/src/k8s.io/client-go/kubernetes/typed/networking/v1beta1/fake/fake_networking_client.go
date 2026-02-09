@@ -29,19 +29,19 @@ type FakeNetworkingV1beta1 struct {
 }
 
 func (c *FakeNetworkingV1beta1) IPAddresses() v1beta1.IPAddressInterface {
-	return &FakeIPAddresses{c}
+	return newFakeIPAddresses(c)
 }
 
 func (c *FakeNetworkingV1beta1) Ingresses(namespace string) v1beta1.IngressInterface {
-	return &FakeIngresses{c, namespace}
+	return newFakeIngresses(c, namespace)
 }
 
 func (c *FakeNetworkingV1beta1) IngressClasses() v1beta1.IngressClassInterface {
-	return &FakeIngressClasses{c}
+	return newFakeIngressClasses(c)
 }
 
 func (c *FakeNetworkingV1beta1) ServiceCIDRs() v1beta1.ServiceCIDRInterface {
-	return &FakeServiceCIDRs{c}
+	return newFakeServiceCIDRs(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

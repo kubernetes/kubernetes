@@ -27,10 +27,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+)
+
+const (
+	// replicaSetNameSeparator is the character used to separate deployment name from hash
+	replicaSetNameSeparator = "-"
 )
 
 // syncStatusOnly only updates Deployments Status and doesn't take any mutating actions.
@@ -196,7 +204,7 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 	newRS := apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			// Make the name deterministic, to ensure idempotence
-			Name:            d.Name + "-" + podTemplateSpecHash,
+			Name:            generateReplicaSetName(d.Name, podTemplateSpecHash),
 			Namespace:       d.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 			Labels:          newRSTemplate.Labels,
@@ -275,7 +283,7 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 		return nil, err
 	}
 	if !alreadyExists && newReplicasCount > 0 {
-		dc.eventRecorder.Eventf(d, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
+		dc.eventRecorder.Eventf(d, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s from 0 to %d", createdRS.Name, newReplicasCount)
 	}
 
 	needsUpdate := deploymentutil.SetDeploymentRevision(d, newRevision)
@@ -303,7 +311,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 		if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) {
 			return nil
 		}
-		_, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment)
+		_, _, err := dc.scaleReplicaSet(ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment, false)
 		return err
 	}
 
@@ -311,7 +319,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 	// This case handles replica set adoption during a saturated new replica set.
 	if deploymentutil.IsSaturated(deployment, newRS) {
 		for _, old := range controller.FilterActiveReplicaSets(oldRSs) {
-			if _, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, old, 0, deployment); err != nil {
+			if _, _, err := dc.scaleReplicaSet(ctx, old, 0, deployment, false); err != nil {
 				return err
 			}
 		}
@@ -340,15 +348,12 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 		// drives what happens in case we are trying to scale replica sets of the same size.
 		// In such a case when scaling up, we should scale up newer replica sets first, and
 		// when scaling down, we should scale down older replica sets first.
-		var scalingOperation string
 		switch {
 		case deploymentReplicasToAdd > 0:
 			sort.Sort(controller.ReplicaSetsBySizeNewer(allRSs))
-			scalingOperation = "up"
 
 		case deploymentReplicasToAdd < 0:
 			sort.Sort(controller.ReplicaSetsBySizeOlder(allRSs))
-			scalingOperation = "down"
 		}
 
 		// Iterate over all active replica sets and estimate proportions for each of them.
@@ -363,7 +368,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 			// Estimate proportions if we have replicas to add, otherwise simply populate
 			// nameToSize with the current sizes for each replica set.
 			if deploymentReplicasToAdd != 0 {
-				proportion := deploymentutil.GetProportion(logger, rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
+				proportion := deploymentutil.GetReplicaSetProportion(logger, rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
 
 				nameToSize[rs.Name] = *(rs.Spec.Replicas) + proportion
 				deploymentReplicasAdded += proportion
@@ -386,7 +391,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 			}
 
 			// TODO: Use transactions when we have them.
-			if _, _, err := dc.scaleReplicaSet(ctx, rs, nameToSize[rs.Name], deployment, scalingOperation); err != nil {
+			if _, _, err := dc.scaleReplicaSet(ctx, rs, nameToSize[rs.Name], deployment, true); err != nil {
 				// Return as soon as we fail, the deployment is requeued
 				return err
 			}
@@ -395,25 +400,18 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 	return nil
 }
 
-func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
-	// No need to scale
-	if *(rs.Spec.Replicas) == newScale {
+// scaleReplicaSet acts in two modes:
+//  1. lazy update - when forceUpdate is false, it will only act when the replicas
+//     where changed;
+//  2. normal - either replicaset annotations (DesiredReplicasAnnotation and
+//     MaxReplicasAnnotation) require an update or the replicas have changed.
+func (dc *DeploymentController) scaleReplicaSet(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment, forceUpdate bool) (bool, *apps.ReplicaSet, error) {
+	// Don't scale, unless it's a forced update or the replicas actually differ
+	if !forceUpdate && *(rs.Spec.Replicas) == newScale {
 		return false, rs, nil
 	}
-	var scalingOperation string
-	if *(rs.Spec.Replicas) < newScale {
-		scalingOperation = "up"
-	} else {
-		scalingOperation = "down"
-	}
-	scaled, newRS, err := dc.scaleReplicaSet(ctx, rs, newScale, deployment, scalingOperation)
-	return scaled, newRS, err
-}
-
-func (dc *DeploymentController) scaleReplicaSet(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment, scalingOperation string) (bool, *apps.ReplicaSet, error) {
 
 	sizeNeedsUpdate := *(rs.Spec.Replicas) != newScale
-
 	annotationsNeedUpdate := deploymentutil.ReplicasAnnotationsNeedUpdate(rs, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 
 	scaled := false
@@ -425,8 +423,14 @@ func (dc *DeploymentController) scaleReplicaSet(ctx context.Context, rs *apps.Re
 		deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 		rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(ctx, rsCopy, metav1.UpdateOptions{})
 		if err == nil && sizeNeedsUpdate {
+			var scalingOperation string
+			if oldScale < newScale {
+				scalingOperation = "up"
+			} else {
+				scalingOperation = "down"
+			}
 			scaled = true
-			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d from %d", scalingOperation, rs.Name, newScale, oldScale)
+			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s from %d to %d", scalingOperation, rs.Name, oldScale, newScale)
 		}
 	}
 	return scaled, rs, err
@@ -507,6 +511,9 @@ func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployme
 		UnavailableReplicas: unavailableReplicas,
 		CollisionCount:      deployment.Status.CollisionCount,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
+		status.TerminatingReplicas = deploymentutil.GetTerminatingReplicaCountForReplicaSets(allRSs)
+	}
 
 	// Copy conditions one by one so we won't mutate the original object.
 	conditions := deployment.Status.Conditions
@@ -546,4 +553,16 @@ func (dc *DeploymentController) isScalingEvent(ctx context.Context, d *apps.Depl
 		}
 	}
 	return false, nil
+}
+
+// generateReplicaSetName generates a ReplicaSet name by adding a pod template spec hash
+// to a Deployment name, optionally truncating it to ensure the ReplicaSet name is within the limit.
+func generateReplicaSetName(deploymentName, podTemplateSpecHash string) string {
+	maxDeploymentNameLength := validation.DNS1123SubdomainMaxLength - len(replicaSetNameSeparator) - len(podTemplateSpecHash)
+
+	if len(deploymentName) > maxDeploymentNameLength && maxDeploymentNameLength > 0 {
+		return deploymentName[:maxDeploymentNameLength] + replicaSetNameSeparator + podTemplateSpecHash
+	}
+
+	return deploymentName + replicaSetNameSeparator + podTemplateSpecHash
 }

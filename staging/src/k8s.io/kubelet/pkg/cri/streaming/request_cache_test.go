@@ -71,7 +71,7 @@ func TestInsert(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	require.NoError(t, WriteError(err, recorder))
 	errResponse := recorder.Result()
-	assert.Equal(t, errResponse.StatusCode, http.StatusTooManyRequests)
+	assert.Equal(t, http.StatusTooManyRequests, errResponse.StatusCode)
 	assert.Equal(t, strconv.Itoa(int(cacheTTL.Seconds())), errResponse.Header.Get("Retry-After"))
 
 	assertCacheSize(t, c, maxInFlight)

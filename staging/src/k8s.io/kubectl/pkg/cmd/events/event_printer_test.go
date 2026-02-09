@@ -18,11 +18,12 @@ package events
 
 import (
 	"bytes"
+	"testing"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"testing"
-	"time"
 )
 
 func TestPrintObj(t *testing.T) {
@@ -50,7 +51,7 @@ func TestPrintObj(t *testing.T) {
 				},
 				Type:                corev1.EventTypeNormal,
 				Reason:              "ScalingReplicaSet",
-				Message:             "Scaled up replica set bar-002 to 1",
+				Message:             "Scaled up replica set bar-002 from 0 to 1",
 				ReportingController: "deployment-controller",
 				EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
 				Series: &corev1.EventSeries{
@@ -59,7 +60,7 @@ func TestPrintObj(t *testing.T) {
 				},
 			},
 			expected: `LAST SEEN	TYPE	REASON	OBJECT	MESSAGE
-12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 to 1
+12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 from 0 to 1
 `,
 		},
 		{
@@ -83,7 +84,7 @@ func TestPrintObj(t *testing.T) {
 						},
 						Type:                corev1.EventTypeNormal,
 						Reason:              "ScalingReplicaSet",
-						Message:             "Scaled up replica set bar-002 to 1",
+						Message:             "Scaled up replica set bar-002 from 0 to 1",
 						ReportingController: "deployment-controller",
 						EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
 						Series: &corev1.EventSeries{
@@ -105,7 +106,7 @@ func TestPrintObj(t *testing.T) {
 						},
 						Type:                corev1.EventTypeNormal,
 						Reason:              "ScalingReplicaSet",
-						Message:             "Scaled up replica set bar-002 to 1",
+						Message:             "Scaled up replica set bar-002 from 0 to 1",
 						ReportingController: "deployment-controller",
 						EventTime:           metav1.NewMicroTime(time.Now().Add(-15 * time.Minute)),
 						Series: &corev1.EventSeries{
@@ -116,8 +117,8 @@ func TestPrintObj(t *testing.T) {
 				},
 			},
 			expected: `NAMESPACE	LAST SEEN	TYPE	REASON	OBJECT	MESSAGE
-foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 to 1
-bar	11m (x3 over 15m)	Normal	ScalingReplicaSet	Deployment/bar2	Scaled up replica set bar-002 to 1
+foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 from 0 to 1
+bar	11m (x3 over 15m)	Normal	ScalingReplicaSet	Deployment/bar2	Scaled up replica set bar-002 from 0 to 1
 `,
 		},
 		{
@@ -139,7 +140,7 @@ bar	11m (x3 over 15m)	Normal	ScalingReplicaSet	Deployment/bar2	Scaled up replica
 				},
 				Type:                corev1.EventTypeNormal,
 				Reason:              "ScalingReplicaSet",
-				Message:             "Scaled up replica set bar-002 to 1",
+				Message:             "Scaled up replica set bar-002 from 0 to 1",
 				ReportingController: "deployment-controller",
 				EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
 				Series: &corev1.EventSeries{
@@ -147,7 +148,7 @@ bar	11m (x3 over 15m)	Normal	ScalingReplicaSet	Deployment/bar2	Scaled up replica
 					LastObservedTime: metav1.NewMicroTime(time.Now().Add(-12 * time.Minute)),
 				},
 			},
-			expected: "12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 to 1\n",
+			expected: "12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 from 0 to 1\n",
 		},
 		{
 			printer: EventPrinter{
@@ -168,7 +169,7 @@ bar	11m (x3 over 15m)	Normal	ScalingReplicaSet	Deployment/bar2	Scaled up replica
 				},
 				Type:                corev1.EventTypeNormal,
 				Reason:              "ScalingReplicaSet",
-				Message:             "Scaled up replica set bar-002 to 1",
+				Message:             "Scaled up replica set bar-002 from 0 to 1",
 				ReportingController: "deployment-controller",
 				EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
 				Series: &corev1.EventSeries{
@@ -177,7 +178,7 @@ bar	11m (x3 over 15m)	Normal	ScalingReplicaSet	Deployment/bar2	Scaled up replica
 				},
 			},
 			expected: `NAMESPACE	LAST SEEN	TYPE	REASON	OBJECT	MESSAGE
-foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 to 1
+foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 from 0 to 1
 `,
 		},
 		{
@@ -199,7 +200,7 @@ foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica 
 				},
 				Type:                corev1.EventTypeNormal,
 				Reason:              "ScalingReplicaSet",
-				Message:             "Scaled up replica set bar-002 to 1",
+				Message:             "Scaled up replica set bar-002 from 0 to 1",
 				ReportingController: "deployment-controller",
 				EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
 				Series: &corev1.EventSeries{
@@ -207,7 +208,7 @@ foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica 
 					LastObservedTime: metav1.NewMicroTime(time.Now().Add(-12 * time.Minute)),
 				},
 			},
-			expected: `foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 to 1
+			expected: `foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 from 0 to 1
 `,
 		},
 		{

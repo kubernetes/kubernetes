@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta2
 
 import (
-	"context"
+	context "context"
 
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
+	applyconfigurationsappsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,38 @@ type ReplicaSetsGetter interface {
 
 // ReplicaSetInterface has methods to work with ReplicaSet resources.
 type ReplicaSetInterface interface {
-	Create(ctx context.Context, replicaSet *v1beta2.ReplicaSet, opts v1.CreateOptions) (*v1beta2.ReplicaSet, error)
-	Update(ctx context.Context, replicaSet *v1beta2.ReplicaSet, opts v1.UpdateOptions) (*v1beta2.ReplicaSet, error)
+	Create(ctx context.Context, replicaSet *appsv1beta2.ReplicaSet, opts v1.CreateOptions) (*appsv1beta2.ReplicaSet, error)
+	Update(ctx context.Context, replicaSet *appsv1beta2.ReplicaSet, opts v1.UpdateOptions) (*appsv1beta2.ReplicaSet, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, replicaSet *v1beta2.ReplicaSet, opts v1.UpdateOptions) (*v1beta2.ReplicaSet, error)
+	UpdateStatus(ctx context.Context, replicaSet *appsv1beta2.ReplicaSet, opts v1.UpdateOptions) (*appsv1beta2.ReplicaSet, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta2.ReplicaSet, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta2.ReplicaSetList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1beta2.ReplicaSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1beta2.ReplicaSetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.ReplicaSet, err error)
-	Apply(ctx context.Context, replicaSet *appsv1beta2.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.ReplicaSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1beta2.ReplicaSet, err error)
+	Apply(ctx context.Context, replicaSet *applyconfigurationsappsv1beta2.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta2.ReplicaSet, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, replicaSet *appsv1beta2.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.ReplicaSet, err error)
+	ApplyStatus(ctx context.Context, replicaSet *applyconfigurationsappsv1beta2.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta2.ReplicaSet, err error)
 	ReplicaSetExpansion
 }
 
 // replicaSets implements ReplicaSetInterface
 type replicaSets struct {
-	*gentype.ClientWithListAndApply[*v1beta2.ReplicaSet, *v1beta2.ReplicaSetList, *appsv1beta2.ReplicaSetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1beta2.ReplicaSet, *appsv1beta2.ReplicaSetList, *applyconfigurationsappsv1beta2.ReplicaSetApplyConfiguration]
 }
 
 // newReplicaSets returns a ReplicaSets
 func newReplicaSets(c *AppsV1beta2Client, namespace string) *replicaSets {
 	return &replicaSets{
-		gentype.NewClientWithListAndApply[*v1beta2.ReplicaSet, *v1beta2.ReplicaSetList, *appsv1beta2.ReplicaSetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1beta2.ReplicaSet, *appsv1beta2.ReplicaSetList, *applyconfigurationsappsv1beta2.ReplicaSetApplyConfiguration](
 			"replicasets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta2.ReplicaSet { return &v1beta2.ReplicaSet{} },
-			func() *v1beta2.ReplicaSetList { return &v1beta2.ReplicaSetList{} }),
+			func() *appsv1beta2.ReplicaSet { return &appsv1beta2.ReplicaSet{} },
+			func() *appsv1beta2.ReplicaSetList { return &appsv1beta2.ReplicaSetList{} },
+			gentype.PrefersProtobuf[*appsv1beta2.ReplicaSet](),
+		),
 	}
 }

@@ -68,7 +68,7 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 			}
 		}
 
-		if IsZeroCIDR(str) {
+		if IsZeroCIDR(cidr) {
 			// Ignore everything else
 			npa.cidrs = []*net.IPNet{cidr}
 			npa.matchAll = true

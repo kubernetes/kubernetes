@@ -23,8 +23,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	metricutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -39,10 +41,11 @@ const (
 	unboundPVCKey = "unbound_pvc_count"
 
 	// Label names.
-	namespaceLabel    = "namespace"
-	storageClassLabel = "storage_class"
-	pluginNameLabel   = "plugin_name"
-	volumeModeLabel   = "volume_mode"
+	namespaceLabel             = "namespace"
+	storageClassLabel          = "storage_class"
+	volumeAttributesClassLabel = "volume_attributes_class"
+	pluginNameLabel            = "plugin_name"
+	volumeModeLabel            = "volume_mode"
 
 	// String to use when plugin name cannot be determined
 	pluginNameNotAvailable = "N/A"
@@ -86,6 +89,19 @@ type pvAndPVCCountCollector struct {
 	pluginMgr *volume.VolumePluginMgr
 }
 
+// Holds all dimensions for bound/unbound PVC metrics
+type pvcBindingMetricDimensions struct {
+	namespace, storageClassName, volumeAttributesClassName string
+}
+
+func getPVCMetricDimensions(pvc *v1.PersistentVolumeClaim) pvcBindingMetricDimensions {
+	return pvcBindingMetricDimensions{
+		namespace:                 pvc.Namespace,
+		storageClassName:          storagehelpers.GetPersistentVolumeClaimClass(pvc),
+		volumeAttributesClassName: ptr.Deref(pvc.Spec.VolumeAttributesClassName, ""),
+	}
+}
+
 // Check if our collector implements necessary collector interface
 var _ metrics.StableCollector = &pvAndPVCCountCollector{}
 
@@ -109,12 +125,12 @@ var (
 	boundPVCCountDesc = metrics.NewDesc(
 		metrics.BuildFQName("", pvControllerSubsystem, boundPVCKey),
 		"Gauge measuring number of persistent volume claim currently bound",
-		[]string{namespaceLabel}, nil,
+		[]string{namespaceLabel, storageClassLabel, volumeAttributesClassLabel}, nil,
 		metrics.ALPHA, "")
 	unboundPVCCountDesc = metrics.NewDesc(
 		metrics.BuildFQName("", pvControllerSubsystem, unboundPVCKey),
 		"Gauge measuring number of persistent volume claim currently unbound",
-		[]string{namespaceLabel}, nil,
+		[]string{namespaceLabel, storageClassLabel, volumeAttributesClassLabel}, nil,
 		metrics.ALPHA, "")
 
 	volumeOperationErrorsMetric = metrics.NewCounterVec(
@@ -218,32 +234,32 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- metrics.Metric) {
 }
 
 func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- metrics.Metric) {
-	boundNumberByNamespace := make(map[string]int)
-	unboundNumberByNamespace := make(map[string]int)
+	boundNumber := make(map[pvcBindingMetricDimensions]int)
+	unboundNumber := make(map[pvcBindingMetricDimensions]int)
 	for _, pvcObj := range collector.pvcLister.List() {
 		pvc, ok := pvcObj.(*v1.PersistentVolumeClaim)
 		if !ok {
 			continue
 		}
 		if pvc.Status.Phase == v1.ClaimBound {
-			boundNumberByNamespace[pvc.Namespace]++
+			boundNumber[getPVCMetricDimensions(pvc)]++
 		} else {
-			unboundNumberByNamespace[pvc.Namespace]++
+			unboundNumber[getPVCMetricDimensions(pvc)]++
 		}
 	}
-	for namespace, number := range boundNumberByNamespace {
+	for pvcLabels, number := range boundNumber {
 		ch <- metrics.NewLazyConstMetric(
 			boundPVCCountDesc,
 			metrics.GaugeValue,
 			float64(number),
-			namespace)
+			pvcLabels.namespace, pvcLabels.storageClassName, pvcLabels.volumeAttributesClassName)
 	}
-	for namespace, number := range unboundNumberByNamespace {
+	for pvcLabels, number := range unboundNumber {
 		ch <- metrics.NewLazyConstMetric(
 			unboundPVCCountDesc,
 			metrics.GaugeValue,
 			float64(number),
-			namespace)
+			pvcLabels.namespace, pvcLabels.storageClassName, pvcLabels.volumeAttributesClassName)
 	}
 }
 

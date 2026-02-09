@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
+	applyconfigurationsextensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type NetworkPoliciesGetter interface {
 
 // NetworkPolicyInterface has methods to work with NetworkPolicy resources.
 type NetworkPolicyInterface interface {
-	Create(ctx context.Context, networkPolicy *v1beta1.NetworkPolicy, opts v1.CreateOptions) (*v1beta1.NetworkPolicy, error)
-	Update(ctx context.Context, networkPolicy *v1beta1.NetworkPolicy, opts v1.UpdateOptions) (*v1beta1.NetworkPolicy, error)
+	Create(ctx context.Context, networkPolicy *extensionsv1beta1.NetworkPolicy, opts v1.CreateOptions) (*extensionsv1beta1.NetworkPolicy, error)
+	Update(ctx context.Context, networkPolicy *extensionsv1beta1.NetworkPolicy, opts v1.UpdateOptions) (*extensionsv1beta1.NetworkPolicy, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.NetworkPolicy, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.NetworkPolicyList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*extensionsv1beta1.NetworkPolicy, error)
+	List(ctx context.Context, opts v1.ListOptions) (*extensionsv1beta1.NetworkPolicyList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.NetworkPolicy, err error)
-	Apply(ctx context.Context, networkPolicy *extensionsv1beta1.NetworkPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.NetworkPolicy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *extensionsv1beta1.NetworkPolicy, err error)
+	Apply(ctx context.Context, networkPolicy *applyconfigurationsextensionsv1beta1.NetworkPolicyApplyConfiguration, opts v1.ApplyOptions) (result *extensionsv1beta1.NetworkPolicy, err error)
 	NetworkPolicyExpansion
 }
 
 // networkPolicies implements NetworkPolicyInterface
 type networkPolicies struct {
-	*gentype.ClientWithListAndApply[*v1beta1.NetworkPolicy, *v1beta1.NetworkPolicyList, *extensionsv1beta1.NetworkPolicyApplyConfiguration]
+	*gentype.ClientWithListAndApply[*extensionsv1beta1.NetworkPolicy, *extensionsv1beta1.NetworkPolicyList, *applyconfigurationsextensionsv1beta1.NetworkPolicyApplyConfiguration]
 }
 
 // newNetworkPolicies returns a NetworkPolicies
 func newNetworkPolicies(c *ExtensionsV1beta1Client, namespace string) *networkPolicies {
 	return &networkPolicies{
-		gentype.NewClientWithListAndApply[*v1beta1.NetworkPolicy, *v1beta1.NetworkPolicyList, *extensionsv1beta1.NetworkPolicyApplyConfiguration](
+		gentype.NewClientWithListAndApply[*extensionsv1beta1.NetworkPolicy, *extensionsv1beta1.NetworkPolicyList, *applyconfigurationsextensionsv1beta1.NetworkPolicyApplyConfiguration](
 			"networkpolicies",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta1.NetworkPolicy { return &v1beta1.NetworkPolicy{} },
-			func() *v1beta1.NetworkPolicyList { return &v1beta1.NetworkPolicyList{} }),
+			func() *extensionsv1beta1.NetworkPolicy { return &extensionsv1beta1.NetworkPolicy{} },
+			func() *extensionsv1beta1.NetworkPolicyList { return &extensionsv1beta1.NetworkPolicyList{} },
+			gentype.PrefersProtobuf[*extensionsv1beta1.NetworkPolicy](),
+		),
 	}
 }

@@ -20,36 +20,52 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	"k8s.io/client-go/tools/cache"
+
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
 	"k8s.io/cloud-provider/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	"k8s.io/component-base/metrics/testutil"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 type componentTester interface {
-	StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error)
+	StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptions, *server.SecureServingInfo, func(), error)
 }
 
 type kubeControllerManagerTester struct{}
 
-func (kubeControllerManagerTester) StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
+func (kubeControllerManagerTester) StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptions, *server.SecureServingInfo, func(), error) {
 	// avoid starting any controller loops, we're just testing serving
 	customFlags = append([]string{"--controllers="}, customFlags...)
-	gotResult, err := kubectrlmgrtesting.StartTestServer(ctx, customFlags)
+	gotResult, err := kubectrlmgrtesting.StartTestServer(t, ctx, customFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -58,18 +74,18 @@ func (kubeControllerManagerTester) StartTestServer(ctx context.Context, customFl
 
 type cloudControllerManagerTester struct{}
 
-func (cloudControllerManagerTester) StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
-	gotResult, err := cloudctrlmgrtesting.StartTestServer(ctx, customFlags)
+func (cloudControllerManagerTester) StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptions, *server.SecureServingInfo, func(), error) {
+	gotResult, err := cloudctrlmgrtesting.StartTestServer(t, ctx, customFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.TearDownFn, err
+	return gotResult.Options.SecureServing.SecureServingOptions, gotResult.Config.SecureServing, gotResult.TearDownFn, err
 }
 
 type kubeSchedulerTester struct{}
 
-func (kubeSchedulerTester) StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
-	gotResult, err := kubeschedulertesting.StartTestServer(ctx, customFlags)
+func (kubeSchedulerTester) StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (*options.SecureServingOptions, *server.SecureServingInfo, func(), error) {
+	gotResult, err := kubeschedulertesting.StartTestServer(t, ctx, customFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -132,10 +148,12 @@ users:
 	apiserverConfig.Close()
 
 	// create BROKEN kubeconfig for the apiserver
+
 	brokenApiserverConfig, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	brokenApiserverConfig.WriteString(fmt.Sprintf(`
 apiVersion: v1
 kind: Config
@@ -187,30 +205,30 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 		{"/healthz without authn/authz", []string{
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/healthz", true, false, intPtr(http.StatusOK)},
+		}, "/healthz", true, false, ptr.To(http.StatusOK)},
 		{"/metrics without authn/authz", []string{
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/metrics", true, false, intPtr(http.StatusForbidden)},
+		}, "/metrics", true, false, ptr.To(http.StatusForbidden)},
 		{"authorization skipped for /healthz with authn/authz", []string{
 			"--authentication-kubeconfig", kubeconfig,
 			"--authorization-kubeconfig", kubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/healthz", false, false, intPtr(http.StatusOK)},
+		}, "/healthz", false, false, ptr.To(http.StatusOK)},
 		{"authorization skipped for /healthz with BROKEN authn/authz", []string{
 			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
 			"--authentication-kubeconfig", brokenKubeconfig,
 			"--authorization-kubeconfig", brokenKubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/healthz", false, false, intPtr(http.StatusOK)},
+		}, "/healthz", false, false, ptr.To(http.StatusOK)},
 		{"not authorized /metrics with BROKEN authn/authz", []string{
 			"--authentication-kubeconfig", kubeconfig,
 			"--authorization-kubeconfig", brokenKubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusInternalServerError)},
+		}, "/metrics", false, false, ptr.To(http.StatusInternalServerError)},
 		{"always-allowed /metrics with BROKEN authn/authz", []string{
 			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
 			"--authentication-kubeconfig", brokenKubeconfig,
@@ -218,12 +236,12 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 			"--authorization-always-allow-paths", "/healthz,/metrics",
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusOK)},
+		}, "/metrics", false, false, ptr.To(http.StatusOK)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			secureOptions, secureInfo, tearDownFn, err := tester.StartTestServer(ctx, append(append([]string{}, tt.flags...), extraFlags...))
+			secureOptions, secureInfo, tearDownFn, err := tester.StartTestServer(t, ctx, slices.Concat(tt.flags, extraFlags))
 			if tearDownFn != nil {
 				defer tearDownFn()
 			}
@@ -280,12 +298,487 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 	}
 }
 
-func intPtr(x int) *int {
-	return &x
-}
-
 func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
 	return &fake.Cloud{
 		DisableRoutes: true, // disable routes for server tests, otherwise --cluster-cidr is required
 	}, nil
+}
+
+func TestKubeControllerManagerServingZPages(t *testing.T) {
+	// authenticate to apiserver via bearer token
+	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tokenFile.WriteString(fmt.Sprintf(`
+%s,system:kube-controller-manager,system:kube-controller-manager,""
+`, token)); err != nil {
+		t.Fatal(err)
+	}
+	if err = tokenFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// start apiserver
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--token-auth-file", tokenFile.Name(),
+		"--authorization-mode", "RBAC",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// create kubeconfig for the apiserver
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = apiserverConfig.WriteString(fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: controller-manager
+  name: default-context
+current-context: default-context
+users:
+- name: controller-manager
+  user:
+    token: %s
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, token)); err != nil {
+		t.Fatal(err)
+	}
+	if err = apiserverConfig.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuszWantBodyStr := "kube-controller-manager statusz\nWarning: This endpoint is not meant to be machine parseable"
+	statuszWantBodyJSON := &v1alpha1.Statusz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Statusz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-controller-manager",
+		},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/metrics"},
+	}
+
+	flagzWantBodyStr := "kube-controller-manager flagz\nWarning: This endpoint is not meant to be machine parseable"
+	flagzWantBodyJSON := &flagzv1alpha1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-controller-manager",
+		},
+	}
+
+	statuszTestCases := []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string            // for text/plain
+		wantJSON     *v1alpha1.Statusz // for structured json
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  statuszWantBodyStr,
+		},
+		{
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     statuszWantBodyJSON,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  statuszWantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  statuszWantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  statuszWantBodyStr,
+		},
+	}
+
+	flagzTestCases := []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string               // for text/plain
+		wantJSON     *flagzv1alpha1.Flagz // for structured json
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     flagzWantBodyJSON,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentFlagz, true)
+	_, ctx := ktesting.NewTestContext(t)
+	flags := []string{
+		"--authentication-skip-lookup",
+		"--authentication-kubeconfig", apiserverConfig.Name(),
+		"--authorization-kubeconfig", apiserverConfig.Name(),
+		"--authorization-always-allow-paths", "/statusz,/flagz",
+		"--kubeconfig", apiserverConfig.Name(),
+		"--leader-elect=false",
+	}
+	secureOptions, secureInfo, tearDownFn, err := kubeControllerManagerTester{}.StartTestServer(t, ctx, flags)
+	if tearDownFn != nil {
+		defer tearDownFn()
+	}
+	if err != nil {
+		t.Fatalf("StartTestServer() error = %v", err)
+	}
+	if secureInfo == nil {
+		t.Fatalf("SecureServing not enabled")
+	}
+	_, port, err := net.SplitHostPort(secureInfo.Listener.Addr().String())
+	if err != nil {
+		t.Fatalf("could not get host and port from %s : %v", secureInfo.Listener.Addr().String(), err)
+	}
+	statuszURL := fmt.Sprintf("https://127.0.0.1:%s/statusz", port)
+	flagzURL := fmt.Sprintf("https://127.0.0.1:%s/flagz", port)
+
+	// read self-signed server cert disk
+	pool := x509.NewCertPool()
+	serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+	serverCert, err := os.ReadFile(serverCertPath)
+	if err != nil {
+		t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
+	}
+	pool.AppendCertsFromPEM(serverCert)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: pool,
+		},
+	}
+	client := &http.Client{Transport: tr}
+
+	for _, tc := range statuszTestCases {
+		t.Run("statusz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, statuszURL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			req.Header.Set("Accept", tc.acceptHeader)
+			req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+			r, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("failed to GET /statusz: %v", err)
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+
+			if err = r.Body.Close(); err != nil {
+				t.Fatalf("failed to close response body: %v", err)
+			}
+
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
+			}
+
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodySub != "" {
+					if !strings.Contains(string(body), tc.wantBodySub) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+					}
+				}
+				if tc.wantJSON != nil {
+					var got v1alpha1.Statusz
+					if err := json.Unmarshal(body, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					}
+					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
+						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
+					}
+				}
+			}
+		})
+	}
+
+	for _, tc := range flagzTestCases {
+		t.Run("flagz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, flagzURL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			req.Header.Set("Accept", tc.acceptHeader)
+			req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+			r, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("failed to GET /flagz: %v", err)
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+
+			if err = r.Body.Close(); err != nil {
+				t.Fatalf("failed to close response body: %v", err)
+			}
+
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
+			}
+
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodySub != "" {
+					if !strings.Contains(string(body), tc.wantBodySub) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+					}
+				}
+				if tc.wantJSON != nil {
+					var got flagzv1alpha1.Flagz
+					if err := json.Unmarshal(body, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestKubeControllerManagerInformerMetrics(t *testing.T) {
+	// authenticate to apiserver via bearer token
+	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = fmt.Fprintf(tokenFile, `
+%s,system:kube-controller-manager,system:kube-controller-manager,""
+`, token); err != nil {
+		t.Fatal(err)
+	}
+	if err = tokenFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// start apiserver
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--token-auth-file", tokenFile.Name(),
+		"--authorization-mode", "RBAC",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// create kubeconfig for the apiserver
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = fmt.Fprintf(apiserverConfig, `
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: controller-manager
+  name: default-context
+current-context: default-context
+users:
+- name: controller-manager
+  user:
+    token: %s
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, token); err != nil {
+		t.Fatal(err)
+	}
+	if err = apiserverConfig.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	legacyregistry.Reset()
+	cache.ResetInformerNamesForTesting()
+	fifo.Register()
+	_, ctx := ktesting.NewTestContext(t)
+	flags := []string{
+		"--authentication-skip-lookup",
+		"--authentication-kubeconfig", apiserverConfig.Name(),
+		"--authorization-kubeconfig", apiserverConfig.Name(),
+		"--authorization-always-allow-paths", "/metrics",
+		"--kubeconfig", apiserverConfig.Name(),
+		"--leader-elect=false",
+		// Enable a minimal set of controllers to ensure informers are started and metrics are produced.
+		"--controllers=garbagecollector",
+	}
+	secureOptions, secureInfo, tearDownFn, err := kubeControllerManagerTester{}.StartTestServer(t, ctx, flags)
+	if tearDownFn != nil {
+		defer tearDownFn()
+	}
+	if err != nil {
+		t.Fatalf("StartTestServer() error = %v", err)
+	}
+	if secureInfo == nil {
+		t.Fatalf("SecureServing not enabled")
+	}
+	_, port, err := net.SplitHostPort(secureInfo.Listener.Addr().String())
+	if err != nil {
+		t.Fatalf("could not get host and port from %s : %v", secureInfo.Listener.Addr().String(), err)
+	}
+	metricsURL := fmt.Sprintf("https://127.0.0.1:%s/metrics", port)
+
+	// read self-signed server cert disk
+	pool := x509.NewCertPool()
+	serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+	serverCert, err := os.ReadFile(serverCertPath)
+	if err != nil {
+		t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
+	}
+	pool.AppendCertsFromPEM(serverCert)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: pool,
+		},
+	}
+	client := &http.Client{Transport: tr}
+
+	req, err := http.NewRequest(http.MethodGet, metricsURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+	r, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to GET /metrics: %v", err)
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	if err = r.Body.Close(); err != nil {
+		t.Fatalf("failed to close response body: %v", err)
+	}
+
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("want status %d, got %d: %s", http.StatusOK, r.StatusCode, string(body))
+	}
+
+	// Parse metrics using testutil
+	metrics := testutil.NewMetrics()
+	if err := testutil.ParseMetrics(string(body), &metrics); err != nil {
+		t.Fatalf("failed to parse metrics: %v", err)
+	}
+
+	// Verify that informer_queued_items metric exists
+	wantMetricName := "informer_queued_items"
+	samples, found := metrics[wantMetricName]
+	if !found {
+		t.Fatalf("expected metrics to contain %q, but it was not found", wantMetricName)
+	}
+
+	// Verify that at least one sample has the kube-controller-manager name label
+	wantLabelValue := testutil.LabelValue("kube-controller-manager")
+	foundKCM := false
+	for _, sample := range samples {
+		if nameLabel, ok := sample.Metric["name"]; ok && nameLabel == wantLabelValue {
+			foundKCM = true
+			t.Logf("Found expected metric: %s", sample.String())
+			break
+		}
+	}
+	if !foundKCM {
+		t.Errorf("expected to find informer_queued_items metric with name=\"kube-controller-manager\" label")
+	}
 }

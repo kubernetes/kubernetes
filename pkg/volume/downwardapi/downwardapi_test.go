@@ -248,7 +248,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 	}
 	podMeta.UID = testPodUID
 	pod := &v1.Pod{ObjectMeta: podMeta}
-	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -321,7 +321,7 @@ func (step stepName) getName() string { return step.name }
 func doVerifyLinesInFile(t *testing.T, volumePath, filename string, expected string) {
 	data, err := os.ReadFile(filepath.Join(volumePath, filename))
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err.Error())
 		return
 	}
 	actualStr := string(data)
@@ -357,7 +357,7 @@ type verifyMode struct {
 func (step verifyMode) run(test *downwardAPITest) {
 	fileInfo, err := os.Stat(filepath.Join(test.volumePath, step.name))
 	if err != nil {
-		test.t.Errorf(err.Error())
+		test.t.Error(err.Error())
 		return
 	}
 

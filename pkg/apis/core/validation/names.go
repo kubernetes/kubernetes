@@ -25,6 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+// IsKubernetesSignerName checks if signerName is one reserved by the Kubernetes project.
+func IsKubernetesSignerName(signerName string) bool {
+	hostName, _, _ := strings.Cut(signerName, "/")
+	return hostName == "kubernetes.io" || strings.HasSuffix(hostName, ".kubernetes.io")
+}
+
 // ValidateSignerName checks that signerName is syntactically valid.
 //
 // ensure signerName is of the form domain.com/something and up to 571 characters.
@@ -54,7 +60,7 @@ func ValidateSignerName(fldPath *field.Path, signerName string) field.ErrorList 
 	// validate that segments[0] is less than 253 characters altogether
 	maxDomainSegmentLength := validation.DNS1123SubdomainMaxLength
 	if len(segments[0]) > maxDomainSegmentLength {
-		el = append(el, field.TooLong(fldPath, segments[0], maxDomainSegmentLength))
+		el = append(el, field.TooLong(fldPath, "" /*unused*/, maxDomainSegmentLength))
 	}
 	// validate that segments[0] consists of valid DNS1123 labels separated by '.'
 	domainLabels := strings.Split(segments[0], ".")
@@ -97,7 +103,7 @@ func ValidateSignerName(fldPath *field.Path, signerName string) field.ErrorList 
 	maxPathSegmentLength := validation.DNS1123SubdomainMaxLength + validation.DNS1123LabelMaxLength + 1
 	maxSignerNameLength := maxDomainSegmentLength + maxPathSegmentLength + 1
 	if len(signerName) > maxSignerNameLength {
-		el = append(el, field.TooLong(fldPath, signerName, maxSignerNameLength))
+		el = append(el, field.TooLong(fldPath, "" /*unused*/, maxSignerNameLength))
 	}
 
 	return el

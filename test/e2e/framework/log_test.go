@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("log", func() {
 	})
 	ginkgo.AfterEach(func() {
 		framework.Logf("after")
-		gomega.Expect(true).To(gomega.BeFalse(), "true is never false either")
+		gomega.Expect(true).To(gomega.BeFalseBecause("artificial assertion failure"))
 	})
 	ginkgo.It("fails", func() {
 		func() {
@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("log", func() {
 		}()
 	})
 	ginkgo.It("asserts", func() {
-		gomega.Expect(false).To(gomega.BeTrue(), "false is never true")
+		gomega.Expect(false).To(gomega.BeTrueBecause("artificial assertion failure"))
 	})
 	ginkgo.It("error", func() {
 		err := errors.New("an error with a long, useless description")
@@ -106,10 +106,7 @@ In [It] at: log_test.go:57 <time>
 < Exit [It] fails - log_test.go:55 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
 <klog> log_test.go:52] after
-[FAILED] true is never false either
-Expected
-    <bool>: true
-to be false
+[FAILED] artificial assertion failure
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -119,10 +116,7 @@ In [AfterEach] at: log_test.go:53 <time>
 					Status: "failed",
 					Failure: &reporters.JUnitFailure{
 						Type: "failed",
-						Description: `[FAILED] false is never true
-Expected
-    <bool>: false
-to be true
+						Description: `[FAILED] artificial assertion failure
 In [It] at: log_test.go:61 <time>
 
 There were additional failures detected after the initial failure. These are visible in the timeline
@@ -132,18 +126,12 @@ There were additional failures detected after the initial failure. These are vis
 <klog> log_test.go:49] before
 < Exit [BeforeEach] log - log_test.go:48 <time>
 > Enter [It] asserts - log_test.go:60 <time>
-[FAILED] false is never true
-Expected
-    <bool>: false
-to be true
+[FAILED] artificial assertion failure
 In [It] at: log_test.go:61 <time>
 < Exit [It] asserts - log_test.go:60 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
 <klog> log_test.go:52] after
-[FAILED] true is never false either
-Expected
-    <bool>: true
-to be false
+[FAILED] artificial assertion failure
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -174,10 +162,7 @@ In [It] at: log_test.go:65 <time>
 < Exit [It] error - log_test.go:63 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
 <klog> log_test.go:52] after
-[FAILED] true is never false either
-Expected
-    <bool>: true
-to be false
+[FAILED] artificial assertion failure
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -210,10 +195,7 @@ In [It] at: log_test.go:68 <time>
 < Exit [It] equal - log_test.go:67 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
 <klog> log_test.go:52] after
-[FAILED] true is never false either
-Expected
-    <bool>: true
-to be false
+[FAILED] artificial assertion failure
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -238,10 +220,7 @@ In [It] at: log_test.go:44 <time>
 < Exit [It] fails with helper - log_test.go:70 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
 <klog> log_test.go:52] after
-[FAILED] true is never false either
-Expected
-    <bool>: true
-to be false
+[FAILED] artificial assertion failure
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -251,10 +230,7 @@ In [AfterEach] at: log_test.go:53 <time>
 					Status: "failed",
 					Failure: &reporters.JUnitFailure{
 						Type: "failed",
-						Description: `[FAILED] true is never false either
-Expected
-    <bool>: true
-to be false
+						Description: `[FAILED] artificial assertion failure
 In [AfterEach] at: log_test.go:53 <time>
 `,
 					},
@@ -267,10 +243,7 @@ In [AfterEach] at: log_test.go:53 <time>
 < Exit [It] redirects klog - log_test.go:73 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
 <klog> log_test.go:52] after
-[FAILED] true is never false either
-Expected
-    <bool>: true
-to be false
+[FAILED] artificial assertion failure
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,

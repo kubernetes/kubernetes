@@ -478,7 +478,7 @@ function kube::util::create_client_certkey {
     done
     ${sudo} /usr/bin/env bash -e <<EOF
     cd ${dest_dir}
-    echo '{"CN":"${cn}","names":[${groups}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare client-${id}
+    echo '{"CN":"${cn}","names":[${groups}],"hosts":[],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare client-${id}
     mv "client-${id}-key.pem" "client-${id}.key"
     mv "client-${id}.pem" "client-${id}.crt"
     rm -f "client-${id}.csr"
@@ -720,22 +720,22 @@ function kube::util::ensure-gnu-sed {
   kube::util::sourced_variable "${SED}"
 }
 
-# kube::util::ensure-gnu-date
+# kube::util::ensure-gnu-compatible-date
 # Determines which date binary is gnu-date on linux/darwin
 #
 # Sets:
 #  DATE: The name of the gnu-date binary
 #
-function kube::util::ensure-gnu-date {
+function kube::util::ensure-gnu-compatible-date {
   # NOTE: the echo below is a workaround to ensure date is executed before the grep.
   # see: https://github.com/kubernetes/kubernetes/issues/87251
-  date_help="$(LANG=C date --help 2>&1 || true)"
-  if echo "${date_help}" | grep -q "GNU\|BusyBox"; then
+  date_version="$(LANG=C date --version 2>&1 || true)"
+  if echo "${date_version}" | grep -q "GNU\|BusyBox\|uutils"; then
     DATE="date"
   elif command -v gdate &>/dev/null; then
     DATE="gdate"
   else
-    kube::log::error "Failed to find GNU date as date or gdate. If you are on Mac: brew install coreutils." >&2
+    kube::log::error "Failed to find GNU-compatible date as date or gdate. If you are on Mac: brew install coreutils." >&2
     return 1
   fi
   kube::util::sourced_variable "${DATE}"
@@ -826,6 +826,18 @@ function kube::util::read-array {
   if ! eval "[[ \${$1[--__read_array_i]} ]]"; then
     unset "$1[__read_array_i]" # ensures last element isn't empty
   fi
+}
+
+# kube::util::run-in
+# Changes directory to "$1", runs the rest of the arguments, and restores the initial directory
+# Returns 1 if a directory change fails, the result of running the arguments otherwise
+function kube::util::run-in {
+  pushd "$1" > /dev/null || return 1
+  shift
+  "$@"
+  local result=$?
+  popd > /dev/null || return 1
+  return $result
 }
 
 # Some useful colors.

@@ -17,16 +17,8 @@ limitations under the License.
 package nodevolumelimits
 
 import (
-	"strings"
-
-	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // isCSIMigrationOn returns a boolean value indicating whether
@@ -42,9 +34,7 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	case csilibplugins.AWSEBSInTreePluginName:
 		return true
 	case csilibplugins.PortworxVolumePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx) {
-			return false
-		}
+		return true
 	case csilibplugins.GCEPDInTreePluginName:
 		return true
 	case csilibplugins.AzureDiskInTreePluginName:
@@ -54,33 +44,4 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	default:
 		return false
 	}
-
-	// The plugin name should be listed in the CSINode object annotation.
-	// This indicates that the plugin has been migrated to a CSI driver in the node.
-	csiNodeAnn := csiNode.GetAnnotations()
-	if csiNodeAnn == nil {
-		return false
-	}
-
-	var mpaSet sets.Set[string]
-	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
-	if len(mpa) == 0 {
-		mpaSet = sets.New[string]()
-	} else {
-		tok := strings.Split(mpa, ",")
-		mpaSet = sets.New(tok...)
-	}
-
-	return mpaSet.Has(pluginName)
-}
-
-// volumeLimits returns volume limits associated with the node.
-func volumeLimits(n *framework.NodeInfo) map[v1.ResourceName]int64 {
-	volumeLimits := map[v1.ResourceName]int64{}
-	for k, v := range n.Allocatable.ScalarResources {
-		if v1helper.IsAttachableVolumeResourceName(k) {
-			volumeLimits[k] = v
-		}
-	}
-	return volumeLimits
 }

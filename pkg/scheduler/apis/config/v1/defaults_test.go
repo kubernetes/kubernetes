@@ -51,6 +51,16 @@ var pluginConfigs = []configv1.PluginConfig{
 			}},
 	},
 	{
+		Name: "DynamicResources",
+		Args: runtime.RawExtension{Object: &configv1.DynamicResourcesArgs{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "DynamicResourcesArgs",
+				APIVersion: "kubescheduler.config.k8s.io/v1",
+			},
+			FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+		}},
+	},
+	{
 		Name: "InterPodAffinity",
 		Args: runtime.RawExtension{
 			Object: &configv1.InterPodAffinityArgs{
@@ -121,6 +131,7 @@ func TestSchedulerDefaults(t *testing.T) {
 	unknownPluginConfigs[0].Args = runtime.RawExtension{Object: &runtime.Unknown{}}
 
 	tests := []struct {
+		features map[featuregate.Feature]bool
 		name     string
 		config   *configv1.KubeSchedulerConfiguration
 		expected *configv1.KubeSchedulerConfiguration
@@ -262,6 +273,16 @@ func TestSchedulerDefaults(t *testing.T) {
 									}},
 							},
 							{
+								Name: "DynamicResources",
+								Args: runtime.RawExtension{Object: &configv1.DynamicResourcesArgs{
+									TypeMeta: metav1.TypeMeta{
+										Kind:       "DynamicResourcesArgs",
+										APIVersion: "kubescheduler.config.k8s.io/v1",
+									},
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+								}},
+							},
+							{
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
 									Object: &configv1.InterPodAffinityArgs{
@@ -345,6 +366,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.VolumeZone},
 									{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
 									{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
+									{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
 									{Name: names.DefaultPreemption},
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
@@ -640,10 +662,47 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:     "default DynamicResources",
+			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
+			config:   &configv1.KubeSchedulerConfiguration{},
+			expected: &configv1.KubeSchedulerConfiguration{
+				Parallelism: ptr.To[int32](16),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       ptr.To(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "leases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: ptr.To[int32](config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds: ptr.To[int64](1),
+				PodMaxBackoffSeconds:     ptr.To[int64](10),
+				Profiles: []configv1.KubeSchedulerProfile{
+					{
+						Plugins:       getDefaultPlugins(),
+						PluginConfig:  pluginConfigs,
+						SchedulerName: ptr.To("default-scheduler"),
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
 			SetDefaults_KubeSchedulerConfiguration(tc.config)
 			if diff := cmp.Diff(tc.expected, tc.config); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
@@ -810,9 +869,9 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "VolumeBindingArgs empty, VolumeCapacityPriority disabled",
+			name: "VolumeBindingArgs empty, StorageCapacityScoring disabled",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: false,
+				features.StorageCapacityScoring: false,
 			},
 			in: &configv1.VolumeBindingArgs{},
 			want: &configv1.VolumeBindingArgs{
@@ -820,17 +879,29 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "VolumeBindingArgs empty, VolumeCapacityPriority enabled",
+			name: "VolumeBindingArgs empty, StorageCapacityScoring enabled",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: true,
+				features.StorageCapacityScoring: true,
 			},
 			in: &configv1.VolumeBindingArgs{},
 			want: &configv1.VolumeBindingArgs{
 				BindTimeoutSeconds: ptr.To[int64](600),
 				Shape: []configv1.UtilizationShapePoint{
-					{Utilization: 0, Score: 0},
-					{Utilization: 100, Score: 10},
+					{Utilization: 0, Score: 10},
+					{Utilization: 100, Score: 0},
 				},
+			},
+		},
+		{
+			name: "DynamicResourcesArgs defaults, DRADeviceBindingConditions enabled",
+			features: map[featuregate.Feature]bool{
+				features.DRADeviceBindingConditions:   true,
+				features.DRAResourceClaimDeviceStatus: true,
+			},
+			in: &configv1.DynamicResourcesArgs{},
+			want: &configv1.DynamicResourcesArgs{
+				FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+				BindingTimeout: &metav1.Duration{Duration: 600 * time.Second},
 			},
 		},
 	}
@@ -838,9 +909,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 		scheme := runtime.NewScheme()
 		utilruntime.Must(AddToScheme(scheme))
 		t.Run(tc.name, func(t *testing.T) {
-			for k, v := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
-			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
 			scheme.Default(tc.in)
 			if diff := cmp.Diff(tc.want, tc.in); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)

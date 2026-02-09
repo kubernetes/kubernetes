@@ -1,7 +1,7 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(
-    default_visibility = ["//parser:__subpackages__"],
+    default_visibility = ["//:__subpackages__"],
     licenses = ["notice"],  # Apache 2.0
 )
 

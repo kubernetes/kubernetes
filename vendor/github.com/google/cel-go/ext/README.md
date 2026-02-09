@@ -3,15 +3,15 @@
 CEL extensions are a related set of constants, functions, macros, or other
 features which may not be covered by the core CEL spec.
 
-## Bindings 
+## Bindings
 
 Returns a cel.EnvOption to configure support for local variable bindings
 in expressions.
 
-# Cel.Bind
+### Cel.Bind
 
 Binds a simple identifier to an initialization expression which may be used
-in a subsequenct result expression. Bindings may also be nested within each
+in a subsequent result expression. Bindings may also be nested within each
 other.
 
     cel.bind(<varName>, <initExpr>, <resultExpr>)
@@ -19,17 +19,17 @@ other.
 Examples:
 
     cel.bind(a, 'hello',
-     cel.bind(b, 'world', a + b + b + a)) // "helloworldworldhello"
+    cel.bind(b, 'world', a + b + b + a)) // "helloworldworldhello"
 
     // Avoid a list allocation within the exists comprehension.
     cel.bind(valid_values, [a, b, c],
-     [d, e, f].exists(elem, elem in valid_values))
+    [d, e, f].exists(elem, elem in valid_values))
 
 Local bindings are not guaranteed to be evaluated before use.
 
 ## Encoders
 
-Encoding utilies for marshalling data into standardized representations.
+Encoding utilities for marshalling data into standardized representations.
 
 ### Base64.Decode
 
@@ -100,7 +100,8 @@ argument. Simple numeric and list literals are supported as valid argument
 types; however, other literals will be flagged as errors during macro
 expansion. If the argument expression does not resolve to a numeric or
 list(numeric) type during type-checking, or during runtime then an error
-will be produced. If a list argument is empty, this too will produce an error.
+will be produced. If a list argument is empty, this too will produce an
+error.
 
     math.least(<arg>, ...) -> <double|int|uint>
 
@@ -116,6 +117,261 @@ Examples:
     math.least('string') // parse error
     math.least(a, b)     // check-time error if a or b is non-numeric
     math.least(dyn('string')) // runtime error
+
+### Math.BitOr
+
+Introduced at version: 1
+
+Performs a bitwise-OR operation over two int or uint values.
+
+    math.bitOr(<int>, <int>) -> <int>
+    math.bitOr(<uint>, <uint>) -> <uint>
+
+Examples:
+
+    math.bitOr(1u, 2u)    // returns 3u
+    math.bitOr(-2, -4)    // returns -2
+
+### Math.BitAnd
+
+Introduced at version: 1
+
+Performs a bitwise-AND operation over two int or uint values.
+
+    math.bitAnd(<int>, <int>) -> <int>
+    math.bitAnd(<uint>, <uint>) -> <uint>
+
+Examples:
+
+    math.bitAnd(3u, 2u)   // return 2u
+    math.bitAnd(3, 5)     // returns 3
+    math.bitAnd(-3, -5)   // returns -7
+
+### Math.BitXor
+
+Introduced at version: 1
+
+    math.bitXor(<int>, <int>) -> <int>
+    math.bitXor(<uint>, <uint>) -> <uint>
+
+Performs a bitwise-XOR operation over two int or uint values.
+
+Examples:
+
+    math.bitXor(3u, 5u) // returns 6u
+    math.bitXor(1, 3)   // returns 2
+
+### Math.BitNot
+
+Introduced at version: 1
+
+Function which accepts a single int or uint and performs a bitwise-NOT
+ones-complement of the given binary value.
+
+    math.bitNot(<int>) -> <int>
+    math.bitNot(<uint>) -> <uint>
+
+Examples
+
+    math.bitNot(1)  // returns -1
+    math.bitNot(-1) // return 0
+    math.bitNot(0u) // returns 18446744073709551615u
+
+### Math.BitShiftLeft
+
+Introduced at version: 1
+
+Perform a left shift of bits on the first parameter, by the amount of bits
+specified in the second parameter. The first parameter is either a uint or
+an int. The second parameter must be an int.
+
+When the second parameter is 64 or greater, 0 will be always be returned
+since the number of bits shifted is greater than or equal to the total bit
+length of the number being shifted. Negative valued bit shifts will result
+in a runtime error.
+
+    math.bitShiftLeft(<int>, <int>) -> <int>
+    math.bitShiftLeft(<uint>, <int>) -> <uint>
+
+Examples
+
+    math.bitShiftLeft(1, 2)    // returns 4
+    math.bitShiftLeft(-1, 2)   // returns -4
+    math.bitShiftLeft(1u, 2)   // return 4u
+    math.bitShiftLeft(1u, 200) // returns 0u
+
+### Math.BitShiftRight
+
+Introduced at version: 1
+
+Perform a right shift of bits on the first parameter, by the amount of bits
+specified in the second parameter. The first parameter is either a uint or
+an int. The second parameter must be an int.
+
+When the second parameter is 64 or greater, 0 will always be returned since
+the number of bits shifted is greater than or equal to the total bit length
+of the number being shifted. Negative valued bit shifts will result in a
+runtime error.
+
+The sign bit extension will not be preserved for this operation: vacant bits
+on the left are filled with 0.
+
+    math.bitShiftRight(<int>, <int>) -> <int>
+    math.bitShiftRight(<uint>, <int>) -> <uint>
+
+Examples
+
+    math.bitShiftRight(1024, 2)    // returns 256
+    math.bitShiftRight(1024u, 2)   // returns 256u
+    math.bitShiftRight(1024u, 64)  // returns 0u
+
+### Math.Ceil
+
+Introduced at version: 1
+
+Compute the ceiling of a double value.
+
+    math.ceil(<double>) -> <double>
+
+Examples:
+
+    math.ceil(1.2)   // returns 2.0
+    math.ceil(-1.2)  // returns -1.0
+
+### Math.Floor
+
+Introduced at version: 1
+
+Compute the floor of a double value.
+
+    math.floor(<double>) -> <double>
+
+Examples:
+
+    math.floor(1.2)   // returns 1.0
+    math.floor(-1.2)  // returns -2.0
+
+### Math.Round
+
+Introduced at version: 1
+
+Rounds the double value to the nearest whole number with ties rounding away
+from zero, e.g. 1.5 -> 2.0, -1.5 -> -2.0.
+
+    math.round(<double>) -> <double>
+
+Examples:
+
+    math.round(1.2)  // returns 1.0
+    math.round(1.5)  // returns 2.0
+    math.round(-1.5) // returns -2.0
+
+### Math.Trunc
+
+Introduced at version: 1
+
+Truncates the fractional portion of the double value.
+
+    math.trunc(<double>) -> <double>
+
+Examples:
+
+    math.trunc(-1.3)  // returns -1.0
+    math.trunc(1.3)   // returns 1.0
+
+### Math.Abs
+
+Introduced at version: 1
+
+Returns the absolute value of the numeric type provided as input. If the
+value is NaN, the output is NaN. If the input is int64 min, the function
+will result in an overflow error.
+
+    math.abs(<double>) -> <double>
+    math.abs(<int>) -> <int>
+    math.abs(<uint>) -> <uint>
+
+Examples:
+
+    math.abs(-1)  // returns 1
+    math.abs(1)   // returns 1
+    math.abs(-9223372036854775808) // overlflow error
+
+### Math.Sign
+
+Introduced at version: 1
+
+Returns the sign of the numeric type, either -1, 0, 1 as an int, double, or
+uint depending on the overload. For floating point values, if NaN is
+provided as input, the output is also NaN. The implementation does not
+differentiate between positive and negative zero.
+
+    math.sign(<double>) -> <double>
+    math.sign(<int>) -> <int>
+    math.sign(<uint>) -> <uint>
+
+Examples:
+
+    math.sign(-42) // returns -1
+    math.sign(0)   // returns 0
+    math.sign(42)  // returns 1
+
+### Math.IsInf
+
+Introduced at version: 1
+
+Returns true if the input double value is -Inf or +Inf.
+
+    math.isInf(<double>) -> <bool>
+
+Examples:
+
+    math.isInf(1.0/0.0)  // returns true
+    math.isInf(1.2)      // returns false
+
+### Math.IsNaN
+
+Introduced at version: 1
+
+Returns true if the input double value is NaN, false otherwise.
+
+    math.isNaN(<double>) -> <bool>
+
+Examples:
+
+    math.isNaN(0.0/0.0)  // returns true
+    math.isNaN(1.2)      // returns false
+
+### Math.IsFinite
+
+Introduced at version: 1
+
+Returns true if the value is a finite number. Equivalent in behavior to:
+!math.isNaN(double) && !math.isInf(double)
+
+    math.isFinite(<double>) -> <bool>
+
+Examples:
+
+    math.isFinite(0.0/0.0)  // returns false
+    math.isFinite(1.2)      // returns true
+
+### Math.Sqrt
+
+Introduced at version: 2
+
+Returns the square root of the given input as double
+Throws error for negative or non-numeric inputs
+
+    math.sqrt(<double>) -> <double>
+    math.sqrt(<int>) -> <double>
+    math.sqrt(<uint>) -> <double>
+
+Examples:
+
+    math.sqrt(81) // returns 9.0
+    math.sqrt(985.25)   // returns 31.388692231439016
+    math.sqrt(-15)  // returns NaN
 
 ## Protos
 
@@ -154,8 +410,68 @@ Example:
 Extended functions for list manipulation. As a general note, all indices are
 zero-based.
 
+### Distinct
+
+**Introduced in version 2 (cost support in version 3)**
+
+Returns the distinct elements of a list.
+
+	<list(T)>.distinct() -> <list(T)>
+
+Examples:
+
+    [1, 2, 2, 3, 3, 3].distinct() // return [1, 2, 3]
+    ["b", "b", "c", "a", "c"].distinct() // return ["b", "c", "a"]
+    [1, "b", 2, "b"].distinct() // return [1, "b", 2]
+
+### Flatten
+
+**Introduced in version 1 (cost support in version 3)**
+
+Flattens a list recursively.
+If an optional depth is provided, the list is flattened to a the specificied level.
+A negative depth value will result in an error.
+
+	<list>.flatten(<list>) -> <list>
+	<list>.flatten(<list>, <int>) -> <list>
+
+Examples:
+
+    [1,[2,3],[4]].flatten() // return [1, 2, 3, 4]
+    [1,[2,[3,4]]].flatten() // return [1, 2, [3, 4]]
+    [1,2,[],[],[3,4]].flatten() // return [1, 2, 3, 4]
+    [1,[2,[3,[4]]]].flatten(2) // return [1, 2, 3, [4]]
+    [1,[2,[3,[4]]]].flatten(-1) // error
+
+### Range
+
+**Introduced in version 2 (cost support in version 3)**
+
+Returns a list of integers from 0 to n-1.
+
+	lists.range(<int>) -> <list(int)>
+
+Examples:
+
+	lists.range(5) -> [0, 1, 2, 3, 4]
+
+
+### Reverse
+
+**Introduced in version 2 (cost support in version 3)**
+
+Returns the elements of a list in reverse order.
+
+	<list(T)>.reverse() -> <list(T)>
+
+Examples:
+
+	[5, 3, 1, 2].reverse() // return [2, 1, 3, 5]
+
+
 ### Slice
 
+**Introduced in version 0 (cost support in version 3)**
 
 Returns a new sub-list using the indexes provided.
 
@@ -164,7 +480,73 @@ Returns a new sub-list using the indexes provided.
 Examples:
 
     [1,2,3,4].slice(1, 3) // return [2, 3]
-    [1,2,3,4].slice(2, 4) // return [3 ,4]
+    [1,2,3,4].slice(2, 4) // return [3, 4]
+
+### Sort
+
+**Introduced in version 2 (cost support in version 3)**
+
+Sorts a list with comparable elements. If the element type is not comparable
+or the element types are not the same, the function will produce an error.
+
+    <list(T)>.sort() -> <list(T)>
+    T in {int, uint, double, bool, duration, timestamp, string, bytes}
+
+Examples:
+
+    [3, 2, 1].sort() // return [1, 2, 3]
+    ["b", "c", "a"].sort() // return ["a", "b", "c"]
+    [1, "b"].sort() // error
+    [[1, 2, 3]].sort() // error
+
+### SortBy
+
+**Introduced in version 2 (cost support in version 3)**
+
+Sorts a list by a key value, i.e., the order is determined by the result of
+an expression applied to each element of the list.
+
+    <list(T)>.sortBy(<bindingName>, <keyExpr>) -> <list(T)>
+    keyExpr returns a value in {int, uint, double, bool, duration, timestamp, string, bytes}
+
+Examples:
+
+	[
+	  Player { name: "foo", score: 0 },
+	  Player { name: "bar", score: -10 },
+	  Player { name: "baz", score: 1000 },
+	].sortBy(e, e.score).map(e, e.name)
+	== ["bar", "foo", "baz"]
+
+### Last
+
+**Introduced in the OptionalTypes library version 2**
+
+Returns an optional with the last value from the list or `optional.None` if the
+list is empty.
+
+    <list(T)>.last() -> <Optional(T)>
+
+Examples:
+
+    [1, 2, 3].last().value() == 3
+    [].last().orValue('test') == 'test'
+
+This is syntactic sugar for list[list.size()-1].
+
+### First
+
+**Introduced in the OptionalTypes library version 2**
+
+Returns an optional with the first value from the list or `optional.None` if the
+list is empty.
+
+    <list(T)>.first() -> <Optional(T)>
+
+Examples:
+
+     [1, 2, 3].first().value() == 1
+     [].first().orValue('test') == 'test'
 
 ## Sets
 
@@ -259,7 +641,8 @@ Examples:
     'hello mellow'.indexOf('jello')    // returns -1
     'hello mellow'.indexOf('', 2)      // returns 2
     'hello mellow'.indexOf('ello', 2)  // returns 7
-    'hello mellow'.indexOf('ello', 20) // error
+    'hello mellow'.indexOf('ello', 20) // returns -1
+    'hello mellow'.indexOf('ello', -1) // error
 
 ### Join
 
@@ -273,10 +656,10 @@ elements in the resulting string.
 
 Examples:
 
-	['hello', 'mellow'].join() // returns 'hellomellow'
-	['hello', 'mellow'].join(' ') // returns 'hello mellow'
-	[].join() // returns ''
-	[].join('/') // returns ''
+    ['hello', 'mellow'].join() // returns 'hellomellow'
+    ['hello', 'mellow'].join(' ') // returns 'hello mellow'
+    [].join() // returns ''
+    [].join('/') // returns ''
 
 ### LastIndexOf
 
@@ -297,6 +680,7 @@ Examples:
     'hello mellow'.lastIndexOf('ello')     // returns 7
     'hello mellow'.lastIndexOf('jello')    // returns -1
     'hello mellow'.lastIndexOf('ello', 6)  // returns 1
+    'hello mellow'.lastIndexOf('ello', 20) // returns -1
     'hello mellow'.lastIndexOf('ello', -1) // error
 
 ### LowerAscii
@@ -428,3 +812,136 @@ Examples:
 
     'gums'.reverse() // returns 'smug'
     'John Smith'.reverse() // returns 'htimS nhoJ'
+
+## TwoVarComprehensions
+
+TwoVarComprehensions introduces support for two-variable comprehensions.
+
+The two-variable form of comprehensions looks similar to the one-variable
+counterparts. Where possible, the same macro names were used and additional
+macro signatures added. The notable distinction for two-variable comprehensions
+is the introduction of `transformList`, `transformMap`, and `transformMapEntry`
+support for list and map types rather than the more traditional `map` and
+`filter` macros.
+
+### All
+
+Comprehension which tests whether all elements in the list or map satisfy a
+given predicate. The `all` macro evaluates in a manner consistent with logical
+AND and will short-circuit when encountering a `false` value.
+
+    <list>.all(indexVar, valueVar, <predicate>) -> bool
+    <map>.all(keyVar, valueVar, <predicate>) -> bool
+
+Examples:
+
+    [1, 2, 3].all(i, j, i < j) // returns true
+    {'hello': 'world', 'taco': 'taco'}.all(k, v, k != v) // returns false
+
+    // Combines two-variable comprehension with single variable
+    {'h': ['hello', 'hi'], 'j': ['joke', 'jog']}
+      .all(k, vals, vals.all(v, v.startsWith(k))) // returns true
+
+### Exists
+
+Comprehension which tests whether any element in a list or map exists which
+satisfies a given predicate. The `exists` macro evaluates in a manner consistent
+with logical OR and will short-circuit when encountering a `true` value.
+
+    <list>.exists(indexVar, valueVar, <predicate>) -> bool
+    <map>.exists(keyVar, valueVar, <predicate>) -> bool
+
+Examples:
+
+    {'greeting': 'hello', 'farewell': 'goodbye'}
+      .exists(k, v, k.startsWith('good') || v.endsWith('bye')) // returns true
+    [1, 2, 4, 8, 16].exists(i, v, v == 1024 && i == 10) // returns false
+
+### ExistsOne
+
+Comprehension which tests whether exactly one element in a list or map exists
+which satisfies a given predicate expression. This comprehension does not
+short-circuit in keeping with the one-variable exists one macro semantics.
+
+    <list>.existsOne(indexVar, valueVar, <predicate>)
+    <map>.existsOne(keyVar, valueVar, <predicate>)
+
+This macro may also be used with the `exists_one` function name, for
+compatibility with the one-variable macro of the same name.
+
+Examples:
+
+    [1, 2, 1, 3, 1, 4].existsOne(i, v, i == 1 || v == 1) // returns false
+    [1, 1, 2, 2, 3, 3].existsOne(i, v, i == 2 && v == 2) // returns true
+    {'i': 0, 'j': 1, 'k': 2}.existsOne(i, v, i == 'l' || v == 1) // returns true
+
+### TransformList
+
+Comprehension which converts a map or a list into a list value. The output
+expression of the comprehension determines the contents of the output list.
+Elements in the list may optionally be filtered according to a predicate
+expression, where elements that satisfy the predicate are transformed.
+
+    <list>.transformList(indexVar, valueVar, <transform>)
+    <list>.transformList(indexVar, valueVar, <filter>, <transform>)
+    <map>.transformList(keyVar, valueVar, <transform>)
+    <map>.transformList(keyVar, valueVar, <filter>, <transform>)
+
+Examples:
+
+    [1, 2, 3].transformList(indexVar, valueVar,
+      (indexVar * valueVar) + valueVar) // returns [1, 4, 9]
+    [1, 2, 3].transformList(indexVar, valueVar, indexVar % 2 == 0
+      (indexVar * valueVar) + valueVar) // returns [1, 9]
+    {'greeting': 'hello', 'farewell': 'goodbye'}
+      .transformList(k, _, k) // returns ['greeting', 'farewell']
+    {'greeting': 'hello', 'farewell': 'goodbye'}
+      .transformList(_, v, v) // returns ['hello', 'goodbye']
+
+### TransformMap
+
+Comprehension which converts a map or a list into a map value. The output
+expression of the comprehension determines the value of the output map entry;
+however, the key remains fixed. Elements in the map may optionally be filtered
+according to a predicate expression, where elements that satisfy the predicate
+are transformed.
+
+    <list>.transformMap(indexVar, valueVar, <transform>)
+    <list>.transformMap(indexVar, valueVar, <filter>, <transform>)
+    <map>.transformMap(keyVar, valueVar, <transform>)
+    <map>.transformMap(keyVar, valueVar, <filter>, <transform>)
+
+Examples:
+
+    [1, 2, 3].transformMap(indexVar, valueVar,
+      (indexVar * valueVar) + valueVar) // returns {0: 1, 1: 4, 2: 9}
+    [1, 2, 3].transformMap(indexVar, valueVar, indexVar % 2 == 0
+      (indexVar * valueVar) + valueVar) // returns {0: 1, 2: 9}
+    {'greeting': 'hello'}.transformMap(k, v, v + '!') // returns {'greeting': 'hello!'}
+
+### TransformMapEntry
+
+Comprehension which converts a map or a list into a map value; however, this
+transform expects the entry expression be a map literal. If the transform
+produces an entry which duplicates a key in the target map, the comprehension
+will error. Note, that key equality is determined using CEL equality which
+asserts that numeric values which are equal, even if they don't have the same
+type will cause a key collision.
+
+Elements in the map may optionally be filtered according to a predicate
+expression, where elements that satisfy the predicate are transformed.
+
+    <list>.transformMap(indexVar, valueVar, <transform>)
+    <list>.transformMap(indexVar, valueVar, <filter>, <transform>)
+    <map>.transformMap(keyVar, valueVar, <transform>)
+    <map>.transformMap(keyVar, valueVar, <filter>, <transform>)
+
+Examples:
+
+    // returns {'hello': 'greeting'}
+    {'greeting': 'hello'}.transformMapEntry(keyVar, valueVar, {valueVar: keyVar})
+    // reverse lookup, require all values in list be unique
+    [1, 2, 3].transformMapEntry(indexVar, valueVar, {valueVar: indexVar})
+
+    {'greeting': 'aloha', 'farewell': 'aloha'}
+      .transformMapEntry(keyVar, valueVar, {valueVar: keyVar}) // error, duplicate key

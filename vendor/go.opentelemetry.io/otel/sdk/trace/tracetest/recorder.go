@@ -47,14 +47,14 @@ func (sr *SpanRecorder) OnEnd(s sdktrace.ReadOnlySpan) {
 // Shutdown does nothing.
 //
 // This method is safe to be called concurrently.
-func (sr *SpanRecorder) Shutdown(context.Context) error {
+func (*SpanRecorder) Shutdown(context.Context) error {
 	return nil
 }
 
 // ForceFlush does nothing.
 //
 // This method is safe to be called concurrently.
-func (sr *SpanRecorder) ForceFlush(context.Context) error {
+func (*SpanRecorder) ForceFlush(context.Context) error {
 	return nil
 }
 
@@ -67,6 +67,19 @@ func (sr *SpanRecorder) Started() []sdktrace.ReadWriteSpan {
 	dst := make([]sdktrace.ReadWriteSpan, len(sr.started))
 	copy(dst, sr.started)
 	return dst
+}
+
+// Reset clears the recorded spans.
+//
+// This method is safe to be called concurrently.
+func (sr *SpanRecorder) Reset() {
+	sr.startedMu.Lock()
+	sr.endedMu.Lock()
+	defer sr.startedMu.Unlock()
+	defer sr.endedMu.Unlock()
+
+	sr.started = nil
+	sr.ended = nil
 }
 
 // Ended returns a copy of all ended spans that have been recorded.

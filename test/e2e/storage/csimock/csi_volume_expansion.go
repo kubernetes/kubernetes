@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
@@ -45,13 +44,17 @@ type expansionStatus int
 
 const (
 	expansionSuccess = iota
-	expansionFailedOnController
-	expansionFailedOnNode
+	expansionFailedOnControllerWithInfeasibleError
+	expansionFailedOnControllerWithFinalError
+	expansionFailedOnNodeWithInfeasibleError
+	expansionFailedOnNodeWithFinalError
 	expansionFailedMissingStagingPath
 )
 
 const (
 	resizePollInterval = 2 * time.Second
+	pvcCountQuotaKey   = "persistentvolumeclaims"
+	pvcSizeQuotaKey    = "requests.storage"
 )
 
 var (
@@ -61,12 +64,15 @@ var (
 )
 
 type recoveryTest struct {
-	name                    string
-	pvcRequestSize          string
-	allocatedResource       string
-	simulatedCSIDriverError expansionStatus
-	expectedResizeStatus    v1.ClaimResourceStatus
-	recoverySize            resource.Quantity
+	name                       string
+	pvcRequestSize             string
+	allocatedResource          string
+	simulatedCSIDriverError    expansionStatus
+	disableControllerExpansion bool
+	expectedResizeStatus       v1.ClaimResourceStatus
+	recoverySize               resource.Quantity
+	fullResourceQuota          *v1.ResourceQuota
+	expectedQuotaUsage         *v1.ResourceQuota
 }
 
 var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
@@ -177,11 +183,6 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					npvc, err := testsuites.WaitForPendingFSResizeCondition(ctx, pvc, m.cs)
 					framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
 					pvc = npvc
-
-					inProgressConditions := pvc.Status.Conditions
-					if len(inProgressConditions) > 0 {
-						gomega.Expect(inProgressConditions[0].Type).To(gomega.Equal(v1.PersistentVolumeClaimFileSystemResizePending), "pvc must have fs resizing condition")
-					}
 
 					ginkgo.By("Deleting the previously created pod")
 					if test.simulatedCSIDriverError == expansionFailedMissingStagingPath {
@@ -397,30 +398,140 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 		}
 	})
 
-	f.Context("Expansion with recovery", feature.RecoverVolumeExpansionFailure, func() {
+	f.Context("Expansion with recovery", func() {
 		tests := []recoveryTest{
 			{
-				name:                    "should record target size in allocated resources",
-				pvcRequestSize:          "4Gi",
-				allocatedResource:       "4Gi",
-				simulatedCSIDriverError: expansionSuccess,
-				expectedResizeStatus:    "",
+				name:                       "should record target size in allocated resources",
+				pvcRequestSize:             "4Gi",
+				allocatedResource:          "4Gi",
+				disableControllerExpansion: false,
+				simulatedCSIDriverError:    expansionSuccess,
+				expectedResizeStatus:       "",
+				fullResourceQuota: &v1.ResourceQuota{
+					Spec: v1.ResourceQuotaSpec{
+						Hard: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("20Gi"),
+							pvcCountQuotaKey: resource.MustParse("5"),
+						},
+					},
+				},
+				expectedQuotaUsage: &v1.ResourceQuota{
+					Status: v1.ResourceQuotaStatus{
+						Used: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("4Gi"),
+							pvcCountQuotaKey: resource.MustParse("1"),
+						},
+					},
+				},
 			},
 			{
-				name:                    "should allow recovery if controller expansion fails with final error",
-				pvcRequestSize:          "11Gi", // expansion to 11Gi will cause expansion to fail on controller
-				allocatedResource:       "11Gi",
-				simulatedCSIDriverError: expansionFailedOnController,
-				expectedResizeStatus:    v1.PersistentVolumeClaimControllerResizeFailed,
-				recoverySize:            resource.MustParse("4Gi"),
+				name:                       "should allow recovery if controller expansion fails with infeasible error",
+				pvcRequestSize:             "11Gi", // expansion to 11Gi will cause expansion to fail on controller
+				allocatedResource:          "11Gi",
+				disableControllerExpansion: false,
+				simulatedCSIDriverError:    expansionFailedOnControllerWithInfeasibleError,
+				expectedResizeStatus:       v1.PersistentVolumeClaimControllerResizeInfeasible,
+				recoverySize:               resource.MustParse("4Gi"),
+				fullResourceQuota: &v1.ResourceQuota{
+					Spec: v1.ResourceQuotaSpec{
+						Hard: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("20Gi"),
+							pvcCountQuotaKey: resource.MustParse("5"),
+						},
+					},
+				},
+				expectedQuotaUsage: &v1.ResourceQuota{
+					Status: v1.ResourceQuotaStatus{
+						Used: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("4Gi"),
+							pvcCountQuotaKey: resource.MustParse("1"),
+						},
+					},
+				},
 			},
 			{
-				name:                    "recovery should not be possible in partially expanded volumes",
-				pvcRequestSize:          "9Gi", // expansion to 9Gi will cause expansion to fail on node
-				allocatedResource:       "9Gi",
-				simulatedCSIDriverError: expansionFailedOnNode,
-				expectedResizeStatus:    v1.PersistentVolumeClaimNodeResizeFailed,
-				recoverySize:            resource.MustParse("5Gi"),
+				name:                       "should allow recovery if controller expansion fails with final error",
+				pvcRequestSize:             "11Gi", // expansion to 11Gi will cause expansion to fail on controller
+				allocatedResource:          "11Gi",
+				disableControllerExpansion: false,
+				simulatedCSIDriverError:    expansionFailedOnControllerWithFinalError,
+				expectedResizeStatus:       v1.PersistentVolumeClaimControllerResizeInProgress,
+				recoverySize:               resource.MustParse("4Gi"),
+				fullResourceQuota: &v1.ResourceQuota{
+					Spec: v1.ResourceQuotaSpec{
+						Hard: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("20Gi"),
+							pvcCountQuotaKey: resource.MustParse("5"),
+						},
+					},
+				},
+				expectedQuotaUsage: &v1.ResourceQuota{
+					Status: v1.ResourceQuotaStatus{
+						Used: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("4Gi"),
+							pvcCountQuotaKey: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			{
+				name:                       "recovery should not be possible in partially expanded volumes",
+				pvcRequestSize:             "9Gi", // expansion to 9Gi will cause expansion to fail on node
+				allocatedResource:          "9Gi",
+				disableControllerExpansion: false,
+				simulatedCSIDriverError:    expansionFailedOnNodeWithInfeasibleError,
+				expectedResizeStatus:       v1.PersistentVolumeClaimNodeResizeInfeasible,
+				recoverySize:               resource.MustParse("5Gi"),
+			},
+			{
+				name:                       "recovery should be possible for node-only expanded volumes with infeasible error",
+				pvcRequestSize:             "9Gi", // expansion to 9Gi will cause expansion to fail on node
+				allocatedResource:          "9Gi",
+				disableControllerExpansion: true,
+				simulatedCSIDriverError:    expansionFailedOnNodeWithInfeasibleError,
+				expectedResizeStatus:       v1.PersistentVolumeClaimNodeResizeInfeasible,
+				recoverySize:               resource.MustParse("5Gi"),
+				fullResourceQuota: &v1.ResourceQuota{
+					Spec: v1.ResourceQuotaSpec{
+						Hard: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("20Gi"),
+							pvcCountQuotaKey: resource.MustParse("5"),
+						},
+					},
+				},
+				expectedQuotaUsage: &v1.ResourceQuota{
+					Status: v1.ResourceQuotaStatus{
+						Used: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("5Gi"),
+							pvcCountQuotaKey: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			{
+				name:                       "recovery should be possible for node-only expanded volumes with final error",
+				pvcRequestSize:             "9Gi", // expansion to 9Gi will cause expansion to fail on node
+				allocatedResource:          "9Gi",
+				disableControllerExpansion: true,
+				simulatedCSIDriverError:    expansionFailedOnNodeWithFinalError,
+				expectedResizeStatus:       v1.PersistentVolumeClaimNodeResizeInProgress,
+				recoverySize:               resource.MustParse("5Gi"),
+				fullResourceQuota: &v1.ResourceQuota{
+					Spec: v1.ResourceQuotaSpec{
+						Hard: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("20Gi"),
+							pvcCountQuotaKey: resource.MustParse("5"),
+						},
+					},
+				},
+				expectedQuotaUsage: &v1.ResourceQuota{
+					Status: v1.ResourceQuotaStatus{
+						Used: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("5Gi"),
+							pvcCountQuotaKey: resource.MustParse("1"),
+						},
+					},
+				},
 			},
 		}
 
@@ -428,7 +539,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 			test := t
 			ginkgo.It(test.name, func(ctx context.Context) {
 				var err error
-				params := testParameters{enableResizing: true, enableNodeExpansion: true, enableRecoverExpansionFailure: true}
+				params := testParameters{enableResizing: true, enableNodeExpansion: true, disableControllerExpansion: test.disableControllerExpansion}
 
 				if test.simulatedCSIDriverError != expansionSuccess {
 					params.hooks = createExpansionHook(test.simulatedCSIDriverError)
@@ -436,6 +547,11 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 
 				m.init(ctx, params)
 				ginkgo.DeferCleanup(m.cleanup)
+				var currentQuota *v1.ResourceQuota
+
+				if test.fullResourceQuota != nil {
+					currentQuota = m.createResourceQuota(ctx, test.fullResourceQuota)
+				}
 
 				sc, pvc, pod := m.createPod(ctx, pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
@@ -464,21 +580,64 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				} else {
 					validateRecoveryBehaviour(ctx, pvc, m, test)
 				}
+
+				if test.expectedQuotaUsage != nil {
+					validateQuotaUsage(ctx, m, currentQuota, test.expectedQuotaUsage)
+				}
 			})
 		}
-
 	})
 })
+
+func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, expectedQuota *v1.ResourceQuota) {
+	ginkgo.By("Waiting for resource quota usage to be updated")
+	var (
+		quota     *v1.ResourceQuota
+		usedCount resource.Quantity
+		usedSize  resource.Quantity
+	)
+
+	expectedCount := expectedQuota.Status.Used[pvcCountQuotaKey]
+	expectedUsedSize := expectedQuota.Status.Used[pvcSizeQuotaKey]
+
+	gomega.Eventually(func() error {
+		q, err := m.cs.CoreV1().ResourceQuotas(currentQuota.Namespace).Get(ctx, currentQuota.Name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get resource quota %s/%s: %w", currentQuota.Namespace, currentQuota.Name, err)
+		}
+		if q.Status.Used == nil {
+			return fmt.Errorf("resource quota %s/%s has nil Status.Used", currentQuota.Namespace, currentQuota.Name)
+		}
+
+		quota = q
+		usedCount = quota.Status.Used[pvcCountQuotaKey]
+		usedSize = quota.Status.Used[pvcSizeQuotaKey]
+
+		if usedCount.Cmp(expectedCount) != 0 || usedSize.Cmp(expectedUsedSize) != 0 {
+			return fmt.Errorf(
+				"resource quota usage did not converge; currentlyUsed: %s/%s, expected: %s/%s",
+				usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(),
+			)
+		}
+		return nil
+	}, csiResizeWaitPeriod, resizePollInterval).Should(gomega.Succeed())
+}
 
 func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
 	var err error
 	ginkgo.By("Waiting for resizer to set allocated resource")
-	err = waitForAllocatedResource(pvc, m, test.allocatedResource)
+	err = waitForAllocatedResource(ctx, pvc, m, test.allocatedResource)
 	framework.ExpectNoError(err, "While waiting for allocated resource to be updated")
 
-	ginkgo.By("Waiting for resizer to set resize status")
-	err = waitForResizeStatus(pvc, m.cs, test.expectedResizeStatus)
-	framework.ExpectNoError(err, "While waiting for resize status to be set")
+	if test.expectedResizeStatus == v1.PersistentVolumeClaimNodeResizeInfeasible {
+		ginkgo.By("Waiting for kubelet to fail expansion on the node")
+		err = waitForResizeToFailOnNode(ctx, pvc, m.cs)
+		framework.ExpectNoError(err, "While waiting for resize status to be set")
+	} else {
+		ginkgo.By("Waiting for resizer to set resize status")
+		err = waitForResizeStatus(ctx, pvc, m.cs, test.expectedResizeStatus)
+		framework.ExpectNoError(err, "While waiting for resize status to be set")
+	}
 
 	ginkgo.By("Recover pvc size")
 	newPVC, err := testsuites.ExpandPVCSize(ctx, pvc, test.recoverySize, m.cs)
@@ -491,17 +650,28 @@ func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClai
 		framework.Failf("error updating pvc size %q", pvc.Name)
 	}
 
-	// if expansion failed on controller with final error, then recovery should be possible
-	if test.simulatedCSIDriverError == expansionFailedOnController {
+	// If expansion failed on controller (infeasible or final), recovery should be possible.
+	// Wait for the recovery resize to settle before checking quota.
+	if test.simulatedCSIDriverError == expansionFailedOnControllerWithInfeasibleError ||
+		test.simulatedCSIDriverError == expansionFailedOnControllerWithFinalError {
+		validateExpansionSuccess(ctx, pvc, m, test, test.recoverySize.String())
+		return
+	}
+
+	// if expansion failed on node with final error but volume was only expanded on the node
+	// then recovery should be possible
+	if test.disableControllerExpansion &&
+		(test.simulatedCSIDriverError == expansionFailedOnNodeWithInfeasibleError ||
+			test.simulatedCSIDriverError == expansionFailedOnNodeWithFinalError) {
 		validateExpansionSuccess(ctx, pvc, m, test, test.recoverySize.String())
 		return
 	}
 
 	// if expansion succeeded on controller but failed on the node
-	if test.simulatedCSIDriverError == expansionFailedOnNode {
+	if test.simulatedCSIDriverError == expansionFailedOnNodeWithInfeasibleError {
 		ginkgo.By("Wait for expansion to fail on node again")
-		err = waitForResizeStatus(pvc, m.cs, v1.PersistentVolumeClaimNodeResizeFailed)
-		framework.ExpectNoError(err, "While waiting for resize status to be set to expansion-failed-on-node")
+		err = waitForResizeToFailOnNode(ctx, pvc, m.cs)
+		framework.ExpectNoError(err, "While waiting for resize status to be set")
 
 		ginkgo.By("verify allocated resources after recovery")
 		pvc, err = m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
@@ -520,11 +690,11 @@ func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClai
 
 func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest, expectedAllocatedSize string) {
 	var err error
-	ginkgo.By("Waiting for persistent volume resize to finish")
+	ginkgo.By(fmt.Sprintf("Waiting for PV %s to be expanded to %s", pvc.Spec.VolumeName, test.recoverySize.String()))
 	err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
 	framework.ExpectNoError(err, "While waiting for PV resize to finish")
 
-	ginkgo.By("Waiting for PVC resize to finish")
+	ginkgo.By(fmt.Sprintf("Waiting for PVC %s to be expanded to %s", pvc.Name, test.recoverySize.String()))
 	pvc, err = testsuites.WaitForFSResize(ctx, pvc, m.cs)
 	framework.ExpectNoError(err, "while waiting for PVC to finish")
 
@@ -541,31 +711,56 @@ func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim
 	gomega.Expect(resizeStatus).To(gomega.BeZero(), "resize status should be empty")
 }
 
-func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, expectedState v1.ClaimResourceStatus) error {
-	var actualResizeStatus *v1.ClaimResourceStatus
+func waitForResizeStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface, expectedState v1.ClaimResourceStatus) error {
+	var actualResizeStatus v1.ClaimResourceStatus
 
-	waitErr := wait.PollImmediate(resizePollInterval, csiResizeWaitPeriod, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(pollContext context.Context) (bool, error) {
 		var err error
-		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
+		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pollContext, pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
 		}
 
-		actualResizeStatus := updatedPVC.Status.AllocatedResourceStatuses[v1.ResourceStorage]
+		actualResizeStatus = updatedPVC.Status.AllocatedResourceStatuses[v1.ResourceStorage]
 		return (actualResizeStatus == expectedState), nil
 	})
 	if waitErr != nil {
-		return fmt.Errorf("error while waiting for resize status to sync to %v, actualStatus %s: %v", expectedState, *actualResizeStatus, waitErr)
+		return fmt.Errorf("error while waiting for resize status to sync to %v, actualStatus %s: %w", expectedState, actualResizeStatus, waitErr)
 	}
 	return nil
 }
 
-func waitForAllocatedResource(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, expectedSize string) error {
-	expectedQuantity := resource.MustParse(expectedSize)
-	waitErr := wait.PollImmediate(resizePollInterval, csiResizeWaitPeriod, func() (bool, error) {
+func waitForResizeToFailOnNode(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface) error {
+	var finalConditions []v1.PersistentVolumeClaimCondition
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(pollContext context.Context) (bool, error) {
 		var err error
-		updatedPVC, err := m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
+		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pollContext, pvc.Name, metav1.GetOptions{})
+
+		if err != nil {
+			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
+		}
+		pvcConditions := updatedPVC.Status.Conditions
+		for _, cond := range pvcConditions {
+			if cond.Type == v1.PersistentVolumeClaimNodeResizeError {
+				return true, nil
+			}
+		}
+		finalConditions = pvcConditions
+		return false, nil
+	})
+
+	if waitErr != nil {
+		return fmt.Errorf("error while waiting for resize condition sync to NodeResizeError, actualStatus %+v: %w", finalConditions, waitErr)
+	}
+	return nil
+}
+
+func waitForAllocatedResource(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, expectedSize string) error {
+	expectedQuantity := resource.MustParse(expectedSize)
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(pollContext context.Context) (bool, error) {
+		var err error
+		updatedPVC, err := m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pollContext, pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
@@ -596,7 +791,7 @@ func createExpansionHook(expectedExpansionStatus expansionStatus) *drivers.Hooks
 					}
 
 				}
-			case expansionFailedOnController:
+			case expansionFailedOnControllerWithInfeasibleError:
 				expansionRequest, ok := request.(*csipbv1.ControllerExpandVolumeRequest)
 				if ok {
 					requestedSize := resource.NewQuantity(expansionRequest.CapacityRange.RequiredBytes, resource.BinarySI)
@@ -604,7 +799,16 @@ func createExpansionHook(expectedExpansionStatus expansionStatus) *drivers.Hooks
 						return nil, status.Error(codes.InvalidArgument, "invalid expansion request")
 					}
 				}
-			case expansionFailedOnNode:
+			case expansionFailedOnControllerWithFinalError:
+				// This simulates a condition that a final, but not infeasible error is returned when expansion fails in the controller.
+				expansionRequest, ok := request.(*csipbv1.ControllerExpandVolumeRequest)
+				if ok {
+					requestedSize := resource.NewQuantity(expansionRequest.CapacityRange.RequiredBytes, resource.BinarySI)
+					if requestedSize.Cmp(maxControllerSizeLimit) > 0 {
+						return nil, status.Error(codes.PermissionDenied, "permission denied for expansion")
+					}
+				}
+			case expansionFailedOnNodeWithInfeasibleError:
 				expansionRequest, ok := request.(*csipbv1.NodeExpandVolumeRequest)
 				if ok {
 					requestedSize := resource.NewQuantity(expansionRequest.CapacityRange.RequiredBytes, resource.BinarySI)
@@ -612,6 +816,14 @@ func createExpansionHook(expectedExpansionStatus expansionStatus) *drivers.Hooks
 						return nil, status.Error(codes.InvalidArgument, "invalid node expansion request")
 					}
 
+				}
+			case expansionFailedOnNodeWithFinalError:
+				expansionRequest, ok := request.(*csipbv1.NodeExpandVolumeRequest)
+				if ok {
+					requestedSize := resource.NewQuantity(expansionRequest.CapacityRange.RequiredBytes, resource.BinarySI)
+					if requestedSize.Cmp(maxNodeExpansionLimit) > 0 {
+						return nil, status.Error(codes.PermissionDenied, "permission denied for expansion")
+					}
 				}
 			}
 

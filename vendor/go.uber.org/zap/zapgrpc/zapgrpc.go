@@ -36,16 +36,14 @@ const (
 	grpcLvlFatal
 )
 
-var (
-	// _grpcToZapLevel maps gRPC log levels to zap log levels.
-	// See https://pkg.go.dev/go.uber.org/zap@v1.16.0/zapcore#Level
-	_grpcToZapLevel = map[int]zapcore.Level{
-		grpcLvlInfo:  zapcore.InfoLevel,
-		grpcLvlWarn:  zapcore.WarnLevel,
-		grpcLvlError: zapcore.ErrorLevel,
-		grpcLvlFatal: zapcore.FatalLevel,
-	}
-)
+// _grpcToZapLevel maps gRPC log levels to zap log levels.
+// See https://pkg.go.dev/go.uber.org/zap@v1.16.0/zapcore#Level
+var _grpcToZapLevel = map[int]zapcore.Level{
+	grpcLvlInfo:  zapcore.InfoLevel,
+	grpcLvlWarn:  zapcore.WarnLevel,
+	grpcLvlError: zapcore.ErrorLevel,
+	grpcLvlFatal: zapcore.FatalLevel,
+}
 
 // An Option overrides a Logger's default configuration.
 type Option interface {

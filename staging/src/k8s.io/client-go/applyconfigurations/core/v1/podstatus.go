@@ -19,29 +19,126 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PodStatusApplyConfiguration represents a declarative configuration of the PodStatus type for use
 // with apply.
+//
+// PodStatus represents information about the status of a pod. Status may trail the actual
+// state of a system, especially if the node that hosts the pod cannot contact the control
+// plane.
 type PodStatusApplyConfiguration struct {
-	Phase                      *v1.PodPhase                               `json:"phase,omitempty"`
-	Conditions                 []PodConditionApplyConfiguration           `json:"conditions,omitempty"`
-	Message                    *string                                    `json:"message,omitempty"`
-	Reason                     *string                                    `json:"reason,omitempty"`
-	NominatedNodeName          *string                                    `json:"nominatedNodeName,omitempty"`
-	HostIP                     *string                                    `json:"hostIP,omitempty"`
-	HostIPs                    []HostIPApplyConfiguration                 `json:"hostIPs,omitempty"`
-	PodIP                      *string                                    `json:"podIP,omitempty"`
-	PodIPs                     []PodIPApplyConfiguration                  `json:"podIPs,omitempty"`
-	StartTime                  *metav1.Time                               `json:"startTime,omitempty"`
-	InitContainerStatuses      []ContainerStatusApplyConfiguration        `json:"initContainerStatuses,omitempty"`
-	ContainerStatuses          []ContainerStatusApplyConfiguration        `json:"containerStatuses,omitempty"`
-	QOSClass                   *v1.PodQOSClass                            `json:"qosClass,omitempty"`
-	EphemeralContainerStatuses []ContainerStatusApplyConfiguration        `json:"ephemeralContainerStatuses,omitempty"`
-	Resize                     *v1.PodResizeStatus                        `json:"resize,omitempty"`
-	ResourceClaimStatuses      []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
+	// If set, this represents the .metadata.generation that the pod status was set based upon.
+	// The PodObservedGenerationTracking feature gate must be enabled to use this field.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.
+	// The conditions array, the reason and message fields, and the individual container status
+	// arrays contain more detail about the pod's status.
+	// There are five possible phase values:
+	//
+	// Pending: The pod has been accepted by the Kubernetes system, but one or more of the
+	// container images has not been created. This includes time before being scheduled as
+	// well as time spent downloading images over the network, which could take a while.
+	// Running: The pod has been bound to a node, and all of the containers have been created.
+	// At least one container is still running, or is in the process of starting or restarting.
+	// Succeeded: All containers in the pod have terminated in success, and will not be restarted.
+	// Failed: All containers in the pod have terminated, and at least one container has
+	// terminated in failure. The container either exited with non-zero status or was terminated
+	// by the system.
+	// Unknown: For some reason the state of the pod could not be obtained, typically due to an
+	// error in communicating with the host of the pod.
+	//
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase
+	Phase *corev1.PodPhase `json:"phase,omitempty"`
+	// Current service state of pod.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+	Conditions []PodConditionApplyConfiguration `json:"conditions,omitempty"`
+	// A human readable message indicating details about why the pod is in this condition.
+	Message *string `json:"message,omitempty"`
+	// A brief CamelCase message indicating details about why the pod is in this state.
+	// e.g. 'Evicted'
+	Reason *string `json:"reason,omitempty"`
+	// nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be
+	// scheduled right away as preemption victims receive their graceful termination periods.
+	// This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide
+	// to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to
+	// give the resources on this node to a higher priority pod that is created after preemption.
+	// As a result, this field may be different than PodSpec.nodeName when the pod is
+	// scheduled.
+	NominatedNodeName *string `json:"nominatedNodeName,omitempty"`
+	// hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet.
+	// A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will
+	// not be updated even if there is a node is assigned to pod
+	HostIP *string `json:"hostIP,omitempty"`
+	// hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must
+	// match the hostIP field. This list is empty if the pod has not started yet.
+	// A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will
+	// not be updated even if there is a node is assigned to this pod.
+	HostIPs []HostIPApplyConfiguration `json:"hostIPs,omitempty"`
+	// podIP address allocated to the pod. Routable at least within the cluster.
+	// Empty if not yet allocated.
+	PodIP *string `json:"podIP,omitempty"`
+	// podIPs holds the IP addresses allocated to the pod. If this field is specified, the 0th entry must
+	// match the podIP field. Pods may be allocated at most 1 value for each of IPv4 and IPv6. This list
+	// is empty if no IPs have been allocated yet.
+	PodIPs []PodIPApplyConfiguration `json:"podIPs,omitempty"`
+	// RFC 3339 date and time at which the object was acknowledged by the Kubelet.
+	// This is before the Kubelet pulled the container image(s) for the pod.
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+	// Statuses of init containers in this pod. The most recent successful non-restartable
+	// init container will have ready = true, the most recently started container will have
+	// startTime set.
+	// Each init container in the pod should have at most one status in this list,
+	// and all statuses should be for containers in the pod.
+	// However this is not enforced.
+	// If a status for a non-existent container is present in the list, or the list has duplicate names,
+	// the behavior of various Kubernetes components is not defined and those statuses might be
+	// ignored.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
+	InitContainerStatuses []ContainerStatusApplyConfiguration `json:"initContainerStatuses,omitempty"`
+	// Statuses of containers in this pod.
+	// Each container in the pod should have at most one status in this list,
+	// and all statuses should be for containers in the pod.
+	// However this is not enforced.
+	// If a status for a non-existent container is present in the list, or the list has duplicate names,
+	// the behavior of various Kubernetes components is not defined and those statuses might be
+	// ignored.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
+	ContainerStatuses []ContainerStatusApplyConfiguration `json:"containerStatuses,omitempty"`
+	// The Quality of Service (QOS) classification assigned to the pod based on resource requirements
+	// See PodQOSClass type for available QOS classes
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/#quality-of-service-classes
+	QOSClass *corev1.PodQOSClass `json:"qosClass,omitempty"`
+	// Statuses for any ephemeral containers that have run in this pod.
+	// Each ephemeral container in the pod should have at most one status in this list,
+	// and all statuses should be for containers in the pod.
+	// However this is not enforced.
+	// If a status for a non-existent container is present in the list, or the list has duplicate names,
+	// the behavior of various Kubernetes components is not defined and those statuses might be
+	// ignored.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
+	EphemeralContainerStatuses []ContainerStatusApplyConfiguration `json:"ephemeralContainerStatuses,omitempty"`
+	// Status of resources resize desired for pod's containers.
+	// It is empty if no resources resize is pending.
+	// Any changes to container resources will automatically set this to "Proposed"
+	// Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
+	// PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
+	// PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
+	Resize *corev1.PodResizeStatus `json:"resize,omitempty"`
+	// Status of resource claims.
+	ResourceClaimStatuses []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
+	// Status of extended resource claim backed by DRA.
+	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatusApplyConfiguration `json:"extendedResourceClaimStatus,omitempty"`
+	// AllocatedResources is the total requests allocated for this pod by the node.
+	// If pod-level requests are not set, this will be the total requests aggregated
+	// across containers in the pod.
+	AllocatedResources *corev1.ResourceList `json:"allocatedResources,omitempty"`
+	// Resources represents the compute resource requests and limits that have been
+	// applied at the pod level if pod-level requests or limits are set in
+	// PodSpec.Resources
+	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
@@ -50,10 +147,18 @@ func PodStatus() *PodStatusApplyConfiguration {
 	return &PodStatusApplyConfiguration{}
 }
 
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithObservedGeneration(value int64) *PodStatusApplyConfiguration {
+	b.ObservedGeneration = &value
+	return b
+}
+
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Phase field is set to the value of the last call.
-func (b *PodStatusApplyConfiguration) WithPhase(value v1.PodPhase) *PodStatusApplyConfiguration {
+func (b *PodStatusApplyConfiguration) WithPhase(value corev1.PodPhase) *PodStatusApplyConfiguration {
 	b.Phase = &value
 	return b
 }
@@ -174,7 +279,7 @@ func (b *PodStatusApplyConfiguration) WithContainerStatuses(values ...*Container
 // WithQOSClass sets the QOSClass field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the QOSClass field is set to the value of the last call.
-func (b *PodStatusApplyConfiguration) WithQOSClass(value v1.PodQOSClass) *PodStatusApplyConfiguration {
+func (b *PodStatusApplyConfiguration) WithQOSClass(value corev1.PodQOSClass) *PodStatusApplyConfiguration {
 	b.QOSClass = &value
 	return b
 }
@@ -195,7 +300,7 @@ func (b *PodStatusApplyConfiguration) WithEphemeralContainerStatuses(values ...*
 // WithResize sets the Resize field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Resize field is set to the value of the last call.
-func (b *PodStatusApplyConfiguration) WithResize(value v1.PodResizeStatus) *PodStatusApplyConfiguration {
+func (b *PodStatusApplyConfiguration) WithResize(value corev1.PodResizeStatus) *PodStatusApplyConfiguration {
 	b.Resize = &value
 	return b
 }
@@ -210,5 +315,29 @@ func (b *PodStatusApplyConfiguration) WithResourceClaimStatuses(values ...*PodRe
 		}
 		b.ResourceClaimStatuses = append(b.ResourceClaimStatuses, *values[i])
 	}
+	return b
+}
+
+// WithExtendedResourceClaimStatus sets the ExtendedResourceClaimStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ExtendedResourceClaimStatus field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithExtendedResourceClaimStatus(value *PodExtendedResourceClaimStatusApplyConfiguration) *PodStatusApplyConfiguration {
+	b.ExtendedResourceClaimStatus = value
+	return b
+}
+
+// WithAllocatedResources sets the AllocatedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllocatedResources field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithAllocatedResources(value corev1.ResourceList) *PodStatusApplyConfiguration {
+	b.AllocatedResources = &value
+	return b
+}
+
+// WithResources sets the Resources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resources field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *PodStatusApplyConfiguration {
+	b.Resources = value
 	return b
 }

@@ -18,6 +18,8 @@ package rest
 
 import (
 	coordinationv1 "k8s.io/api/coordination/v1"
+	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
+	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -25,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	leasestorage "k8s.io/kubernetes/pkg/registry/coordination/lease/storage"
+	leasecandidatestorage "k8s.io/kubernetes/pkg/registry/coordination/leasecandidate/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -39,6 +42,19 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[coordinationv1.SchemeGroupVersion.Version] = storageMap
 	}
+
+	if storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[coordinationv1beta1.SchemeGroupVersion.Version] = storageMap
+	}
+
+	if storageMap, err := p.v1alpha2Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[coordinationv1alpha2.SchemeGroupVersion.Version] = storageMap
+	}
+
 	return apiGroupInfo, nil
 }
 
@@ -52,6 +68,34 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 			return storage, err
 		}
 		storage[resource] = leaseStorage
+	}
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	// identity
+	if resource := "leasecandidates"; apiResourceConfigSource.ResourceEnabled(coordinationv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		leaseCandidateStorage, err := leasecandidatestorage.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = leaseCandidateStorage
+	}
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	// identity
+	if resource := "leasecandidates"; apiResourceConfigSource.ResourceEnabled(coordinationv1alpha2.SchemeGroupVersion.WithResource(resource)) {
+		leaseCandidateStorage, err := leasecandidatestorage.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = leaseCandidateStorage
 	}
 	return storage, nil
 }

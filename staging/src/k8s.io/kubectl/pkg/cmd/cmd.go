@@ -20,15 +20,14 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
-	"syscall"
+	"sync/atomic"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -56,6 +55,8 @@ import (
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
 	"k8s.io/kubectl/pkg/cmd/get"
+	kuberccmd "k8s.io/kubectl/pkg/cmd/kuberc"
+	"k8s.io/kubectl/pkg/cmd/kustomize"
 	"k8s.io/kubectl/pkg/cmd/label"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	"k8s.io/kubectl/pkg/cmd/options"
@@ -73,16 +74,11 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/version"
 	"k8s.io/kubectl/pkg/cmd/wait"
+	"k8s.io/kubectl/pkg/kuberc"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
-
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/kustomize"
 )
-
-const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
 
 type KubectlOptions struct {
 	PluginHandler PluginHandler
@@ -111,205 +107,65 @@ func NewDefaultKubectlCommand() *cobra.Command {
 func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 	cmd := NewKubectlCommand(o)
 
-	if o.PluginHandler == nil {
+	if o.PluginHandler == nil || len(o.Arguments) <= 1 {
 		return cmd
 	}
 
-	if len(o.Arguments) > 1 {
-		cmdPathPieces := o.Arguments[1:]
-
-		// only look for suitable extension executables if
-		// the specified command does not already exist
-		if foundCmd, foundArgs, err := cmd.Find(cmdPathPieces); err != nil {
-			// Also check the commands that will be added by Cobra.
-			// These commands are only added once rootCmd.Execute() is called, so we
-			// need to check them explicitly here.
-			var cmdName string // first "non-flag" arguments
-			for _, arg := range cmdPathPieces {
-				if !strings.HasPrefix(arg, "-") {
-					cmdName = arg
-					break
-				}
-			}
-
-			switch cmdName {
-			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
-				// Don't search for a plugin
-			default:
-				if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, 1); err != nil {
-					fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
-					os.Exit(1)
-				}
-			}
-		} else if err == nil {
-			if !cmdutil.CmdPluginAsSubcommand.IsDisabled() {
-				// Command exists(e.g. kubectl create), but it is not certain that
-				// subcommand also exists (e.g. kubectl create networkpolicy)
-				// we also have to eliminate kubectl create -f
-				if IsSubcommandPluginAllowed(foundCmd.Name()) && len(foundArgs) >= 1 && !strings.HasPrefix(foundArgs[0], "-") {
-					subcommand := foundArgs[0]
-					builtinSubcmdExist := false
-					for _, subcmd := range foundCmd.Commands() {
-						if subcmd.Name() == subcommand {
-							builtinSubcmdExist = true
-							break
-						}
-					}
-
-					if !builtinSubcmdExist {
-						if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, len(cmdPathPieces)-len(foundArgs)+1); err != nil {
-							fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
-							os.Exit(1)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return cmd
-}
-
-// IsSubcommandPluginAllowed returns the given command is allowed
-// to use plugin as subcommand if the subcommand does not exist as builtin.
-func IsSubcommandPluginAllowed(foundCmd string) bool {
-	allowedCmds := map[string]struct{}{"create": {}}
-	_, ok := allowedCmds[foundCmd]
-	return ok
-}
-
-// PluginHandler is capable of parsing command line arguments
-// and performing executable filename lookups to search
-// for valid plugin files, and execute found plugins.
-type PluginHandler interface {
-	// exists at the given filename, or a boolean false.
-	// Lookup will iterate over a list of given prefixes
-	// in order to recognize valid plugin filenames.
-	// The first filepath to match a prefix is returned.
-	Lookup(filename string) (string, bool)
-	// Execute receives an executable's filepath, a slice
-	// of arguments, and a slice of environment variables
-	// to relay to the executable.
-	Execute(executablePath string, cmdArgs, environment []string) error
-}
-
-// DefaultPluginHandler implements PluginHandler
-type DefaultPluginHandler struct {
-	ValidPrefixes []string
-}
-
-// NewDefaultPluginHandler instantiates the DefaultPluginHandler with a list of
-// given filename prefixes used to identify valid plugin filenames.
-func NewDefaultPluginHandler(validPrefixes []string) *DefaultPluginHandler {
-	return &DefaultPluginHandler{
-		ValidPrefixes: validPrefixes,
-	}
-}
-
-// Lookup implements PluginHandler
-func (h *DefaultPluginHandler) Lookup(filename string) (string, bool) {
-	for _, prefix := range h.ValidPrefixes {
-		path, err := exec.LookPath(fmt.Sprintf("%s-%s", prefix, filename))
-		if shouldSkipOnLookPathErr(err) || len(path) == 0 {
-			continue
-		}
-		return path, true
-	}
-	return "", false
-}
-
-func Command(name string, arg ...string) *exec.Cmd {
-	cmd := &exec.Cmd{
-		Path: name,
-		Args: append([]string{name}, arg...),
-	}
-	if filepath.Base(name) == name {
-		lp, err := exec.LookPath(name)
-		if lp != "" && !shouldSkipOnLookPathErr(err) {
-			// Update cmd.Path even if err is non-nil.
-			// If err is ErrDot (especially on Windows), lp may include a resolved
-			// extension (like .exe or .bat) that should be preserved.
-			cmd.Path = lp
-		}
-	}
-	return cmd
-}
-
-// Execute implements PluginHandler
-func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environment []string) error {
-
-	// Windows does not support exec syscall.
-	if runtime.GOOS == "windows" {
-		cmd := Command(executablePath, cmdArgs...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Stdin = os.Stdin
-		cmd.Env = environment
-		err := cmd.Run()
-		if err == nil {
-			os.Exit(0)
-		}
-		return err
-	}
-
-	// invoke cmd binary relaying the environment and args given
-	// append executablePath to cmdArgs, as execve will make first argument the "binary name".
-	return syscall.Exec(executablePath, append([]string{executablePath}, cmdArgs...), environment)
-}
-
-// HandlePluginCommand receives a pluginHandler and command-line arguments and attempts to find
-// a plugin executable on the PATH that satisfies the given arguments.
-func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string, minArgs int) error {
-	var remainingArgs []string // all "non-flag" arguments
-	for _, arg := range cmdArgs {
-		if strings.HasPrefix(arg, "-") {
-			break
-		}
-		remainingArgs = append(remainingArgs, strings.Replace(arg, "-", "_", -1))
-	}
-
-	if len(remainingArgs) == 0 {
-		// the length of cmdArgs is at least 1
-		return fmt.Errorf("flags cannot be placed before plugin name: %s", cmdArgs[0])
-	}
-
-	foundBinaryPath := ""
-
-	// attempt to find binary, starting at longest possible name with given cmdArgs
-	for len(remainingArgs) > 0 {
-		path, found := pluginHandler.Lookup(strings.Join(remainingArgs, "-"))
-		if !found {
-			remainingArgs = remainingArgs[:len(remainingArgs)-1]
-			if len(remainingArgs) < minArgs {
-				// we shouldn't continue searching with shorter names.
-				// this is especially for not searching kubectl-create plugin
-				// when kubectl-create-foo plugin is not found.
+	cmdPathPieces := o.Arguments[1:]
+	// only look for suitable extension executables if
+	// the specified command does not already exist
+	foundCmd, foundArgs, err := cmd.Find(cmdPathPieces)
+	if err != nil {
+		// Also check the commands that will be added by Cobra.
+		// These commands are only added once rootCmd.Execute() is called, so we
+		// need to check them explicitly here.
+		var cmdName string // first "non-flag" arguments
+		for _, arg := range cmdPathPieces {
+			if !strings.HasPrefix(arg, "-") {
+				cmdName = arg
 				break
 			}
-
-			continue
 		}
 
-		foundBinaryPath = path
-		break
+		switch cmdName {
+		case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+			// Don't search for a plugin
+		default:
+			if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, 1); err != nil {
+				fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
+				os.Exit(1)
+			}
+		}
+	}
+	// Command exists(e.g. kubectl create), but it is not certain that
+	// subcommand also exists (e.g. kubectl create networkpolicy)
+	// we also have to eliminate kubectl create -f
+	if IsSubcommandPluginAllowed(foundCmd.Name()) && len(foundArgs) >= 1 && !strings.HasPrefix(foundArgs[0], "-") {
+		subcommand := foundArgs[0]
+		builtinSubcmdExist := false
+		for _, subcmd := range foundCmd.Commands() {
+			if subcmd.Name() == subcommand {
+				builtinSubcmdExist = true
+				break
+			}
+		}
+
+		if !builtinSubcmdExist {
+			if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, len(cmdPathPieces)-len(foundArgs)+1); err != nil {
+				fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
+				os.Exit(1)
+			}
+		}
 	}
 
-	if len(foundBinaryPath) == 0 {
-		return nil
-	}
-
-	// invoke cmd binary relaying the current environment and args given
-	if err := pluginHandler.Execute(foundBinaryPath, cmdArgs[len(remainingArgs):], os.Environ()); err != nil {
-		return err
-	}
-
-	return nil
+	return cmd
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(o KubectlOptions) *cobra.Command {
-	warningHandler := rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(o.IOStreams.ErrOut)})
+	warningHandler := rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: printers.AllowsColorOutput(o.IOStreams.ErrOut)})
 	warningsAsErrors := false
+	var finishProfiling func() error
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -331,11 +187,15 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 				plugin.SetupPluginCompletion(cmd, args)
 			}
 
-			return initProfiling()
+			var err error
+			finishProfiling, err = initProfiling()
+			return err
 		},
 		PersistentPostRunE: func(*cobra.Command, []string) error {
-			if err := flushProfiling(); err != nil {
-				return err
+			if finishProfiling != nil {
+				if err := finishProfiling(); err != nil {
+					return err
+				}
 			}
 			if warningsAsErrors {
 				count := warningHandler.WarningCount()
@@ -361,6 +221,11 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
+	pref := kuberc.NewPreferences()
+	if !cmdutil.KubeRC.IsDisabled() {
+		pref.AddFlags(flags)
+	}
+
 	kubeConfigFlags := o.ConfigFlags
 	if kubeConfigFlags == nil {
 		kubeConfigFlags = defaultConfigFlags().WithWarningPrinter(o.IOStreams)
@@ -369,20 +234,24 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
 	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
-	addCmdHeaderHooks(cmds, kubeConfigFlags)
+	var isProxyCmd atomic.Bool
+	addCmdHeaderHooks(cmds, kubeConfigFlags, &isProxyCmd)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
-	// Proxy command is incompatible with CommandHeaderRoundTripper, so
-	// clear the WrapConfigFn before running proxy command.
+	// Proxy command is incompatible with the headers set by
+	// CommandHeaderRoundTripper, so the RoundTripper hooks set in
+	// `addCmdHeaderHooks` needs to be aware that the subcommand is `proxy`
 	proxyCmd := proxy.NewCmdProxy(f, o.IOStreams)
 	proxyCmd.PreRun = func(cmd *cobra.Command, args []string) {
-		kubeConfigFlags.WrapConfigFn = nil
+		isProxyCmd.Store(true)
 	}
 
 	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()
 	getCmd := get.NewCmdGet("kubectl", f, o.IOStreams)
 	getCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
+	debugCmd := debug.NewCmdDebug(f, o.IOStreams)
+	debugCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
 
 	groups := templates.CommandGroups{
 		{
@@ -434,7 +303,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 				proxyCmd,
 				cp.NewCmdCp(f, o.IOStreams),
 				auth.NewCmdAuth(f, o.IOStreams),
-				debug.NewCmdDebug(f, o.IOStreams),
+				debugCmd,
 				events.NewCmdEvents(f, o.IOStreams),
 			},
 		},
@@ -486,10 +355,30 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.AddCommand(apiresources.NewCmdAPIVersions(f, o.IOStreams))
 	cmds.AddCommand(apiresources.NewCmdAPIResources(f, o.IOStreams))
 	cmds.AddCommand(options.NewCmdOptions(o.IOStreams.Out))
+	if !cmdutil.KubeRC.IsDisabled() {
+		cmds.AddCommand(kuberccmd.NewCmdKubeRC(o.IOStreams))
+	}
 
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
+
+	if !cmdutil.KubeRC.IsDisabled() {
+		existingPreRunE := cmds.PersistentPreRunE
+		cmds.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+			if originalCommandArgs, ok := cmd.Annotations[kuberc.KubeRCOriginalCommandAnnotation]; ok {
+				originalCommand := fmt.Sprintf("%s %s", cmd.Root().Name(), originalCommandArgs)
+				klog.V(1).Info(fmt.Sprintf("original command: %q", originalCommand))
+			}
+			return existingPreRunE(cmd, args)
+		}
+		_, err := pref.Apply(cmds, kubeConfigFlags, o.Arguments, o.IOStreams.ErrOut)
+		if err != nil {
+			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	return cmds
 }
 
@@ -501,20 +390,10 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 //     RoundTripper. CommandHeaderRoundTripper adds X-Headers then delegates
 //     to standard RoundTripper.
 //
-// For beta, these hooks are updated unless the KUBECTL_COMMAND_HEADERS environment variable
-// is set, and the value of the env var is false (or zero).
 // See SIG CLI KEP 859 for more information:
 //
 //	https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
-func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags) {
-	// If the feature gate env var is set to "false", then do no add kubectl command headers.
-	if value, exists := os.LookupEnv(kubectlCmdHeaders); exists {
-		if value == "false" || value == "0" {
-			klog.V(5).Infoln("kubectl command headers turned off")
-			return
-		}
-	}
-	klog.V(5).Infoln("kubectl command headers turned on")
+func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags, isProxyCmd *atomic.Bool) {
 	crt := &genericclioptions.CommandHeaderRoundTripper{}
 	existingPreRunE := cmds.PersistentPreRunE
 	// Add command parsing to the existing persistent pre-run function.
@@ -524,7 +403,7 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 	}
 	wrapConfigFn := kubeConfigFlags.WrapConfigFn
 	// Wraps CommandHeaderRoundTripper around standard RoundTripper.
-	kubeConfigFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
+	kubeConfigFlags.WithWrapConfigFn(func(c *rest.Config) *rest.Config {
 		if wrapConfigFn != nil {
 			c = wrapConfigFn(c)
 		}
@@ -532,12 +411,13 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 			// Must be separate RoundTripper; not "crt" closure.
 			// Fixes: https://github.com/kubernetes/kubectl/issues/1098
 			return &genericclioptions.CommandHeaderRoundTripper{
-				Delegate: rt,
-				Headers:  crt.Headers,
+				Delegate:    rt,
+				Headers:     crt.Headers,
+				SkipHeaders: isProxyCmd, // proxy command is incompatible with these headers
 			}
 		})
 		return c
-	}
+	})
 }
 
 func runHelp(cmd *cobra.Command, args []string) {
@@ -565,4 +445,30 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+// GetLogVerbosity parses the provided command-line arguments to determine
+// the verbosity level for logging. Returns string representing the verbosity
+// level, or 0 if no verbosity flag is specified.
+func GetLogVerbosity(args []string) string {
+	for i, arg := range args {
+		if arg == "--" {
+			// flags after "--" does not represent any flag of
+			// the command. We should short cut the iteration in here.
+			break
+		}
+
+		if arg == "--v" || arg == "-v" {
+			if i+1 < len(args) {
+				return args[i+1]
+			}
+		} else if strings.Contains(arg, "--v=") || strings.Contains(arg, "-v=") {
+			parg := strings.Split(arg, "=")
+			if len(parg) > 1 && parg[1] != "" {
+				return parg[1]
+			}
+		}
+	}
+
+	return "0"
 }

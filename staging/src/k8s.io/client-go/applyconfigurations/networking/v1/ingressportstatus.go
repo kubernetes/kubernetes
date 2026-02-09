@@ -19,15 +19,28 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // IngressPortStatusApplyConfiguration represents a declarative configuration of the IngressPortStatus type for use
 // with apply.
+//
+// IngressPortStatus represents the error condition of a service port
 type IngressPortStatusApplyConfiguration struct {
-	Port     *int32       `json:"port,omitempty"`
-	Protocol *v1.Protocol `json:"protocol,omitempty"`
-	Error    *string      `json:"error,omitempty"`
+	// port is the port number of the ingress port.
+	Port *int32 `json:"port,omitempty"`
+	// protocol is the protocol of the ingress port.
+	// The supported values are: "TCP", "UDP", "SCTP"
+	Protocol *corev1.Protocol `json:"protocol,omitempty"`
+	// error is to record the problem with the service port
+	// The format of the error shall comply with the following rules:
+	// - built-in error values shall be specified in this file and those shall use
+	// CamelCase names
+	// - cloud provider specific error values must have names that comply with the
+	// format foo.example.com/CamelCase.
+	// ---
+	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+	Error *string `json:"error,omitempty"`
 }
 
 // IngressPortStatusApplyConfiguration constructs a declarative configuration of the IngressPortStatus type for use with
@@ -47,7 +60,7 @@ func (b *IngressPortStatusApplyConfiguration) WithPort(value int32) *IngressPort
 // WithProtocol sets the Protocol field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Protocol field is set to the value of the last call.
-func (b *IngressPortStatusApplyConfiguration) WithProtocol(value v1.Protocol) *IngressPortStatusApplyConfiguration {
+func (b *IngressPortStatusApplyConfiguration) WithProtocol(value corev1.Protocol) *IngressPortStatusApplyConfiguration {
 	b.Protocol = &value
 	return b
 }

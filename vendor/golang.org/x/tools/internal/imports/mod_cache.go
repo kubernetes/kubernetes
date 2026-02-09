@@ -128,7 +128,7 @@ func (d *DirInfoCache) ScanAndListen(ctx context.Context, listener cacheListener
 	// are going to be. Setting an arbitrary limit makes it much easier.
 	const maxInFlight = 10
 	sema := make(chan struct{}, maxInFlight)
-	for i := 0; i < maxInFlight; i++ {
+	for range maxInFlight {
 		sema <- struct{}{}
 	}
 
@@ -156,7 +156,7 @@ func (d *DirInfoCache) ScanAndListen(ctx context.Context, listener cacheListener
 		d.mu.Lock()
 		delete(d.listeners, cookie)
 		d.mu.Unlock()
-		for i := 0; i < maxInFlight; i++ {
+		for range maxInFlight {
 			<-sema
 		}
 	}

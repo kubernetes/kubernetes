@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
-	v1 "k8s.io/code-generator/examples/single/api/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
+	apiv1 "k8s.io/code-generator/examples/single/api/v1"
 )
 
 // ClusterTestTypeLister helps list ClusterTestTypes.
@@ -30,19 +30,19 @@ import (
 type ClusterTestTypeLister interface {
 	// List lists all ClusterTestTypes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ClusterTestType, err error)
+	List(selector labels.Selector) (ret []*apiv1.ClusterTestType, err error)
 	// Get retrieves the ClusterTestType from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ClusterTestType, error)
+	Get(name string) (*apiv1.ClusterTestType, error)
 	ClusterTestTypeListerExpansion
 }
 
 // clusterTestTypeLister implements the ClusterTestTypeLister interface.
 type clusterTestTypeLister struct {
-	listers.ResourceIndexer[*v1.ClusterTestType]
+	listers.ResourceIndexer[*apiv1.ClusterTestType]
 }
 
 // NewClusterTestTypeLister returns a new ClusterTestTypeLister.
 func NewClusterTestTypeLister(indexer cache.Indexer) ClusterTestTypeLister {
-	return &clusterTestTypeLister{listers.New[*v1.ClusterTestType](indexer, v1.Resource("clustertesttype"))}
+	return &clusterTestTypeLister{listers.New[*apiv1.ClusterTestType](indexer, apiv1.Resource("clustertesttype"))}
 }

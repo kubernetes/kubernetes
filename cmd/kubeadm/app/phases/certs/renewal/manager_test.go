@@ -37,7 +37,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 var (
@@ -106,8 +105,7 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestRenewUsingLocalCA(t *testing.T) {
-	dir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	if err := pkiutil.WriteCertAndKey(dir, "ca", testCACert, testCAKey); err != nil {
 		t.Fatalf("couldn't write out CA certificate to %s", dir)
@@ -184,7 +182,7 @@ func TestRenewUsingLocalCA(t *testing.T) {
 			}
 
 			if !newCert.NotAfter.After(cert.NotAfter) {
-				t.Fatalf("expected new certificate with updated expiration, but renewed certificate has same NotAfter value: saw %s, expected greather than %s", newCert.NotAfter, cert.NotAfter)
+				t.Fatalf("expected new certificate with updated expiration, but renewed certificate has same NotAfter value: saw %s, expected greater than %s", newCert.NotAfter, cert.NotAfter)
 			}
 
 			certtestutil.AssertCertificateIsSignedByCa(t, newCert, testCACert)
@@ -200,8 +198,7 @@ func TestRenewUsingLocalCA(t *testing.T) {
 }
 
 func TestCreateRenewCSR(t *testing.T) {
-	dir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	outdir := filepath.Join(dir, "out")
 

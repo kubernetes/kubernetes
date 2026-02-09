@@ -119,23 +119,6 @@ func ParseDuration(cand string) (time.Duration, error) {
 	return 0, fmt.Errorf("unable to parse %s as duration", cand)
 }
 
-// Scan reads a Duration value from database driver type.
-func (d *Duration) Scan(raw interface{}) error {
-	switch v := raw.(type) {
-	// TODO: case []byte: // ?
-	case int64:
-		*d = Duration(v)
-	case float64:
-		*d = Duration(int64(v))
-	case nil:
-		*d = Duration(0)
-	default:
-		return fmt.Errorf("cannot sql.Scan() strfmt.Duration from: %#v", v)
-	}
-
-	return nil
-}
-
 // String converts this duration to a string
 func (d Duration) String() string {
 	return time.Duration(d).String()

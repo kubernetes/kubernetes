@@ -168,6 +168,12 @@ func TestTopPod(t *testing.T) {
 			namespaces: []string{testNS, testNS, testNS},
 			containers: true,
 		},
+		{
+			name:            "with swap",
+			options:         &TopPodOptions{AllNamespaces: true, ShowSwap: true},
+			namespaces:      []string{testNS, "secondtestns", "thirdtestns"},
+			listsNamespaces: true,
+		},
 	}
 	cmdtesting.InitTestErrorHandler(t)
 	for _, testCase := range testCases {
@@ -284,8 +290,99 @@ func TestTopPod(t *testing.T) {
 					t.Errorf("containers not matching:\n\texpectedContainers: %v\n\tresultContainers: %v\n", testCase.expectedContainers, resultContainers)
 				}
 			}
+			if testCase.options != nil && testCase.options.ShowSwap {
+				if !strings.Contains(result, "SWAP(bytes)") {
+					t.Errorf("missing SWAP(bytes) header: \n%s", result)
+				}
+			}
 		})
 	}
+}
+
+func TestTopPodWithSwap(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	const testName = "TestTopPodWithSwap"
+	t.Run(testName, func(t *testing.T) {
+		metricsList := testV1beta1PodMetricsData()
+		fakemetricsClientset := &metricsfake.Clientset{}
+
+		fakemetricsClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			res := &metricsv1beta1api.PodMetricsList{
+				Items: metricsList,
+			}
+			return true, res, nil
+		})
+
+		tf := cmdtesting.NewTestFactory()
+		defer tf.Cleanup()
+
+		ns := scheme.Codecs.WithoutConversion()
+
+		tf.Client = &fake.RESTClient{
+			NegotiatedSerializer: ns,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch req.URL.Path {
+				case "/api":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				case "/apis":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+				default:
+					t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v",
+						testName, req, req.URL)
+					return nil, nil
+				}
+			}),
+		}
+		streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+
+		cmd := NewCmdTopPod(tf, nil, streams)
+		cmdOptions := &TopPodOptions{
+			ShowSwap: true,
+		}
+		cmdOptions.IOStreams = streams
+
+		if err := cmdOptions.Complete(tf, cmd, nil); err != nil {
+			t.Fatal(err)
+		}
+		cmdOptions.MetricsClient = fakemetricsClientset
+		if err := cmdOptions.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if err := cmdOptions.RunTopPod(); err != nil {
+			t.Fatal(err)
+		}
+
+		result := buf.String()
+
+		expectedSwapBytes := map[string]string{
+			"pod1": "4Mi",
+			"pod2": "0Mi",
+			"pod3": "3Mi",
+		}
+
+		actualSwapBytes := map[string]string{}
+		for _, line := range strings.Split(result, "\n")[1:] {
+			lineFields := strings.Fields(line)
+			if len(lineFields) < 4 {
+				continue
+			}
+
+			podName := lineFields[0]
+			swapBytes := lineFields[3]
+			actualSwapBytes[podName] = swapBytes
+		}
+
+		for expectedPodName, expectedSwapBytes := range expectedSwapBytes {
+			actualSwapBytes, found := actualSwapBytes[expectedPodName]
+			if !found {
+				t.Errorf("missing swap metrics for pod %s", expectedPodName)
+			}
+			if actualSwapBytes != expectedSwapBytes {
+				t.Errorf("unexpected swap metrics for pod %s: expected %s, got %s", expectedPodName, expectedSwapBytes, actualSwapBytes)
+			}
+		}
+	})
 }
 
 func getResultColumnValues(result string, columnIndex int) []string {
@@ -410,6 +507,7 @@ func testV1beta1PodMetricsData() []metricsv1beta1api.PodMetrics {
 					Usage: v1.ResourceList{
 						v1.ResourceCPU:     *resource.NewMilliQuantity(1, resource.DecimalSI),
 						v1.ResourceMemory:  *resource.NewQuantity(2*(1024*1024), resource.DecimalSI),
+						"swap":             *resource.NewQuantity(1*(1024*1024), resource.DecimalSI),
 						v1.ResourceStorage: *resource.NewQuantity(3*(1024*1024), resource.DecimalSI),
 					},
 				},
@@ -418,6 +516,7 @@ func testV1beta1PodMetricsData() []metricsv1beta1api.PodMetrics {
 					Usage: v1.ResourceList{
 						v1.ResourceCPU:     *resource.NewMilliQuantity(4, resource.DecimalSI),
 						v1.ResourceMemory:  *resource.NewQuantity(5*(1024*1024), resource.DecimalSI),
+						"swap":             *resource.NewQuantity(3*(1024*1024), resource.DecimalSI),
 						v1.ResourceStorage: *resource.NewQuantity(6*(1024*1024), resource.DecimalSI),
 					},
 				},
@@ -462,6 +561,7 @@ func testV1beta1PodMetricsData() []metricsv1beta1api.PodMetrics {
 					Usage: v1.ResourceList{
 						v1.ResourceCPU:     *resource.NewMilliQuantity(7, resource.DecimalSI),
 						v1.ResourceMemory:  *resource.NewQuantity(8*(1024*1024), resource.DecimalSI),
+						"swap":             *resource.NewQuantity(3*(1024*1024), resource.DecimalSI),
 						v1.ResourceStorage: *resource.NewQuantity(9*(1024*1024), resource.DecimalSI),
 					},
 				},

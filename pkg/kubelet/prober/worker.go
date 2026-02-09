@@ -23,9 +23,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
@@ -79,6 +81,16 @@ type worker struct {
 	// for the ProberDuration metric by result.
 	proberDurationSuccessfulMetricLabels metrics.Labels
 	proberDurationUnknownMetricLabels    metrics.Labels
+}
+
+// isInitContainer checks if the worker's container is in the pod's init containers
+func (w *worker) isInitContainer() bool {
+	for _, initContainer := range w.pod.Spec.InitContainers {
+		if initContainer.Name == w.container.Name {
+			return true
+		}
+	}
+	return false
 }
 
 // Creates and starts a new probe worker.
@@ -143,8 +155,8 @@ func newWorker(
 }
 
 // run periodically probes the container.
-func (w *worker) run() {
-	ctx := context.Background()
+func (w *worker) run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
 	// If kubelet restarted the probes could be started in rapid succession.
@@ -178,7 +190,12 @@ probeLoop:
 		case <-w.stopCh:
 			break probeLoop
 		case <-probeTicker.C:
+			// continue
 		case <-w.manualTriggerCh:
+			// Updating the periodic timer to run the probe again at intervals of probeTickerPeriod
+			// starting from the moment a manual run occurs.
+			probeTicker.Reset(probeTickerPeriod)
+			logger.V(4).Info("Triggered Probe by manual run", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
 			// continue
 		}
 	}
@@ -197,19 +214,20 @@ func (w *worker) stop() {
 // Returns whether the worker should continue.
 func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
-	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
+	defer runtime.HandleCrashWithContext(ctx, func(ctx context.Context, _ interface{}) { keepGoing = true })
 
+	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.
-		klog.V(3).InfoS("No status for pod", "pod", klog.KObj(w.pod))
+		logger.V(3).Info("No status for pod", "pod", klog.KObj(w.pod))
 		return true
 	}
 
 	// Worker should terminate if pod is terminated.
 	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
-		klog.V(3).InfoS("Pod is terminated, exiting probe worker",
+		logger.V(3).Info("Pod is terminated, exiting probe worker",
 			"pod", klog.KObj(w.pod), "phase", status.Phase)
 		return false
 	}
@@ -219,7 +237,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		c, ok = podutil.GetContainerStatus(status.InitContainerStatuses, w.container.Name)
 		if !ok || len(c.ContainerID) == 0 {
 			// Either the container has not been created yet, or it was deleted.
-			klog.V(3).InfoS("Probe target container not found",
+			logger.V(3).Info("Probe target container not found",
 				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
 			return true // Wait for more information.
 		}
@@ -229,8 +247,25 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
+
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+			// On kubelet restart, we don't want to immediately set the probe result to Failure,
+			// as this could cause a container that was Ready to become NotReady.
+			isRestart := false
+			if c.State.Running != nil {
+				containerStartTime := c.State.Running.StartedAt.Time
+				if !containerStartTime.IsZero() && containerStartTime.Before(kubeletRestartGracePeriod(w.probeManager.start)) {
+					isRestart = true
+				}
+			}
+			if !isRestart {
+				w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+			}
+		} else {
+			w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		}
+
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
@@ -241,22 +276,35 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	if c.State.Running == nil {
-		klog.V(3).InfoS("Non-running container probed",
+		logger.V(3).Info("Non-running container probed",
 			"pod", klog.KObj(w.pod), "containerName", w.container.Name)
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
 		}
+
+		isRestartableInitContainer := w.isInitContainer() &&
+			w.container.RestartPolicy != nil && *w.container.RestartPolicy == v1.ContainerRestartPolicyAlways
+
 		// Abort if the container will not be restarted.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+			if c.State.Terminated == nil {
+				return true
+			}
+			containerShouldRestart := podutil.ContainerShouldRestart(w.container, w.pod.Spec, c.State.Terminated.ExitCode)
+			allContainersRestarting := utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) && kubecontainer.ShouldAllContainersRestart(w.pod, nil, &status)
+			return containerShouldRestart || allContainersRestarting
+		}
 		return c.State.Terminated == nil ||
-			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
+			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever ||
+			isRestartableInitContainer
 	}
 
 	// Graceful shutdown of the pod.
 	if w.pod.ObjectMeta.DeletionTimestamp != nil && (w.probeType == liveness || w.probeType == startup) {
-		klog.V(3).InfoS("Pod deletion requested, setting probe result to success",
+		logger.V(3).Info("Pod deletion requested, setting probe result to success",
 			"probeType", w.probeType, "pod", klog.KObj(w.pod), "containerName", w.container.Name)
 		if w.probeType == startup {
-			klog.InfoS("Pod deletion requested before container has fully started",
+			logger.Info("Pod deletion requested before container has fully started",
 				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
 		}
 		// Set a last result to ensure quiet shutdown.
@@ -316,11 +364,14 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
 
-	if (w.probeType == liveness || w.probeType == startup) && result == results.Failure {
+	if (w.probeType == liveness && result == results.Failure) || w.probeType == startup {
 		// The container fails a liveness/startup check, it will need to be restarted.
 		// Stop probing until we see a new container ID. This is to reduce the
 		// chance of hitting #21751, where running `docker exec` when a
 		// container is being stopped may lead to corrupted container state.
+		// In addition, if the threshold for each result of a startup probe is exceeded, we should stop probing
+		// until the container is restarted.
+		// This is to prevent extra Probe executions #117153.
 		w.onHold = true
 		w.resultRun = 0
 	}

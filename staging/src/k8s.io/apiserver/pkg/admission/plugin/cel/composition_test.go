@@ -48,15 +48,14 @@ func (t *testVariable) GetName() string {
 
 func TestCompositedPolicies(t *testing.T) {
 	cases := []struct {
-		name                  string
-		variables             []NamedExpressionAccessor
-		expression            string
-		attributes            admission.Attributes
-		expectedResult        any
-		expectErr             bool
-		expectedErrorMessage  string
-		runtimeCostBudget     int64
-		strictCostEnforcement bool
+		name                 string
+		variables            []NamedExpressionAccessor
+		expression           string
+		attributes           admission.Attributes
+		expectedResult       any
+		expectErr            bool
+		expectedErrorMessage string
+		runtimeCostBudget    int64
 	}{
 		{
 			name: "simple",
@@ -187,44 +186,29 @@ func TestCompositedPolicies(t *testing.T) {
 			expectedErrorMessage: "found no matching overload for '_==_' applied to '(string, int)'",
 		},
 		{
-			name: "with strictCostEnforcement on: exceeds cost budget",
+			name: "exceeds cost budget",
 			variables: []NamedExpressionAccessor{
 				&testVariable{
 					name:       "dict",
 					expression: "'abc 123 def 123'.split(' ')",
 				},
 			},
-			attributes:            endpointCreateAttributes(),
-			expression:            "size(variables.dict) > 0",
-			expectErr:             true,
-			expectedErrorMessage:  "validation failed due to running out of cost budget, no further validation rules will be run",
-			runtimeCostBudget:     5,
-			strictCostEnforcement: true,
-		},
-		{
-			name: "with strictCostEnforcement off: not exceed cost budget",
-			variables: []NamedExpressionAccessor{
-				&testVariable{
-					name:       "dict",
-					expression: "'abc 123 def 123'.split(' ')",
-				},
-			},
-			attributes:            endpointCreateAttributes(),
-			expression:            "size(variables.dict) > 0",
-			expectedResult:        true,
-			runtimeCostBudget:     5,
-			strictCostEnforcement: false,
+			attributes:           endpointCreateAttributes(),
+			expression:           "size(variables.dict) > 0",
+			expectErr:            true,
+			expectedErrorMessage: "validation failed due to running out of cost budget, no further validation rules will be run",
+			runtimeCostBudget:    5,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			compiler, err := NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), tc.strictCostEnforcement))
+			compiler, err := NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 			if err != nil {
 				t.Fatal(err)
 			}
-			compiler.CompileAndStoreVariables(tc.variables, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false, StrictCost: tc.strictCostEnforcement}, environment.NewExpressions)
-			validations := []ExpressionAccessor{&condition{Expression: tc.expression}}
-			f := compiler.Compile(validations, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false, StrictCost: tc.strictCostEnforcement}, environment.NewExpressions)
+			compiler.CompileAndStoreVariables(tc.variables, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, environment.NewExpressions)
+			validations := []ExpressionAccessor{&testCondition{Expression: tc.expression}}
+			f := compiler.CompileCondition(validations, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, environment.NewExpressions)
 			versionedAttr, err := admission.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
 			if err != nil {
 				t.Fatal(err)
@@ -261,5 +245,48 @@ func TestCompositedPolicies(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+// TestCompilerIsolation verifies that each call to NewCompositedCompiler
+// creates an isolated environment where variables from one compiler
+// do not leak into another.
+func TestCompilerIsolation(t *testing.T) {
+	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+
+	// Create first compiler with variable "foo"
+	compiler1, err := NewCompositedCompiler(baseEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vars1 := []NamedExpressionAccessor{
+		&testVariable{name: "foo", expression: "'bar'"},
+	}
+	compiler1.CompileAndStoreVariables(vars1, OptionalVariableDeclarations{}, environment.StoredExpressions)
+
+	// Create second compiler with variable "baz"
+	compiler2, err := NewCompositedCompiler(baseEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vars2 := []NamedExpressionAccessor{
+		&testVariable{name: "baz", expression: "'qux'"},
+	}
+	compiler2.CompileAndStoreVariables(vars2, OptionalVariableDeclarations{}, environment.StoredExpressions)
+
+	// Verify isolation: compiler1 should not have "baz", compiler2 should not have "foo"
+	if _, ok := compiler1.state.mapType.Fields["baz"]; ok {
+		t.Error("compiler1 should not have variable 'baz' from compiler2")
+	}
+	if _, ok := compiler2.state.mapType.Fields["foo"]; ok {
+		t.Error("compiler2 should not have variable 'foo' from compiler1")
+	}
+
+	// Verify each compiler has its own variable
+	if _, ok := compiler1.state.mapType.Fields["foo"]; !ok {
+		t.Error("compiler1 should have variable 'foo'")
+	}
+	if _, ok := compiler2.state.mapType.Fields["baz"]; !ok {
+		t.Error("compiler2 should have variable 'baz'")
 	}
 }

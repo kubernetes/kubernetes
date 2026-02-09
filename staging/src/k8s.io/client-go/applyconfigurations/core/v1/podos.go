@@ -19,13 +19,19 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // PodOSApplyConfiguration represents a declarative configuration of the PodOS type for use
 // with apply.
+//
+// PodOS defines the OS parameters of a pod.
 type PodOSApplyConfiguration struct {
-	Name *v1.OSName `json:"name,omitempty"`
+	// Name is the name of the operating system. The currently supported values are linux and windows.
+	// Additional value may be defined in future and can be one of:
+	// https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
+	// Clients should expect to handle additional values and treat unrecognized values in this field as os: null
+	Name *corev1.OSName `json:"name,omitempty"`
 }
 
 // PodOSApplyConfiguration constructs a declarative configuration of the PodOS type for use with
@@ -37,7 +43,7 @@ func PodOS() *PodOSApplyConfiguration {
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *PodOSApplyConfiguration) WithName(value v1.OSName) *PodOSApplyConfiguration {
+func (b *PodOSApplyConfiguration) WithName(value corev1.OSName) *PodOSApplyConfiguration {
 	b.Name = &value
 	return b
 }

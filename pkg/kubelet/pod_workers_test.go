@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"strconv"
 	"sync"
@@ -30,8 +31,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -451,6 +455,7 @@ func createPodWorkers() (*podWorkers, *containertest.FakeRuntime, map[types.UID]
 		time.Second,
 		time.Millisecond,
 		fakeCache,
+		allocation.NewInMemoryManager(cm.NodeConfig{}, nil, nil, nil, nil, nil, nil, nil),
 	)
 	workers := w.(*podWorkers)
 	workers.clock = clock
@@ -878,6 +883,191 @@ func TestUpdatePod(t *testing.T) {
 			// the amount of testing we need to do in kubelet_pods_test.go
 		})
 	}
+}
+
+func TestCompleteWork_Enqueue(t *testing.T) {
+	const noJitter = 0.0
+
+	defaultBackoff := 10 * time.Second
+	resyncInterval := 20 * time.Second
+	clock := clocktesting.NewFakePassiveClock(time.Unix(1, 0))
+
+	testCases := []struct {
+		name            string
+		phaseTransition bool
+		syncErr         error
+		expectedMin     time.Duration
+		jitterFactor    float64
+	}{
+		{
+			name:            "phase transition requeues for immediate processing",
+			phaseTransition: true,
+			expectedMin:     0,
+			jitterFactor:    noJitter,
+		},
+		{
+			name:         "no error uses regular resync interval",
+			syncErr:      nil,
+			expectedMin:  resyncInterval,
+			jitterFactor: workerResyncIntervalJitterFactor,
+		},
+		{
+			name:         "generic error uses default backoff",
+			syncErr:      errors.New("generic error"),
+			expectedMin:  defaultBackoff,
+			jitterFactor: workerBackOffPeriodJitterFactor,
+		},
+		{
+			name: "BackoffError uses error's backoff",
+			syncErr: kubecontainer.NewBackoffError(
+				errors.New("backoff error"),
+				clock.Now().Add(5*time.Second),
+			),
+			expectedMin:  5 * time.Second,
+			jitterFactor: workerBackOffPeriodJitterFactor,
+		},
+		{
+			name: "Aggregate error with one BackoffError uses its backoff",
+			syncErr: utilerrors.NewAggregate([]error{
+				errors.New("some other error"),
+				kubecontainer.NewBackoffError(
+					errors.New("backoff error in aggregate"),
+					clock.Now().Add(7*time.Second),
+				),
+			}),
+			expectedMin:  7 * time.Second,
+			jitterFactor: workerBackOffPeriodJitterFactor,
+		},
+		{
+			name: "Aggregate error with multiple BackoffErrors uses minimum backoff",
+			syncErr: utilerrors.NewAggregate([]error{
+				kubecontainer.NewBackoffError(
+					errors.New("backoff error 1"),
+					clock.Now().Add(10*time.Second),
+				),
+				kubecontainer.NewBackoffError(
+					errors.New("backoff error 2"),
+					clock.Now().Add(3*time.Second),
+				),
+			}),
+			expectedMin:  3 * time.Second,
+			jitterFactor: workerBackOffPeriodJitterFactor,
+		},
+		{
+			name:         "BackoffError in the past enqueues for immediate processing with jitter",
+			syncErr:      kubecontainer.NewBackoffError(errors.New("backoff error"), clock.Now().Add(-5*time.Second)),
+			expectedMin:  0,
+			jitterFactor: workerBackOffPeriodJitterFactor,
+		},
+		{
+			name:         "Excessively long backoff duration enqueues for the maximum allowed",
+			syncErr:      kubecontainer.NewBackoffError(errors.New("backoff error"), clock.Now().Add(resyncInterval*2)),
+			expectedMin:  resyncInterval,
+			jitterFactor: workerBackOffPeriodJitterFactor,
+		},
+		{
+			name:         "NetworkNotReadyError uses backOffOnTransientErrorPeriod",
+			syncErr:      errors.New(NetworkNotReadyErrorMsg),
+			expectedMin:  backOffOnTransientErrorPeriod,
+			jitterFactor: workerBackOffPeriodJitterFactor,
+		},
+		{
+			name: "Aggregate with NetworkNotReadyError",
+			syncErr: utilerrors.NewAggregate([]error{
+				errors.New("some other error"),
+				errors.New(NetworkNotReadyErrorMsg),
+			}),
+			expectedMin:  backOffOnTransientErrorPeriod,
+			jitterFactor: workerBackOffPeriodJitterFactor,
+		},
+		{
+			name: "Aggregate with NetworkNotReadyError and BackoffError",
+			syncErr: utilerrors.NewAggregate([]error{
+				errors.New("some other error"),
+				errors.New(NetworkNotReadyErrorMsg),
+				kubecontainer.NewBackoffError(
+					errors.New("backoff error 2"),
+					clock.Now().Add(3*time.Second),
+				),
+			}),
+			expectedMin:  backOffOnTransientErrorPeriod,
+			jitterFactor: workerBackOffPeriodJitterFactor,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podWorkers, _, _ := createPodWorkers()
+			podWorkers.clock = clock
+			fakeQueue := podWorkers.workQueue.(*fakeQueue)
+			podUID := types.UID("12345")
+
+			podWorkers.resyncInterval = resyncInterval
+			podWorkers.backOffPeriod = defaultBackoff
+			podWorkers.podSyncStatuses[podUID] = &podSyncStatus{}
+			podWorkers.completeWork(podUID, tc.phaseTransition, tc.syncErr)
+
+			if fakeQueue.Empty() {
+				t.Fatalf("work queue should not be empty")
+			}
+			items := fakeQueue.Items()
+			if len(items) != 1 {
+				t.Fatalf("expected 1 item in queue, got %d", len(items))
+			}
+			item := items[0]
+			if item.UID != podUID {
+				t.Errorf("expected pod UID %q, got %q", podUID, item.UID)
+			}
+
+			expectedMax := tc.expectedMin + time.Duration(float64(tc.expectedMin)*tc.jitterFactor)
+			if item.Delay < tc.expectedMin || item.Delay > expectedMax {
+				t.Errorf("expected delay in range [%v, %v], got %v", tc.expectedMin, expectedMax, item.Delay)
+			}
+		})
+	}
+}
+
+func TestCompleteWork_PendingUpdate(t *testing.T) {
+	podUID := types.UID("pod-with-pending-update-check")
+
+	t.Run("with nil pendingUpdate, clears working status", func(t *testing.T) {
+		p := &podWorkers{
+			podSyncStatuses: make(map[types.UID]*podSyncStatus),
+			workQueue:       &fakeQueue{},
+		}
+		p.podSyncStatuses[podUID] = &podSyncStatus{working: true, pendingUpdate: nil}
+
+		p.completeWork(podUID, false, nil)
+
+		p.podLock.Lock()
+		defer p.podLock.Unlock()
+		if p.podSyncStatuses[podUID].working {
+			t.Error("expected pod status 'working' to be false, but it was true")
+		}
+	})
+
+	t.Run("with non-nil pendingUpdate, queues an update signal", func(t *testing.T) {
+		p := &podWorkers{
+			podSyncStatuses: make(map[types.UID]*podSyncStatus),
+			podUpdates:      make(map[types.UID]chan struct{}),
+			workQueue:       &fakeQueue{},
+		}
+		p.podUpdates[podUID] = make(chan struct{}, 1)
+
+		dummyUpdate := &UpdatePodOptions{
+			Pod: newNamedPod("1", "ns", "running-pod", false),
+		}
+		p.podSyncStatuses[podUID] = &podSyncStatus{working: true, pendingUpdate: dummyUpdate}
+
+		p.completeWork(podUID, false, nil)
+
+		select {
+		case <-p.podUpdates[podUID]:
+			// Success! The channel received the signal as expected.
+		default:
+			t.Fatal("expected an update to be queued on the podUpdates channel, but none was received")
+		}
+	})
 }
 
 func TestUpdatePodForRuntimePod(t *testing.T) {
@@ -1940,7 +2130,13 @@ func TestFakePodWorkers(t *testing.T) {
 
 	realPodWorkers := newPodWorkers(
 		realPodSyncer,
-		fakeRecorder, queue.NewBasicWorkQueue(&clock.RealClock{}), time.Second, time.Second, fakeCache)
+		fakeRecorder,
+		queue.NewBasicWorkQueue(&clock.RealClock{}),
+		time.Second,
+		time.Second,
+		fakeCache,
+		allocation.NewInMemoryManager(cm.NodeConfig{}, nil, nil, nil, nil, nil, nil, nil),
+	)
 	fakePodWorkers := &fakePodWorkers{
 		syncPodFn: kubeletForFakeWorkers.SyncPod,
 		cache:     fakeCache,

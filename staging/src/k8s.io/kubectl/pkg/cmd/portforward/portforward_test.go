@@ -820,6 +820,24 @@ func TestConvertPodNamedPortToNumber(t *testing.T) {
 			ports: []string{"https", "http"},
 			err:   true,
 		},
+		{
+			name: "empty port name",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: int32(27017)},
+							},
+						},
+					},
+				},
+			},
+			ports:     []string{"28015:"},
+			converted: nil,
+			err:       true,
+		},
 	}
 
 	for _, tc := range cases {

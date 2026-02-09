@@ -398,7 +398,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				t.Fatal("csiTest.VolumeAll volumePlugin.CanSupport returned false")
 			}
 
-			mounter, err := volPlug.NewMounter(volSpec, pod, volume.VolumeOptions{})
+			mounter, err := volPlug.NewMounter(volSpec, pod)
 			if err != nil || mounter == nil {
 				t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter is nil or error: %s", err)
 			}
@@ -485,7 +485,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			if volPlug == nil {
 				t.Fatalf("csiTest.VolumeAll volumePlugin is nil")
 			}
-			mounter, err = volPlug.NewMounter(volSpec, pod, volume.VolumeOptions{})
+			mounter, err = volPlug.NewMounter(volSpec, pod)
 			if err != nil || mounter == nil {
 				t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter is nil or error: %s", err)
 			}

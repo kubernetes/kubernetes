@@ -27,10 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -245,19 +243,15 @@ func copyAnnotations(template *batchv1.JobTemplateSpec) labels.Set {
 // granularity of 1 minute for scheduling job.
 func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	labels := copyLabels(&cj.Spec.JobTemplate)
-	annotations := copyAnnotations(&cj.Spec.JobTemplate)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 	name := getJobName(cj, scheduledTime)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CronJobsScheduledAnnotation) {
-
-		timeZoneLocation, err := time.LoadLocation(ptr.Deref(cj.Spec.TimeZone, ""))
-		if err != nil {
-			return nil, err
-		}
-		// Append job creation timestamp to the cronJob annotations. The time will be in RFC3339 form.
-		annotations[batchv1.CronJobScheduledTimestampAnnotation] = scheduledTime.In(timeZoneLocation).Format(time.RFC3339)
+	annotations := copyAnnotations(&cj.Spec.JobTemplate)
+	timeZoneLocation, err := time.LoadLocation(ptr.Deref(cj.Spec.TimeZone, ""))
+	if err != nil {
+		return nil, err
 	}
+	// Append job creation timestamp to the cronJob annotations. The time will be in RFC3339 form.
+	annotations[batchv1.CronJobScheduledTimestampAnnotation] = scheduledTime.In(timeZoneLocation).Format(time.RFC3339)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -272,7 +266,7 @@ func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1
 	return job, nil
 }
 
-// getTimeHash returns Unix Epoch Time in minutes
+// getTimeHashInMinutes returns Unix Epoch Time in minutes
 func getTimeHashInMinutes(scheduledTime time.Time) int64 {
 	return scheduledTime.Unix() / 60
 }

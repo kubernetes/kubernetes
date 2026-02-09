@@ -9,9 +9,10 @@
   - k8s.io/kubernetes/pkg/fieldpath
   - k8s.io/kubernetes/pkg/util
   - k8s.io/api/core/v1
-  - k8s.io/utils/pointer
+  - k8s.io/utils/ptr
   - k8s.io/utils/net
   - k8s.io/klog
+  - k8s.io/component-helpers/resource
 
   # the following are temporary and should go away. Think twice (or more) before adding anything here.
   # Main goal: pkg/apis should be as self-contained as possible.
@@ -31,7 +32,7 @@
   - k8s.io/cli-runtime/pkg/printers
   - k8s.io/cli-runtime/pkg/resource
   - k8s.io/cli-runtime/pkg/kustomize
-  - k8s.io/utils/pointer
+  - k8s.io/utils/ptr
 
 - baseImportPath: "./staging/src/k8s.io/apimachinery"
   allowedImports:
@@ -54,10 +55,12 @@
   - "./staging/src/k8s.io/code-generator/examples"
   - "./staging/src/k8s.io/code-generator/cmd/defaulter-gen/output_tests"
   allowedImports:
-  - k8s.io/gengo
+  - k8s.io/apimachinery
+  - k8s.io/gengo/v2
   - k8s.io/code-generator
   - k8s.io/kube-openapi
   - k8s.io/klog
+  - k8s.io/utils/ptr
 
 - baseImportPath: "./staging/src/k8s.io/component-base"
   allowedImports:
@@ -91,6 +94,7 @@
   ignoredSubTrees:
   - "./staging/src/k8s.io/client-go/tools/cache/testing"
   - "./staging/src/k8s.io/client-go/tools/leaderelection/resourcelock"
+  - "./staging/src/k8s.io/client-go/tools/leaderelection"
   - "./staging/src/k8s.io/client-go/tools/portforward"
   - "./staging/src/k8s.io/client-go/tools/record"
   - "./staging/src/k8s.io/client-go/tools/events"
@@ -179,7 +183,7 @@
 - baseImportPath: "./vendor/k8s.io/kube-openapi"
   allowedImports:
   - k8s.io/kube-openapi
-  - k8s.io/gengo
+  - k8s.io/gengo/v2
   - k8s.io/klog
   - k8s.io/utils
 
@@ -210,10 +214,13 @@
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/client-go
   - k8s.io/component-base
   - k8s.io/klog
   - k8s.io/kube-scheduler
   - k8s.io/utils
+  - k8s.io/dynamic-resource-allocation/structured
+  - k8s.io/component-helpers/nodedeclaredfeatures
 
 - baseImportPath: "./staging/src/k8s.io/kubelet"
   allowedImports:
@@ -256,6 +263,7 @@
   - k8s.io/apiserver/pkg/cel
   - k8s.io/apiserver/pkg/cel/environment
   - k8s.io/client-go
+  - k8s.io/component-helpers/scheduling/corev1/nodeaffinity
   - k8s.io/dynamic-resource-allocation
   - k8s.io/klog
   - k8s.io/kubelet
@@ -314,3 +322,7 @@
   - k8s.io/cri-client
   - k8s.io/klog/v2
   - k8s.io/utils
+
+- baseImportPath: "./staging/src/k8s.io/externaljwt"
+  allowedImports:
+  - k8s.io/externaljwt

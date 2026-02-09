@@ -37,13 +37,6 @@ const (
 	UnprivilegedUserToken = "unprivileged-user"
 )
 
-// MinVerbosity determines the minimum klog verbosity when running tests that
-// involve the apiserver.  This overrides the -v value from the command line,
-// i.e. -v=0 has no effect when MinVerbosity is 4 (the default).  Tests can opt
-// out of this by setting MinVerbosity to zero before starting the control
-// plane or choose some different minimum verbosity.
-var MinVerbosity = 4
-
 // DefaultOpenAPIConfig returns an openapicommon.Config initialized to default values.
 func DefaultOpenAPIConfig() *openapicommon.Config {
 	openAPIConfig := genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
@@ -93,6 +86,12 @@ func DefaultEtcdOptions() *options.EtcdOptions {
 }
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
+//
+// The transport CertFile/KeyFile/TrustedCAFile will be empty for insecure connections.
+// In that case, *no* TLS config should be used because etcd would try to use
+// it for Unix Domain sockets (https://github.com/etcd-io/etcd/blob/5a8fba466087686fc15815f5bc041fb7eb1f23ea/client/v3/internal/endpoint/endpoint.go#L61-L66)
+// and fail to connect because the TLS config is insufficient. It works
+// for TCP because http disables using TLS.
 func SharedEtcd() *storagebackend.Config {
 	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New().String(), "registry"), nil)
 	cfg.Transport.ServerList = []string{GetEtcdURL()}

@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -24,7 +25,6 @@ import (
 	"sync/atomic"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/cache"
 
@@ -51,16 +51,17 @@ var Manifest = map[string]string{
 }
 
 type Config struct {
-	DisableAttach              bool
-	DriverName                 string
-	AttachLimit                int64
-	NodeExpansionRequired      bool
-	VolumeMountGroupRequired   bool
-	DisableControllerExpansion bool
-	DisableOnlineExpansion     bool
-	PermissiveTargetPath       bool
-	EnableTopology             bool
-	IO                         DirIO
+	DisableAttach               bool
+	DriverName                  string
+	AttachLimit                 int64
+	NodeExpansionRequired       bool
+	NodeVolumeConditionRequired bool
+	VolumeMountGroupRequired    bool
+	DisableControllerExpansion  bool
+	DisableOnlineExpansion      bool
+	PermissiveTargetPath        bool
+	EnableTopology              bool
+	IO                          DirIO
 }
 
 // DirIO is an abstraction over direct os calls.
@@ -112,13 +113,16 @@ type Service interface {
 }
 
 type service struct {
+	csi.UnimplementedControllerServer
+	csi.UnimplementedIdentityServer
+	csi.UnimplementedNodeServer
 	sync.Mutex
 	nodeID       string
 	vols         []csi.Volume
 	volsRWL      sync.RWMutex
-	volsNID      uint64
+	volsNID      atomic.Uint64
 	snapshots    cache.SnapshotCache
-	snapshotsNID uint64
+	snapshotsNID atomic.Uint64
 	config       Config
 }
 
@@ -169,7 +173,7 @@ const (
 
 func (s *service) newVolume(name string, capcity int64) csi.Volume {
 	vol := csi.Volume{
-		VolumeId:      fmt.Sprintf("%d", atomic.AddUint64(&s.volsNID, 1)),
+		VolumeId:      fmt.Sprintf("%d", s.volsNID.Add(1)),
 		VolumeContext: map[string]string{"name": name},
 		CapacityBytes: capcity,
 	}
@@ -259,7 +263,7 @@ func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string
 		Name:       name,
 		Parameters: parameters,
 		SnapshotCSI: csi.Snapshot{
-			SnapshotId:     fmt.Sprintf("%d", atomic.AddUint64(&s.snapshotsNID, 1)),
+			SnapshotId:     fmt.Sprintf("%d", s.snapshotsNID.Add(1)),
 			CreationTime:   ptime,
 			SourceVolumeId: sourceVolumeId,
 			ReadyToUse:     true,

@@ -24,7 +24,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	v1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
@@ -37,40 +37,40 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ClusterTrustBundle)(nil), (*certificates.ClusterTrustBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClusterTrustBundle_To_certificates_ClusterTrustBundle(a.(*v1alpha1.ClusterTrustBundle), b.(*certificates.ClusterTrustBundle), scope)
+	if err := s.AddGeneratedConversionFunc((*certificatesv1alpha1.ClusterTrustBundle)(nil), (*certificates.ClusterTrustBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClusterTrustBundle_To_certificates_ClusterTrustBundle(a.(*certificatesv1alpha1.ClusterTrustBundle), b.(*certificates.ClusterTrustBundle), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*certificates.ClusterTrustBundle)(nil), (*v1alpha1.ClusterTrustBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_certificates_ClusterTrustBundle_To_v1alpha1_ClusterTrustBundle(a.(*certificates.ClusterTrustBundle), b.(*v1alpha1.ClusterTrustBundle), scope)
+	if err := s.AddGeneratedConversionFunc((*certificates.ClusterTrustBundle)(nil), (*certificatesv1alpha1.ClusterTrustBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_ClusterTrustBundle_To_v1alpha1_ClusterTrustBundle(a.(*certificates.ClusterTrustBundle), b.(*certificatesv1alpha1.ClusterTrustBundle), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ClusterTrustBundleList)(nil), (*certificates.ClusterTrustBundleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClusterTrustBundleList_To_certificates_ClusterTrustBundleList(a.(*v1alpha1.ClusterTrustBundleList), b.(*certificates.ClusterTrustBundleList), scope)
+	if err := s.AddGeneratedConversionFunc((*certificatesv1alpha1.ClusterTrustBundleList)(nil), (*certificates.ClusterTrustBundleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClusterTrustBundleList_To_certificates_ClusterTrustBundleList(a.(*certificatesv1alpha1.ClusterTrustBundleList), b.(*certificates.ClusterTrustBundleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*certificates.ClusterTrustBundleList)(nil), (*v1alpha1.ClusterTrustBundleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_certificates_ClusterTrustBundleList_To_v1alpha1_ClusterTrustBundleList(a.(*certificates.ClusterTrustBundleList), b.(*v1alpha1.ClusterTrustBundleList), scope)
+	if err := s.AddGeneratedConversionFunc((*certificates.ClusterTrustBundleList)(nil), (*certificatesv1alpha1.ClusterTrustBundleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_ClusterTrustBundleList_To_v1alpha1_ClusterTrustBundleList(a.(*certificates.ClusterTrustBundleList), b.(*certificatesv1alpha1.ClusterTrustBundleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ClusterTrustBundleSpec)(nil), (*certificates.ClusterTrustBundleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(a.(*v1alpha1.ClusterTrustBundleSpec), b.(*certificates.ClusterTrustBundleSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*certificatesv1alpha1.ClusterTrustBundleSpec)(nil), (*certificates.ClusterTrustBundleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(a.(*certificatesv1alpha1.ClusterTrustBundleSpec), b.(*certificates.ClusterTrustBundleSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*certificates.ClusterTrustBundleSpec)(nil), (*v1alpha1.ClusterTrustBundleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(a.(*certificates.ClusterTrustBundleSpec), b.(*v1alpha1.ClusterTrustBundleSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*certificates.ClusterTrustBundleSpec)(nil), (*certificatesv1alpha1.ClusterTrustBundleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(a.(*certificates.ClusterTrustBundleSpec), b.(*certificatesv1alpha1.ClusterTrustBundleSpec), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_ClusterTrustBundle_To_certificates_ClusterTrustBundle(in *v1alpha1.ClusterTrustBundle, out *certificates.ClusterTrustBundle, s conversion.Scope) error {
+func autoConvert_v1alpha1_ClusterTrustBundle_To_certificates_ClusterTrustBundle(in *certificatesv1alpha1.ClusterTrustBundle, out *certificates.ClusterTrustBundle, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -79,11 +79,11 @@ func autoConvert_v1alpha1_ClusterTrustBundle_To_certificates_ClusterTrustBundle(
 }
 
 // Convert_v1alpha1_ClusterTrustBundle_To_certificates_ClusterTrustBundle is an autogenerated conversion function.
-func Convert_v1alpha1_ClusterTrustBundle_To_certificates_ClusterTrustBundle(in *v1alpha1.ClusterTrustBundle, out *certificates.ClusterTrustBundle, s conversion.Scope) error {
+func Convert_v1alpha1_ClusterTrustBundle_To_certificates_ClusterTrustBundle(in *certificatesv1alpha1.ClusterTrustBundle, out *certificates.ClusterTrustBundle, s conversion.Scope) error {
 	return autoConvert_v1alpha1_ClusterTrustBundle_To_certificates_ClusterTrustBundle(in, out, s)
 }
 
-func autoConvert_certificates_ClusterTrustBundle_To_v1alpha1_ClusterTrustBundle(in *certificates.ClusterTrustBundle, out *v1alpha1.ClusterTrustBundle, s conversion.Scope) error {
+func autoConvert_certificates_ClusterTrustBundle_To_v1alpha1_ClusterTrustBundle(in *certificates.ClusterTrustBundle, out *certificatesv1alpha1.ClusterTrustBundle, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -92,50 +92,50 @@ func autoConvert_certificates_ClusterTrustBundle_To_v1alpha1_ClusterTrustBundle(
 }
 
 // Convert_certificates_ClusterTrustBundle_To_v1alpha1_ClusterTrustBundle is an autogenerated conversion function.
-func Convert_certificates_ClusterTrustBundle_To_v1alpha1_ClusterTrustBundle(in *certificates.ClusterTrustBundle, out *v1alpha1.ClusterTrustBundle, s conversion.Scope) error {
+func Convert_certificates_ClusterTrustBundle_To_v1alpha1_ClusterTrustBundle(in *certificates.ClusterTrustBundle, out *certificatesv1alpha1.ClusterTrustBundle, s conversion.Scope) error {
 	return autoConvert_certificates_ClusterTrustBundle_To_v1alpha1_ClusterTrustBundle(in, out, s)
 }
 
-func autoConvert_v1alpha1_ClusterTrustBundleList_To_certificates_ClusterTrustBundleList(in *v1alpha1.ClusterTrustBundleList, out *certificates.ClusterTrustBundleList, s conversion.Scope) error {
+func autoConvert_v1alpha1_ClusterTrustBundleList_To_certificates_ClusterTrustBundleList(in *certificatesv1alpha1.ClusterTrustBundleList, out *certificates.ClusterTrustBundleList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]certificates.ClusterTrustBundle)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1alpha1_ClusterTrustBundleList_To_certificates_ClusterTrustBundleList is an autogenerated conversion function.
-func Convert_v1alpha1_ClusterTrustBundleList_To_certificates_ClusterTrustBundleList(in *v1alpha1.ClusterTrustBundleList, out *certificates.ClusterTrustBundleList, s conversion.Scope) error {
+func Convert_v1alpha1_ClusterTrustBundleList_To_certificates_ClusterTrustBundleList(in *certificatesv1alpha1.ClusterTrustBundleList, out *certificates.ClusterTrustBundleList, s conversion.Scope) error {
 	return autoConvert_v1alpha1_ClusterTrustBundleList_To_certificates_ClusterTrustBundleList(in, out, s)
 }
 
-func autoConvert_certificates_ClusterTrustBundleList_To_v1alpha1_ClusterTrustBundleList(in *certificates.ClusterTrustBundleList, out *v1alpha1.ClusterTrustBundleList, s conversion.Scope) error {
+func autoConvert_certificates_ClusterTrustBundleList_To_v1alpha1_ClusterTrustBundleList(in *certificates.ClusterTrustBundleList, out *certificatesv1alpha1.ClusterTrustBundleList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha1.ClusterTrustBundle)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]certificatesv1alpha1.ClusterTrustBundle)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_certificates_ClusterTrustBundleList_To_v1alpha1_ClusterTrustBundleList is an autogenerated conversion function.
-func Convert_certificates_ClusterTrustBundleList_To_v1alpha1_ClusterTrustBundleList(in *certificates.ClusterTrustBundleList, out *v1alpha1.ClusterTrustBundleList, s conversion.Scope) error {
+func Convert_certificates_ClusterTrustBundleList_To_v1alpha1_ClusterTrustBundleList(in *certificates.ClusterTrustBundleList, out *certificatesv1alpha1.ClusterTrustBundleList, s conversion.Scope) error {
 	return autoConvert_certificates_ClusterTrustBundleList_To_v1alpha1_ClusterTrustBundleList(in, out, s)
 }
 
-func autoConvert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(in *v1alpha1.ClusterTrustBundleSpec, out *certificates.ClusterTrustBundleSpec, s conversion.Scope) error {
+func autoConvert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(in *certificatesv1alpha1.ClusterTrustBundleSpec, out *certificates.ClusterTrustBundleSpec, s conversion.Scope) error {
 	out.SignerName = in.SignerName
 	out.TrustBundle = in.TrustBundle
 	return nil
 }
 
 // Convert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec is an autogenerated conversion function.
-func Convert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(in *v1alpha1.ClusterTrustBundleSpec, out *certificates.ClusterTrustBundleSpec, s conversion.Scope) error {
+func Convert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(in *certificatesv1alpha1.ClusterTrustBundleSpec, out *certificates.ClusterTrustBundleSpec, s conversion.Scope) error {
 	return autoConvert_v1alpha1_ClusterTrustBundleSpec_To_certificates_ClusterTrustBundleSpec(in, out, s)
 }
 
-func autoConvert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(in *certificates.ClusterTrustBundleSpec, out *v1alpha1.ClusterTrustBundleSpec, s conversion.Scope) error {
+func autoConvert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(in *certificates.ClusterTrustBundleSpec, out *certificatesv1alpha1.ClusterTrustBundleSpec, s conversion.Scope) error {
 	out.SignerName = in.SignerName
 	out.TrustBundle = in.TrustBundle
 	return nil
 }
 
 // Convert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec is an autogenerated conversion function.
-func Convert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(in *certificates.ClusterTrustBundleSpec, out *v1alpha1.ClusterTrustBundleSpec, s conversion.Scope) error {
+func Convert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(in *certificates.ClusterTrustBundleSpec, out *certificatesv1alpha1.ClusterTrustBundleSpec, s conversion.Scope) error {
 	return autoConvert_certificates_ClusterTrustBundleSpec_To_v1alpha1_ClusterTrustBundleSpec(in, out, s)
 }

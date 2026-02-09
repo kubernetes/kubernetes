@@ -29,6 +29,7 @@ func (r descsByName) initEnumDeclarations(eds []*descriptorpb.EnumDescriptorProt
 			e.L2.Options = func() protoreflect.ProtoMessage { return opts }
 		}
 		e.L1.EditionFeatures = mergeEditionFeatures(parent, ed.GetOptions().GetFeatures())
+		e.L1.Visibility = int32(ed.GetVisibility())
 		for _, s := range ed.GetReservedName() {
 			e.L2.ReservedNames.List = append(e.L2.ReservedNames.List, protoreflect.Name(s))
 		}
@@ -70,6 +71,7 @@ func (r descsByName) initMessagesDeclarations(mds []*descriptorpb.DescriptorProt
 			return nil, err
 		}
 		m.L1.EditionFeatures = mergeEditionFeatures(parent, md.GetOptions().GetFeatures())
+		m.L1.Visibility = int32(md.GetVisibility())
 		if opts := md.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.MessageOptions)
 			m.L2.Options = func() protoreflect.ProtoMessage { return opts }
@@ -149,7 +151,7 @@ func (r descsByName) initFieldsFromDescriptorProto(fds []*descriptorpb.FieldDesc
 		if opts := fd.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.FieldOptions)
 			f.L1.Options = func() protoreflect.ProtoMessage { return opts }
-			f.L1.IsWeak = opts.GetWeak()
+			f.L1.IsLazy = opts.GetLazy()
 			if opts.Packed != nil {
 				f.L1.EditionFeatures.IsPacked = opts.GetPacked()
 			}
@@ -213,6 +215,9 @@ func (r descsByName) initExtensionDeclarations(xds []*descriptorpb.FieldDescript
 		}
 		if xd.JsonName != nil {
 			x.L2.StringName.InitJSON(xd.GetJsonName())
+		}
+		if x.L1.Kind == protoreflect.MessageKind && x.L1.EditionFeatures.IsDelimitedEncoded {
+			x.L1.Kind = protoreflect.GroupKind
 		}
 	}
 	return xs, nil

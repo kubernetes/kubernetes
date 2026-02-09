@@ -19,133 +19,33 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-// FakeComponentStatuses implements ComponentStatusInterface
-type FakeComponentStatuses struct {
+// fakeComponentStatuses implements ComponentStatusInterface
+type fakeComponentStatuses struct {
+	*gentype.FakeClientWithListAndApply[*v1.ComponentStatus, *v1.ComponentStatusList, *corev1.ComponentStatusApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
-var componentstatusesResource = v1.SchemeGroupVersion.WithResource("componentstatuses")
-
-var componentstatusesKind = v1.SchemeGroupVersion.WithKind("ComponentStatus")
-
-// Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
-func (c *FakeComponentStatuses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ComponentStatus, err error) {
-	emptyResult := &v1.ComponentStatus{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(componentstatusesResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeComponentStatuses(fake *FakeCoreV1) typedcorev1.ComponentStatusInterface {
+	return &fakeComponentStatuses{
+		gentype.NewFakeClientWithListAndApply[*v1.ComponentStatus, *v1.ComponentStatusList, *corev1.ComponentStatusApplyConfiguration](
+			fake.Fake,
+			"",
+			v1.SchemeGroupVersion.WithResource("componentstatuses"),
+			v1.SchemeGroupVersion.WithKind("ComponentStatus"),
+			func() *v1.ComponentStatus { return &v1.ComponentStatus{} },
+			func() *v1.ComponentStatusList { return &v1.ComponentStatusList{} },
+			func(dst, src *v1.ComponentStatusList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.ComponentStatusList) []*v1.ComponentStatus { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.ComponentStatusList, items []*v1.ComponentStatus) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1.ComponentStatus), err
-}
-
-// List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
-func (c *FakeComponentStatuses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ComponentStatusList, err error) {
-	emptyResult := &v1.ComponentStatusList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(componentstatusesResource, componentstatusesKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.ComponentStatusList{ListMeta: obj.(*v1.ComponentStatusList).ListMeta}
-	for _, item := range obj.(*v1.ComponentStatusList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested componentStatuses.
-func (c *FakeComponentStatuses) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(componentstatusesResource, opts))
-}
-
-// Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *FakeComponentStatuses) Create(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.CreateOptions) (result *v1.ComponentStatus, err error) {
-	emptyResult := &v1.ComponentStatus{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(componentstatusesResource, componentStatus, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ComponentStatus), err
-}
-
-// Update takes the representation of a componentStatus and updates it. Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *FakeComponentStatuses) Update(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.UpdateOptions) (result *v1.ComponentStatus, err error) {
-	emptyResult := &v1.ComponentStatus{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(componentstatusesResource, componentStatus, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ComponentStatus), err
-}
-
-// Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
-func (c *FakeComponentStatuses) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(componentstatusesResource, name, opts), &v1.ComponentStatus{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeComponentStatuses) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(componentstatusesResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.ComponentStatusList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched componentStatus.
-func (c *FakeComponentStatuses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ComponentStatus, err error) {
-	emptyResult := &v1.ComponentStatus{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(componentstatusesResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ComponentStatus), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied componentStatus.
-func (c *FakeComponentStatuses) Apply(ctx context.Context, componentStatus *corev1.ComponentStatusApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ComponentStatus, err error) {
-	if componentStatus == nil {
-		return nil, fmt.Errorf("componentStatus provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(componentStatus)
-	if err != nil {
-		return nil, err
-	}
-	name := componentStatus.Name
-	if name == nil {
-		return nil, fmt.Errorf("componentStatus.Name must be provided to Apply")
-	}
-	emptyResult := &v1.ComponentStatus{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(componentstatusesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ComponentStatus), err
 }

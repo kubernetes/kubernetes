@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -194,43 +196,39 @@ nodePortAddresses:
 					Kubeconfig:         "/path/to/kubeconfig",
 					QPS:                7,
 				},
-				ClusterCIDR:      tc.clusterCIDR,
+				MinSyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+				SyncPeriod:       metav1.Duration{Duration: 60 * time.Second},
 				ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
-				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					MaxPerCore:            ptr.To[int32](2),
-					Min:                   ptr.To[int32](1),
-					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
-					TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
+				Linux: kubeproxyconfig.KubeProxyLinuxConfiguration{
+					Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+						MaxPerCore:            ptr.To[int32](2),
+						Min:                   ptr.To[int32](1),
+						TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
+						TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
+					},
+					MasqueradeAll: true,
+					OOMScoreAdj:   ptr.To[int32](17),
 				},
 				FeatureGates:       map[string]bool{},
 				HealthzBindAddress: tc.healthzBindAddress,
 				HostnameOverride:   "foo",
 				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-					MasqueradeAll:      true,
 					MasqueradeBit:      ptr.To[int32](17),
 					LocalhostNodePorts: ptr.To(true),
-					MinSyncPeriod:      metav1.Duration{Duration: 10 * time.Second},
-					SyncPeriod:         metav1.Duration{Duration: 60 * time.Second},
 				},
 				IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
-					MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
-					SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
-					ExcludeCIDRs:  []string{"10.20.30.40/16", "fd00:1::0/64"},
+					ExcludeCIDRs: []string{"10.20.30.40/16", "fd00:1::0/64"},
 				},
 				NFTables: kubeproxyconfig.KubeProxyNFTablesConfiguration{
-					MasqueradeAll: true,
 					MasqueradeBit: ptr.To[int32](18),
-					MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
-					SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 				},
 				MetricsBindAddress: tc.metricsBindAddress,
 				Mode:               kubeproxyconfig.ProxyMode(tc.mode),
-				OOMScoreAdj:        ptr.To[int32](17),
-				PortRange:          "2-7",
 				NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 				DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
 				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					BridgeInterface:     "cbr0",
+					ClusterCIDRs:        strings.Split(tc.clusterCIDR, ","),
 					InterfaceNamePrefix: "veth",
 				},
 				Logging: logsapi.LoggingConfiguration{
@@ -317,7 +315,7 @@ func TestLoadConfigFailures(t *testing.T) {
 			_, err := options.loadConfig([]byte(config))
 
 			require.Error(t, err, tc.name)
-			require.Contains(t, err.Error(), tc.expErr)
+			require.ErrorContains(t, err, tc.expErr)
 
 			if tc.checkFn != nil {
 				require.True(t, tc.checkFn(err), tc.name)
@@ -372,6 +370,99 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 					t.Fatalf("expected hostname: %s, but got: %s", tc.expectedHostname, options.config.HostnameOverride)
 				}
 			}
+		})
+	}
+}
+
+// TestProcessV1Alpha1Flags tests processing v1alpha1 flags.
+func TestProcessV1Alpha1Flags(t *testing.T) {
+	testCases := []struct {
+		name     string
+		flags    []string
+		validate func(*kubeproxyconfig.KubeProxyConfiguration) bool
+	}{
+		{
+			name: "iptables configuration",
+			flags: []string{
+				"--iptables-sync-period=36s",
+				"--iptables-min-sync-period=3s",
+				"--proxy-mode=iptables",
+			},
+			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
+				return config.SyncPeriod == metav1.Duration{Duration: 36 * time.Second} &&
+					config.MinSyncPeriod == metav1.Duration{Duration: 3 * time.Second}
+			},
+		},
+		{
+			name: "iptables + ipvs configuration with iptables mode",
+			flags: []string{
+				"--iptables-sync-period=36s",
+				"--iptables-min-sync-period=3s",
+				"--ipvs-sync-period=16s",
+				"--ipvs-min-sync-period=7s",
+				"--proxy-mode=iptables",
+			},
+			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
+				return config.SyncPeriod == metav1.Duration{Duration: 36 * time.Second} &&
+					config.MinSyncPeriod == metav1.Duration{Duration: 3 * time.Second}
+			},
+		},
+		{
+			name: "winkernel configuration",
+			flags: []string{
+				"--iptables-sync-period=36s",
+				"--iptables-min-sync-period=3s",
+				"--proxy-mode=kernelspace",
+			},
+			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
+				return config.SyncPeriod == metav1.Duration{Duration: 36 * time.Second} &&
+					config.MinSyncPeriod == metav1.Duration{Duration: 3 * time.Second}
+			},
+		},
+		{
+			name: "ipvs + iptables configuration with ipvs mode",
+			flags: []string{
+				"--iptables-sync-period=36s",
+				"--iptables-min-sync-period=3s",
+				"--ipvs-sync-period=16s",
+				"--ipvs-min-sync-period=7s",
+				"--proxy-mode=ipvs",
+			},
+			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
+				return config.SyncPeriod == metav1.Duration{Duration: 16 * time.Second} &&
+					config.MinSyncPeriod == metav1.Duration{Duration: 7 * time.Second}
+			},
+		},
+		{
+			name: "ipvs configuration",
+			flags: []string{
+				"--ipvs-sync-period=16s",
+				"--ipvs-min-sync-period=7s",
+				"--proxy-mode=ipvs",
+			},
+			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
+				return config.SyncPeriod == metav1.Duration{Duration: 16 * time.Second} &&
+					config.MinSyncPeriod == metav1.Duration{Duration: 7 * time.Second}
+			},
+		},
+		{
+			name: "cluster cidr",
+			flags: []string{
+				"--cluster-cidr=2002:0:0:1234::/64,10.0.0.0/14",
+			},
+			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
+				return reflect.DeepEqual(config.DetectLocal.ClusterCIDRs, []string{"2002:0:0:1234::/64", "10.0.0.0/14"})
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			options := NewOptions()
+			fs := new(pflag.FlagSet)
+			options.AddFlags(fs)
+			require.NoError(t, fs.Parse(tc.flags))
+			options.processV1Alpha1Flags(fs)
+			require.True(t, tc.validate(options.config))
 		})
 	}
 }
@@ -433,6 +524,22 @@ kind: KubeProxyConfiguration
 	}{
 		"empty": {
 			expected: expected,
+		},
+		"conntrack": {
+			flags: []string{
+				"--conntrack-max-per-core=0",
+				"--conntrack-min=0",
+				"--conntrack-tcp-timeout-established=0",
+				"--conntrack-tcp-timeout-close-wait=0",
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Linux.Conntrack.MaxPerCore = ptr.To(int32(0))
+				c.Linux.Conntrack.Min = ptr.To(int32(0))
+				c.Linux.Conntrack.TCPEstablishedTimeout = ptr.To(metav1.Duration{})
+				c.Linux.Conntrack.TCPCloseWaitTimeout = ptr.To(metav1.Duration{})
+				return c
+			}(),
 		},
 		"empty-config": {
 			config:   header,

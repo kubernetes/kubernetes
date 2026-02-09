@@ -35,12 +35,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	applyadmissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/openapi3"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -289,7 +291,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	*/
 	framework.It("should type check a CRD", func(ctx context.Context) {
 		crd := crontabExampleCRD()
-		crd.Spec.Group = "stable." + f.UniqueName
+		crd.Spec.Group = "stable." + f.UniqueName + ".example.com"
 		crd.Name = crd.Spec.Names.Plural + "." + crd.Spec.Group
 		var policy *admissionregistrationv1.ValidatingAdmissionPolicy
 		ginkgo.By("creating the CRD", func() {
@@ -366,11 +368,16 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 					// TODO(#123829) Remove once the schema watcher is merged.
 					// If the warnings are empty, touch the policy to retry type checking
 					if len(policy.Status.TypeChecking.ExpressionWarnings) == 0 {
-						applyConfig := applyadmissionregistrationv1.ValidatingAdmissionPolicy(policy.Name).WithLabels(map[string]string{
-							"touched": time.Now().String(),
-							"random":  fmt.Sprintf("%d", rand.Int()),
-						})
-						_, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Apply(ctx, applyConfig, metav1.ApplyOptions{})
+						randomValue := fmt.Sprintf(`"%d"`, rand.Int())
+						// Use a fixed key and change only the value
+						applyConfig := applyadmissionregistrationv1.ValidatingAdmissionPolicy(policy.Name).
+							WithSpec(applyadmissionregistrationv1.ValidatingAdmissionPolicySpec().
+								WithAuditAnnotations(applyadmissionregistrationv1.AuditAnnotation().
+									WithKey("key").
+									WithValueExpression(randomValue),
+								),
+							)
+						_, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Apply(ctx, applyConfig, metav1.ApplyOptions{FieldManager: "validatingadmissionpolicy-e2e"})
 						return false, err
 					}
 					return true, nil
@@ -514,6 +521,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		vapRead, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(vapRead.UID).To(gomega.Equal(vapCreated.UID))
+		gomega.Expect(vapRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
@@ -530,6 +538,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		framework.ExpectNoError(err)
 		gomega.Expect(vapPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(vapPatched.Spec.FailurePolicy).To(gomega.HaveValue(gomega.Equal(admissionregistrationv1.Ignore)), "patched object should have the applied spec")
+		gomega.Expect(resourceversion.CompareResourceVersion(vapRead.ResourceVersion, vapPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var vapUpdated *admissionregistrationv1.ValidatingAdmissionPolicy
@@ -759,6 +768,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		vapbRead, err := client.Get(ctx, vapbCreated.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(vapbRead.UID).To(gomega.Equal(vapbCreated.UID))
+		gomega.Expect(vapbRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
@@ -775,6 +785,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		framework.ExpectNoError(err)
 		gomega.Expect(vapbPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(vapbPatched.Spec.ValidationActions).To(gomega.Equal([]admissionregistrationv1.ValidationAction{admissionregistrationv1.Warn}), "patched object should have the applied spec")
+		gomega.Expect(resourceversion.CompareResourceVersion(vapbRead.ResourceVersion, vapbPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var vapbUpdated *admissionregistrationv1.ValidatingAdmissionPolicyBinding

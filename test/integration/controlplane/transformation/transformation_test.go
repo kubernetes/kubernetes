@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -87,27 +87,35 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+type transformTestConfig struct {
+	transformerConfigYAML string
+	reload                bool
+	configDir             string
+	storageConfig         *storagebackend.Config
+	runtimeConfig         []string
+}
+
+func newTransformTest(tb testing.TB, config transformTestConfig) (*transformTest, error) {
 	tCtx := ktesting.Init(tb)
-	if storageConfig == nil {
-		storageConfig = framework.SharedEtcd()
+	if config.storageConfig == nil {
+		config.storageConfig = framework.SharedEtcd()
 	}
 	e := transformTest{
 		TContext:          tCtx,
-		transformerConfig: transformerConfigYAML,
-		storageConfig:     storageConfig,
+		transformerConfig: config.transformerConfigYAML,
+		storageConfig:     config.storageConfig,
 	}
 
 	var err error
 	// create config dir with provided config yaml
-	if transformerConfigYAML != "" && configDir == "" {
+	if config.transformerConfigYAML != "" && config.configDir == "" {
 		if e.configDir, err = e.createEncryptionConfig(); err != nil {
 			e.cleanUp()
 			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %w", err)
 		}
 	} else {
 		// configDir already exists. api-server must be restarting with existing encryption config
-		e.configDir = configDir
+		e.configDir = config.configDir
 	}
 	configFile := filepath.Join(e.configDir, encryptionConfigFileName)
 	_, err = os.ReadFile(configFile)
@@ -116,9 +124,13 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
+	flags := e.getEncryptionOptions(config.reload)
+	if len(config.runtimeConfig) > 0 {
+		flags = append(flags, "--runtime-config="+strings.Join(config.runtimeConfig, ","))
+	}
 	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(
 		tb, nil,
-		e.getEncryptionOptions(reload), e.storageConfig); err != nil {
+		flags, e.storageConfig); err != nil {
 		e.cleanUp()
 		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)
 	}
@@ -134,7 +146,7 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 		return nil, err
 	}
 
-	if transformerConfigYAML != "" && reload {
+	if config.transformerConfigYAML != "" && config.reload {
 		// when reloading is enabled, this healthz endpoint is always present
 		mustBeHealthy(tCtx, "/kms-providers", "ok", e.kubeAPIServer.ClientConfig)
 		mustNotHaveLivez(tCtx, "/kms-providers", "404 page not found", e.kubeAPIServer.ClientConfig)
@@ -280,7 +292,8 @@ func (e *transformTest) getEncryptionOptions(reload bool) []string {
 		return []string{
 			"--encryption-provider-config", filepath.Join(e.configDir, encryptionConfigFileName),
 			fmt.Sprintf("--encryption-provider-config-automatic-reload=%v", reload),
-			"--disable-admission-plugins", "ServiceAccount"}
+			"--disable-admission-plugins", "ServiceAccount",
+			"--authorization-mode=RBAC"}
 	}
 
 	return nil
@@ -404,7 +417,7 @@ func (e *transformTest) createDeployment(name, namespace string) (*appsv1.Deploy
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32(2),
+			Replicas: ptr.To[int32](2),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",

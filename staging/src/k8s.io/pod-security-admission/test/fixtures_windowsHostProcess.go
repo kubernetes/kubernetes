@@ -19,7 +19,7 @@ package test
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 /*
@@ -37,7 +37,7 @@ containerFields: []string{
 func init() {
 
 	fixtureData_1_0 := fixtureGenerator{
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			// minimal valid pod already captures all valid combinations
 			return nil
 		},
@@ -59,15 +59,15 @@ func init() {
 					// HostNetwork is required to be true for HostProcess pods.
 					// Set to true here so we pass API validation and get to admission checks.
 					p.Spec.HostNetwork = true
-					p.Spec.SecurityContext.WindowsOptions.HostProcess = pointer.BoolPtr(true)
+					p.Spec.SecurityContext.WindowsOptions.HostProcess = ptr.To(true)
 				}),
 				// true for containers
 				tweak(p, func(p *corev1.Pod) {
 					// HostNetwork is required to be true for HostProcess pods.
 					// Set to true here so we pass API validation and get to admission checks.
 					p.Spec.HostNetwork = true
-					p.Spec.Containers[0].SecurityContext.WindowsOptions.HostProcess = pointer.BoolPtr(true)
-					p.Spec.InitContainers[0].SecurityContext.WindowsOptions.HostProcess = pointer.BoolPtr(true)
+					p.Spec.Containers[0].SecurityContext.WindowsOptions.HostProcess = ptr.To(true)
+					p.Spec.InitContainers[0].SecurityContext.WindowsOptions.HostProcess = ptr.To(true)
 				}),
 			}
 		},

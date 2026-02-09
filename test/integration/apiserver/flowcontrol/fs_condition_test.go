@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -42,7 +43,7 @@ func TestConditionIsolation(t *testing.T) {
 	fsClient := loopbackClient.FlowcontrolV1().FlowSchemas()
 	var dangleOrig *flowcontrol.FlowSchemaCondition
 
-	wait.PollUntil(time.Second, func() (bool, error) {
+	err := wait.PollUntilContextCancel(ctx, time.Second, false, func(ctx context.Context) (done bool, err error) {
 		fsGot, err := fsClient.Get(ctx, fsOrig.Name, metav1.GetOptions{})
 		if err != nil {
 			klog.Errorf("Failed to fetch FlowSchema %q: %v", fsOrig.Name, err)
@@ -50,7 +51,10 @@ func TestConditionIsolation(t *testing.T) {
 		}
 		dangleOrig = getCondition(fsGot.Status.Conditions, flowcontrol.FlowSchemaConditionDangling)
 		return dangleOrig != nil, nil
-	}, ctx.Done())
+	})
+	if err != nil {
+		t.Error(err)
+	}
 
 	ssaType := flowcontrol.FlowSchemaConditionType("test-ssa")
 	patchSSA := flowcontrolapply.FlowSchema(fsOrig.Name).

@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
+	applyconfigurationsadmissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,34 +38,38 @@ type ValidatingAdmissionPolicyBindingsGetter interface {
 
 // ValidatingAdmissionPolicyBindingInterface has methods to work with ValidatingAdmissionPolicyBinding resources.
 type ValidatingAdmissionPolicyBindingInterface interface {
-	Create(ctx context.Context, validatingAdmissionPolicyBinding *v1beta1.ValidatingAdmissionPolicyBinding, opts v1.CreateOptions) (*v1beta1.ValidatingAdmissionPolicyBinding, error)
-	Update(ctx context.Context, validatingAdmissionPolicyBinding *v1beta1.ValidatingAdmissionPolicyBinding, opts v1.UpdateOptions) (*v1beta1.ValidatingAdmissionPolicyBinding, error)
+	Create(ctx context.Context, validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, opts v1.CreateOptions) (*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, error)
+	Update(ctx context.Context, validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, opts v1.UpdateOptions) (*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.ValidatingAdmissionPolicyBinding, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ValidatingAdmissionPolicyBindingList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, error)
+	List(ctx context.Context, opts v1.ListOptions) (*admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ValidatingAdmissionPolicyBinding, err error)
-	Apply(ctx context.Context, validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ValidatingAdmissionPolicyBinding, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, err error)
+	Apply(ctx context.Context, validatingAdmissionPolicyBinding *applyconfigurationsadmissionregistrationv1beta1.ValidatingAdmissionPolicyBindingApplyConfiguration, opts v1.ApplyOptions) (result *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, err error)
 	ValidatingAdmissionPolicyBindingExpansion
 }
 
 // validatingAdmissionPolicyBindings implements ValidatingAdmissionPolicyBindingInterface
 type validatingAdmissionPolicyBindings struct {
-	*gentype.ClientWithListAndApply[*v1beta1.ValidatingAdmissionPolicyBinding, *v1beta1.ValidatingAdmissionPolicyBindingList, *admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingApplyConfiguration]
+	*gentype.ClientWithListAndApply[*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, *admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1beta1.ValidatingAdmissionPolicyBindingApplyConfiguration]
 }
 
 // newValidatingAdmissionPolicyBindings returns a ValidatingAdmissionPolicyBindings
 func newValidatingAdmissionPolicyBindings(c *AdmissionregistrationV1beta1Client) *validatingAdmissionPolicyBindings {
 	return &validatingAdmissionPolicyBindings{
-		gentype.NewClientWithListAndApply[*v1beta1.ValidatingAdmissionPolicyBinding, *v1beta1.ValidatingAdmissionPolicyBindingList, *admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingApplyConfiguration](
+		gentype.NewClientWithListAndApply[*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, *admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingList, *applyconfigurationsadmissionregistrationv1beta1.ValidatingAdmissionPolicyBindingApplyConfiguration](
 			"validatingadmissionpolicybindings",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1beta1.ValidatingAdmissionPolicyBinding { return &v1beta1.ValidatingAdmissionPolicyBinding{} },
-			func() *v1beta1.ValidatingAdmissionPolicyBindingList {
-				return &v1beta1.ValidatingAdmissionPolicyBindingList{}
-			}),
+			func() *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding {
+				return &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{}
+			},
+			func() *admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingList {
+				return &admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingList{}
+			},
+			gentype.PrefersProtobuf[*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding](),
+		),
 	}
 }

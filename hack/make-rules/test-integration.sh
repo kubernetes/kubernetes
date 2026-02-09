@@ -21,12 +21,18 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::golang::setup_env
+kube::util::require-jq
+
+set -x
+
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
-# panic the server on watch decode errors since they are considered coder mistakes
-KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
+# default set to "false" to avoid panic on decode errors.
+# integration tests intentionally insert data that cannot be decoded.
+KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-false}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
@@ -43,16 +49,25 @@ KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 # Default glog module settings.
 KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-""}
 
-kube::test::find_integration_test_dirs() {
+set +x
+
+kube::test::find_integration_test_pkgs() {
   (
     cd "${KUBE_ROOT}"
-    # The "./" syntax here produces Go-compatible package names.
-    find ./test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname \
-      | LC_ALL=C sort -u
-    find ./staging/src/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname \
-      | LC_ALL=C sort -u
+
+    # Get a list of all the modules in this workspace.
+    local -a workspace_module_patterns
+    kube::util::read-array workspace_module_patterns < <(
+        go list -m -json | jq -r '.Dir' \
+        | while read -r D; do
+            SUB="${D}/test/integration";
+            test -d "${SUB}" && echo "${SUB}/...";
+        done)
+
+    # Get a list of all packages which have test files.
+    go list -find \
+        -f '{{if or (gt (len .TestGoFiles) 0) (gt (len .XTestGoFiles) 0)}}{{.ImportPath}}{{end}}' \
+        "${workspace_module_patterns[@]}"
   )
 }
 
@@ -81,10 +96,10 @@ runTests() {
   # empty here to ensure that we aren't unintentionally consuming them from the
   # previous make invocation.
   KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS}" \
-      WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
+      WHAT="${WHAT:-$(kube::test::find_integration_test_pkgs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
-      KUBE_RACE="" \
+      KUBE_RACE=${KUBE_RACE:-""} \
       MAKEFLAGS="" \
       make -C "${KUBE_ROOT}" test
 

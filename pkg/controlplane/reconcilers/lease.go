@@ -123,7 +123,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 // RemoveLease removes the lease on a master IP in storage
 func (s *storageLeases) RemoveLease(ip string) error {
 	key := path.Join(s.baseKey, ip)
-	return s.storage.Delete(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc, nil)
+	return s.storage.Delete(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 }
 
 func (s *storageLeases) Destroy() {
@@ -132,9 +132,9 @@ func (s *storageLeases) Destroy() {
 
 // NewLeases creates a new etcd-based Leases implementation.
 func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTime time.Duration) (Leases, error) {
-	// note that newFunc, newListFunc and resourcePrefix
+	// note that newFunc, newListFunc
 	// can be left blank unless the storage.Watch method is used
-	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil, nil, "")
+	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil, nil, baseKey)
 	if err != nil {
 		return nil, fmt.Errorf("error creating storage factory: %v", err)
 	}

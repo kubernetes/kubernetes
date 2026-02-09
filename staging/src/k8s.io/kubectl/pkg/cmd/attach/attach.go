@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 )
 
 var (
@@ -184,7 +185,9 @@ func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Exec
 		if err != nil {
 			return nil, err
 		}
-		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, httpstream.IsUpgradeFailure)
+		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, func(err error) bool {
+			return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -204,7 +207,7 @@ func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 	o.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return cmdutil.UsageErrorf(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, "%s", err.Error())
 	}
 
 	o.Builder = f.NewBuilder
@@ -298,13 +301,16 @@ func (o *AttachOptions) Run() error {
 			sizePlusOne.Height++
 
 			// this call spawns a goroutine to monitor/update the terminal size
-			sizeQueue = t.MonitorSize(&sizePlusOne, size)
+			sizeQueue = &terminalSizeQueueAdapter{
+				delegate: t.MonitorSize(&sizePlusOne, size),
+			}
 		}
 
 		o.DisableStderr = true
 	}
 
 	if !o.Quiet {
+		_, _ = fmt.Fprintln(o.ErrOut, "All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.")
 		fmt.Fprintln(o.ErrOut, "If you don't see a command prompt, try pressing enter.")
 	}
 	if err := t.Safe(o.AttachFunc(o, containerToAttach, t.Raw, sizeQueue)); err != nil {
@@ -350,7 +356,22 @@ func (o *AttachOptions) reattachMessage(containerName string, rawTTY bool) strin
 		return ""
 	}
 	if _, path := podcmd.FindContainerByName(o.Pod, containerName); strings.HasPrefix(path, "spec.ephemeralContainers") {
-		return fmt.Sprintf("Session ended, the ephemeral container will not be restarted but may be reattached using '%s %s -c %s -i -t' if it is still running", o.CommandName, o.Pod.Name, containerName)
+		return fmt.Sprintf("Session ended, the ephemeral container will not be restarted but may be reattached using '%s %s -c %s -n %s -i -t' if it is still running", o.CommandName, o.Pod.Name, containerName, o.Pod.Namespace)
 	}
-	return fmt.Sprintf("Session ended, resume using '%s %s -c %s -i -t' command when the pod is running", o.CommandName, o.Pod.Name, containerName)
+	return fmt.Sprintf("Session ended, resume using '%s %s -c %s -n %s -i -t' command when the pod is running", o.CommandName, o.Pod.Name, containerName, o.Pod.Namespace)
+}
+
+type terminalSizeQueueAdapter struct {
+	delegate term.TerminalSizeQueue
+}
+
+func (a *terminalSizeQueueAdapter) Next() *remotecommand.TerminalSize {
+	next := a.delegate.Next()
+	if next == nil {
+		return nil
+	}
+	return &remotecommand.TerminalSize{
+		Width:  next.Width,
+		Height: next.Height,
+	}
 }

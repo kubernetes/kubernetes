@@ -397,11 +397,6 @@ func watchConfigMaps(ctx context.Context, f *framework.Framework, resourceVersio
 	return c.CoreV1().ConfigMaps(ns).Watch(ctx, opts)
 }
 
-func int64ptr(i int) *int64 {
-	i64 := int64(i)
-	return &i64
-}
-
 func setConfigMapData(cm *v1.ConfigMap, key, value string) {
 	if cm.Data == nil {
 		cm.Data = make(map[string]string)

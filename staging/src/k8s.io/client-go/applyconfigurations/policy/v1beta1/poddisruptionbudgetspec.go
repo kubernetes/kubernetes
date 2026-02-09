@@ -19,18 +19,55 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PodDisruptionBudgetSpecApplyConfiguration represents a declarative configuration of the PodDisruptionBudgetSpec type for use
 // with apply.
+//
+// PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 type PodDisruptionBudgetSpecApplyConfiguration struct {
-	MinAvailable               *intstr.IntOrString                     `json:"minAvailable,omitempty"`
-	Selector                   *v1.LabelSelectorApplyConfiguration     `json:"selector,omitempty"`
-	MaxUnavailable             *intstr.IntOrString                     `json:"maxUnavailable,omitempty"`
-	UnhealthyPodEvictionPolicy *v1beta1.UnhealthyPodEvictionPolicyType `json:"unhealthyPodEvictionPolicy,omitempty"`
+	// An eviction is allowed if at least "minAvailable" pods selected by
+	// "selector" will still be available after the eviction, i.e. even in the
+	// absence of the evicted pod.  So for example you can prevent all voluntary
+	// evictions by specifying "100%".
+	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty"`
+	// Label query over pods whose evictions are managed by the disruption
+	// budget.
+	// A null selector selects no pods.
+	// An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
+	// In policy/v1, an empty selector will select all pods in the namespace.
+	Selector *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
+	// An eviction is allowed if at most "maxUnavailable" pods selected by
+	// "selector" are unavailable after the eviction, i.e. even in absence of
+	// the evicted pod. For example, one can prevent all voluntary evictions
+	// by specifying 0. This is a mutually exclusive setting with "minAvailable".
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	// UnhealthyPodEvictionPolicy defines the criteria for when unhealthy pods
+	// should be considered for eviction. Current implementation considers healthy pods,
+	// as pods that have status.conditions item with type="Ready",status="True".
+	//
+	// Valid policies are IfHealthyBudget and AlwaysAllow.
+	// If no policy is specified, the default behavior will be used,
+	// which corresponds to the IfHealthyBudget policy.
+	//
+	// IfHealthyBudget policy means that running pods (status.phase="Running"),
+	// but not yet healthy can be evicted only if the guarded application is not
+	// disrupted (status.currentHealthy is at least equal to status.desiredHealthy).
+	// Healthy pods will be subject to the PDB for eviction.
+	//
+	// AlwaysAllow policy means that all running pods (status.phase="Running"),
+	// but not yet healthy are considered disrupted and can be evicted regardless
+	// of whether the criteria in a PDB is met. This means perspective running
+	// pods of a disrupted application might not get a chance to become healthy.
+	// Healthy pods will be subject to the PDB for eviction.
+	//
+	// Additional policies may be added in the future.
+	// Clients making eviction decisions should disallow eviction of unhealthy pods
+	// if they encounter an unrecognized policy in this field.
+	UnhealthyPodEvictionPolicy *policyv1beta1.UnhealthyPodEvictionPolicyType `json:"unhealthyPodEvictionPolicy,omitempty"`
 }
 
 // PodDisruptionBudgetSpecApplyConfiguration constructs a declarative configuration of the PodDisruptionBudgetSpec type for use with
@@ -66,7 +103,7 @@ func (b *PodDisruptionBudgetSpecApplyConfiguration) WithMaxUnavailable(value int
 // WithUnhealthyPodEvictionPolicy sets the UnhealthyPodEvictionPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the UnhealthyPodEvictionPolicy field is set to the value of the last call.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) WithUnhealthyPodEvictionPolicy(value v1beta1.UnhealthyPodEvictionPolicyType) *PodDisruptionBudgetSpecApplyConfiguration {
+func (b *PodDisruptionBudgetSpecApplyConfiguration) WithUnhealthyPodEvictionPolicy(value policyv1beta1.UnhealthyPodEvictionPolicyType) *PodDisruptionBudgetSpecApplyConfiguration {
 	b.UnhealthyPodEvictionPolicy = &value
 	return b
 }

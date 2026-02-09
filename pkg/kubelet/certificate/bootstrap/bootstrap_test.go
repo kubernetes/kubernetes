@@ -17,7 +17,6 @@ limitations under the License.
 package bootstrap
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -26,6 +25,7 @@ import (
 	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -273,9 +273,10 @@ users:
 		},
 	}
 
+	logger, _ := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			certConfig, clientConfig, err := LoadClientConfig(test.kubeconfigPath, test.bootstrapPath, test.certDir)
+			certConfig, clientConfig, err := LoadClientConfig(logger, test.kubeconfigPath, test.bootstrapPath, test.certDir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -348,7 +349,8 @@ users:
 }
 
 func TestRequestNodeCertificateNoKeyData(t *testing.T) {
-	certData, err := requestNodeCertificate(context.TODO(), newClientset(fakeClient{}), []byte{}, "fake-node-name")
+	tCtx := ktesting.Init(t)
+	certData, err := requestNodeCertificate(tCtx, newClientset(fakeClient{}), []byte{}, "fake-node-name")
 	if err == nil {
 		t.Errorf("Got no error, wanted error an error because there was an empty private key passed in.")
 	}
@@ -358,6 +360,7 @@ func TestRequestNodeCertificateNoKeyData(t *testing.T) {
 }
 
 func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	client := newClientset(fakeClient{
 		failureType: createError,
 	})
@@ -366,7 +369,7 @@ func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
 		t.Fatalf("Unable to generate a new private key: %v", err)
 	}
 
-	certData, err := requestNodeCertificate(context.TODO(), client, privateKeyData, "fake-node-name")
+	certData, err := requestNodeCertificate(tCtx, client, privateKeyData, "fake-node-name")
 	if err == nil {
 		t.Errorf("Got no error, wanted error an error because client.Create failed.")
 	}
@@ -376,12 +379,13 @@ func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
 }
 
 func TestRequestNodeCertificate(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	privateKeyData, err := keyutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
 		t.Fatalf("Unable to generate a new private key: %v", err)
 	}
 
-	certData, err := requestNodeCertificate(context.TODO(), newClientset(fakeClient{}), privateKeyData, "fake-node-name")
+	certData, err := requestNodeCertificate(tCtx, newClientset(fakeClient{}), privateKeyData, "fake-node-name")
 	if err != nil {
 		t.Errorf("Got %v, wanted no error.", err)
 	}
@@ -393,7 +397,7 @@ func TestRequestNodeCertificate(t *testing.T) {
 type failureType int
 
 const (
-	noError failureType = iota //nolint:deadcode,varcheck
+	noError failureType = iota
 	createError
 	certificateSigningRequestDenied
 )

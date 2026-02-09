@@ -3,6 +3,5 @@
 ./staging/src/k8s.io/api/autoscaling/v2beta2/types.go
 ./staging/src/k8s.io/api/certificates/v1/types.go
 ./staging/src/k8s.io/api/certificates/v1beta1/types.go
-./staging/src/k8s.io/api/core/v1/types.go
 ./staging/src/k8s.io/api/networking/v1/types.go
 ./staging/src/k8s.io/api/networking/v1beta1/types.go

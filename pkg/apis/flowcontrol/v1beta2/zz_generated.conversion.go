@@ -24,7 +24,7 @@ package v1beta2
 import (
 	unsafe "unsafe"
 
-	v1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	flowcontrol "k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -37,282 +37,282 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta2.ExemptPriorityLevelConfiguration)(nil), (*flowcontrol.ExemptPriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPriorityLevelConfiguration(a.(*v1beta2.ExemptPriorityLevelConfiguration), b.(*flowcontrol.ExemptPriorityLevelConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.ExemptPriorityLevelConfiguration)(nil), (*flowcontrol.ExemptPriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPriorityLevelConfiguration(a.(*flowcontrolv1beta2.ExemptPriorityLevelConfiguration), b.(*flowcontrol.ExemptPriorityLevelConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.ExemptPriorityLevelConfiguration)(nil), (*v1beta2.ExemptPriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta2_ExemptPriorityLevelConfiguration(a.(*flowcontrol.ExemptPriorityLevelConfiguration), b.(*v1beta2.ExemptPriorityLevelConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.ExemptPriorityLevelConfiguration)(nil), (*flowcontrolv1beta2.ExemptPriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta2_ExemptPriorityLevelConfiguration(a.(*flowcontrol.ExemptPriorityLevelConfiguration), b.(*flowcontrolv1beta2.ExemptPriorityLevelConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.FlowDistinguisherMethod)(nil), (*flowcontrol.FlowDistinguisherMethod)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMethod(a.(*v1beta2.FlowDistinguisherMethod), b.(*flowcontrol.FlowDistinguisherMethod), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.FlowDistinguisherMethod)(nil), (*flowcontrol.FlowDistinguisherMethod)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMethod(a.(*flowcontrolv1beta2.FlowDistinguisherMethod), b.(*flowcontrol.FlowDistinguisherMethod), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowDistinguisherMethod)(nil), (*v1beta2.FlowDistinguisherMethod)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_FlowDistinguisherMethod_To_v1beta2_FlowDistinguisherMethod(a.(*flowcontrol.FlowDistinguisherMethod), b.(*v1beta2.FlowDistinguisherMethod), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowDistinguisherMethod)(nil), (*flowcontrolv1beta2.FlowDistinguisherMethod)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_FlowDistinguisherMethod_To_v1beta2_FlowDistinguisherMethod(a.(*flowcontrol.FlowDistinguisherMethod), b.(*flowcontrolv1beta2.FlowDistinguisherMethod), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.FlowSchema)(nil), (*flowcontrol.FlowSchema)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_FlowSchema_To_flowcontrol_FlowSchema(a.(*v1beta2.FlowSchema), b.(*flowcontrol.FlowSchema), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.FlowSchema)(nil), (*flowcontrol.FlowSchema)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_FlowSchema_To_flowcontrol_FlowSchema(a.(*flowcontrolv1beta2.FlowSchema), b.(*flowcontrol.FlowSchema), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchema)(nil), (*v1beta2.FlowSchema)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_FlowSchema_To_v1beta2_FlowSchema(a.(*flowcontrol.FlowSchema), b.(*v1beta2.FlowSchema), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchema)(nil), (*flowcontrolv1beta2.FlowSchema)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_FlowSchema_To_v1beta2_FlowSchema(a.(*flowcontrol.FlowSchema), b.(*flowcontrolv1beta2.FlowSchema), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.FlowSchemaCondition)(nil), (*flowcontrol.FlowSchemaCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(a.(*v1beta2.FlowSchemaCondition), b.(*flowcontrol.FlowSchemaCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.FlowSchemaCondition)(nil), (*flowcontrol.FlowSchemaCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(a.(*flowcontrolv1beta2.FlowSchemaCondition), b.(*flowcontrol.FlowSchemaCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchemaCondition)(nil), (*v1beta2.FlowSchemaCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_FlowSchemaCondition_To_v1beta2_FlowSchemaCondition(a.(*flowcontrol.FlowSchemaCondition), b.(*v1beta2.FlowSchemaCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchemaCondition)(nil), (*flowcontrolv1beta2.FlowSchemaCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_FlowSchemaCondition_To_v1beta2_FlowSchemaCondition(a.(*flowcontrol.FlowSchemaCondition), b.(*flowcontrolv1beta2.FlowSchemaCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.FlowSchemaList)(nil), (*flowcontrol.FlowSchemaList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_FlowSchemaList_To_flowcontrol_FlowSchemaList(a.(*v1beta2.FlowSchemaList), b.(*flowcontrol.FlowSchemaList), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.FlowSchemaList)(nil), (*flowcontrol.FlowSchemaList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_FlowSchemaList_To_flowcontrol_FlowSchemaList(a.(*flowcontrolv1beta2.FlowSchemaList), b.(*flowcontrol.FlowSchemaList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchemaList)(nil), (*v1beta2.FlowSchemaList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_FlowSchemaList_To_v1beta2_FlowSchemaList(a.(*flowcontrol.FlowSchemaList), b.(*v1beta2.FlowSchemaList), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchemaList)(nil), (*flowcontrolv1beta2.FlowSchemaList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_FlowSchemaList_To_v1beta2_FlowSchemaList(a.(*flowcontrol.FlowSchemaList), b.(*flowcontrolv1beta2.FlowSchemaList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.FlowSchemaSpec)(nil), (*flowcontrol.FlowSchemaSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(a.(*v1beta2.FlowSchemaSpec), b.(*flowcontrol.FlowSchemaSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.FlowSchemaSpec)(nil), (*flowcontrol.FlowSchemaSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(a.(*flowcontrolv1beta2.FlowSchemaSpec), b.(*flowcontrol.FlowSchemaSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchemaSpec)(nil), (*v1beta2.FlowSchemaSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_FlowSchemaSpec_To_v1beta2_FlowSchemaSpec(a.(*flowcontrol.FlowSchemaSpec), b.(*v1beta2.FlowSchemaSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchemaSpec)(nil), (*flowcontrolv1beta2.FlowSchemaSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_FlowSchemaSpec_To_v1beta2_FlowSchemaSpec(a.(*flowcontrol.FlowSchemaSpec), b.(*flowcontrolv1beta2.FlowSchemaSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.FlowSchemaStatus)(nil), (*flowcontrol.FlowSchemaStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus(a.(*v1beta2.FlowSchemaStatus), b.(*flowcontrol.FlowSchemaStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.FlowSchemaStatus)(nil), (*flowcontrol.FlowSchemaStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus(a.(*flowcontrolv1beta2.FlowSchemaStatus), b.(*flowcontrol.FlowSchemaStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchemaStatus)(nil), (*v1beta2.FlowSchemaStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_FlowSchemaStatus_To_v1beta2_FlowSchemaStatus(a.(*flowcontrol.FlowSchemaStatus), b.(*v1beta2.FlowSchemaStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.FlowSchemaStatus)(nil), (*flowcontrolv1beta2.FlowSchemaStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_FlowSchemaStatus_To_v1beta2_FlowSchemaStatus(a.(*flowcontrol.FlowSchemaStatus), b.(*flowcontrolv1beta2.FlowSchemaStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.GroupSubject)(nil), (*flowcontrol.GroupSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_GroupSubject_To_flowcontrol_GroupSubject(a.(*v1beta2.GroupSubject), b.(*flowcontrol.GroupSubject), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.GroupSubject)(nil), (*flowcontrol.GroupSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_GroupSubject_To_flowcontrol_GroupSubject(a.(*flowcontrolv1beta2.GroupSubject), b.(*flowcontrol.GroupSubject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.GroupSubject)(nil), (*v1beta2.GroupSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_GroupSubject_To_v1beta2_GroupSubject(a.(*flowcontrol.GroupSubject), b.(*v1beta2.GroupSubject), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.GroupSubject)(nil), (*flowcontrolv1beta2.GroupSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_GroupSubject_To_v1beta2_GroupSubject(a.(*flowcontrol.GroupSubject), b.(*flowcontrolv1beta2.GroupSubject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.LimitResponse)(nil), (*flowcontrol.LimitResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_LimitResponse_To_flowcontrol_LimitResponse(a.(*v1beta2.LimitResponse), b.(*flowcontrol.LimitResponse), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.LimitResponse)(nil), (*flowcontrol.LimitResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_LimitResponse_To_flowcontrol_LimitResponse(a.(*flowcontrolv1beta2.LimitResponse), b.(*flowcontrol.LimitResponse), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.LimitResponse)(nil), (*v1beta2.LimitResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_LimitResponse_To_v1beta2_LimitResponse(a.(*flowcontrol.LimitResponse), b.(*v1beta2.LimitResponse), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.LimitResponse)(nil), (*flowcontrolv1beta2.LimitResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_LimitResponse_To_v1beta2_LimitResponse(a.(*flowcontrol.LimitResponse), b.(*flowcontrolv1beta2.LimitResponse), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.NonResourcePolicyRule)(nil), (*flowcontrol.NonResourcePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule(a.(*v1beta2.NonResourcePolicyRule), b.(*flowcontrol.NonResourcePolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.NonResourcePolicyRule)(nil), (*flowcontrol.NonResourcePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule(a.(*flowcontrolv1beta2.NonResourcePolicyRule), b.(*flowcontrol.NonResourcePolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.NonResourcePolicyRule)(nil), (*v1beta2.NonResourcePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_NonResourcePolicyRule_To_v1beta2_NonResourcePolicyRule(a.(*flowcontrol.NonResourcePolicyRule), b.(*v1beta2.NonResourcePolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.NonResourcePolicyRule)(nil), (*flowcontrolv1beta2.NonResourcePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_NonResourcePolicyRule_To_v1beta2_NonResourcePolicyRule(a.(*flowcontrol.NonResourcePolicyRule), b.(*flowcontrolv1beta2.NonResourcePolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.PolicyRulesWithSubjects)(nil), (*flowcontrol.PolicyRulesWithSubjects)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubjects(a.(*v1beta2.PolicyRulesWithSubjects), b.(*flowcontrol.PolicyRulesWithSubjects), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.PolicyRulesWithSubjects)(nil), (*flowcontrol.PolicyRulesWithSubjects)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubjects(a.(*flowcontrolv1beta2.PolicyRulesWithSubjects), b.(*flowcontrol.PolicyRulesWithSubjects), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.PolicyRulesWithSubjects)(nil), (*v1beta2.PolicyRulesWithSubjects)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_PolicyRulesWithSubjects_To_v1beta2_PolicyRulesWithSubjects(a.(*flowcontrol.PolicyRulesWithSubjects), b.(*v1beta2.PolicyRulesWithSubjects), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.PolicyRulesWithSubjects)(nil), (*flowcontrolv1beta2.PolicyRulesWithSubjects)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_PolicyRulesWithSubjects_To_v1beta2_PolicyRulesWithSubjects(a.(*flowcontrol.PolicyRulesWithSubjects), b.(*flowcontrolv1beta2.PolicyRulesWithSubjects), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.PriorityLevelConfiguration)(nil), (*flowcontrol.PriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration(a.(*v1beta2.PriorityLevelConfiguration), b.(*flowcontrol.PriorityLevelConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.PriorityLevelConfiguration)(nil), (*flowcontrol.PriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration(a.(*flowcontrolv1beta2.PriorityLevelConfiguration), b.(*flowcontrol.PriorityLevelConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfiguration)(nil), (*v1beta2.PriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevelConfiguration(a.(*flowcontrol.PriorityLevelConfiguration), b.(*v1beta2.PriorityLevelConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfiguration)(nil), (*flowcontrolv1beta2.PriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevelConfiguration(a.(*flowcontrol.PriorityLevelConfiguration), b.(*flowcontrolv1beta2.PriorityLevelConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.PriorityLevelConfigurationCondition)(nil), (*flowcontrol.PriorityLevelConfigurationCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_PriorityLevelConfigurationCondition_To_flowcontrol_PriorityLevelConfigurationCondition(a.(*v1beta2.PriorityLevelConfigurationCondition), b.(*flowcontrol.PriorityLevelConfigurationCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.PriorityLevelConfigurationCondition)(nil), (*flowcontrol.PriorityLevelConfigurationCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_PriorityLevelConfigurationCondition_To_flowcontrol_PriorityLevelConfigurationCondition(a.(*flowcontrolv1beta2.PriorityLevelConfigurationCondition), b.(*flowcontrol.PriorityLevelConfigurationCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationCondition)(nil), (*v1beta2.PriorityLevelConfigurationCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta2_PriorityLevelConfigurationCondition(a.(*flowcontrol.PriorityLevelConfigurationCondition), b.(*v1beta2.PriorityLevelConfigurationCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationCondition)(nil), (*flowcontrolv1beta2.PriorityLevelConfigurationCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta2_PriorityLevelConfigurationCondition(a.(*flowcontrol.PriorityLevelConfigurationCondition), b.(*flowcontrolv1beta2.PriorityLevelConfigurationCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.PriorityLevelConfigurationList)(nil), (*flowcontrol.PriorityLevelConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList(a.(*v1beta2.PriorityLevelConfigurationList), b.(*flowcontrol.PriorityLevelConfigurationList), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.PriorityLevelConfigurationList)(nil), (*flowcontrol.PriorityLevelConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList(a.(*flowcontrolv1beta2.PriorityLevelConfigurationList), b.(*flowcontrol.PriorityLevelConfigurationList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationList)(nil), (*v1beta2.PriorityLevelConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_PriorityLevelConfigurationList_To_v1beta2_PriorityLevelConfigurationList(a.(*flowcontrol.PriorityLevelConfigurationList), b.(*v1beta2.PriorityLevelConfigurationList), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationList)(nil), (*flowcontrolv1beta2.PriorityLevelConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_PriorityLevelConfigurationList_To_v1beta2_PriorityLevelConfigurationList(a.(*flowcontrol.PriorityLevelConfigurationList), b.(*flowcontrolv1beta2.PriorityLevelConfigurationList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.PriorityLevelConfigurationReference)(nil), (*flowcontrol.PriorityLevelConfigurationReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(a.(*v1beta2.PriorityLevelConfigurationReference), b.(*flowcontrol.PriorityLevelConfigurationReference), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.PriorityLevelConfigurationReference)(nil), (*flowcontrol.PriorityLevelConfigurationReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(a.(*flowcontrolv1beta2.PriorityLevelConfigurationReference), b.(*flowcontrol.PriorityLevelConfigurationReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationReference)(nil), (*v1beta2.PriorityLevelConfigurationReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta2_PriorityLevelConfigurationReference(a.(*flowcontrol.PriorityLevelConfigurationReference), b.(*v1beta2.PriorityLevelConfigurationReference), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationReference)(nil), (*flowcontrolv1beta2.PriorityLevelConfigurationReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta2_PriorityLevelConfigurationReference(a.(*flowcontrol.PriorityLevelConfigurationReference), b.(*flowcontrolv1beta2.PriorityLevelConfigurationReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.PriorityLevelConfigurationSpec)(nil), (*flowcontrol.PriorityLevelConfigurationSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(a.(*v1beta2.PriorityLevelConfigurationSpec), b.(*flowcontrol.PriorityLevelConfigurationSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.PriorityLevelConfigurationSpec)(nil), (*flowcontrol.PriorityLevelConfigurationSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(a.(*flowcontrolv1beta2.PriorityLevelConfigurationSpec), b.(*flowcontrol.PriorityLevelConfigurationSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationSpec)(nil), (*v1beta2.PriorityLevelConfigurationSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta2_PriorityLevelConfigurationSpec(a.(*flowcontrol.PriorityLevelConfigurationSpec), b.(*v1beta2.PriorityLevelConfigurationSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationSpec)(nil), (*flowcontrolv1beta2.PriorityLevelConfigurationSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta2_PriorityLevelConfigurationSpec(a.(*flowcontrol.PriorityLevelConfigurationSpec), b.(*flowcontrolv1beta2.PriorityLevelConfigurationSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.PriorityLevelConfigurationStatus)(nil), (*flowcontrol.PriorityLevelConfigurationStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLevelConfigurationStatus(a.(*v1beta2.PriorityLevelConfigurationStatus), b.(*flowcontrol.PriorityLevelConfigurationStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.PriorityLevelConfigurationStatus)(nil), (*flowcontrol.PriorityLevelConfigurationStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLevelConfigurationStatus(a.(*flowcontrolv1beta2.PriorityLevelConfigurationStatus), b.(*flowcontrol.PriorityLevelConfigurationStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationStatus)(nil), (*v1beta2.PriorityLevelConfigurationStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta2_PriorityLevelConfigurationStatus(a.(*flowcontrol.PriorityLevelConfigurationStatus), b.(*v1beta2.PriorityLevelConfigurationStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.PriorityLevelConfigurationStatus)(nil), (*flowcontrolv1beta2.PriorityLevelConfigurationStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta2_PriorityLevelConfigurationStatus(a.(*flowcontrol.PriorityLevelConfigurationStatus), b.(*flowcontrolv1beta2.PriorityLevelConfigurationStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.QueuingConfiguration)(nil), (*flowcontrol.QueuingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_QueuingConfiguration_To_flowcontrol_QueuingConfiguration(a.(*v1beta2.QueuingConfiguration), b.(*flowcontrol.QueuingConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.QueuingConfiguration)(nil), (*flowcontrol.QueuingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_QueuingConfiguration_To_flowcontrol_QueuingConfiguration(a.(*flowcontrolv1beta2.QueuingConfiguration), b.(*flowcontrol.QueuingConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.QueuingConfiguration)(nil), (*v1beta2.QueuingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_QueuingConfiguration_To_v1beta2_QueuingConfiguration(a.(*flowcontrol.QueuingConfiguration), b.(*v1beta2.QueuingConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.QueuingConfiguration)(nil), (*flowcontrolv1beta2.QueuingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_QueuingConfiguration_To_v1beta2_QueuingConfiguration(a.(*flowcontrol.QueuingConfiguration), b.(*flowcontrolv1beta2.QueuingConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.ResourcePolicyRule)(nil), (*flowcontrol.ResourcePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(a.(*v1beta2.ResourcePolicyRule), b.(*flowcontrol.ResourcePolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.ResourcePolicyRule)(nil), (*flowcontrol.ResourcePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(a.(*flowcontrolv1beta2.ResourcePolicyRule), b.(*flowcontrol.ResourcePolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.ResourcePolicyRule)(nil), (*v1beta2.ResourcePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_ResourcePolicyRule_To_v1beta2_ResourcePolicyRule(a.(*flowcontrol.ResourcePolicyRule), b.(*v1beta2.ResourcePolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.ResourcePolicyRule)(nil), (*flowcontrolv1beta2.ResourcePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_ResourcePolicyRule_To_v1beta2_ResourcePolicyRule(a.(*flowcontrol.ResourcePolicyRule), b.(*flowcontrolv1beta2.ResourcePolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.ServiceAccountSubject)(nil), (*flowcontrol.ServiceAccountSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject(a.(*v1beta2.ServiceAccountSubject), b.(*flowcontrol.ServiceAccountSubject), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.ServiceAccountSubject)(nil), (*flowcontrol.ServiceAccountSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject(a.(*flowcontrolv1beta2.ServiceAccountSubject), b.(*flowcontrol.ServiceAccountSubject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.ServiceAccountSubject)(nil), (*v1beta2.ServiceAccountSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_ServiceAccountSubject_To_v1beta2_ServiceAccountSubject(a.(*flowcontrol.ServiceAccountSubject), b.(*v1beta2.ServiceAccountSubject), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.ServiceAccountSubject)(nil), (*flowcontrolv1beta2.ServiceAccountSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_ServiceAccountSubject_To_v1beta2_ServiceAccountSubject(a.(*flowcontrol.ServiceAccountSubject), b.(*flowcontrolv1beta2.ServiceAccountSubject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.Subject)(nil), (*flowcontrol.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_Subject_To_flowcontrol_Subject(a.(*v1beta2.Subject), b.(*flowcontrol.Subject), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.Subject)(nil), (*flowcontrol.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_Subject_To_flowcontrol_Subject(a.(*flowcontrolv1beta2.Subject), b.(*flowcontrol.Subject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.Subject)(nil), (*v1beta2.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_Subject_To_v1beta2_Subject(a.(*flowcontrol.Subject), b.(*v1beta2.Subject), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.Subject)(nil), (*flowcontrolv1beta2.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_Subject_To_v1beta2_Subject(a.(*flowcontrol.Subject), b.(*flowcontrolv1beta2.Subject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.UserSubject)(nil), (*flowcontrol.UserSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_UserSubject_To_flowcontrol_UserSubject(a.(*v1beta2.UserSubject), b.(*flowcontrol.UserSubject), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrolv1beta2.UserSubject)(nil), (*flowcontrol.UserSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_UserSubject_To_flowcontrol_UserSubject(a.(*flowcontrolv1beta2.UserSubject), b.(*flowcontrol.UserSubject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*flowcontrol.UserSubject)(nil), (*v1beta2.UserSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_UserSubject_To_v1beta2_UserSubject(a.(*flowcontrol.UserSubject), b.(*v1beta2.UserSubject), scope)
+	if err := s.AddGeneratedConversionFunc((*flowcontrol.UserSubject)(nil), (*flowcontrolv1beta2.UserSubject)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_UserSubject_To_v1beta2_UserSubject(a.(*flowcontrol.UserSubject), b.(*flowcontrolv1beta2.UserSubject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*flowcontrol.LimitedPriorityLevelConfiguration)(nil), (*v1beta2.LimitedPriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta2_LimitedPriorityLevelConfiguration(a.(*flowcontrol.LimitedPriorityLevelConfiguration), b.(*v1beta2.LimitedPriorityLevelConfiguration), scope)
+	if err := s.AddConversionFunc((*flowcontrol.LimitedPriorityLevelConfiguration)(nil), (*flowcontrolv1beta2.LimitedPriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta2_LimitedPriorityLevelConfiguration(a.(*flowcontrol.LimitedPriorityLevelConfiguration), b.(*flowcontrolv1beta2.LimitedPriorityLevelConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta2.LimitedPriorityLevelConfiguration)(nil), (*flowcontrol.LimitedPriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPriorityLevelConfiguration(a.(*v1beta2.LimitedPriorityLevelConfiguration), b.(*flowcontrol.LimitedPriorityLevelConfiguration), scope)
+	if err := s.AddConversionFunc((*flowcontrolv1beta2.LimitedPriorityLevelConfiguration)(nil), (*flowcontrol.LimitedPriorityLevelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPriorityLevelConfiguration(a.(*flowcontrolv1beta2.LimitedPriorityLevelConfiguration), b.(*flowcontrol.LimitedPriorityLevelConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta2_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPriorityLevelConfiguration(in *v1beta2.ExemptPriorityLevelConfiguration, out *flowcontrol.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
+func autoConvert_v1beta2_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPriorityLevelConfiguration(in *flowcontrolv1beta2.ExemptPriorityLevelConfiguration, out *flowcontrol.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
 	out.NominalConcurrencyShares = (*int32)(unsafe.Pointer(in.NominalConcurrencyShares))
 	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
 	return nil
 }
 
 // Convert_v1beta2_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPriorityLevelConfiguration is an autogenerated conversion function.
-func Convert_v1beta2_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPriorityLevelConfiguration(in *v1beta2.ExemptPriorityLevelConfiguration, out *flowcontrol.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
+func Convert_v1beta2_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPriorityLevelConfiguration(in *flowcontrolv1beta2.ExemptPriorityLevelConfiguration, out *flowcontrol.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
 	return autoConvert_v1beta2_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPriorityLevelConfiguration(in, out, s)
 }
 
-func autoConvert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta2_ExemptPriorityLevelConfiguration(in *flowcontrol.ExemptPriorityLevelConfiguration, out *v1beta2.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
+func autoConvert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta2_ExemptPriorityLevelConfiguration(in *flowcontrol.ExemptPriorityLevelConfiguration, out *flowcontrolv1beta2.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
 	out.NominalConcurrencyShares = (*int32)(unsafe.Pointer(in.NominalConcurrencyShares))
 	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
 	return nil
 }
 
 // Convert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta2_ExemptPriorityLevelConfiguration is an autogenerated conversion function.
-func Convert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta2_ExemptPriorityLevelConfiguration(in *flowcontrol.ExemptPriorityLevelConfiguration, out *v1beta2.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
+func Convert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta2_ExemptPriorityLevelConfiguration(in *flowcontrol.ExemptPriorityLevelConfiguration, out *flowcontrolv1beta2.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
 	return autoConvert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta2_ExemptPriorityLevelConfiguration(in, out, s)
 }
 
-func autoConvert_v1beta2_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMethod(in *v1beta2.FlowDistinguisherMethod, out *flowcontrol.FlowDistinguisherMethod, s conversion.Scope) error {
+func autoConvert_v1beta2_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMethod(in *flowcontrolv1beta2.FlowDistinguisherMethod, out *flowcontrol.FlowDistinguisherMethod, s conversion.Scope) error {
 	out.Type = flowcontrol.FlowDistinguisherMethodType(in.Type)
 	return nil
 }
 
 // Convert_v1beta2_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMethod is an autogenerated conversion function.
-func Convert_v1beta2_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMethod(in *v1beta2.FlowDistinguisherMethod, out *flowcontrol.FlowDistinguisherMethod, s conversion.Scope) error {
+func Convert_v1beta2_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMethod(in *flowcontrolv1beta2.FlowDistinguisherMethod, out *flowcontrol.FlowDistinguisherMethod, s conversion.Scope) error {
 	return autoConvert_v1beta2_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMethod(in, out, s)
 }
 
-func autoConvert_flowcontrol_FlowDistinguisherMethod_To_v1beta2_FlowDistinguisherMethod(in *flowcontrol.FlowDistinguisherMethod, out *v1beta2.FlowDistinguisherMethod, s conversion.Scope) error {
-	out.Type = v1beta2.FlowDistinguisherMethodType(in.Type)
+func autoConvert_flowcontrol_FlowDistinguisherMethod_To_v1beta2_FlowDistinguisherMethod(in *flowcontrol.FlowDistinguisherMethod, out *flowcontrolv1beta2.FlowDistinguisherMethod, s conversion.Scope) error {
+	out.Type = flowcontrolv1beta2.FlowDistinguisherMethodType(in.Type)
 	return nil
 }
 
 // Convert_flowcontrol_FlowDistinguisherMethod_To_v1beta2_FlowDistinguisherMethod is an autogenerated conversion function.
-func Convert_flowcontrol_FlowDistinguisherMethod_To_v1beta2_FlowDistinguisherMethod(in *flowcontrol.FlowDistinguisherMethod, out *v1beta2.FlowDistinguisherMethod, s conversion.Scope) error {
+func Convert_flowcontrol_FlowDistinguisherMethod_To_v1beta2_FlowDistinguisherMethod(in *flowcontrol.FlowDistinguisherMethod, out *flowcontrolv1beta2.FlowDistinguisherMethod, s conversion.Scope) error {
 	return autoConvert_flowcontrol_FlowDistinguisherMethod_To_v1beta2_FlowDistinguisherMethod(in, out, s)
 }
 
-func autoConvert_v1beta2_FlowSchema_To_flowcontrol_FlowSchema(in *v1beta2.FlowSchema, out *flowcontrol.FlowSchema, s conversion.Scope) error {
+func autoConvert_v1beta2_FlowSchema_To_flowcontrol_FlowSchema(in *flowcontrolv1beta2.FlowSchema, out *flowcontrol.FlowSchema, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -324,11 +324,11 @@ func autoConvert_v1beta2_FlowSchema_To_flowcontrol_FlowSchema(in *v1beta2.FlowSc
 }
 
 // Convert_v1beta2_FlowSchema_To_flowcontrol_FlowSchema is an autogenerated conversion function.
-func Convert_v1beta2_FlowSchema_To_flowcontrol_FlowSchema(in *v1beta2.FlowSchema, out *flowcontrol.FlowSchema, s conversion.Scope) error {
+func Convert_v1beta2_FlowSchema_To_flowcontrol_FlowSchema(in *flowcontrolv1beta2.FlowSchema, out *flowcontrol.FlowSchema, s conversion.Scope) error {
 	return autoConvert_v1beta2_FlowSchema_To_flowcontrol_FlowSchema(in, out, s)
 }
 
-func autoConvert_flowcontrol_FlowSchema_To_v1beta2_FlowSchema(in *flowcontrol.FlowSchema, out *v1beta2.FlowSchema, s conversion.Scope) error {
+func autoConvert_flowcontrol_FlowSchema_To_v1beta2_FlowSchema(in *flowcontrol.FlowSchema, out *flowcontrolv1beta2.FlowSchema, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_flowcontrol_FlowSchemaSpec_To_v1beta2_FlowSchemaSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -340,11 +340,11 @@ func autoConvert_flowcontrol_FlowSchema_To_v1beta2_FlowSchema(in *flowcontrol.Fl
 }
 
 // Convert_flowcontrol_FlowSchema_To_v1beta2_FlowSchema is an autogenerated conversion function.
-func Convert_flowcontrol_FlowSchema_To_v1beta2_FlowSchema(in *flowcontrol.FlowSchema, out *v1beta2.FlowSchema, s conversion.Scope) error {
+func Convert_flowcontrol_FlowSchema_To_v1beta2_FlowSchema(in *flowcontrol.FlowSchema, out *flowcontrolv1beta2.FlowSchema, s conversion.Scope) error {
 	return autoConvert_flowcontrol_FlowSchema_To_v1beta2_FlowSchema(in, out, s)
 }
 
-func autoConvert_v1beta2_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(in *v1beta2.FlowSchemaCondition, out *flowcontrol.FlowSchemaCondition, s conversion.Scope) error {
+func autoConvert_v1beta2_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(in *flowcontrolv1beta2.FlowSchemaCondition, out *flowcontrol.FlowSchemaCondition, s conversion.Scope) error {
 	out.Type = flowcontrol.FlowSchemaConditionType(in.Type)
 	out.Status = flowcontrol.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -354,13 +354,13 @@ func autoConvert_v1beta2_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(
 }
 
 // Convert_v1beta2_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition is an autogenerated conversion function.
-func Convert_v1beta2_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(in *v1beta2.FlowSchemaCondition, out *flowcontrol.FlowSchemaCondition, s conversion.Scope) error {
+func Convert_v1beta2_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(in *flowcontrolv1beta2.FlowSchemaCondition, out *flowcontrol.FlowSchemaCondition, s conversion.Scope) error {
 	return autoConvert_v1beta2_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(in, out, s)
 }
 
-func autoConvert_flowcontrol_FlowSchemaCondition_To_v1beta2_FlowSchemaCondition(in *flowcontrol.FlowSchemaCondition, out *v1beta2.FlowSchemaCondition, s conversion.Scope) error {
-	out.Type = v1beta2.FlowSchemaConditionType(in.Type)
-	out.Status = v1beta2.ConditionStatus(in.Status)
+func autoConvert_flowcontrol_FlowSchemaCondition_To_v1beta2_FlowSchemaCondition(in *flowcontrol.FlowSchemaCondition, out *flowcontrolv1beta2.FlowSchemaCondition, s conversion.Scope) error {
+	out.Type = flowcontrolv1beta2.FlowSchemaConditionType(in.Type)
+	out.Status = flowcontrolv1beta2.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -368,33 +368,33 @@ func autoConvert_flowcontrol_FlowSchemaCondition_To_v1beta2_FlowSchemaCondition(
 }
 
 // Convert_flowcontrol_FlowSchemaCondition_To_v1beta2_FlowSchemaCondition is an autogenerated conversion function.
-func Convert_flowcontrol_FlowSchemaCondition_To_v1beta2_FlowSchemaCondition(in *flowcontrol.FlowSchemaCondition, out *v1beta2.FlowSchemaCondition, s conversion.Scope) error {
+func Convert_flowcontrol_FlowSchemaCondition_To_v1beta2_FlowSchemaCondition(in *flowcontrol.FlowSchemaCondition, out *flowcontrolv1beta2.FlowSchemaCondition, s conversion.Scope) error {
 	return autoConvert_flowcontrol_FlowSchemaCondition_To_v1beta2_FlowSchemaCondition(in, out, s)
 }
 
-func autoConvert_v1beta2_FlowSchemaList_To_flowcontrol_FlowSchemaList(in *v1beta2.FlowSchemaList, out *flowcontrol.FlowSchemaList, s conversion.Scope) error {
+func autoConvert_v1beta2_FlowSchemaList_To_flowcontrol_FlowSchemaList(in *flowcontrolv1beta2.FlowSchemaList, out *flowcontrol.FlowSchemaList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]flowcontrol.FlowSchema)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1beta2_FlowSchemaList_To_flowcontrol_FlowSchemaList is an autogenerated conversion function.
-func Convert_v1beta2_FlowSchemaList_To_flowcontrol_FlowSchemaList(in *v1beta2.FlowSchemaList, out *flowcontrol.FlowSchemaList, s conversion.Scope) error {
+func Convert_v1beta2_FlowSchemaList_To_flowcontrol_FlowSchemaList(in *flowcontrolv1beta2.FlowSchemaList, out *flowcontrol.FlowSchemaList, s conversion.Scope) error {
 	return autoConvert_v1beta2_FlowSchemaList_To_flowcontrol_FlowSchemaList(in, out, s)
 }
 
-func autoConvert_flowcontrol_FlowSchemaList_To_v1beta2_FlowSchemaList(in *flowcontrol.FlowSchemaList, out *v1beta2.FlowSchemaList, s conversion.Scope) error {
+func autoConvert_flowcontrol_FlowSchemaList_To_v1beta2_FlowSchemaList(in *flowcontrol.FlowSchemaList, out *flowcontrolv1beta2.FlowSchemaList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta2.FlowSchema)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]flowcontrolv1beta2.FlowSchema)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_flowcontrol_FlowSchemaList_To_v1beta2_FlowSchemaList is an autogenerated conversion function.
-func Convert_flowcontrol_FlowSchemaList_To_v1beta2_FlowSchemaList(in *flowcontrol.FlowSchemaList, out *v1beta2.FlowSchemaList, s conversion.Scope) error {
+func Convert_flowcontrol_FlowSchemaList_To_v1beta2_FlowSchemaList(in *flowcontrol.FlowSchemaList, out *flowcontrolv1beta2.FlowSchemaList, s conversion.Scope) error {
 	return autoConvert_flowcontrol_FlowSchemaList_To_v1beta2_FlowSchemaList(in, out, s)
 }
 
-func autoConvert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in *v1beta2.FlowSchemaSpec, out *flowcontrol.FlowSchemaSpec, s conversion.Scope) error {
+func autoConvert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in *flowcontrolv1beta2.FlowSchemaSpec, out *flowcontrol.FlowSchemaSpec, s conversion.Scope) error {
 	if err := Convert_v1beta2_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(&in.PriorityLevelConfiguration, &out.PriorityLevelConfiguration, s); err != nil {
 		return err
 	}
@@ -405,88 +405,88 @@ func autoConvert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in *v1beta
 }
 
 // Convert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec is an autogenerated conversion function.
-func Convert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in *v1beta2.FlowSchemaSpec, out *flowcontrol.FlowSchemaSpec, s conversion.Scope) error {
+func Convert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in *flowcontrolv1beta2.FlowSchemaSpec, out *flowcontrol.FlowSchemaSpec, s conversion.Scope) error {
 	return autoConvert_v1beta2_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in, out, s)
 }
 
-func autoConvert_flowcontrol_FlowSchemaSpec_To_v1beta2_FlowSchemaSpec(in *flowcontrol.FlowSchemaSpec, out *v1beta2.FlowSchemaSpec, s conversion.Scope) error {
+func autoConvert_flowcontrol_FlowSchemaSpec_To_v1beta2_FlowSchemaSpec(in *flowcontrol.FlowSchemaSpec, out *flowcontrolv1beta2.FlowSchemaSpec, s conversion.Scope) error {
 	if err := Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta2_PriorityLevelConfigurationReference(&in.PriorityLevelConfiguration, &out.PriorityLevelConfiguration, s); err != nil {
 		return err
 	}
 	out.MatchingPrecedence = in.MatchingPrecedence
-	out.DistinguisherMethod = (*v1beta2.FlowDistinguisherMethod)(unsafe.Pointer(in.DistinguisherMethod))
-	out.Rules = *(*[]v1beta2.PolicyRulesWithSubjects)(unsafe.Pointer(&in.Rules))
+	out.DistinguisherMethod = (*flowcontrolv1beta2.FlowDistinguisherMethod)(unsafe.Pointer(in.DistinguisherMethod))
+	out.Rules = *(*[]flowcontrolv1beta2.PolicyRulesWithSubjects)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_flowcontrol_FlowSchemaSpec_To_v1beta2_FlowSchemaSpec is an autogenerated conversion function.
-func Convert_flowcontrol_FlowSchemaSpec_To_v1beta2_FlowSchemaSpec(in *flowcontrol.FlowSchemaSpec, out *v1beta2.FlowSchemaSpec, s conversion.Scope) error {
+func Convert_flowcontrol_FlowSchemaSpec_To_v1beta2_FlowSchemaSpec(in *flowcontrol.FlowSchemaSpec, out *flowcontrolv1beta2.FlowSchemaSpec, s conversion.Scope) error {
 	return autoConvert_flowcontrol_FlowSchemaSpec_To_v1beta2_FlowSchemaSpec(in, out, s)
 }
 
-func autoConvert_v1beta2_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus(in *v1beta2.FlowSchemaStatus, out *flowcontrol.FlowSchemaStatus, s conversion.Scope) error {
+func autoConvert_v1beta2_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus(in *flowcontrolv1beta2.FlowSchemaStatus, out *flowcontrol.FlowSchemaStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]flowcontrol.FlowSchemaCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_v1beta2_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus is an autogenerated conversion function.
-func Convert_v1beta2_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus(in *v1beta2.FlowSchemaStatus, out *flowcontrol.FlowSchemaStatus, s conversion.Scope) error {
+func Convert_v1beta2_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus(in *flowcontrolv1beta2.FlowSchemaStatus, out *flowcontrol.FlowSchemaStatus, s conversion.Scope) error {
 	return autoConvert_v1beta2_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus(in, out, s)
 }
 
-func autoConvert_flowcontrol_FlowSchemaStatus_To_v1beta2_FlowSchemaStatus(in *flowcontrol.FlowSchemaStatus, out *v1beta2.FlowSchemaStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1beta2.FlowSchemaCondition)(unsafe.Pointer(&in.Conditions))
+func autoConvert_flowcontrol_FlowSchemaStatus_To_v1beta2_FlowSchemaStatus(in *flowcontrol.FlowSchemaStatus, out *flowcontrolv1beta2.FlowSchemaStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]flowcontrolv1beta2.FlowSchemaCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_flowcontrol_FlowSchemaStatus_To_v1beta2_FlowSchemaStatus is an autogenerated conversion function.
-func Convert_flowcontrol_FlowSchemaStatus_To_v1beta2_FlowSchemaStatus(in *flowcontrol.FlowSchemaStatus, out *v1beta2.FlowSchemaStatus, s conversion.Scope) error {
+func Convert_flowcontrol_FlowSchemaStatus_To_v1beta2_FlowSchemaStatus(in *flowcontrol.FlowSchemaStatus, out *flowcontrolv1beta2.FlowSchemaStatus, s conversion.Scope) error {
 	return autoConvert_flowcontrol_FlowSchemaStatus_To_v1beta2_FlowSchemaStatus(in, out, s)
 }
 
-func autoConvert_v1beta2_GroupSubject_To_flowcontrol_GroupSubject(in *v1beta2.GroupSubject, out *flowcontrol.GroupSubject, s conversion.Scope) error {
+func autoConvert_v1beta2_GroupSubject_To_flowcontrol_GroupSubject(in *flowcontrolv1beta2.GroupSubject, out *flowcontrol.GroupSubject, s conversion.Scope) error {
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_v1beta2_GroupSubject_To_flowcontrol_GroupSubject is an autogenerated conversion function.
-func Convert_v1beta2_GroupSubject_To_flowcontrol_GroupSubject(in *v1beta2.GroupSubject, out *flowcontrol.GroupSubject, s conversion.Scope) error {
+func Convert_v1beta2_GroupSubject_To_flowcontrol_GroupSubject(in *flowcontrolv1beta2.GroupSubject, out *flowcontrol.GroupSubject, s conversion.Scope) error {
 	return autoConvert_v1beta2_GroupSubject_To_flowcontrol_GroupSubject(in, out, s)
 }
 
-func autoConvert_flowcontrol_GroupSubject_To_v1beta2_GroupSubject(in *flowcontrol.GroupSubject, out *v1beta2.GroupSubject, s conversion.Scope) error {
+func autoConvert_flowcontrol_GroupSubject_To_v1beta2_GroupSubject(in *flowcontrol.GroupSubject, out *flowcontrolv1beta2.GroupSubject, s conversion.Scope) error {
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_flowcontrol_GroupSubject_To_v1beta2_GroupSubject is an autogenerated conversion function.
-func Convert_flowcontrol_GroupSubject_To_v1beta2_GroupSubject(in *flowcontrol.GroupSubject, out *v1beta2.GroupSubject, s conversion.Scope) error {
+func Convert_flowcontrol_GroupSubject_To_v1beta2_GroupSubject(in *flowcontrol.GroupSubject, out *flowcontrolv1beta2.GroupSubject, s conversion.Scope) error {
 	return autoConvert_flowcontrol_GroupSubject_To_v1beta2_GroupSubject(in, out, s)
 }
 
-func autoConvert_v1beta2_LimitResponse_To_flowcontrol_LimitResponse(in *v1beta2.LimitResponse, out *flowcontrol.LimitResponse, s conversion.Scope) error {
+func autoConvert_v1beta2_LimitResponse_To_flowcontrol_LimitResponse(in *flowcontrolv1beta2.LimitResponse, out *flowcontrol.LimitResponse, s conversion.Scope) error {
 	out.Type = flowcontrol.LimitResponseType(in.Type)
 	out.Queuing = (*flowcontrol.QueuingConfiguration)(unsafe.Pointer(in.Queuing))
 	return nil
 }
 
 // Convert_v1beta2_LimitResponse_To_flowcontrol_LimitResponse is an autogenerated conversion function.
-func Convert_v1beta2_LimitResponse_To_flowcontrol_LimitResponse(in *v1beta2.LimitResponse, out *flowcontrol.LimitResponse, s conversion.Scope) error {
+func Convert_v1beta2_LimitResponse_To_flowcontrol_LimitResponse(in *flowcontrolv1beta2.LimitResponse, out *flowcontrol.LimitResponse, s conversion.Scope) error {
 	return autoConvert_v1beta2_LimitResponse_To_flowcontrol_LimitResponse(in, out, s)
 }
 
-func autoConvert_flowcontrol_LimitResponse_To_v1beta2_LimitResponse(in *flowcontrol.LimitResponse, out *v1beta2.LimitResponse, s conversion.Scope) error {
-	out.Type = v1beta2.LimitResponseType(in.Type)
-	out.Queuing = (*v1beta2.QueuingConfiguration)(unsafe.Pointer(in.Queuing))
+func autoConvert_flowcontrol_LimitResponse_To_v1beta2_LimitResponse(in *flowcontrol.LimitResponse, out *flowcontrolv1beta2.LimitResponse, s conversion.Scope) error {
+	out.Type = flowcontrolv1beta2.LimitResponseType(in.Type)
+	out.Queuing = (*flowcontrolv1beta2.QueuingConfiguration)(unsafe.Pointer(in.Queuing))
 	return nil
 }
 
 // Convert_flowcontrol_LimitResponse_To_v1beta2_LimitResponse is an autogenerated conversion function.
-func Convert_flowcontrol_LimitResponse_To_v1beta2_LimitResponse(in *flowcontrol.LimitResponse, out *v1beta2.LimitResponse, s conversion.Scope) error {
+func Convert_flowcontrol_LimitResponse_To_v1beta2_LimitResponse(in *flowcontrol.LimitResponse, out *flowcontrolv1beta2.LimitResponse, s conversion.Scope) error {
 	return autoConvert_flowcontrol_LimitResponse_To_v1beta2_LimitResponse(in, out, s)
 }
 
-func autoConvert_v1beta2_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPriorityLevelConfiguration(in *v1beta2.LimitedPriorityLevelConfiguration, out *flowcontrol.LimitedPriorityLevelConfiguration, s conversion.Scope) error {
+func autoConvert_v1beta2_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPriorityLevelConfiguration(in *flowcontrolv1beta2.LimitedPriorityLevelConfiguration, out *flowcontrol.LimitedPriorityLevelConfiguration, s conversion.Scope) error {
 	// WARNING: in.AssuredConcurrencyShares requires manual conversion: does not exist in peer-type
 	if err := Convert_v1beta2_LimitResponse_To_flowcontrol_LimitResponse(&in.LimitResponse, &out.LimitResponse, s); err != nil {
 		return err
@@ -496,7 +496,7 @@ func autoConvert_v1beta2_LimitedPriorityLevelConfiguration_To_flowcontrol_Limite
 	return nil
 }
 
-func autoConvert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta2_LimitedPriorityLevelConfiguration(in *flowcontrol.LimitedPriorityLevelConfiguration, out *v1beta2.LimitedPriorityLevelConfiguration, s conversion.Scope) error {
+func autoConvert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta2_LimitedPriorityLevelConfiguration(in *flowcontrol.LimitedPriorityLevelConfiguration, out *flowcontrolv1beta2.LimitedPriorityLevelConfiguration, s conversion.Scope) error {
 	// WARNING: in.NominalConcurrencyShares requires manual conversion: does not exist in peer-type
 	if err := Convert_flowcontrol_LimitResponse_To_v1beta2_LimitResponse(&in.LimitResponse, &out.LimitResponse, s); err != nil {
 		return err
@@ -506,29 +506,29 @@ func autoConvert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta2_Limite
 	return nil
 }
 
-func autoConvert_v1beta2_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule(in *v1beta2.NonResourcePolicyRule, out *flowcontrol.NonResourcePolicyRule, s conversion.Scope) error {
+func autoConvert_v1beta2_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule(in *flowcontrolv1beta2.NonResourcePolicyRule, out *flowcontrol.NonResourcePolicyRule, s conversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
 	return nil
 }
 
 // Convert_v1beta2_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule is an autogenerated conversion function.
-func Convert_v1beta2_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule(in *v1beta2.NonResourcePolicyRule, out *flowcontrol.NonResourcePolicyRule, s conversion.Scope) error {
+func Convert_v1beta2_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule(in *flowcontrolv1beta2.NonResourcePolicyRule, out *flowcontrol.NonResourcePolicyRule, s conversion.Scope) error {
 	return autoConvert_v1beta2_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule(in, out, s)
 }
 
-func autoConvert_flowcontrol_NonResourcePolicyRule_To_v1beta2_NonResourcePolicyRule(in *flowcontrol.NonResourcePolicyRule, out *v1beta2.NonResourcePolicyRule, s conversion.Scope) error {
+func autoConvert_flowcontrol_NonResourcePolicyRule_To_v1beta2_NonResourcePolicyRule(in *flowcontrol.NonResourcePolicyRule, out *flowcontrolv1beta2.NonResourcePolicyRule, s conversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
 	return nil
 }
 
 // Convert_flowcontrol_NonResourcePolicyRule_To_v1beta2_NonResourcePolicyRule is an autogenerated conversion function.
-func Convert_flowcontrol_NonResourcePolicyRule_To_v1beta2_NonResourcePolicyRule(in *flowcontrol.NonResourcePolicyRule, out *v1beta2.NonResourcePolicyRule, s conversion.Scope) error {
+func Convert_flowcontrol_NonResourcePolicyRule_To_v1beta2_NonResourcePolicyRule(in *flowcontrol.NonResourcePolicyRule, out *flowcontrolv1beta2.NonResourcePolicyRule, s conversion.Scope) error {
 	return autoConvert_flowcontrol_NonResourcePolicyRule_To_v1beta2_NonResourcePolicyRule(in, out, s)
 }
 
-func autoConvert_v1beta2_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubjects(in *v1beta2.PolicyRulesWithSubjects, out *flowcontrol.PolicyRulesWithSubjects, s conversion.Scope) error {
+func autoConvert_v1beta2_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubjects(in *flowcontrolv1beta2.PolicyRulesWithSubjects, out *flowcontrol.PolicyRulesWithSubjects, s conversion.Scope) error {
 	out.Subjects = *(*[]flowcontrol.Subject)(unsafe.Pointer(&in.Subjects))
 	out.ResourceRules = *(*[]flowcontrol.ResourcePolicyRule)(unsafe.Pointer(&in.ResourceRules))
 	out.NonResourceRules = *(*[]flowcontrol.NonResourcePolicyRule)(unsafe.Pointer(&in.NonResourceRules))
@@ -536,23 +536,23 @@ func autoConvert_v1beta2_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithS
 }
 
 // Convert_v1beta2_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubjects is an autogenerated conversion function.
-func Convert_v1beta2_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubjects(in *v1beta2.PolicyRulesWithSubjects, out *flowcontrol.PolicyRulesWithSubjects, s conversion.Scope) error {
+func Convert_v1beta2_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubjects(in *flowcontrolv1beta2.PolicyRulesWithSubjects, out *flowcontrol.PolicyRulesWithSubjects, s conversion.Scope) error {
 	return autoConvert_v1beta2_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubjects(in, out, s)
 }
 
-func autoConvert_flowcontrol_PolicyRulesWithSubjects_To_v1beta2_PolicyRulesWithSubjects(in *flowcontrol.PolicyRulesWithSubjects, out *v1beta2.PolicyRulesWithSubjects, s conversion.Scope) error {
-	out.Subjects = *(*[]v1beta2.Subject)(unsafe.Pointer(&in.Subjects))
-	out.ResourceRules = *(*[]v1beta2.ResourcePolicyRule)(unsafe.Pointer(&in.ResourceRules))
-	out.NonResourceRules = *(*[]v1beta2.NonResourcePolicyRule)(unsafe.Pointer(&in.NonResourceRules))
+func autoConvert_flowcontrol_PolicyRulesWithSubjects_To_v1beta2_PolicyRulesWithSubjects(in *flowcontrol.PolicyRulesWithSubjects, out *flowcontrolv1beta2.PolicyRulesWithSubjects, s conversion.Scope) error {
+	out.Subjects = *(*[]flowcontrolv1beta2.Subject)(unsafe.Pointer(&in.Subjects))
+	out.ResourceRules = *(*[]flowcontrolv1beta2.ResourcePolicyRule)(unsafe.Pointer(&in.ResourceRules))
+	out.NonResourceRules = *(*[]flowcontrolv1beta2.NonResourcePolicyRule)(unsafe.Pointer(&in.NonResourceRules))
 	return nil
 }
 
 // Convert_flowcontrol_PolicyRulesWithSubjects_To_v1beta2_PolicyRulesWithSubjects is an autogenerated conversion function.
-func Convert_flowcontrol_PolicyRulesWithSubjects_To_v1beta2_PolicyRulesWithSubjects(in *flowcontrol.PolicyRulesWithSubjects, out *v1beta2.PolicyRulesWithSubjects, s conversion.Scope) error {
+func Convert_flowcontrol_PolicyRulesWithSubjects_To_v1beta2_PolicyRulesWithSubjects(in *flowcontrol.PolicyRulesWithSubjects, out *flowcontrolv1beta2.PolicyRulesWithSubjects, s conversion.Scope) error {
 	return autoConvert_flowcontrol_PolicyRulesWithSubjects_To_v1beta2_PolicyRulesWithSubjects(in, out, s)
 }
 
-func autoConvert_v1beta2_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration(in *v1beta2.PriorityLevelConfiguration, out *flowcontrol.PriorityLevelConfiguration, s conversion.Scope) error {
+func autoConvert_v1beta2_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration(in *flowcontrolv1beta2.PriorityLevelConfiguration, out *flowcontrol.PriorityLevelConfiguration, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -564,11 +564,11 @@ func autoConvert_v1beta2_PriorityLevelConfiguration_To_flowcontrol_PriorityLevel
 }
 
 // Convert_v1beta2_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration is an autogenerated conversion function.
-func Convert_v1beta2_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration(in *v1beta2.PriorityLevelConfiguration, out *flowcontrol.PriorityLevelConfiguration, s conversion.Scope) error {
+func Convert_v1beta2_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration(in *flowcontrolv1beta2.PriorityLevelConfiguration, out *flowcontrol.PriorityLevelConfiguration, s conversion.Scope) error {
 	return autoConvert_v1beta2_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration(in, out, s)
 }
 
-func autoConvert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevelConfiguration(in *flowcontrol.PriorityLevelConfiguration, out *v1beta2.PriorityLevelConfiguration, s conversion.Scope) error {
+func autoConvert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevelConfiguration(in *flowcontrol.PriorityLevelConfiguration, out *flowcontrolv1beta2.PriorityLevelConfiguration, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta2_PriorityLevelConfigurationSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -580,11 +580,11 @@ func autoConvert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevel
 }
 
 // Convert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevelConfiguration is an autogenerated conversion function.
-func Convert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevelConfiguration(in *flowcontrol.PriorityLevelConfiguration, out *v1beta2.PriorityLevelConfiguration, s conversion.Scope) error {
+func Convert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevelConfiguration(in *flowcontrol.PriorityLevelConfiguration, out *flowcontrolv1beta2.PriorityLevelConfiguration, s conversion.Scope) error {
 	return autoConvert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevelConfiguration(in, out, s)
 }
 
-func autoConvert_v1beta2_PriorityLevelConfigurationCondition_To_flowcontrol_PriorityLevelConfigurationCondition(in *v1beta2.PriorityLevelConfigurationCondition, out *flowcontrol.PriorityLevelConfigurationCondition, s conversion.Scope) error {
+func autoConvert_v1beta2_PriorityLevelConfigurationCondition_To_flowcontrol_PriorityLevelConfigurationCondition(in *flowcontrolv1beta2.PriorityLevelConfigurationCondition, out *flowcontrol.PriorityLevelConfigurationCondition, s conversion.Scope) error {
 	out.Type = flowcontrol.PriorityLevelConfigurationConditionType(in.Type)
 	out.Status = flowcontrol.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -594,13 +594,13 @@ func autoConvert_v1beta2_PriorityLevelConfigurationCondition_To_flowcontrol_Prio
 }
 
 // Convert_v1beta2_PriorityLevelConfigurationCondition_To_flowcontrol_PriorityLevelConfigurationCondition is an autogenerated conversion function.
-func Convert_v1beta2_PriorityLevelConfigurationCondition_To_flowcontrol_PriorityLevelConfigurationCondition(in *v1beta2.PriorityLevelConfigurationCondition, out *flowcontrol.PriorityLevelConfigurationCondition, s conversion.Scope) error {
+func Convert_v1beta2_PriorityLevelConfigurationCondition_To_flowcontrol_PriorityLevelConfigurationCondition(in *flowcontrolv1beta2.PriorityLevelConfigurationCondition, out *flowcontrol.PriorityLevelConfigurationCondition, s conversion.Scope) error {
 	return autoConvert_v1beta2_PriorityLevelConfigurationCondition_To_flowcontrol_PriorityLevelConfigurationCondition(in, out, s)
 }
 
-func autoConvert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta2_PriorityLevelConfigurationCondition(in *flowcontrol.PriorityLevelConfigurationCondition, out *v1beta2.PriorityLevelConfigurationCondition, s conversion.Scope) error {
-	out.Type = v1beta2.PriorityLevelConfigurationConditionType(in.Type)
-	out.Status = v1beta2.ConditionStatus(in.Status)
+func autoConvert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta2_PriorityLevelConfigurationCondition(in *flowcontrol.PriorityLevelConfigurationCondition, out *flowcontrolv1beta2.PriorityLevelConfigurationCondition, s conversion.Scope) error {
+	out.Type = flowcontrolv1beta2.PriorityLevelConfigurationConditionType(in.Type)
+	out.Status = flowcontrolv1beta2.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -608,11 +608,11 @@ func autoConvert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta2_Prio
 }
 
 // Convert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta2_PriorityLevelConfigurationCondition is an autogenerated conversion function.
-func Convert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta2_PriorityLevelConfigurationCondition(in *flowcontrol.PriorityLevelConfigurationCondition, out *v1beta2.PriorityLevelConfigurationCondition, s conversion.Scope) error {
+func Convert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta2_PriorityLevelConfigurationCondition(in *flowcontrol.PriorityLevelConfigurationCondition, out *flowcontrolv1beta2.PriorityLevelConfigurationCondition, s conversion.Scope) error {
 	return autoConvert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta2_PriorityLevelConfigurationCondition(in, out, s)
 }
 
-func autoConvert_v1beta2_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList(in *v1beta2.PriorityLevelConfigurationList, out *flowcontrol.PriorityLevelConfigurationList, s conversion.Scope) error {
+func autoConvert_v1beta2_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList(in *flowcontrolv1beta2.PriorityLevelConfigurationList, out *flowcontrol.PriorityLevelConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -629,15 +629,15 @@ func autoConvert_v1beta2_PriorityLevelConfigurationList_To_flowcontrol_PriorityL
 }
 
 // Convert_v1beta2_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList is an autogenerated conversion function.
-func Convert_v1beta2_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList(in *v1beta2.PriorityLevelConfigurationList, out *flowcontrol.PriorityLevelConfigurationList, s conversion.Scope) error {
+func Convert_v1beta2_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList(in *flowcontrolv1beta2.PriorityLevelConfigurationList, out *flowcontrol.PriorityLevelConfigurationList, s conversion.Scope) error {
 	return autoConvert_v1beta2_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList(in, out, s)
 }
 
-func autoConvert_flowcontrol_PriorityLevelConfigurationList_To_v1beta2_PriorityLevelConfigurationList(in *flowcontrol.PriorityLevelConfigurationList, out *v1beta2.PriorityLevelConfigurationList, s conversion.Scope) error {
+func autoConvert_flowcontrol_PriorityLevelConfigurationList_To_v1beta2_PriorityLevelConfigurationList(in *flowcontrol.PriorityLevelConfigurationList, out *flowcontrolv1beta2.PriorityLevelConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta2.PriorityLevelConfiguration, len(*in))
+		*out = make([]flowcontrolv1beta2.PriorityLevelConfiguration, len(*in))
 		for i := range *in {
 			if err := Convert_flowcontrol_PriorityLevelConfiguration_To_v1beta2_PriorityLevelConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -650,31 +650,31 @@ func autoConvert_flowcontrol_PriorityLevelConfigurationList_To_v1beta2_PriorityL
 }
 
 // Convert_flowcontrol_PriorityLevelConfigurationList_To_v1beta2_PriorityLevelConfigurationList is an autogenerated conversion function.
-func Convert_flowcontrol_PriorityLevelConfigurationList_To_v1beta2_PriorityLevelConfigurationList(in *flowcontrol.PriorityLevelConfigurationList, out *v1beta2.PriorityLevelConfigurationList, s conversion.Scope) error {
+func Convert_flowcontrol_PriorityLevelConfigurationList_To_v1beta2_PriorityLevelConfigurationList(in *flowcontrol.PriorityLevelConfigurationList, out *flowcontrolv1beta2.PriorityLevelConfigurationList, s conversion.Scope) error {
 	return autoConvert_flowcontrol_PriorityLevelConfigurationList_To_v1beta2_PriorityLevelConfigurationList(in, out, s)
 }
 
-func autoConvert_v1beta2_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(in *v1beta2.PriorityLevelConfigurationReference, out *flowcontrol.PriorityLevelConfigurationReference, s conversion.Scope) error {
+func autoConvert_v1beta2_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(in *flowcontrolv1beta2.PriorityLevelConfigurationReference, out *flowcontrol.PriorityLevelConfigurationReference, s conversion.Scope) error {
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_v1beta2_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference is an autogenerated conversion function.
-func Convert_v1beta2_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(in *v1beta2.PriorityLevelConfigurationReference, out *flowcontrol.PriorityLevelConfigurationReference, s conversion.Scope) error {
+func Convert_v1beta2_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(in *flowcontrolv1beta2.PriorityLevelConfigurationReference, out *flowcontrol.PriorityLevelConfigurationReference, s conversion.Scope) error {
 	return autoConvert_v1beta2_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(in, out, s)
 }
 
-func autoConvert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta2_PriorityLevelConfigurationReference(in *flowcontrol.PriorityLevelConfigurationReference, out *v1beta2.PriorityLevelConfigurationReference, s conversion.Scope) error {
+func autoConvert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta2_PriorityLevelConfigurationReference(in *flowcontrol.PriorityLevelConfigurationReference, out *flowcontrolv1beta2.PriorityLevelConfigurationReference, s conversion.Scope) error {
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta2_PriorityLevelConfigurationReference is an autogenerated conversion function.
-func Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta2_PriorityLevelConfigurationReference(in *flowcontrol.PriorityLevelConfigurationReference, out *v1beta2.PriorityLevelConfigurationReference, s conversion.Scope) error {
+func Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta2_PriorityLevelConfigurationReference(in *flowcontrol.PriorityLevelConfigurationReference, out *flowcontrolv1beta2.PriorityLevelConfigurationReference, s conversion.Scope) error {
 	return autoConvert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta2_PriorityLevelConfigurationReference(in, out, s)
 }
 
-func autoConvert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(in *v1beta2.PriorityLevelConfigurationSpec, out *flowcontrol.PriorityLevelConfigurationSpec, s conversion.Scope) error {
+func autoConvert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(in *flowcontrolv1beta2.PriorityLevelConfigurationSpec, out *flowcontrol.PriorityLevelConfigurationSpec, s conversion.Scope) error {
 	out.Type = flowcontrol.PriorityLevelEnablement(in.Type)
 	if in.Limited != nil {
 		in, out := &in.Limited, &out.Limited
@@ -690,51 +690,51 @@ func autoConvert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityL
 }
 
 // Convert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec is an autogenerated conversion function.
-func Convert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(in *v1beta2.PriorityLevelConfigurationSpec, out *flowcontrol.PriorityLevelConfigurationSpec, s conversion.Scope) error {
+func Convert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(in *flowcontrolv1beta2.PriorityLevelConfigurationSpec, out *flowcontrol.PriorityLevelConfigurationSpec, s conversion.Scope) error {
 	return autoConvert_v1beta2_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(in, out, s)
 }
 
-func autoConvert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta2_PriorityLevelConfigurationSpec(in *flowcontrol.PriorityLevelConfigurationSpec, out *v1beta2.PriorityLevelConfigurationSpec, s conversion.Scope) error {
-	out.Type = v1beta2.PriorityLevelEnablement(in.Type)
+func autoConvert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta2_PriorityLevelConfigurationSpec(in *flowcontrol.PriorityLevelConfigurationSpec, out *flowcontrolv1beta2.PriorityLevelConfigurationSpec, s conversion.Scope) error {
+	out.Type = flowcontrolv1beta2.PriorityLevelEnablement(in.Type)
 	if in.Limited != nil {
 		in, out := &in.Limited, &out.Limited
-		*out = new(v1beta2.LimitedPriorityLevelConfiguration)
+		*out = new(flowcontrolv1beta2.LimitedPriorityLevelConfiguration)
 		if err := Convert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta2_LimitedPriorityLevelConfiguration(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
 		out.Limited = nil
 	}
-	out.Exempt = (*v1beta2.ExemptPriorityLevelConfiguration)(unsafe.Pointer(in.Exempt))
+	out.Exempt = (*flowcontrolv1beta2.ExemptPriorityLevelConfiguration)(unsafe.Pointer(in.Exempt))
 	return nil
 }
 
 // Convert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta2_PriorityLevelConfigurationSpec is an autogenerated conversion function.
-func Convert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta2_PriorityLevelConfigurationSpec(in *flowcontrol.PriorityLevelConfigurationSpec, out *v1beta2.PriorityLevelConfigurationSpec, s conversion.Scope) error {
+func Convert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta2_PriorityLevelConfigurationSpec(in *flowcontrol.PriorityLevelConfigurationSpec, out *flowcontrolv1beta2.PriorityLevelConfigurationSpec, s conversion.Scope) error {
 	return autoConvert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta2_PriorityLevelConfigurationSpec(in, out, s)
 }
 
-func autoConvert_v1beta2_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLevelConfigurationStatus(in *v1beta2.PriorityLevelConfigurationStatus, out *flowcontrol.PriorityLevelConfigurationStatus, s conversion.Scope) error {
+func autoConvert_v1beta2_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLevelConfigurationStatus(in *flowcontrolv1beta2.PriorityLevelConfigurationStatus, out *flowcontrol.PriorityLevelConfigurationStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]flowcontrol.PriorityLevelConfigurationCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_v1beta2_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLevelConfigurationStatus is an autogenerated conversion function.
-func Convert_v1beta2_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLevelConfigurationStatus(in *v1beta2.PriorityLevelConfigurationStatus, out *flowcontrol.PriorityLevelConfigurationStatus, s conversion.Scope) error {
+func Convert_v1beta2_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLevelConfigurationStatus(in *flowcontrolv1beta2.PriorityLevelConfigurationStatus, out *flowcontrol.PriorityLevelConfigurationStatus, s conversion.Scope) error {
 	return autoConvert_v1beta2_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLevelConfigurationStatus(in, out, s)
 }
 
-func autoConvert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta2_PriorityLevelConfigurationStatus(in *flowcontrol.PriorityLevelConfigurationStatus, out *v1beta2.PriorityLevelConfigurationStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1beta2.PriorityLevelConfigurationCondition)(unsafe.Pointer(&in.Conditions))
+func autoConvert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta2_PriorityLevelConfigurationStatus(in *flowcontrol.PriorityLevelConfigurationStatus, out *flowcontrolv1beta2.PriorityLevelConfigurationStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]flowcontrolv1beta2.PriorityLevelConfigurationCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta2_PriorityLevelConfigurationStatus is an autogenerated conversion function.
-func Convert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta2_PriorityLevelConfigurationStatus(in *flowcontrol.PriorityLevelConfigurationStatus, out *v1beta2.PriorityLevelConfigurationStatus, s conversion.Scope) error {
+func Convert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta2_PriorityLevelConfigurationStatus(in *flowcontrol.PriorityLevelConfigurationStatus, out *flowcontrolv1beta2.PriorityLevelConfigurationStatus, s conversion.Scope) error {
 	return autoConvert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta2_PriorityLevelConfigurationStatus(in, out, s)
 }
 
-func autoConvert_v1beta2_QueuingConfiguration_To_flowcontrol_QueuingConfiguration(in *v1beta2.QueuingConfiguration, out *flowcontrol.QueuingConfiguration, s conversion.Scope) error {
+func autoConvert_v1beta2_QueuingConfiguration_To_flowcontrol_QueuingConfiguration(in *flowcontrolv1beta2.QueuingConfiguration, out *flowcontrol.QueuingConfiguration, s conversion.Scope) error {
 	out.Queues = in.Queues
 	out.HandSize = in.HandSize
 	out.QueueLengthLimit = in.QueueLengthLimit
@@ -742,11 +742,11 @@ func autoConvert_v1beta2_QueuingConfiguration_To_flowcontrol_QueuingConfiguratio
 }
 
 // Convert_v1beta2_QueuingConfiguration_To_flowcontrol_QueuingConfiguration is an autogenerated conversion function.
-func Convert_v1beta2_QueuingConfiguration_To_flowcontrol_QueuingConfiguration(in *v1beta2.QueuingConfiguration, out *flowcontrol.QueuingConfiguration, s conversion.Scope) error {
+func Convert_v1beta2_QueuingConfiguration_To_flowcontrol_QueuingConfiguration(in *flowcontrolv1beta2.QueuingConfiguration, out *flowcontrol.QueuingConfiguration, s conversion.Scope) error {
 	return autoConvert_v1beta2_QueuingConfiguration_To_flowcontrol_QueuingConfiguration(in, out, s)
 }
 
-func autoConvert_flowcontrol_QueuingConfiguration_To_v1beta2_QueuingConfiguration(in *flowcontrol.QueuingConfiguration, out *v1beta2.QueuingConfiguration, s conversion.Scope) error {
+func autoConvert_flowcontrol_QueuingConfiguration_To_v1beta2_QueuingConfiguration(in *flowcontrol.QueuingConfiguration, out *flowcontrolv1beta2.QueuingConfiguration, s conversion.Scope) error {
 	out.Queues = in.Queues
 	out.HandSize = in.HandSize
 	out.QueueLengthLimit = in.QueueLengthLimit
@@ -754,11 +754,11 @@ func autoConvert_flowcontrol_QueuingConfiguration_To_v1beta2_QueuingConfiguratio
 }
 
 // Convert_flowcontrol_QueuingConfiguration_To_v1beta2_QueuingConfiguration is an autogenerated conversion function.
-func Convert_flowcontrol_QueuingConfiguration_To_v1beta2_QueuingConfiguration(in *flowcontrol.QueuingConfiguration, out *v1beta2.QueuingConfiguration, s conversion.Scope) error {
+func Convert_flowcontrol_QueuingConfiguration_To_v1beta2_QueuingConfiguration(in *flowcontrol.QueuingConfiguration, out *flowcontrolv1beta2.QueuingConfiguration, s conversion.Scope) error {
 	return autoConvert_flowcontrol_QueuingConfiguration_To_v1beta2_QueuingConfiguration(in, out, s)
 }
 
-func autoConvert_v1beta2_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(in *v1beta2.ResourcePolicyRule, out *flowcontrol.ResourcePolicyRule, s conversion.Scope) error {
+func autoConvert_v1beta2_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(in *flowcontrolv1beta2.ResourcePolicyRule, out *flowcontrol.ResourcePolicyRule, s conversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
@@ -768,11 +768,11 @@ func autoConvert_v1beta2_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(in
 }
 
 // Convert_v1beta2_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule is an autogenerated conversion function.
-func Convert_v1beta2_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(in *v1beta2.ResourcePolicyRule, out *flowcontrol.ResourcePolicyRule, s conversion.Scope) error {
+func Convert_v1beta2_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(in *flowcontrolv1beta2.ResourcePolicyRule, out *flowcontrol.ResourcePolicyRule, s conversion.Scope) error {
 	return autoConvert_v1beta2_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(in, out, s)
 }
 
-func autoConvert_flowcontrol_ResourcePolicyRule_To_v1beta2_ResourcePolicyRule(in *flowcontrol.ResourcePolicyRule, out *v1beta2.ResourcePolicyRule, s conversion.Scope) error {
+func autoConvert_flowcontrol_ResourcePolicyRule_To_v1beta2_ResourcePolicyRule(in *flowcontrol.ResourcePolicyRule, out *flowcontrolv1beta2.ResourcePolicyRule, s conversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
@@ -782,33 +782,33 @@ func autoConvert_flowcontrol_ResourcePolicyRule_To_v1beta2_ResourcePolicyRule(in
 }
 
 // Convert_flowcontrol_ResourcePolicyRule_To_v1beta2_ResourcePolicyRule is an autogenerated conversion function.
-func Convert_flowcontrol_ResourcePolicyRule_To_v1beta2_ResourcePolicyRule(in *flowcontrol.ResourcePolicyRule, out *v1beta2.ResourcePolicyRule, s conversion.Scope) error {
+func Convert_flowcontrol_ResourcePolicyRule_To_v1beta2_ResourcePolicyRule(in *flowcontrol.ResourcePolicyRule, out *flowcontrolv1beta2.ResourcePolicyRule, s conversion.Scope) error {
 	return autoConvert_flowcontrol_ResourcePolicyRule_To_v1beta2_ResourcePolicyRule(in, out, s)
 }
 
-func autoConvert_v1beta2_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject(in *v1beta2.ServiceAccountSubject, out *flowcontrol.ServiceAccountSubject, s conversion.Scope) error {
+func autoConvert_v1beta2_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject(in *flowcontrolv1beta2.ServiceAccountSubject, out *flowcontrol.ServiceAccountSubject, s conversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_v1beta2_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject is an autogenerated conversion function.
-func Convert_v1beta2_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject(in *v1beta2.ServiceAccountSubject, out *flowcontrol.ServiceAccountSubject, s conversion.Scope) error {
+func Convert_v1beta2_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject(in *flowcontrolv1beta2.ServiceAccountSubject, out *flowcontrol.ServiceAccountSubject, s conversion.Scope) error {
 	return autoConvert_v1beta2_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject(in, out, s)
 }
 
-func autoConvert_flowcontrol_ServiceAccountSubject_To_v1beta2_ServiceAccountSubject(in *flowcontrol.ServiceAccountSubject, out *v1beta2.ServiceAccountSubject, s conversion.Scope) error {
+func autoConvert_flowcontrol_ServiceAccountSubject_To_v1beta2_ServiceAccountSubject(in *flowcontrol.ServiceAccountSubject, out *flowcontrolv1beta2.ServiceAccountSubject, s conversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_flowcontrol_ServiceAccountSubject_To_v1beta2_ServiceAccountSubject is an autogenerated conversion function.
-func Convert_flowcontrol_ServiceAccountSubject_To_v1beta2_ServiceAccountSubject(in *flowcontrol.ServiceAccountSubject, out *v1beta2.ServiceAccountSubject, s conversion.Scope) error {
+func Convert_flowcontrol_ServiceAccountSubject_To_v1beta2_ServiceAccountSubject(in *flowcontrol.ServiceAccountSubject, out *flowcontrolv1beta2.ServiceAccountSubject, s conversion.Scope) error {
 	return autoConvert_flowcontrol_ServiceAccountSubject_To_v1beta2_ServiceAccountSubject(in, out, s)
 }
 
-func autoConvert_v1beta2_Subject_To_flowcontrol_Subject(in *v1beta2.Subject, out *flowcontrol.Subject, s conversion.Scope) error {
+func autoConvert_v1beta2_Subject_To_flowcontrol_Subject(in *flowcontrolv1beta2.Subject, out *flowcontrol.Subject, s conversion.Scope) error {
 	out.Kind = flowcontrol.SubjectKind(in.Kind)
 	out.User = (*flowcontrol.UserSubject)(unsafe.Pointer(in.User))
 	out.Group = (*flowcontrol.GroupSubject)(unsafe.Pointer(in.Group))
@@ -817,39 +817,39 @@ func autoConvert_v1beta2_Subject_To_flowcontrol_Subject(in *v1beta2.Subject, out
 }
 
 // Convert_v1beta2_Subject_To_flowcontrol_Subject is an autogenerated conversion function.
-func Convert_v1beta2_Subject_To_flowcontrol_Subject(in *v1beta2.Subject, out *flowcontrol.Subject, s conversion.Scope) error {
+func Convert_v1beta2_Subject_To_flowcontrol_Subject(in *flowcontrolv1beta2.Subject, out *flowcontrol.Subject, s conversion.Scope) error {
 	return autoConvert_v1beta2_Subject_To_flowcontrol_Subject(in, out, s)
 }
 
-func autoConvert_flowcontrol_Subject_To_v1beta2_Subject(in *flowcontrol.Subject, out *v1beta2.Subject, s conversion.Scope) error {
-	out.Kind = v1beta2.SubjectKind(in.Kind)
-	out.User = (*v1beta2.UserSubject)(unsafe.Pointer(in.User))
-	out.Group = (*v1beta2.GroupSubject)(unsafe.Pointer(in.Group))
-	out.ServiceAccount = (*v1beta2.ServiceAccountSubject)(unsafe.Pointer(in.ServiceAccount))
+func autoConvert_flowcontrol_Subject_To_v1beta2_Subject(in *flowcontrol.Subject, out *flowcontrolv1beta2.Subject, s conversion.Scope) error {
+	out.Kind = flowcontrolv1beta2.SubjectKind(in.Kind)
+	out.User = (*flowcontrolv1beta2.UserSubject)(unsafe.Pointer(in.User))
+	out.Group = (*flowcontrolv1beta2.GroupSubject)(unsafe.Pointer(in.Group))
+	out.ServiceAccount = (*flowcontrolv1beta2.ServiceAccountSubject)(unsafe.Pointer(in.ServiceAccount))
 	return nil
 }
 
 // Convert_flowcontrol_Subject_To_v1beta2_Subject is an autogenerated conversion function.
-func Convert_flowcontrol_Subject_To_v1beta2_Subject(in *flowcontrol.Subject, out *v1beta2.Subject, s conversion.Scope) error {
+func Convert_flowcontrol_Subject_To_v1beta2_Subject(in *flowcontrol.Subject, out *flowcontrolv1beta2.Subject, s conversion.Scope) error {
 	return autoConvert_flowcontrol_Subject_To_v1beta2_Subject(in, out, s)
 }
 
-func autoConvert_v1beta2_UserSubject_To_flowcontrol_UserSubject(in *v1beta2.UserSubject, out *flowcontrol.UserSubject, s conversion.Scope) error {
+func autoConvert_v1beta2_UserSubject_To_flowcontrol_UserSubject(in *flowcontrolv1beta2.UserSubject, out *flowcontrol.UserSubject, s conversion.Scope) error {
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_v1beta2_UserSubject_To_flowcontrol_UserSubject is an autogenerated conversion function.
-func Convert_v1beta2_UserSubject_To_flowcontrol_UserSubject(in *v1beta2.UserSubject, out *flowcontrol.UserSubject, s conversion.Scope) error {
+func Convert_v1beta2_UserSubject_To_flowcontrol_UserSubject(in *flowcontrolv1beta2.UserSubject, out *flowcontrol.UserSubject, s conversion.Scope) error {
 	return autoConvert_v1beta2_UserSubject_To_flowcontrol_UserSubject(in, out, s)
 }
 
-func autoConvert_flowcontrol_UserSubject_To_v1beta2_UserSubject(in *flowcontrol.UserSubject, out *v1beta2.UserSubject, s conversion.Scope) error {
+func autoConvert_flowcontrol_UserSubject_To_v1beta2_UserSubject(in *flowcontrol.UserSubject, out *flowcontrolv1beta2.UserSubject, s conversion.Scope) error {
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_flowcontrol_UserSubject_To_v1beta2_UserSubject is an autogenerated conversion function.
-func Convert_flowcontrol_UserSubject_To_v1beta2_UserSubject(in *flowcontrol.UserSubject, out *v1beta2.UserSubject, s conversion.Scope) error {
+func Convert_flowcontrol_UserSubject_To_v1beta2_UserSubject(in *flowcontrol.UserSubject, out *flowcontrolv1beta2.UserSubject, s conversion.Scope) error {
 	return autoConvert_flowcontrol_UserSubject_To_v1beta2_UserSubject(in, out, s)
 }

@@ -86,13 +86,19 @@ func (Meter) Int64Gauge(string, ...metric.Int64GaugeOption) (metric.Int64Gauge, 
 
 // Int64ObservableCounter returns an ObservableCounter used to record int64
 // measurements that produces no telemetry.
-func (Meter) Int64ObservableCounter(string, ...metric.Int64ObservableCounterOption) (metric.Int64ObservableCounter, error) {
+func (Meter) Int64ObservableCounter(
+	string,
+	...metric.Int64ObservableCounterOption,
+) (metric.Int64ObservableCounter, error) {
 	return Int64ObservableCounter{}, nil
 }
 
 // Int64ObservableUpDownCounter returns an ObservableUpDownCounter used to
 // record int64 measurements that produces no telemetry.
-func (Meter) Int64ObservableUpDownCounter(string, ...metric.Int64ObservableUpDownCounterOption) (metric.Int64ObservableUpDownCounter, error) {
+func (Meter) Int64ObservableUpDownCounter(
+	string,
+	...metric.Int64ObservableUpDownCounterOption,
+) (metric.Int64ObservableUpDownCounter, error) {
 	return Int64ObservableUpDownCounter{}, nil
 }
 
@@ -128,19 +134,28 @@ func (Meter) Float64Gauge(string, ...metric.Float64GaugeOption) (metric.Float64G
 
 // Float64ObservableCounter returns an ObservableCounter used to record int64
 // measurements that produces no telemetry.
-func (Meter) Float64ObservableCounter(string, ...metric.Float64ObservableCounterOption) (metric.Float64ObservableCounter, error) {
+func (Meter) Float64ObservableCounter(
+	string,
+	...metric.Float64ObservableCounterOption,
+) (metric.Float64ObservableCounter, error) {
 	return Float64ObservableCounter{}, nil
 }
 
 // Float64ObservableUpDownCounter returns an ObservableUpDownCounter used to
 // record int64 measurements that produces no telemetry.
-func (Meter) Float64ObservableUpDownCounter(string, ...metric.Float64ObservableUpDownCounterOption) (metric.Float64ObservableUpDownCounter, error) {
+func (Meter) Float64ObservableUpDownCounter(
+	string,
+	...metric.Float64ObservableUpDownCounterOption,
+) (metric.Float64ObservableUpDownCounter, error) {
 	return Float64ObservableUpDownCounter{}, nil
 }
 
 // Float64ObservableGauge returns an ObservableGauge used to record int64
 // measurements that produces no telemetry.
-func (Meter) Float64ObservableGauge(string, ...metric.Float64ObservableGaugeOption) (metric.Float64ObservableGauge, error) {
+func (Meter) Float64ObservableGauge(
+	string,
+	...metric.Float64ObservableGaugeOption,
+) (metric.Float64ObservableGauge, error) {
 	return Float64ObservableGauge{}, nil
 }
 

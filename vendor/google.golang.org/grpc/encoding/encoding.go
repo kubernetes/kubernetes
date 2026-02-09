@@ -27,14 +27,34 @@ package encoding
 
 import (
 	"io"
+	"slices"
 	"strings"
 
+	"google.golang.org/grpc/encoding/internal"
 	"google.golang.org/grpc/internal/grpcutil"
 )
 
 // Identity specifies the optional encoding for uncompressed streams.
 // It is intended for grpc internal use only.
 const Identity = "identity"
+
+func init() {
+	internal.RegisterCompressorForTesting = func(c Compressor) func() {
+		name := c.Name()
+		curCompressor, found := registeredCompressor[name]
+		RegisterCompressor(c)
+		return func() {
+			if found {
+				registeredCompressor[name] = curCompressor
+				return
+			}
+			delete(registeredCompressor, name)
+			grpcutil.RegisteredCompressorNames = slices.DeleteFunc(grpcutil.RegisteredCompressorNames, func(s string) bool {
+				return s == name
+			})
+		}
+	}
+}
 
 // Compressor is used for compressing and decompressing when sending or
 // receiving messages.
@@ -94,7 +114,7 @@ type Codec interface {
 	Name() string
 }
 
-var registeredCodecs = make(map[string]Codec)
+var registeredCodecs = make(map[string]any)
 
 // RegisterCodec registers the provided Codec for use with all gRPC clients and
 // servers.
@@ -126,5 +146,6 @@ func RegisterCodec(codec Codec) {
 //
 // The content-subtype is expected to be lowercase.
 func GetCodec(contentSubtype string) Codec {
-	return registeredCodecs[contentSubtype]
+	c, _ := registeredCodecs[contentSubtype].(Codec)
+	return c
 }

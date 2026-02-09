@@ -21,22 +21,39 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PriorityClassApplyConfiguration represents a declarative configuration of the PriorityClass type for use
 // with apply.
+//
+// PriorityClass defines mapping from a priority class name to the priority
+// integer value. The value can be any valid integer.
 type PriorityClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Value                            *int32                   `json:"value,omitempty"`
-	GlobalDefault                    *bool                    `json:"globalDefault,omitempty"`
-	Description                      *string                  `json:"description,omitempty"`
-	PreemptionPolicy                 *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	// value represents the integer value of this priority class. This is the actual priority that pods
+	// receive when they have the name of this class in their pod spec.
+	Value *int32 `json:"value,omitempty"`
+	// globalDefault specifies whether this PriorityClass should be considered as
+	// the default priority for pods that do not have any priority class.
+	// Only one PriorityClass can be marked as `globalDefault`. However, if more than
+	// one PriorityClasses exists with their `globalDefault` field set to true,
+	// the smallest value of such global default PriorityClasses will be used as the default priority.
+	GlobalDefault *bool `json:"globalDefault,omitempty"`
+	// description is an arbitrary string that usually provides guidelines on
+	// when this priority class should be used.
+	Description *string `json:"description,omitempty"`
+	// preemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	PreemptionPolicy *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
 // PriorityClass constructs a declarative configuration of the PriorityClass type for use with
@@ -49,29 +66,14 @@ func PriorityClass(name string) *PriorityClassApplyConfiguration {
 	return b
 }
 
-// ExtractPriorityClass extracts the applied configuration owned by fieldManager from
-// priorityClass. If no managedFields are found in priorityClass for fieldManager, a
-// PriorityClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractPriorityClassFrom extracts the applied configuration owned by fieldManager from
+// priorityClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // priorityClass must be a unmodified PriorityClass API object that was retrieved from the Kubernetes API.
-// ExtractPriorityClass provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractPriorityClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractPriorityClass(priorityClass *schedulingv1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
-	return extractPriorityClass(priorityClass, fieldManager, "")
-}
-
-// ExtractPriorityClassStatus is the same as ExtractPriorityClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPriorityClassStatus(priorityClass *schedulingv1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
-	return extractPriorityClass(priorityClass, fieldManager, "status")
-}
-
-func extractPriorityClass(priorityClass *schedulingv1.PriorityClass, fieldManager string, subresource string) (*PriorityClassApplyConfiguration, error) {
+func ExtractPriorityClassFrom(priorityClass *schedulingv1.PriorityClass, fieldManager string, subresource string) (*PriorityClassApplyConfiguration, error) {
 	b := &PriorityClassApplyConfiguration{}
 	err := managedfields.ExtractInto(priorityClass, internal.Parser().Type("io.k8s.api.scheduling.v1.PriorityClass"), fieldManager, b, subresource)
 	if err != nil {
@@ -84,11 +86,27 @@ func extractPriorityClass(priorityClass *schedulingv1.PriorityClass, fieldManage
 	return b, nil
 }
 
+// ExtractPriorityClass extracts the applied configuration owned by fieldManager from
+// priorityClass. If no managedFields are found in priorityClass for fieldManager, a
+// PriorityClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// priorityClass must be a unmodified PriorityClass API object that was retrieved from the Kubernetes API.
+// ExtractPriorityClass provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractPriorityClass(priorityClass *schedulingv1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
+	return ExtractPriorityClassFrom(priorityClass, fieldManager, "")
+}
+
+func (b PriorityClassApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithKind(value string) *PriorityClassApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -96,7 +114,7 @@ func (b *PriorityClassApplyConfiguration) WithKind(value string) *PriorityClassA
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithAPIVersion(value string) *PriorityClassApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -105,7 +123,7 @@ func (b *PriorityClassApplyConfiguration) WithAPIVersion(value string) *Priority
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithName(value string) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -114,7 +132,7 @@ func (b *PriorityClassApplyConfiguration) WithName(value string) *PriorityClassA
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithGenerateName(value string) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -123,7 +141,7 @@ func (b *PriorityClassApplyConfiguration) WithGenerateName(value string) *Priori
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithNamespace(value string) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -132,7 +150,7 @@ func (b *PriorityClassApplyConfiguration) WithNamespace(value string) *PriorityC
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithUID(value types.UID) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -141,7 +159,7 @@ func (b *PriorityClassApplyConfiguration) WithUID(value types.UID) *PriorityClas
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithResourceVersion(value string) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -150,25 +168,25 @@ func (b *PriorityClassApplyConfiguration) WithResourceVersion(value string) *Pri
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithGeneration(value int64) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *PriorityClassApplyConfiguration) WithCreationTimestamp(value metav1.Time) *PriorityClassApplyConfiguration {
+func (b *PriorityClassApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *PriorityClassApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *PriorityClassApplyConfiguration {
+func (b *PriorityClassApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -177,7 +195,7 @@ func (b *PriorityClassApplyConfiguration) WithDeletionTimestamp(value metav1.Tim
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *PriorityClassApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -187,11 +205,11 @@ func (b *PriorityClassApplyConfiguration) WithDeletionGracePeriodSeconds(value i
 // overwriting an existing map entries in Labels field with the same key.
 func (b *PriorityClassApplyConfiguration) WithLabels(entries map[string]string) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -202,11 +220,11 @@ func (b *PriorityClassApplyConfiguration) WithLabels(entries map[string]string) 
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *PriorityClassApplyConfiguration) WithAnnotations(entries map[string]string) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -214,13 +232,13 @@ func (b *PriorityClassApplyConfiguration) WithAnnotations(entries map[string]str
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *PriorityClassApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *PriorityClassApplyConfiguration {
+func (b *PriorityClassApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -231,14 +249,14 @@ func (b *PriorityClassApplyConfiguration) WithOwnerReferences(values ...*v1.Owne
 func (b *PriorityClassApplyConfiguration) WithFinalizers(values ...string) *PriorityClassApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *PriorityClassApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -274,8 +292,24 @@ func (b *PriorityClassApplyConfiguration) WithPreemptionPolicy(value corev1.Pree
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *PriorityClassApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *PriorityClassApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *PriorityClassApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *PriorityClassApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

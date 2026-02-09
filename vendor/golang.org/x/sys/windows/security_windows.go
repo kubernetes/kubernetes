@@ -894,7 +894,7 @@ type ACL struct {
 	aclRevision byte
 	sbz1        byte
 	aclSize     uint16
-	aceCount    uint16
+	AceCount    uint16
 	sbz2        uint16
 }
 
@@ -1087,6 +1087,27 @@ type EXPLICIT_ACCESS struct {
 	Trustee           TRUSTEE
 }
 
+// https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-ace_header
+type ACE_HEADER struct {
+	AceType  uint8
+	AceFlags uint8
+	AceSize  uint16
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-access_allowed_ace
+type ACCESS_ALLOWED_ACE struct {
+	Header   ACE_HEADER
+	Mask     ACCESS_MASK
+	SidStart uint32
+}
+
+const (
+	// Constants for AceType
+	// https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-ace_header
+	ACCESS_ALLOWED_ACE_TYPE = 0
+	ACCESS_DENIED_ACE_TYPE  = 1
+)
+
 // This type is the union inside of TRUSTEE and must be created using one of the TrusteeValueFrom* functions.
 type TrusteeValue uintptr
 
@@ -1158,6 +1179,7 @@ type OBJECTS_AND_NAME struct {
 //sys	makeSelfRelativeSD(absoluteSD *SECURITY_DESCRIPTOR, selfRelativeSD *SECURITY_DESCRIPTOR, selfRelativeSDSize *uint32) (err error) = advapi32.MakeSelfRelativeSD
 
 //sys	setEntriesInAcl(countExplicitEntries uint32, explicitEntries *EXPLICIT_ACCESS, oldACL *ACL, newACL **ACL) (ret error) = advapi32.SetEntriesInAclW
+//sys	GetAce(acl *ACL, aceIndex uint32, pAce **ACCESS_ALLOWED_ACE) (err error) = advapi32.GetAce
 
 // Control returns the security descriptor control bits.
 func (sd *SECURITY_DESCRIPTOR) Control() (control SECURITY_DESCRIPTOR_CONTROL, revision uint32, err error) {
@@ -1281,7 +1303,10 @@ func (selfRelativeSD *SECURITY_DESCRIPTOR) ToAbsolute() (absoluteSD *SECURITY_DE
 		return nil, err
 	}
 	if absoluteSDSize > 0 {
-		absoluteSD = (*SECURITY_DESCRIPTOR)(unsafe.Pointer(&make([]byte, absoluteSDSize)[0]))
+		absoluteSD = new(SECURITY_DESCRIPTOR)
+		if unsafe.Sizeof(*absoluteSD) < uintptr(absoluteSDSize) {
+			panic("sizeof(SECURITY_DESCRIPTOR) too small")
+		}
 	}
 	var (
 		dacl  *ACL
@@ -1290,19 +1315,55 @@ func (selfRelativeSD *SECURITY_DESCRIPTOR) ToAbsolute() (absoluteSD *SECURITY_DE
 		group *SID
 	)
 	if daclSize > 0 {
-		dacl = (*ACL)(unsafe.Pointer(&make([]byte, daclSize)[0]))
+		dacl = (*ACL)(unsafe.Pointer(unsafe.SliceData(make([]byte, daclSize))))
 	}
 	if saclSize > 0 {
-		sacl = (*ACL)(unsafe.Pointer(&make([]byte, saclSize)[0]))
+		sacl = (*ACL)(unsafe.Pointer(unsafe.SliceData(make([]byte, saclSize))))
 	}
 	if ownerSize > 0 {
-		owner = (*SID)(unsafe.Pointer(&make([]byte, ownerSize)[0]))
+		owner = (*SID)(unsafe.Pointer(unsafe.SliceData(make([]byte, ownerSize))))
 	}
 	if groupSize > 0 {
-		group = (*SID)(unsafe.Pointer(&make([]byte, groupSize)[0]))
+		group = (*SID)(unsafe.Pointer(unsafe.SliceData(make([]byte, groupSize))))
 	}
+	// We call into Windows via makeAbsoluteSD, which sets up
+	// pointers within absoluteSD that point to other chunks of memory
+	// we pass into makeAbsoluteSD, and that happens outside the view of the GC.
+	// We therefore take some care here to then verify the pointers are as we expect
+	// and set them explicitly in view of the GC. See https://go.dev/issue/73199.
+	// TODO: consider weak pointers once Go 1.24 is appropriate. See suggestion in https://go.dev/cl/663575.
 	err = makeAbsoluteSD(selfRelativeSD, absoluteSD, &absoluteSDSize,
 		dacl, &daclSize, sacl, &saclSize, owner, &ownerSize, group, &groupSize)
+	if err != nil {
+		// Don't return absoluteSD, which might be partially initialized.
+		return nil, err
+	}
+	// Before using any fields, verify absoluteSD is in the format we expect according to Windows.
+	// See https://learn.microsoft.com/en-us/windows/win32/secauthz/absolute-and-self-relative-security-descriptors
+	absControl, _, err := absoluteSD.Control()
+	if err != nil {
+		panic("absoluteSD: " + err.Error())
+	}
+	if absControl&SE_SELF_RELATIVE != 0 {
+		panic("absoluteSD not in absolute format")
+	}
+	if absoluteSD.dacl != dacl {
+		panic("dacl pointer mismatch")
+	}
+	if absoluteSD.sacl != sacl {
+		panic("sacl pointer mismatch")
+	}
+	if absoluteSD.owner != owner {
+		panic("owner pointer mismatch")
+	}
+	if absoluteSD.group != group {
+		panic("group pointer mismatch")
+	}
+	absoluteSD.dacl = dacl
+	absoluteSD.sacl = sacl
+	absoluteSD.owner = owner
+	absoluteSD.group = group
+
 	return
 }
 

@@ -32,21 +32,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilptr "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -100,6 +101,12 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 
+		// Read the running pod to get the current node name
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
 		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
 		mountedToken, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey))
 		framework.ExpectNoError(err)
@@ -132,6 +139,29 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 		if !groups.Has("system:serviceaccounts:" + f.Namespace.Name) {
 			framework.Failf("expected system:serviceaccounts:%s group, had %v", f.Namespace.Name, groups.List())
+		}
+
+		credentialID, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/credential-id"]
+		if !ok || len(credentialID) != 1 || !strings.HasPrefix(credentialID[0], "JTI=") {
+			framework.Failf("expected single authentication.kubernetes.io/credential-id extra info item starting with 'JTI=', got %v", credentialID)
+		}
+
+		podName, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/pod-name"]
+		if !ok || len(podName) != 1 || podName[0] != pod.Name {
+			framework.Failf("expected single authentication.kubernetes.io/pod-name extra info item matching %v, got %v", pod.Name, podName)
+		}
+		podUID, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/pod-uid"]
+		if !ok || len(podUID) != 1 || podUID[0] != string(pod.UID) {
+			framework.Failf("expected single authentication.kubernetes.io/pod-uid extra info item matching %v, got %v", pod.UID, podUID)
+		}
+
+		nodeName, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/node-name"]
+		if !ok || len(nodeName) != 1 || nodeName[0] != node.Name {
+			framework.Failf("expected single authentication.kubernetes.io/node-name extra info item matching %v, got %v", node.Name, nodeName)
+		}
+		nodeUID, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/node-uid"]
+		if !ok || len(nodeUID) != 1 || nodeUID[0] != string(node.UID) {
+			framework.Failf("expected single authentication.kubernetes.io/node-uid extra info item matching %v, got %v", node.UID, nodeUID)
 		}
 	})
 
@@ -292,7 +322,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 							{
 								ServiceAccountToken: &v1.ServiceAccountTokenProjection{
 									Path:              "token",
-									ExpirationSeconds: utilptr.Int64Ptr(60 * 60),
+									ExpirationSeconds: ptr.To[int64](60 * 60),
 								},
 							},
 						},
@@ -335,7 +365,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   Containers MUST verify that the projected service account token can be
 	   read and has correct file mode set including ownership and permission.
 	*/
-	f.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
+	f.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly]", func(ctx context.Context) {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		var (
@@ -354,7 +384,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 							{
 								ServiceAccountToken: &v1.ServiceAccountTokenProjection{
 									Path:              "token",
-									ExpirationSeconds: utilptr.Int64Ptr(60 * 60),
+									ExpirationSeconds: ptr.To[int64](60 * 60),
 								},
 							},
 						},
@@ -661,6 +691,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 		createdServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Create(ctx, &testServiceAccount, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create a ServiceAccount")
+		gomega.Expect(createdServiceAccount).To(apimachineryutils.HaveValidResourceVersion())
 
 		getServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Get(ctx, testServiceAccountName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch the created ServiceAccount")
@@ -691,8 +722,10 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			AutomountServiceAccountToken: &boolFalse,
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON patch for the ServiceAccount")
-		_, err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Patch(ctx, testServiceAccountName, types.StrategicMergePatchType, []byte(testServiceAccountPatchData), metav1.PatchOptions{})
+		patchedServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Patch(ctx, testServiceAccountName, types.StrategicMergePatchType, []byte(testServiceAccountPatchData), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch the ServiceAccount")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdServiceAccount.ResourceVersion, patchedServiceAccount.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
+
 		eventFound = false
 		for watchEvent := range resourceWatchChan {
 			if watchEvent.Type == watch.Modified {
@@ -753,7 +786,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}))
 		framework.Logf("Got root ca configmap in namespace %q", f.Namespace.Name)
 
-		framework.ExpectNoError(f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, rootCAConfigMapName, metav1.DeleteOptions{GracePeriodSeconds: utilptr.Int64Ptr(0)}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, rootCAConfigMapName, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](0)}))
 		framework.Logf("Deleted root ca configmap in namespace %q", f.Namespace.Name)
 
 		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -815,13 +848,13 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: saName,
 			},
-			AutomountServiceAccountToken: utilptr.Bool(false),
+			AutomountServiceAccountToken: ptr.To(false),
 		}
 
 		ginkgo.By(fmt.Sprintf("Creating ServiceAccount %q ", saName))
 		createdServiceAccount, err := saClient.Create(ctx, initialServiceAccount, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(createdServiceAccount.AutomountServiceAccountToken).To(gomega.Equal(utilptr.Bool(false)), "Failed to set AutomountServiceAccountToken")
+		gomega.Expect(createdServiceAccount.AutomountServiceAccountToken).To(gomega.Equal(ptr.To(false)), "Failed to set AutomountServiceAccountToken")
 		framework.Logf("AutomountServiceAccountToken: %v", *createdServiceAccount.AutomountServiceAccountToken)
 
 		ginkgo.By(fmt.Sprintf("Updating ServiceAccount %q ", saName))
@@ -830,13 +863,47 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			updateServiceAccount, err := saClient.Get(ctx, saName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Unable to get ServiceAccount %q", saName)
-			updateServiceAccount.AutomountServiceAccountToken = utilptr.Bool(true)
+			updateServiceAccount.AutomountServiceAccountToken = ptr.To(true)
 			updatedServiceAccount, err = saClient.Update(ctx, updateServiceAccount, metav1.UpdateOptions{})
 			return err
 		})
 		framework.ExpectNoError(err, "Failed to update ServiceAccount")
-		gomega.Expect(updatedServiceAccount.AutomountServiceAccountToken).To(gomega.Equal(utilptr.Bool(true)), "Failed to set AutomountServiceAccountToken")
+		gomega.Expect(updatedServiceAccount.AutomountServiceAccountToken).To(gomega.Equal(ptr.To(true)), "Failed to set AutomountServiceAccountToken")
 		framework.Logf("AutomountServiceAccountToken: %v", *updatedServiceAccount.AutomountServiceAccountToken)
+	})
+
+	/*
+		Release: v1.32
+		Testname: ServiceAccount, create and review token
+		Description: Creating a ServiceAccount MUST succeed. Creating a ServiceAccountToken
+		MUST succeed. The token MUST not be empty. Creating a TokenReview MUST succeed.
+		The TokenReview MUST be authenticated without any errors.
+	*/
+	framework.ConformanceIt("should create a serviceAccountToken and ensure a successful TokenReview", func(ctx context.Context) {
+		ns := f.Namespace.Name
+		saClient := f.ClientSet.CoreV1().ServiceAccounts(ns)
+		saName := "e2e-sa-" + utilrand.String(5)
+
+		ginkgo.By(fmt.Sprintf("Creating a Serviceaccount %q in namespace %q", saName, ns))
+		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(context.TODO(), &v1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: saName,
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Unable to create serviceaccount %q", saName)
+
+		ginkgo.By(fmt.Sprintf("Creating a ServiceaccountToken %q in namespace %q", saName, ns))
+		request := &authenticationv1.TokenRequest{}
+		response, err := saClient.CreateToken(context.TODO(), saName, request, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Unable to create serviceAccountToken")
+		gomega.Expect(response.Status.Token).ToNot(gomega.BeEmpty(), "confirm that a Token has been created")
+
+		ginkgo.By(fmt.Sprintf("Creating a TokenReview for %q in namespace %q", response.Name, ns))
+		tokenReview := &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: response.Status.Token}}
+		tokenReview, err = f.ClientSet.AuthenticationV1().TokenReviews().Create(ctx, tokenReview, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create a TokenReview")
+		gomega.Expect(tokenReview.Status.Authenticated).To(gomega.BeTrueBecause("expect that the TokenReview is authenticated"))
+		gomega.Expect(tokenReview.Status.Error).To(gomega.BeEmpty(), "confirm that there are no TokenReview errors")
 	})
 })
 

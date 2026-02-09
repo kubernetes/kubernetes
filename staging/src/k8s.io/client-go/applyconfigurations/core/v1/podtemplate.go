@@ -19,20 +19,26 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PodTemplateApplyConfiguration represents a declarative configuration of the PodTemplate type for use
 // with apply.
+//
+// PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplateApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Template                         *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	// Template defines the pods that will be created from this pod template.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Template *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
 // PodTemplate constructs a declarative configuration of the PodTemplate type for use with
@@ -46,29 +52,14 @@ func PodTemplate(name, namespace string) *PodTemplateApplyConfiguration {
 	return b
 }
 
-// ExtractPodTemplate extracts the applied configuration owned by fieldManager from
-// podTemplate. If no managedFields are found in podTemplate for fieldManager, a
-// PodTemplateApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractPodTemplateFrom extracts the applied configuration owned by fieldManager from
+// podTemplate for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // podTemplate must be a unmodified PodTemplate API object that was retrieved from the Kubernetes API.
-// ExtractPodTemplate provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractPodTemplateFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractPodTemplate(podTemplate *apicorev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
-	return extractPodTemplate(podTemplate, fieldManager, "")
-}
-
-// ExtractPodTemplateStatus is the same as ExtractPodTemplate except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPodTemplateStatus(podTemplate *apicorev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
-	return extractPodTemplate(podTemplate, fieldManager, "status")
-}
-
-func extractPodTemplate(podTemplate *apicorev1.PodTemplate, fieldManager string, subresource string) (*PodTemplateApplyConfiguration, error) {
+func ExtractPodTemplateFrom(podTemplate *corev1.PodTemplate, fieldManager string, subresource string) (*PodTemplateApplyConfiguration, error) {
 	b := &PodTemplateApplyConfiguration{}
 	err := managedfields.ExtractInto(podTemplate, internal.Parser().Type("io.k8s.api.core.v1.PodTemplate"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,11 +73,27 @@ func extractPodTemplate(podTemplate *apicorev1.PodTemplate, fieldManager string,
 	return b, nil
 }
 
+// ExtractPodTemplate extracts the applied configuration owned by fieldManager from
+// podTemplate. If no managedFields are found in podTemplate for fieldManager, a
+// PodTemplateApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// podTemplate must be a unmodified PodTemplate API object that was retrieved from the Kubernetes API.
+// ExtractPodTemplate provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractPodTemplate(podTemplate *corev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
+	return ExtractPodTemplateFrom(podTemplate, fieldManager, "")
+}
+
+func (b PodTemplateApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *PodTemplateApplyConfiguration) WithKind(value string) *PodTemplateApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -94,7 +101,7 @@ func (b *PodTemplateApplyConfiguration) WithKind(value string) *PodTemplateApply
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *PodTemplateApplyConfiguration) WithAPIVersion(value string) *PodTemplateApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -103,7 +110,7 @@ func (b *PodTemplateApplyConfiguration) WithAPIVersion(value string) *PodTemplat
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *PodTemplateApplyConfiguration) WithName(value string) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -112,7 +119,7 @@ func (b *PodTemplateApplyConfiguration) WithName(value string) *PodTemplateApply
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *PodTemplateApplyConfiguration) WithGenerateName(value string) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -121,7 +128,7 @@ func (b *PodTemplateApplyConfiguration) WithGenerateName(value string) *PodTempl
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *PodTemplateApplyConfiguration) WithNamespace(value string) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -130,7 +137,7 @@ func (b *PodTemplateApplyConfiguration) WithNamespace(value string) *PodTemplate
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *PodTemplateApplyConfiguration) WithUID(value types.UID) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -139,7 +146,7 @@ func (b *PodTemplateApplyConfiguration) WithUID(value types.UID) *PodTemplateApp
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *PodTemplateApplyConfiguration) WithResourceVersion(value string) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -148,25 +155,25 @@ func (b *PodTemplateApplyConfiguration) WithResourceVersion(value string) *PodTe
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *PodTemplateApplyConfiguration) WithGeneration(value int64) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *PodTemplateApplyConfiguration) WithCreationTimestamp(value metav1.Time) *PodTemplateApplyConfiguration {
+func (b *PodTemplateApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *PodTemplateApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *PodTemplateApplyConfiguration {
+func (b *PodTemplateApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -175,7 +182,7 @@ func (b *PodTemplateApplyConfiguration) WithDeletionTimestamp(value metav1.Time)
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *PodTemplateApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -185,11 +192,11 @@ func (b *PodTemplateApplyConfiguration) WithDeletionGracePeriodSeconds(value int
 // overwriting an existing map entries in Labels field with the same key.
 func (b *PodTemplateApplyConfiguration) WithLabels(entries map[string]string) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -200,11 +207,11 @@ func (b *PodTemplateApplyConfiguration) WithLabels(entries map[string]string) *P
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *PodTemplateApplyConfiguration) WithAnnotations(entries map[string]string) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -212,13 +219,13 @@ func (b *PodTemplateApplyConfiguration) WithAnnotations(entries map[string]strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *PodTemplateApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *PodTemplateApplyConfiguration {
+func (b *PodTemplateApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -229,14 +236,14 @@ func (b *PodTemplateApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerR
 func (b *PodTemplateApplyConfiguration) WithFinalizers(values ...string) *PodTemplateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *PodTemplateApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -248,8 +255,24 @@ func (b *PodTemplateApplyConfiguration) WithTemplate(value *PodTemplateSpecApply
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *PodTemplateApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *PodTemplateApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *PodTemplateApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *PodTemplateApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

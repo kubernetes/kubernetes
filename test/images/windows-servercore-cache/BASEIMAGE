@@ -1,2 +1,3 @@
 linux/amd64/1809=mcr.microsoft.com/windows/servercore:ltsc2019
 linux/amd64/ltsc2022=mcr.microsoft.com/windows/servercore:ltsc2022
+linux/amd64/ltsc2025=mcr.microsoft.com/windows/servercore:ltsc2025

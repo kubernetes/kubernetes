@@ -25,16 +25,20 @@ import (
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/util/version"
+	"k8s.io/apiserver/pkg/util/compatibility"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storagemigration"
 )
 
@@ -59,6 +63,11 @@ func DefaultWatchCacheSizes() map[schema.GroupResource]int {
 
 // NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
+	return NewStorageFactoryConfigEffectiveVersion(compatibility.DefaultComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent))
+}
+
+// NewStorageFactoryConfigEffectiveVersion returns a new StorageFactoryConfig set up with necessary resource overrides for a given EffectiveVersion.
+func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.EffectiveVersion) *StorageFactoryConfig {
 	resources := []schema.GroupVersionResource{
 		// If a resource has to be stored in a version that is not the
 		// latest, then it can be listed here. Usually this is the case
@@ -71,16 +80,19 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		//
 		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
 		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
-		networking.Resource("ipaddresses").WithVersion("v1beta1"),
-		networking.Resource("servicecidrs").WithVersion("v1beta1"),
-		certificates.Resource("clustertrustbundles").WithVersion("v1alpha1"),
-		storage.Resource("volumeattributesclasses").WithVersion("v1alpha1"),
-		storagemigration.Resource("storagemigrations").WithVersion("v1alpha1"),
+		coordination.Resource("leasecandidates").WithVersion("v1beta1"),
+		admissionregistration.Resource("mutatingadmissionpolicies").WithVersion("v1beta1"),
+		admissionregistration.Resource("mutatingadmissionpolicybindings").WithVersion("v1beta1"),
+		certificates.Resource("clustertrustbundles").WithVersion("v1beta1"),
+		certificates.Resource("podcertificaterequests").WithVersion("v1beta1"),
+		storagemigration.Resource("storagemigrations").WithVersion("v1beta1"),
+		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
+		scheduling.Resource("workloads").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,
-		DefaultResourceEncoding:   serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme),
+		DefaultResourceEncoding:   serverstorage.NewDefaultResourceEncodingConfigForEffectiveVersion(legacyscheme.Scheme, effectiveVersion),
 		ResourceEncodingOverrides: resources,
 	}
 }
@@ -94,7 +106,6 @@ type StorageFactoryConfig struct {
 	Serializer                runtime.StorageSerializer
 	ResourceEncodingOverrides []schema.GroupVersionResource
 	EtcdServersOverrides      []string
-	CurrentVersion            version.EffectiveVersion
 }
 
 // Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.

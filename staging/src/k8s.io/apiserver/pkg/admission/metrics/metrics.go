@@ -207,7 +207,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "webhook_fail_open_count",
-			Help:           "Admission webhook fail open count, identified by name and broken out for each admission type (validating or mutating).",
+			Help:           "Admission webhook fail open count, identified by name and broken out for each admission type (validating or admit).",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"name", "type"})
@@ -217,7 +217,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "webhook_request_total",
-			Help:           "Admission webhook request total, identified by name and broken out for each admission type (validating or mutating) and operation. Additional labels specify whether the request was rejected or not and an HTTP status code. Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
+			Help:           "Admission webhook request total, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify whether the request was rejected or not and an HTTP status code. Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"name", "type", "operation", "code", "rejected"})
@@ -303,6 +303,11 @@ func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, st
 		rejectionCode = 600
 	}
 	m.webhookRejection.WithContext(ctx).WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode)).Inc()
+}
+
+// WebhookRejectionGathererForTest exposes admission webhook rejection metric for access by unit test.
+func (m *AdmissionMetrics) WebhookRejectionGathererForTest() *metrics.CounterVec {
+	return m.webhookRejection
 }
 
 // ObserveWebhookFailOpen records validating or mutating webhook that fail open.

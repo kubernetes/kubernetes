@@ -26,7 +26,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	netutils "k8s.io/utils/net"
 
-	"k8s.io/apimachinery/pkg/util/version"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/features"
@@ -133,22 +132,12 @@ func (s CompletedOptions) Validate() []error {
 	var errs []error
 
 	errs = append(errs, s.CompletedOptions.Validate()...)
-	errs = append(errs, s.CloudProvider.Validate()...)
 	errs = append(errs, validateClusterIPFlags(s.Extra)...)
 	errs = append(errs, validateServiceNodePort(s.Extra)...)
 	errs = append(errs, validatePublicIPServiceClusterIPRangeIPFamilies(s.Extra, *s.GenericServerRunOptions)...)
 
 	if s.MasterCount <= 0 {
 		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
-	}
-
-	// TODO: remove in 1.32
-	// emulationVersion is introduced in 1.31, so it is only allowed to be equal to the binary version at 1.31.
-	effectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor(s.GenericServerRunOptions.ComponentName)
-	binaryVersion := version.MajorMinor(effectiveVersion.BinaryVersion().Major(), effectiveVersion.BinaryVersion().Minor())
-	if binaryVersion.EqualTo(version.MajorMinor(1, 31)) && !effectiveVersion.EmulationVersion().EqualTo(binaryVersion) {
-		errs = append(errs, fmt.Errorf("emulation version needs to be equal to binary version(%s) in compatibility-version alpha, got %s",
-			binaryVersion.String(), effectiveVersion.EmulationVersion().String()))
 	}
 
 	return errs

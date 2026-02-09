@@ -25,7 +25,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/discovery/install"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSetDefaultEndpointPort(t *testing.T) {
@@ -40,13 +40,13 @@ func TestSetDefaultEndpointPort(t *testing.T) {
 	}{
 		"should set appropriate defaults": {
 			original: &discovery.EndpointSlice{Ports: []discovery.EndpointPort{{
-				Port: utilpointer.Int32(80),
+				Port: ptr.To[int32](80),
 			}}},
 			expected: &discovery.EndpointSlice{
 				Ports: []discovery.EndpointPort{{
 					Name:     &emptyStr,
 					Protocol: &protoTCP,
-					Port:     utilpointer.Int32(80),
+					Port:     ptr.To[int32](80),
 				}},
 			},
 		},

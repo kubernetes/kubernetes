@@ -40,45 +40,45 @@ func (g *Gomega) ConfigureWithT(t types.GomegaTestingT) *Gomega {
 	return g
 }
 
-func (g *Gomega) Ω(actual interface{}, extra ...interface{}) types.Assertion {
+func (g *Gomega) Ω(actual any, extra ...any) types.Assertion {
 	return g.ExpectWithOffset(0, actual, extra...)
 }
 
-func (g *Gomega) Expect(actual interface{}, extra ...interface{}) types.Assertion {
+func (g *Gomega) Expect(actual any, extra ...any) types.Assertion {
 	return g.ExpectWithOffset(0, actual, extra...)
 }
 
-func (g *Gomega) ExpectWithOffset(offset int, actual interface{}, extra ...interface{}) types.Assertion {
+func (g *Gomega) ExpectWithOffset(offset int, actual any, extra ...any) types.Assertion {
 	return NewAssertion(actual, g, offset, extra...)
 }
 
-func (g *Gomega) Eventually(actualOrCtx interface{}, args ...interface{}) types.AsyncAssertion {
+func (g *Gomega) Eventually(actualOrCtx any, args ...any) types.AsyncAssertion {
 	return g.makeAsyncAssertion(AsyncAssertionTypeEventually, 0, actualOrCtx, args...)
 }
 
-func (g *Gomega) EventuallyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) types.AsyncAssertion {
+func (g *Gomega) EventuallyWithOffset(offset int, actualOrCtx any, args ...any) types.AsyncAssertion {
 	return g.makeAsyncAssertion(AsyncAssertionTypeEventually, offset, actualOrCtx, args...)
 }
 
-func (g *Gomega) Consistently(actualOrCtx interface{}, args ...interface{}) types.AsyncAssertion {
+func (g *Gomega) Consistently(actualOrCtx any, args ...any) types.AsyncAssertion {
 	return g.makeAsyncAssertion(AsyncAssertionTypeConsistently, 0, actualOrCtx, args...)
 }
 
-func (g *Gomega) ConsistentlyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) types.AsyncAssertion {
+func (g *Gomega) ConsistentlyWithOffset(offset int, actualOrCtx any, args ...any) types.AsyncAssertion {
 	return g.makeAsyncAssertion(AsyncAssertionTypeConsistently, offset, actualOrCtx, args...)
 }
 
-func (g *Gomega) makeAsyncAssertion(asyncAssertionType AsyncAssertionType, offset int, actualOrCtx interface{}, args ...interface{}) types.AsyncAssertion {
+func (g *Gomega) makeAsyncAssertion(asyncAssertionType AsyncAssertionType, offset int, actualOrCtx any, args ...any) types.AsyncAssertion {
 	baseOffset := 3
 	timeoutInterval := -time.Duration(1)
 	pollingInterval := -time.Duration(1)
-	intervals := []interface{}{}
+	intervals := []any{}
 	var ctx context.Context
 
 	actual := actualOrCtx
 	startingIndex := 0
 	if _, isCtx := actualOrCtx.(context.Context); isCtx && len(args) > 0 {
-		// the first argument is a context, we should accept it as the context _only if_ it is **not** the only argumnent **and** the second argument is not a parseable duration
+		// the first argument is a context, we should accept it as the context _only if_ it is **not** the only argument **and** the second argument is not a parseable duration
 		// this is due to an unfortunate ambiguity in early version of Gomega in which multi-type durations are allowed after the actual
 		if _, err := toDuration(args[0]); err != nil {
 			ctx = actualOrCtx.(context.Context)
@@ -126,4 +126,12 @@ func (g *Gomega) SetDefaultConsistentlyDuration(t time.Duration) {
 
 func (g *Gomega) SetDefaultConsistentlyPollingInterval(t time.Duration) {
 	g.DurationBundle.ConsistentlyPollingInterval = t
+}
+
+func (g *Gomega) EnforceDefaultTimeoutsWhenUsingContexts() {
+	g.DurationBundle.EnforceDefaultTimeoutsWhenUsingContexts = true
+}
+
+func (g *Gomega) DisableDefaultTimeoutsWhenUsingContext() {
+	g.DurationBundle.EnforceDefaultTimeoutsWhenUsingContexts = false
 }

@@ -48,24 +48,24 @@ func TestUnregisterHandlers(t *testing.T) {
 	assert.Contains(t, c.ListedPaths(), "/nonswagger")
 
 	resp, _ := http.Get(s.URL + "/nonswagger")
-	assert.Equal(t, first, 1)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
+	assert.Equal(t, 1, first)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	c.Unregister("/nonswagger")
 	assert.NotContains(t, c.ListedPaths(), "/nonswagger")
 
 	resp, _ = http.Get(s.URL + "/nonswagger")
-	assert.Equal(t, first, 1)
-	assert.Equal(t, resp.StatusCode, http.StatusNotFound)
+	assert.Equal(t, 1, first)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 
 	c.HandleFunc("/nonswagger", func(http.ResponseWriter, *http.Request) {
 		second = second + 1
 	})
 	assert.Contains(t, c.ListedPaths(), "/nonswagger")
 	resp, _ = http.Get(s.URL + "/nonswagger")
-	assert.Equal(t, first, 1)
-	assert.Equal(t, second, 1)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
+	assert.Equal(t, 1, first)
+	assert.Equal(t, 1, second)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
 func TestPrefixHandlers(t *testing.T) {
@@ -103,10 +103,10 @@ func TestPrefixHandlers(t *testing.T) {
 
 	resp, _ := http.Get(s.URL + "/fallthrough")
 	assert.Equal(t, 1, fallThroughCount)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	resp, _ = http.Get(s.URL + "/publicPrefix")
 	assert.Equal(t, 2, fallThroughCount)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	http.Get(s.URL + "/publicPrefix/")
 	assert.Equal(t, 1, publicPrefixCount)

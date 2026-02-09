@@ -159,7 +159,7 @@ func TestTLSConfigKey(t *testing.T) {
 
 			shouldCacheA := valueA.Proxy == nil
 			if shouldCacheA != canCacheA {
-				t.Errorf("Unexpected canCache=false for " + nameA)
+				t.Error("Unexpected canCache=false for " + nameA)
 			}
 
 			configIsNotEmpty := !reflect.DeepEqual(*valueA, Config{})

@@ -2376,7 +2376,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
 			node.Status.Allocatable = allocatableResources("100M", "1")
 			node.Spec.Unschedulable = c.nodeUnschedulable
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			manager, _, _, err := newTestController(ctx)
 			if err != nil {
 				t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -2387,7 +2387,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 				manager.podStore.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
-			shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(node, c.ds)
+			shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(logger, node, c.ds)
 
 			if shouldRun != c.shouldRun {
 				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldRun, shouldRun)
@@ -2410,6 +2410,9 @@ func TestUpdateNode(t *testing.T) {
 		expectedEventsFunc func(strategyType apps.DaemonSetUpdateStrategyType) int
 		shouldEnqueue      bool
 		expectedCreates    func() int
+		// Indicates whether a DaemonSet pod was already present on the node before the node transitioned to Ready and schedulable state.
+		// (In other words, was the DaemonSet pod scheduled before the node lost its readiness / was tainted?)
+		preExistingPod bool
 	}{
 		{
 			test:    "Nothing changed, should not enqueue",
@@ -2422,6 +2425,7 @@ func TestUpdateNode(t *testing.T) {
 			}(),
 			shouldEnqueue:   false,
 			expectedCreates: func() int { return 0 },
+			preExistingPod:  false,
 		},
 		{
 			test:    "Node labels changed",
@@ -2434,6 +2438,7 @@ func TestUpdateNode(t *testing.T) {
 			}(),
 			shouldEnqueue:   true,
 			expectedCreates: func() int { return 0 },
+			preExistingPod:  false,
 		},
 		{
 			test: "Node taints changed",
@@ -2446,6 +2451,7 @@ func TestUpdateNode(t *testing.T) {
 			ds:              newDaemonSet("ds"),
 			shouldEnqueue:   true,
 			expectedCreates: func() int { return 0 },
+			preExistingPod:  false,
 		},
 		{
 			test:    "Node Allocatable changed",
@@ -2475,6 +2481,21 @@ func TestUpdateNode(t *testing.T) {
 			expectedCreates: func() int {
 				return 1
 			},
+			preExistingPod: false,
+		},
+		{
+			test:    "Pod transitions from misscheduled to scheduled due to node label change",
+			oldNode: newNode("node1", nil),
+			newNode: newNode("node1", simpleNodeLabel),
+			ds: func() *apps.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+				ds.Status.NumberMisscheduled = 1
+				return ds
+			}(),
+			shouldEnqueue:   true,
+			expectedCreates: func() int { return 0 },
+			preExistingPod:  true,
 		},
 	}
 	for _, c := range cases {
@@ -2494,6 +2515,13 @@ func TestUpdateNode(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			manager.nodeUpdateQueue = workqueue.NewTypedRateLimitingQueueWithConfig(
+				workqueue.DefaultTypedControllerRateLimiter[string](),
+				workqueue.TypedRateLimitingQueueConfig[string]{
+					Name: "test-daemon-node-updates",
+				},
+			)
+
 			expectedEvents := 0
 			if c.expectedEventsFunc != nil {
 				expectedEvents = c.expectedEventsFunc(strategy.Type)
@@ -2504,14 +2532,28 @@ func TestUpdateNode(t *testing.T) {
 			}
 			expectSyncDaemonSets(t, manager, c.ds, podControl, expectedCreates, 0, expectedEvents)
 
+			if c.preExistingPod {
+				addPods(manager.podStore, c.oldNode.Name, simpleDaemonSetLabel, c.ds, 1)
+			}
+
 			manager.enqueueDaemonSet = func(ds *apps.DaemonSet) {
 				if ds.Name == "ds" {
 					enqueued = true
 				}
 			}
 
+			err = manager.nodeStore.Add(c.newNode)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			enqueued = false
 			manager.updateNode(logger, c.oldNode, c.newNode)
+
+			nodeKeys := getQueuedKeys(manager.nodeUpdateQueue)
+			for _, key := range nodeKeys {
+				manager.syncNodeUpdate(ctx, key)
+			}
 			if enqueued != c.shouldEnqueue {
 				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
 			}
@@ -2880,18 +2922,29 @@ func TestAddNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager.addNode(logger, node1)
-	if got, want := manager.queue.Len(), 0; got != want {
+	if got, want := manager.nodeUpdateQueue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
+	key, done := manager.nodeUpdateQueue.Get()
+	if done {
+		t.Fatal("failed to get item from nodeUpdateQueue")
+	}
+	if key != node1.Name {
+		t.Fatalf("expected node name %v, got %v", node1.Name, key)
+	}
+	manager.nodeUpdateQueue.Done(key)
 
 	node2 := newNode("node2", simpleNodeLabel)
 	manager.addNode(logger, node2)
-	if got, want := manager.queue.Len(), 1; got != want {
+	if got, want := manager.nodeUpdateQueue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
-	key, done := manager.queue.Get()
-	if key == "" || done {
-		t.Fatalf("failed to enqueue controller for node %v", node2.Name)
+	key, done = manager.nodeUpdateQueue.Get()
+	if done {
+		t.Fatal("failed to get item from nodeUpdateQueue")
+	}
+	if key != node2.Name {
+		t.Fatalf("expected node name %v, got %v", node2.Name, key)
 	}
 }
 

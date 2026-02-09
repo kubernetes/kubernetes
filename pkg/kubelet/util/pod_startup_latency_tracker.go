@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -97,11 +98,14 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 	}
 
 	if hasPodStartedSLO(pod) {
+		// TODO: it needs to be replaced by a proper context in the future
+		ctx := context.TODO()
+		logger := klog.FromContext(ctx)
 		podStartingDuration := when.Sub(pod.CreationTimestamp.Time)
 		imagePullingDuration := state.lastFinishedPulling.Sub(state.firstStartedPulling)
 		podStartSLOduration := (podStartingDuration - imagePullingDuration).Seconds()
 
-		klog.InfoS("Observed pod startup duration",
+		logger.Info("Observed pod startup duration",
 			"pod", klog.KObj(pod),
 			"podStartSLOduration", podStartSLOduration,
 			"podStartE2EDuration", podStartingDuration,
@@ -146,7 +150,9 @@ func (p *basicPodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.
 		return
 	}
 
-	state.lastFinishedPulling = p.clock.Now() // Now is always grater than values from the past.
+	if !state.firstStartedPulling.IsZero() {
+		state.lastFinishedPulling = p.clock.Now() // Now is always grater than values from the past.
+	}
 }
 
 func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
@@ -168,8 +174,11 @@ func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
 		return
 	}
 
+	// TODO: it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	if hasPodStartedSLO(pod) {
-		klog.V(3).InfoS("Mark when the pod was running for the first time", "pod", klog.KObj(pod), "rv", pod.ResourceVersion)
+		logger.V(3).Info("Mark when the pod was running for the first time", "pod", klog.KObj(pod), "rv", pod.ResourceVersion)
 		state.observedRunningTime = p.clock.Now()
 	}
 }

@@ -28,6 +28,8 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	mutatingadmissionpolicystorage "k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingadmissionpolicy/storage"
+	mutationpolicybindingstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingadmissionpolicybinding/storage"
 	mutatingwebhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	validatingadmissionpolicystorage "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicy/storage"
@@ -128,24 +130,23 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 		return storage, err
 	}
 
-	// validatingadmissionpolicies
-	if resource := "validatingadmissionpolicies"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		policyStorage, policyStatusStorage, err := validatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
+	// mutatingadmissionpolicies
+	if resource := "mutatingadmissionpolicies"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		policyStorage, err := mutatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
 		if err != nil {
 			return storage, err
 		}
 		policyGetter = policyStorage
 		storage[resource] = policyStorage
-		storage[resource+"/status"] = policyStatusStorage
 	}
 
-	// validatingadmissionpolicybindings
-	if resource := "validatingadmissionpolicybindings"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		policyBindingStorage, err := policybindingstorage.NewREST(restOptionsGetter, p.Authorizer, &policybindingstorage.DefaultPolicyGetter{Getter: policyGetter}, r)
+	// mutatingadmissionpolicybindings
+	if resource := "mutatingadmissionpolicybindings"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		mutationpolicybindingstorage, err := mutationpolicybindingstorage.NewREST(restOptionsGetter, p.Authorizer, &mutationpolicybindingstorage.DefaultPolicyGetter{Getter: policyGetter}, r)
 		if err != nil {
 			return storage, err
 		}
-		storage[resource] = policyBindingStorage
+		storage[resource] = mutationpolicybindingstorage
 	}
 
 	return storage, nil
@@ -180,6 +181,25 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 			return storage, err
 		}
 		storage[resource] = policyBindingStorage
+	}
+
+	// mutatingadmissionpolicies
+	if resource := "mutatingadmissionpolicies"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		policyStorage, err := mutatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
+		if err != nil {
+			return storage, err
+		}
+		policyGetter = policyStorage
+		storage[resource] = policyStorage
+	}
+
+	// mutatingadmissionpolicybindings
+	if resource := "mutatingadmissionpolicybindings"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		mutationpolicybindingstorage, err := mutationpolicybindingstorage.NewREST(restOptionsGetter, p.Authorizer, &mutationpolicybindingstorage.DefaultPolicyGetter{Getter: policyGetter}, r)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = mutationpolicybindingstorage
 	}
 
 	return storage, nil

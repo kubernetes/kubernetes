@@ -30,13 +30,13 @@ func TestAddAnnotation(t *testing.T) {
 	attr.AddAnnotation("foo.admission.k8s.io/key1", "value1")
 	attr.AddAnnotation("foo.admission.k8s.io/key2", "value2")
 	annotations := attr.getAnnotations(auditinternal.LevelMetadata)
-	assert.Equal(t, annotations["foo.admission.k8s.io/key1"], "value1")
+	assert.Equal(t, "value1", annotations["foo.admission.k8s.io/key1"])
 
 	// test overwrite
 	assert.Error(t, attr.AddAnnotation("foo.admission.k8s.io/key1", "value1-overwrite"),
 		"admission annotations should not be allowd to be overwritten")
 	annotations = attr.getAnnotations(auditinternal.LevelMetadata)
-	assert.Equal(t, annotations["foo.admission.k8s.io/key1"], "value1", "admission annotations should not be overwritten")
+	assert.Equal(t, "value1", annotations["foo.admission.k8s.io/key1"], "admission annotations should not be overwritten")
 
 	// test invalid plugin names
 	var testCases = map[string]string{
@@ -49,17 +49,16 @@ func TestAddAnnotation(t *testing.T) {
 		err := attr.AddAnnotation(invalidKey, "value-foo")
 		assert.Error(t, err)
 		annotations = attr.getAnnotations(auditinternal.LevelMetadata)
-		assert.Equal(t, annotations[invalidKey], "", name+": invalid pluginName is not allowed ")
+		assert.Equal(t, "", annotations[invalidKey], name+": invalid pluginName is not allowed ")
 	}
 
 	// test all saved annotations
 	assert.Equal(
 		t,
-		annotations,
 		map[string]string{
 			"foo.admission.k8s.io/key1": "value1",
 			"foo.admission.k8s.io/key2": "value2",
-		},
+		}, annotations,
 		"unexpected final annotations",
 	)
 }

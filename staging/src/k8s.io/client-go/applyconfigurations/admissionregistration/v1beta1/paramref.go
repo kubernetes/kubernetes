@@ -19,17 +19,60 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ParamRefApplyConfiguration represents a declarative configuration of the ParamRef type for use
 // with apply.
+//
+// ParamRef describes how to locate the params to be used as input to
+// expressions of rules applied by a policy binding.
 type ParamRefApplyConfiguration struct {
-	Name                    *string                              `json:"name,omitempty"`
-	Namespace               *string                              `json:"namespace,omitempty"`
-	Selector                *v1.LabelSelectorApplyConfiguration  `json:"selector,omitempty"`
-	ParameterNotFoundAction *v1beta1.ParameterNotFoundActionType `json:"parameterNotFoundAction,omitempty"`
+	// name is the name of the resource being referenced.
+	//
+	// One of `name` or `selector` must be set, but `name` and `selector` are
+	// mutually exclusive properties. If one is set, the other must be unset.
+	//
+	// A single parameter used for all admission requests can be configured
+	// by setting the `name` field, leaving `selector` blank, and setting namespace
+	// if `paramKind` is namespace-scoped.
+	Name *string `json:"name,omitempty"`
+	// namespace is the namespace of the referenced resource. Allows limiting
+	// the search for params to a specific namespace. Applies to both `name` and
+	// `selector` fields.
+	//
+	// A per-namespace parameter may be used by specifying a namespace-scoped
+	// `paramKind` in the policy and leaving this field empty.
+	//
+	// - If `paramKind` is cluster-scoped, this field MUST be unset. Setting this
+	// field results in a configuration error.
+	//
+	// - If `paramKind` is namespace-scoped, the namespace of the object being
+	// evaluated for admission will be used when this field is left unset. Take
+	// care that if this is left empty the binding must not match any cluster-scoped
+	// resources, which will result in an error.
+	Namespace *string `json:"namespace,omitempty"`
+	// selector can be used to match multiple param objects based on their labels.
+	// Supply selector: {} to match all resources of the ParamKind.
+	//
+	// If multiple params are found, they are all evaluated with the policy expressions
+	// and the results are ANDed together.
+	//
+	// One of `name` or `selector` must be set, but `name` and `selector` are
+	// mutually exclusive properties. If one is set, the other must be unset.
+	Selector *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
+	// parameterNotFoundAction controls the behavior of the binding when the resource
+	// exists, and name or selector is valid, but there are no parameters
+	// matched by the binding. If the value is set to `Allow`, then no
+	// matched parameters will be treated as successful validation by the binding.
+	// If set to `Deny`, then no matched parameters will be subject to the
+	// `failurePolicy` of the policy.
+	//
+	// Allowed values are `Allow` or `Deny`
+	//
+	// Required
+	ParameterNotFoundAction *admissionregistrationv1beta1.ParameterNotFoundActionType `json:"parameterNotFoundAction,omitempty"`
 }
 
 // ParamRefApplyConfiguration constructs a declarative configuration of the ParamRef type for use with
@@ -65,7 +108,7 @@ func (b *ParamRefApplyConfiguration) WithSelector(value *v1.LabelSelectorApplyCo
 // WithParameterNotFoundAction sets the ParameterNotFoundAction field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ParameterNotFoundAction field is set to the value of the last call.
-func (b *ParamRefApplyConfiguration) WithParameterNotFoundAction(value v1beta1.ParameterNotFoundActionType) *ParamRefApplyConfiguration {
+func (b *ParamRefApplyConfiguration) WithParameterNotFoundAction(value admissionregistrationv1beta1.ParameterNotFoundActionType) *ParamRefApplyConfiguration {
 	b.ParameterNotFoundAction = &value
 	return b
 }

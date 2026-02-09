@@ -24,8 +24,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
-	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
-	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,7 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/internalbootstrap"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestFlowSchemaValidation(t *testing.T) {
@@ -748,15 +746,15 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 	badExemptSpec1 := flowcontrol.PriorityLevelConfigurationSpec{
 		Type: flowcontrol.PriorityLevelEnablementExempt,
 		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
-			NominalConcurrencyShares: pointer.Int32(-1),
-			LendablePercent:          pointer.Int32(101),
+			NominalConcurrencyShares: ptr.To[int32](-1),
+			LendablePercent:          ptr.To[int32](101),
 		},
 	}
 	badExemptSpec2 := flowcontrol.PriorityLevelConfigurationSpec{
 		Type: flowcontrol.PriorityLevelEnablementExempt,
 		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
-			NominalConcurrencyShares: pointer.Int32(-1),
-			LendablePercent:          pointer.Int32(-1),
+			NominalConcurrencyShares: ptr.To[int32](-1),
+			LendablePercent:          ptr.To[int32](-1),
 		},
 	}
 
@@ -775,8 +773,8 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		return flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementExempt,
 			Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
-				NominalConcurrencyShares: pointer.Int32(*have.Spec.Exempt.NominalConcurrencyShares + 10),
-				LendablePercent:          pointer.Int32(*have.Spec.Exempt.LendablePercent + 10),
+				NominalConcurrencyShares: ptr.To[int32](*have.Spec.Exempt.NominalConcurrencyShares + 10),
+				LendablePercent:          ptr.To[int32](*have.Spec.Exempt.LendablePercent + 10),
 			},
 		}
 	}
@@ -811,8 +809,8 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementExempt,
 				Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
-					NominalConcurrencyShares: pointer.Int32(0),
-					LendablePercent:          pointer.Int32(0),
+					NominalConcurrencyShares: ptr.To[int32](0),
+					LendablePercent:          ptr.To[int32](0),
 				},
 			},
 		},
@@ -826,7 +824,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: badSpec,
 		},
 		expectedErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "type must be 'Exempt' if and only if name is 'exempt'"),
+			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "must be 'Exempt' if and only if `name` is 'exempt'"),
 			field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
 		},
 	}, {
@@ -857,7 +855,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		name:                       "admins are not allowed to repurpose the 'exempt' pl to a limited type",
 		priorityLevelConfiguration: exemptTypeRepurposed,
 		expectedErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "type must be 'Exempt' if and only if name is 'exempt'"),
+			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "must be 'Exempt' if and only if `name` is 'exempt'"),
 			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
 			field.Invalid(field.NewPath("spec"), exemptTypeRepurposed.Spec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
 		},
@@ -962,7 +960,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 					NominalConcurrencyShares: 5,
-					LendablePercent:          pointer.Int32(0),
+					LendablePercent:          ptr.To[int32](0),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject,
 					}}},
@@ -1173,7 +1171,7 @@ func TestValidateFlowSchemaStatus(t *testing.T) {
 			}},
 		},
 		expectedErrors: field.ErrorList{
-			field.Required(field.NewPath("status").Child("conditions").Index(0).Child("type"), "must not be empty"),
+			field.Required(field.NewPath("status").Child("conditions").Index(0).Child("type"), ""),
 		},
 	}}
 	for _, testCase := range testCases {
@@ -1215,7 +1213,7 @@ func TestValidatePriorityLevelConfigurationStatus(t *testing.T) {
 			}},
 		},
 		expectedErrors: field.ErrorList{
-			field.Required(field.NewPath("status").Child("conditions").Index(0).Child("type"), "must not be empty"),
+			field.Required(field.NewPath("status").Child("conditions").Index(0).Child("type"), ""),
 		},
 	}}
 	for _, testCase := range testCases {
@@ -1304,65 +1302,32 @@ func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
 
 	tests := []struct {
 		requestVersion    schema.GroupVersion
-		allowZero         bool
 		concurrencyShares int32
 		errExpected       field.ErrorList
 	}{{
-		requestVersion:    flowcontrolv1beta1.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("assuredConcurrencyShares", 0, "must be positive"),
-	}, {
-		requestVersion:    flowcontrolv1beta2.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("assuredConcurrencyShares", 0, "must be positive"),
-	}, {
 		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("nominalConcurrencyShares", 0, "must be positive"),
-	}, {
-		requestVersion:    flowcontrolv1.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("nominalConcurrencyShares", 0, "must be positive"),
-	}, {
-		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		concurrencyShares: 100,
-		errExpected:       nil,
-	}, {
-		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: 0,
 		errExpected:       nil,
 	}, {
 		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: -1,
 		errExpected:       errExpectedFn("nominalConcurrencyShares", -1, "must be a non-negative integer"),
 	}, {
 		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: 1,
 		errExpected:       nil,
 	}, {
 		requestVersion:    flowcontrolv1.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: 0,
 		errExpected:       nil,
 	}, {
 		requestVersion:    flowcontrolv1.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: -1,
 		errExpected:       errExpectedFn("nominalConcurrencyShares", -1, "must be a non-negative integer"),
 	}, {
 		requestVersion:    flowcontrolv1.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: 1,
 		errExpected:       nil,
-	}, {
-		// this should never really happen in real life, the request
-		// context should always contain the request {group, version}
-		requestVersion:    schema.GroupVersion{},
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("nominalConcurrencyShares", 0, "must be positive"),
 	}}
 
 	for _, test := range tests {
@@ -1375,7 +1340,7 @@ func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
 			}
 			specPath := field.NewPath("spec").Child("limited")
 
-			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, test.requestVersion, specPath, PriorityLevelValidationOptions{AllowZeroLimitedNominalConcurrencyShares: test.allowZero})
+			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, test.requestVersion, specPath, PriorityLevelValidationOptions{})
 			if !cmp.Equal(test.errExpected, errGot) {
 				t.Errorf("Expected error: %v, diff: %s", test.errExpected, cmp.Diff(test.errExpected, errGot))
 			}
@@ -1413,31 +1378,31 @@ func TestValidateLimitedPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 		lendablePercent: nil,
 		errExpected:     nil,
 	}, {
-		lendablePercent: pointer.Int32(0),
+		lendablePercent: ptr.To[int32](0),
 		errExpected:     nil,
 	}, {
-		lendablePercent: pointer.Int32(100),
+		lendablePercent: ptr.To[int32](100),
 		errExpected:     nil,
 	}, {
-		lendablePercent: pointer.Int32(101),
+		lendablePercent: ptr.To[int32](101),
 		errExpected:     errLendablePercentFn(101),
 	}, {
-		lendablePercent: pointer.Int32(-1),
+		lendablePercent: ptr.To[int32](-1),
 		errExpected:     errLendablePercentFn(-1),
 	}, {
 		borrowingLimitPercent: nil,
 		errExpected:           nil,
 	}, {
-		borrowingLimitPercent: pointer.Int32(1),
+		borrowingLimitPercent: ptr.To[int32](1),
 		errExpected:           nil,
 	}, {
-		borrowingLimitPercent: pointer.Int32(100),
+		borrowingLimitPercent: ptr.To[int32](100),
 		errExpected:           nil,
 	}, {
-		borrowingLimitPercent: pointer.Int32(0),
+		borrowingLimitPercent: ptr.To[int32](0),
 		errExpected:           nil,
 	}, {
-		borrowingLimitPercent: pointer.Int32(-1),
+		borrowingLimitPercent: ptr.To[int32](-1),
 		errExpected:           errBorrowingLimitPercentFn(-1),
 	}}
 

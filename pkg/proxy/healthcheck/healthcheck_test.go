@@ -17,6 +17,7 @@ limitations under the License.
 package healthcheck
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -26,19 +27,21 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/component-base/metrics/testutil"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
+
+const testNodeName = "test-node"
 
 type fakeListener struct {
 	openPorts sets.Set[string]
@@ -54,17 +57,17 @@ func (fake *fakeListener) hasPort(addr string) bool {
 	return fake.openPorts.Has(addr)
 }
 
-func (fake *fakeListener) Listen(addr string) (net.Listener, error) {
-	fake.openPorts.Insert(addr)
+func (fake *fakeListener) Listen(_ context.Context, addrs ...string) (net.Listener, error) {
+	fake.openPorts.Insert(addrs...)
 	return &fakeNetListener{
 		parent: fake,
-		addr:   addr,
+		addrs:  addrs,
 	}, nil
 }
 
 type fakeNetListener struct {
 	parent *fakeListener
-	addr   string
+	addrs  []string
 }
 
 type fakeAddr struct {
@@ -82,7 +85,7 @@ func (fake *fakeNetListener) Accept() (net.Conn, error) {
 }
 
 func (fake *fakeNetListener) Close() error {
-	fake.parent.openPorts.Delete(fake.addr)
+	fake.parent.openPorts.Delete(fake.addrs...)
 	return nil
 }
 
@@ -97,15 +100,13 @@ func newFakeHTTPServerFactory() *fakeHTTPServerFactory {
 	return &fakeHTTPServerFactory{}
 }
 
-func (fake *fakeHTTPServerFactory) New(addr string, handler http.Handler) httpServer {
+func (fake *fakeHTTPServerFactory) New(handler http.Handler) httpServer {
 	return &fakeHTTPServer{
-		addr:    addr,
 		handler: handler,
 	}
 }
 
 type fakeHTTPServer struct {
-	addr    string
 	handler http.Handler
 }
 
@@ -133,25 +134,20 @@ type hcPayload struct {
 	ServiceProxyHealthy bool
 }
 
-type healthzPayload struct {
-	LastUpdated string
-	CurrentTime string
-	NodeHealthy bool
-}
-
-type fakeProxierHealthChecker struct {
+type fakeProxyHealthChecker struct {
 	healthy bool
 }
 
-func (fake fakeProxierHealthChecker) IsHealthy() bool {
-	return fake.healthy
+func (fake fakeProxyHealthChecker) Health() ProxyHealth {
+	// we only need "healthy" field for testing service healthchecks.
+	return ProxyHealth{Healthy: fake.healthy}
 }
 
 func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{})
-	proxyChecker := &fakeProxierHealthChecker{true}
+	proxyChecker := &fakeProxyHealthChecker{true}
 
 	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)
@@ -436,7 +432,16 @@ func tHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, 
 type nodeTweak func(n *v1.Node)
 
 func makeNode(tweaks ...nodeTweak) *v1.Node {
-	n := &v1.Node{}
+	n := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNodeName,
+		},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{{
+				Type: v1.NodeInternalIP, Address: "192.168.0.1",
+			}},
+		},
+	}
 	for _, tw := range tweaks {
 		tw(n)
 	}
@@ -464,14 +469,27 @@ type serverTest struct {
 	tracking503 int
 }
 
+type testNodeManager struct {
+	node *v1.Node
+}
+
+func (t *testNodeManager) Node() *v1.Node {
+	return t.node
+}
+
+func (t *testNodeManager) update(node *v1.Node) {
+	t.node = node
+}
+
 func TestHealthzServer(t *testing.T) {
 	metrics.RegisterMetrics("")
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
-	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
+	nodeManager := &testNodeManager{node: makeNode()}
+	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nodeManager)
+	server := hs.httpFactory.New(healthzHandler{hs: hs})
 
 	hsTest := &serverTest{
 		server:      server,
@@ -480,23 +498,66 @@ func TestHealthzServer(t *testing.T) {
 		tracking503: 0,
 	}
 
-	testProxierHealthUpdater(hs, hsTest, fakeClock, t)
+	var expectedPayload ProxyHealth
+	// testProxyHealthUpdater only asserts on proxy health, without considering node eligibility
+	// defaulting node health to true for testing.
+	testProxyHealthUpdater(hs, hsTest, fakeClock, ptr.To(true), t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
-	hs.SyncNode(makeNode(tweakTainted("other")))
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	nodeManager.update(makeNode(tweakTainted("other")))
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: ptr.To(true),
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if we've synced a ToBeDeletedTaint node
-	hs.SyncNode(makeNode(tweakTainted(ToBeDeletedTaint)))
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+	nodeManager.update(makeNode(tweakTainted(ToBeDeletedTaint)))
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: ptr.To(false),
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
-	hs.SyncNode(makeNode(tweakTainted("other")))
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	nodeManager.update(makeNode(tweakTainted("other")))
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: ptr.To(true),
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if we've synced a deleted node
-	hs.SyncNode(makeNode(tweakDeleted()))
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+	nodeManager.update(makeNode(tweakDeleted()))
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: ptr.To(false),
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 }
 
 func TestLivezServer(t *testing.T) {
@@ -505,8 +566,9 @@ func TestLivezServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
-	server := hs.httpFactory.New(hs.addr, livezHandler{hs: hs})
+	nodeManager := &testNodeManager{node: makeNode()}
+	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nodeManager)
+	server := hs.httpFactory.New(livezHandler{hs: hs})
 
 	hsTest := &serverTest{
 		server:      server,
@@ -515,23 +577,62 @@ func TestLivezServer(t *testing.T) {
 		tracking503: 0,
 	}
 
-	testProxierHealthUpdater(hs, hsTest, fakeClock, t)
+	var expectedPayload ProxyHealth
+	// /livez doesn't have a concept of "nodeEligible", keeping the value
+	// for node eligibility nil.
+	testProxyHealthUpdater(hs, hsTest, fakeClock, nil, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	hs.SyncNode(makeNode(tweakTainted("other")))
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	nodeManager.update(makeNode(tweakTainted("other")))
+	expectedPayload = ProxyHealth{
+		CurrentTime: fakeClock.Now(),
+		LastUpdated: fakeClock.Now(),
+		Healthy:     true,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	hs.SyncNode(makeNode(tweakTainted(ToBeDeletedTaint)))
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	nodeManager.update(makeNode(tweakTainted(ToBeDeletedTaint)))
+	expectedPayload = ProxyHealth{
+		CurrentTime: fakeClock.Now(),
+		LastUpdated: fakeClock.Now(),
+		Healthy:     true,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	hs.SyncNode(makeNode(tweakTainted("other")))
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	nodeManager.update(makeNode(tweakTainted("other")))
+	expectedPayload = ProxyHealth{
+		CurrentTime: fakeClock.Now(),
+		LastUpdated: fakeClock.Now(),
+		Healthy:     true,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	hs.SyncNode(makeNode(tweakDeleted()))
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	nodeManager.update(makeNode(tweakDeleted()))
+	expectedPayload = ProxyHealth{
+		CurrentTime: fakeClock.Now(),
+		LastUpdated: fakeClock.Now(),
+		Healthy:     true,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 }
 
 type url string
@@ -541,78 +642,257 @@ var (
 	livezURL   url = "/livez"
 )
 
-func testProxierHealthUpdater(hs *ProxierHealthServer, hsTest *serverTest, fakeClock *testingclock.FakeClock, t *testing.T) {
+func testProxyHealthUpdater(hs *ProxyHealthServer, hsTest *serverTest, fakeClock *testingclock.FakeClock, nodeEligible *bool, t *testing.T) {
+	var expectedPayload ProxyHealth
+	// lastUpdated is used to track the time whenever any of the proxier update is simulated,
+	// is used in assertion of the http response.
+	var lastUpdated time.Time
+	var ipv4LastUpdated time.Time
+	var ipv6LastUpdated time.Time
+
 	// Should return 200 "OK" by default.
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" after first update for both IPv4 and IPv6 proxiers.
 	hs.Updated(v1.IPv4Protocol)
+	ipv4LastUpdated = fakeClock.Now()
 	hs.Updated(v1.IPv6Protocol)
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	ipv6LastUpdated = fakeClock.Now()
+	lastUpdated = fakeClock.Now()
+	// for backward-compatibility returned last_updated is current_time when proxy is healthy,
+	// using fakeClock.Now().String() instead of lastUpdated.String() here.
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should continue to return 200 "OK" as long as no further updates are queued for any proxier.
 	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	// for backward-compatibility returned last_updated is current_time when proxy is healthy,
+	// using fakeClock.Now().String() instead of lastUpdated.String() here.
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if IPv4 proxier exceed max update-processing time.
 	hs.QueuedUpdate(v1.IPv4Protocol)
 	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  lastUpdated,
+		Healthy:      false,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: false},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	// Should return 200 "OK" after processing update for both IPv4 and IPv6 proxiers.
 	hs.Updated(v1.IPv4Protocol)
+	ipv4LastUpdated = fakeClock.Now()
 	hs.Updated(v1.IPv6Protocol)
+	ipv6LastUpdated = fakeClock.Now()
+	lastUpdated = fakeClock.Now()
 	fakeClock.Step(5 * time.Second)
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	// for backward-compatibility returned last_updated is current_time when proxy is healthy,
+	// using fakeClock.Now().String() instead of lastUpdated.String() here.
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if IPv6 proxier exceed max update-processing time.
 	hs.QueuedUpdate(v1.IPv6Protocol)
 	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  lastUpdated,
+		Healthy:      false,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: false},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	// Should return 200 "OK" after processing update for both IPv4 and IPv6 proxiers.
 	hs.Updated(v1.IPv4Protocol)
+	ipv4LastUpdated = fakeClock.Now()
 	hs.Updated(v1.IPv6Protocol)
+	ipv6LastUpdated = fakeClock.Now()
+	lastUpdated = fakeClock.Now()
 	fakeClock.Step(5 * time.Second)
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	// for backward-compatibility returned last_updated is current_time when proxy is healthy,
+	// using fakeClock.Now().String() instead of lastUpdated.String() here.
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if both IPv4 and IPv6 proxiers exceed max update-processing time.
 	hs.QueuedUpdate(v1.IPv4Protocol)
 	hs.QueuedUpdate(v1.IPv6Protocol)
 	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  lastUpdated,
+		Healthy:      false,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: false},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: false},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	// Should return 200 "OK" after processing update for both IPv4 and IPv6 proxiers.
 	hs.Updated(v1.IPv4Protocol)
+	ipv4LastUpdated = fakeClock.Now()
 	hs.Updated(v1.IPv6Protocol)
+	ipv6LastUpdated = fakeClock.Now()
+	lastUpdated = fakeClock.Now()
 	fakeClock.Step(5 * time.Second)
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	// for backward-compatibility returned last_updated is current_time when proxy is healthy,
+	// using fakeClock.Now().String() instead of lastUpdated.String() here.
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// If IPv6 proxier is late for an update but IPv4 proxier is not then updating IPv4 proxier should have no effect.
 	hs.QueuedUpdate(v1.IPv6Protocol)
 	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  lastUpdated,
+		Healthy:      false,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: false},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	hs.Updated(v1.IPv4Protocol)
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+	ipv4LastUpdated = fakeClock.Now()
+	lastUpdated = fakeClock.Now()
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  lastUpdated,
+		Healthy:      false,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: false},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	hs.Updated(v1.IPv6Protocol)
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	ipv6LastUpdated = fakeClock.Now()
+	lastUpdated = fakeClock.Now()
+	// for backward-compatibility returned last_updated is current_time when proxy is healthy,
+	// using fakeClock.Now().String() instead of lastUpdated.String() here.
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// If both IPv4 and IPv6 proxiers are late for an update, we shouldn't report 200 "OK" until after both of them update.
 	hs.QueuedUpdate(v1.IPv4Protocol)
 	hs.QueuedUpdate(v1.IPv6Protocol)
 	fakeClock.Step(25 * time.Second)
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  lastUpdated,
+		Healthy:      false,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: false},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: false},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	hs.Updated(v1.IPv4Protocol)
-	testHTTPHandler(hsTest, http.StatusServiceUnavailable, t)
+	ipv4LastUpdated = fakeClock.Now()
 
 	hs.Updated(v1.IPv6Protocol)
-	testHTTPHandler(hsTest, http.StatusOK, t)
+	ipv6LastUpdated = fakeClock.Now()
+	// for backward-compatibility returned last_updated is current_time when proxy is healthy,
+	// using fakeClock.Now().String() instead of lastUpdated.String() here.
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: nodeEligible,
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: ipv4LastUpdated, Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: ipv6LastUpdated, Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 }
 
-func testHTTPHandler(hsTest *serverTest, status int, t *testing.T) {
+func testHTTPHandler(hsTest *serverTest, status int, expectedPayload ProxyHealth, t *testing.T) {
+	t.Helper()
 	handler := hsTest.server.(*fakeHTTPServer).handler
 	req, err := http.NewRequest("GET", string(hsTest.url), nil)
 	if err != nil {
@@ -625,9 +905,29 @@ func testHTTPHandler(hsTest *serverTest, status int, t *testing.T) {
 	if resp.Code != status {
 		t.Errorf("expected status code %v, got %v", status, resp.Code)
 	}
-	var payload healthzPayload
+	var payload ProxyHealth
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
+	}
+
+	// assert on payload
+	if !payload.LastUpdated.Equal(expectedPayload.LastUpdated) {
+		t.Errorf("expected last updated: %s; got: %s", expectedPayload.LastUpdated.String(), payload.LastUpdated.String())
+	}
+	if !payload.CurrentTime.Equal(expectedPayload.CurrentTime) {
+		t.Errorf("expected current time: %s; got: %s", expectedPayload.CurrentTime.String(), payload.CurrentTime.String())
+	}
+	if payload.Healthy != expectedPayload.Healthy {
+		t.Errorf("expected healthy: %v, got: %v", expectedPayload.Healthy, payload.Healthy)
+	}
+	// assert on individual proxier response
+	for ipFamily := range payload.Status {
+		if payload.Status[ipFamily].Healthy != expectedPayload.Status[ipFamily].Healthy {
+			t.Errorf("expected healthy[%s]: %v, got: %v", ipFamily, expectedPayload.Status[ipFamily].Healthy, payload.Status[ipFamily].Healthy)
+		}
+		if !payload.Status[ipFamily].LastUpdated.Equal(expectedPayload.Status[ipFamily].LastUpdated) {
+			t.Errorf("expected last updated[%s]: %s; got: %s", ipFamily, expectedPayload.Status[ipFamily].LastUpdated.String(), payload.Status[ipFamily].LastUpdated.String())
+		}
 	}
 
 	if status == http.StatusOK {
@@ -637,10 +937,16 @@ func testHTTPHandler(hsTest *serverTest, status int, t *testing.T) {
 		hsTest.tracking503++
 	}
 	if hsTest.url == healthzURL {
+		if *payload.NodeEligible != *expectedPayload.NodeEligible {
+			t.Errorf("expected node eligible: %v; got: %v", *payload.NodeEligible, *expectedPayload.NodeEligible)
+		}
 		testMetricEquals(metrics.ProxyHealthzTotal.WithLabelValues("200"), float64(hsTest.tracking200), t)
 		testMetricEquals(metrics.ProxyHealthzTotal.WithLabelValues("503"), float64(hsTest.tracking503), t)
 	}
 	if hsTest.url == livezURL {
+		if payload.NodeEligible != nil {
+			t.Errorf("expected node eligible nil for %s response", livezURL)
+		}
 		testMetricEquals(metrics.ProxyLivezTotal.WithLabelValues("200"), float64(hsTest.tracking200), t)
 		testMetricEquals(metrics.ProxyLivezTotal.WithLabelValues("503"), float64(hsTest.tracking503), t)
 	}
@@ -660,7 +966,7 @@ func testMetricEquals(metric basemetrics.CounterMetric, expected float64, t *tes
 func TestServerWithSelectiveListeningAddress(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
-	proxyChecker := &fakeProxierHealthChecker{true}
+	proxyChecker := &fakeProxyHealthChecker{true}
 
 	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine

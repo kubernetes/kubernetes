@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
@@ -99,7 +98,7 @@ func fieldsHaveProtobufTags(obj reflect.Type) error {
 
 func TestProtobufRoundTrip(t *testing.T) {
 	obj := &v1.Pod{}
-	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs).Fuzz(obj)
+	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs).Fill(obj)
 	// InitContainers are turned into annotations by conversion.
 	obj.Spec.InitContainers = nil
 	obj.Status.InitContainerStatuses = nil
@@ -225,7 +224,7 @@ func BenchmarkDecodeCodecToInternalProtobuf(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
+// BenchmarkDecodeIntoProtobuf provides a baseline for regular protobuf decode performance
 func BenchmarkDecodeIntoProtobuf(b *testing.B) {
 	items := benchmarkItems(b)
 	width := len(items)
@@ -237,14 +236,16 @@ func BenchmarkDecodeIntoProtobuf(b *testing.B) {
 		}
 		encoded[i] = data
 		validate := &v1.Pod{}
-		if err := proto.Unmarshal(data, validate); err != nil {
+		validate.Reset() // decode normally resets internally
+		if err := validate.Unmarshal(data); err != nil {
 			b.Fatalf("Failed to unmarshal %d: %v\n%#v", i, err, items[i])
 		}
 	}
 
 	for i := 0; i < b.N; i++ {
-		obj := v1.Pod{}
-		if err := proto.Unmarshal(encoded[i%width], &obj); err != nil {
+		obj := &v1.Pod{}
+		obj.Reset() // decode normally resets internally
+		if err := obj.Unmarshal(encoded[i%width]); err != nil {
 			b.Fatal(err)
 		}
 	}

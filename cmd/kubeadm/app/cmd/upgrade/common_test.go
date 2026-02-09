@@ -30,7 +30,6 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 const testConfigToken = `apiVersion: v1
@@ -47,7 +46,6 @@ contexts:
   name: default
 current-context: default
 kind: Config
-preferences: {}
 users:
 - name: kubernetes-admin
   user:
@@ -55,8 +53,7 @@ users:
 `
 
 func TestEnforceRequirements(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	fullPath := filepath.Join(tmpDir, "test-config-file")
 	f, err := os.Create(fullPath)
 	if err != nil {
@@ -79,8 +76,8 @@ func TestEnforceRequirements(t *testing.T) {
 			flags: applyPlanFlags{
 				kubeConfigPath: fullPath,
 			},
-			expectedErr:        "ERROR CoreDNSUnsupportedPlugins",
-			expectedErrNonRoot: "user is not running as", // user is not running as (root || administrator)
+			expectedErr:        "preflight checks failed",
+			expectedErrNonRoot: "preflight checks failed",
 		},
 		{
 			name: "Bogus preflight check specify all with individual check",

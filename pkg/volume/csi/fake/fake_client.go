@@ -31,7 +31,8 @@ import (
 
 const (
 	// NodePublishTimeOut_VolumeID is volume id that will result in NodePublish operation to timeout
-	NodePublishTimeOut_VolumeID = "node-publish-timeout"
+	NodePublishTimeOut_VolumeID    = "node-publish-timeout"
+	NodePublishFinalError_VolumeID = "node-publish-final-error"
 
 	// NodeStageTimeOut_VolumeID is a volume id that will result in NodeStage operation to timeout
 	NodeStageTimeOut_VolumeID = "node-stage-timeout"
@@ -80,12 +81,15 @@ type NodeClient struct {
 	expansionSet             bool
 	volumeStatsSet           bool
 	volumeConditionSet       bool
+	SetVolumeStats           bool
+	SetVolumecondition       bool
 	singleNodeMultiWriterSet bool
 	volumeMountGroupSet      bool
 	nodeGetInfoResp          *csipb.NodeGetInfoResponse
 	nodeVolumeStatsResp      *csipb.NodeGetVolumeStatsResponse
 	FakeNodeExpansionRequest *csipb.NodeExpandVolumeRequest
 	nextErr                  error
+	getCapabilitiesErr       error
 }
 
 // NewNodeClient returns fake node client
@@ -110,13 +114,16 @@ func NewNodeClientWithExpansion(stageUnstageSet bool, expansionSet bool) *NodeCl
 func NewNodeClientWithVolumeStats(volumeStatsSet bool) *NodeClient {
 	return &NodeClient{
 		volumeStatsSet: volumeStatsSet,
+		SetVolumeStats: true,
 	}
 }
 
-func NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet bool) *NodeClient {
+func NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet, setVolumeStats, setVolumeCondition bool) *NodeClient {
 	return &NodeClient{
 		volumeStatsSet:     volumeStatsSet,
 		volumeConditionSet: volumeConditionSet,
+		SetVolumeStats:     setVolumeStats,
+		SetVolumecondition: setVolumeCondition,
 	}
 }
 
@@ -142,6 +149,10 @@ func NewNodeClientWithVolumeMountGroup(stageUnstageSet, volumeMountGroupSet bool
 // SetNextError injects next expected error
 func (f *NodeClient) SetNextError(err error) {
 	f.nextErr = err
+}
+
+func (f *NodeClient) SetGetCapabilitiesErr(err error) {
+	f.getCapabilitiesErr = err
 }
 
 func (f *NodeClient) SetNodeGetInfoResp(resp *csipb.NodeGetInfoResponse) {
@@ -199,6 +210,10 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 	if req.GetVolumeId() == NodePublishTimeOut_VolumeID {
 		timeoutErr := status.Errorf(codes.DeadlineExceeded, "timeout exceeded")
 		return nil, timeoutErr
+	}
+
+	if req.GetVolumeId() == NodePublishFinalError_VolumeID {
+		return nil, status.Errorf(codes.Internal, "final error")
 	}
 
 	// "Creation of target_path is the responsibility of the SP."
@@ -344,6 +359,10 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 	resp := &csipb.NodeGetCapabilitiesResponse{
 		Capabilities: []*csipb.NodeServiceCapability{},
 	}
+	if f.getCapabilitiesErr != nil {
+		return resp, f.getCapabilitiesErr
+	}
+
 	if f.stageUnstageSet {
 		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
 			Type: &csipb.NodeServiceCapability_Rpc{

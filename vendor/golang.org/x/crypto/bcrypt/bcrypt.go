@@ -4,7 +4,7 @@
 
 // Package bcrypt implements Provos and Mazières's bcrypt adaptive hashing
 // algorithm. See http://www.usenix.org/event/usenix99/provos/provos.pdf
-package bcrypt // import "golang.org/x/crypto/bcrypt"
+package bcrypt
 
 // The code is a port of Provos and Mazières's C implementation.
 import (
@@ -50,7 +50,7 @@ func (ih InvalidHashPrefixError) Error() string {
 type InvalidCostError int
 
 func (ic InvalidCostError) Error() string {
-	return fmt.Sprintf("crypto/bcrypt: cost %d is outside allowed range (%d,%d)", int(ic), MinCost, MaxCost)
+	return fmt.Sprintf("crypto/bcrypt: cost %d is outside allowed inclusive range %d..%d", int(ic), MinCost, MaxCost)
 }
 
 const (

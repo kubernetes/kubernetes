@@ -22,6 +22,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -40,7 +41,7 @@ var uidSetKeyFunc = func(obj interface{}) (string, error) {
 // uidTrackingExpectations to remember which UID it has seen/still waiting for.
 type uidSet struct {
 	sync.RWMutex
-	set sets.Set[string]
+	set sets.Set[types.UID]
 	key string
 }
 
@@ -60,7 +61,7 @@ func (u *uidTrackingExpectations) getSet(controllerKey string) *uidSet {
 	return nil
 }
 
-func (u *uidTrackingExpectations) getExpectedUIDs(controllerKey string) sets.Set[string] {
+func (u *uidTrackingExpectations) getExpectedUIDs(controllerKey string) sets.Set[types.UID] {
 	uids := u.getSet(controllerKey)
 	if uids == nil {
 		return nil
@@ -74,14 +75,14 @@ func (u *uidTrackingExpectations) getExpectedUIDs(controllerKey string) sets.Set
 // ExpectDeletions records expectations for the given deleteKeys, against the
 // given job-key.
 // This is thread-safe across different job keys.
-func (u *uidTrackingExpectations) expectFinalizersRemoved(logger klog.Logger, jobKey string, deletedKeys []string) error {
+func (u *uidTrackingExpectations) expectFinalizersRemoved(logger klog.Logger, jobKey string, deletedKeys []types.UID) error {
 	logger.V(4).Info("Expecting tracking finalizers removed", "key", jobKey, "podUIDs", deletedKeys)
 
 	uids := u.getSet(jobKey)
 	if uids == nil {
 		uids = &uidSet{
 			key: jobKey,
-			set: sets.New[string](),
+			set: sets.New[types.UID](),
 		}
 		if err := u.store.Add(uids); err != nil {
 			return err
@@ -94,7 +95,7 @@ func (u *uidTrackingExpectations) expectFinalizersRemoved(logger klog.Logger, jo
 }
 
 // FinalizerRemovalObserved records the given deleteKey as a deletion, for the given job.
-func (u *uidTrackingExpectations) finalizerRemovalObserved(logger klog.Logger, jobKey, deleteKey string) {
+func (u *uidTrackingExpectations) finalizerRemovalObserved(logger klog.Logger, jobKey string, deleteKey types.UID) {
 	uids := u.getSet(jobKey)
 	if uids != nil {
 		uids.Lock()

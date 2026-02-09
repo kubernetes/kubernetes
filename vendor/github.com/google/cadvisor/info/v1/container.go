@@ -261,6 +261,26 @@ func (ci *ContainerInfo) StatsEndTime() time.Time {
 	return ret
 }
 
+// PSI statistics for an individual resource.
+type PSIStats struct {
+	// PSI data for all tasks of in the cgroup.
+	Full PSIData `json:"full,omitempty"`
+	// PSI data for some tasks in the cgroup.
+	Some PSIData `json:"some,omitempty"`
+}
+
+type PSIData struct {
+	// Total time duration for tasks in the cgroup have waited due to congestion.
+	// Unit: nanoseconds.
+	Total uint64 `json:"total"`
+	// The average (in %) tasks have waited due to congestion over a 10 second window.
+	Avg10 float64 `json:"avg10"`
+	// The average (in %) tasks have waited due to congestion over a 60 second window.
+	Avg60 float64 `json:"avg60"`
+	// The average (in %) tasks have waited due to congestion over a 300 second window.
+	Avg300 float64 `json:"avg300"`
+}
+
 // This mirrors kernel internal structure.
 type LoadStats struct {
 	// Number of sleeping tasks.
@@ -309,6 +329,13 @@ type CpuCFS struct {
 	// Total time duration for which tasks in the cgroup have been throttled.
 	// Unit: nanoseconds.
 	ThrottledTime uint64 `json:"throttled_time"`
+
+	// Total number of periods when CPU burst occurs.
+	BurstsPeriods uint64 `json:"bursts_periods"`
+
+	// Total time duration when CPU burst occurs.
+	// Unit: nanoseconds.
+	BurstTime uint64 `json:"burst_time"`
 }
 
 // Cpu Aggregated scheduler statistics
@@ -333,6 +360,9 @@ type CpuStats struct {
 	// Load is smoothed over the last 10 seconds. Instantaneous value can be read
 	// from LoadStats.NrRunning.
 	LoadAverage int32 `json:"load_average"`
+	// from LoadStats.NrUninterruptible
+	LoadDAverage int32    `json:"load_d_average"`
+	PSI          PSIStats `json:"psi"`
 }
 
 type PerDiskStats struct {
@@ -351,6 +381,11 @@ type DiskIoStats struct {
 	IoWaitTime     []PerDiskStats `json:"io_wait_time,omitempty"`
 	IoMerged       []PerDiskStats `json:"io_merged,omitempty"`
 	IoTime         []PerDiskStats `json:"io_time,omitempty"`
+	IoCostUsage    []PerDiskStats `json:"io_cost_usage,omitempty"`
+	IoCostWait     []PerDiskStats `json:"io_cost_wait,omitempty"`
+	IoCostIndebt   []PerDiskStats `json:"io_cost_indebt,omitempty"`
+	IoCostIndelay  []PerDiskStats `json:"io_cost_indelay,omitempty"`
+	PSI            PSIStats       `json:"psi"`
 }
 
 type HugetlbStats struct {
@@ -393,6 +428,14 @@ type MemoryStats struct {
 	// Units: Bytes.
 	WorkingSet uint64 `json:"working_set"`
 
+	// The total amount of active file memory.
+	// Units: Bytes.
+	TotalActiveFile uint64 `json:"total_active_file"`
+
+	// The total amount of inactive file memory.
+	// Units: Bytes.
+	TotalInactiveFile uint64 `json:"total_inactive_file"`
+
 	Failcnt uint64 `json:"failcnt"`
 
 	// Size of kernel memory allocated in bytes.
@@ -401,6 +444,8 @@ type MemoryStats struct {
 
 	ContainerData    MemoryStatsMemoryData `json:"container_data,omitempty"`
 	HierarchicalData MemoryStatsMemoryData `json:"hierarchical_data,omitempty"`
+
+	PSI PSIStats `json:"psi"`
 }
 
 type CPUSetStats struct {
@@ -629,7 +674,7 @@ type TcpAdvancedStat struct {
 	// The number of retransmits failed, including FastRetrans, SlowStartRetrans
 	TCPRetransFail uint64
 
-	// he number of packets collapsed in receive queue due to low socket buffer
+	// The number of packets collapsed in receive queue due to low socket buffer
 	TCPRcvCollapsed uint64
 	// The number of DSACKs sent for old packets
 	TCPDSACKOldSent uint64
@@ -930,6 +975,11 @@ type ProcessStats struct {
 	Ulimits []UlimitSpec `json:"ulimits,omitempty"`
 }
 
+type Health struct {
+	// Health status of the container
+	Status string `json:"status"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time               `json:"timestamp"`
@@ -969,6 +1019,8 @@ type ContainerStats struct {
 	CpuSet CPUSetStats `json:"cpuset,omitempty"`
 
 	OOMEvents uint64 `json:"oom_events,omitempty"`
+
+	Health Health `json:"health,omitempty"`
 }
 
 func timeEq(t1, t2 time.Time, tolerance time.Duration) bool {
@@ -1063,6 +1115,9 @@ const (
 type EventData struct {
 	// Information about an OOM kill event.
 	OomKill *OomKillEventData `json:"oom,omitempty"`
+
+	// Information about a container deletion event.
+	ContainerDeletion *ContainerDeletionEventData `json:"container_deletion,omitempty"`
 }
 
 // Information related to an OOM kill instance
@@ -1072,4 +1127,11 @@ type OomKillEventData struct {
 
 	// The name of the killed process
 	ProcessName string `json:"process_name"`
+}
+
+// Information related to a container deletion event
+type ContainerDeletionEventData struct {
+	// ExitCode is the exit code of the container.
+	// A value of -1 indicates the exit code was not available or not applicable.
+	ExitCode int `json:"exit_code"`
 }

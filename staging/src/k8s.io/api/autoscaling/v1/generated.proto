@@ -202,9 +202,13 @@ message HorizontalPodAutoscalerSpec {
   // metric is configured.  Scaling is active as long as at least one metric value is
   // available.
   // +optional
+  // +k8s:optional
   optional int32 minReplicas = 2;
 
   // maxReplicas is the upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
+  // +required
+  // +k8s:required
+  // +k8s:minimum=1
   optional int32 maxReplicas = 3;
 
   // targetCPUUtilizationPercentage is the target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
@@ -241,8 +245,6 @@ message HorizontalPodAutoscalerStatus {
 message MetricSpec {
   // type is the type of metric source.  It should be one of "ContainerResource",
   // "External", "Object", "Pods" or "Resource", each mapping to a matching field in the object.
-  // Note: "ContainerResource" type is available on when the feature-gate
-  // HPAContainerMetrics is enabled
   optional string type = 1;
 
   // object refers to a metric describing a single kubernetes object
@@ -269,7 +271,6 @@ message MetricSpec {
   // current scale target (e.g. CPU or memory). Such metrics are built in to
   // Kubernetes, and have special scaling options on top of those available
   // to normal per-pod metrics using the "pods" source.
-  // This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
   // +optional
   optional ContainerResourceMetricSource containerResource = 7;
 
@@ -286,8 +287,6 @@ message MetricSpec {
 message MetricStatus {
   // type is the type of metric source.  It will be one of "ContainerResource",
   // "External", "Object", "Pods" or "Resource", each corresponds to a matching field in the object.
-  // Note: "ContainerResource" type is available on when the feature-gate
-  // HPAContainerMetrics is enabled
   optional string type = 1;
 
   // object refers to a metric describing a single kubernetes object
@@ -477,6 +476,9 @@ message Scale {
 message ScaleSpec {
   // replicas is the desired number of instances for the scaled object.
   // +optional
+  // +k8s:optional
+  // +default=0
+  // +k8s:minimum=0
   optional int32 replicas = 1;
 }
 

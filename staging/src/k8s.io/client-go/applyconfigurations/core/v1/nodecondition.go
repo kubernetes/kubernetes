@@ -19,19 +19,27 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NodeConditionApplyConfiguration represents a declarative configuration of the NodeCondition type for use
 // with apply.
+//
+// NodeCondition contains condition information for a node.
 type NodeConditionApplyConfiguration struct {
-	Type               *v1.NodeConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus   `json:"status,omitempty"`
-	LastHeartbeatTime  *metav1.Time          `json:"lastHeartbeatTime,omitempty"`
-	LastTransitionTime *metav1.Time          `json:"lastTransitionTime,omitempty"`
-	Reason             *string               `json:"reason,omitempty"`
-	Message            *string               `json:"message,omitempty"`
+	// Type of node condition.
+	Type *corev1.NodeConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// Last time we got an update on a given condition.
+	LastHeartbeatTime *metav1.Time `json:"lastHeartbeatTime,omitempty"`
+	// Last time the condition transit from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// (brief) reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// Human readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // NodeConditionApplyConfiguration constructs a declarative configuration of the NodeCondition type for use with
@@ -43,7 +51,7 @@ func NodeCondition() *NodeConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *NodeConditionApplyConfiguration) WithType(value v1.NodeConditionType) *NodeConditionApplyConfiguration {
+func (b *NodeConditionApplyConfiguration) WithType(value corev1.NodeConditionType) *NodeConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -51,7 +59,7 @@ func (b *NodeConditionApplyConfiguration) WithType(value v1.NodeConditionType) *
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *NodeConditionApplyConfiguration) WithStatus(value v1.ConditionStatus) *NodeConditionApplyConfiguration {
+func (b *NodeConditionApplyConfiguration) WithStatus(value corev1.ConditionStatus) *NodeConditionApplyConfiguration {
 	b.Status = &value
 	return b
 }

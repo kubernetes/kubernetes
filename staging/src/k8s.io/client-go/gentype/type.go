@@ -18,18 +18,15 @@ package gentype
 
 import (
 	"context"
-	json "encoding/json"
 	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
-	"k8s.io/client-go/util/consistencydetector"
-	"k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/apply"
 )
 
 // objectWithMeta matches objects implementing both runtime.Object and metav1.Object.
@@ -51,6 +48,8 @@ type Client[T objectWithMeta] struct {
 	namespace      string // "" for non-namespaced clients
 	newObject      func() T
 	parameterCodec runtime.ParameterCodec
+
+	prefersProtobuf bool
 }
 
 // ClientWithList represents a client with support for lists.
@@ -82,26 +81,37 @@ type alsoApplier[T objectWithMeta, C namedObject] struct {
 	client *Client[T]
 }
 
+type Option[T objectWithMeta] func(*Client[T])
+
+func PrefersProtobuf[T objectWithMeta]() Option[T] {
+	return func(c *Client[T]) { c.prefersProtobuf = true }
+}
+
 // NewClient constructs a client, namespaced or not, with no support for lists or apply.
 // Non-namespaced clients are constructed by passing an empty namespace ("").
 func NewClient[T objectWithMeta](
 	resource string, client rest.Interface, parameterCodec runtime.ParameterCodec, namespace string, emptyObjectCreator func() T,
+	options ...Option[T],
 ) *Client[T] {
-	return &Client[T]{
+	c := &Client[T]{
 		resource:       resource,
 		client:         client,
 		parameterCodec: parameterCodec,
 		namespace:      namespace,
 		newObject:      emptyObjectCreator,
 	}
+	for _, option := range options {
+		option(c)
+	}
+	return c
 }
 
 // NewClientWithList constructs a namespaced client with support for lists.
 func NewClientWithList[T objectWithMeta, L runtime.Object](
 	resource string, client rest.Interface, parameterCodec runtime.ParameterCodec, namespace string, emptyObjectCreator func() T,
-	emptyListCreator func() L,
+	emptyListCreator func() L, options ...Option[T],
 ) *ClientWithList[T, L] {
-	typeClient := NewClient[T](resource, client, parameterCodec, namespace, emptyObjectCreator)
+	typeClient := NewClient[T](resource, client, parameterCodec, namespace, emptyObjectCreator, options...)
 	return &ClientWithList[T, L]{
 		typeClient,
 		alsoLister[T, L]{typeClient, emptyListCreator},
@@ -111,8 +121,9 @@ func NewClientWithList[T objectWithMeta, L runtime.Object](
 // NewClientWithApply constructs a namespaced client with support for apply declarative configurations.
 func NewClientWithApply[T objectWithMeta, C namedObject](
 	resource string, client rest.Interface, parameterCodec runtime.ParameterCodec, namespace string, emptyObjectCreator func() T,
+	options ...Option[T],
 ) *ClientWithApply[T, C] {
-	typeClient := NewClient[T](resource, client, parameterCodec, namespace, emptyObjectCreator)
+	typeClient := NewClient[T](resource, client, parameterCodec, namespace, emptyObjectCreator, options...)
 	return &ClientWithApply[T, C]{
 		typeClient,
 		alsoApplier[T, C]{typeClient},
@@ -122,9 +133,9 @@ func NewClientWithApply[T objectWithMeta, C namedObject](
 // NewClientWithListAndApply constructs a client with support for lists and applying declarative configurations.
 func NewClientWithListAndApply[T objectWithMeta, L runtime.Object, C namedObject](
 	resource string, client rest.Interface, parameterCodec runtime.ParameterCodec, namespace string, emptyObjectCreator func() T,
-	emptyListCreator func() L,
+	emptyListCreator func() L, options ...Option[T],
 ) *ClientWithListAndApply[T, L, C] {
-	typeClient := NewClient[T](resource, client, parameterCodec, namespace, emptyObjectCreator)
+	typeClient := NewClient[T](resource, client, parameterCodec, namespace, emptyObjectCreator, options...)
 	return &ClientWithListAndApply[T, L, C]{
 		typeClient,
 		alsoLister[T, L]{typeClient, emptyListCreator},
@@ -146,6 +157,7 @@ func (c *Client[T]) GetNamespace() string {
 func (c *Client[T]) Get(ctx context.Context, name string, options metav1.GetOptions) (T, error) {
 	result := c.newObject()
 	err := c.client.Get().
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
 		Name(name).
@@ -157,30 +169,13 @@ func (c *Client[T]) Get(ctx context.Context, name string, options metav1.GetOpti
 
 // List takes label and field selectors, and returns the list of resources that match those selectors.
 func (l *alsoLister[T, L]) List(ctx context.Context, opts metav1.ListOptions) (L, error) {
-	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for $.type|resource$, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
-	} else if hasWatchListOptionsPrepared {
-		result, err := l.watchList(ctx, watchListOptions)
-		if err == nil {
-			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for "+l.client.resource, l.list, opts, result)
-			return result, nil
-		}
-		klog.Warningf("The watchlist request for %s ended with an error, falling back to the standard LIST semantics, err = %v", l.client.resource, err)
-	}
-	result, err := l.list(ctx, opts)
-	if err == nil {
-		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for "+l.client.resource, l.list, opts, result)
-	}
-	return result, err
-}
-
-func (l *alsoLister[T, L]) list(ctx context.Context, opts metav1.ListOptions) (L, error) {
 	list := l.newList()
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
 	err := l.client.client.Get().
+		UseProtobufAsDefaultIfPreferred(l.client.prefersProtobuf).
 		NamespaceIfScoped(l.client.namespace, l.client.namespace != "").
 		Resource(l.client.resource).
 		VersionedParams(&opts, l.client.parameterCodec).
@@ -188,23 +183,6 @@ func (l *alsoLister[T, L]) list(ctx context.Context, opts metav1.ListOptions) (L
 		Do(ctx).
 		Into(list)
 	return list, err
-}
-
-// watchList establishes a watch stream with the server and returns the list of resources.
-func (l *alsoLister[T, L]) watchList(ctx context.Context, opts metav1.ListOptions) (result L, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = l.newList()
-	err = l.client.client.Get().
-		NamespaceIfScoped(l.client.namespace, l.client.namespace != "").
-		Resource(l.client.resource).
-		VersionedParams(&opts, l.client.parameterCodec).
-		Timeout(timeout).
-		WatchList(ctx).
-		Into(result)
-	return
 }
 
 // Watch returns a watch.Interface that watches the requested resources.
@@ -215,6 +193,7 @@ func (c *Client[T]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 	}
 	opts.Watch = true
 	return c.client.Get().
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
 		VersionedParams(&opts, c.parameterCodec).
@@ -226,6 +205,7 @@ func (c *Client[T]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 func (c *Client[T]) Create(ctx context.Context, obj T, opts metav1.CreateOptions) (T, error) {
 	result := c.newObject()
 	err := c.client.Post().
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
 		VersionedParams(&opts, c.parameterCodec).
@@ -239,6 +219,7 @@ func (c *Client[T]) Create(ctx context.Context, obj T, opts metav1.CreateOptions
 func (c *Client[T]) Update(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
 	result := c.newObject()
 	err := c.client.Put().
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
 		Name(obj.GetName()).
@@ -253,6 +234,7 @@ func (c *Client[T]) Update(ctx context.Context, obj T, opts metav1.UpdateOptions
 func (c *Client[T]) UpdateStatus(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
 	result := c.newObject()
 	err := c.client.Put().
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
 		Name(obj.GetName()).
@@ -267,6 +249,7 @@ func (c *Client[T]) UpdateStatus(ctx context.Context, obj T, opts metav1.UpdateO
 // Delete takes name of the resource and deletes it. Returns an error if one occurs.
 func (c *Client[T]) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
 		Name(name).
@@ -282,6 +265,7 @@ func (l *alsoLister[T, L]) DeleteCollection(ctx context.Context, opts metav1.Del
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return l.client.client.Delete().
+		UseProtobufAsDefaultIfPreferred(l.client.prefersProtobuf).
 		NamespaceIfScoped(l.client.namespace, l.client.namespace != "").
 		Resource(l.client.resource).
 		VersionedParams(&listOpts, l.client.parameterCodec).
@@ -295,6 +279,7 @@ func (l *alsoLister[T, L]) DeleteCollection(ctx context.Context, opts metav1.Del
 func (c *Client[T]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (T, error) {
 	result := c.newObject()
 	err := c.client.Patch(pt).
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
 		Name(name).
@@ -313,47 +298,50 @@ func (a *alsoApplier[T, C]) Apply(ctx context.Context, obj C, opts metav1.ApplyO
 		return *new(T), fmt.Errorf("object provided to Apply must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return *new(T), err
-	}
 	if obj.GetName() == nil {
 		return *new(T), fmt.Errorf("obj.Name must be provided to Apply")
 	}
-	err = a.client.client.Patch(types.ApplyPatchType).
+
+	request, err := apply.NewRequest(a.client.client, obj)
+	if err != nil {
+		return *new(T), err
+	}
+
+	err = request.
+		UseProtobufAsDefaultIfPreferred(a.client.prefersProtobuf).
 		NamespaceIfScoped(a.client.namespace, a.client.namespace != "").
 		Resource(a.client.resource).
 		Name(*obj.GetName()).
 		VersionedParams(&patchOpts, a.client.parameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return result, err
 }
 
-// Apply takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
+// ApplyStatus takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
 func (a *alsoApplier[T, C]) ApplyStatus(ctx context.Context, obj C, opts metav1.ApplyOptions) (T, error) {
 	if obj == *new(C) {
 		return *new(T), fmt.Errorf("object provided to Apply must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return *new(T), err
-	}
 
 	if obj.GetName() == nil {
 		return *new(T), fmt.Errorf("obj.Name must be provided to Apply")
 	}
 
+	request, err := apply.NewRequest(a.client.client, obj)
+	if err != nil {
+		return *new(T), err
+	}
+
 	result := a.client.newObject()
-	err = a.client.client.Patch(types.ApplyPatchType).
+	err = request.
+		UseProtobufAsDefaultIfPreferred(a.client.prefersProtobuf).
 		NamespaceIfScoped(a.client.namespace, a.client.namespace != "").
 		Resource(a.client.resource).
 		Name(*obj.GetName()).
 		SubResource("status").
 		VersionedParams(&patchOpts, a.client.parameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return result, err

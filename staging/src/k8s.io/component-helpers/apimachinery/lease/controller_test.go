@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -72,8 +72,8 @@ func TestNewNodeLease(t *testing.T) {
 					Namespace: corev1.NamespaceNodeLease,
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To(node.Name),
+					LeaseDurationSeconds: ptr.To[int32](10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},
 			},
@@ -102,8 +102,8 @@ func TestNewNodeLease(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To(node.Name),
+					LeaseDurationSeconds: ptr.To[int32](10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},
 			},
@@ -122,8 +122,8 @@ func TestNewNodeLease(t *testing.T) {
 					Namespace: corev1.NamespaceNodeLease,
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To(node.Name),
+					LeaseDurationSeconds: ptr.To[int32](10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-10 * time.Second)},
 				},
 			},
@@ -141,8 +141,8 @@ func TestNewNodeLease(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To(node.Name),
+					LeaseDurationSeconds: ptr.To[int32](10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},
 			},
@@ -169,8 +169,8 @@ func TestNewNodeLease(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To(node.Name),
+					LeaseDurationSeconds: ptr.To[int32](10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-10 * time.Second)},
 				},
 			},
@@ -188,8 +188,55 @@ func TestNewNodeLease(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
-					LeaseDurationSeconds: pointer.Int32Ptr(10),
+					HolderIdentity:       ptr.To(node.Name),
+					LeaseDurationSeconds: ptr.To[int32](10),
+					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
+				},
+			},
+		},
+		{
+			desc: "non-nil base with owner ref, lease duration is updated",
+			controller: &controller{
+				client:               fake.NewSimpleClientset(node),
+				holderIdentity:       node.Name,
+				leaseDurationSeconds: 456,
+				clock:                fakeClock,
+			},
+			base: &coordinationv1.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      node.Name,
+					Namespace: corev1.NamespaceNodeLease,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
+							Kind:       corev1.SchemeGroupVersion.WithKind("Node").Kind,
+							Name:       node.Name,
+							UID:        node.UID,
+						},
+					},
+				},
+				Spec: coordinationv1.LeaseSpec{
+					HolderIdentity:       ptr.To(node.Name),
+					LeaseDurationSeconds: ptr.To[int32](123),
+					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-10 * time.Second)},
+				},
+			},
+			expect: &coordinationv1.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      node.Name,
+					Namespace: corev1.NamespaceNodeLease,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
+							Kind:       corev1.SchemeGroupVersion.WithKind("Node").Kind,
+							Name:       node.Name,
+							UID:        node.UID,
+						},
+					},
+				},
+				Spec: coordinationv1.LeaseSpec{
+					HolderIdentity:       ptr.To(node.Name),
+					LeaseDurationSeconds: ptr.To[int32](456),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},
 			},

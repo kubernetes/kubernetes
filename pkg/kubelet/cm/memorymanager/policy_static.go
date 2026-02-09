@@ -18,7 +18,6 @@ package memorymanager
 
 import (
 	"fmt"
-	"reflect"
 	"sort"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -26,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corehelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -35,10 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-const policyTypeStatic policyType = "Static"
+const PolicyTypeStatic policyType = "Static"
 
 type systemReservedMemory map[int]map[v1.ResourceName]uint64
 type reusableMemory map[string]map[string]map[v1.ResourceName]uint64
@@ -61,7 +60,7 @@ type staticPolicy struct {
 var _ Policy = &staticPolicy{}
 
 // NewPolicyStatic returns new static policy instance
-func NewPolicyStatic(machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
+func NewPolicyStatic(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
 	var totalSystemReserved uint64
 	for _, node := range reserved {
 		if _, ok := node[v1.ResourceMemory]; !ok {
@@ -84,26 +83,34 @@ func NewPolicyStatic(machineInfo *cadvisorapi.MachineInfo, reserved systemReserv
 }
 
 func (p *staticPolicy) Name() string {
-	return string(policyTypeStatic)
+	return string(PolicyTypeStatic)
 }
 
-func (p *staticPolicy) Start(s state.State) error {
-	if err := p.validateState(s); err != nil {
-		klog.ErrorS(err, "Invalid state, please drain node and remove policy state file")
+func (p *staticPolicy) Start(logger klog.Logger, s state.State) error {
+	if err := p.validateState(logger, s); err != nil {
+		logger.Error(err, "Invalid state, please drain node and remove policy state file")
 		return err
 	}
 	return nil
 }
 
 // Allocate call is idempotent
-func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	// allocate the memory only for guaranteed pods
-	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "containerName", container.Name)
+	qos := v1qos.GetPodQOS(pod)
+	if qos != v1.PodQOSGuaranteed {
+		logger.V(5).Info("Exclusive memory allocation skipped, pod QoS is not guaranteed", "qos", qos)
 		return nil
 	}
 
 	podUID := string(pod.UID)
-	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		logger.V(2).Info("Allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", podUID)
+		return nil
+	}
+
+	logger.Info("Allocate")
 	// container belongs in an exclusively allocated pool
 	metrics.MemoryManagerPinningRequestTotal.Inc()
 	defer func() {
@@ -114,13 +121,13 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	if blocks := s.GetMemoryBlocks(podUID, container.Name); blocks != nil {
 		p.updatePodReusableMemory(pod, container, blocks)
 
-		klog.InfoS("Container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
+		logger.Info("Container already present in state, skipping")
 		return nil
 	}
 
 	// Call Topology Manager to get the aligned affinity across all hint providers.
 	hint := p.affinity.GetAffinity(podUID, container.Name)
-	klog.InfoS("Got topology affinity", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "hint", hint)
+	logger.Info("Got topology affinity", "hint", hint)
 
 	requestedResources, err := getRequestedResources(pod, container)
 	if err != nil {
@@ -157,6 +164,13 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		bestHint = extendedHint
 	}
 
+	// the best hint might violate the NUMA allocation rule on which
+	// NUMA node cannot have both single and cross NUMA node allocations
+	// https://kubernetes.io/blog/2021/08/11/kubernetes-1-22-feature-memory-manager-moves-to-beta/#single-vs-cross-numa-node-allocation
+	if isAffinityViolatingNUMAAllocations(machineState, bestHint.NUMANodeAffinity) {
+		return fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")
+	}
+
 	var containerBlocks []state.Block
 	maskBits := bestHint.NUMANodeAffinity.GetBits()
 	for resourceName, requestedSize := range requestedResources {
@@ -189,8 +203,9 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	// we only do this so that the sum(memory_for_all_containers) == total amount of allocated memory to the pod, even
 	// though the final state here doesn't accurately reflect what was (in reality) allocated to each container
 	// TODO: we should refactor our state structs to reflect the amount of the re-used memory
-	p.updateInitContainersMemoryBlocks(s, pod, container, containerBlocks)
+	p.updateInitContainersMemoryBlocks(logger, s, pod, container, containerBlocks)
 
+	logger.V(4).Info("Allocated exclusive memory")
 	return nil
 }
 
@@ -240,13 +255,15 @@ func (p *staticPolicy) getPodReusableMemory(pod *v1.Pod, numaAffinity bitmask.Bi
 }
 
 // RemoveContainer call is idempotent
-func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) {
+func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string) {
+	logger = klog.LoggerWithValues(logger, "podUID", podUID, "containerName", containerName)
+
 	blocks := s.GetMemoryBlocks(podUID, containerName)
 	if blocks == nil {
 		return
 	}
 
-	klog.InfoS("RemoveContainer", "podUID", podUID, "containerName", containerName)
+	logger.Info("RemoveContainer", "podUID", podUID, "containerName", containerName)
 	s.Delete(podUID, containerName)
 
 	// Mutate machine memory state to update free and reserved memory
@@ -292,35 +309,35 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 	s.SetMachineState(machineState)
 }
 
-func regenerateHints(pod *v1.Pod, ctn *v1.Container, ctnBlocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
+func regenerateHints(logger klog.Logger, pod *v1.Pod, ctn *v1.Container, ctnBlocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
 	hints := map[string][]topologymanager.TopologyHint{}
 	for resourceName := range reqRsrc {
 		hints[string(resourceName)] = []topologymanager.TopologyHint{}
 	}
 
 	if len(ctnBlocks) != len(reqRsrc) {
-		klog.ErrorS(nil, "The number of requested resources by the container differs from the number of memory blocks", "containerName", ctn.Name)
+		logger.Info("The number of requested resources by the container differs from the number of memory blocks", "containerName", ctn.Name)
 		return nil
 	}
 
 	for _, b := range ctnBlocks {
 		if _, ok := reqRsrc[b.Type]; !ok {
-			klog.ErrorS(nil, "Container requested resources do not have resource of this type", "containerName", ctn.Name, "type", b.Type)
+			logger.Info("Container requested resources but none available of this type", "containerName", ctn.Name, "type", b.Type)
 			return nil
 		}
 
 		if b.Size != reqRsrc[b.Type] {
-			klog.ErrorS(nil, "Memory already allocated with different numbers than requested", "podUID", pod.UID, "type", b.Type, "containerName", ctn.Name, "requestedResource", reqRsrc[b.Type], "allocatedSize", b.Size)
+			logger.Info("Memory already allocated with different numbers than requested", "containerName", ctn.Name, "type", b.Type, "requestedResource", reqRsrc[b.Type], "allocatedSize", b.Size)
 			return nil
 		}
 
 		containerNUMAAffinity, err := bitmask.NewBitMask(b.NUMAAffinity...)
 		if err != nil {
-			klog.ErrorS(err, "Failed to generate NUMA bitmask")
+			logger.Error(err, "Failed to generate NUMA bitmask", "containerName", ctn.Name, "type", b.Type)
 			return nil
 		}
 
-		klog.InfoS("Regenerating TopologyHints, resource was already allocated to pod", "resourceName", b.Type, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", ctn.Name)
+		logger.Info("Regenerating TopologyHints, resource was already allocated to pod", "resourceName", b.Type, "podUID", pod.UID, "containerName", ctn.Name)
 		hints[string(b.Type)] = append(hints[string(b.Type)], topologymanager.TopologyHint{
 			NUMANodeAffinity: containerNUMAAffinity,
 			Preferred:        true,
@@ -347,7 +364,7 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 
 			// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 			// for the detail.
-			if types.IsRestartableInitContainer(&ctr) {
+			if podutil.IsRestartableInitContainer(&ctr) {
 				reqRsrcsByRestartableInitCtrs[rsrcName] += qty
 			} else if reqRsrcsByRestartableInitCtrs[rsrcName]+qty > reqRsrcsByInitCtrs[rsrcName] {
 				reqRsrcsByInitCtrs[rsrcName] = reqRsrcsByRestartableInitCtrs[rsrcName] + qty
@@ -384,14 +401,21 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 	return reqRsrcs, nil
 }
 
-func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
 	}
 
 	reqRsrcs, err := getPodRequestedResources(pod)
 	if err != nil {
-		klog.ErrorS(err, "Failed to get pod requested resources", "pod", klog.KObj(pod), "podUID", pod.UID)
+		logger.Error(err, "Failed to get pod requested resources", "podUID", pod.UID)
+		return nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		logger.V(3).Info("Topology hints generation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", pod.UID)
 		return nil
 	}
 
@@ -401,7 +425,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 		// memory allocated for the container. This might happen after a
 		// kubelet restart, for example.
 		if containerBlocks != nil {
-			return regenerateHints(pod, &ctn, containerBlocks, reqRsrcs)
+			return regenerateHints(logger, pod, &ctn, containerBlocks, reqRsrcs)
 		}
 	}
 
@@ -412,14 +436,21 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
 	}
 
 	requestedResources, err := getRequestedResources(pod, container)
 	if err != nil {
-		klog.ErrorS(err, "Failed to get container requested resources", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+		logger.Error(err, "Failed to get container requested resources", "podUID", pod.UID, "containerName", container.Name)
+		return nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		logger.V(3).Info("Topology hints generation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", pod.UID)
 		return nil
 	}
 
@@ -428,7 +459,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 	// memory allocated for the container. This might happen after a
 	// kubelet restart, for example.
 	if containerBlocks != nil {
-		return regenerateHints(pod, container, containerBlocks, requestedResources)
+		return regenerateHints(logger, pod, container, containerBlocks, requestedResources)
 	}
 
 	return p.calculateHints(s.GetMachineState(), pod, requestedResources)
@@ -436,17 +467,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 
 func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {
 	requestedResources := map[v1.ResourceName]uint64{}
-	resources := container.Resources.Requests
-	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
-	// We should return this value because this is what kubelet agreed to allocate for the container
-	// and the value configured with runtime.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-			resources = cs.AllocatedResources
-		}
-	}
-	for resourceName, quantity := range resources {
+	for resourceName, quantity := range container.Resources.Requests {
 		if resourceName != v1.ResourceMemory && !corehelper.IsHugePageResourceName(resourceName) {
 			continue
 		}
@@ -574,7 +595,7 @@ func areGroupsEqual(group1, group2 []int) bool {
 	return true
 }
 
-func (p *staticPolicy) validateState(s state.State) error {
+func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	machineState := s.GetMachineState()
 	memoryAssignments := s.GetMemoryAssignments()
 
@@ -640,53 +661,89 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// Validate that total size, system reserved and reserved memory not changed, it can happen, when:
 	// - adding or removing physical memory bank from the node
 	// - change of kubelet system-reserved, kube-reserved or pre-reserved-memory-zone parameters
-	if !areMachineStatesEqual(machineState, expectedMachineState) {
+	if !areMachineStatesEqual(logger, machineState, expectedMachineState) {
 		return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
 	}
 
 	return nil
 }
 
-func areMachineStatesEqual(ms1, ms2 state.NUMANodeMap) bool {
+func areMachineStatesEqual(logger klog.Logger, ms1, ms2 state.NUMANodeMap) bool {
 	if len(ms1) != len(ms2) {
-		klog.ErrorS(nil, "Node states are different", "lengthNode1", len(ms1), "lengthNode2", len(ms2))
+		logger.Info("Node states were different", "lengthNode1", len(ms1), "lengthNode2", len(ms2))
 		return false
 	}
 
 	for nodeID, nodeState1 := range ms1 {
 		nodeState2, ok := ms2[nodeID]
 		if !ok {
-			klog.ErrorS(nil, "Node state does not have node ID", "nodeID", nodeID)
+			logger.Info("Node state didn't have node ID", "nodeID", nodeID)
 			return false
 		}
 
 		if nodeState1.NumberOfAssignments != nodeState2.NumberOfAssignments {
-			klog.ErrorS(nil, "Node states number of assignments are different", "assignment1", nodeState1.NumberOfAssignments, "assignment2", nodeState2.NumberOfAssignments)
+			logger.Info("Node state had a different number of memory assignments.", "assignment1", nodeState1.NumberOfAssignments, "assignment2", nodeState2.NumberOfAssignments)
 			return false
 		}
 
 		if !areGroupsEqual(nodeState1.Cells, nodeState2.Cells) {
-			klog.ErrorS(nil, "Node states groups are different", "stateNode1", nodeState1.Cells, "stateNode2", nodeState2.Cells)
+			logger.Info("Node states had different groups", "stateNode1", nodeState1.Cells, "stateNode2", nodeState2.Cells)
 			return false
 		}
 
 		if len(nodeState1.MemoryMap) != len(nodeState2.MemoryMap) {
-			klog.ErrorS(nil, "Node states memory map have different lengths", "lengthNode1", len(nodeState1.MemoryMap), "lengthNode2", len(nodeState2.MemoryMap))
+			logger.Info("Node state had memory maps of different lengths", "lengthNode1", len(nodeState1.MemoryMap), "lengthNode2", len(nodeState2.MemoryMap))
 			return false
 		}
 
 		for resourceName, memoryState1 := range nodeState1.MemoryMap {
 			memoryState2, ok := nodeState2.MemoryMap[resourceName]
 			if !ok {
-				klog.ErrorS(nil, "Memory state does not have resource", "resource", resourceName)
+				logger.Info("Memory state didn't have resource", "resource", resourceName)
 				return false
 			}
 
-			if !reflect.DeepEqual(*memoryState1, *memoryState2) {
-				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+			if !areMemoryStatesEqual(logger, memoryState1, memoryState2, nodeID, resourceName) {
+				return false
+			}
+
+			tmpState1 := state.MemoryTable{}
+			tmpState2 := state.MemoryTable{}
+			for _, nodeID := range nodeState1.Cells {
+				tmpState1.Free += ms1[nodeID].MemoryMap[resourceName].Free
+				tmpState1.Reserved += ms1[nodeID].MemoryMap[resourceName].Reserved
+				tmpState2.Free += ms2[nodeID].MemoryMap[resourceName].Free
+				tmpState2.Reserved += ms2[nodeID].MemoryMap[resourceName].Reserved
+			}
+
+			if tmpState1.Free != tmpState2.Free {
+				logger.Info("NUMA node and resource had different memory states", "node", nodeID, "resource", resourceName, "field", "free", "free1", tmpState1.Free, "free2", tmpState2.Free, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+				return false
+			}
+			if tmpState1.Reserved != tmpState2.Reserved {
+				logger.Info("NUMA node and resource had different memory states", "node", nodeID, "resource", resourceName, "field", "reserved", "reserved1", tmpState1.Reserved, "reserved2", tmpState2.Reserved, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
 				return false
 			}
 		}
+	}
+	return true
+}
+
+func areMemoryStatesEqual(logger klog.Logger, memoryState1, memoryState2 *state.MemoryTable, nodeID int, resourceName v1.ResourceName) bool {
+	loggerWithValues := klog.LoggerWithValues(logger, "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+	if memoryState1.TotalMemSize != memoryState2.TotalMemSize {
+		logger.Info("Memory states for the NUMA node and resource are different", "field", "TotalMemSize", "TotalMemSize1", memoryState1.TotalMemSize, "TotalMemSize2", memoryState2.TotalMemSize)
+		return false
+	}
+
+	if memoryState1.SystemReserved != memoryState2.SystemReserved {
+		loggerWithValues.Info("Memory states for the NUMA node and resource are different", "field", "SystemReserved", "SystemReserved1", memoryState1.SystemReserved, "SystemReserved2", memoryState2.SystemReserved)
+		return false
+	}
+
+	if memoryState1.Allocatable != memoryState2.Allocatable {
+		loggerWithValues.Info("Memory states for the NUMA node and resource are different", "field", "Allocatable", "Allocatable1", memoryState1.Allocatable, "Allocatable2", memoryState2.Allocatable)
+		return false
 	}
 	return true
 }
@@ -913,7 +970,7 @@ func (p *staticPolicy) updatePodReusableMemory(pod *v1.Pod, container *v1.Contai
 	}
 }
 
-func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.Pod, container *v1.Container, containerMemoryBlocks []state.Block) {
+func (p *staticPolicy) updateInitContainersMemoryBlocks(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, containerMemoryBlocks []state.Block) {
 	podUID := string(pod.UID)
 
 	for _, containerBlock := range containerMemoryBlocks {
@@ -928,7 +985,7 @@ func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.P
 				break
 			}
 
-			if types.IsRestartableInitContainer(&initContainer) {
+			if podutil.IsRestartableInitContainer(&initContainer) {
 				// we should not reuse the resource from any restartable init
 				// container
 				continue
@@ -949,7 +1006,7 @@ func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.P
 					continue
 				}
 
-				if !isNUMAAffinitiesEqual(initContainerBlock.NUMAAffinity, containerBlock.NUMAAffinity) {
+				if !isNUMAAffinitiesEqual(logger, initContainerBlock.NUMAAffinity, containerBlock.NUMAAffinity) {
 					continue
 				}
 
@@ -970,25 +1027,48 @@ func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.P
 func isRegularInitContainer(pod *v1.Pod, container *v1.Container) bool {
 	for _, initContainer := range pod.Spec.InitContainers {
 		if initContainer.Name == container.Name {
-			return !types.IsRestartableInitContainer(&initContainer)
+			return !podutil.IsRestartableInitContainer(&initContainer)
 		}
 	}
 
 	return false
 }
 
-func isNUMAAffinitiesEqual(numaAffinity1, numaAffinity2 []int) bool {
+func isNUMAAffinitiesEqual(logger klog.Logger, numaAffinity1, numaAffinity2 []int) bool {
 	bitMask1, err := bitmask.NewBitMask(numaAffinity1...)
 	if err != nil {
-		klog.ErrorS(err, "failed to create bit mask", "numaAffinity1", numaAffinity1)
+		logger.Error(err, "failed to create bit mask", "numaAffinity1", numaAffinity1)
 		return false
 	}
 
 	bitMask2, err := bitmask.NewBitMask(numaAffinity2...)
 	if err != nil {
-		klog.ErrorS(err, "failed to create bit mask", "numaAffinity2", numaAffinity2)
+		logger.Error(err, "failed to create bit mask", "numaAffinity2", numaAffinity2)
 		return false
 	}
 
 	return bitMask1.IsEqual(bitMask2)
+}
+
+func isAffinityViolatingNUMAAllocations(machineState state.NUMANodeMap, mask bitmask.BitMask) bool {
+	maskBits := mask.GetBits()
+	singleNUMAHint := len(maskBits) == 1
+	for _, nodeID := range mask.GetBits() {
+		// the node was never used for the memory allocation
+		if machineState[nodeID].NumberOfAssignments == 0 {
+			continue
+		}
+		if singleNUMAHint {
+			continue
+		}
+		// the node used for the single NUMA memory allocation, it cannot be used for the multi NUMA node allocation
+		if len(machineState[nodeID].Cells) == 1 {
+			return true
+		}
+		// the node already used with a different group of nodes, it cannot be used within the current hint
+		if !areGroupsEqual(machineState[nodeID].Cells, maskBits) {
+			return true
+		}
+	}
+	return false
 }

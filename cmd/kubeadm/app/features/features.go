@@ -22,24 +22,26 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
+// Feature gates should be listed in alphabetical, case-sensitive
+// (upper before any lower case character) order. This reduces the risk
+// of code conflicts because changes are more likely to be scattered
+// across the file.
 const (
+	// NodeLocalCRISocket is expected to be in alpha in v1.32, beta in v1.34, ga in v1.36
+	NodeLocalCRISocket = "NodeLocalCRISocket"
+
 	// PublicKeysECDSA is expected to be alpha in v1.19
 	PublicKeysECDSA = "PublicKeysECDSA"
+
 	// RootlessControlPlane is expected to be in alpha in v1.22
 	RootlessControlPlane = "RootlessControlPlane"
-	// EtcdLearnerMode is expected to be in alpha in v1.27, beta in v1.29
-	EtcdLearnerMode = "EtcdLearnerMode"
-	// WaitForAllControlPlaneComponents is expected to be alpha in v1.30
-	WaitForAllControlPlaneComponents = "WaitForAllControlPlaneComponents"
-	// ControlPlaneKubeletLocalMode is expected to be in alpha in v1.31, beta in v1.32
-	ControlPlaneKubeletLocalMode = "ControlPlaneKubeletLocalMode"
 )
 
 // InitFeatureGates are the default feature gates for the init command
@@ -53,9 +55,7 @@ var InitFeatureGates = FeatureList{
 		DeprecationMessage: "Deprecated in favor of the core kubelet feature UserNamespacesSupport which is beta since 1.30." +
 			" Once UserNamespacesSupport graduates to GA, kubeadm will start using it and RootlessControlPlane will be removed.",
 	},
-	EtcdLearnerMode:                  {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
-	WaitForAllControlPlaneComponents: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	ControlPlaneKubeletLocalMode:     {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	NodeLocalCRISocket: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.GA, LockToDefault: true}},
 }
 
 // Feature represents a feature being gated

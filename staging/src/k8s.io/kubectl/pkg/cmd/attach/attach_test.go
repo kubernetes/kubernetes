@@ -242,6 +242,7 @@ func TestAttach(t *testing.T) {
 		pod                                                         *corev1.Pod
 		remoteAttachErr                                             bool
 		expectedErr                                                 string
+		expectedErrOut                                              []string
 	}{
 		{
 			name:         "pod attach",
@@ -251,6 +252,10 @@ func TestAttach(t *testing.T) {
 			attachPath:   "/api/" + version + "/namespaces/test/pods/foo/attach",
 			pod:          attachPod(),
 			container:    "bar",
+			expectedErrOut: []string{
+				"All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.",
+				"If you don't see a command prompt, try pressing enter.",
+			},
 		},
 		{
 			name:            "pod attach error",
@@ -305,10 +310,11 @@ func TestAttach(t *testing.T) {
 			if test.remoteAttachErr {
 				remoteAttach.err = fmt.Errorf("attach error")
 			}
+			streams, _, _, errOut := genericiooptions.NewTestIOStreams()
 			options := &AttachOptions{
 				StreamOptions: exec.StreamOptions{
 					ContainerName: test.container,
-					IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
+					IOStreams:     streams,
 				},
 				Attach:        remoteAttach,
 				GetPodTimeout: 1000,
@@ -348,6 +354,14 @@ func TestAttach(t *testing.T) {
 			}
 			if remoteAttach.url.Query().Get("container") != "bar" {
 				t.Errorf("%s: Did not have query parameters: %s", test.name, remoteAttach.url.Query())
+			}
+			if test.expectedErrOut != nil {
+				for _, expect := range test.expectedErrOut {
+					if !strings.Contains(errOut.String(), expect) {
+						t.Errorf("%s: expected message %s not found, got: %s", test.name, expect, strings.ReplaceAll(errOut.String(), "\n", ""))
+						return
+					}
+				}
 			}
 		})
 	}
@@ -496,7 +510,7 @@ func TestReattachMessage(t *testing.T) {
 			container: "bar",
 			rawTTY:    true,
 			stdin:     true,
-			expected:  "Session ended, resume using",
+			expected:  "Session ended, resume using 'kubectl foo -c bar -n test -i -t' command when the pod is running",
 		},
 		{
 			name:      "no stdin",
@@ -535,7 +549,7 @@ func TestReattachMessage(t *testing.T) {
 			container: "debugger",
 			rawTTY:    true,
 			stdin:     true,
-			expected:  "Session ended, the ephemeral container will not be restarted",
+			expected:  "Session ended, the ephemeral container will not be restarted but may be reattached using 'kubectl foo -c debugger -n test -i -t' if it is still running",
 		},
 	}
 	for _, test := range tests {
@@ -544,7 +558,8 @@ func TestReattachMessage(t *testing.T) {
 				StreamOptions: exec.StreamOptions{
 					Stdin: test.stdin,
 				},
-				Pod: test.pod,
+				CommandName: "kubectl",
+				Pod:         test.pod,
 			}
 			if msg := options.reattachMessage(test.container, test.rawTTY); test.expected == "" && msg != "" {
 				t.Errorf("reattachMessage(%v, %v) = %q, want empty string", test.container, test.rawTTY, msg)

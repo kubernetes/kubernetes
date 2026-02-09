@@ -693,8 +693,9 @@ func TestCelCompilation(t *testing.T) {
 				},
 			},
 			expectedResults: []validationMatcher{
-				invalidError("undefined field 'namespace'"),
-				invalidError("undefined field 'if'"),
+				// starting 1.32, the preserved keyword as field name would be supported.
+				noError(),
+				noError(),
 				invalidError("found no matching overload"),
 			},
 		},
@@ -850,7 +851,7 @@ func TestCelCompilation(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).Extend(
+			env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Extend(
 				environment.VersionedOptions{
 					IntroducedVersion: version.MajorMinor(1, 999),
 					EnvOptions:        []celgo.EnvOption{celgo.Lib(&fakeLib{})},
@@ -1327,7 +1328,7 @@ func genMapWithCustomItemRule(item *schema.Structural, rule string) func(maxProp
 // if expectedCostExceedsLimit is non-zero. Typically, only expectedCost or expectedCostExceedsLimit is non-zero, not both.
 func schemaChecker(schema *schema.Structural, expectedCost uint64, expectedCostExceedsLimit uint64, t *testing.T) func(t *testing.T) {
 	return func(t *testing.T) {
-		compilationResults, err := Compile(schema, model.SchemaDeclType(schema, false), celconfig.PerCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true), NewExpressionsEnvLoader())
+		compilationResults, err := Compile(schema, model.SchemaDeclType(schema, false), celconfig.PerCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()), NewExpressionsEnvLoader())
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -1871,6 +1872,18 @@ func TestCostEstimation(t *testing.T) {
 			setMaxElements:   1000,
 			expectedSetCost:  401,
 		},
+		{
+			name: "IntOrString type with quantity rule",
+			schemaGenerator: func(max *int64) *schema.Structural {
+				intOrString := intOrStringType()
+				intOrString = withRule(intOrString, "isQuantity(self)")
+				intOrString = withMaxLength(intOrString, max)
+				return &intOrString
+			},
+			expectedCalcCost: 314574,
+			setMaxElements:   20,
+			expectedSetCost:  9,
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -1885,7 +1898,7 @@ func TestCostEstimation(t *testing.T) {
 }
 
 func BenchmarkCompile(b *testing.B) {
-	env := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true) // prepare the environment
+	env := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()) // prepare the environment
 	s := genArrayWithRule("number", "true")(nil)
 	b.ReportAllocs()
 	b.ResetTimer()

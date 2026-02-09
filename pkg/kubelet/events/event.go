@@ -30,10 +30,16 @@ const (
 
 // Pod event reason list
 const (
-	FailedToKillPod                = "FailedKillPod"
-	FailedToCreatePodContainer     = "FailedCreatePodContainer"
-	FailedToMakePodDataDirectories = "Failed"
-	NetworkNotReady                = "NetworkNotReady"
+	FailedToKillPod                 = "FailedKillPod"
+	FailedToCreatePodContainer      = "FailedCreatePodContainer"
+	FailedToMakePodDataDirectories  = "Failed"
+	NetworkNotReady                 = "NetworkNotReady"
+	ResizeDeferred                  = "ResizeDeferred"
+	ResizeInfeasible                = "ResizeInfeasible"
+	ResizeCompleted                 = "ResizeCompleted"
+	ResizeStarted                   = "ResizeStarted"
+	ResizeError                     = "ResizeError"
+	FailedNodeDeclaredFeaturesCheck = "FailedNodeDeclaredFeaturesCheck"
 )
 
 // Image event reason list
@@ -59,6 +65,7 @@ const (
 	VolumeResizeFailed                   = "VolumeResizeFailed"
 	VolumeResizeSuccess                  = "VolumeResizeSuccessful"
 	FileSystemResizeFailed               = "FileSystemResizeFailed"
+	VolumePermissionChangeInProgress     = "VolumePermissionChangeInProgress"
 	FileSystemResizeSuccess              = "FileSystemResizeSuccessful"
 	FailedMapVolume                      = "FailedMapVolume"
 	WarnAlreadyMountedVolume             = "AlreadyMountedVolume"

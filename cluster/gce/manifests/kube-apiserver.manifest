@@ -67,8 +67,6 @@
     "volumeMounts": [
         {{kms_socket_mount}}
         {{encryption_provider_mount}}
-        {{cloud_config_mount}}
-        {{additional_cloud_config_mount}}
         {{webhook_config_mount}}
         {{webhook_authn_config_mount}}
         {{csc_config_mount}}
@@ -108,8 +106,6 @@
 "volumes":[
   {{kms_socket_volume}}
   {{encryption_provider_volume}}
-  {{cloud_config_volume}}
-  {{additional_cloud_config_volume}}
   {{webhook_config_volume}}
   {{webhook_authn_config_volume}}
   {{csc_config_volume}}

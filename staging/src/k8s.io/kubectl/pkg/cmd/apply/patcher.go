@@ -17,14 +17,14 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/jonboulle/clockwork"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,7 +60,7 @@ const (
 // patchRetryBackOffPeriod is the period to back off when apply patch results in error.
 var patchRetryBackOffPeriod = 1 * time.Second
 
-var createPatchErrFormat = "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
+var createPatchErrFormat = "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor: %w"
 
 // Patcher defines options to patch OpenAPI objects.
 type Patcher struct {
@@ -115,17 +115,17 @@ func (p *Patcher) delete(namespace, name string) error {
 	return err
 }
 
-func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
+func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer, localApply bool) ([]byte, runtime.Object, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "serializing current configuration from:\n%v\nfor:", obj)
+		return nil, nil, fmt.Errorf("serializing current configuration from:\n%v\nfor: %w", obj, err)
 	}
 
 	// Retrieve the original configuration of the object from the annotation.
 	original, err := util.GetOriginalConfiguration(obj)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "retrieving original configuration from:\n%v\nfor:", obj)
+		return nil, nil, fmt.Errorf("retrieving original configuration from:\n%v\nfor: %w", obj, err)
 	}
 
 	var patchType types.PatchType
@@ -177,17 +177,17 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 			patchType = types.StrategicMergePatchType
 			patch, err = p.buildStrategicMergeFromBuiltins(versionedObj, original, modified, current)
 			if err != nil {
-				return nil, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
+				return nil, nil, fmt.Errorf(createPatchErrFormat, original, modified, current, err)
 			}
 		} else {
 			if !runtime.IsNotRegisteredError(err) {
-				return nil, nil, errors.Wrapf(err, "getting instance of versioned object for %v:", p.Mapping.GroupVersionKind)
+				return nil, nil, fmt.Errorf("getting instance of versioned object for %v: %w", p.Mapping.GroupVersionKind, err)
 			}
 
 			patchType = types.MergePatchType
 			patch, err = p.buildMergePatch(original, modified, current)
 			if err != nil {
-				return nil, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
+				return nil, nil, fmt.Errorf(createPatchErrFormat, original, modified, current, err)
 			}
 		}
 	}
@@ -196,10 +196,28 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 		return patch, obj, nil
 	}
 
+	if localApply {
+		var patchedBytes []byte
+		if patchType == types.StrategicMergePatchType {
+			versionedObj, _ := scheme.Scheme.New(p.Mapping.GroupVersionKind)
+			patchedBytes, err = strategicpatch.StrategicMergePatch(current, patch, versionedObj)
+		} else {
+			patchedBytes, err = jsonpatch.MergePatch(current, patch)
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("applying patch locally: %w", err)
+		}
+		patchedObj, _, err := unstructured.UnstructuredJSONScheme.Decode(patchedBytes, nil, nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("decoding locally patched object: %w", err)
+		}
+		return patch, patchedObj, nil
+	}
+
 	if p.ResourceVersion != nil {
 		patch, err = addResourceVersion(patch, *p.ResourceVersion)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "Failed to insert resourceVersion in patch")
+			return nil, nil, fmt.Errorf("failed to insert resourceVersion in patch: %w", err)
 		}
 	}
 
@@ -358,7 +376,7 @@ func (p *Patcher) buildStrategicMergeFromBuiltins(versionedObj runtime.Object, o
 // the final patched object. On failure, returns an error.
 func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	var getErr error
-	patchBytes, patchObject, err := p.patchSimple(current, modified, namespace, name, errOut)
+	patchBytes, patchObject, err := p.patchSimple(current, modified, namespace, name, errOut, false)
 	if p.Retries == 0 {
 		p.Retries = maxPatchRetry
 	}
@@ -370,7 +388,7 @@ func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, nil, getErr
 		}
-		patchBytes, patchObject, err = p.patchSimple(current, modified, namespace, name, errOut)
+		patchBytes, patchObject, err = p.patchSimple(current, modified, namespace, name, errOut, false)
 	}
 	if err != nil {
 		if (apierrors.IsConflict(err) || apierrors.IsInvalid(err)) && p.Force {
@@ -382,12 +400,18 @@ func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespa
 	return patchBytes, patchObject, err
 }
 
+// PatchLocal computes and applies the patch locally without sending to the server.
+// Used for --dry-run=client.
+func (p *Patcher) PatchLocal(current runtime.Object, modified []byte, errOut io.Writer) ([]byte, runtime.Object, error) {
+	return p.patchSimple(current, modified, "", "", errOut, true)
+}
+
 func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, namespace, name string) ([]byte, runtime.Object, error) {
 	if err := p.delete(namespace, name); err != nil {
 		return modified, nil, err
 	}
 	// TODO: use wait
-	if err := wait.PollImmediate(1*time.Second, p.Timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, p.Timeout, true, func(ctx context.Context) (bool, error) {
 		if _, err := p.Helper.Get(namespace, name); !apierrors.IsNotFound(err) {
 			return false, err
 		}

@@ -215,6 +215,11 @@ func (w *debugWriter) appendComprehension(comprehension ast.ComprehensionExpr) {
 	w.append(comprehension.IterVar())
 	w.append(",")
 	w.appendLine()
+	if comprehension.HasIterVar2() {
+		w.append(comprehension.IterVar2())
+		w.append(",")
+		w.appendLine()
+	}
 	w.append("// Target")
 	w.appendLine()
 	w.Buffer(comprehension.IterRange())
@@ -252,7 +257,7 @@ func formatLiteral(c ref.Val) string {
 	case types.Bool:
 		return fmt.Sprintf("%t", v)
 	case types.Bytes:
-		return fmt.Sprintf("b\"%s\"", string(v))
+		return fmt.Sprintf("b%s", strconv.Quote(string(v)))
 	case types.Double:
 		return fmt.Sprintf("%v", float64(v))
 	case types.Int:

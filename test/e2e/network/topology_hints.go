@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -41,7 +40,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = common.SIGDescribe(feature.TopologyHints, func() {
+var _ = common.SIGDescribe("Topology Hints", func() {
 	f := framework.NewDefaultFramework("topology-hints")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -62,7 +61,7 @@ var _ = common.SIGDescribe(feature.TopologyHints, func() {
 		ds, err := c.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, dsConf, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "error creating DaemonSet")
 
-		svc := createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "topology-hints",
 				Annotations: map[string]string{
@@ -79,7 +78,9 @@ var _ = common.SIGDescribe(feature.TopologyHints, func() {
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc, err = c.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
 			return e2edaemonset.CheckRunningOnAllNodes(ctx, f, ds)

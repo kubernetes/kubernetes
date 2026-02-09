@@ -18,6 +18,7 @@ package memorymanager
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
@@ -31,7 +32,7 @@ type none struct{}
 var _ Policy = &none{}
 
 // NewPolicyNone returns new none policy instance
-func NewPolicyNone() Policy {
+func NewPolicyNone(logger klog.Logger) Policy {
 	return &none{}
 }
 
@@ -39,30 +40,31 @@ func (p *none) Name() string {
 	return string(policyTypeNone)
 }
 
-func (p *none) Start(s state.State) error {
+func (p *none) Start(logger klog.Logger, s state.State) error {
+	logger.Info("Start")
 	return nil
 }
 
 // Allocate call is idempotent
-func (p *none) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *none) Allocate(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
 // RemoveContainer call is idempotent
-func (p *none) RemoveContainer(s state.State, podUID string, containerName string) {
+func (p *none) RemoveContainer(_ klog.Logger, s state.State, podUID string, containerName string) {
 }
 
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *none) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *none) GetTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
 // GetPodTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *none) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *none) GetPodTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 

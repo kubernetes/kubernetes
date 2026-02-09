@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -128,4 +130,53 @@ func (f *fakeLister) Get(name string) (runtime.Object, error) {
 }
 func (f *fakeLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
 	panic("not implemented")
+}
+
+func TestObjectCountEvaluatorHandles(t *testing.T) {
+	evaluator := objectCountEvaluator{}
+	testCases := []struct {
+		name  string
+		attrs admission.Attributes
+		want  bool
+	}{
+		{
+			name:  "create",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Create, nil, false, nil),
+			want:  true,
+		},
+		{
+			name:  "update",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "delete",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Delete, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "connect",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Connect, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "create-subresource",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "subresource", admission.Create, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "update-subresource",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "subresource", admission.Update, nil, false, nil),
+			want:  false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := evaluator.Handles(tc.attrs)
+
+			if tc.want != actual {
+				t.Errorf("%s expected:\n%v\n, actual:\n%v", tc.name, tc.want, actual)
+			}
+		})
+	}
 }

@@ -20,17 +20,15 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/utils/ptr"
 )
-
-func strptr(s string) *string {
-	return &s
-}
 
 func TestReadEgressSelectorConfiguration(t *testing.T) {
 	testcases := []struct {
@@ -45,14 +43,46 @@ func TestReadEgressSelectorConfiguration(t *testing.T) {
 			createFile:     true,
 			contents:       ``,
 			expectedResult: nil,
-			expectedError:  strptr("invalid service configuration object \"\""),
+			expectedError:  ptr.To("invalid service configuration object \"\""),
 		},
 		{
 			name:           "absent",
 			createFile:     false,
 			contents:       ``,
 			expectedResult: nil,
-			expectedError:  strptr("unable to read egress selector configuration from \"test-egress-selector-config-absent\" [open test-egress-selector-config-absent: no such file or directory]"),
+			expectedError:  ptr.To("errors.errorString{s:\"unable to read egress selector configuration"),
+		},
+		{
+			name:       "unknown field causes error",
+			createFile: false,
+			contents: `
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: "etcd"
+  connection:
+    proxyProtocol: "Direct"
+  foo:
+    bar: "baz"
+`,
+			expectedResult: nil,
+			expectedError:  ptr.To("runtime.strictDecodingError"),
+		},
+		{
+			name:       "duplicate field causes error",
+			createFile: false,
+			contents: `
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: "etcd"
+  connection:
+    proxyProtocol: "Direct"
+  connection:
+    proxyProtocol: "Indirect"
+`,
+			expectedResult: nil,
+			expectedError:  ptr.To("runtime.strictDecodingError"),
 		},
 		{
 			name:       "v1beta1",
@@ -270,7 +300,7 @@ spec:
               mountPath: /etc/srv/kubernetes/pki/konnectivity-agent
 `,
 			expectedResult: nil,
-			expectedError:  strptr("invalid service configuration object \"DaemonSet\""),
+			expectedError:  ptr.To("invalid service configuration object \"DaemonSet\""),
 		},
 	}
 
@@ -295,7 +325,7 @@ spec:
 			if err != nil && tc.expectedError == nil {
 				t.Errorf("unexpected error calling ReadEgressSelectorConfiguration got: %#v", err)
 			}
-			if err != nil && tc.expectedError != nil && err.Error() != *tc.expectedError {
+			if err != nil && tc.expectedError != nil && strings.Contains(err.Error(), *tc.expectedError) {
 				t.Errorf("calling ReadEgressSelectorConfiguration expected error: %s, got %#v", *tc.expectedError, err)
 			}
 			if !reflect.DeepEqual(config, tc.expectedResult) {

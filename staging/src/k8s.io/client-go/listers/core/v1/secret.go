@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // SecretLister helps list Secrets.
@@ -30,7 +30,7 @@ import (
 type SecretLister interface {
 	// List lists all Secrets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Secret, err error)
+	List(selector labels.Selector) (ret []*corev1.Secret, err error)
 	// Secrets returns an object that can list and get Secrets.
 	Secrets(namespace string) SecretNamespaceLister
 	SecretListerExpansion
@@ -38,17 +38,17 @@ type SecretLister interface {
 
 // secretLister implements the SecretLister interface.
 type secretLister struct {
-	listers.ResourceIndexer[*v1.Secret]
+	listers.ResourceIndexer[*corev1.Secret]
 }
 
 // NewSecretLister returns a new SecretLister.
 func NewSecretLister(indexer cache.Indexer) SecretLister {
-	return &secretLister{listers.New[*v1.Secret](indexer, v1.Resource("secret"))}
+	return &secretLister{listers.New[*corev1.Secret](indexer, corev1.Resource("secret"))}
 }
 
 // Secrets returns an object that can list and get Secrets.
 func (s *secretLister) Secrets(namespace string) SecretNamespaceLister {
-	return secretNamespaceLister{listers.NewNamespaced[*v1.Secret](s.ResourceIndexer, namespace)}
+	return secretNamespaceLister{listers.NewNamespaced[*corev1.Secret](s.ResourceIndexer, namespace)}
 }
 
 // SecretNamespaceLister helps list and get Secrets.
@@ -56,15 +56,15 @@ func (s *secretLister) Secrets(namespace string) SecretNamespaceLister {
 type SecretNamespaceLister interface {
 	// List lists all Secrets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Secret, err error)
+	List(selector labels.Selector) (ret []*corev1.Secret, err error)
 	// Get retrieves the Secret from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Secret, error)
+	Get(name string) (*corev1.Secret, error)
 	SecretNamespaceListerExpansion
 }
 
 // secretNamespaceLister implements the SecretNamespaceLister
 // interface.
 type secretNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Secret]
+	listers.ResourceIndexer[*corev1.Secret]
 }

@@ -29,8 +29,18 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&AuthorizationConfiguration{}, func(obj interface{}) { SetObjectDefaults_AuthorizationConfiguration(obj.(*AuthorizationConfiguration)) })
 	scheme.AddTypeDefaultingFunc(&EncryptionConfiguration{}, func(obj interface{}) { SetObjectDefaults_EncryptionConfiguration(obj.(*EncryptionConfiguration)) })
 	return nil
+}
+
+func SetObjectDefaults_AuthorizationConfiguration(in *AuthorizationConfiguration) {
+	for i := range in.Authorizers {
+		a := &in.Authorizers[i]
+		if a.Webhook != nil {
+			SetDefaults_WebhookConfiguration(a.Webhook)
+		}
+	}
 }
 
 func SetObjectDefaults_EncryptionConfiguration(in *EncryptionConfiguration) {

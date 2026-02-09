@@ -81,8 +81,31 @@ const oneValidOwnerPodName = "test.pod.3"
 const toBeDeletedRCName = "test.rc.1"
 const remainingRCName = "test.rc.2"
 
+// testCert was generated from crypto/tls/generate_cert.go with the following command:
+//
+//	go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+var testCert = []byte(`-----BEGIN CERTIFICATE-----
+MIIDGDCCAgCgAwIBAgIQTKCKn99d5HhQVCLln2Q+eTANBgkqhkiG9w0BAQsFADAS
+MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw
+MDAwWjASMRAwDgYDVQQKEwdBY21lIENvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEA1Z5/aTwqY706M34tn60l8ZHkanWDl8mM1pYf4Q7qg3zA9XqWLX6S
+4rTYDYCb4stEasC72lQnbEWHbthiQE76zubP8WOFHdvGR3mjAvHWz4FxvLOTheZ+
+3iDUrl6Aj9UIsYqzmpBJAoY4+vGGf+xHvuukHrVcFqR9ZuBdZuJ/HbbjUyuNr3X9
+erNIr5Ha17gVzf17SNbYgNrX9gbCeEB8Z9Ox7dVuJhLDkpF0T/B5Zld3BjyUVY/T
+cukU4dTVp6isbWPvCMRCZCCOpb+qIhxEjJ0n6tnPt8nf9lvDl4SWMl6X1bH+2EFa
+a8R06G0QI+XhwPyjXUyCR8QEOZPCR5wyqQIDAQABo2gwZjAOBgNVHQ8BAf8EBAMC
+AqQwEwYDVR0lBAwwCgYIKwYBBQUHAwEwDwYDVR0TAQH/BAUwAwEB/zAuBgNVHREE
+JzAlggtleGFtcGxlLmNvbYcEfwAAAYcQAAAAAAAAAAAAAAAAAAAAATANBgkqhkiG
+9w0BAQsFAAOCAQEAThqgJ/AFqaANsOp48lojDZfZBFxJQ3A4zfR/MgggUoQ9cP3V
+rxuKAFWQjze1EZc7J9iO1WvH98lOGVNRY/t2VIrVoSsBiALP86Eew9WucP60tbv2
+8/zsBDSfEo9Wl+Q/gwdEh8dgciUKROvCm76EgAwPGicMAgRsxXgwXHhS5e8nnbIE
+Ewaqvb5dY++6kh0Oz+adtNT5OqOwXTIRI67WuEe6/B3Z4LNVPQDIj7ZUJGNw8e6L
+F4nkUthwlKx4yEJHZBRuFPnO7Z81jNKuwL276+mczRH7piI6z9uyMV/JbEsOIxyL
+W6CzB7pZ9Nj1YLpgzc1r6oONHLokMJJIz/IvkQ==
+-----END CERTIFICATE-----`)
+
 func newPod(podName, podNamespace string, ownerReferences []metav1.OwnerReference) *v1.Pod {
-	for i := 0; i < len(ownerReferences); i++ {
+	for i := range ownerReferences {
 		if len(ownerReferences[i].Kind) == 0 {
 			ownerReferences[i].Kind = "ReplicationController"
 		}
@@ -252,6 +275,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	logger := tCtx.Logger()
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
+
 	gc, err := garbagecollector.NewGarbageCollector(
 		tCtx,
 		clientSet,
@@ -277,7 +301,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 			// mapper, but we'll deal with it for now.
 			restMapper.Reset()
 		}, syncPeriod, tCtx.Done())
-		go gc.Run(tCtx, workers)
+		go gc.Run(tCtx, workers, syncPeriod)
 		go gc.Sync(tCtx, clientSet.Discovery(), syncPeriod)
 	}
 
@@ -355,7 +379,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < validChildrenCount; i++ {
+	for range validChildrenCount {
 		_, err := clientSet.CoreV1().Secrets(namespaceB).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "child-", OwnerReferences: []metav1.OwnerReference{
 			{Name: "parent", Kind: "ConfigMap", APIVersion: "v1", UID: parent.UID, Controller: ptr.To(false)},
 		}}}, metav1.CreateOptions{})
@@ -368,12 +392,12 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 
 	// Construct invalid owner references:
 	invalidOwnerReferences := []metav1.OwnerReference{}
-	for i := 0; i < 25; i++ {
+	for i := range 25 {
 		invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: types.UID(fmt.Sprintf("invalid-%d", i)), APIVersion: "test/v1", Kind: fmt.Sprintf("invalid%d", i)})
 	}
 	invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: ptr.To(false)})
 
-	for i := 0; i < workers; i++ {
+	for range workers {
 		_, err := clientSet.CoreV1().ConfigMaps(namespaceA).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
@@ -410,7 +434,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 			return false, nil
 		}
 		return true, nil
-	}); err != nil && err != wait.ErrWaitTimeout {
+	}); err != nil && !wait.Interrupted(err) {
 		t.Error(err)
 	}
 
@@ -424,7 +448,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 			return false, fmt.Errorf("expected %d valid children, got %d", validChildrenCount, len(children.Items))
 		}
 		return false, nil
-	}); err != nil && err != wait.ErrWaitTimeout {
+	}); err != nil && !wait.Interrupted(err) {
 		t.Error(err)
 	}
 
@@ -593,7 +617,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	rcUIDs <- rc.ObjectMeta.UID
 	// create pods.
 	var podUIDs []types.UID
-	for j := 0; j < 3; j++ {
+	for j := range 3 {
 		podName := "test.pod." + nameSuffix + "-" + strconv.Itoa(j)
 		pod := newPod(podName, namespace, []metav1.OwnerReference{{UID: rc.ObjectMeta.UID, Name: rc.ObjectMeta.Name}})
 		createdPod, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -682,7 +706,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	wg.Add(collections * 5)
 	rcUIDs := make(chan types.UID, collections*5)
 	errs := make(chan string, 5)
-	for i := 0; i < collections; i++ {
+	for i := range collections {
 		// rc is created with empty finalizers, deleted with nil delete options, pods will remain.
 		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, metav1.DeleteOptions{}, &wg, rcUIDs, errs)
 		// rc is created with the orphan finalizer, deleted with nil options, pods will remain.
@@ -697,7 +721,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	wg.Wait()
 	close(errs)
 	for errString := range errs {
-		t.Fatalf(errString)
+		t.Fatal(errString)
 	}
 	t.Logf("all pods are created, all replications controllers are created then deleted")
 	// wait for the RCs and Pods to reach the expected numbers.
@@ -724,7 +748,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	}
 
 	// verify there is no node representing replication controllers in the gc's graph
-	for i := 0; i < collections; i++ {
+	for range collections {
 		uid := <-rcUIDs
 		if gc.GraphHasUID(uid) {
 			t.Errorf("Expect all nodes representing replication controllers are removed from the Propagator's graph")
@@ -753,7 +777,7 @@ func TestOrphaning(t *testing.T) {
 	// these pods should be orphaned.
 	var podUIDs []types.UID
 	podsNum := 3
-	for i := 0; i < podsNum; i++ {
+	for i := range podsNum {
 		podName := garbageCollectedPodName + strconv.Itoa(i)
 		pod := newPod(podName, ns.Name, []metav1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
 		createdPod, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -1283,5 +1307,123 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for dependent %q (owned by %q) to be deleted", dependent.GetName(), owner.GetName())
+	}
+}
+
+// TestCascadingDeleteOnCRDConversionFailure tests that a bad conversion webhook cannot block the entire GC controller.
+// Historically, a cache sync failure from a single resource prevented GC controller from running. This test creates
+// a CRD, updates the storage version with a bad conversion webhook and then runs a simple cascading delete test.
+func TestCascadingDeleteOnCRDConversionFailure(t *testing.T) {
+	ctx := setup(t, 0)
+	defer ctx.tearDown()
+	gc, apiExtensionClient, dynamicClient, clientSet := ctx.gc, ctx.apiExtensionClient, ctx.dynamicClient, ctx.clientSet
+
+	ns := createNamespaceOrDie("gc-cache-sync-fail", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+
+	// Create a CRD with storage/serving version v1beta2. Then update the CRD with v1 as the storage version
+	// and an invalid conversion webhook. This should result in cache sync failures for the CRD from the GC controller.
+	def, dc := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
+	_, err := dc.Create(context.TODO(), newCRDInstance(def, ns.Name, names.SimpleNameGenerator.GenerateName("test")), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create custom resource: %v", err)
+	}
+
+	def, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), def.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get custom resource: %v", err)
+	}
+
+	newDefinition := def.DeepCopy()
+	newDefinition.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+		Strategy: apiextensionsv1.WebhookConverter,
+		Webhook: &apiextensionsv1.WebhookConversion{
+			ClientConfig: &apiextensionsv1.WebhookClientConfig{
+				Service: &apiextensionsv1.ServiceReference{
+					Name:      "foobar",
+					Namespace: ns.Name,
+				},
+				CABundle: testCert,
+			},
+			ConversionReviewVersions: []string{
+				"v1", "v1beta1",
+			},
+		},
+	}
+	newDefinition.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+		{
+			Name:    "v1",
+			Served:  true,
+			Storage: true,
+			Schema:  apiextensionstestserver.AllowAllSchema(),
+		},
+		{
+			Name:    "v1beta1",
+			Served:  true,
+			Storage: false,
+			Schema:  apiextensionstestserver.AllowAllSchema(),
+		},
+	}
+
+	_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), newDefinition, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Error updating CRD with conversion webhook: %v", err)
+	}
+
+	ctx.startGC(5)
+	// make sure gc.Sync finds the new CRD and starts monitoring it
+	time.Sleep(ctx.syncPeriod + 1*time.Second)
+
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
+
+	toBeDeletedRC, err := rcClient.Create(context.TODO(), newOwnerRC(toBeDeletedRCName, ns.Name), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create replication controller: %v", err)
+	}
+
+	rcs, err := rcClient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list replication controllers: %v", err)
+	}
+	if len(rcs.Items) != 1 {
+		t.Fatalf("Expect only 1 replication controller")
+	}
+
+	pod := newPod(garbageCollectedPodName, ns.Name, []metav1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
+	_, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create Pod: %v", err)
+	}
+
+	pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list pods: %v", err)
+	}
+	if len(pods.Items) != 1 {
+		t.Fatalf("Expect only 1 pods")
+	}
+
+	if err := rcClient.Delete(context.TODO(), toBeDeletedRCName, getNonOrphanOptions()); err != nil {
+		t.Fatalf("failed to delete replication controller: %v", err)
+	}
+
+	// sometimes the deletion of the RC takes long time to be observed by
+	// the gc, so wait for the garbage collector to observe the deletion of
+	// the toBeDeletedRC
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
+		return !gc.GraphHasUID(toBeDeletedRC.ObjectMeta.UID), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 1*time.Second, 30*time.Second); err != nil {
+		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
+	}
+
+	// Check that the cache is still not synced after cascading delete succeeded
+	// If this check passes, check that the conversion webhook is correctly misconfigured
+	// to prevent watch cache from listing the CRD.
+	if ctx.gc.IsSynced(ctx.logger) {
+		t.Fatal("cache is not expected to be synced due to bad conversion webhook")
 	}
 }

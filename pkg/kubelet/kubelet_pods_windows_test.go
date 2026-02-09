@@ -27,9 +27,11 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMakeMountsWindows(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// TODO: remove skip once the failing test has been fixed.
 	t.Skip("Skip failing test on Windows.")
 	container := v1.Container{
@@ -92,7 +94,7 @@ func TestMakeMountsWindows(t *testing.T) {
 	podDir, err := os.MkdirTemp("", "test-rotate-logs")
 	require.NoError(t, err)
 	defer os.RemoveAll(podDir)
-	mounts, _, err := makeMounts(&pod, podDir, &container, "fakepodname", "", []string{""}, podVolumes, fhu, fsp, nil, false)
+	mounts, _, err := makeMounts(logger, &pod, podDir, &container, "fakepodname", "", []string{""}, podVolumes, fhu, fsp, nil, false, nil)
 	require.NoError(t, err)
 
 	expectedMounts := []kubecontainer.Mount{

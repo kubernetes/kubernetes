@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -91,9 +90,9 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 
 	if dualStackMode {
 		proxier, err = winkernel.NewDualStackProxier(
-			config.IPTables.SyncPeriod.Duration,
-			config.IPTables.MinSyncPeriod.Duration,
-			s.Hostname,
+			config.SyncPeriod.Duration,
+			config.MinSyncPeriod.Duration,
+			s.NodeName,
 			s.NodeIPs,
 			s.Recorder,
 			s.HealthzServer,
@@ -103,9 +102,9 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 	} else {
 		proxier, err = winkernel.NewProxier(
 			s.PrimaryIPFamily,
-			config.IPTables.SyncPeriod.Duration,
-			config.IPTables.MinSyncPeriod.Duration,
-			s.Hostname,
+			config.SyncPeriod.Duration,
+			config.MinSyncPeriod.Duration,
+			s.NodeName,
 			s.NodeIPs[s.PrimaryIPFamily],
 			s.Recorder,
 			s.HealthzServer,

@@ -25,6 +25,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
@@ -35,23 +36,23 @@ func TestUIDTrackingExpectations(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	tracks := []struct {
 		job         string
-		firstRound  []string
-		secondRound []string
+		firstRound  []types.UID
+		secondRound []types.UID
 	}{
 		{
 			job:         "foo",
-			firstRound:  []string{"a", "b", "c", "d"},
-			secondRound: []string{"e", "f"},
+			firstRound:  []types.UID{"a", "b", "c", "d"},
+			secondRound: []types.UID{"e", "f"},
 		},
 		{
 			job:         "bar",
-			firstRound:  []string{"x", "y", "z"},
-			secondRound: []string{"u", "v", "w"},
+			firstRound:  []types.UID{"x", "y", "z"},
+			secondRound: []types.UID{"u", "v", "w"},
 		},
 		{
 			job:         "baz",
-			firstRound:  []string{"w"},
-			secondRound: []string{"a"},
+			firstRound:  []types.UID{"w"},
+			secondRound: []types.UID{"a"},
 		},
 	}
 	expectations := newUIDTrackingExpectations()

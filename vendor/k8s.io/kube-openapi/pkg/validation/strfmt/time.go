@@ -16,7 +16,6 @@ package strfmt
 
 import (
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -111,25 +110,6 @@ func (t *DateTime) UnmarshalText(text []byte) error {
 		return err
 	}
 	*t = tt
-	return nil
-}
-
-// Scan scans a DateTime value from database driver type.
-func (t *DateTime) Scan(raw interface{}) error {
-	// TODO: case int64: and case float64: ?
-	switch v := raw.(type) {
-	case []byte:
-		return t.UnmarshalText(v)
-	case string:
-		return t.UnmarshalText([]byte(v))
-	case time.Time:
-		*t = DateTime(v)
-	case nil:
-		*t = DateTime{}
-	default:
-		return fmt.Errorf("cannot sql.Scan() strfmt.DateTime from: %#v", v)
-	}
-
 	return nil
 }
 

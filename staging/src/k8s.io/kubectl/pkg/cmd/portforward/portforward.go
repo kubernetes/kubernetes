@@ -148,7 +148,9 @@ func createDialer(method string, url *url.URL, opts PortForwardOptions) (httpstr
 			return nil, err
 		}
 		// First attempt tunneling (websocket) dialer, then fallback to spdy dialer.
-		dialer = portforward.NewFallbackDialer(tunnelingDialer, dialer, httpstream.IsUpgradeFailure)
+		dialer = portforward.NewFallbackDialer(tunnelingDialer, dialer, func(err error) bool {
+			return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+		})
 	}
 	return dialer, nil
 }
@@ -221,7 +223,9 @@ func convertPodNamedPortToNumber(ports []string, pod corev1.Pod) ([]string, erro
 	var converted []string
 	for _, port := range ports {
 		localPort, remotePort := splitPort(port)
-
+		if remotePort == "" {
+			return nil, fmt.Errorf("remote port cannot be empty")
+		}
 		containerPortStr := remotePort
 		_, err := strconv.Atoi(remotePort)
 		if err != nil {
@@ -243,7 +247,7 @@ func convertPodNamedPortToNumber(ports []string, pod corev1.Pod) ([]string, erro
 	return converted, nil
 }
 
-func checkUDPPorts(udpOnlyPorts sets.Int, ports []string, obj metav1.Object) error {
+func checkUDPPorts(udpOnlyPorts sets.Set[int], ports []string, obj metav1.Object) error {
 	for _, port := range ports {
 		_, remotePort := splitPort(port)
 		portNum, err := strconv.Atoi(remotePort)
@@ -277,8 +281,8 @@ func checkUDPPorts(udpOnlyPorts sets.Int, ports []string, obj metav1.Object) err
 // checkUDPPortInService returns an error if remote port in Service is a UDP port
 // TODO: remove this check after #47862 is solved
 func checkUDPPortInService(ports []string, svc *corev1.Service) error {
-	udpPorts := sets.NewInt()
-	tcpPorts := sets.NewInt()
+	udpPorts := sets.New[int]()
+	tcpPorts := sets.New[int]()
 	for _, port := range svc.Spec.Ports {
 		portNum := int(port.Port)
 		switch port.Protocol {
@@ -294,8 +298,8 @@ func checkUDPPortInService(ports []string, svc *corev1.Service) error {
 // checkUDPPortInPod returns an error if remote port in Pod is a UDP port
 // TODO: remove this check after #47862 is solved
 func checkUDPPortInPod(ports []string, pod *corev1.Pod) error {
-	udpPorts := sets.NewInt()
-	tcpPorts := sets.NewInt()
+	udpPorts := sets.New[int]()
+	tcpPorts := sets.New[int]()
 	for _, ct := range pod.Spec.Containers {
 		for _, ctPort := range ct.Ports {
 			portNum := int(ctPort.ContainerPort)
@@ -329,7 +333,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 
 	getPodTimeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return cmdutil.UsageErrorf(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, "%s", err.Error())
 	}
 
 	resourceName := args[0]
@@ -407,7 +411,6 @@ func (o PortForwardOptions) Validate() error {
 }
 
 // Deprecated: Use RunPortForwardContext instead, which allows canceling.
-// RunPortForward implements all the necessary functionality for port-forward cmd.
 func (o PortForwardOptions) RunPortForward() error {
 	return o.RunPortForwardContext(context.Background())
 }

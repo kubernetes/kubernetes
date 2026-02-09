@@ -2,9 +2,9 @@
 
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go#utilities)
 
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/jonboulle/clockwork/CI?style=flat-square)](https://github.com/jonboulle/clockwork/actions?query=workflow%3ACI)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jonboulle/clockwork/ci.yaml?style=flat-square)](https://github.com/jonboulle/clockwork/actions?query=workflow%3ACI)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jonboulle/clockwork?style=flat-square)](https://goreportcard.com/report/github.com/jonboulle/clockwork)
-![Go Version](https://img.shields.io/badge/go%20version-%3E=1.11-61CFDD.svg?style=flat-square)
+![Go Version](https://img.shields.io/badge/go%20version-%3E=1.15-61CFDD.svg?style=flat-square)
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/mod/github.com/jonboulle/clockwork)
 
 **A simple fake clock for Go.**
@@ -36,6 +36,7 @@ Now you can easily test `myFunc` with a `FakeClock`:
 
 ```go
 func TestMyFunc(t *testing.T) {
+	ctx := context.Background()
 	c := clockwork.NewFakeClock()
 
 	// Start our sleepy function
@@ -46,8 +47,12 @@ func TestMyFunc(t *testing.T) {
 		wg.Done()
 	}()
 
-	// Ensure we wait until myFunc is sleeping
-	c.BlockUntil(1)
+	// Ensure we wait until myFunc is waiting on the clock.
+	// Use a context to avoid blocking forever if something
+	// goes wrong.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	c.BlockUntilContext(ctx, 1)
 
 	assertState()
 

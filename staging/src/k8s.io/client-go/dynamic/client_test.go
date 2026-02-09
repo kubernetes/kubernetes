@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	restclientwatch "k8s.io/client-go/rest/watch"
+	"k8s.io/client-go/util/watchlist"
 )
 
 func getJSON(version, kind, name string) []byte {
@@ -60,6 +61,12 @@ func getObject(version, kind, name string) *unstructured.Unstructured {
 	}
 }
 
+func getObjectFromJSON(b []byte) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	_ = obj.UnmarshalJSON(b) // can ignore parse error because the comparison will fail
+	return obj
+}
+
 func getClientServer(h func(http.ResponseWriter, *http.Request)) (Interface, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
 	cl, err := NewForConfig(&restclient.Config{
@@ -70,6 +77,16 @@ func getClientServer(h func(http.ResponseWriter, *http.Request)) (Interface, *ht
 		return nil, nil, err
 	}
 	return cl, srv, nil
+}
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	target, err := NewForConfig(&restclient.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if watchlist.DoesClientNotSupportWatchListSemantics(target) {
+		t.Fatalf("Dynamic client should support WatchList semantics")
+	}
 }
 
 func TestList(t *testing.T) {
@@ -189,6 +206,15 @@ func TestGet(t *testing.T) {
 			path:        "/apis/gtest/vtest/namespaces/nstest/rtest/namespaced_subresource_get/srtest",
 			resp:        getJSON("vTest", "srTest", "namespaced_subresource_get"),
 			want:        getObject("vTest", "srTest", "namespaced_subresource_get"),
+		},
+		{
+			resource:    "rtest",
+			subresource: []string{"srtest"},
+			namespace:   "nstest",
+			name:        "namespaced_subresource_get_list",
+			path:        "/apis/gtest/vtest/namespaces/nstest/rtest/namespaced_subresource_get_list/srtest",
+			resp:        getListJSON("vTest", "srTest", getJSON("vTest", "srTest", "a1")),
+			want:        getObjectFromJSON(getListJSON("vTest", "srTest", getJSON("vTest", "srTest", "a1"))),
 		},
 	}
 	for _, tc := range tcs {

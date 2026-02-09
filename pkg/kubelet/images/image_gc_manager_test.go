@@ -37,7 +37,9 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	stats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 var zero time.Time
@@ -124,7 +126,7 @@ func makeContainer(id int) *container.Container {
 }
 
 func TestDetectImagesInitialDetect(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -154,7 +156,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 	_, err := manager.detectImages(ctx, zero)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(manager.imageRecordsLen(), 3)
+	assert.Equal(3, manager.imageRecordsLen())
 	noContainer, ok := manager.getImageRecord(imageID(0))
 	require.True(t, ok)
 	assert.Equal(zero, noContainer.firstDetected)
@@ -172,7 +174,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 	testRuntimeHandler := "test-runtimeHandler"
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -207,7 +209,7 @@ func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *
 	_, err := manager.detectImages(ctx, zero)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(manager.imageRecordsLen(), 3)
+	assert.Equal(3, manager.imageRecordsLen())
 	noContainer, ok := manager.getImageRecordWithRuntimeHandlerInImageCriAPIFeatureGate(imageID(0), testRuntimeHandler)
 	require.True(t, ok)
 	assert.Equal(zero, noContainer.firstDetected)
@@ -226,7 +228,7 @@ func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *
 }
 
 func TestDetectImagesWithNewImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	// Just one image initially.
@@ -246,7 +248,7 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 	_, err := manager.detectImages(ctx, zero)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(manager.imageRecordsLen(), 2)
+	assert.Equal(2, manager.imageRecordsLen())
 
 	// Add a new image.
 	fakeRuntime.ImageList = []container.Image{
@@ -259,7 +261,7 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 	startTime := time.Now().Add(-time.Millisecond)
 	_, err = manager.detectImages(ctx, detectedTime)
 	require.NoError(t, err)
-	assert.Equal(manager.imageRecordsLen(), 3)
+	assert.Equal(3, manager.imageRecordsLen())
 	noContainer, ok := manager.getImageRecord(imageID(0))
 	require.True(t, ok)
 	assert.Equal(zero, noContainer.firstDetected)
@@ -278,7 +280,7 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 }
 
 func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -297,7 +299,7 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 }
 
 func TestDeletePinnedImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -320,7 +322,7 @@ func TestDeletePinnedImage(t *testing.T) {
 }
 
 func TestDoNotDeletePinnedImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -341,7 +343,7 @@ func TestDoNotDeletePinnedImage(t *testing.T) {
 }
 
 func TestDeleteUnPinnedImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -362,7 +364,7 @@ func TestDeleteUnPinnedImage(t *testing.T) {
 }
 
 func TestAllPinnedImages(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -384,7 +386,7 @@ func TestAllPinnedImages(t *testing.T) {
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -403,7 +405,7 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 	_, err := manager.detectImages(ctx, zero)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(manager.imageRecordsLen(), 2)
+	assert.Equal(2, manager.imageRecordsLen())
 	withContainer, ok := manager.getImageRecord(imageID(1))
 	require.True(t, ok)
 
@@ -411,7 +413,7 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 	fakeRuntime.AllPodList = []*containertest.FakePod{}
 	_, err = manager.detectImages(ctx, time.Now())
 	require.NoError(t, err)
-	assert.Equal(manager.imageRecordsLen(), 2)
+	assert.Equal(2, manager.imageRecordsLen())
 	container1, ok := manager.getImageRecord(imageID(0))
 	require.True(t, ok)
 	assert.Equal(zero, container1.firstDetected)
@@ -423,7 +425,7 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 }
 
 func TestDetectImagesWithRemovedImages(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -442,17 +444,17 @@ func TestDetectImagesWithRemovedImages(t *testing.T) {
 	_, err := manager.detectImages(ctx, zero)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(manager.imageRecordsLen(), 2)
+	assert.Equal(2, manager.imageRecordsLen())
 
 	// Simulate both images being removed.
 	fakeRuntime.ImageList = []container.Image{}
 	_, err = manager.detectImages(ctx, time.Now())
 	require.NoError(t, err)
-	assert.Equal(manager.imageRecordsLen(), 0)
+	assert.Equal(0, manager.imageRecordsLen())
 }
 
 func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -473,7 +475,7 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 }
 
 func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -497,7 +499,7 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 }
 
 func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{
@@ -516,7 +518,7 @@ func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
 		}},
 	}
 	// start to detect images
-	manager.Start()
+	manager.Start(ctx)
 	// try to delete images, but images are not old enough,so no image will be deleted
 	err := manager.DeleteUnusedImages(ctx)
 	assert := assert.New(t)
@@ -530,7 +532,7 @@ func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
 }
 
 func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -573,7 +575,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 	}
 	_, err = manager.detectImages(ctx, time.Now())
 	require.NoError(t, err)
-	require.Equal(t, manager.imageRecordsLen(), 2)
+	require.Equal(t, 2, manager.imageRecordsLen())
 
 	// We're setting the delete time one minute in the future, so the time the image
 	// was first detected and the delete time are different.
@@ -582,7 +584,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 }
 
 func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -609,14 +611,14 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 	fakeRuntime.AllPodList = []*containertest.FakePod{}
 	_, err = manager.detectImages(ctx, time.Now())
 	require.NoError(t, err)
-	require.Equal(t, manager.imageRecordsLen(), 2)
+	require.Equal(t, 2, manager.imageRecordsLen())
 
 	assert := assert.New(t)
 	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 1024, 2048, 1, time.Now())
 }
 
 func TestGarbageCollectBelowLowThreshold(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -626,8 +628,8 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 
 	// Expect 40% usage.
 	imageStats := &statsapi.FsStats{
-		AvailableBytes: uint64Ptr(600),
-		CapacityBytes:  uint64Ptr(1000),
+		AvailableBytes: ptr.To(uint64(600)),
+		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageStats, imageStats, nil)
 
@@ -635,7 +637,7 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 }
 
 func TestGarbageCollectCadvisorFailure(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -644,11 +646,11 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 	manager, _ := newRealImageGCManager(policy, mockStatsProvider)
 
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(&statsapi.FsStats{}, &statsapi.FsStats{}, fmt.Errorf("error"))
-	assert.NotNil(t, manager.GarbageCollect(ctx, time.Now()))
+	require.Error(t, manager.GarbageCollect(ctx, time.Now()))
 }
 
 func TestGarbageCollectBelowSuccess(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -659,8 +661,8 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 
 	// Expect 95% usage and most of it gets freed.
 	imageFs := &statsapi.FsStats{
-		AvailableBytes: uint64Ptr(50),
-		CapacityBytes:  uint64Ptr(1000),
+		AvailableBytes: ptr.To(uint64(50)),
+		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
 	fakeRuntime.ImageList = []container.Image{
@@ -671,29 +673,55 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 }
 
 func TestGarbageCollectNotEnoughFreed(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
 	mockStatsProvider := statstest.NewMockProvider(t)
-	manager, fakeRuntime := newRealImageGCManager(policy, mockStatsProvider)
+	fakeRuntime := &containertest.FakeRuntime{}
+	recorder := record.NewFakeRecorder(1)
+	manager := &realImageGCManager{
+		runtime:       fakeRuntime,
+		policy:        policy,
+		imageRecords:  make(map[string]*imageRecord),
+		statsProvider: mockStatsProvider,
+		recorder:      recorder,
+		tracer:        noopoteltrace.NewTracerProvider().Tracer(""),
+	}
 
-	// Expect 95% usage and little of it gets freed.
+	// Initial state: 95% usage, of which 5% is garbage images.
+	capacity := uint64(10 * 1024 * 1024 * 1024)
+	available := capacity / 20 // 5% available, 95% usage
 	imageFs := &statsapi.FsStats{
-		AvailableBytes: uint64Ptr(50),
-		CapacityBytes:  uint64Ptr(1000),
+		AvailableBytes: ptr.To(available),
+		CapacityBytes:  ptr.To(capacity),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
+	// This image is unused and eligible for deletion.
+	// Its size is less than the required amount to free.
+	imageSize := int64(500 * 1024 * 1024) // 500 MiB
 	fakeRuntime.ImageList = []container.Image{
-		makeImage(0, 50),
+		makeImage(0, imageSize),
 	}
 
-	assert.NotNil(t, manager.GarbageCollect(ctx, time.Now()))
+	err := manager.GarbageCollect(ctx, time.Now())
+	require.Error(t, err)
+
+	// Check that a warning event was sent
+	expectedEvent := "Warning FreeDiskSpaceFailed Insufficient free disk space on the node's image filesystem" +
+		" (95% of 10.0 GiB used). Failed to free sufficient space by deleting unused images (freed 524288000 bytes)." +
+		" Investigate disk usage, as it could be used by active images, logs, volumes, or other data."
+	select {
+	case event := <-recorder.Events:
+		assert.Equal(t, expectedEvent, event)
+	default:
+		t.Errorf("expected a 'FreeDiskSpaceFailed' event")
+	}
 }
 
 func TestGarbageCollectImageNotOldEnough(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -726,7 +754,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	t.Log(fakeClock.Now())
 	_, err := manager.detectImages(ctx, fakeClock.Now())
 	require.NoError(t, err)
-	require.Equal(t, manager.imageRecordsLen(), 2)
+	require.Equal(t, 2, manager.imageRecordsLen())
 	// no space freed since one image is in used, and another one is not old enough
 	assert := assert.New(t)
 	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 1024, 0, 2, fakeClock.Now())
@@ -739,14 +767,14 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 func getImagesAndFreeSpace(ctx context.Context, t *testing.T, assert *assert.Assertions, im *realImageGCManager, fakeRuntime *containertest.FakeRuntime, spaceToFree, expectedSpaceFreed int64, imagesLen int, freeTime time.Time) {
 	images, err := im.imagesInEvictionOrder(ctx, freeTime)
 	require.NoError(t, err)
-	spaceFreed, err := im.freeSpace(ctx, spaceToFree, freeTime, images)
+	_, spaceFreed, err := im.freeSpace(ctx, spaceToFree, freeTime, images)
 	require.NoError(t, err)
 	assert.EqualValues(expectedSpaceFreed, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, imagesLen)
 }
 
 func TestGarbageCollectImageTooOld(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -801,7 +829,7 @@ func TestGarbageCollectImageTooOld(t *testing.T) {
 }
 
 func TestGarbageCollectImageMaxAgeDisabled(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -909,14 +937,10 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, noopoteltrace.NewTracerProvider()); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, nil, tc.imageGCPolicy, noopoteltrace.NewTracerProvider()); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
 		}
 	}
-}
-
-func uint64Ptr(i uint64) *uint64 {
-	return &i
 }

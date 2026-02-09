@@ -19,17 +19,26 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // HorizontalPodAutoscalerStatusApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerStatus type for use
 // with apply.
+//
+// current status of a horizontal pod autoscaler
 type HorizontalPodAutoscalerStatusApplyConfiguration struct {
-	ObservedGeneration              *int64   `json:"observedGeneration,omitempty"`
-	LastScaleTime                   *v1.Time `json:"lastScaleTime,omitempty"`
-	CurrentReplicas                 *int32   `json:"currentReplicas,omitempty"`
-	DesiredReplicas                 *int32   `json:"desiredReplicas,omitempty"`
-	CurrentCPUUtilizationPercentage *int32   `json:"currentCPUUtilizationPercentage,omitempty"`
+	// observedGeneration is the most recent generation observed by this autoscaler.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods;
+	// used by the autoscaler to control how often the number of pods is changed.
+	LastScaleTime *metav1.Time `json:"lastScaleTime,omitempty"`
+	// currentReplicas is the current number of replicas of pods managed by this autoscaler.
+	CurrentReplicas *int32 `json:"currentReplicas,omitempty"`
+	// desiredReplicas is the  desired number of replicas of pods managed by this autoscaler.
+	DesiredReplicas *int32 `json:"desiredReplicas,omitempty"`
+	// currentCPUUtilizationPercentage is the current average CPU utilization over all pods, represented as a percentage of requested CPU,
+	// e.g. 70 means that an average pod is using now 70% of its requested CPU.
+	CurrentCPUUtilizationPercentage *int32 `json:"currentCPUUtilizationPercentage,omitempty"`
 }
 
 // HorizontalPodAutoscalerStatusApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerStatus type for use with
@@ -49,7 +58,7 @@ func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithObservedGeneration
 // WithLastScaleTime sets the LastScaleTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LastScaleTime field is set to the value of the last call.
-func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithLastScaleTime(value v1.Time) *HorizontalPodAutoscalerStatusApplyConfiguration {
+func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithLastScaleTime(value metav1.Time) *HorizontalPodAutoscalerStatusApplyConfiguration {
 	b.LastScaleTime = &value
 	return b
 }

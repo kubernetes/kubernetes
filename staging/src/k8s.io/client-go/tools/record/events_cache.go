@@ -23,14 +23,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/groupcache/lru"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/lru"
 )
 
 const (
@@ -77,6 +76,7 @@ func getSpamKey(event *v1.Event) string {
 		event.InvolvedObject.Name,
 		string(event.InvolvedObject.UID),
 		event.InvolvedObject.APIVersion,
+		event.Type,
 	},
 		"")
 }
@@ -90,8 +90,6 @@ type EventFilterFunc func(event *v1.Event) bool
 // EventSourceObjectSpamFilter is responsible for throttling
 // the amount of events a source and object can produce.
 type EventSourceObjectSpamFilter struct {
-	sync.RWMutex
-
 	// the cache that manages last synced state
 	cache *lru.Cache
 
@@ -133,8 +131,6 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 	eventKey := f.spamKeyFunc(event)
 
 	// do we have a record of similar events in our cache?
-	f.Lock()
-	defer f.Unlock()
 	value, found := f.cache.Get(eventKey)
 	if found {
 		record = value.(spamRecord)
@@ -227,7 +223,7 @@ func NewEventAggregator(lruCacheSize int, keyFunc EventAggregatorKeyFunc, messag
 type aggregateRecord struct {
 	// we track the number of unique local keys we have seen in the aggregate set to know when to actually aggregate
 	// if the size of this set exceeds the max, we know we need to aggregate
-	localKeys sets.String
+	localKeys sets.Set[string]
 	// The last time at which the aggregate was recorded
 	lastTimestamp metav1.Time
 }
@@ -261,7 +257,7 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, string)
 	maxInterval := time.Duration(e.maxIntervalInSeconds) * time.Second
 	interval := now.Time.Sub(record.lastTimestamp.Time)
 	if interval > maxInterval {
-		record = aggregateRecord{localKeys: sets.NewString()}
+		record = aggregateRecord{localKeys: sets.New[string]()}
 	}
 
 	// Write the new event into the aggregation record and put it on the cache

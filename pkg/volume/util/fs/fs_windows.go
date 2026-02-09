@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -82,6 +81,11 @@ func diskUsage(currPath string, info os.FileInfo) (int64, error) {
 	var size int64
 
 	if info.Mode()&os.ModeSymlink != 0 {
+		return size, nil
+	}
+
+	// go1.23 behavior change: https://github.com/golang/go/issues/63703#issuecomment-2535941458
+	if info.Mode()&os.ModeIrregular != 0 {
 		return size, nil
 	}
 

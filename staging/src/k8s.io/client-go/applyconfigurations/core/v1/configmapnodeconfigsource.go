@@ -24,12 +24,25 @@ import (
 
 // ConfigMapNodeConfigSourceApplyConfiguration represents a declarative configuration of the ConfigMapNodeConfigSource type for use
 // with apply.
+//
+// ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.
+// This API is deprecated since 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
 type ConfigMapNodeConfigSourceApplyConfiguration struct {
-	Namespace        *string    `json:"namespace,omitempty"`
-	Name             *string    `json:"name,omitempty"`
-	UID              *types.UID `json:"uid,omitempty"`
-	ResourceVersion  *string    `json:"resourceVersion,omitempty"`
-	KubeletConfigKey *string    `json:"kubeletConfigKey,omitempty"`
+	// Namespace is the metadata.namespace of the referenced ConfigMap.
+	// This field is required in all cases.
+	Namespace *string `json:"namespace,omitempty"`
+	// Name is the metadata.name of the referenced ConfigMap.
+	// This field is required in all cases.
+	Name *string `json:"name,omitempty"`
+	// UID is the metadata.UID of the referenced ConfigMap.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
+	UID *types.UID `json:"uid,omitempty"`
+	// ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
+	ResourceVersion *string `json:"resourceVersion,omitempty"`
+	// KubeletConfigKey declares which key of the referenced ConfigMap corresponds to the KubeletConfiguration structure
+	// This field is required in all cases.
+	KubeletConfigKey *string `json:"kubeletConfigKey,omitempty"`
 }
 
 // ConfigMapNodeConfigSourceApplyConfiguration constructs a declarative configuration of the ConfigMapNodeConfigSource type for use with

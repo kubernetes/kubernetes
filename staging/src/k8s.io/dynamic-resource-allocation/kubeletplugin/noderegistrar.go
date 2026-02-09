@@ -17,6 +17,7 @@ limitations under the License.
 package kubeletplugin
 
 import (
+	"context"
 	"fmt"
 
 	"google.golang.org/grpc"
@@ -25,22 +26,20 @@ import (
 )
 
 type nodeRegistrar struct {
-	logger klog.Logger
 	registrationServer
 	server *grpcServer
 }
 
 // startRegistrar returns a running instance.
-func startRegistrar(logger klog.Logger, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, driverName string, endpoint string, pluginRegistrationEndpoint endpoint) (*nodeRegistrar, error) {
+func startRegistrar(logger klog.Logger, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, driverName string, supportedServices []string, draEndpointPath string, pluginRegistrationEndpoint endpoint, errHandler func(ctx context.Context, err error)) (*nodeRegistrar, error) {
 	n := &nodeRegistrar{
-		logger: logger,
 		registrationServer: registrationServer{
 			driverName:        driverName,
-			endpoint:          endpoint,
-			supportedVersions: []string{"1.0.0"}, // TODO: is this correct?
+			draEndpointPath:   draEndpointPath,
+			supportedVersions: supportedServices, // DRA uses this field to describe provided services (e.g. "v1beta1.DRAPlugin").
 		},
 	}
-	s, err := startGRPCServer(logger, grpcVerbosity, interceptors, streamInterceptors, pluginRegistrationEndpoint, func(grpcServer *grpc.Server) {
+	s, err := startGRPCServer(logger, grpcVerbosity, interceptors, streamInterceptors, pluginRegistrationEndpoint, errHandler, func(grpcServer *grpc.Server) {
 		registerapi.RegisterRegistrationServer(grpcServer, n)
 	})
 	if err != nil {

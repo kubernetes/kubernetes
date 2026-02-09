@@ -20,10 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/features"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -171,8 +168,6 @@ var provision2Success = provisionCall{
 // 2. Call the syncVolume *once*.
 // 3. Compare resulting volumes with expected volumes.
 func TestProvisionSync(t *testing.T) {
-	// Default enable the HonorPVReclaimPolicy feature gate.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{
@@ -598,9 +593,6 @@ func TestProvisionSync(t *testing.T) {
 //
 // Some limit of calls in enforced to prevent endless loops.
 func TestProvisionMultiSync(t *testing.T) {
-	// Default enable the HonorPVReclaimPolicy feature gate.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
-
 	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{

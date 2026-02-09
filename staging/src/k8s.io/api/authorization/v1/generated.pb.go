@@ -23,515 +23,46 @@ import (
 	fmt "fmt"
 
 	io "io"
+	"sort"
 
-	proto "github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+func (m *ExtraValue) Reset() { *m = ExtraValue{} }
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+func (m *FieldSelectorAttributes) Reset() { *m = FieldSelectorAttributes{} }
 
-func (m *ExtraValue) Reset()      { *m = ExtraValue{} }
-func (*ExtraValue) ProtoMessage() {}
-func (*ExtraValue) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{0}
-}
-func (m *ExtraValue) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ExtraValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ExtraValue) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ExtraValue.Merge(m, src)
-}
-func (m *ExtraValue) XXX_Size() int {
-	return m.Size()
-}
-func (m *ExtraValue) XXX_DiscardUnknown() {
-	xxx_messageInfo_ExtraValue.DiscardUnknown(m)
-}
+func (m *LabelSelectorAttributes) Reset() { *m = LabelSelectorAttributes{} }
 
-var xxx_messageInfo_ExtraValue proto.InternalMessageInfo
+func (m *LocalSubjectAccessReview) Reset() { *m = LocalSubjectAccessReview{} }
 
-func (m *LocalSubjectAccessReview) Reset()      { *m = LocalSubjectAccessReview{} }
-func (*LocalSubjectAccessReview) ProtoMessage() {}
-func (*LocalSubjectAccessReview) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{1}
-}
-func (m *LocalSubjectAccessReview) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *LocalSubjectAccessReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *LocalSubjectAccessReview) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_LocalSubjectAccessReview.Merge(m, src)
-}
-func (m *LocalSubjectAccessReview) XXX_Size() int {
-	return m.Size()
-}
-func (m *LocalSubjectAccessReview) XXX_DiscardUnknown() {
-	xxx_messageInfo_LocalSubjectAccessReview.DiscardUnknown(m)
-}
+func (m *NonResourceAttributes) Reset() { *m = NonResourceAttributes{} }
 
-var xxx_messageInfo_LocalSubjectAccessReview proto.InternalMessageInfo
+func (m *NonResourceRule) Reset() { *m = NonResourceRule{} }
 
-func (m *NonResourceAttributes) Reset()      { *m = NonResourceAttributes{} }
-func (*NonResourceAttributes) ProtoMessage() {}
-func (*NonResourceAttributes) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{2}
-}
-func (m *NonResourceAttributes) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *NonResourceAttributes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *NonResourceAttributes) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NonResourceAttributes.Merge(m, src)
-}
-func (m *NonResourceAttributes) XXX_Size() int {
-	return m.Size()
-}
-func (m *NonResourceAttributes) XXX_DiscardUnknown() {
-	xxx_messageInfo_NonResourceAttributes.DiscardUnknown(m)
-}
+func (m *ResourceAttributes) Reset() { *m = ResourceAttributes{} }
 
-var xxx_messageInfo_NonResourceAttributes proto.InternalMessageInfo
+func (m *ResourceRule) Reset() { *m = ResourceRule{} }
 
-func (m *NonResourceRule) Reset()      { *m = NonResourceRule{} }
-func (*NonResourceRule) ProtoMessage() {}
-func (*NonResourceRule) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{3}
-}
-func (m *NonResourceRule) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *NonResourceRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *NonResourceRule) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NonResourceRule.Merge(m, src)
-}
-func (m *NonResourceRule) XXX_Size() int {
-	return m.Size()
-}
-func (m *NonResourceRule) XXX_DiscardUnknown() {
-	xxx_messageInfo_NonResourceRule.DiscardUnknown(m)
-}
+func (m *SelfSubjectAccessReview) Reset() { *m = SelfSubjectAccessReview{} }
 
-var xxx_messageInfo_NonResourceRule proto.InternalMessageInfo
+func (m *SelfSubjectAccessReviewSpec) Reset() { *m = SelfSubjectAccessReviewSpec{} }
 
-func (m *ResourceAttributes) Reset()      { *m = ResourceAttributes{} }
-func (*ResourceAttributes) ProtoMessage() {}
-func (*ResourceAttributes) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{4}
-}
-func (m *ResourceAttributes) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ResourceAttributes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ResourceAttributes) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ResourceAttributes.Merge(m, src)
-}
-func (m *ResourceAttributes) XXX_Size() int {
-	return m.Size()
-}
-func (m *ResourceAttributes) XXX_DiscardUnknown() {
-	xxx_messageInfo_ResourceAttributes.DiscardUnknown(m)
-}
+func (m *SelfSubjectRulesReview) Reset() { *m = SelfSubjectRulesReview{} }
 
-var xxx_messageInfo_ResourceAttributes proto.InternalMessageInfo
+func (m *SelfSubjectRulesReviewSpec) Reset() { *m = SelfSubjectRulesReviewSpec{} }
 
-func (m *ResourceRule) Reset()      { *m = ResourceRule{} }
-func (*ResourceRule) ProtoMessage() {}
-func (*ResourceRule) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{5}
-}
-func (m *ResourceRule) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ResourceRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ResourceRule) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ResourceRule.Merge(m, src)
-}
-func (m *ResourceRule) XXX_Size() int {
-	return m.Size()
-}
-func (m *ResourceRule) XXX_DiscardUnknown() {
-	xxx_messageInfo_ResourceRule.DiscardUnknown(m)
-}
+func (m *SubjectAccessReview) Reset() { *m = SubjectAccessReview{} }
 
-var xxx_messageInfo_ResourceRule proto.InternalMessageInfo
+func (m *SubjectAccessReviewSpec) Reset() { *m = SubjectAccessReviewSpec{} }
 
-func (m *SelfSubjectAccessReview) Reset()      { *m = SelfSubjectAccessReview{} }
-func (*SelfSubjectAccessReview) ProtoMessage() {}
-func (*SelfSubjectAccessReview) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{6}
-}
-func (m *SelfSubjectAccessReview) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SelfSubjectAccessReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SelfSubjectAccessReview) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SelfSubjectAccessReview.Merge(m, src)
-}
-func (m *SelfSubjectAccessReview) XXX_Size() int {
-	return m.Size()
-}
-func (m *SelfSubjectAccessReview) XXX_DiscardUnknown() {
-	xxx_messageInfo_SelfSubjectAccessReview.DiscardUnknown(m)
-}
+func (m *SubjectAccessReviewStatus) Reset() { *m = SubjectAccessReviewStatus{} }
 
-var xxx_messageInfo_SelfSubjectAccessReview proto.InternalMessageInfo
-
-func (m *SelfSubjectAccessReviewSpec) Reset()      { *m = SelfSubjectAccessReviewSpec{} }
-func (*SelfSubjectAccessReviewSpec) ProtoMessage() {}
-func (*SelfSubjectAccessReviewSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{7}
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SelfSubjectAccessReviewSpec.Merge(m, src)
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_SelfSubjectAccessReviewSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SelfSubjectAccessReviewSpec proto.InternalMessageInfo
-
-func (m *SelfSubjectRulesReview) Reset()      { *m = SelfSubjectRulesReview{} }
-func (*SelfSubjectRulesReview) ProtoMessage() {}
-func (*SelfSubjectRulesReview) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{8}
-}
-func (m *SelfSubjectRulesReview) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SelfSubjectRulesReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SelfSubjectRulesReview) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SelfSubjectRulesReview.Merge(m, src)
-}
-func (m *SelfSubjectRulesReview) XXX_Size() int {
-	return m.Size()
-}
-func (m *SelfSubjectRulesReview) XXX_DiscardUnknown() {
-	xxx_messageInfo_SelfSubjectRulesReview.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SelfSubjectRulesReview proto.InternalMessageInfo
-
-func (m *SelfSubjectRulesReviewSpec) Reset()      { *m = SelfSubjectRulesReviewSpec{} }
-func (*SelfSubjectRulesReviewSpec) ProtoMessage() {}
-func (*SelfSubjectRulesReviewSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{9}
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SelfSubjectRulesReviewSpec.Merge(m, src)
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_SelfSubjectRulesReviewSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SelfSubjectRulesReviewSpec proto.InternalMessageInfo
-
-func (m *SubjectAccessReview) Reset()      { *m = SubjectAccessReview{} }
-func (*SubjectAccessReview) ProtoMessage() {}
-func (*SubjectAccessReview) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{10}
-}
-func (m *SubjectAccessReview) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SubjectAccessReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SubjectAccessReview) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SubjectAccessReview.Merge(m, src)
-}
-func (m *SubjectAccessReview) XXX_Size() int {
-	return m.Size()
-}
-func (m *SubjectAccessReview) XXX_DiscardUnknown() {
-	xxx_messageInfo_SubjectAccessReview.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SubjectAccessReview proto.InternalMessageInfo
-
-func (m *SubjectAccessReviewSpec) Reset()      { *m = SubjectAccessReviewSpec{} }
-func (*SubjectAccessReviewSpec) ProtoMessage() {}
-func (*SubjectAccessReviewSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{11}
-}
-func (m *SubjectAccessReviewSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SubjectAccessReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SubjectAccessReviewSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SubjectAccessReviewSpec.Merge(m, src)
-}
-func (m *SubjectAccessReviewSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *SubjectAccessReviewSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_SubjectAccessReviewSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SubjectAccessReviewSpec proto.InternalMessageInfo
-
-func (m *SubjectAccessReviewStatus) Reset()      { *m = SubjectAccessReviewStatus{} }
-func (*SubjectAccessReviewStatus) ProtoMessage() {}
-func (*SubjectAccessReviewStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{12}
-}
-func (m *SubjectAccessReviewStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SubjectAccessReviewStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SubjectAccessReviewStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SubjectAccessReviewStatus.Merge(m, src)
-}
-func (m *SubjectAccessReviewStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *SubjectAccessReviewStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_SubjectAccessReviewStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SubjectAccessReviewStatus proto.InternalMessageInfo
-
-func (m *SubjectRulesReviewStatus) Reset()      { *m = SubjectRulesReviewStatus{} }
-func (*SubjectRulesReviewStatus) ProtoMessage() {}
-func (*SubjectRulesReviewStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{13}
-}
-func (m *SubjectRulesReviewStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SubjectRulesReviewStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SubjectRulesReviewStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SubjectRulesReviewStatus.Merge(m, src)
-}
-func (m *SubjectRulesReviewStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *SubjectRulesReviewStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_SubjectRulesReviewStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SubjectRulesReviewStatus proto.InternalMessageInfo
-
-func init() {
-	proto.RegisterType((*ExtraValue)(nil), "k8s.io.api.authorization.v1.ExtraValue")
-	proto.RegisterType((*LocalSubjectAccessReview)(nil), "k8s.io.api.authorization.v1.LocalSubjectAccessReview")
-	proto.RegisterType((*NonResourceAttributes)(nil), "k8s.io.api.authorization.v1.NonResourceAttributes")
-	proto.RegisterType((*NonResourceRule)(nil), "k8s.io.api.authorization.v1.NonResourceRule")
-	proto.RegisterType((*ResourceAttributes)(nil), "k8s.io.api.authorization.v1.ResourceAttributes")
-	proto.RegisterType((*ResourceRule)(nil), "k8s.io.api.authorization.v1.ResourceRule")
-	proto.RegisterType((*SelfSubjectAccessReview)(nil), "k8s.io.api.authorization.v1.SelfSubjectAccessReview")
-	proto.RegisterType((*SelfSubjectAccessReviewSpec)(nil), "k8s.io.api.authorization.v1.SelfSubjectAccessReviewSpec")
-	proto.RegisterType((*SelfSubjectRulesReview)(nil), "k8s.io.api.authorization.v1.SelfSubjectRulesReview")
-	proto.RegisterType((*SelfSubjectRulesReviewSpec)(nil), "k8s.io.api.authorization.v1.SelfSubjectRulesReviewSpec")
-	proto.RegisterType((*SubjectAccessReview)(nil), "k8s.io.api.authorization.v1.SubjectAccessReview")
-	proto.RegisterType((*SubjectAccessReviewSpec)(nil), "k8s.io.api.authorization.v1.SubjectAccessReviewSpec")
-	proto.RegisterMapType((map[string]ExtraValue)(nil), "k8s.io.api.authorization.v1.SubjectAccessReviewSpec.ExtraEntry")
-	proto.RegisterType((*SubjectAccessReviewStatus)(nil), "k8s.io.api.authorization.v1.SubjectAccessReviewStatus")
-	proto.RegisterType((*SubjectRulesReviewStatus)(nil), "k8s.io.api.authorization.v1.SubjectRulesReviewStatus")
-}
-
-func init() {
-	proto.RegisterFile("k8s.io/api/authorization/v1/generated.proto", fileDescriptor_aafd0e5e70cec678)
-}
-
-var fileDescriptor_aafd0e5e70cec678 = []byte{
-	// 1126 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x57, 0x4f, 0x6f, 0x1b, 0x45,
-	0x14, 0xf7, 0xfa, 0x4f, 0x6a, 0x3f, 0x37, 0x24, 0x9d, 0x28, 0xcd, 0x36, 0x11, 0x76, 0xb4, 0x48,
-	0x90, 0xaa, 0x65, 0x97, 0x58, 0x6d, 0x13, 0x55, 0xaa, 0x90, 0xad, 0x46, 0x28, 0x52, 0x5b, 0xaa,
-	0x89, 0x12, 0x89, 0x22, 0x10, 0xe3, 0xf5, 0xc4, 0x5e, 0x62, 0xef, 0x2e, 0x3b, 0xbb, 0x0e, 0xe1,
-	0x54, 0x89, 0x2f, 0xc0, 0x91, 0x03, 0x07, 0xbe, 0x01, 0x17, 0x24, 0x6e, 0x1c, 0x38, 0xa0, 0x1c,
-	0x7b, 0x2c, 0x12, 0xb2, 0xc8, 0x72, 0xe6, 0x3b, 0xa0, 0x99, 0x1d, 0x7b, 0xd7, 0xc9, 0xda, 0x8d,
-	0x39, 0xd0, 0x4b, 0x6f, 0xde, 0xf7, 0xfb, 0xbd, 0x37, 0x6f, 0xde, 0xbf, 0x79, 0x86, 0x5b, 0x47,
-	0xdb, 0x4c, 0xb7, 0x1c, 0x83, 0xb8, 0x96, 0x41, 0x02, 0xbf, 0xe3, 0x78, 0xd6, 0x37, 0xc4, 0xb7,
-	0x1c, 0xdb, 0xe8, 0x6f, 0x1a, 0x6d, 0x6a, 0x53, 0x8f, 0xf8, 0xb4, 0xa5, 0xbb, 0x9e, 0xe3, 0x3b,
-	0x68, 0x2d, 0x22, 0xeb, 0xc4, 0xb5, 0xf4, 0x31, 0xb2, 0xde, 0xdf, 0x5c, 0x7d, 0xbf, 0x6d, 0xf9,
-	0x9d, 0xa0, 0xa9, 0x9b, 0x4e, 0xcf, 0x68, 0x3b, 0x6d, 0xc7, 0x10, 0x3a, 0xcd, 0xe0, 0x50, 0x7c,
-	0x89, 0x0f, 0xf1, 0x2b, 0xb2, 0xb5, 0x7a, 0x27, 0x3e, 0xb8, 0x47, 0xcc, 0x8e, 0x65, 0x53, 0xef,
-	0xc4, 0x70, 0x8f, 0xda, 0x5c, 0xc0, 0x8c, 0x1e, 0xf5, 0x49, 0x8a, 0x07, 0xab, 0xc6, 0x24, 0x2d,
-	0x2f, 0xb0, 0x7d, 0xab, 0x47, 0x2f, 0x28, 0xdc, 0x7b, 0x95, 0x02, 0x33, 0x3b, 0xb4, 0x47, 0xce,
-	0xeb, 0x69, 0x5b, 0x00, 0x3b, 0x5f, 0xfb, 0x1e, 0x39, 0x20, 0xdd, 0x80, 0xa2, 0x2a, 0x14, 0x2c,
-	0x9f, 0xf6, 0x98, 0xaa, 0xac, 0xe7, 0x36, 0x4a, 0x8d, 0x52, 0x38, 0xa8, 0x16, 0x76, 0xb9, 0x00,
-	0x47, 0xf2, 0xfb, 0xc5, 0xef, 0x7f, 0xac, 0x66, 0x9e, 0xff, 0xb9, 0x9e, 0xd1, 0x7e, 0xce, 0x82,
-	0xfa, 0xc8, 0x31, 0x49, 0x77, 0x2f, 0x68, 0x7e, 0x49, 0x4d, 0xbf, 0x6e, 0x9a, 0x94, 0x31, 0x4c,
-	0xfb, 0x16, 0x3d, 0x46, 0x5f, 0x40, 0x91, 0xdf, 0xac, 0x45, 0x7c, 0xa2, 0x2a, 0xeb, 0xca, 0x46,
-	0xb9, 0xf6, 0x81, 0x1e, 0xc7, 0x74, 0xe4, 0xa0, 0xee, 0x1e, 0xb5, 0xb9, 0x80, 0xe9, 0x9c, 0xad,
-	0xf7, 0x37, 0xf5, 0x8f, 0x85, 0xad, 0xc7, 0xd4, 0x27, 0x0d, 0x74, 0x3a, 0xa8, 0x66, 0xc2, 0x41,
-	0x15, 0x62, 0x19, 0x1e, 0x59, 0x45, 0x07, 0x90, 0x67, 0x2e, 0x35, 0xd5, 0xac, 0xb0, 0x7e, 0x47,
-	0x9f, 0x92, 0x31, 0x3d, 0xc5, 0xc3, 0x3d, 0x97, 0x9a, 0x8d, 0xab, 0xf2, 0x84, 0x3c, 0xff, 0xc2,
-	0xc2, 0x1e, 0xfa, 0x1c, 0xe6, 0x98, 0x4f, 0xfc, 0x80, 0xa9, 0x39, 0x61, 0xf9, 0xde, 0xcc, 0x96,
-	0x85, 0x76, 0xe3, 0x2d, 0x69, 0x7b, 0x2e, 0xfa, 0xc6, 0xd2, 0xaa, 0xf6, 0x29, 0x2c, 0x3f, 0x71,
-	0x6c, 0x4c, 0x99, 0x13, 0x78, 0x26, 0xad, 0xfb, 0xbe, 0x67, 0x35, 0x03, 0x9f, 0x32, 0xb4, 0x0e,
-	0x79, 0x97, 0xf8, 0x1d, 0x11, 0xae, 0x52, 0xec, 0xda, 0x53, 0xe2, 0x77, 0xb0, 0x40, 0x38, 0xa3,
-	0x4f, 0xbd, 0xa6, 0xb8, 0x72, 0x82, 0x71, 0x40, 0xbd, 0x26, 0x16, 0x88, 0xf6, 0x15, 0x2c, 0x24,
-	0x8c, 0xe3, 0xa0, 0x2b, 0x32, 0xca, 0xa1, 0xb1, 0x8c, 0x72, 0x0d, 0x86, 0x23, 0x39, 0x7a, 0x00,
-	0x0b, 0x76, 0xac, 0xb3, 0x8f, 0x1f, 0x31, 0x35, 0x2b, 0xa8, 0x4b, 0xe1, 0xa0, 0x9a, 0x34, 0xc7,
-	0x21, 0x7c, 0x9e, 0xab, 0xfd, 0x9a, 0x05, 0x94, 0x72, 0x1b, 0x03, 0x4a, 0x36, 0xe9, 0x51, 0xe6,
-	0x12, 0x93, 0xca, 0x2b, 0x5d, 0x93, 0x0e, 0x97, 0x9e, 0x0c, 0x01, 0x1c, 0x73, 0x5e, 0x7d, 0x39,
-	0xf4, 0x0e, 0x14, 0xda, 0x9e, 0x13, 0xb8, 0x22, 0x31, 0xa5, 0xc6, 0xbc, 0xa4, 0x14, 0x3e, 0xe2,
-	0x42, 0x1c, 0x61, 0xe8, 0x26, 0x5c, 0xe9, 0x53, 0x8f, 0x59, 0x8e, 0xad, 0xe6, 0x05, 0x6d, 0x41,
-	0xd2, 0xae, 0x1c, 0x44, 0x62, 0x3c, 0xc4, 0xd1, 0x6d, 0x28, 0x7a, 0xd2, 0x71, 0xb5, 0x20, 0xb8,
-	0x8b, 0x92, 0x5b, 0x1c, 0x45, 0x70, 0xc4, 0x40, 0x77, 0xa1, 0xcc, 0x82, 0xe6, 0x48, 0x61, 0x4e,
-	0x28, 0x2c, 0x49, 0x85, 0xf2, 0x5e, 0x0c, 0xe1, 0x24, 0x8f, 0x5f, 0x8b, 0xdf, 0x51, 0xbd, 0x32,
-	0x7e, 0x2d, 0x1e, 0x02, 0x2c, 0x10, 0xed, 0x37, 0x05, 0xae, 0xce, 0x96, 0xb1, 0x5b, 0x50, 0x22,
-	0xae, 0x25, 0xae, 0x3d, 0xcc, 0xd5, 0x3c, 0x8f, 0x6b, 0xfd, 0xe9, 0x6e, 0x24, 0xc4, 0x31, 0xce,
-	0xc9, 0x43, 0x67, 0x78, 0x49, 0x8f, 0xc8, 0xc3, 0x23, 0x19, 0x8e, 0x71, 0xb4, 0x05, 0xf3, 0xc3,
-	0x0f, 0x91, 0x24, 0x35, 0x2f, 0x14, 0xae, 0x85, 0x83, 0xea, 0x3c, 0x4e, 0x02, 0x78, 0x9c, 0xa7,
-	0xfd, 0x92, 0x85, 0x95, 0x3d, 0xda, 0x3d, 0x7c, 0x3d, 0xb3, 0xe0, 0xd9, 0xd8, 0x2c, 0xd8, 0x9e,
-	0xde, 0xb1, 0xe9, 0x5e, 0xbe, 0xb6, 0x79, 0xf0, 0x43, 0x16, 0xd6, 0xa6, 0xf8, 0x84, 0x8e, 0x01,
-	0x79, 0x17, 0xda, 0x4b, 0xc6, 0xd1, 0x98, 0xea, 0xcb, 0xc5, 0xae, 0x6c, 0x5c, 0x0f, 0x07, 0xd5,
-	0x94, 0x6e, 0xc5, 0x29, 0x47, 0xa0, 0x6f, 0x15, 0x58, 0xb6, 0xd3, 0x26, 0x95, 0x0c, 0x73, 0x6d,
-	0xea, 0xe1, 0xa9, 0x33, 0xae, 0x71, 0x23, 0x1c, 0x54, 0xd3, 0xc7, 0x1f, 0x4e, 0x3f, 0x8b, 0xbf,
-	0x32, 0xd7, 0x13, 0xe1, 0xe1, 0x0d, 0xf2, 0xff, 0xd5, 0xd5, 0x27, 0x63, 0x75, 0xb5, 0x75, 0xd9,
-	0xba, 0x4a, 0x38, 0x39, 0xb1, 0xac, 0x3e, 0x3b, 0x57, 0x56, 0x77, 0x2f, 0x53, 0x56, 0x49, 0xc3,
-	0xd3, 0xab, 0xea, 0x31, 0xac, 0x4e, 0x76, 0x68, 0xe6, 0xe1, 0xac, 0xfd, 0x94, 0x85, 0xa5, 0x37,
-	0xcf, 0xfc, 0x2c, 0x6d, 0xfd, 0x7b, 0x1e, 0x56, 0xde, 0xb4, 0xf4, 0xa4, 0x45, 0x27, 0x60, 0xd4,
-	0x93, 0xcf, 0xf8, 0x28, 0x39, 0xfb, 0x8c, 0x7a, 0x58, 0x20, 0x48, 0x83, 0xb9, 0x76, 0xf4, 0xba,
-	0x45, 0xef, 0x0f, 0xf0, 0x00, 0xcb, 0xa7, 0x4d, 0x22, 0xa8, 0x05, 0x05, 0xca, 0xf7, 0x56, 0xb5,
-	0xb0, 0x9e, 0xdb, 0x28, 0xd7, 0x3e, 0xfc, 0x2f, 0x95, 0xa1, 0x8b, 0xcd, 0x77, 0xc7, 0xf6, 0xbd,
-	0x93, 0x78, 0x9d, 0x10, 0x32, 0x1c, 0x19, 0x47, 0x6f, 0x43, 0x2e, 0xb0, 0x5a, 0xf2, 0xb5, 0x2f,
-	0x4b, 0x4a, 0x6e, 0x7f, 0xf7, 0x21, 0xe6, 0xf2, 0x55, 0x22, 0x97, 0x67, 0x61, 0x02, 0x2d, 0x42,
-	0xee, 0x88, 0x9e, 0x44, 0x0d, 0x85, 0xf9, 0x4f, 0xf4, 0x00, 0x0a, 0x7d, 0xbe, 0x57, 0xcb, 0xf8,
-	0xbe, 0x37, 0xd5, 0xc9, 0x78, 0x0d, 0xc7, 0x91, 0xd6, 0xfd, 0xec, 0xb6, 0xa2, 0xfd, 0xa1, 0xc0,
-	0x8d, 0x89, 0xe5, 0xc7, 0xd7, 0x1d, 0xd2, 0xed, 0x3a, 0xc7, 0xb4, 0x25, 0x8e, 0x2d, 0xc6, 0xeb,
-	0x4e, 0x3d, 0x12, 0xe3, 0x21, 0x8e, 0xde, 0x85, 0xb9, 0x16, 0xb5, 0x2d, 0xda, 0x12, 0x8b, 0x51,
-	0x31, 0xae, 0xdc, 0x87, 0x42, 0x8a, 0x25, 0xca, 0x79, 0x1e, 0x25, 0xcc, 0xb1, 0xe5, 0x2a, 0x36,
-	0xe2, 0x61, 0x21, 0xc5, 0x12, 0x45, 0x75, 0x58, 0xa0, 0xdc, 0x4d, 0xe1, 0xff, 0x8e, 0xe7, 0x39,
-	0xc3, 0x8c, 0xae, 0x48, 0x85, 0x85, 0x9d, 0x71, 0x18, 0x9f, 0xe7, 0x6b, 0xff, 0x64, 0x41, 0x9d,
-	0x34, 0xda, 0xd0, 0x61, 0xbc, 0x8b, 0x08, 0x50, 0xac, 0x43, 0xe5, 0xda, 0xcd, 0x4b, 0x35, 0x08,
-	0xd7, 0x68, 0x2c, 0x4b, 0x47, 0xe6, 0x93, 0xd2, 0xc4, 0xea, 0x22, 0x3e, 0x91, 0x07, 0x8b, 0xf6,
-	0xf8, 0xce, 0x1c, 0x2d, 0x55, 0xe5, 0xda, 0xed, 0xcb, 0xb6, 0x83, 0x38, 0x4d, 0x95, 0xa7, 0x2d,
-	0x9e, 0x03, 0x18, 0xbe, 0x60, 0x1f, 0xd5, 0x00, 0x2c, 0xdb, 0x74, 0x7a, 0x6e, 0x97, 0xfa, 0x54,
-	0x84, 0xad, 0x18, 0xcf, 0xc1, 0xdd, 0x11, 0x82, 0x13, 0xac, 0xb4, 0x78, 0xe7, 0x67, 0x8b, 0x77,
-	0xa3, 0x7e, 0x7a, 0x56, 0xc9, 0xbc, 0x38, 0xab, 0x64, 0x5e, 0x9e, 0x55, 0x32, 0xcf, 0xc3, 0x8a,
-	0x72, 0x1a, 0x56, 0x94, 0x17, 0x61, 0x45, 0x79, 0x19, 0x56, 0x94, 0xbf, 0xc2, 0x8a, 0xf2, 0xdd,
-	0xdf, 0x95, 0xcc, 0xb3, 0xb5, 0x29, 0xff, 0x94, 0xff, 0x0d, 0x00, 0x00, 0xff, 0xff, 0x45, 0x6f,
-	0xe0, 0x61, 0x47, 0x0f, 0x00, 0x00,
-}
+func (m *SubjectRulesReviewStatus) Reset() { *m = SubjectRulesReviewStatus{} }
 
 func (m ExtraValue) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -562,6 +93,90 @@ func (m ExtraValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			dAtA[i] = 0xa
 		}
 	}
+	return len(dAtA) - i, nil
+}
+
+func (m *FieldSelectorAttributes) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *FieldSelectorAttributes) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *FieldSelectorAttributes) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Requirements) > 0 {
+		for iNdEx := len(m.Requirements) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Requirements[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	i -= len(m.RawSelector)
+	copy(dAtA[i:], m.RawSelector)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RawSelector)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *LabelSelectorAttributes) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *LabelSelectorAttributes) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *LabelSelectorAttributes) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Requirements) > 0 {
+		for iNdEx := len(m.Requirements) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Requirements[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	i -= len(m.RawSelector)
+	copy(dAtA[i:], m.RawSelector)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RawSelector)))
+	i--
+	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
 }
 
@@ -712,6 +327,30 @@ func (m *ResourceAttributes) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.LabelSelector != nil {
+		{
+			size, err := m.LabelSelector.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x4a
+	}
+	if m.FieldSelector != nil {
+		{
+			size, err := m.FieldSelector.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x42
+	}
 	i -= len(m.Name)
 	copy(dAtA[i:], m.Name)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
@@ -1073,7 +712,7 @@ func (m *SubjectAccessReviewSpec) MarshalToSizedBuffer(dAtA []byte) (int, error)
 		for k := range m.Extra {
 			keysForExtra = append(keysForExtra, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForExtra)
+		sort.Strings(keysForExtra)
 		for iNdEx := len(keysForExtra) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.Extra[string(keysForExtra[iNdEx])]
 			baseI := i
@@ -1277,6 +916,40 @@ func (m ExtraValue) Size() (n int) {
 	return n
 }
 
+func (m *FieldSelectorAttributes) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.RawSelector)
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Requirements) > 0 {
+		for _, e := range m.Requirements {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *LabelSelectorAttributes) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.RawSelector)
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Requirements) > 0 {
+		for _, e := range m.Requirements {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *LocalSubjectAccessReview) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1346,6 +1019,14 @@ func (m *ResourceAttributes) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Name)
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.FieldSelector != nil {
+		l = m.FieldSelector.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.LabelSelector != nil {
+		l = m.LabelSelector.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1536,6 +1217,38 @@ func sovGenerated(x uint64) (n int) {
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+func (this *FieldSelectorAttributes) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForRequirements := "[]FieldSelectorRequirement{"
+	for _, f := range this.Requirements {
+		repeatedStringForRequirements += fmt.Sprintf("%v", f) + ","
+	}
+	repeatedStringForRequirements += "}"
+	s := strings.Join([]string{`&FieldSelectorAttributes{`,
+		`RawSelector:` + fmt.Sprintf("%v", this.RawSelector) + `,`,
+		`Requirements:` + repeatedStringForRequirements + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *LabelSelectorAttributes) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForRequirements := "[]LabelSelectorRequirement{"
+	for _, f := range this.Requirements {
+		repeatedStringForRequirements += fmt.Sprintf("%v", f) + ","
+	}
+	repeatedStringForRequirements += "}"
+	s := strings.Join([]string{`&LabelSelectorAttributes{`,
+		`RawSelector:` + fmt.Sprintf("%v", this.RawSelector) + `,`,
+		`Requirements:` + repeatedStringForRequirements + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *LocalSubjectAccessReview) String() string {
 	if this == nil {
 		return "nil"
@@ -1582,6 +1295,8 @@ func (this *ResourceAttributes) String() string {
 		`Resource:` + fmt.Sprintf("%v", this.Resource) + `,`,
 		`Subresource:` + fmt.Sprintf("%v", this.Subresource) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`FieldSelector:` + strings.Replace(this.FieldSelector.String(), "FieldSelectorAttributes", "FieldSelectorAttributes", 1) + `,`,
+		`LabelSelector:` + strings.Replace(this.LabelSelector.String(), "LabelSelectorAttributes", "LabelSelectorAttributes", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1664,7 +1379,7 @@ func (this *SubjectAccessReviewSpec) String() string {
 	for k := range this.Extra {
 		keysForExtra = append(keysForExtra, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForExtra)
+	sort.Strings(keysForExtra)
 	mapStringForExtra := "map[string]ExtraValue{"
 	for _, k := range keysForExtra {
 		mapStringForExtra += fmt.Sprintf("%v: %v,", k, this.Extra[k])
@@ -1785,6 +1500,238 @@ func (m *ExtraValue) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			*m = append(*m, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *FieldSelectorAttributes) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: FieldSelectorAttributes: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: FieldSelectorAttributes: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RawSelector", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RawSelector = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Requirements", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Requirements = append(m.Requirements, v1.FieldSelectorRequirement{})
+			if err := m.Requirements[len(m.Requirements)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *LabelSelectorAttributes) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: LabelSelectorAttributes: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: LabelSelectorAttributes: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RawSelector", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RawSelector = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Requirements", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Requirements = append(m.Requirements, v1.LabelSelectorRequirement{})
+			if err := m.Requirements[len(m.Requirements)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -2436,6 +2383,78 @@ func (m *ResourceAttributes) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FieldSelector", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.FieldSelector == nil {
+				m.FieldSelector = &FieldSelectorAttributes{}
+			}
+			if err := m.FieldSelector.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LabelSelector", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.LabelSelector == nil {
+				m.LabelSelector = &LabelSelectorAttributes{}
+			}
+			if err := m.LabelSelector.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

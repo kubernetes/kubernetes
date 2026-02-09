@@ -19,6 +19,7 @@ package v1
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,7 +65,7 @@ type KubeSchedulerConfiguration struct {
 	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
 	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
 	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
-	// nodes will be scored. It is overridden by profile level PercentageofNodesToScore.
+	// nodes will be scored. It is overridden by profile level PercentageOfNodesToScore.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
@@ -395,3 +396,69 @@ type ExtenderTLSConfig struct {
 	// +listType=atomic
 	CAData []byte `json:"caData,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// DynamicResourcesArgs holds arguments used to configure the DynamicResources plugin.
+type DynamicResourcesArgs struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// FilterTimeout limits the amount of time that the filter operation may
+	// take per node to search for devices that can be allocated to scheduler
+	// a pod to that node.
+	//
+	// In typical scenarios, this operation should complete in 10 to 200
+	// milliseconds, but could also be longer depending on the number of
+	// requests per ResourceClaim, number of ResourceClaims, number of
+	// published devices in ResourceSlices, and the complexity of the
+	// requests. Other checks besides CEL evaluation also take time (usage
+	// checks, match attributes, etc.).
+	//
+	// Therefore the scheduler plugin applies this timeout. If the timeout
+	// is reached, the Pod is considered unschedulable for the node.
+	// If filtering succeeds for some other node(s), those are picked instead.
+	// If filtering fails for all of them, the Pod is placed in the
+	// unschedulable queue. It will get checked again if changes in
+	// e.g. ResourceSlices or ResourceClaims indicate that
+	// another scheduling attempt might succeed. If this fails repeatedly,
+	// exponential backoff slows down future attempts.
+	//
+	// The default is 10 seconds.
+	// This is sufficient to prevent worst-case scenarios while not impacting normal
+	// usage of DRA. However, slow filtering can slow down Pod scheduling
+	// also for Pods not using DRA. Administators can reduce the timeout
+	// after checking the
+	// `scheduler_framework_extension_point_duration_seconds` metrics.
+	//
+	// Setting it to zero completely disables the timeout.
+	FilterTimeout *metav1.Duration `json:"filterTimeout"`
+
+	// BindingTimeout limits how long the PreBind extension point may wait for
+	// ResourceClaim device BindingConditions to become satisfied when such
+	// conditions are present. While waiting, the scheduler periodically checks
+	// device status. If the timeout elapses before all required conditions are
+	// true (or any bindingFailureConditions become true), the allocation is
+	// cleared and the Pod re-enters scheduling queue. Note that the same or other node may be
+	// chosen if feasible; otherwise the Pod is placed in the unschedulable queue and
+	// retried based on cluster changes and backoff.
+	//
+	// Defaults & feature gates:
+	//   - Defaults to 10 minutes when the DRADeviceBindingConditions feature gate is enabled.
+	//   - Has effect only when BOTH DRADeviceBindingConditions and
+	//     DRAResourceClaimDeviceStatus are enabled; otherwise omit this field.
+	//   - When DRADeviceBindingConditions is disabled, setting this field is considered an error.
+	//
+	// Valid values:
+	//   - >=1s (non-zero). No upper bound is enforced.
+	//
+	// Tuning guidance:
+	//   - Lower values reduce time-to-retry when devices aren’t ready but can
+	//     increase churn if drivers typically need longer to report readiness.
+	//   - Review scheduler latency metrics (e.g. PreBind duration in
+	//     `scheduler_framework_extension_point_duration_seconds`) and driver
+	//     readiness behavior before tightening this timeout.
+	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty"`
+}
+
+const DynamicResourcesFilterTimeoutDefault = 10 * time.Second
+const DynamicResourcesBindingTimeoutDefault = 600 * time.Second

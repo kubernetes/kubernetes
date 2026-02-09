@@ -52,20 +52,16 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		return err
 	}
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&ResourceClass{},
-		&ResourceClassList{},
+		&DeviceClass{},
+		&DeviceClassList{},
+		&DeviceTaintRule{},
+		&DeviceTaintRuleList{},
 		&ResourceClaim{},
 		&ResourceClaimList{},
 		&ResourceClaimTemplate{},
 		&ResourceClaimTemplateList{},
-		&PodSchedulingContext{},
-		&PodSchedulingContextList{},
 		&ResourceSlice{},
 		&ResourceSliceList{},
-		&ResourceClaimParameters{},
-		&ResourceClaimParametersList{},
-		&ResourceClassParameters{},
-		&ResourceClassParametersList{},
 	)
 
 	return nil

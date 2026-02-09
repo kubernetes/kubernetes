@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -20,79 +19,60 @@ limitations under the License.
 package conntrack
 
 import (
-	"fmt"
+	"sync"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"github.com/vishvananda/netlink"
 )
 
-// FakeInterface implements Interface by just recording entries that have been cleared.
-type FakeInterface struct {
-	ClearedIPs      sets.Set[string]
-	ClearedPorts    sets.Set[int]
-	ClearedNATs     map[string]string // origin -> dest
-	ClearedPortNATs map[int]string    // port -> dest
-}
-
-var _ Interface = &FakeInterface{}
-
 // NewFake creates a new FakeInterface
-func NewFake() *FakeInterface {
-	fake := &FakeInterface{}
-	fake.Reset()
-	return fake
+func NewFake() Interface {
+	return newConntracker(
+		&fakeHandler{
+			entries: make([]*netlink.ConntrackFlow, 0),
+		},
+	)
 }
 
-// Reset clears fake's sets/maps
-func (fake *FakeInterface) Reset() {
-	fake.ClearedIPs = sets.New[string]()
-	fake.ClearedPorts = sets.New[int]()
-	fake.ClearedNATs = make(map[string]string)
-	fake.ClearedPortNATs = make(map[int]string)
+var _ netlinkHandler = (*fakeHandler)(nil)
+
+type fakeHandler struct {
+	mu              sync.Mutex
+	entries         []*netlink.ConntrackFlow
+	netlinkRequests int // try to get the estimated number of netlink request
 }
 
-// ClearEntriesForIP is part of Interface
-func (fake *FakeInterface) ClearEntriesForIP(ip string, protocol v1.Protocol) error {
-	if protocol != v1.ProtocolUDP {
-		return fmt.Errorf("FakeInterface currently only supports UDP")
-	}
-
-	fake.ClearedIPs.Insert(ip)
-	return nil
+func (f *fakeHandler) ConntrackTableList(_ netlink.ConntrackTableType, _ netlink.InetFamily) ([]*netlink.ConntrackFlow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.netlinkRequests++
+	return f.entries, nil
 }
 
-// ClearEntriesForPort is part of Interface
-func (fake *FakeInterface) ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
-	if protocol != v1.ProtocolUDP {
-		return fmt.Errorf("FakeInterface currently only supports UDP")
-	}
+func (f *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTableType, family netlink.InetFamily, netlinkFilters ...netlink.CustomConntrackFilter) (uint, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
-	fake.ClearedPorts.Insert(port)
-	return nil
-}
+	// 1 netlink request to dump the table
+	// https://github.com/vishvananda/netlink/blob/0af32151e72b990c271ef6268e8aadb7e015f2bd/conntrack_linux.go#L163
+	f.netlinkRequests++
+	var dataplaneFlows []*netlink.ConntrackFlow
+	before := len(f.entries)
 
-// ClearEntriesForNAT is part of Interface
-func (fake *FakeInterface) ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
-	if protocol != v1.ProtocolUDP {
-		return fmt.Errorf("FakeInterface currently only supports UDP")
+	for _, flow := range f.entries {
+		var matched bool
+		for _, filter := range netlinkFilters {
+			matched = filter.MatchConntrackFlow(flow)
+			if matched {
+				// 1 netlink request to delete the flow
+				// https://github.com/vishvananda/netlink/blob/0af32151e72b990c271ef6268e8aadb7e015f2bd/conntrack_linux.go#L182
+				f.netlinkRequests++
+			}
+		}
+		// no filter matched, keep the flow
+		if !matched {
+			dataplaneFlows = append(dataplaneFlows, flow)
+		}
 	}
-	if previous, exists := fake.ClearedNATs[origin]; exists && previous != dest {
-		return fmt.Errorf("ClearEntriesForNAT called with same origin (%s), different destination (%s / %s)", origin, previous, dest)
-	}
-
-	fake.ClearedNATs[origin] = dest
-	return nil
-}
-
-// ClearEntriesForPortNAT is part of Interface
-func (fake *FakeInterface) ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error {
-	if protocol != v1.ProtocolUDP {
-		return fmt.Errorf("FakeInterface currently only supports UDP")
-	}
-	if previous, exists := fake.ClearedPortNATs[port]; exists && previous != dest {
-		return fmt.Errorf("ClearEntriesForPortNAT called with same port (%d), different destination (%s / %s)", port, previous, dest)
-	}
-
-	fake.ClearedPortNATs[port] = dest
-	return nil
+	f.entries = dataplaneFlows
+	return uint(before - len(f.entries)), nil
 }

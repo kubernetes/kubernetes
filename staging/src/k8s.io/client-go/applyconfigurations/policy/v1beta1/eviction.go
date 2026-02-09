@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -29,10 +29,16 @@ import (
 
 // EvictionApplyConfiguration represents a declarative configuration of the Eviction type for use
 // with apply.
+//
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+// This is a subresource of Pod.  A request to cause such an eviction is
+// created by POSTing to .../pods/<pod name>/evictions.
 type EvictionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// ObjectMeta describes the pod that is being evicted.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DeleteOptions                    *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
+	// DeleteOptions may be provided
+	DeleteOptions *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }
 
 // Eviction constructs a declarative configuration of the Eviction type for use with
@@ -46,29 +52,14 @@ func Eviction(name, namespace string) *EvictionApplyConfiguration {
 	return b
 }
 
-// ExtractEviction extracts the applied configuration owned by fieldManager from
-// eviction. If no managedFields are found in eviction for fieldManager, a
-// EvictionApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractEvictionFrom extracts the applied configuration owned by fieldManager from
+// eviction for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // eviction must be a unmodified Eviction API object that was retrieved from the Kubernetes API.
-// ExtractEviction provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractEvictionFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractEviction(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
-	return extractEviction(eviction, fieldManager, "")
-}
-
-// ExtractEvictionStatus is the same as ExtractEviction except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractEvictionStatus(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
-	return extractEviction(eviction, fieldManager, "status")
-}
-
-func extractEviction(eviction *v1beta1.Eviction, fieldManager string, subresource string) (*EvictionApplyConfiguration, error) {
+func ExtractEvictionFrom(eviction *policyv1beta1.Eviction, fieldManager string, subresource string) (*EvictionApplyConfiguration, error) {
 	b := &EvictionApplyConfiguration{}
 	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,11 +73,27 @@ func extractEviction(eviction *v1beta1.Eviction, fieldManager string, subresourc
 	return b, nil
 }
 
+// ExtractEviction extracts the applied configuration owned by fieldManager from
+// eviction. If no managedFields are found in eviction for fieldManager, a
+// EvictionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// eviction must be a unmodified Eviction API object that was retrieved from the Kubernetes API.
+// ExtractEviction provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractEviction(eviction *policyv1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+	return ExtractEvictionFrom(eviction, fieldManager, "")
+}
+
+func (b EvictionApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithKind(value string) *EvictionApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -94,7 +101,7 @@ func (b *EvictionApplyConfiguration) WithKind(value string) *EvictionApplyConfig
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithAPIVersion(value string) *EvictionApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -103,7 +110,7 @@ func (b *EvictionApplyConfiguration) WithAPIVersion(value string) *EvictionApply
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithName(value string) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -112,7 +119,7 @@ func (b *EvictionApplyConfiguration) WithName(value string) *EvictionApplyConfig
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithGenerateName(value string) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -121,7 +128,7 @@ func (b *EvictionApplyConfiguration) WithGenerateName(value string) *EvictionApp
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithNamespace(value string) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -130,7 +137,7 @@ func (b *EvictionApplyConfiguration) WithNamespace(value string) *EvictionApplyC
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithUID(value types.UID) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -139,7 +146,7 @@ func (b *EvictionApplyConfiguration) WithUID(value types.UID) *EvictionApplyConf
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithResourceVersion(value string) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -148,7 +155,7 @@ func (b *EvictionApplyConfiguration) WithResourceVersion(value string) *Eviction
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithGeneration(value int64) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -157,7 +164,7 @@ func (b *EvictionApplyConfiguration) WithGeneration(value int64) *EvictionApplyC
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithCreationTimestamp(value metav1.Time) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -166,7 +173,7 @@ func (b *EvictionApplyConfiguration) WithCreationTimestamp(value metav1.Time) *E
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -175,7 +182,7 @@ func (b *EvictionApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *E
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *EvictionApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -185,11 +192,11 @@ func (b *EvictionApplyConfiguration) WithDeletionGracePeriodSeconds(value int64)
 // overwriting an existing map entries in Labels field with the same key.
 func (b *EvictionApplyConfiguration) WithLabels(entries map[string]string) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -200,11 +207,11 @@ func (b *EvictionApplyConfiguration) WithLabels(entries map[string]string) *Evic
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *EvictionApplyConfiguration) WithAnnotations(entries map[string]string) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -218,7 +225,7 @@ func (b *EvictionApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefe
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -229,7 +236,7 @@ func (b *EvictionApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefe
 func (b *EvictionApplyConfiguration) WithFinalizers(values ...string) *EvictionApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -248,8 +255,24 @@ func (b *EvictionApplyConfiguration) WithDeleteOptions(value *v1.DeleteOptionsAp
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *EvictionApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *EvictionApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *EvictionApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *EvictionApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

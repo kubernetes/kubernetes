@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -23,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -400,4 +399,114 @@ func getEphemeralStorageResourceList(storage string) v1.ResourceList {
 		res[v1.ResourceEphemeralStorage] = resource.MustParse(storage)
 	}
 	return res
+}
+
+func TestNodeRefFromNode(t *testing.T) {
+	testCases := []struct {
+		name     string
+		nodeName string
+		expected *v1.ObjectReference
+	}{
+		{
+			name:     "normal node name",
+			nodeName: "test-node",
+			expected: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Node",
+				Name:       "test-node",
+				Namespace:  "",
+			},
+		},
+		{
+			name:     "empty node name",
+			nodeName: "",
+			expected: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Node",
+				Name:       "",
+				UID:        "",
+				Namespace:  "",
+			},
+		},
+		{
+			name:     "node name with special characters",
+			nodeName: "test-node-123.domain.local",
+			expected: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Node",
+				Name:       "test-node-123.domain.local",
+				Namespace:  "",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := nodeRefFromNode(tc.nodeName)
+
+			assert.Equal(t, tc.expected, result, "test case %q failed", tc.name)
+		})
+	}
+}
+
+func TestGetCgroupConfig(t *testing.T) {
+	cases := []struct {
+		name                  string
+		resourceList          v1.ResourceList
+		compressibleResources bool
+		checks                func(*ResourceConfig, *testing.T)
+	}{
+		{
+			name:                  "Nil resource list",
+			resourceList:          nil,
+			compressibleResources: false,
+			checks: func(actual *ResourceConfig, t *testing.T) {
+				assert.Nil(t, actual)
+			},
+		},
+		{
+			name: "Compressible resources only",
+			resourceList: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("200Mi"),
+			},
+			compressibleResources: true,
+			checks: func(actual *ResourceConfig, t *testing.T) {
+				assert.NotNil(t, actual.CPUShares)
+				assert.Nil(t, actual.Memory)
+				assert.Nil(t, actual.PidsLimit)
+				assert.Nil(t, actual.HugePageLimit)
+			},
+		},
+		{
+			name: "Memory only",
+			resourceList: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("200Mi"),
+			},
+			compressibleResources: false,
+			checks: func(actual *ResourceConfig, t *testing.T) {
+				assert.NotNil(t, actual.Memory)
+				assert.Nil(t, actual.CPUShares)
+			},
+		},
+		{
+			name: "Memory and CPU without compressible resources",
+			resourceList: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("200Mi"),
+			},
+			compressibleResources: false,
+			checks: func(actual *ResourceConfig, t *testing.T) {
+				assert.NotNil(t, actual.Memory)
+				assert.NotNil(t, actual.CPUShares)
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := getCgroupConfigInternal(tc.resourceList, tc.compressibleResources)
+			tc.checks(actual, t)
+		})
+	}
 }

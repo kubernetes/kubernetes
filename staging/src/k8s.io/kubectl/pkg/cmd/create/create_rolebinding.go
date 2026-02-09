@@ -44,7 +44,7 @@ var (
 		# Create a role binding for user1, user2, and group1 using the admin cluster role
 		kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1
 
-		# Create a role binding for serviceaccount monitoring:sa-dev using the admin role
+		# Create a role binding for service account monitoring:sa-dev using the admin role
 		kubectl create rolebinding admin-binding --role=admin --serviceaccount=monitoring:sa-dev`))
 )
 

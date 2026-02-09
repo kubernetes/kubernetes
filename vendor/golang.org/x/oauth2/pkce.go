@@ -1,6 +1,7 @@
 // Copyright 2023 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+
 package oauth2
 
 import (
@@ -20,9 +21,9 @@ const (
 // This follows recommendations in RFC 7636.
 //
 // A fresh verifier should be generated for each authorization.
-// S256ChallengeOption(verifier) should then be passed to Config.AuthCodeURL
-// (or Config.DeviceAccess) and VerifierOption(verifier) to Config.Exchange
-// (or Config.DeviceAccessToken).
+// The resulting verifier should be passed to [Config.AuthCodeURL] or [Config.DeviceAuth]
+// with [S256ChallengeOption], and to [Config.Exchange] or [Config.DeviceAccessToken]
+// with [VerifierOption].
 func GenerateVerifier() string {
 	// "RECOMMENDED that the output of a suitable random number generator be
 	// used to create a 32-octet sequence.  The octet sequence is then
@@ -36,22 +37,22 @@ func GenerateVerifier() string {
 	return base64.RawURLEncoding.EncodeToString(data)
 }
 
-// VerifierOption returns a PKCE code verifier AuthCodeOption. It should be
-// passed to Config.Exchange or Config.DeviceAccessToken only.
+// VerifierOption returns a PKCE code verifier [AuthCodeOption]. It should only be
+// passed to [Config.Exchange] or [Config.DeviceAccessToken].
 func VerifierOption(verifier string) AuthCodeOption {
 	return setParam{k: codeVerifierKey, v: verifier}
 }
 
 // S256ChallengeFromVerifier returns a PKCE code challenge derived from verifier with method S256.
 //
-// Prefer to use S256ChallengeOption where possible.
+// Prefer to use [S256ChallengeOption] where possible.
 func S256ChallengeFromVerifier(verifier string) string {
 	sha := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sha[:])
 }
 
-// S256ChallengeOption derives a PKCE code challenge derived from verifier with
-// method S256. It should be passed to Config.AuthCodeURL or Config.DeviceAccess
+// S256ChallengeOption derives a PKCE code challenge from the verifier with
+// method S256. It should be passed to [Config.AuthCodeURL] or [Config.DeviceAuth]
 // only.
 func S256ChallengeOption(verifier string) AuthCodeOption {
 	return challengeOption{

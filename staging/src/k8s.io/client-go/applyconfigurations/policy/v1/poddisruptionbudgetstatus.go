@@ -19,20 +19,52 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PodDisruptionBudgetStatusApplyConfiguration represents a declarative configuration of the PodDisruptionBudgetStatus type for use
 // with apply.
+//
+// PodDisruptionBudgetStatus represents information about the status of a
+// PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatusApplyConfiguration struct {
-	ObservedGeneration *int64                               `json:"observedGeneration,omitempty"`
-	DisruptedPods      map[string]v1.Time                   `json:"disruptedPods,omitempty"`
-	DisruptionsAllowed *int32                               `json:"disruptionsAllowed,omitempty"`
-	CurrentHealthy     *int32                               `json:"currentHealthy,omitempty"`
-	DesiredHealthy     *int32                               `json:"desiredHealthy,omitempty"`
-	ExpectedPods       *int32                               `json:"expectedPods,omitempty"`
-	Conditions         []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	// Most recent generation observed when updating this PDB status. DisruptionsAllowed and other
+	// status information is valid only if observedGeneration equals to PDB's object generation.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// DisruptedPods contains information about pods whose eviction was
+	// processed by the API server eviction subresource handler but has not
+	// yet been observed by the PodDisruptionBudget controller.
+	// A pod will be in this map from the time when the API server processed the
+	// eviction request to the time when the pod is seen by PDB controller
+	// as having been marked for deletion (or after a timeout). The key in the map is the name of the pod
+	// and the value is the time when the API server processed the eviction request. If
+	// the deletion didn't occur and a pod is still there it will be removed from
+	// the list automatically by PodDisruptionBudget controller after some time.
+	// If everything goes smooth this map should be empty for the most of the time.
+	// Large number of entries in the map may indicate problems with pod deletions.
+	DisruptedPods map[string]metav1.Time `json:"disruptedPods,omitempty"`
+	// Number of pod disruptions that are currently allowed.
+	DisruptionsAllowed *int32 `json:"disruptionsAllowed,omitempty"`
+	// current number of healthy pods
+	CurrentHealthy *int32 `json:"currentHealthy,omitempty"`
+	// minimum desired number of healthy pods
+	DesiredHealthy *int32 `json:"desiredHealthy,omitempty"`
+	// total number of pods counted by this disruption budget
+	ExpectedPods *int32 `json:"expectedPods,omitempty"`
+	// Conditions contain conditions for PDB. The disruption controller sets the
+	// DisruptionAllowed condition. The following are known values for the reason field
+	// (additional reasons could be added in the future):
+	// - SyncFailed: The controller encountered an error and wasn't able to compute
+	// the number of allowed disruptions. Therefore no disruptions are
+	// allowed and the status of the condition will be False.
+	// - InsufficientPods: The number of pods are either at or below the number
+	// required by the PodDisruptionBudget. No disruptions are
+	// allowed and the status of the condition will be False.
+	// - SufficientPods: There are more pods than required by the PodDisruptionBudget.
+	// The condition will be True, and the number of allowed
+	// disruptions are provided by the disruptionsAllowed property.
+	Conditions []applyconfigurationsmetav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // PodDisruptionBudgetStatusApplyConfiguration constructs a declarative configuration of the PodDisruptionBudgetStatus type for use with
@@ -53,9 +85,9 @@ func (b *PodDisruptionBudgetStatusApplyConfiguration) WithObservedGeneration(val
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the DisruptedPods field,
 // overwriting an existing map entries in DisruptedPods field with the same key.
-func (b *PodDisruptionBudgetStatusApplyConfiguration) WithDisruptedPods(entries map[string]v1.Time) *PodDisruptionBudgetStatusApplyConfiguration {
+func (b *PodDisruptionBudgetStatusApplyConfiguration) WithDisruptedPods(entries map[string]metav1.Time) *PodDisruptionBudgetStatusApplyConfiguration {
 	if b.DisruptedPods == nil && len(entries) > 0 {
-		b.DisruptedPods = make(map[string]v1.Time, len(entries))
+		b.DisruptedPods = make(map[string]metav1.Time, len(entries))
 	}
 	for k, v := range entries {
 		b.DisruptedPods[k] = v
@@ -98,7 +130,7 @@ func (b *PodDisruptionBudgetStatusApplyConfiguration) WithExpectedPods(value int
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *PodDisruptionBudgetStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *PodDisruptionBudgetStatusApplyConfiguration {
+func (b *PodDisruptionBudgetStatusApplyConfiguration) WithConditions(values ...*applyconfigurationsmetav1.ConditionApplyConfiguration) *PodDisruptionBudgetStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")

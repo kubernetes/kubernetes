@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -20,18 +19,22 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
-func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, _ *kubecontainer.ContainerID) error {
-	windowsConfig, err := m.generateWindowsContainerConfig(container, pod, uid, username)
+func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx context.Context, config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, _ *kubecontainer.ContainerID) error {
+	windowsConfig, err := m.generateWindowsContainerConfig(ctx, container, pod, uid, username)
 	if err != nil {
 		return err
 	}
@@ -41,21 +44,26 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 }
 
 // generateContainerResources generates platform specific (windows) container resources config for runtime
-func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
+func (m *kubeGenericRuntimeManager) generateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
 	return &runtimeapi.ContainerResources{
-		Windows: m.generateWindowsContainerResources(pod, container),
+		Windows: m.generateWindowsContainerResources(ctx, pod, container),
 	}
 }
 
+// generateUpdatePodSandboxResourcesRequest generates platform specific podsandox resources config for runtime
+func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) *runtimeapi.UpdatePodSandboxResourcesRequest {
+	return nil
+}
+
 // generateWindowsContainerResources generates windows container resources config for runtime
-func (m *kubeGenericRuntimeManager) generateWindowsContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.WindowsContainerResources {
-	wcr := m.calculateWindowsResources(container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
+func (m *kubeGenericRuntimeManager) generateWindowsContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container) *runtimeapi.WindowsContainerResources {
+	wcr := m.calculateWindowsResources(ctx, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
 
 	return wcr
 }
 
 // calculateWindowsResources will create the windowsContainerResources type based on the provided CPU and memory resource requests, limits
-func (m *kubeGenericRuntimeManager) calculateWindowsResources(cpuLimit, memoryLimit *resource.Quantity) *runtimeapi.WindowsContainerResources {
+func (m *kubeGenericRuntimeManager) calculateWindowsResources(ctx context.Context, cpuLimit, memoryLimit *resource.Quantity) *runtimeapi.WindowsContainerResources {
 	resources := runtimeapi.WindowsContainerResources{}
 
 	memLimit := memoryLimit.Value()
@@ -93,7 +101,8 @@ func (m *kubeGenericRuntimeManager) calculateWindowsResources(cpuLimit, memoryLi
 	if resources.CpuCount > 0 {
 		if resources.CpuMaximum > 0 {
 			resources.CpuMaximum = 0
-			klog.InfoS("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
+			logger := klog.FromContext(ctx)
+			logger.Info("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
 		}
 	}
 
@@ -106,9 +115,9 @@ func (m *kubeGenericRuntimeManager) calculateWindowsResources(cpuLimit, memoryLi
 
 // generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
 // Refer https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cri-windows.md.
-func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
+func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
 	wc := &runtimeapi.WindowsContainerConfig{
-		Resources:       m.generateWindowsContainerResources(pod, container),
+		Resources:       m.generateWindowsContainerResources(ctx, pod, container),
 		SecurityContext: &runtimeapi.WindowsContainerSecurityContext{},
 	}
 
@@ -176,4 +185,13 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 
 func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.ContainerUser {
 	return nil
+}
+
+func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) types.SwapBehavior {
+	return types.NoSwap
+}
+
+// initSwapControllerAvailabilityCheck returns a function that always returns false on Windows
+func initSwapControllerAvailabilityCheck(ctx context.Context) func() bool {
+	return func() bool { return false }
 }

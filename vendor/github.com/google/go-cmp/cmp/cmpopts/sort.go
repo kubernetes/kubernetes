@@ -14,22 +14,29 @@ import (
 )
 
 // SortSlices returns a [cmp.Transformer] option that sorts all []V.
-// The less function must be of the form "func(T, T) bool" which is used to
-// sort any slice with element type V that is assignable to T.
+// The lessOrCompareFunc function must be either
+// a less function of the form "func(T, T) bool" or
+// a compare function of the format "func(T, T) int"
+// which is used to sort any slice with element type V that is assignable to T.
 //
-// The less function must be:
+// A less function must be:
 //   - Deterministic: less(x, y) == less(x, y)
 //   - Irreflexive: !less(x, x)
 //   - Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
 //
-// The less function does not have to be "total". That is, if !less(x, y) and
-// !less(y, x) for two elements x and y, their relative order is maintained.
+// A compare function must be:
+//   - Deterministic: compare(x, y) == compare(x, y)
+//   - Irreflexive: compare(x, x) == 0
+//   - Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
+//
+// The function does not have to be "total". That is, if x != y, but
+// less or compare report inequality, their relative order is maintained.
 //
 // SortSlices can be used in conjunction with [EquateEmpty].
-func SortSlices(lessFunc interface{}) cmp.Option {
-	vf := reflect.ValueOf(lessFunc)
-	if !function.IsType(vf.Type(), function.Less) || vf.IsNil() {
-		panic(fmt.Sprintf("invalid less function: %T", lessFunc))
+func SortSlices(lessOrCompareFunc interface{}) cmp.Option {
+	vf := reflect.ValueOf(lessOrCompareFunc)
+	if (!function.IsType(vf.Type(), function.Less) && !function.IsType(vf.Type(), function.Compare)) || vf.IsNil() {
+		panic(fmt.Sprintf("invalid less or compare function: %T", lessOrCompareFunc))
 	}
 	ss := sliceSorter{vf.Type().In(0), vf}
 	return cmp.FilterValues(ss.filter, cmp.Transformer("cmpopts.SortSlices", ss.sort))
@@ -79,28 +86,40 @@ func (ss sliceSorter) checkSort(v reflect.Value) {
 }
 func (ss sliceSorter) less(v reflect.Value, i, j int) bool {
 	vx, vy := v.Index(i), v.Index(j)
-	return ss.fnc.Call([]reflect.Value{vx, vy})[0].Bool()
+	vo := ss.fnc.Call([]reflect.Value{vx, vy})[0]
+	if vo.Kind() == reflect.Bool {
+		return vo.Bool()
+	} else {
+		return vo.Int() < 0
+	}
 }
 
-// SortMaps returns a [cmp.Transformer] option that flattens map[K]V types to be a
-// sorted []struct{K, V}. The less function must be of the form
-// "func(T, T) bool" which is used to sort any map with key K that is
-// assignable to T.
+// SortMaps returns a [cmp.Transformer] option that flattens map[K]V types to be
+// a sorted []struct{K, V}. The lessOrCompareFunc function must be either
+// a less function of the form "func(T, T) bool" or
+// a compare function of the format "func(T, T) int"
+// which is used to sort any map with key K that is assignable to T.
 //
 // Flattening the map into a slice has the property that [cmp.Equal] is able to
 // use [cmp.Comparer] options on K or the K.Equal method if it exists.
 //
-// The less function must be:
+// A less function must be:
 //   - Deterministic: less(x, y) == less(x, y)
 //   - Irreflexive: !less(x, x)
 //   - Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
 //   - Total: if x != y, then either less(x, y) or less(y, x)
 //
+// A compare function must be:
+//   - Deterministic: compare(x, y) == compare(x, y)
+//   - Irreflexive: compare(x, x) == 0
+//   - Transitive: if compare(x, y) < 0 and compare(y, z) < 0, then compare(x, z) < 0
+//   - Total: if x != y, then compare(x, y) != 0
+//
 // SortMaps can be used in conjunction with [EquateEmpty].
-func SortMaps(lessFunc interface{}) cmp.Option {
-	vf := reflect.ValueOf(lessFunc)
-	if !function.IsType(vf.Type(), function.Less) || vf.IsNil() {
-		panic(fmt.Sprintf("invalid less function: %T", lessFunc))
+func SortMaps(lessOrCompareFunc interface{}) cmp.Option {
+	vf := reflect.ValueOf(lessOrCompareFunc)
+	if (!function.IsType(vf.Type(), function.Less) && !function.IsType(vf.Type(), function.Compare)) || vf.IsNil() {
+		panic(fmt.Sprintf("invalid less or compare function: %T", lessOrCompareFunc))
 	}
 	ms := mapSorter{vf.Type().In(0), vf}
 	return cmp.FilterValues(ms.filter, cmp.Transformer("cmpopts.SortMaps", ms.sort))
@@ -143,5 +162,10 @@ func (ms mapSorter) checkSort(v reflect.Value) {
 }
 func (ms mapSorter) less(v reflect.Value, i, j int) bool {
 	vx, vy := v.Index(i).Field(0), v.Index(j).Field(0)
-	return ms.fnc.Call([]reflect.Value{vx, vy})[0].Bool()
+	vo := ms.fnc.Call([]reflect.Value{vx, vy})[0]
+	if vo.Kind() == reflect.Bool {
+		return vo.Bool()
+	} else {
+		return vo.Int() < 0
+	}
 }

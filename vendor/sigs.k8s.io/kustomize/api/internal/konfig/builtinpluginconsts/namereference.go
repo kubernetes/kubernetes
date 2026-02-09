@@ -421,6 +421,13 @@ nameReference:
   fieldSpecs:
   - path: spec/ingressClassName
     kind: Ingress
+
+- kind: ValidatingAdmissionPolicy
+  group: admissionregistration.k8s.io
+  fieldSpecs:
+  - path: spec/policyName
+    kind: ValidatingAdmissionPolicyBinding
+    group: admissionregistration.k8s.io
 `
 )
 

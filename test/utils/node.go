@@ -16,7 +16,7 @@ limitations under the License.
 
 package utils
 
-import "k8s.io/api/core/v1"
+import v1 "k8s.io/api/core/v1"
 
 // GetNodeCondition extracts the provided condition from the given status and returns that.
 // Returns nil and -1 if the condition is not present, and the index of the located condition.

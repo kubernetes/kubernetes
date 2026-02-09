@@ -39,7 +39,7 @@ declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["pp
 # NOTE(claudiub): In the test image build jobs, this script is not being run in a git repository,
 # which would cause git log to fail. Instead, we can use the GIT_COMMIT_ID set in cloudbuild.yaml.
 GIT_COMMIT_ID=$(git log -1 --format=%h || echo "${GIT_COMMIT_ID}")
-windows_os_versions=(1809 ltsc2022)
+windows_os_versions=(1809 ltsc2022 ltsc2025)
 declare -A WINDOWS_OS_VERSIONS_MAP
 
 initWindowsOsVersions() {
@@ -187,7 +187,7 @@ build() {
 
     # `--provenance=false --sbom=false` is set to avoid creating a manifest list: https://github.com/kubernetes/kubernetes/issues/123266
     docker buildx build --progress=plain --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" --provenance=false --sbom=false \
-        --build-arg BASEIMAGE="${base_image}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" \
+        --build-arg BASEIMAGE="${base_image}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" --build-arg GOLANG_VERSION="${GOLANG_VERSION}" \
         -t "${REGISTRY}/${image}:${TAG}-${suffix}" -f "${dockerfile_name}" \
 	--label "image_version=${TAG}" --label "commit_id=${GIT_COMMIT_ID}" \
 	--label "git_url=https://github.com/kubernetes/kubernetes/tree/${GIT_COMMIT_ID}/test/images/${img_folder}" .
@@ -259,18 +259,15 @@ build_and_push() {
 }
 
 # This function is for building the go code
+# shellcheck disable=SC2153
 bin() {
-  local arch_prefix=""
-  if [[ "${ARCH:-}" == "arm" ]]; then
-    arch_prefix="GOARM=${GOARM:-7}"
-  fi
   for SRC in "$@";
   do
   docker run --rm -v "${TARGET}:${TARGET}:Z" -v "${KUBE_ROOT}":/go/src/k8s.io/kubernetes:Z \
         golang:"${GOLANG_VERSION}" \
         /bin/bash -c "\
                 cd /go/src/k8s.io/kubernetes/test/images/${SRC_DIR} && \
-                CGO_ENABLED=0 ${arch_prefix} GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags \"-w ${LD_FLAGS:-}\" -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
+                CGO_ENABLED=0 GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags \"-w ${LD_FLAGS:-}\" -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
   done
 }
 

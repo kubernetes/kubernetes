@@ -22,7 +22,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -32,15 +32,24 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*v1.CronJob)) })
-	scheme.AddTypeDefaultingFunc(&v1.CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*v1.CronJobList)) })
-	scheme.AddTypeDefaultingFunc(&v1.Job{}, func(obj interface{}) { SetObjectDefaults_Job(obj.(*v1.Job)) })
-	scheme.AddTypeDefaultingFunc(&v1.JobList{}, func(obj interface{}) { SetObjectDefaults_JobList(obj.(*v1.JobList)) })
+	scheme.AddTypeDefaultingFunc(&batchv1.CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*batchv1.CronJob)) })
+	scheme.AddTypeDefaultingFunc(&batchv1.CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*batchv1.CronJobList)) })
+	scheme.AddTypeDefaultingFunc(&batchv1.Job{}, func(obj interface{}) { SetObjectDefaults_Job(obj.(*batchv1.Job)) })
+	scheme.AddTypeDefaultingFunc(&batchv1.JobList{}, func(obj interface{}) { SetObjectDefaults_JobList(obj.(*batchv1.JobList)) })
 	return nil
 }
 
-func SetObjectDefaults_CronJob(in *v1.CronJob) {
+func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 	SetDefaults_CronJob(in)
+	if in.Spec.JobTemplate.Spec.PodFailurePolicy != nil {
+		for i := range in.Spec.JobTemplate.Spec.PodFailurePolicy.Rules {
+			a := &in.Spec.JobTemplate.Spec.PodFailurePolicy.Rules[i]
+			for j := range a.OnPodConditions {
+				b := &a.OnPodConditions[j]
+				SetDefaults_PodFailurePolicyOnPodConditionsPattern(b)
+			}
+		}
+	}
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
@@ -145,6 +154,12 @@ func SetObjectDefaults_CronJob(in *v1.CronJob) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -212,6 +227,12 @@ func SetObjectDefaults_CronJob(in *v1.CronJob) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -281,6 +302,12 @@ func SetObjectDefaults_CronJob(in *v1.CronJob) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
@@ -335,17 +362,30 @@ func SetObjectDefaults_CronJob(in *v1.CronJob) {
 		}
 	}
 	apiscorev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Overhead)
+	if in.Spec.JobTemplate.Spec.Template.Spec.Resources != nil {
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Resources.Limits)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
-func SetObjectDefaults_CronJobList(in *v1.CronJobList) {
+func SetObjectDefaults_CronJobList(in *batchv1.CronJobList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_CronJob(a)
 	}
 }
 
-func SetObjectDefaults_Job(in *v1.Job) {
+func SetObjectDefaults_Job(in *batchv1.Job) {
 	SetDefaults_Job(in)
+	if in.Spec.PodFailurePolicy != nil {
+		for i := range in.Spec.PodFailurePolicy.Rules {
+			a := &in.Spec.PodFailurePolicy.Rules[i]
+			for j := range a.OnPodConditions {
+				b := &a.OnPodConditions[j]
+				SetDefaults_PodFailurePolicyOnPodConditionsPattern(b)
+			}
+		}
+	}
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
@@ -450,6 +490,12 @@ func SetObjectDefaults_Job(in *v1.Job) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -517,6 +563,12 @@ func SetObjectDefaults_Job(in *v1.Job) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -586,6 +638,12 @@ func SetObjectDefaults_Job(in *v1.Job) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
@@ -640,9 +698,13 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		}
 	}
 	apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
-func SetObjectDefaults_JobList(in *v1.JobList) {
+func SetObjectDefaults_JobList(in *batchv1.JobList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Job(a)

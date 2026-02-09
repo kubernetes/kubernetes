@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package api contains constants and helpers for PodSecurity admission label keys and values
-package api // import "k8s.io/pod-security-admission/api"
+package api

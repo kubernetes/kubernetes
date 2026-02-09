@@ -98,7 +98,7 @@ func calculateFailedIndexes(logger klog.Logger, job *batch.Job, pods []*v1.Pod) 
 func isIndexFailed(logger klog.Logger, job *batch.Job, pod *v1.Pod) bool {
 	isPodFailedCounted := false
 	if isPodFailed(pod, job) {
-		if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+		if job.Spec.PodFailurePolicy != nil {
 			_, countFailed, action := matchPodFailurePolicy(job.Spec.PodFailurePolicy, pod)
 			if action != nil && *action == batch.PodFailurePolicyActionFailIndex {
 				return true
@@ -361,7 +361,7 @@ func getNewIndexFailureCounts(logger klog.Logger, job *batch.Job, podBeingReplac
 	if podBeingReplaced != nil {
 		indexFailureCount := parseIndexFailureCountAnnotation(logger, podBeingReplaced)
 		indexIgnoredFailureCount := parseIndexFailureIgnoreCountAnnotation(logger, podBeingReplaced)
-		if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+		if job.Spec.PodFailurePolicy != nil {
 			_, countFailed, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, podBeingReplaced)
 			if countFailed {
 				indexFailureCount++
@@ -467,12 +467,7 @@ func addCompletionIndexEnvVariable(container *v1.Container) {
 			return
 		}
 	}
-	var fieldPath string
-	if feature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
-		fieldPath = fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation)
-	} else {
-		fieldPath = fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation)
-	}
+	fieldPath := fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation)
 	container.Env = append(container.Env, v1.EnvVar{
 		Name: completionIndexEnvName,
 		ValueFrom: &v1.EnvVarSource{

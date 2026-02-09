@@ -14,9 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockery
 package cm
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -27,11 +29,14 @@ import (
 
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/server/healthz"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/klog/v2"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -44,17 +49,25 @@ import (
 
 const (
 	// Warning message for the users still using cgroup v1
-	CgroupV1MaintenanceModeWarning = "Cgroup v1 support is in maintenance mode, please migrate to Cgroup v2."
+	CgroupV1DeprecatedWarning = "cgroup v1 detected. cgroup v1 support is deprecated and will be removed in a future release. Please migrate to cgroup v2. More information at https://git.k8s.io/enhancements/keps/sig-node/5573-remove-cgroup-v1"
+
+	// Warning message for the users using cgroup v2 on kernel doesn't support root `cpu.stat`.
+	// `cpu.stat` was added to root cgroup in kernel 5.8.
+	// (ref: https://github.com/torvalds/linux/commit/936f2a70f2077f64fab1dcb3eca71879e82ecd3f)
+	CgroupV2KernelWarning = "cgroup v2 is being used on a kernel, which doesn't support root `cpu.stat`." +
+		"Kubelet will continue, but may experience instability or wrong behavior"
 )
 
 type ActivePodsFunc func() []*v1.Pod
+
+type GetNodeFunc func(context.Context) (*v1.Node, error)
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
+	Start(context.Context, *v1.Node, ActivePodsFunc, GetNodeFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -89,11 +102,11 @@ type ContainerManager interface {
 
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
-	UpdateQOSCgroups() error
+	UpdateQOSCgroups(logger klog.Logger) error
 
 	// GetResources returns RunContainerOptions with devices, mounts, and env fields populated for
 	// extended resources required by container.
-	GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error)
+	GetResources(ctx context.Context, pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error)
 
 	// UpdatePluginResources calls Allocate of device plugin handler for potential
 	// requests for device plugin resources, and returns an error if fails.
@@ -107,10 +120,14 @@ type ContainerManager interface {
 	// GetPodCgroupRoot returns the cgroup which contains all pods.
 	GetPodCgroupRoot() string
 
-	// GetPluginRegistrationHandler returns a plugin registration handler
+	// GetPluginRegistrationHandlers returns a set of plugin registration handlers
 	// The pluginwatcher's Handlers allow to have a single module for handling
 	// registration.
-	GetPluginRegistrationHandler() cache.PluginHandler
+	GetPluginRegistrationHandlers() map[string]cache.PluginHandler
+
+	// GetHealthCheckers returns a set of health checkers for all plugins.
+	// These checkers are integrated into the systemd watchdog to monitor the service's health.
+	GetHealthCheckers() []healthz.HealthChecker
 
 	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
 	// due to node recreation.
@@ -123,20 +140,37 @@ type ContainerManager interface {
 	GetNodeAllocatableAbsolute() v1.ResourceList
 
 	// PrepareDynamicResource prepares dynamic pod resources
-	PrepareDynamicResources(*v1.Pod) error
+	PrepareDynamicResources(context.Context, *v1.Pod) error
 
 	// UnprepareDynamicResources unprepares dynamic pod resources
-	UnprepareDynamicResources(*v1.Pod) error
+	UnprepareDynamicResources(context.Context, *v1.Pod) error
 
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
+
+	// UpdateAllocatedResourcesStatus updates the status of allocated resources for the pod.
+	UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus)
+
+	// Updates returns a channel that receives an Update when the device changed its status.
+	Updates() <-chan resourceupdates.Update
+
+	// PodHasExclusiveCPUs returns true if the provided pod has containers with exclusive CPUs,
+	// This means that at least one sidecar container or one app container has exclusive CPUs allocated.
+	PodHasExclusiveCPUs(pod *v1.Pod) bool
+
+	// ContainerHasExclusiveCPUs returns true if the provided container in the pod has exclusive cpu
+	ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool
 
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider
 	podresources.MemoryProvider
 	podresources.DynamicResourcesProvider
+}
+
+type cpuAllocationReader interface {
+	GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet
 }
 
 type NodeConfig struct {
@@ -152,19 +186,19 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	QOSReserved                             map[v1.ResourceName]int64
-	CPUManagerPolicy                        string
-	CPUManagerPolicyOptions                 map[string]string
-	TopologyManagerScope                    string
-	CPUManagerReconcilePeriod               time.Duration
-	ExperimentalMemoryManagerPolicy         string
-	ExperimentalMemoryManagerReservedMemory []kubeletconfig.MemoryReservation
-	PodPidsLimit                            int64
-	EnforceCPULimits                        bool
-	CPUCFSQuotaPeriod                       time.Duration
-	TopologyManagerPolicy                   string
-	TopologyManagerPolicyOptions            map[string]string
-	CgroupVersion                           int
+	QOSReserved                  map[v1.ResourceName]int64
+	CPUManagerPolicy             string
+	CPUManagerPolicyOptions      map[string]string
+	TopologyManagerScope         string
+	CPUManagerReconcilePeriod    time.Duration
+	MemoryManagerPolicy          string
+	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
+	PodPidsLimit                 int64
+	EnforceCPULimits             bool
+	CPUCFSQuotaPeriod            time.Duration
+	TopologyManagerPolicy        string
+	TopologyManagerPolicyOptions map[string]string
+	CgroupVersion                int
 }
 
 type NodeAllocatableConfig struct {
@@ -180,6 +214,38 @@ type NodeAllocatableConfig struct {
 type Status struct {
 	// Any soft requirements that were unsatisfied.
 	SoftRequirements error
+}
+
+func int64Slice(in []int) []int64 {
+	out := make([]int64, len(in))
+	for i := range in {
+		out[i] = int64(in[i])
+	}
+	return out
+}
+
+func podHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod) bool {
+	for _, container := range pod.Spec.InitContainers {
+		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
+			return true
+		}
+	}
+	for _, container := range pod.Spec.Containers {
+		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
+			return true
+		}
+	}
+	logger.V(4).Info("Pod contains no container with pinned cpus", "podName", pod.Name)
+	return false
+}
+
+func containerHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod, container *v1.Container) bool {
+	exclusiveCPUs := cr.GetExclusiveCPUs(string(pod.UID), container.Name)
+	if !exclusiveCPUs.IsEmpty() {
+		logger.V(4).Info("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
+		return true
+	}
+	return false
 }
 
 // parsePercentage parses the percentage string to numeric value.

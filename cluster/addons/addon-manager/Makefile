@@ -15,10 +15,10 @@
 IMAGE=gcr.io/k8s-staging-addon-manager/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v9.1.7
-KUBECTL_VERSION?=v1.27.1
+VERSION=v9.1.8
+KUBECTL_VERSION?=v1.32.2
 
-BASEIMAGE=registry.k8s.io/debian-base-$(ARCH):v1.0.1
+BASEIMAGE=registry.k8s.io/build-image/debian-base-$(ARCH):bookworm-v1.0.6
 
 SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 

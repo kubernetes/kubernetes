@@ -19,25 +19,26 @@ package fuzzer
 import (
 	"fmt"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/utils/ptr"
 )
 
 // Funcs returns the fuzzer functions for the apps api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(r *apps.ControllerRevision, c fuzz.Continue) {
-			c.FuzzNoCustom(r)
+		func(r *apps.ControllerRevision, c randfill.Continue) {
+			c.FillNoCustom(r)
 			// match the fuzzer default content for runtime.Object
 			r.Data = runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
 		},
-		func(s *apps.StatefulSet, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
+		func(s *apps.StatefulSet, c randfill.Continue) {
+			c.FillNoCustom(s) // fuzz self without calling this function again
 
 			// match defaulter
 			if len(s.Spec.PodManagementPolicy) == 0 {
@@ -71,9 +72,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(s.Labels) == 0 {
 				s.Labels = s.Spec.Template.Labels
 			}
+			if s.Spec.UpdateStrategy.RollingUpdate != nil && s.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+				s.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(1))
+			}
 		},
-		func(j *apps.Deployment, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
+		func(j *apps.Deployment, c randfill.Continue) {
+			c.FillNoCustom(j)
 
 			// match defaulting
 			if j.Spec.Selector == nil {
@@ -83,15 +87,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.Labels = j.Spec.Template.Labels
 			}
 		},
-		func(j *apps.DeploymentSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
+		func(j *apps.DeploymentSpec, c randfill.Continue) {
+			c.FillNoCustom(j) // fuzz self without calling this function again
 			rhl := int32(c.Rand.Int31())
 			pds := int32(c.Rand.Int31())
 			j.RevisionHistoryLimit = &rhl
 			j.ProgressDeadlineSeconds = &pds
 		},
-		func(j *apps.DeploymentStrategy, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
+		func(j *apps.DeploymentStrategy, c randfill.Continue) {
+			c.FillNoCustom(j) // fuzz self without calling this function again
 			// Ensure that strategyType is one of valid values.
 			strategyTypes := []apps.DeploymentStrategyType{apps.RecreateDeploymentStrategyType, apps.RollingUpdateDeploymentStrategyType}
 			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
@@ -99,7 +103,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.RollingUpdate = nil
 			} else {
 				rollingUpdate := apps.RollingUpdateDeployment{}
-				if c.RandBool() {
+				if c.Bool() {
 					rollingUpdate.MaxUnavailable = intstr.FromInt32(c.Rand.Int31())
 					rollingUpdate.MaxSurge = intstr.FromInt32(c.Rand.Int31())
 				} else {
@@ -108,8 +112,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.RollingUpdate = &rollingUpdate
 			}
 		},
-		func(j *apps.DaemonSet, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
+		func(j *apps.DaemonSet, c randfill.Continue) {
+			c.FillNoCustom(j)
 
 			// match defaulter
 			j.Spec.Template.Generation = 0
@@ -117,13 +121,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.ObjectMeta.Labels = j.Spec.Template.ObjectMeta.Labels
 			}
 		},
-		func(j *apps.DaemonSetSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
+		func(j *apps.DaemonSetSpec, c randfill.Continue) {
+			c.FillNoCustom(j) // fuzz self without calling this function again
 			rhl := int32(c.Rand.Int31())
 			j.RevisionHistoryLimit = &rhl
 		},
-		func(j *apps.DaemonSetUpdateStrategy, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
+		func(j *apps.DaemonSetUpdateStrategy, c randfill.Continue) {
+			c.FillNoCustom(j) // fuzz self without calling this function again
 			// Ensure that strategyType is one of valid values.
 			strategyTypes := []apps.DaemonSetUpdateStrategyType{apps.RollingUpdateDaemonSetStrategyType, apps.OnDeleteDaemonSetStrategyType}
 			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
@@ -131,8 +135,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.RollingUpdate = nil
 			} else {
 				rollingUpdate := apps.RollingUpdateDaemonSet{}
-				if c.RandBool() {
-					if c.RandBool() {
+				if c.Bool() {
+					if c.Bool() {
 						rollingUpdate.MaxUnavailable = intstr.FromInt32(c.Rand.Int31())
 						rollingUpdate.MaxSurge = intstr.FromInt32(c.Rand.Int31())
 					} else {
@@ -143,8 +147,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.RollingUpdate = &rollingUpdate
 			}
 		},
-		func(j *apps.ReplicaSet, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
+		func(j *apps.ReplicaSet, c randfill.Continue) {
+			c.FillNoCustom(j)
 
 			// match defaulter
 			if j.Spec.Selector == nil {

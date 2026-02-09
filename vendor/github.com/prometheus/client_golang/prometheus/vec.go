@@ -79,7 +79,7 @@ func (m *MetricVec) DeleteLabelValues(lvs ...string) bool {
 		return false
 	}
 
-	return m.metricMap.deleteByHashWithLabelValues(h, lvs, m.curry)
+	return m.deleteByHashWithLabelValues(h, lvs, m.curry)
 }
 
 // Delete deletes the metric where the variable labels are the same as those
@@ -101,7 +101,7 @@ func (m *MetricVec) Delete(labels Labels) bool {
 		return false
 	}
 
-	return m.metricMap.deleteByHashWithLabels(h, labels, m.curry)
+	return m.deleteByHashWithLabels(h, labels, m.curry)
 }
 
 // DeletePartialMatch deletes all metrics where the variable labels contain all of those
@@ -114,7 +114,7 @@ func (m *MetricVec) DeletePartialMatch(labels Labels) int {
 	labels, closer := constrainLabels(m.desc, labels)
 	defer closer()
 
-	return m.metricMap.deleteByLabels(labels, m.curry)
+	return m.deleteByLabels(labels, m.curry)
 }
 
 // Without explicit forwarding of Describe, Collect, Reset, those methods won't
@@ -216,7 +216,7 @@ func (m *MetricVec) GetMetricWithLabelValues(lvs ...string) (Metric, error) {
 		return nil, err
 	}
 
-	return m.metricMap.getOrCreateMetricWithLabelValues(h, lvs, m.curry), nil
+	return m.getOrCreateMetricWithLabelValues(h, lvs, m.curry), nil
 }
 
 // GetMetricWith returns the Metric for the given Labels map (the label names
@@ -244,7 +244,7 @@ func (m *MetricVec) GetMetricWith(labels Labels) (Metric, error) {
 		return nil, err
 	}
 
-	return m.metricMap.getOrCreateMetricWithLabels(h, labels, m.curry), nil
+	return m.getOrCreateMetricWithLabels(h, labels, m.curry), nil
 }
 
 func (m *MetricVec) hashLabelValues(vals []string) (uint64, error) {
@@ -507,7 +507,7 @@ func (m *metricMap) getOrCreateMetricWithLabelValues(
 	return metric
 }
 
-// getOrCreateMetricWithLabelValues retrieves the metric by hash and label value
+// getOrCreateMetricWithLabels retrieves the metric by hash and label value
 // or creates it and returns the new one.
 //
 // This function holds the mutex.

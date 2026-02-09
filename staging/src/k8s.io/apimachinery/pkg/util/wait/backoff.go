@@ -157,6 +157,8 @@ func (b Backoff) DelayWithReset(c clock.Clock, resetInterval time.Duration) Dela
 // Until is syntactic sugar on top of JitterUntil with zero jitter factor and
 // with sliding = true (which means the timer for period starts after the f
 // completes).
+//
+// Contextual logging: UntilWithContext should be used instead of Until in code which supports contextual logging.
 func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 	JitterUntil(f, period, 0.0, true, stopCh)
 }
@@ -176,6 +178,8 @@ func UntilWithContext(ctx context.Context, f func(context.Context), period time.
 // NonSlidingUntil is syntactic sugar on top of JitterUntil with zero jitter
 // factor, with sliding = false (meaning the timer for period starts at the same
 // time as the function starts).
+//
+// Contextual logging: NonSlidingUntilWithContext should be used instead of NonSlidingUntil in code which supports contextual logging.
 func NonSlidingUntil(f func(), period time.Duration, stopCh <-chan struct{}) {
 	JitterUntil(f, period, 0.0, false, stopCh)
 }
@@ -200,19 +204,44 @@ func NonSlidingUntilWithContext(ctx context.Context, f func(context.Context), pe
 //
 // Close stopCh to stop. f may not be invoked if stop channel is already
 // closed. Pass NeverStop to if you don't want it stop.
+//
+// Contextual logging: JitterUntilWithContext should be used instead of JitterUntil in code which supports contextual logging.
 func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
 	BackoffUntil(f, NewJitteredBackoffManager(period, jitterFactor, &clock.RealClock{}), sliding, stopCh)
+}
+
+// JitterUntilWithContext loops until context is done, running f every period.
+//
+// If jitterFactor is positive, the period is jittered before every run of f.
+// If jitterFactor is not positive, the period is unchanged and not jittered.
+//
+// If sliding is true, the period is computed after f runs. If it is false then
+// period includes the runtime for f.
+//
+// Cancel context to stop. f may not be invoked if context is already done.
+func JitterUntilWithContext(ctx context.Context, f func(context.Context), period time.Duration, jitterFactor float64, sliding bool) {
+	BackoffUntilWithContext(ctx, f, NewJitteredBackoffManager(period, jitterFactor, &clock.RealClock{}), sliding)
 }
 
 // BackoffUntil loops until stop channel is closed, run f every duration given by BackoffManager.
 //
 // If sliding is true, the period is computed after f runs. If it is false then
 // period includes the runtime for f.
+//
+// Contextual logging: BackoffUntilWithContext should be used instead of BackoffUntil in code which supports contextual logging.
 func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan struct{}) {
+	BackoffUntilWithContext(ContextForChannel(stopCh), func(context.Context) { f() }, backoff, sliding)
+}
+
+// BackoffUntilWithContext loops until context is done, run f every duration given by BackoffManager.
+//
+// If sliding is true, the period is computed after f runs. If it is false then
+// period includes the runtime for f.
+func BackoffUntilWithContext(ctx context.Context, f func(ctx context.Context), backoff BackoffManager, sliding bool) {
 	var t clock.Timer
 	for {
 		select {
-		case <-stopCh:
+		case <-ctx.Done():
 			return
 		default:
 		}
@@ -222,8 +251,8 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 		}
 
 		func() {
-			defer runtime.HandleCrash()
-			f()
+			defer runtime.HandleCrashWithContext(ctx)
+			f(ctx)
 		}()
 
 		if sliding {
@@ -236,7 +265,7 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 		// In order to mitigate we re-check stopCh at the beginning
 		// of every loop to prevent extra executions of f().
 		select {
-		case <-stopCh:
+		case <-ctx.Done():
 			if !t.Stop() {
 				<-t.C()
 			}
@@ -244,19 +273,6 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 		case <-t.C():
 		}
 	}
-}
-
-// JitterUntilWithContext loops until context is done, running f every period.
-//
-// If jitterFactor is positive, the period is jittered before every run of f.
-// If jitterFactor is not positive, the period is unchanged and not jittered.
-//
-// If sliding is true, the period is computed after f runs. If it is false then
-// period includes the runtime for f.
-//
-// Cancel context to stop. f may not be invoked if context is already expired.
-func JitterUntilWithContext(ctx context.Context, f func(context.Context), period time.Duration, jitterFactor float64, sliding bool) {
-	JitterUntil(func() { f(ctx) }, period, jitterFactor, sliding, ctx.Done())
 }
 
 // backoffManager provides simple backoff behavior in a threadsafe manner to a caller.

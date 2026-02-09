@@ -61,7 +61,7 @@ func DefaultServerURL(host, apiPath string, groupVersion schema.GroupVersion, de
 	return hostURL, versionedAPIPath, nil
 }
 
-// DefaultVersionedAPIPathFor constructs the default path for the given group version, assuming the given
+// DefaultVersionedAPIPath constructs the default path for the given group version, assuming the given
 // API path, following the standard conventions of the Kubernetes API.
 func DefaultVersionedAPIPath(apiPath string, groupVersion schema.GroupVersion) string {
 	versionedAPIPath := path.Join("/", apiPath)

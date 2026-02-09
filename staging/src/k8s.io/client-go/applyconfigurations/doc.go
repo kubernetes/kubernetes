@@ -74,7 +74,6 @@ but when marshalled to YAML, produces:
 	metadata:
 	  name: myHPA
 	  namespace: myNamespace
-	  creationTimestamp: null
 	spec:
 	  scaleTargetRef:
 	    kind: ""
@@ -148,4 +147,4 @@ reconciliation code that performs a "read/modify-in-place/update" (or patch) wor
 	    // apply
 	    applied, err := deploymentClient.Apply(ctx, extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
 */
-package applyconfigurations // import "k8s.io/client-go/applyconfigurations"
+package applyconfigurations

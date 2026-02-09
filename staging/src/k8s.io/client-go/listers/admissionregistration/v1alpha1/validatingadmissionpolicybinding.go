@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ValidatingAdmissionPolicyBindingLister helps list ValidatingAdmissionPolicyBindings.
@@ -30,19 +30,19 @@ import (
 type ValidatingAdmissionPolicyBindingLister interface {
 	// List lists all ValidatingAdmissionPolicyBindings in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ValidatingAdmissionPolicyBinding, err error)
+	List(selector labels.Selector) (ret []*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, err error)
 	// Get retrieves the ValidatingAdmissionPolicyBinding from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ValidatingAdmissionPolicyBinding, error)
+	Get(name string) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, error)
 	ValidatingAdmissionPolicyBindingListerExpansion
 }
 
 // validatingAdmissionPolicyBindingLister implements the ValidatingAdmissionPolicyBindingLister interface.
 type validatingAdmissionPolicyBindingLister struct {
-	listers.ResourceIndexer[*v1alpha1.ValidatingAdmissionPolicyBinding]
+	listers.ResourceIndexer[*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding]
 }
 
 // NewValidatingAdmissionPolicyBindingLister returns a new ValidatingAdmissionPolicyBindingLister.
 func NewValidatingAdmissionPolicyBindingLister(indexer cache.Indexer) ValidatingAdmissionPolicyBindingLister {
-	return &validatingAdmissionPolicyBindingLister{listers.New[*v1alpha1.ValidatingAdmissionPolicyBinding](indexer, v1alpha1.Resource("validatingadmissionpolicybinding"))}
+	return &validatingAdmissionPolicyBindingLister{listers.New[*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding](indexer, admissionregistrationv1alpha1.Resource("validatingadmissionpolicybinding"))}
 }

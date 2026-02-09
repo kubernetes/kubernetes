@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package testcerts contains generated key pairs used by the unit tests of
 // mutating and validating webhooks. They are for testing only.
-package testcerts // import "k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts"
+package testcerts

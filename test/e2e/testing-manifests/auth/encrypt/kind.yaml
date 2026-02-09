@@ -3,11 +3,14 @@ apiVersion: kind.x-k8s.io/v1alpha4
 # this containerd config patch sets the registry to the local registry where we push mock kms provider
 containerdConfigPatches:
 - |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
-    endpoint = ["http://kind-registry:5000"]
+  [plugins."io.containerd.grpc.v1.cri".registry]
+    config_path = "/etc/containerd/certs.d"
 nodes:
 - role: control-plane
   extraMounts:
+  - containerPath: /etc/containerd/certs.d
+    hostPath: test/e2e/testing-manifests/auth/encrypt/certs.d
+    readOnly: true
   - containerPath: /etc/kubernetes/encryption-config.yaml
     hostPath: test/e2e/testing-manifests/auth/encrypt/encryption-config.yaml
     readOnly: true
@@ -21,12 +24,42 @@ nodes:
     readOnly: true
     propagation: None
   kubeadmConfigPatches:
+    # v1beta4 for the future (v1.35.0+ ?)
+    # https://github.com/kubernetes-sigs/kind/issues/3847
+    # TODO: drop v1beta3 when kind makes the switch
     - |
       kind: ClusterConfiguration
+      apiVersion: kubeadm.k8s.io/v1beta4
+      apiServer:
+        extraArgs:
+          - name: "encryption-provider-config"
+            value: "/etc/kubernetes/encryption-config.yaml"
+          - name: "v"
+            value: "5"
+        extraVolumes:
+        - name: encryption-config
+          hostPath: "/etc/kubernetes/encryption-config.yaml"
+          mountPath: "/etc/kubernetes/encryption-config.yaml"
+          readOnly: true
+          pathType: File
+        - name: sock-path
+          hostPath: "/tmp"
+          mountPath: "/tmp"
+      scheduler:
+        extraArgs:
+          - name: "v"
+            value: "5"
+      controllerManager:
+        extraArgs:
+          - name: "v"
+            value: "5"
+    # v1beta3 for v1.23.0 ... ?
+    - |
+      kind: ClusterConfiguration
+      apiVersion: kubeadm.k8s.io/v1beta3
       apiServer:
         extraArgs:
           encryption-provider-config: "/etc/kubernetes/encryption-config.yaml"
-          feature-gates: "KMSv2=true"
           v: "5"
         extraVolumes:
         - name: encryption-config

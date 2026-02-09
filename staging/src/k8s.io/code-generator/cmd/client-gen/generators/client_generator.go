@@ -29,6 +29,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	codegennamer "k8s.io/code-generator/pkg/namer"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -128,7 +129,7 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetDir, clientsetPkg string, groupPkgName string, groupGoName string, apiPath string, inputPkg string, applyBuilderPkg string, boilerplate []byte) generator.Target {
+func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetDir, clientsetPkg string, groupPkgName string, groupGoName string, apiPath string, inputPkg string, applyBuilderPkg string, boilerplate []byte, prefersProtobuf bool) generator.Target {
 	subdir := []string{"typed", strings.ToLower(groupPkgName), strings.ToLower(gv.Version.NonEmpty())}
 	gvDir := filepath.Join(clientsetDir, filepath.Join(subdir...))
 	gvPkg := path.Join(clientsetPkg, path.Join(subdir...))
@@ -160,8 +161,9 @@ func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 					group:                     gv.Group.NonEmpty(),
 					version:                   gv.Version.String(),
 					groupGoName:               groupGoName,
+					prefersProtobuf:           prefersProtobuf,
 					typeToMatch:               t,
-					imports:                   generator.NewImportTracker(),
+					imports:                   generator.NewImportTrackerForPackage(gvPkg),
 				})
 			}
 
@@ -177,7 +179,7 @@ func targetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clie
 				groupGoName:      groupGoName,
 				apiPath:          apiPath,
 				types:            typeList,
-				imports:          generator.NewImportTracker(),
+				imports:          generator.NewImportTrackerForPackage(gvPkg),
 			})
 
 			expansionFileName := "generated_expansion.go"
@@ -214,7 +216,7 @@ func targetForClientset(args *args.Args, clientsetDir, clientsetPkg string, grou
 					groups:           args.Groups,
 					groupGoNames:     groupGoNames,
 					clientsetPackage: clientsetPkg,
-					imports:          generator.NewImportTracker(),
+					imports:          generator.NewImportTrackerForPackage(clientsetPkg),
 				},
 			}
 			return generators
@@ -260,7 +262,7 @@ NextGroup:
 					OutputPath:     schemeDir,
 					Groups:         args.Groups,
 					GroupGoNames:   groupGoNames,
-					ImportTracker:  generator.NewImportTracker(),
+					ImportTracker:  generator.NewImportTrackerForPackage(schemePkg),
 					CreateRegistry: internalClient,
 				},
 			}
@@ -274,14 +276,18 @@ NextGroup:
 // first field (somegroup) as the name of the group in Go code, e.g. as the func name in a clientset.
 //
 // If the first field of the groupName is not unique within the clientset, use "// +groupName=unique
-func applyGroupOverrides(universe types.Universe, args *args.Args) {
+func applyGroupOverrides(universe types.Universe, args *args.Args) error {
 	// Create a map from "old GV" to "new GV" so we know what changes we need to make.
 	changes := make(map[clientgentypes.GroupVersion]clientgentypes.GroupVersion)
 	for gv, inputDir := range args.GroupVersionPackages() {
 		p := universe.Package(inputDir)
-		if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
+		override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupName"}, p.Comments)
+		if err != nil {
+			return fmt.Errorf("cannot extract groupName tags: %w", err)
+		}
+		if override["groupName"] != nil {
 			newGV := clientgentypes.GroupVersion{
-				Group:   clientgentypes.Group(override[0]),
+				Group:   clientgentypes.Group(override["groupName"][0]),
 				Version: gv.Version,
 			}
 			changes[gv] = newGV
@@ -309,6 +315,7 @@ func applyGroupOverrides(universe types.Universe, args *args.Args) {
 		}
 	}
 	args.Groups = newGroups
+	return nil
 }
 
 // Because we try to assemble inputs from an input-base and a set of
@@ -352,7 +359,9 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	if err := sanitizePackagePaths(context, args); err != nil {
 		klog.Fatalf("cannot sanitize inputs: %v", err)
 	}
-	applyGroupOverrides(context.Universe, args)
+	if err := applyGroupOverrides(context.Universe, args); err != nil {
+		klog.Fatalf("cannot apply group overrides: %v", err)
+	}
 
 	gvToTypes := map[clientgentypes.GroupVersion][]*types.Type{}
 	groupGoNames := make(map[clientgentypes.GroupVersion]string)
@@ -362,8 +371,12 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
 		// the Go group identifier in CamelCase. It defaults
 		groupGoNames[gv] = namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
-		if override := gengo.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
-			groupGoNames[gv] = namer.IC(override[0])
+		override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupGoName"}, p.Comments)
+		if err != nil {
+			klog.Fatalf("cannot extract groupGoName tags: %v", err)
+		}
+		if override["groupGoName"] != nil {
+			groupGoNames[gv] = namer.IC(override["groupGoName"][0])
 		}
 
 		for n, t := range p.Types {
@@ -424,7 +437,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				targetForGroup(
 					gv, orderer.OrderTypes(types), clientsetDir, clientsetPkg,
 					group.PackageName, groupGoNames[gv], args.ClientsetAPIPath,
-					inputPath, args.ApplyConfigurationPackage, boilerplate))
+					inputPath, args.ApplyConfigurationPackage, boilerplate, args.PrefersProtobuf))
 			if args.FakeClient {
 				targetList = append(targetList,
 					fake.TargetForGroup(gv, orderer.OrderTypes(types), clientsetDir, clientsetPkg, group.PackageName, groupGoNames[gv], inputPath, args.ApplyConfigurationPackage, boilerplate))

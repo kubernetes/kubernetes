@@ -160,6 +160,7 @@ func (x placeholderExtension) HasPresence() bool                                
 func (x placeholderExtension) HasOptionalKeyword() bool                           { return false }
 func (x placeholderExtension) IsExtension() bool                                  { return true }
 func (x placeholderExtension) IsWeak() bool                                       { return false }
+func (x placeholderExtension) IsLazy() bool                                       { return false }
 func (x placeholderExtension) IsPacked() bool                                     { return false }
 func (x placeholderExtension) IsList() bool                                       { return false }
 func (x placeholderExtension) IsMap() bool                                        { return false }

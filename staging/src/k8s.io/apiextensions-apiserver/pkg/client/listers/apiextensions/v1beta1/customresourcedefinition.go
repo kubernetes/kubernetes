@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CustomResourceDefinitionLister helps list CustomResourceDefinitions.
@@ -30,19 +30,19 @@ import (
 type CustomResourceDefinitionLister interface {
 	// List lists all CustomResourceDefinitions in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.CustomResourceDefinition, err error)
+	List(selector labels.Selector) (ret []*apiextensionsv1beta1.CustomResourceDefinition, err error)
 	// Get retrieves the CustomResourceDefinition from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.CustomResourceDefinition, error)
+	Get(name string) (*apiextensionsv1beta1.CustomResourceDefinition, error)
 	CustomResourceDefinitionListerExpansion
 }
 
 // customResourceDefinitionLister implements the CustomResourceDefinitionLister interface.
 type customResourceDefinitionLister struct {
-	listers.ResourceIndexer[*v1beta1.CustomResourceDefinition]
+	listers.ResourceIndexer[*apiextensionsv1beta1.CustomResourceDefinition]
 }
 
 // NewCustomResourceDefinitionLister returns a new CustomResourceDefinitionLister.
 func NewCustomResourceDefinitionLister(indexer cache.Indexer) CustomResourceDefinitionLister {
-	return &customResourceDefinitionLister{listers.New[*v1beta1.CustomResourceDefinition](indexer, v1beta1.Resource("customresourcedefinition"))}
+	return &customResourceDefinitionLister{listers.New[*apiextensionsv1beta1.CustomResourceDefinition](indexer, apiextensionsv1beta1.Resource("customresourcedefinition"))}
 }

@@ -24,7 +24,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apiserverinternal "k8s.io/kubernetes/pkg/apis/apiserverinternal"
@@ -37,70 +37,70 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ServerStorageVersion)(nil), (*apiserverinternal.ServerStorageVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVersion(a.(*v1alpha1.ServerStorageVersion), b.(*apiserverinternal.ServerStorageVersion), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternalv1alpha1.ServerStorageVersion)(nil), (*apiserverinternal.ServerStorageVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVersion(a.(*apiserverinternalv1alpha1.ServerStorageVersion), b.(*apiserverinternal.ServerStorageVersion), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiserverinternal.ServerStorageVersion)(nil), (*v1alpha1.ServerStorageVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorageVersion(a.(*apiserverinternal.ServerStorageVersion), b.(*v1alpha1.ServerStorageVersion), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternal.ServerStorageVersion)(nil), (*apiserverinternalv1alpha1.ServerStorageVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorageVersion(a.(*apiserverinternal.ServerStorageVersion), b.(*apiserverinternalv1alpha1.ServerStorageVersion), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.StorageVersion)(nil), (*apiserverinternal.StorageVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(a.(*v1alpha1.StorageVersion), b.(*apiserverinternal.StorageVersion), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternalv1alpha1.StorageVersion)(nil), (*apiserverinternal.StorageVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(a.(*apiserverinternalv1alpha1.StorageVersion), b.(*apiserverinternal.StorageVersion), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersion)(nil), (*v1alpha1.StorageVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(a.(*apiserverinternal.StorageVersion), b.(*v1alpha1.StorageVersion), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersion)(nil), (*apiserverinternalv1alpha1.StorageVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(a.(*apiserverinternal.StorageVersion), b.(*apiserverinternalv1alpha1.StorageVersion), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.StorageVersionCondition)(nil), (*apiserverinternal.StorageVersionCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersionCondition(a.(*v1alpha1.StorageVersionCondition), b.(*apiserverinternal.StorageVersionCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternalv1alpha1.StorageVersionCondition)(nil), (*apiserverinternal.StorageVersionCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersionCondition(a.(*apiserverinternalv1alpha1.StorageVersionCondition), b.(*apiserverinternal.StorageVersionCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersionCondition)(nil), (*v1alpha1.StorageVersionCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersionCondition(a.(*apiserverinternal.StorageVersionCondition), b.(*v1alpha1.StorageVersionCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersionCondition)(nil), (*apiserverinternalv1alpha1.StorageVersionCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersionCondition(a.(*apiserverinternal.StorageVersionCondition), b.(*apiserverinternalv1alpha1.StorageVersionCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.StorageVersionList)(nil), (*apiserverinternal.StorageVersionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList(a.(*v1alpha1.StorageVersionList), b.(*apiserverinternal.StorageVersionList), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternalv1alpha1.StorageVersionList)(nil), (*apiserverinternal.StorageVersionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList(a.(*apiserverinternalv1alpha1.StorageVersionList), b.(*apiserverinternal.StorageVersionList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersionList)(nil), (*v1alpha1.StorageVersionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList(a.(*apiserverinternal.StorageVersionList), b.(*v1alpha1.StorageVersionList), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersionList)(nil), (*apiserverinternalv1alpha1.StorageVersionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList(a.(*apiserverinternal.StorageVersionList), b.(*apiserverinternalv1alpha1.StorageVersionList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.StorageVersionSpec)(nil), (*apiserverinternal.StorageVersionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec(a.(*v1alpha1.StorageVersionSpec), b.(*apiserverinternal.StorageVersionSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternalv1alpha1.StorageVersionSpec)(nil), (*apiserverinternal.StorageVersionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec(a.(*apiserverinternalv1alpha1.StorageVersionSpec), b.(*apiserverinternal.StorageVersionSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersionSpec)(nil), (*v1alpha1.StorageVersionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(a.(*apiserverinternal.StorageVersionSpec), b.(*v1alpha1.StorageVersionSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersionSpec)(nil), (*apiserverinternalv1alpha1.StorageVersionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(a.(*apiserverinternal.StorageVersionSpec), b.(*apiserverinternalv1alpha1.StorageVersionSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.StorageVersionStatus)(nil), (*apiserverinternal.StorageVersionStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionStatus(a.(*v1alpha1.StorageVersionStatus), b.(*apiserverinternal.StorageVersionStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternalv1alpha1.StorageVersionStatus)(nil), (*apiserverinternal.StorageVersionStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionStatus(a.(*apiserverinternalv1alpha1.StorageVersionStatus), b.(*apiserverinternal.StorageVersionStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersionStatus)(nil), (*v1alpha1.StorageVersionStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiserverinternal_StorageVersionStatus_To_v1alpha1_StorageVersionStatus(a.(*apiserverinternal.StorageVersionStatus), b.(*v1alpha1.StorageVersionStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiserverinternal.StorageVersionStatus)(nil), (*apiserverinternalv1alpha1.StorageVersionStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserverinternal_StorageVersionStatus_To_v1alpha1_StorageVersionStatus(a.(*apiserverinternal.StorageVersionStatus), b.(*apiserverinternalv1alpha1.StorageVersionStatus), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVersion(in *v1alpha1.ServerStorageVersion, out *apiserverinternal.ServerStorageVersion, s conversion.Scope) error {
+func autoConvert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVersion(in *apiserverinternalv1alpha1.ServerStorageVersion, out *apiserverinternal.ServerStorageVersion, s conversion.Scope) error {
 	out.APIServerID = in.APIServerID
 	out.EncodingVersion = in.EncodingVersion
 	out.DecodableVersions = *(*[]string)(unsafe.Pointer(&in.DecodableVersions))
@@ -109,11 +109,11 @@ func autoConvert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorag
 }
 
 // Convert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVersion is an autogenerated conversion function.
-func Convert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVersion(in *v1alpha1.ServerStorageVersion, out *apiserverinternal.ServerStorageVersion, s conversion.Scope) error {
+func Convert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVersion(in *apiserverinternalv1alpha1.ServerStorageVersion, out *apiserverinternal.ServerStorageVersion, s conversion.Scope) error {
 	return autoConvert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVersion(in, out, s)
 }
 
-func autoConvert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorageVersion(in *apiserverinternal.ServerStorageVersion, out *v1alpha1.ServerStorageVersion, s conversion.Scope) error {
+func autoConvert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorageVersion(in *apiserverinternal.ServerStorageVersion, out *apiserverinternalv1alpha1.ServerStorageVersion, s conversion.Scope) error {
 	out.APIServerID = in.APIServerID
 	out.EncodingVersion = in.EncodingVersion
 	out.DecodableVersions = *(*[]string)(unsafe.Pointer(&in.DecodableVersions))
@@ -122,11 +122,11 @@ func autoConvert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorag
 }
 
 // Convert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorageVersion is an autogenerated conversion function.
-func Convert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorageVersion(in *apiserverinternal.ServerStorageVersion, out *v1alpha1.ServerStorageVersion, s conversion.Scope) error {
+func Convert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorageVersion(in *apiserverinternal.ServerStorageVersion, out *apiserverinternalv1alpha1.ServerStorageVersion, s conversion.Scope) error {
 	return autoConvert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorageVersion(in, out, s)
 }
 
-func autoConvert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(in *v1alpha1.StorageVersion, out *apiserverinternal.StorageVersion, s conversion.Scope) error {
+func autoConvert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(in *apiserverinternalv1alpha1.StorageVersion, out *apiserverinternal.StorageVersion, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -138,11 +138,11 @@ func autoConvert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(in 
 }
 
 // Convert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion is an autogenerated conversion function.
-func Convert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(in *v1alpha1.StorageVersion, out *apiserverinternal.StorageVersion, s conversion.Scope) error {
+func Convert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(in *apiserverinternalv1alpha1.StorageVersion, out *apiserverinternal.StorageVersion, s conversion.Scope) error {
 	return autoConvert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(in, out, s)
 }
 
-func autoConvert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(in *apiserverinternal.StorageVersion, out *v1alpha1.StorageVersion, s conversion.Scope) error {
+func autoConvert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(in *apiserverinternal.StorageVersion, out *apiserverinternalv1alpha1.StorageVersion, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -154,11 +154,11 @@ func autoConvert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(in 
 }
 
 // Convert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion is an autogenerated conversion function.
-func Convert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(in *apiserverinternal.StorageVersion, out *v1alpha1.StorageVersion, s conversion.Scope) error {
+func Convert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(in *apiserverinternal.StorageVersion, out *apiserverinternalv1alpha1.StorageVersion, s conversion.Scope) error {
 	return autoConvert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(in, out, s)
 }
 
-func autoConvert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersionCondition(in *v1alpha1.StorageVersionCondition, out *apiserverinternal.StorageVersionCondition, s conversion.Scope) error {
+func autoConvert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersionCondition(in *apiserverinternalv1alpha1.StorageVersionCondition, out *apiserverinternal.StorageVersionCondition, s conversion.Scope) error {
 	out.Type = apiserverinternal.StorageVersionConditionType(in.Type)
 	out.Status = apiserverinternal.ConditionStatus(in.Status)
 	out.ObservedGeneration = in.ObservedGeneration
@@ -169,13 +169,13 @@ func autoConvert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVe
 }
 
 // Convert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersionCondition is an autogenerated conversion function.
-func Convert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersionCondition(in *v1alpha1.StorageVersionCondition, out *apiserverinternal.StorageVersionCondition, s conversion.Scope) error {
+func Convert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersionCondition(in *apiserverinternalv1alpha1.StorageVersionCondition, out *apiserverinternal.StorageVersionCondition, s conversion.Scope) error {
 	return autoConvert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersionCondition(in, out, s)
 }
 
-func autoConvert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersionCondition(in *apiserverinternal.StorageVersionCondition, out *v1alpha1.StorageVersionCondition, s conversion.Scope) error {
-	out.Type = v1alpha1.StorageVersionConditionType(in.Type)
-	out.Status = v1alpha1.ConditionStatus(in.Status)
+func autoConvert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersionCondition(in *apiserverinternal.StorageVersionCondition, out *apiserverinternalv1alpha1.StorageVersionCondition, s conversion.Scope) error {
+	out.Type = apiserverinternalv1alpha1.StorageVersionConditionType(in.Type)
+	out.Status = apiserverinternalv1alpha1.ConditionStatus(in.Status)
 	out.ObservedGeneration = in.ObservedGeneration
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -184,51 +184,51 @@ func autoConvert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVe
 }
 
 // Convert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersionCondition is an autogenerated conversion function.
-func Convert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersionCondition(in *apiserverinternal.StorageVersionCondition, out *v1alpha1.StorageVersionCondition, s conversion.Scope) error {
+func Convert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersionCondition(in *apiserverinternal.StorageVersionCondition, out *apiserverinternalv1alpha1.StorageVersionCondition, s conversion.Scope) error {
 	return autoConvert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersionCondition(in, out, s)
 }
 
-func autoConvert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList(in *v1alpha1.StorageVersionList, out *apiserverinternal.StorageVersionList, s conversion.Scope) error {
+func autoConvert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList(in *apiserverinternalv1alpha1.StorageVersionList, out *apiserverinternal.StorageVersionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]apiserverinternal.StorageVersion)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList is an autogenerated conversion function.
-func Convert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList(in *v1alpha1.StorageVersionList, out *apiserverinternal.StorageVersionList, s conversion.Scope) error {
+func Convert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList(in *apiserverinternalv1alpha1.StorageVersionList, out *apiserverinternal.StorageVersionList, s conversion.Scope) error {
 	return autoConvert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList(in, out, s)
 }
 
-func autoConvert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList(in *apiserverinternal.StorageVersionList, out *v1alpha1.StorageVersionList, s conversion.Scope) error {
+func autoConvert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList(in *apiserverinternal.StorageVersionList, out *apiserverinternalv1alpha1.StorageVersionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha1.StorageVersion)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]apiserverinternalv1alpha1.StorageVersion)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList is an autogenerated conversion function.
-func Convert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList(in *apiserverinternal.StorageVersionList, out *v1alpha1.StorageVersionList, s conversion.Scope) error {
+func Convert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList(in *apiserverinternal.StorageVersionList, out *apiserverinternalv1alpha1.StorageVersionList, s conversion.Scope) error {
 	return autoConvert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList(in, out, s)
 }
 
-func autoConvert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec(in *v1alpha1.StorageVersionSpec, out *apiserverinternal.StorageVersionSpec, s conversion.Scope) error {
+func autoConvert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec(in *apiserverinternalv1alpha1.StorageVersionSpec, out *apiserverinternal.StorageVersionSpec, s conversion.Scope) error {
 	return nil
 }
 
 // Convert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec is an autogenerated conversion function.
-func Convert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec(in *v1alpha1.StorageVersionSpec, out *apiserverinternal.StorageVersionSpec, s conversion.Scope) error {
+func Convert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec(in *apiserverinternalv1alpha1.StorageVersionSpec, out *apiserverinternal.StorageVersionSpec, s conversion.Scope) error {
 	return autoConvert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec(in, out, s)
 }
 
-func autoConvert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(in *apiserverinternal.StorageVersionSpec, out *v1alpha1.StorageVersionSpec, s conversion.Scope) error {
+func autoConvert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(in *apiserverinternal.StorageVersionSpec, out *apiserverinternalv1alpha1.StorageVersionSpec, s conversion.Scope) error {
 	return nil
 }
 
 // Convert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec is an autogenerated conversion function.
-func Convert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(in *apiserverinternal.StorageVersionSpec, out *v1alpha1.StorageVersionSpec, s conversion.Scope) error {
+func Convert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(in *apiserverinternal.StorageVersionSpec, out *apiserverinternalv1alpha1.StorageVersionSpec, s conversion.Scope) error {
 	return autoConvert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(in, out, s)
 }
 
-func autoConvert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionStatus(in *v1alpha1.StorageVersionStatus, out *apiserverinternal.StorageVersionStatus, s conversion.Scope) error {
+func autoConvert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionStatus(in *apiserverinternalv1alpha1.StorageVersionStatus, out *apiserverinternal.StorageVersionStatus, s conversion.Scope) error {
 	out.StorageVersions = *(*[]apiserverinternal.ServerStorageVersion)(unsafe.Pointer(&in.StorageVersions))
 	out.CommonEncodingVersion = (*string)(unsafe.Pointer(in.CommonEncodingVersion))
 	out.Conditions = *(*[]apiserverinternal.StorageVersionCondition)(unsafe.Pointer(&in.Conditions))
@@ -236,18 +236,18 @@ func autoConvert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersi
 }
 
 // Convert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionStatus is an autogenerated conversion function.
-func Convert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionStatus(in *v1alpha1.StorageVersionStatus, out *apiserverinternal.StorageVersionStatus, s conversion.Scope) error {
+func Convert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionStatus(in *apiserverinternalv1alpha1.StorageVersionStatus, out *apiserverinternal.StorageVersionStatus, s conversion.Scope) error {
 	return autoConvert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionStatus(in, out, s)
 }
 
-func autoConvert_apiserverinternal_StorageVersionStatus_To_v1alpha1_StorageVersionStatus(in *apiserverinternal.StorageVersionStatus, out *v1alpha1.StorageVersionStatus, s conversion.Scope) error {
-	out.StorageVersions = *(*[]v1alpha1.ServerStorageVersion)(unsafe.Pointer(&in.StorageVersions))
+func autoConvert_apiserverinternal_StorageVersionStatus_To_v1alpha1_StorageVersionStatus(in *apiserverinternal.StorageVersionStatus, out *apiserverinternalv1alpha1.StorageVersionStatus, s conversion.Scope) error {
+	out.StorageVersions = *(*[]apiserverinternalv1alpha1.ServerStorageVersion)(unsafe.Pointer(&in.StorageVersions))
 	out.CommonEncodingVersion = (*string)(unsafe.Pointer(in.CommonEncodingVersion))
-	out.Conditions = *(*[]v1alpha1.StorageVersionCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]apiserverinternalv1alpha1.StorageVersionCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_apiserverinternal_StorageVersionStatus_To_v1alpha1_StorageVersionStatus is an autogenerated conversion function.
-func Convert_apiserverinternal_StorageVersionStatus_To_v1alpha1_StorageVersionStatus(in *apiserverinternal.StorageVersionStatus, out *v1alpha1.StorageVersionStatus, s conversion.Scope) error {
+func Convert_apiserverinternal_StorageVersionStatus_To_v1alpha1_StorageVersionStatus(in *apiserverinternal.StorageVersionStatus, out *apiserverinternalv1alpha1.StorageVersionStatus, s conversion.Scope) error {
 	return autoConvert_apiserverinternal_StorageVersionStatus_To_v1alpha1_StorageVersionStatus(in, out, s)
 }

@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package test contains tests for PodSecurity admission
-package test // import "k8s.io/pod-security-admission/test"
+package test

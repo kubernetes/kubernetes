@@ -16,7 +16,7 @@
 // of JSON Schemas.
 package jsonschema
 
-import "gopkg.in/yaml.v3"
+import "go.yaml.in/yaml/v3"
 
 // The Schema struct models a JSON Schema and, because schemas are
 // defined hierarchically, contains many references to itself.

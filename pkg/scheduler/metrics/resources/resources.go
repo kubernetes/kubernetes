@@ -29,7 +29,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 
-	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	resourcehelper "k8s.io/component-helpers/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
@@ -181,7 +181,7 @@ func recordMetricWithUnit(
 // total container resource requests and to the total container limits which have a
 // non-zero quantity. The caller may avoid allocations of resource lists by passing
 // a requests and limits list to the function, which will be cleared before use.
-// This method is the same as v1resource.PodRequestsAndLimits but avoids allocating in several
+// This method is the same as resourcehelper.PodRequestsAndLimits but avoids allocating in several
 // scenarios for efficiency.
 func podRequestsAndLimitsByLifecycle(pod *v1.Pod, reuseReqs, reuseLimits v1.ResourceList) (reqs, limits v1.ResourceList, terminal bool) {
 	switch {
@@ -196,7 +196,7 @@ func podRequestsAndLimitsByLifecycle(pod *v1.Pod, reuseReqs, reuseLimits v1.Reso
 		return
 	}
 
-	reqs = v1resource.PodRequests(pod, v1resource.PodResourcesOptions{Reuse: reuseReqs})
-	limits = v1resource.PodLimits(pod, v1resource.PodResourcesOptions{Reuse: reuseLimits})
+	reqs = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{Reuse: reuseReqs})
+	limits = resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{Reuse: reuseLimits})
 	return
 }

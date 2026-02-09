@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -99,20 +99,20 @@ var (
 			Key:               "foo",
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: utilpointer.Int64Ptr(10),
+			TolerationSeconds: ptr.To[int64](10),
 		},
 		"foo-noexec-0": {
 			Key:               "foo",
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: utilpointer.Int64Ptr(0),
+			TolerationSeconds: ptr.To[int64](0),
 		},
 		"foo-bar-noexec-10": {
 			Key:               "foo",
 			Operator:          api.TolerationOpEqual,
 			Value:             "bar",
 			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: utilpointer.Int64Ptr(10),
+			TolerationSeconds: ptr.To[int64](10),
 		},
 	}
 )
@@ -338,10 +338,10 @@ func TestFuzzed(t *testing.T) {
 			gen.Value = strings.Repeat("b", r.Intn(6)+1)
 		}
 		if gen.Effect == api.TaintEffectNoExecute && r.Float32() < tolerationSecondsProbability {
-			gen.TolerationSeconds = utilpointer.Int64Ptr(r.Int63n(10))
+			gen.TolerationSeconds = ptr.To[int64](r.Int63n(10))
 		}
 		// Ensure only valid tolerations are generated.
-		require.NoError(t, validation.ValidateTolerations([]api.Toleration{gen}, field.NewPath("")).ToAggregate(), "%#v", gen)
+		require.NoError(t, validation.ValidateTolerations([]api.Toleration{gen}, field.NewPath(""), validation.PodValidationOptions{}).ToAggregate(), "%#v", gen)
 		return gen
 	}
 	genTolerations := func() []api.Toleration {

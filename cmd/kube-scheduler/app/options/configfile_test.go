@@ -18,6 +18,7 @@ package options
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -103,13 +104,13 @@ func TestLoadConfigFromFile(t *testing.T) {
 		{
 			name:           "Scheduler config with decode error",
 			path:           decodeErrConfigFile,
-			expectedErr:    fmt.Errorf(apiVersionMissing),
+			expectedErr:    errors.New(apiVersionMissing),
 			expectedConfig: nil,
 		},
 		{
 			name:           "Scheduler config version too old",
 			path:           versionTooOldConfigFile,
-			expectedErr:    fmt.Errorf(apiVersionTooOld),
+			expectedErr:    errors.New(apiVersionTooOld),
 			expectedConfig: nil,
 		},
 	}

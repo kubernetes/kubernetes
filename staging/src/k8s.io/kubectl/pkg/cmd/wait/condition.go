@@ -109,7 +109,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 
 	endTime := time.Now().Add(o.Timeout)
 	timeout := time.Until(endTime)
-	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info) // nolint:staticcheck // SA1019
+	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrorInterrupted(nil), info) // nolint:staticcheck // SA1019
 	if o.Timeout == 0 {
 		// If timeout is zero we will fetch the object(s) once only and check
 		gottenObj, initObjGetErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(context.Background(), info.Name, metav1.GetOptions{})
@@ -135,7 +135,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 
 	mapping := info.ResourceMapping() // used to pass back meaningful errors if object disappears
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-	lw := &cache.ListWatch{
+	lw := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
 			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
@@ -144,7 +144,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 			options.FieldSelector = fieldSelector
 			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
 		},
-	}
+	}, o.DynamicClient)
 
 	// this function is used to refresh the cache to prevent timeout waits on resources that have disappeared
 	preconditionFunc := func(store cache.Store) (bool, error) {
@@ -174,7 +174,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 		return err
 	})
 	if err != nil {
-		if errors.Is(err, wait.ErrWaitTimeout) { // nolint:staticcheck // SA1019
+		if wait.Interrupted(err) { // nolint:staticcheck // SA1019
 			return result, false, errWaitTimeoutWithName
 		}
 		return result, false, err

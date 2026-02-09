@@ -25,11 +25,14 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -59,8 +62,9 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("storage.k8s.io", "v1", "volumeattachments"):                `{"status": {"attached": false}}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                     `{"status": {"currentHealthy": 25}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                `{"status": {"currentHealthy": 25}}`,
-	gvr("resource.k8s.io", "v1alpha2", "podschedulingcontexts"):     `{"status": {"resourceClaims": [{"name": "my-claim", "unsuitableNodes": ["node2"]}]}}`, // Not really a conflict with status_test.go: Apply just stores both nodes. Conflict testing therefore gets disabled for podschedulingcontexts.
-	gvr("resource.k8s.io", "v1alpha2", "resourceclaims"):            `{"status": {"driverName": "other.example.com"}}`,
+	gvr("resource.k8s.io", "v1beta1", "resourceclaims"):             `{"status": {"allocation": {"nodeSelector": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "some-label", "operator": "In", "values": ["some-other-value"]}] }]}}}}`,
+	gvr("resource.k8s.io", "v1beta2", "resourceclaims"):             `{"status": {"allocation": {"nodeSelector": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "some-label", "operator": "In", "values": ["some-other-value"]}] }]}}}}`,
+	gvr("resource.k8s.io", "v1", "resourceclaims"):                  `{"status": {"allocation": {"nodeSelector": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "some-label", "operator": "In", "values": ["some-other-value"]}] }]}}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
 	// standard for []metav1.Condition
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
@@ -68,6 +72,7 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):       `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("networking.k8s.io", "v1alpha1", "servicecidrs"):                           `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("networking.k8s.io", "v1beta1", "servicecidrs"):                            `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("networking.k8s.io", "v1", "servicecidrs"):                                 `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 }
 
 // resetFieldsStatusDefault conflicts with statusDefault
@@ -75,7 +80,7 @@ const resetFieldsStatusDefault = `{"status": {"conditions": [{"type": "MyStatus"
 
 var resetFieldsSkippedResources = map[string]struct{}{}
 
-// noConflicts is the set of reources for which
+// noConflicts is the set of resources for which
 // a conflict cannot occur.
 var noConflicts = map[string]struct{}{
 	// both spec and status get wiped for CSRs,
@@ -90,10 +95,6 @@ var noConflicts = map[string]struct{}{
 	// namespaces only have a spec.finalizers field which is also skipped,
 	// thus it will never have a conflict.
 	"namespaces": {},
-	// podschedulingcontexts.status only has a list which contains items with a list,
-	// therefore apply works because it simply merges either the outer or
-	// the inner list.
-	"podschedulingcontexts": {},
 }
 
 var image2 = image.GetE2EImage(image.Etcd)
@@ -142,6 +143,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("networking.k8s.io", "v1", "ingresses"):                                    `{"spec": {"defaultBackend": {"service": {"name": "service2"}}}}`,
 	gvr("networking.k8s.io", "v1alpha1", "servicecidrs"):                           `{}`,
 	gvr("networking.k8s.io", "v1beta1", "servicecidrs"):                            `{}`,
+	gvr("networking.k8s.io", "v1", "servicecidrs"):                                 `{}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                                    `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                               `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("storage.k8s.io", "v1alpha1", "volumeattachments"):                         `{"metadata": {"name": "va3"}, "spec": {"nodeName": "localhost2"}}`,
@@ -152,10 +154,16 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("awesome.bears.com", "v3", "pandas"):                                       `{"spec": {"replicas": 302}}`,
 	gvr("apiregistration.k8s.io", "v1beta1", "apiservices"):                        `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
 	gvr("apiregistration.k8s.io", "v1", "apiservices"):                             `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
-	gvr("resource.k8s.io", "v1alpha2", "podschedulingcontexts"):                    `{"spec": {"selectedNode": "node2name"}}`,
-	gvr("resource.k8s.io", "v1alpha2", "resourceclasses"):                          `{"driverName": "other.example.com"}`,
-	gvr("resource.k8s.io", "v1alpha2", "resourceclaims"):                           `{"spec": {"resourceClassName": "class2name"}}`, // ResourceClassName is immutable, but that doesn't matter for the test.
-	gvr("resource.k8s.io", "v1alpha2", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
+	gvr("resource.k8s.io", "v1alpha3", "devicetaintrules"):                         `{"metadata": {"labels":{"a":"c"}}}`,
+	gvr("resource.k8s.io", "v1beta1", "deviceclasses"):                             `{"metadata": {"labels":{"a":"c"}}}`,
+	gvr("resource.k8s.io", "v1beta1", "resourceclaims"):                            `{"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "other-class"}]}}}`, // spec is immutable, but that doesn't matter for the test.
+	gvr("resource.k8s.io", "v1beta1", "resourceclaimtemplates"):                    `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
+	gvr("resource.k8s.io", "v1beta2", "deviceclasses"):                             `{"metadata": {"labels":{"a":"c"}}}`,
+	gvr("resource.k8s.io", "v1beta2", "resourceclaims"):                            `{"spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "other-class"}}]}}}`, // spec is immutable, but that doesn't matter for the test.
+	gvr("resource.k8s.io", "v1beta2", "resourceclaimtemplates"):                    `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
+	gvr("resource.k8s.io", "v1", "deviceclasses"):                                  `{"metadata": {"labels":{"a":"c"}}}`,
+	gvr("resource.k8s.io", "v1", "resourceclaims"):                                 `{"spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "other-class"}}]}}}`, // spec is immutable, but that doesn't matter for the test.
+	gvr("resource.k8s.io", "v1", "resourceclaimtemplates"):                         `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):                `{}`,
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
 	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
@@ -314,6 +322,116 @@ func TestApplyResetFields(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestUpdateStatusWithOldVersion tests that apply with resetFields works correctly when updating
+// a custom resource's status subresource using an older API version while maintaining field ownership.
+func TestUpdateStatusWithOldVersion(t *testing.T) {
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	apiExtensionClient, err := apiextensionsclientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuBetaDefinition := nearlyRemovedBetaMultipleVersionNoxuCRDWithStatus(apiextensionsv1beta1.NamespaceScoped)
+
+	noxuDefinition, err := fixtures.CreateCRDUsingRemovedAPI(server.EtcdClient, server.EtcdStoragePrefix, noxuBetaDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kind := noxuDefinition.Spec.Names.Kind
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[1].Name
+	name := "mytest"
+
+	rest := apiExtensionClient.Discovery().RESTClient()
+	// create namespace ns test
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resetFieldsNamespace}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the resource using the v1 CRD API.
+	yamlBody := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+ name: %s
+ namespace: %s
+spec:
+ a: value-for-a
+ b: value-for-b`, apiVersion, kind, name, resetFieldsNamespace))
+	result, err := rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[1].Name, "/namespaces", resetFieldsNamespace, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("fieldManager", "apply_test").
+		Body(yamlBody).
+		DoRaw(context.TODO())
+	if err != nil {
+		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
+	}
+	t.Logf("result: %s", string(result))
+	oldManagedFields, err := getManagedFields(result)
+	if err != nil {
+		t.Fatalf("failed to get managed fields: %v", err)
+	}
+	// When updating the status subresource via the v1beta1 CRD API,
+	// we assign a value to the spec field for testing purposes.
+	// However, in this case, the operation should NOT trigger any field manager updates
+	// related to server-side apply tracking.
+	updateStatusBytes := []byte(`{
+  "spec": { "a": "value-for-a-update" },
+  "status": {
+    "a": "status-for-a"
+  }
+}`)
+	result, err = rest.Patch(types.MergePatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, "/namespaces", resetFieldsNamespace, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		SubResource("status").
+		Param("fieldManager", "subresource_test").
+		Body(updateStatusBytes).
+		DoRaw(context.TODO())
+	if err != nil {
+		t.Fatalf("Error updating subresource: %v ", err)
+	}
+	t.Logf("result: %s", string(result))
+	newManagedFields, err := getManagedFields(result)
+	if err != nil {
+		t.Fatalf("failed to get managed fields: %v", err)
+	}
+	// newManagedFields should include oldManagedFields
+	var applyManagerFound, subresourceManagerFound bool
+	for i, field := range newManagedFields {
+		if field.Manager == "apply_test" {
+			if !reflect.DeepEqual(newManagedFields[i], oldManagedFields[0]) {
+				t.Fatalf("Expected managed fields to not have changed when trying manually setting them via subresoures.\n\nExpected: %#v\n\nGot: %#v", oldManagedFields[0], newManagedFields[i])
+			}
+			applyManagerFound = true
+		}
+		if field.Manager == "subresource_test" {
+			subresourceManagerFound = true
+		}
+	}
+	if !applyManagerFound {
+		t.Errorf("expected field manager 'apply_test' to be present in newManagedFields")
+	}
+	if !subresourceManagerFound {
+		t.Errorf("expected field manager 'subresource_test' to be present in newManagedFields")
+	}
+
 }
 
 func expectConflict(objRet *unstructured.Unstructured, err error, dynamicClient dynamic.Interface, resource schema.GroupVersionResource, namespace, name string) error {

@@ -86,7 +86,7 @@ func (i *ignoreFilesMatcher) matchFile(path string) bool {
 	return i.matchers[len(i.matchers)-1].matcher.Match(path, false)
 }
 
-// matchFile checks whether the directory given by the provided path matches
+// matchDir checks whether the directory given by the provided path matches
 // any of the patterns in the .krmignore file for the package.
 func (i *ignoreFilesMatcher) matchDir(path string) bool {
 	if len(i.matchers) == 0 {

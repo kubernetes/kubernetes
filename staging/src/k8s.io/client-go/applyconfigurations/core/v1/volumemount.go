@@ -19,19 +19,54 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // VolumeMountApplyConfiguration represents a declarative configuration of the VolumeMount type for use
 // with apply.
+//
+// VolumeMount describes a mounting of a Volume within a container.
 type VolumeMountApplyConfiguration struct {
-	Name              *string                   `json:"name,omitempty"`
-	ReadOnly          *bool                     `json:"readOnly,omitempty"`
-	RecursiveReadOnly *v1.RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty"`
-	MountPath         *string                   `json:"mountPath,omitempty"`
-	SubPath           *string                   `json:"subPath,omitempty"`
-	MountPropagation  *v1.MountPropagationMode  `json:"mountPropagation,omitempty"`
-	SubPathExpr       *string                   `json:"subPathExpr,omitempty"`
+	// This must match the Name of a Volume.
+	Name *string `json:"name,omitempty"`
+	// Mounted read-only if true, read-write otherwise (false or unspecified).
+	// Defaults to false.
+	ReadOnly *bool `json:"readOnly,omitempty"`
+	// RecursiveReadOnly specifies whether read-only mounts should be handled
+	// recursively.
+	//
+	// If ReadOnly is false, this field has no meaning and must be unspecified.
+	//
+	// If ReadOnly is true, and this field is set to Disabled, the mount is not made
+	// recursively read-only.  If this field is set to IfPossible, the mount is made
+	// recursively read-only, if it is supported by the container runtime.  If this
+	// field is set to Enabled, the mount is made recursively read-only if it is
+	// supported by the container runtime, otherwise the pod will not be started and
+	// an error will be generated to indicate the reason.
+	//
+	// If this field is set to IfPossible or Enabled, MountPropagation must be set to
+	// None (or be unspecified, which defaults to None).
+	//
+	// If this field is not specified, it is treated as an equivalent of Disabled.
+	RecursiveReadOnly *corev1.RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty"`
+	// Path within the container at which the volume should be mounted.  Must
+	// not contain ':'.
+	MountPath *string `json:"mountPath,omitempty"`
+	// Path within the volume from which the container's volume should be mounted.
+	// Defaults to "" (volume's root).
+	SubPath *string `json:"subPath,omitempty"`
+	// mountPropagation determines how mounts are propagated from the host
+	// to container and the other way around.
+	// When not set, MountPropagationNone is used.
+	// This field is beta in 1.10.
+	// When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+	// (which defaults to None).
+	MountPropagation *corev1.MountPropagationMode `json:"mountPropagation,omitempty"`
+	// Expanded path within the volume from which the container's volume should be mounted.
+	// Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
+	// Defaults to "" (volume's root).
+	// SubPathExpr and SubPath are mutually exclusive.
+	SubPathExpr *string `json:"subPathExpr,omitempty"`
 }
 
 // VolumeMountApplyConfiguration constructs a declarative configuration of the VolumeMount type for use with
@@ -59,7 +94,7 @@ func (b *VolumeMountApplyConfiguration) WithReadOnly(value bool) *VolumeMountApp
 // WithRecursiveReadOnly sets the RecursiveReadOnly field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RecursiveReadOnly field is set to the value of the last call.
-func (b *VolumeMountApplyConfiguration) WithRecursiveReadOnly(value v1.RecursiveReadOnlyMode) *VolumeMountApplyConfiguration {
+func (b *VolumeMountApplyConfiguration) WithRecursiveReadOnly(value corev1.RecursiveReadOnlyMode) *VolumeMountApplyConfiguration {
 	b.RecursiveReadOnly = &value
 	return b
 }
@@ -83,7 +118,7 @@ func (b *VolumeMountApplyConfiguration) WithSubPath(value string) *VolumeMountAp
 // WithMountPropagation sets the MountPropagation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MountPropagation field is set to the value of the last call.
-func (b *VolumeMountApplyConfiguration) WithMountPropagation(value v1.MountPropagationMode) *VolumeMountApplyConfiguration {
+func (b *VolumeMountApplyConfiguration) WithMountPropagation(value corev1.MountPropagationMode) *VolumeMountApplyConfiguration {
 	b.MountPropagation = &value
 	return b
 }

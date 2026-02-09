@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
-
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // CreateBasic creates a basic, general KubeConfig object that then can be extended
@@ -104,17 +104,21 @@ func WriteToDisk(filename string, kubeconfig *clientcmdapi.Config) error {
 }
 
 // GetClusterFromKubeConfig returns the default Cluster of the specified KubeConfig
-func GetClusterFromKubeConfig(config *clientcmdapi.Config) (string, *clientcmdapi.Cluster) {
+func GetClusterFromKubeConfig(config *clientcmdapi.Config) (string, *clientcmdapi.Cluster, error) {
 	// If there is an unnamed cluster object, use it
 	if config.Clusters[""] != nil {
-		return "", config.Clusters[""]
+		return "", config.Clusters[""], nil
 	}
 
 	currentContext := config.Contexts[config.CurrentContext]
 	if currentContext != nil {
-		return currentContext.Cluster, config.Clusters[currentContext.Cluster]
+		if config.Clusters[currentContext.Cluster] != nil {
+			return currentContext.Cluster, config.Clusters[currentContext.Cluster], nil
+		}
+		return "", nil, errors.Errorf("no matching cluster for the current context: %s", config.CurrentContext)
 	}
-	return "", nil
+
+	return "", nil, errors.Errorf("the current context is invalid: %s", config.CurrentContext)
 }
 
 // HasAuthenticationCredentials returns true if the current user has valid authentication credentials for

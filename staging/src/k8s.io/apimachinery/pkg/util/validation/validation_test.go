@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -110,31 +111,6 @@ func TestIsDNS1035Label(t *testing.T) {
 	}
 	for _, val := range badValues {
 		if msgs := IsDNS1035Label(val); len(msgs) == 0 {
-			t.Errorf("expected false for '%s'", val)
-		}
-	}
-}
-
-func TestIsCIdentifier(t *testing.T) {
-	goodValues := []string{
-		"a", "ab", "abc", "a1", "_a", "a_", "a_b", "a_1", "a__1__2__b", "__abc_123",
-		"A", "AB", "AbC", "A1", "_A", "A_", "A_B", "A_1", "A__1__2__B", "__123_ABC",
-	}
-	for _, val := range goodValues {
-		if msgs := IsCIdentifier(val); len(msgs) != 0 {
-			t.Errorf("expected true for '%s': %v", val, msgs)
-		}
-	}
-
-	badValues := []string{
-		"", "1", "123", "1a",
-		"-", "a-", "-a", "1-", "-1", "1_", "1_2",
-		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
-		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
-		"#a#",
-	}
-	for _, val := range badValues {
-		if msgs := IsCIdentifier(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
@@ -319,302 +295,6 @@ func TestIsValidLabelValue(t *testing.T) {
 		if errs := IsValidLabelValue(errorCases[i]); len(errs) == 0 {
 			t.Errorf("case[%d] expected failure", i)
 		}
-	}
-}
-
-func TestIsValidIP(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		in     string
-		family int
-		err    string
-	}{
-		// GOOD VALUES
-		{
-			name:   "ipv4",
-			in:     "1.2.3.4",
-			family: 4,
-		},
-		{
-			name:   "ipv4, all zeros",
-			in:     "0.0.0.0",
-			family: 4,
-		},
-		{
-			name:   "ipv4, max",
-			in:     "255.255.255.255",
-			family: 4,
-		},
-		{
-			name:   "ipv6",
-			in:     "1234::abcd",
-			family: 6,
-		},
-		{
-			name:   "ipv6, all zeros, collapsed",
-			in:     "::",
-			family: 6,
-		},
-		{
-			name:   "ipv6, max",
-			in:     "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-			family: 6,
-		},
-
-		// GOOD, THOUGH NON-CANONICAL, VALUES
-		{
-			name:   "ipv6, all zeros, expanded (non-canonical)",
-			in:     "0:0:0:0:0:0:0:0",
-			family: 6,
-		},
-		{
-			name:   "ipv6, leading 0s (non-canonical)",
-			in:     "0001:002:03:4::",
-			family: 6,
-		},
-		{
-			name:   "ipv6, capital letters (non-canonical)",
-			in:     "1234::ABCD",
-			family: 6,
-		},
-
-		// BAD VALUES WE CURRENTLY CONSIDER GOOD
-		{
-			name:   "ipv4 with leading 0s",
-			in:     "1.1.1.01",
-			family: 4,
-		},
-		{
-			name:   "ipv4-in-ipv6 value",
-			in:     "::ffff:1.1.1.1",
-			family: 4,
-		},
-
-		// BAD VALUES
-		{
-			name: "empty string",
-			in:   "",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "junk",
-			in:   "aaaaaaa",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "domain name",
-			in:   "myhost.mydomain",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "cidr",
-			in:   "1.2.3.0/24",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "ipv4 with out-of-range octets",
-			in:   "1.2.3.400",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "ipv4 with negative octets",
-			in:   "-1.0.0.0",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "ipv6 with out-of-range segment",
-			in:   "2001:db8::10005",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "ipv4:port",
-			in:   "1.2.3.4:80",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "ipv6 with brackets",
-			in:   "[2001:db8::1]",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "[ipv6]:port",
-			in:   "[2001:db8::1]:80",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "host:port",
-			in:   "example.com:80",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "ipv6 with zone",
-			in:   "1234::abcd%eth0",
-			err:  "must be a valid IP address",
-		},
-		{
-			name: "ipv4 with zone",
-			in:   "169.254.0.0%eth0",
-			err:  "must be a valid IP address",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			errs := IsValidIP(field.NewPath(""), tc.in)
-			if tc.err == "" {
-				if len(errs) != 0 {
-					t.Errorf("expected %q to be valid but got: %v", tc.in, errs)
-				}
-			} else {
-				if len(errs) != 1 {
-					t.Errorf("expected %q to have 1 error but got: %v", tc.in, errs)
-				} else if !strings.Contains(errs[0].Detail, tc.err) {
-					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, errs[0].Detail)
-				}
-			}
-
-			errs = IsValidIPv4Address(field.NewPath(""), tc.in)
-			if tc.family == 4 {
-				if len(errs) != 0 {
-					t.Errorf("expected %q to pass IsValidIPv4Address but got: %v", tc.in, errs)
-				}
-			} else {
-				if len(errs) == 0 {
-					t.Errorf("expected %q to fail IsValidIPv4Address", tc.in)
-				}
-			}
-
-			errs = IsValidIPv6Address(field.NewPath(""), tc.in)
-			if tc.family == 6 {
-				if len(errs) != 0 {
-					t.Errorf("expected %q to pass IsValidIPv6Address but got: %v", tc.in, errs)
-				}
-			} else {
-				if len(errs) == 0 {
-					t.Errorf("expected %q to fail IsValidIPv6Address", tc.in)
-				}
-			}
-		})
-	}
-}
-
-func TestIsValidCIDR(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		in   string
-		err  string
-	}{
-		// GOOD VALUES
-		{
-			name: "ipv4",
-			in:   "1.0.0.0/8",
-		},
-		{
-			name: "ipv4, all IPs",
-			in:   "0.0.0.0/0",
-		},
-		{
-			name: "ipv4, single IP",
-			in:   "1.1.1.1/32",
-		},
-		{
-			name: "ipv6",
-			in:   "2001:4860:4860::/48",
-		},
-		{
-			name: "ipv6, all IPs",
-			in:   "::/0",
-		},
-		{
-			name: "ipv6, single IP",
-			in:   "::1/128",
-		},
-
-		// GOOD, THOUGH NON-CANONICAL, VALUES
-		{
-			name: "ipv6, extra 0s (non-canonical)",
-			in:   "2a00:79e0:2:0::/64",
-		},
-		{
-			name: "ipv6, capital letters (non-canonical)",
-			in:   "2001:DB8::/64",
-		},
-
-		// BAD VALUES WE CURRENTLY CONSIDER GOOD
-		{
-			name: "ipv4 with leading 0s",
-			in:   "1.1.01.0/24",
-		},
-		{
-			name: "ipv4-in-ipv6 with ipv4-sized prefix",
-			in:   "::ffff:1.1.1.0/24",
-		},
-		{
-			name: "ipv4-in-ipv6 with ipv6-sized prefix",
-			in:   "::ffff:1.1.1.0/120",
-		},
-		{
-			name: "ipv4 with bits past prefix",
-			in:   "1.2.3.4/24",
-		},
-		{
-			name: "ipv6 with bits past prefix",
-			in:   "2001:db8::1/64",
-		},
-		{
-			name: "prefix length with leading 0s",
-			in:   "192.168.0.0/016",
-		},
-
-		// BAD VALUES
-		{
-			name: "empty string",
-			in:   "",
-			err:  "must be a valid CIDR value",
-		},
-		{
-			name: "junk",
-			in:   "aaaaaaa",
-			err:  "must be a valid CIDR value",
-		},
-		{
-			name: "IP address",
-			in:   "1.2.3.4",
-			err:  "must be a valid CIDR value",
-		},
-		{
-			name: "partial URL",
-			in:   "192.168.0.1/healthz",
-			err:  "must be a valid CIDR value",
-		},
-		{
-			name: "partial URL 2",
-			in:   "192.168.0.1/0/99",
-			err:  "must be a valid CIDR value",
-		},
-		{
-			name: "negative prefix length",
-			in:   "192.168.0.0/-16",
-			err:  "must be a valid CIDR value",
-		},
-		{
-			name: "prefix length with sign",
-			in:   "192.168.0.0/+16",
-			err:  "must be a valid CIDR value",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			errs := IsValidCIDR(field.NewPath(""), tc.in)
-			if tc.err == "" {
-				if len(errs) != 0 {
-					t.Errorf("expected %q to be valid but got: %v", tc.in, errs)
-				}
-			} else {
-				if len(errs) != 1 {
-					t.Errorf("expected %q to have 1 error but got: %v", tc.in, errs)
-				} else if !strings.Contains(errs[0].Detail, tc.err) {
-					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, errs[0].Detail)
-				}
-			}
-		})
 	}
 }
 
@@ -929,5 +609,156 @@ func TestIsRelaxedEnvVarName(t *testing.T) {
 		if msgs := IsRelaxedEnvVarName(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
+	}
+}
+
+func TestIsDNS1123SubdomainWithUnderscore(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected []string
+	}{
+		{
+			name:     "valid subdomain",
+			value:    "example.com",
+			expected: nil,
+		},
+		{
+			name:     "valid subdomain with underscore",
+			value:    "_example.com",
+			expected: nil,
+		},
+		{
+			name:     "valid subdomain with multiple segments",
+			value:    "sub._example.com",
+			expected: nil,
+		},
+		{
+			name:     "valid subdomain with hyphen",
+			value:    "sub-domain.example.com",
+			expected: nil,
+		},
+		{
+			name:     "valid subdomain with underscore in middle",
+			value:    "sub_domain.example.com",
+			expected: nil,
+		},
+		{
+			name:     "empty string",
+			value:    "",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "invalid uppercase characters",
+			value:    "Example.com",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "invalid starting character",
+			value:    "-example.com",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "invalid ending character",
+			value:    "example.com-",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "invalid characters",
+			value:    "example@.com",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "too long subdomain",
+			value:    "a." + string(make([]byte, 251)) + ".com",
+			expected: []string{MaxLenError(DNS1123SubdomainMaxLength), RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "multiple dots",
+			value:    "example..com",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "underscore only",
+			value:    "_",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsDNS1123SubdomainWithUnderscore(tt.value)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("IsDNS1123SubdomainWithUnderscore(%q) = %v; want %v", tt.value, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsDomainPrefixedKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected field.ErrorList
+	}{
+		{
+			name:     "valid domain-prefixed key 1",
+			value:    "example.com/foo",
+			expected: nil,
+		},
+		{
+			name:     "valid domain-prefixed key  2",
+			value:    "example/com",
+			expected: nil,
+		},
+		{
+			name:     "invalid key 1",
+			value:    "example",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example", "must be a domain-prefixed key (such as \"acme.io/foo\")")},
+		},
+		{
+			name:     "invalid key 2",
+			value:    "example/foo/bar",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example/foo/bar", "a valid label key must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')")},
+		},
+		{
+			name:     "invalid key 3",
+			value:    "/example/foo",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "/example/foo", "a valid label key must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')")},
+		},
+		{
+			name:     "invalid key 4",
+			value:    "",
+			expected: field.ErrorList{field.Required(field.NewPath("test"), "")},
+		},
+		{
+			name:     "invalid key 5",
+			value:    "example.com/_e",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example.com/_e", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+		{
+			name:     "invalid key 6",
+			value:    "example.com/e_",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example.com/e_", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+		{
+			name:     "invalid key 7",
+			value:    "example.com/e?",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example.com/e?", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+		{
+			name:     "invalid key 8",
+			value:    "example.com/e_$",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example.com/e_$", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsDomainPrefixedKey(field.NewPath("test"), tt.value)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("IsDomainPrefixedKey(%q) = %v; want %v", tt.value, result, tt.expected)
+			}
+		})
 	}
 }

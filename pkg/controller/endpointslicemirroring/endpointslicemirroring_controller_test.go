@@ -172,7 +172,7 @@ func TestSyncEndpoints(t *testing.T) {
 				Name: endpointsName + "-1",
 				Labels: map[string]string{
 					discovery.LabelServiceName: endpointsName,
-					discovery.LabelManagedBy:   controllerName,
+					discovery.LabelManagedBy:   ControllerName,
 				},
 			},
 		}},
@@ -245,8 +245,8 @@ func TestSyncEndpoints(t *testing.T) {
 				}
 			}
 
-			logger, _ := ktesting.NewTestContext(t)
-			err := esController.syncEndpoints(logger, fmt.Sprintf("%s/%s", namespace, endpointsName))
+			_, syncCtx := ktesting.NewTestContext(t)
+			err := esController.syncEndpoints(syncCtx, fmt.Sprintf("%s/%s", namespace, endpointsName))
 			if err != nil {
 				t.Fatalf("Unexpected error from syncEndpoints: %v", err)
 			}
@@ -358,7 +358,7 @@ func TestEndpointSlicesMirroredForService(t *testing.T) {
 				Namespace: "ns1",
 				Labels: map[string]string{
 					discovery.LabelServiceName: "svc1",
-					discovery.LabelManagedBy:   controllerName,
+					discovery.LabelManagedBy:   ControllerName,
 				},
 			},
 		},
@@ -373,7 +373,7 @@ func TestEndpointSlicesMirroredForService(t *testing.T) {
 				Namespace: "ns2",
 				Labels: map[string]string{
 					discovery.LabelServiceName: "svc1",
-					discovery.LabelManagedBy:   controllerName,
+					discovery.LabelManagedBy:   ControllerName,
 				},
 			},
 		},
@@ -388,7 +388,7 @@ func TestEndpointSlicesMirroredForService(t *testing.T) {
 				Namespace: "ns1",
 				Labels: map[string]string{
 					discovery.LabelServiceName: "svc2",
-					discovery.LabelManagedBy:   controllerName,
+					discovery.LabelManagedBy:   ControllerName,
 				},
 			},
 		},
@@ -403,7 +403,7 @@ func TestEndpointSlicesMirroredForService(t *testing.T) {
 				Namespace: "ns1",
 				Labels: map[string]string{
 					discovery.LabelServiceName: "svc1",
-					discovery.LabelManagedBy:   controllerName + "foo",
+					discovery.LabelManagedBy:   ControllerName + "foo",
 				},
 			},
 		},
@@ -431,7 +431,7 @@ func TestEndpointSlicesMirroredForService(t *testing.T) {
 				Name:      "example-1",
 				Namespace: "ns1",
 				Labels: map[string]string{
-					discovery.LabelManagedBy: controllerName,
+					discovery.LabelManagedBy: ControllerName,
 				},
 			},
 		},

@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package queryparams provides conversion from versioned
 // runtime objects to URL query values
-package queryparams // import "k8s.io/apimachinery/pkg/conversion/queryparams"
+package queryparams

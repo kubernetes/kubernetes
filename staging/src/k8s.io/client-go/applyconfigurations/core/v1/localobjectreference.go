@@ -20,7 +20,27 @@ package v1
 
 // LocalObjectReferenceApplyConfiguration represents a declarative configuration of the LocalObjectReference type for use
 // with apply.
+//
+// LocalObjectReference contains enough information to let you locate the
+// referenced object inside the same namespace.
+// ---
+// New uses of this type are discouraged because of difficulty describing its usage when embedded in APIs.
+// 1. Invalid usage help.  It is impossible to add specific help for individual usage.  In most embedded usages, there are particular
+// restrictions like, "must refer only to types A and B" or "UID not honored" or "name must be restricted".
+// Those cannot be well described when embedded.
+// 2. Inconsistent validation.  Because the usages are different, the validation rules are different by usage, which makes it hard for users to predict what will happen.
+// 3. We cannot easily change it.  Because this type is embedded in many locations, updates to this type
+// will affect numerous schemas.  Don't make new APIs embed an underspecified API type they do not control.
+//
+// Instead of using this type, create a locally provided and used type that is well-focused on your reference.
+// For example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .
 type LocalObjectReferenceApplyConfiguration struct {
+	// Name of the referent.
+	// This field is effectively required, but due to backwards compatibility is
+	// allowed to be empty. Instances of this type with an empty value here are
+	// almost certainly wrong.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
 	Name *string `json:"name,omitempty"`
 }
 

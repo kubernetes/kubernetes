@@ -134,6 +134,7 @@ message VolumeAttachment {
 
   // spec represents specification of the desired attach/detach volume behavior.
   // Populated by the Kubernetes system.
+  // +k8s:immutable
   optional VolumeAttachmentSpec spec = 2;
 
   // status represents status of the VolumeAttachment request.
@@ -155,8 +156,8 @@ message VolumeAttachmentList {
 }
 
 // VolumeAttachmentSource represents a volume that should be attached.
-// Right now only PersistenVolumes can be attached via external attacher,
-// in future we may allow also inline volumes in pods.
+// Right now only PersistentVolumes can be attached via external attacher,
+// in the future we may allow also inline volumes in pods.
 // Exactly one member can be set.
 message VolumeAttachmentSource {
   // persistentVolumeName represents the name of the persistent volume to attach.
@@ -177,6 +178,10 @@ message VolumeAttachmentSource {
 message VolumeAttachmentSpec {
   // attacher indicates the name of the volume driver that MUST handle this
   // request. This is the name returned by GetPluginName().
+  // +required
+  // +k8s:required
+  // +k8s:format="k8s-long-name-caseless"
+  // +k8s:maxLength=63
   optional string attacher = 1;
 
   // source represents the volume that should be attached.
@@ -265,5 +270,13 @@ message VolumeError {
   // information.
   // +optional
   optional string message = 2;
+
+  // errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
+  //
+  // This is an optional, alpha field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
+  //
+  // +featureGate=MutableCSINodeAllocatableCount
+  // +optional
+  optional int32 errorCode = 3;
 }
 

@@ -72,9 +72,8 @@ func (fs *DefaultFs) Rename(oldpath, newpath string) error {
 	return os.Rename(oldpath, newpath)
 }
 
-// MkdirAll via os.MkdirAll
 func (fs *DefaultFs) MkdirAll(path string, perm os.FileMode) error {
-	return os.MkdirAll(fs.prefix(path), perm)
+	return MkdirAll(fs.prefix(path), perm)
 }
 
 // MkdirAllWithPathCheck checks if path exists already. If not, it creates a directory
@@ -91,13 +90,13 @@ func MkdirAllWithPathCheck(path string, perm os.FileMode) error {
 		// 1. for Unix/Linux OS, check if the path is directory.
 		// 2. for windows NTFS, check if the path is symlink instead of directory.
 		if dir.IsDir() ||
-			(runtime.GOOS == "windows" && (dir.Mode()&os.ModeSymlink != 0)) {
+			(runtime.GOOS == "windows" && (dir.Mode()&os.ModeSymlink != 0 || dir.Mode()&os.ModeIrregular != 0)) {
 			return nil
 		}
 		return fmt.Errorf("path %v exists but is not a directory", path)
 	}
 	// If existence of path not known, attempt to create it.
-	if err := os.MkdirAll(path, perm); err != nil {
+	if err := MkdirAll(path, perm); err != nil {
 		return err
 	}
 	return nil

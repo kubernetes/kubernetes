@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -39,8 +38,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 type diffFlags struct {
@@ -54,17 +55,14 @@ type diffFlags struct {
 	out                           io.Writer
 }
 
-var (
-	defaultAPIServerManifestPath         = constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
-	defaultControllerManagerManifestPath = constants.GetStaticPodFilepath(constants.KubeControllerManager, constants.GetStaticPodDirectory())
-	defaultSchedulerManifestPath         = constants.GetStaticPodFilepath(constants.KubeScheduler, constants.GetStaticPodDirectory())
-)
-
 // newCmdDiff returns the cobra command for `kubeadm upgrade diff`
 func newCmdDiff(out io.Writer) *cobra.Command {
 	flags := &diffFlags{
-		kubeConfigPath: constants.GetAdminKubeConfigPath(),
-		out:            out,
+		kubeConfigPath:                constants.GetAdminKubeConfigPath(),
+		out:                           out,
+		apiServerManifestPath:         constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory()),
+		controllerManagerManifestPath: constants.GetStaticPodFilepath(constants.KubeControllerManager, constants.GetStaticPodDirectory()),
+		schedulerManifestPath:         constants.GetStaticPodFilepath(constants.KubeScheduler, constants.GetStaticPodDirectory()),
 	}
 
 	cmd := &cobra.Command{
@@ -88,22 +86,12 @@ func newCmdDiff(out io.Writer) *cobra.Command {
 
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeConfigPath)
 	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
-	cmd.Flags().StringVar(&flags.apiServerManifestPath, "api-server-manifest", defaultAPIServerManifestPath, "path to API server manifest")
-	cmd.Flags().MarkDeprecated("api-server-manifest", "This flag is deprecated and will be removed in a future release.")
-	cmd.Flags().StringVar(&flags.controllerManagerManifestPath, "controller-manager-manifest", defaultControllerManagerManifestPath, "path to controller manifest")
-	cmd.Flags().MarkDeprecated("controller-manager-manifest", "This flag is deprecated and will be removed in a future release.")
-	cmd.Flags().StringVar(&flags.schedulerManifestPath, "scheduler-manifest", defaultSchedulerManifestPath, "path to scheduler manifest")
-	cmd.Flags().MarkDeprecated("scheduler-manifest", "This flag is deprecated and will be removed in a future release.")
 	cmd.Flags().IntVarP(&flags.contextLines, "context-lines", "c", 3, "How many lines of context in the diff")
-
 	return cmd
 }
 
 func validateManifestsPath(manifests ...string) (err error) {
 	for _, manifestPath := range manifests {
-		if len(manifestPath) == 0 {
-			return errors.New("empty manifest path")
-		}
 		s, err := os.Stat(manifestPath)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -119,7 +107,7 @@ func validateManifestsPath(manifests ...string) (err error) {
 }
 
 // FetchInitConfigurationFunc defines the signature of the function which will fetch InitConfiguration from cluster.
-type FetchInitConfigurationFunc func(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error)
+type FetchInitConfigurationFunc func(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs bool) (*kubeadmapi.InitConfiguration, error)
 
 func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfigurationFromCluster FetchInitConfigurationFunc) error {
 	externalCfg := &v1beta4.UpgradeConfiguration{}
@@ -132,7 +120,10 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 	if err != nil {
 		return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
-	initCfg, err := fetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", false, true)
+	getNodeRegistration := true
+	getAPIEndpoint := staticpodutil.IsControlPlaneNode()
+	getComponentConfigs := false
+	initCfg, err := fetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
 	if err != nil {
 		return err
 	}
@@ -197,7 +188,9 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 			Context:  cmdutil.ValueFromFlagsOrConfig(fs, "context-lines", upgradeCfg.Diff.DiffContextLines, flags.contextLines).(int),
 		}
 
-		difflib.WriteUnifiedDiff(flags.out, diff)
+		if err = difflib.WriteUnifiedDiff(flags.out, diff); err != nil {
+			return errors.Wrap(err, "error writing unified diff")
+		}
 	}
 	return nil
 }

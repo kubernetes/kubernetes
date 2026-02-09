@@ -22,31 +22,25 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/io"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -111,22 +105,6 @@ func SetReady(dir string) {
 	file.Close()
 }
 
-// GetSecretForPod locates secret by name in the pod's namespace and returns secret map
-func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
-	secret := make(map[string]string)
-	if kubeClient == nil {
-		return secret, fmt.Errorf("cannot get kube client")
-	}
-	secrets, err := kubeClient.CoreV1().Secrets(pod.Namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
-	if err != nil {
-		return secret, err
-	}
-	for name, data := range secrets.Data {
-		secret[name] = string(data)
-	}
-	return secret, nil
-}
-
 // GetSecretForPV locates secret by name and namespace, verifies the secret type, and returns secret map
 func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
@@ -144,23 +122,6 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 		secret[name] = string(data)
 	}
 	return secret, nil
-}
-
-// GetClassForVolume locates storage class by persistent volume
-func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) (*storage.StorageClass, error) {
-	if kubeClient == nil {
-		return nil, fmt.Errorf("cannot get kube client")
-	}
-	className := storagehelpers.GetPersistentVolumeClass(pv)
-	if className == "" {
-		return nil, fmt.Errorf("volume has no storage class")
-	}
-
-	class, err := kubeClient.StorageV1().StorageClasses().Get(context.TODO(), className, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return class, nil
 }
 
 // LoadPodFromFile will read, decode, and return a Pod from a file.
@@ -372,14 +333,6 @@ func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
 	return pluginName, components[2], nil
 }
 
-// NewSafeFormatAndMountFromHost creates a new SafeFormatAndMount with Mounter
-// and Exec taken from given VolumeHost.
-func NewSafeFormatAndMountFromHost(pluginName string, host volume.VolumeHost) *mount.SafeFormatAndMount {
-	mounter := host.GetMounter(pluginName)
-	exec := host.GetExec(pluginName)
-	return &mount.SafeFormatAndMount{Interface: mounter, Exec: exec}
-}
-
 // GetVolumeMode retrieves VolumeMode from pv.
 // If the volume doesn't have PersistentVolume, it's an inline volume,
 // should return volumeMode as filesystem to keep existing behavior.
@@ -538,13 +491,6 @@ func UnmapBlockVolume(
 	return nil
 }
 
-// GetPluginMountDir returns the global mount directory name appended
-// to the given plugin name's plugin directory
-func GetPluginMountDir(host volume.VolumeHost, name string) string {
-	mntDir := filepath.Join(host.GetPluginDir(name), MountsInGlobalPDPath)
-	return mntDir
-}
-
 // IsLocalEphemeralVolume determines whether the argument is a local ephemeral
 // volume vs. some other type
 // Local means the volume is using storage from the local disk that is managed by kubelet.
@@ -555,58 +501,19 @@ func IsLocalEphemeralVolume(volume v1.Volume) bool {
 		volume.ConfigMap != nil
 }
 
-// GetLocalPersistentVolumeNodeNames returns the node affinity node name(s) for
-// local PersistentVolumes. nil is returned if the PV does not have any
-// specific node affinity node selector terms and match expressions.
-// PersistentVolume with node affinity has select and match expressions
-// in the form of:
-//
-//	nodeAffinity:
-//	  required:
-//	    nodeSelectorTerms:
-//	    - matchExpressions:
-//	      - key: kubernetes.io/hostname
-//	        operator: In
-//	        values:
-//	        - <node1>
-//	        - <node2>
-func GetLocalPersistentVolumeNodeNames(pv *v1.PersistentVolume) []string {
-	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil {
-		return nil
-	}
-
-	var result sets.Set[string]
-	for _, term := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
-		var nodes sets.Set[string]
-		for _, matchExpr := range term.MatchExpressions {
-			if matchExpr.Key == v1.LabelHostname && matchExpr.Operator == v1.NodeSelectorOpIn {
-				if nodes == nil {
-					nodes = sets.New(matchExpr.Values...)
-				} else {
-					nodes = nodes.Intersection(sets.New(matchExpr.Values...))
-				}
-			}
-		}
-		result = result.Union(nodes)
-	}
-
-	return sets.List(result)
-}
-
 // GetPodVolumeNames returns names of volumes that are used in a pod,
-// either as filesystem mount or raw block device, together with list
-// of all SELinux contexts of all containers that use the volumes.
-func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[string], seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
+// either as filesystem mount or raw block device.
+// To save another sweep through containers, SELinux options are optionally collected too.
+func GetPodVolumeNames(pod *v1.Pod, collectSELinuxOptions bool) (mounts sets.Set[string], devices sets.Set[string], seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
 	mounts = sets.New[string]()
 	devices = sets.New[string]()
 	seLinuxContainerContexts = make(map[string][]*v1.SELinuxOptions)
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
 		var seLinuxOptions *v1.SELinuxOptions
-		if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		if collectSELinuxOptions {
 			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 			if effectiveContainerSecurity != nil {
-				// No DeepCopy, SELinuxOptions is already a copy of Pod's or container's SELinuxOptions
 				seLinuxOptions = effectiveContainerSecurity.SELinuxOptions
 			}
 		}
@@ -614,7 +521,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[s
 		if container.VolumeMounts != nil {
 			for _, mount := range container.VolumeMounts {
 				mounts.Insert(mount.Name)
-				if seLinuxOptions != nil {
+				if seLinuxOptions != nil && collectSELinuxOptions {
 					seLinuxContainerContexts[mount.Name] = append(seLinuxContainerContexts[mount.Name], seLinuxOptions.DeepCopy())
 				}
 			}
@@ -682,25 +589,6 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 		}
 	}
 	return false
-}
-
-// WriteVolumeCache flush disk data given the specified mount path
-func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
-	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
-	if runtime.GOOS == "windows" {
-		cmdString := "Get-Volume -FilePath $env:mountpath | Write-Volumecache"
-		cmd := exec.Command("powershell", "/c", cmdString)
-		env := append(os.Environ(), fmt.Sprintf("mountpath=%s", deviceMountPath))
-		cmd.SetEnv(env)
-		klog.V(8).Infof("Executing command: %q", cmdString)
-		output, err := cmd.CombinedOutput()
-		klog.Infof("command (%q) execeuted: %v, output: %q", cmdString, err, string(output))
-		if err != nil {
-			return fmt.Errorf("command (%q) failed: %v, output: %q", cmdString, err, string(output))
-		}
-	}
-	// For linux runtime, it skips because unmount will automatically flush disk data
-	return nil
 }
 
 // IsMultiAttachAllowed checks if attaching this volume to multiple nodes is definitely not allowed/possible.
@@ -788,7 +676,7 @@ func GetReliableMountRefs(mounter mount.Interface, mountPath string) ([]string, 
 		}
 		return true, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		return nil, lastErr
 	}
 	return paths, err

@@ -28,7 +28,10 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path"
 	"reflect"
+	"regexp"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -36,7 +39,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -54,12 +61,13 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
 	r := NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{}, nil).Verb("get")
-	if r.headers.Get("Accept") != "" {
+	if r.headers.Get("Accept") != "application/json, */*" {
 		t.Errorf("unexpected headers: %#v", r.headers)
 	}
 	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{ContentType: "application/other"}, nil).Verb("get")
@@ -105,9 +113,9 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 	gvCopy := v1.SchemeGroupVersion
 	original := Request{
 		err: errors.New("test"),
-		c: &RESTClient{
-			content: ClientContentConfig{GroupVersion: gvCopy},
-		},
+		c:   &RESTClient{},
+
+		contentConfig: ClientContentConfig{GroupVersion: gvCopy},
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -229,7 +237,7 @@ func TestRequestParam(t *testing.T) {
 }
 
 func TestRequestVersionedParams(t *testing.T) {
-	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}}).Param("foo", "a")
+	r := (&Request{c: &RESTClient{}, contentConfig: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
@@ -245,7 +253,7 @@ func TestRequestVersionedParams(t *testing.T) {
 }
 
 func TestRequestVersionedParamsFromListOptions(t *testing.T) {
-	r := &Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}}
+	r := &Request{c: &RESTClient{}, contentConfig: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}
 	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "1"}, scheme.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1"},
@@ -265,7 +273,7 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 
 func TestRequestVersionedParamsWithInvalidScheme(t *testing.T) {
 	parameterCodec := runtime.NewParameterCodec(runtime.NewScheme())
-	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}})
+	r := &Request{c: &RESTClient{}, contentConfig: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}
 	r.VersionedParams(&v1.PodExecOptions{Stdin: false, Stdout: true},
 		parameterCodec)
 
@@ -284,14 +292,36 @@ func TestRequestError(t *testing.T) {
 }
 
 func TestRequestURI(t *testing.T) {
-	r := (&Request{}).Param("foo", "a")
+	r := (&Request{c: &RESTClient{base: &url.URL{Path: "/"}}}).Param("foo", "a").Param("bar", "b")
 	r.Prefix("other")
 	r.RequestURI("/test?foo=b&a=b&c=1&c=2")
 	if r.pathPrefix != "/test" {
 		t.Errorf("path is wrong: %#v", r)
 	}
 	if !reflect.DeepEqual(r.params, url.Values{"a": []string{"b"}, "foo": []string{"b"}, "c": []string{"1", "2"}}) {
-		t.Errorf("should have set a param: %#v", r)
+		t.Errorf("should have set a param, got: %#v", r.params)
+	}
+}
+
+func TestRequestURIContext(t *testing.T) {
+	r := (&Request{c: &RESTClient{base: &url.URL{Path: "/context"}}}).Param("foo", "a").Param("bar", "b")
+	r.Prefix("other")
+	r.RequestURI("/test?foo=b&a=b&c=1&c=2")
+	if r.pathPrefix != "/context/test" {
+		t.Errorf("path is wrong: %#v", r)
+	}
+	if !reflect.DeepEqual(r.params, url.Values{"a": []string{"b"}, "foo": []string{"b"}, "c": []string{"1", "2"}}) {
+		t.Errorf("should have set a param, got: %#v", r.params)
+	}
+
+	r = (&Request{c: &RESTClient{base: &url.URL{Path: "/context"}}}).Param("foo", "a").Param("bar", "b")
+	r.Prefix("other")
+	r.RequestURI("../test?foo=b&a=b&c=1&c=2")
+	if r.pathPrefix != "/test" {
+		t.Errorf("path is wrong: %#v", r)
+	}
+	if !reflect.DeepEqual(r.params, url.Values{"a": []string{"b"}, "foo": []string{"b"}, "c": []string{"1", "2"}}) {
+		t.Errorf("should have set a param, got: %#v", r.params)
 	}
 }
 
@@ -329,7 +359,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test unencodable api object
-	r = (&Request{c: &RESTClient{content: defaultContentConfig()}}).Body(&NotAnAPIObject{})
+	r = (&Request{c: &RESTClient{}, contentConfig: defaultContentConfig()}).Body(&NotAnAPIObject{})
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)
 	}
@@ -553,6 +583,7 @@ func TestURLTemplate(t *testing.T) {
 }
 
 func TestTransformResponse(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
 	testCases := []struct {
@@ -601,7 +632,7 @@ func TestTransformResponse(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(test.Response, &http.Request{})
+		result := r.transformResponse(ctx, test.Response, &http.Request{})
 		response, created, err := result.body, result.statusCode == http.StatusCreated, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -652,6 +683,7 @@ func (r *renegotiator) StreamDecoder(contentType string, params map[string]strin
 }
 
 func TestTransformResponseNegotiate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
 	testCases := []struct {
@@ -765,7 +797,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(test.Response, &http.Request{})
+		result := r.transformResponse(ctx, test.Response, &http.Request{})
 		_, err := result.body, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -890,14 +922,14 @@ func TestTransformUnstructuredError(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run("", func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			r := &Request{
-				c: &RESTClient{
-					content: defaultContentConfig(),
-				},
-				resourceName: testCase.Name,
-				resource:     testCase.Resource,
+				contentConfig: defaultContentConfig(),
+				c:             &RESTClient{},
+				resourceName:  testCase.Name,
+				resource:      testCase.Resource,
 			}
-			result := r.transformResponse(testCase.Res, testCase.Req)
+			result := r.transformResponse(ctx, testCase.Res, testCase.Req)
 			err := result.err
 			if !testCase.ErrFn(err) {
 				t.Fatalf("unexpected error: %v", err)
@@ -977,54 +1009,40 @@ func TestRequestWatch(t *testing.T) {
 			Err:              true,
 		},
 		{
-			name: "server returns forbidden",
+			name: "server returns forbidden with json content",
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
 				{response: &http.Response{
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
 					StatusCode: http.StatusForbidden,
-					Body:       io.NopCloser(bytes.NewReader([]byte{})),
+					Body: io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
+						Status:  metav1.StatusFailure,
+						Message: "secrets is forbidden",
+						Reason:  metav1.StatusReasonForbidden,
+						Code:    http.StatusForbidden,
+					})))),
 				}, err: nil},
 			},
 			attemptsExpected: 1,
-			Expect: []watch.Event{
-				{
-					Type: watch.Error,
-					Object: &metav1.Status{
-						Status:  "Failure",
-						Code:    500,
-						Reason:  "InternalError",
-						Message: `an error on the server ("unable to decode an event from the watch stream: test error") has prevented the request from succeeding`,
-						Details: &metav1.StatusDetails{
-							Causes: []metav1.StatusCause{
-								{
-									Type:    "UnexpectedServerResponse",
-									Message: "unable to decode an event from the watch stream: test error",
-								},
-								{
-									Type:    "ClientWatchDecoding",
-									Message: "unable to decode an event from the watch stream: test error",
-								},
-							},
-						},
-					},
-				},
-			},
-			Err: true,
+			Err:              true,
 			ErrFn: func(err error) bool {
+				if err.Error() != "secrets is forbidden" {
+					return false
+				}
 				return apierrors.IsForbidden(err)
 			},
 		},
 		{
-			name: "server returns forbidden",
+			name: "server returns forbidden without content",
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1042,9 +1060,9 @@ func TestRequestWatch(t *testing.T) {
 		{
 			name: "server returns unauthorized",
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1062,9 +1080,9 @@ func TestRequestWatch(t *testing.T) {
 		{
 			name: "server returns unauthorized",
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1258,9 +1276,9 @@ func TestRequestStream(t *testing.T) {
 		},
 		{
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1277,9 +1295,9 @@ func TestRequestStream(t *testing.T) {
 		},
 		{
 			Request: &Request{
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					base:    &url.URL{},
+					base: &url.URL{},
 				},
 			},
 			serverReturns: []responseErr{
@@ -1493,6 +1511,7 @@ func TestDoRequestNewWay(t *testing.T) {
 
 // This test assumes that the client implementation backs off exponentially, for an individual request.
 func TestBackoffLifecycle(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	count := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		count++
@@ -1512,22 +1531,30 @@ func TestBackoffLifecycle(t *testing.T) {
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
 	clock := testingclock.FakeClock{}
-	request.backoff = &URLBackoff{
-		// Use a fake backoff here to avoid flakes and speed the test up.
-		Backoff: flowcontrol.NewFakeBackOff(
-			time.Duration(1)*time.Second,
-			time.Duration(200)*time.Second,
-			&clock,
-		)}
+	request.backoff = stepClockDuringSleep{
+		BackoffManagerWithContext: &URLBackoff{
+			// Use a fake backoff here to avoid flakes and speed the test up.
+			Backoff: flowcontrol.NewFakeBackOff(
+				time.Duration(1)*time.Second,
+				time.Duration(200)*time.Second,
+				&clock,
+			),
+		},
+		clock: &clock,
+	}
 
 	for _, sec := range seconds {
-		thisBackoff := request.backoff.CalculateBackoff(request.URL())
+		thisBackoff := request.backoff.CalculateBackoffWithContext(ctx, request.URL())
 		t.Logf("Current backoff %v", thisBackoff)
 		if thisBackoff != time.Duration(sec)*time.Second {
 			t.Errorf("Backoff is %v instead of %v", thisBackoff, sec)
 		}
+
+		// This relies on advancing the fake clock by exactly the duration
+		// that SleepWithContext is being called for while DoRaw is executing.
+		// stepClockDuringSleep.SleepWithContext ensures that this happens.
 		now := clock.Now()
-		request.DoRaw(context.Background())
+		request.DoRaw(ctx)
 		elapsed := clock.Since(now)
 		if clock.Since(now) != thisBackoff {
 			t.Errorf("CalculatedBackoff not honored by clock: Expected time of %v, but got %v ", thisBackoff, elapsed)
@@ -1535,18 +1562,51 @@ func TestBackoffLifecycle(t *testing.T) {
 	}
 }
 
+type stepClockDuringSleep struct {
+	BackoffManagerWithContext
+	clock *testingclock.FakeClock
+}
+
+// SleepWithContext wraps the underlying SleepWithContext and ensures that once
+// that is sleeping, the fake clock advances by exactly the duration that
+// it is sleeping for.
+func (s stepClockDuringSleep) SleepWithContext(ctx context.Context, d time.Duration) {
+	// This code is sensitive to both the implementation of
+	// URLBackoff.SleepWithContext and of FakeClock.NewTimer:
+	// - SleepWithContext must be a no-op when the duration is zero
+	//   => no need to step the fake clock
+	// - SleepWithContext must use FakeClock.NewTimer, not FakeClock.Sleep
+	//   because the latter would advance time itself
+	if d != 0 {
+		go func() {
+			// Poll until the caller is sleeping.
+			for {
+				if s.clock.HasWaiters() {
+					s.clock.Step(d)
+					return
+				}
+				if ctx.Err() != nil {
+					return
+				}
+				time.Sleep(time.Millisecond)
+			}
+		}()
+	}
+	s.BackoffManagerWithContext.SleepWithContext(ctx, d)
+}
+
 type testBackoffManager struct {
 	sleeps []time.Duration
 }
 
-func (b *testBackoffManager) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (b *testBackoffManager) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
 }
 
-func (b *testBackoffManager) CalculateBackoff(actualUrl *url.URL) time.Duration {
+func (b *testBackoffManager) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
 	return time.Duration(0)
 }
 
-func (b *testBackoffManager) Sleep(d time.Duration) {
+func (b *testBackoffManager) SleepWithContext(ctx context.Context, d time.Duration) {
 	b.sleeps = append(b.sleeps, d)
 }
 
@@ -1572,7 +1632,7 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	expectedSleeps := []time.Duration{0, time.Second, time.Second, time.Second, time.Second}
 
 	c := testRESTClient(t, testServer)
-	c.createBackoffMgr = func() BackoffManager { return backoff }
+	c.createBackoffMgr = func() BackoffManagerWithContext { return backoff }
 	_, err := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
@@ -2345,7 +2405,7 @@ func TestTruncateBody(t *testing.T) {
 	l := flag.Lookup("v").Value.(flag.Getter).Get().(klog.Level)
 	for _, test := range tests {
 		flag.Set("v", test.level)
-		got := truncateBody(test.body)
+		got := truncateBody(klog.Background(), test.body)
 		if got != test.want {
 			t.Errorf("truncateBody(%v) = %v, want %v", test.body, got, test.want)
 		}
@@ -2438,6 +2498,7 @@ func TestRequestPreflightCheck(t *testing.T) {
 }
 
 func TestThrottledLogger(t *testing.T) {
+	logger := klog.Background()
 	now := time.Now()
 	oldClock := globalThrottledLogger.clock
 	defer func() {
@@ -2452,7 +2513,7 @@ func TestThrottledLogger(t *testing.T) {
 		wg.Add(10)
 		for j := 0; j < 10; j++ {
 			go func() {
-				if _, ok := globalThrottledLogger.attemptToLog(); ok {
+				if _, ok := globalThrottledLogger.attemptToLog(logger); ok {
 					logMessages++
 				}
 				wg.Done()
@@ -2615,6 +2676,8 @@ type noSleepBackOff struct {
 }
 
 func (n *noSleepBackOff) Sleep(d time.Duration) {}
+
+func (n *noSleepBackOff) SleepWithContext(ctx context.Context, d time.Duration) {}
 
 func TestRequestWithRetry(t *testing.T) {
 	tests := []struct {
@@ -2961,12 +3024,12 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 			})
 
 			req := &Request{
-				verb:      test.verb,
-				body:      test.body,
-				bodyBytes: test.bodyBytes,
+				verb:          test.verb,
+				body:          test.body,
+				bodyBytes:     test.bodyBytes,
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					content: defaultContentConfig(),
-					Client:  client,
+					Client: client,
 				},
 				backoff:    &noSleepBackOff{},
 				maxRetries: test.maxRetries,
@@ -3001,7 +3064,6 @@ const retryTestKey retryTestKeyType = iota
 // metric calls are invoked appropriately in right order.
 type withRateLimiterBackoffManagerAndMetrics struct {
 	flowcontrol.RateLimiter
-	*NoBackoff
 	metrics.ResultMetric
 	calculateBackoffSeq int64
 	calculateBackoffFn  func(i int64) time.Duration
@@ -3017,7 +3079,7 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Wait(ctx context.Context) err
 	return nil
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *url.URL) time.Duration {
+func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.CalculateBackoff")
 
 	waitFor := lb.calculateBackoffFn(lb.calculateBackoffSeq)
@@ -3025,11 +3087,11 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *u
 	return waitFor
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.UpdateBackoff")
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) Sleep(d time.Duration) {
+func (lb *withRateLimiterBackoffManagerAndMetrics) SleepWithContext(ctx context.Context, d time.Duration) {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.Sleep")
 	lb.sleepsGot = append(lb.sleepsGot, d.String())
 }
@@ -3210,7 +3272,6 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 		t.Run(test.name, func(t *testing.T) {
 			interceptor := &withRateLimiterBackoffManagerAndMetrics{
 				RateLimiter:        flowcontrol.NewFakeAlwaysRateLimiter(),
-				NoBackoff:          &NoBackoff{},
 				calculateBackoffFn: test.calculateBackoffFn,
 			}
 
@@ -3255,11 +3316,11 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 				t.Fatalf("Wrong test setup - did not find expected for: %s", key)
 			}
 			req := &Request{
-				verb:      "GET",
-				bodyBytes: []byte{},
+				verb:          "GET",
+				bodyBytes:     []byte{},
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
 					base:        base,
-					content:     defaultContentConfig(),
 					Client:      client,
 					rateLimiter: interceptor,
 				},
@@ -3391,12 +3452,12 @@ func testWithRetryInvokeOrder(t *testing.T, key string, doFunc func(ctx context.
 				t.Fatalf("Wrong test setup - did not find expected for: %s", key)
 			}
 			req := &Request{
-				verb:      "GET",
-				bodyBytes: []byte{},
+				verb:          "GET",
+				bodyBytes:     []byte{},
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					base:    base,
-					content: defaultContentConfig(),
-					Client:  client,
+					base:   base,
+					Client: client,
 				},
 				pathPrefix:  "/api/v1",
 				rateLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
@@ -3566,12 +3627,12 @@ func testWithWrapPreviousError(t *testing.T, doFunc func(ctx context.Context, r 
 				t.Fatalf("Failed to create new HTTP request - %v", err)
 			}
 			req := &Request{
-				verb:      "GET",
-				bodyBytes: []byte{},
+				verb:          "GET",
+				bodyBytes:     []byte{},
+				contentConfig: defaultContentConfig(),
 				c: &RESTClient{
-					base:    base,
-					content: defaultContentConfig(),
-					Client:  client,
+					base:   base,
+					Client: client,
 				},
 				pathPrefix:  "/api/v1",
 				rateLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
@@ -3990,11 +4051,11 @@ func TestRetryableConditions(t *testing.T) {
 
 					u, _ := url.Parse("http://localhost:123" + "/apis")
 					req := &Request{
-						verb: verb,
+						verb:          verb,
+						contentConfig: defaultContentConfig(),
 						c: &RESTClient{
-							base:    u,
-							content: defaultContentConfig(),
-							Client:  client,
+							base:   u,
+							Client: client,
 						},
 						backoff:    &noSleepBackOff{},
 						maxRetries: 2,
@@ -4034,10 +4095,10 @@ func TestRequestConcurrencyWithRetry(t *testing.T) {
 	})
 
 	req := &Request{
-		verb: "POST",
+		verb:          "POST",
+		contentConfig: defaultContentConfig(),
 		c: &RESTClient{
-			content: defaultContentConfig(),
-			Client:  client,
+			Client: client,
 		},
 		backoff:    &noSleepBackOff{},
 		maxRetries: 9, // 10 attempts in total, including the first
@@ -4064,4 +4125,153 @@ func TestRequestConcurrencyWithRetry(t *testing.T) {
 	if atomic.LoadInt32(&attempts) != int32(expected) {
 		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts)
 	}
+}
+
+func TestRequestLogging(t *testing.T) {
+	testcases := map[string]struct {
+		v              int
+		body           any
+		response       *http.Response
+		expectedOutput string
+	}{
+		"no-output": {
+			v:    7,
+			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
+		},
+		"output": {
+			v:    8,
+			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
+			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
+<location>] "Response Body" logger="TestLogger" body="pong"
+`,
+		},
+		"io-reader": {
+			v:    8,
+			body: strings.NewReader("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
+			// Cannot log the request body!
+			expectedOutput: `<location>] "Response Body" logger="TestLogger" body="pong"
+`,
+		},
+		"truncate": {
+			v:    8,
+			body: []byte(strings.Repeat("a", 2000)),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
+			expectedOutput: fmt.Sprintf(`<location>] "Request Body" logger="TestLogger" body="%s [truncated 976 chars]"
+<location>] "Response Body" logger="TestLogger" body="pong"
+`, strings.Repeat("a", 1024)),
+		},
+		"warnings": {
+			v:    8,
+			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Header: http.Header{
+					"Warning": []string{
+						`299 request-test "warning 1"`,
+						`299 request-test-2 "warning 2"`,
+						`300 request-test-3 "ignore code 300"`,
+					},
+				},
+				Body: io.NopCloser(strings.NewReader("pong")),
+			},
+			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
+<location>] "Response Body" logger="TestLogger" body="pong"
+warnings.go] "Warning: warning 1" logger="TestLogger"
+warnings.go] "Warning: warning 2" logger="TestLogger"
+`,
+		},
+	}
+
+	for name, tc := range testcases {
+		//nolint:logcheck // Intentionally testing with plain klog here.
+		t.Run(name, func(t *testing.T) {
+			state := klog.CaptureState()
+			defer state.Restore()
+
+			var buffer bytes.Buffer
+			klog.SetOutput(&buffer)
+			klog.LogToStderr(false)
+			var fs flag.FlagSet
+			klog.InitFlags(&fs)
+			require.NoError(t, fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
+			require.NoError(t, fs.Set("one_output", "true"), "set one_output")
+
+			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+				return tc.response, nil
+			})
+
+			req := NewRequestWithClient(nil, "", defaultContentConfig(), client).
+				Body(tc.body)
+
+			logger := klog.Background()
+			logger = klog.LoggerWithName(logger, "TestLogger")
+			ctx := klog.NewContext(context.Background(), logger)
+
+			_, file, line, _ := goruntime.Caller(0)
+			result := req.Do(ctx)
+			require.NoError(t, result.Error(), "request.Do")
+
+			// Compare log output:
+			// - strip date/time/pid from each line (fixed length header)
+			// - replace <location> with the actual call location
+			// - strip line number from warnings.go (might change)
+			state.Restore()
+			expectedOutput := strings.ReplaceAll(tc.expectedOutput, "<location>", fmt.Sprintf("%s:%d", path.Base(file), line+1))
+			actualOutput := buffer.String()
+			actualOutput = regexp.MustCompile(`(?m)^.{30}`).ReplaceAllString(actualOutput, "")
+			actualOutput = regexp.MustCompile(`(?m)^warnings\.go:\d+`).ReplaceAllString(actualOutput, "warnings.go")
+			assert.Equal(t, expectedOutput, actualOutput)
+		})
+	}
+}
+
+func TestRequestWarningHandler(t *testing.T) {
+	t.Run("no-context", func(t *testing.T) {
+		request := &Request{}
+		handler := &fakeWarningHandlerWithLogging{}
+		//nolint:logcheck
+		assert.Equal(t, request, request.WarningHandler(handler))
+		assert.NotNil(t, request.warningHandler)
+		request.warningHandler.HandleWarningHeaderWithContext(context.Background(), 0, "", "message")
+		assert.Equal(t, []string{"message"}, handler.messages)
+	})
+
+	t.Run("with-context", func(t *testing.T) {
+		request := &Request{}
+		handler := &fakeWarningHandlerWithContext{}
+		assert.Equal(t, request, request.WarningHandlerWithContext(handler))
+		assert.Equal(t, request.warningHandler, handler)
+	})
+
+	t.Run("nil-no-context", func(t *testing.T) {
+		request := &Request{
+			warningHandler: &fakeWarningHandlerWithContext{},
+		}
+		//nolint:logcheck
+		assert.Equal(t, request, request.WarningHandler(nil))
+		assert.Nil(t, request.warningHandler)
+	})
+
+	t.Run("nil-with-context", func(t *testing.T) {
+		request := &Request{
+			warningHandler: &fakeWarningHandlerWithContext{},
+		}
+		assert.Equal(t, request, request.WarningHandlerWithContext(nil))
+		assert.Nil(t, request.warningHandler)
+	})
 }

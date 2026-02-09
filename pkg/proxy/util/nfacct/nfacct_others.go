@@ -1,5 +1,4 @@
 //go:build !linux
-// +build !linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -24,7 +23,7 @@ import (
 	"runtime"
 )
 
-var unsupportedError = fmt.Errorf(runtime.GOOS + "/" + runtime.GOARCH + "is unsupported")
+var unsupportedError = fmt.Errorf(runtime.GOOS + "/" + runtime.GOARCH + " is unsupported")
 
 func New() (Interface, error) {
 	return nil, unsupportedError

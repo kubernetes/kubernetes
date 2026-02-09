@@ -105,7 +105,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericiooptions.IOStreams)
 	return cmd
 }
 
-// Complete completes al the required options
+// Complete completes all the required options
 func (o *RolloutHistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
 
@@ -177,7 +177,15 @@ func (o *RolloutHistoryOptions) Run() error {
 			}
 
 			if o.Revision > 0 {
-				printer.PrintObj(historyInfo[o.Revision], o.Out)
+				// Ensure the specified revision exists before printing
+				revision, exists := historyInfo[o.Revision]
+				if !exists {
+					return fmt.Errorf("unable to find the specified revision")
+				}
+
+				if err := printer.PrintObj(revision, o.Out); err != nil {
+					return err
+				}
 			} else {
 				sortedKeys := make([]int64, 0, len(historyInfo))
 				for k := range historyInfo {

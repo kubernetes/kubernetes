@@ -22,18 +22,18 @@ import (
 	"sync"
 	"time"
 
-	ptypes "github.com/gogo/protobuf/types"
+	containersapi "github.com/containerd/containerd/api/services/containers/v1"
+	tasksapi "github.com/containerd/containerd/api/services/tasks/v1"
+	versionapi "github.com/containerd/containerd/api/services/version/v1"
+	tasktypes "github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/google/cadvisor/container/containerd/containers"
-	"github.com/google/cadvisor/container/containerd/errdefs"
 	"github.com/google/cadvisor/container/containerd/pkg/dialer"
-	containersapi "github.com/google/cadvisor/third_party/containerd/api/services/containers/v1"
-	tasksapi "github.com/google/cadvisor/third_party/containerd/api/services/tasks/v1"
-	versionapi "github.com/google/cadvisor/third_party/containerd/api/services/version/v1"
-	tasktypes "github.com/google/cadvisor/third_party/containerd/api/types/task"
 )
 
 type client struct {
@@ -45,6 +45,8 @@ type client struct {
 type ContainerdClient interface {
 	LoadContainer(ctx context.Context, id string) (*containers.Container, error)
 	TaskPid(ctx context.Context, id string) (uint32, error)
+	LoadTaskProcess(ctx context.Context, id string) (*tasktypes.Process, error)
+	TaskExitStatus(ctx context.Context, id string) (uint32, error)
 	Version(ctx context.Context) (string, error)
 }
 
@@ -54,6 +56,7 @@ var (
 
 var once sync.Once
 var ctrdClient ContainerdClient = nil
+var ctrdClientErr error = nil
 
 const (
 	maxBackoffDelay   = 3 * time.Second
@@ -64,11 +67,10 @@ const (
 
 // Client creates a containerd client
 func Client(address, namespace string) (ContainerdClient, error) {
-	var retErr error
 	once.Do(func() {
 		tryConn, err := net.DialTimeout("unix", address, connectionTimeout)
 		if err != nil {
-			retErr = fmt.Errorf("containerd: cannot unix dial containerd api service: %v", err)
+			ctrdClientErr = fmt.Errorf("containerd: cannot unix dial containerd api service: %v", err)
 			return
 		}
 		tryConn.Close()
@@ -78,6 +80,7 @@ func Client(address, namespace string) (ContainerdClient, error) {
 		}
 		connParams.Backoff.BaseDelay = baseBackoffDelay
 		connParams.Backoff.MaxDelay = maxBackoffDelay
+		//nolint:staticcheck // SA1019
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithContextDialer(dialer.ContextDialer),
@@ -93,9 +96,10 @@ func Client(address, namespace string) (ContainerdClient, error) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 		defer cancel()
+		//nolint:staticcheck // SA1019
 		conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 		if err != nil {
-			retErr = err
+			ctrdClientErr = err
 			return
 		}
 		ctrdClient = &client{
@@ -104,7 +108,7 @@ func Client(address, namespace string) (ContainerdClient, error) {
 			versionService:   versionapi.NewVersionClient(conn),
 		}
 	})
-	return ctrdClient, retErr
+	return ctrdClient, ctrdClientErr
 }
 
 func (c *client) LoadContainer(ctx context.Context, id string) (*containers.Container, error) {
@@ -112,7 +116,7 @@ func (c *client) LoadContainer(ctx context.Context, id string) (*containers.Cont
 		ID: id,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return containerFromProto(r.Container), nil
 }
@@ -122,24 +126,49 @@ func (c *client) TaskPid(ctx context.Context, id string) (uint32, error) {
 		ContainerID: id,
 	})
 	if err != nil {
-		return 0, errdefs.FromGRPC(err)
+		return 0, errgrpc.ToNative(err)
 	}
-	if response.Process.Status == tasktypes.StatusUnknown {
+	if response.Process.Status == tasktypes.Status_UNKNOWN {
 		return 0, ErrTaskIsInUnknownState
 	}
 	return response.Process.Pid, nil
 }
 
-func (c *client) Version(ctx context.Context) (string, error) {
-	response, err := c.versionService.Version(ctx, &ptypes.Empty{})
+func (c *client) LoadTaskProcess(ctx context.Context, id string) (*tasktypes.Process, error) {
+	response, err := c.taskService.Get(ctx, &tasksapi.GetRequest{
+		ContainerID: id,
+	})
 	if err != nil {
-		return "", errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
+	}
+
+	return response.Process, nil
+}
+
+func (c *client) TaskExitStatus(ctx context.Context, id string) (uint32, error) {
+	response, err := c.taskService.Get(ctx, &tasksapi.GetRequest{
+		ContainerID: id,
+	})
+	if err != nil {
+		return 0, errgrpc.ToNative(err)
+	}
+	if response.Process.Status != tasktypes.Status_STOPPED {
+		return 0, fmt.Errorf("container %s has not exited (status: %v)", id, response.Process.Status)
+	}
+	return response.Process.ExitStatus, nil
+}
+
+func (c *client) Version(ctx context.Context) (string, error) {
+	response, err := c.versionService.Version(ctx, &emptypb.Empty{})
+	if err != nil {
+		return "", errgrpc.ToNative(err)
 	}
 	return response.Version, nil
 }
 
-func containerFromProto(containerpb containersapi.Container) *containers.Container {
+func containerFromProto(containerpb *containersapi.Container) *containers.Container {
 	var runtime containers.RuntimeInfo
+	// TODO: is nil check required for containerpb
 	if containerpb.Runtime != nil {
 		runtime = containers.RuntimeInfo{
 			Name:    containerpb.Runtime.Name,

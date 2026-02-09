@@ -21,13 +21,14 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 )
 
 type merger interface {
 	// Invoked when a change from a source is received.  May also function as an incremental
 	// merger if you wish to consume changes incrementally.  Must be reentrant when more than
 	// one source is defined.
-	Merge(source string, update interface{}) error
+	Merge(ctx context.Context, source string, update sourceUpdate) error
 }
 
 // mux is a class for merging configuration from multiple sources.  Changes are
@@ -39,13 +40,13 @@ type mux struct {
 	// Sources and their lock.
 	sourceLock sync.RWMutex
 	// Maps source names to channels
-	sources map[string]chan interface{}
+	sources map[string]chan sourceUpdate
 }
 
 // newMux creates a new mux that can merge changes from multiple sources.
 func newMux(merger merger) *mux {
 	mux := &mux{
-		sources: make(map[string]chan interface{}),
+		sources: make(map[string]chan sourceUpdate),
 		merger:  merger,
 	}
 	return mux
@@ -56,7 +57,7 @@ func newMux(merger merger) *mux {
 // source will return the same channel. This allows change and state based sources
 // to use the same channel. Different source names however will be treated as a
 // union.
-func (m *mux) ChannelWithContext(ctx context.Context, source string) chan interface{} {
+func (m *mux) ChannelWithContext(ctx context.Context, source string) chan sourceUpdate {
 	if len(source) == 0 {
 		panic("Channel given an empty name")
 	}
@@ -66,15 +67,18 @@ func (m *mux) ChannelWithContext(ctx context.Context, source string) chan interf
 	if exists {
 		return channel
 	}
-	newChannel := make(chan interface{})
+	newChannel := make(chan sourceUpdate)
 	m.sources[source] = newChannel
 
-	go wait.Until(func() { m.listen(source, newChannel) }, 0, ctx.Done())
+	go wait.Until(func() { m.listen(ctx, source, newChannel) }, 0, ctx.Done())
 	return newChannel
 }
 
-func (m *mux) listen(source string, listenChannel <-chan interface{}) {
+func (m *mux) listen(ctx context.Context, source string, listenChannel <-chan sourceUpdate) {
+	logger := klog.FromContext(ctx)
 	for update := range listenChannel {
-		m.merger.Merge(source, update)
+		if err := m.merger.Merge(ctx, source, update); err != nil {
+			logger.Info("failed merging update", "err", err)
+		}
 	}
 }

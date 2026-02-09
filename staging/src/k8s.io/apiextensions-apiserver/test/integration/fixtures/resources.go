@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/utils/pointer"
-
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +35,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -47,7 +46,7 @@ const (
 func AllowAllSchema() *apiextensionsv1.CustomResourceValidation {
 	return &apiextensionsv1.CustomResourceValidation{
 		OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-			XPreserveUnknownFields: pointer.BoolPtr(true),
+			XPreserveUnknownFields: ptr.To(true),
 			Type:                   "object",
 		},
 	}
@@ -347,7 +346,7 @@ func existsInDiscoveryV1(crd *apiextensionsv1.CustomResourceDefinition, apiExten
 func waitForCRDReadyWatchUnsafe(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
 	// wait until all resources appears in discovery
 	for _, version := range servedV1Versions(crd) {
-		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			return existsInDiscoveryV1(crd, apiExtensionsClient, version)
 		})
 		if err != nil {
@@ -375,13 +374,13 @@ func waitForCRDReady(crd *apiextensionsv1.CustomResourceDefinition, apiExtension
 	// For this test, we'll actually cycle, "list/watch/create/delete" until we get an RV from list that observes the create and not an error.
 	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
 	// before like the created RV could be too old to watch.
-	err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		return isWatchCachePrimed(v1CRD, dynamicClientSet)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return v1CRD, err
+	return v1CRD, nil
 }
 
 // CreateNewV1CustomResourceDefinitionWatchUnsafe creates the CRD and makes sure
@@ -396,7 +395,7 @@ func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.Custo
 
 	// wait until all resources appears in discovery
 	for _, version := range servedV1Versions(v1CRD) {
-		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			return existsInDiscoveryV1(v1CRD, apiExtensionsClient, version)
 		})
 		if err != nil {
@@ -404,7 +403,7 @@ func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.Custo
 		}
 	}
 
-	return v1CRD, err
+	return v1CRD, nil
 }
 
 // CreateNewV1CustomResourceDefinition creates the given CRD and makes sure its watch cache is primed on the server.
@@ -424,7 +423,7 @@ func CreateNewV1CustomResourceDefinition(v1CRD *apiextensionsv1.CustomResourceDe
 	// For this test, we'll actually cycle, "list/watch/create/delete" until we get an RV from list that observes the create and not an error.
 	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
 	// before like the created RV could be too old to watch.
-	err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		return isWatchCachePrimed(v1CRD, dynamicClientSet)
 	})
 	if err != nil {
@@ -518,7 +517,7 @@ func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinit
 		return err
 	}
 	for _, version := range servedV1Versions(crd) {
-		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			exists, err := existsInDiscoveryV1(crd, apiExtensionsClient, version)
 			return !exists, err
 		})
@@ -540,7 +539,7 @@ func DeleteV1CustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExt
 	}
 	for _, crd := range list.Items {
 		for _, version := range servedV1Versions(&crd) {
-			err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+			err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 				exists, err := existsInDiscoveryV1(&crd, apiExtensionsClient, version)
 				return !exists, err
 			})

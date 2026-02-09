@@ -19,12 +19,10 @@ package validation
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func testClaimTemplate(name, namespace string, spec resource.ResourceClaimSpec) *resource.ResourceClaimTemplate {
@@ -34,90 +32,79 @@ func testClaimTemplate(name, namespace string, spec resource.ResourceClaimSpec) 
 			Namespace: namespace,
 		},
 		Spec: resource.ResourceClaimTemplateSpec{
-			Spec: spec,
+			Spec: *spec.DeepCopy(),
 		},
 	}
 }
 
 func TestValidateClaimTemplate(t *testing.T) {
-	validMode := resource.AllocationModeImmediate
-	invalidMode := resource.AllocationMode("invalid")
-	goodName := "foo"
-	badName := "!@#$%^"
-	goodNS := "ns"
-	goodClaimSpec := resource.ResourceClaimSpec{
-		ResourceClassName: goodName,
-		AllocationMode:    validMode,
-	}
 	now := metav1.Now()
 	badValue := "spaces not allowed"
-	badAPIGroup := "example.com/v1"
-	goodAPIGroup := "example.com"
 
 	scenarios := map[string]struct {
 		template     *resource.ResourceClaimTemplate
 		wantFailures field.ErrorList
 	}{
 		"good-claim": {
-			template: testClaimTemplate(goodName, goodNS, goodClaimSpec),
+			template: testClaimTemplate(goodName, goodNS, validClaimSpec),
 		},
 		"missing-name": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("metadata", "name"), "name or generateName is required")},
-			template:     testClaimTemplate("", goodNS, goodClaimSpec),
+			template:     testClaimTemplate("", goodNS, validClaimSpec),
 		},
 		"bad-name": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
-			template:     testClaimTemplate(badName, goodNS, goodClaimSpec),
+			template:     testClaimTemplate(badName, goodNS, validClaimSpec),
 		},
 		"missing-namespace": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("metadata", "namespace"), "")},
-			template:     testClaimTemplate(goodName, "", goodClaimSpec),
+			template:     testClaimTemplate(goodName, "", validClaimSpec),
 		},
 		"generate-name": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.GenerateName = "pvc-"
 				return template
 			}(),
 		},
 		"uid": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.UID = "ac051fac-2ead-46d9-b8b4-4e0fbeb7455d"
 				return template
 			}(),
 		},
 		"resource-version": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.ResourceVersion = "1"
 				return template
 			}(),
 		},
 		"generation": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.Generation = 100
 				return template
 			}(),
 		},
 		"creation-timestamp": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.CreationTimestamp = now
 				return template
 			}(),
 		},
 		"deletion-grace-period-seconds": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
-				template.DeletionGracePeriodSeconds = pointer.Int64(10)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
+				template.DeletionGracePeriodSeconds = ptr.To[int64](10)
 				return template
 			}(),
 		},
 		"owner-references": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.OwnerReferences = []metav1.OwnerReference{
 					{
 						APIVersion: "v1",
@@ -131,7 +118,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 		},
 		"finalizers": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.Finalizers = []string{
 					"example.com/foo",
 				}
@@ -140,7 +127,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 		},
 		"managed-fields": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.ManagedFields = []metav1.ManagedFieldsEntry{
 					{
 						FieldsType: "FieldsV1",
@@ -154,7 +141,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 		},
 		"good-labels": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.Labels = map[string]string{
 					"apps.kubernetes.io/name": "test",
 				}
@@ -164,7 +151,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 		"bad-labels": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.Labels = map[string]string{
 					"hello-world": badValue,
 				}
@@ -173,7 +160,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 		},
 		"good-annotations": {
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.Annotations = map[string]string{
 					"foo": "bar",
 				}
@@ -183,7 +170,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 		"bad-annotations": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.Annotations = map[string]string{
 					badName: "hello world",
 				}
@@ -191,71 +178,35 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"bad-classname": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "resourceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
-				template.Spec.Spec.ResourceClassName = badName
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
+				template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName = badName
 				return template
 			}(),
 		},
-		"bad-mode": {
-			wantFailures: field.ErrorList{field.NotSupported(field.NewPath("spec", "spec", "allocationMode"), invalidMode, supportedAllocationModes.List())},
-			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
-				template.Spec.Spec.AllocationMode = invalidMode
-				return template
-			}(),
+		"prioritized-list": {
+			wantFailures: nil,
+			template:     testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable),
 		},
-		"good-parameters": {
+		"prioritized-list-both-first-available-and-exactly-set": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0), nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"),
+			},
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
-				template.Spec.Spec.ParametersRef = &resource.ResourceClaimParametersReference{
-					Kind: "foo",
-					Name: "bar",
+				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				template.Spec.Spec.Devices.Requests[0].Exactly = &resource.ExactDeviceRequest{
+					DeviceClassName: goodName,
+					AllocationMode:  resource.DeviceAllocationModeAll,
 				}
 				return template
 			}(),
 		},
-		"good-parameters-apigroup": {
+		"prioritized-list-bad-class-name-on-subrequest": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')").MarkCoveredByDeclarative()},
 			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
-				template.Spec.Spec.ParametersRef = &resource.ResourceClaimParametersReference{
-					APIGroup: goodAPIGroup,
-					Kind:     "foo",
-					Name:     "bar",
-				}
-				return template
-			}(),
-		},
-		"bad-parameters-apigroup": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "parametersRef", "apiGroup"), badAPIGroup, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
-			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
-				template.Spec.Spec.ParametersRef = &resource.ResourceClaimParametersReference{
-					APIGroup: badAPIGroup,
-					Kind:     "foo",
-					Name:     "bar",
-				}
-				return template
-			}(),
-		},
-		"missing-parameters-kind": {
-			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "spec", "parametersRef", "kind"), "")},
-			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
-				template.Spec.Spec.ParametersRef = &resource.ResourceClaimParametersReference{
-					Name: "bar",
-				}
-				return template
-			}(),
-		},
-		"missing-parameters-name": {
-			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "spec", "parametersRef", "name"), "")},
-			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
-				template.Spec.Spec.ParametersRef = &resource.ResourceClaimParametersReference{
-					Kind: "foo",
-				}
+				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName = badName
 				return template
 			}(),
 		},
@@ -263,23 +214,14 @@ func TestValidateClaimTemplate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateClaimTemplate(scenario.template)
-			assert.Equal(t, scenario.wantFailures, errs)
+			errs := ValidateResourceClaimTemplate(scenario.template)
+			assertFailures(t, scenario.wantFailures, errs)
 		})
 	}
 }
 
 func TestValidateClaimTemplateUpdate(t *testing.T) {
-	name := "valid"
-	parameters := &resource.ResourceClaimParametersReference{
-		Kind: "foo",
-		Name: "bar",
-	}
-	validClaimTemplate := testClaimTemplate("foo", "ns", resource.ResourceClaimSpec{
-		ResourceClassName: name,
-		AllocationMode:    resource.AllocationModeImmediate,
-		ParametersRef:     parameters,
-	})
+	validClaimTemplate := testClaimTemplate(goodName, goodNS, validClaimSpec)
 
 	scenarios := map[string]struct {
 		oldClaimTemplate *resource.ResourceClaimTemplate
@@ -293,36 +235,24 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 		"invalid-update-class": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimTemplateSpec {
 				spec := validClaimTemplate.Spec.DeepCopy()
-				spec.Spec.ResourceClassName += "2"
+				spec.Spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
 				return *spec
 			}(), "field is immutable")},
 			oldClaimTemplate: validClaimTemplate,
 			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
-				template.Spec.Spec.ResourceClassName += "2"
+				template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
 				return template
 			},
 		},
-		"invalid-update-remove-parameters": {
+		"prioritized-listinvalid-update-class": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimTemplateSpec {
-				spec := validClaimTemplate.Spec.DeepCopy()
-				spec.Spec.ParametersRef = nil
-				return *spec
+				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName += "2"
+				return template.Spec
 			}(), "field is immutable")},
-			oldClaimTemplate: validClaimTemplate,
+			oldClaimTemplate: testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable),
 			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
-				template.Spec.Spec.ParametersRef = nil
-				return template
-			},
-		},
-		"invalid-update-mode": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimTemplateSpec {
-				spec := validClaimTemplate.Spec.DeepCopy()
-				spec.Spec.AllocationMode = resource.AllocationModeWaitForFirstConsumer
-				return *spec
-			}(), "field is immutable")},
-			oldClaimTemplate: validClaimTemplate,
-			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
-				template.Spec.Spec.AllocationMode = resource.AllocationModeWaitForFirstConsumer
+				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName += "2"
 				return template
 			},
 		},
@@ -331,8 +261,8 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			scenario.oldClaimTemplate.ResourceVersion = "1"
-			errs := ValidateClaimTemplateUpdate(scenario.update(scenario.oldClaimTemplate.DeepCopy()), scenario.oldClaimTemplate)
-			assert.Equal(t, scenario.wantFailures, errs)
+			errs := ValidateResourceClaimTemplateUpdate(scenario.update(scenario.oldClaimTemplate.DeepCopy()), scenario.oldClaimTemplate)
+			assertFailures(t, scenario.wantFailures, errs)
 		})
 	}
 }

@@ -19,29 +19,26 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1beta1 "k8s.io/api/authorization/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	authorizationv1beta1 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 )
 
-// FakeSubjectAccessReviews implements SubjectAccessReviewInterface
-type FakeSubjectAccessReviews struct {
+// fakeSubjectAccessReviews implements SubjectAccessReviewInterface
+type fakeSubjectAccessReviews struct {
+	*gentype.FakeClient[*v1beta1.SubjectAccessReview]
 	Fake *FakeAuthorizationV1beta1
 }
 
-var subjectaccessreviewsResource = v1beta1.SchemeGroupVersion.WithResource("subjectaccessreviews")
-
-var subjectaccessreviewsKind = v1beta1.SchemeGroupVersion.WithKind("SubjectAccessReview")
-
-// Create takes the representation of a subjectAccessReview and creates it.  Returns the server's representation of the subjectAccessReview, and an error, if there is any.
-func (c *FakeSubjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1beta1.SubjectAccessReview, opts v1.CreateOptions) (result *v1beta1.SubjectAccessReview, err error) {
-	emptyResult := &v1beta1.SubjectAccessReview{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(subjectaccessreviewsResource, subjectAccessReview, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeSubjectAccessReviews(fake *FakeAuthorizationV1beta1) authorizationv1beta1.SubjectAccessReviewInterface {
+	return &fakeSubjectAccessReviews{
+		gentype.NewFakeClient[*v1beta1.SubjectAccessReview](
+			fake.Fake,
+			"",
+			v1beta1.SchemeGroupVersion.WithResource("subjectaccessreviews"),
+			v1beta1.SchemeGroupVersion.WithKind("SubjectAccessReview"),
+			func() *v1beta1.SubjectAccessReview { return &v1beta1.SubjectAccessReview{} },
+		),
+		fake,
 	}
-	return obj.(*v1beta1.SubjectAccessReview), err
 }

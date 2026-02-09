@@ -23,8 +23,6 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/gogo/protobuf/proto"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -72,10 +70,18 @@ func IsNotMarshalable(err error) bool {
 // is passed, the encoded object will have group, version, and kind fields set. If typer is nil, the objects will be written
 // as-is (any type info passed with the object will be used).
 func NewSerializer(creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
+	return NewSerializerWithOptions(creater, typer, SerializerOptions{})
+}
+
+// NewSerializerWithOptions creates a Protobuf serializer that handles encoding versioned objects into the proper wire form. If a typer
+// is passed, the encoded object will have group, version, and kind fields set. If typer is nil, the objects will be written
+// as-is (any type info passed with the object will be used).
+func NewSerializerWithOptions(creater runtime.ObjectCreater, typer runtime.ObjectTyper, opts SerializerOptions) *Serializer {
 	return &Serializer{
 		prefix:  protoEncodingPrefix,
 		creater: creater,
 		typer:   typer,
+		options: opts,
 	}
 }
 
@@ -84,6 +90,14 @@ type Serializer struct {
 	prefix  []byte
 	creater runtime.ObjectCreater
 	typer   runtime.ObjectTyper
+
+	options SerializerOptions
+}
+
+// SerializerOptions holds the options which are used to configure a Proto serializer.
+type SerializerOptions struct {
+	// StreamingCollectionsEncoding enables encoding collection, one item at the time, drastically reducing memory needed.
+	StreamingCollectionsEncoding bool
 }
 
 var _ runtime.Serializer = &Serializer{}
@@ -132,11 +146,13 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		types, _, err := s.typer.ObjectKinds(into)
 		switch {
 		case runtime.IsNotRegisteredError(err):
-			pb, ok := into.(proto.Message)
+			unmarshaler, ok := into.(unmarshaler)
 			if !ok {
 				return nil, &actual, errNotMarshalable{reflect.TypeOf(into)}
 			}
-			if err := proto.Unmarshal(unk.Raw, pb); err != nil {
+			// top-level unmarshal resets before delegating unmarshaling to the object
+			unmarshaler.Reset()
+			if err := unmarshaler.Unmarshal(unk.Raw); err != nil {
 				return nil, &actual, err
 			}
 			return into, &actual, nil
@@ -209,6 +225,13 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.
 			},
 		}
 	}
+	if s.options.StreamingCollectionsEncoding {
+		listData, err := getStreamingListData(obj)
+		if err == nil {
+			// Doesn't honor custom proto marshaling methods (like json streaming), because all proto objects implement proto methods.
+			return streamingEncodeUnknownList(w, unk, listData, memAlloc)
+		}
+	}
 
 	switch t := obj.(type) {
 	case bufferedMarshaller:
@@ -228,7 +251,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.
 		_, err = w.Write(data[:prefixSize+uint64(i)])
 		return err
 
-	case proto.Marshaler:
+	case unbufferedMarshaller:
 		// this path performs extra allocations
 		data, err := t.Marshal()
 		if err != nil {
@@ -283,14 +306,25 @@ func copyKindDefaults(dst, src *schema.GroupVersionKind) {
 // bufferedMarshaller describes a more efficient marshalling interface that can avoid allocating multiple
 // byte buffers by pre-calculating the size of the final buffer needed.
 type bufferedMarshaller interface {
-	proto.Sizer
 	runtime.ProtobufMarshaller
 }
 
 // Like bufferedMarshaller, but is able to marshal backwards, which is more efficient since it doesn't call Size() as frequently.
 type bufferedReverseMarshaller interface {
-	proto.Sizer
 	runtime.ProtobufReverseMarshaller
+}
+
+type unbufferedMarshaller interface {
+	Marshal() ([]byte, error)
+}
+
+// unmarshaler is the subset of gogo Message and Unmarshaler used by unmarshal
+type unmarshaler interface {
+	// Reset() is called on the top-level message before unmarshaling,
+	// and clears all existing data from the message instance.
+	Reset()
+	// Unmarshal decodes from the start of the data into the message.
+	Unmarshal([]byte) error
 }
 
 // estimateUnknownSize returns the expected bytes consumed by a given runtime.Unknown
@@ -358,11 +392,13 @@ func (s *RawSerializer) Decode(originalData []byte, gvk *schema.GroupVersionKind
 	types, _, err := s.typer.ObjectKinds(into)
 	switch {
 	case runtime.IsNotRegisteredError(err):
-		pb, ok := into.(proto.Message)
+		unmarshaler, ok := into.(unmarshaler)
 		if !ok {
 			return nil, actual, errNotMarshalable{reflect.TypeOf(into)}
 		}
-		if err := proto.Unmarshal(data, pb); err != nil {
+		// top-level unmarshal resets before delegating unmarshaling to the object
+		unmarshaler.Reset()
+		if err := unmarshaler.Unmarshal(data); err != nil {
 			return nil, actual, err
 		}
 		return into, actual, nil
@@ -396,11 +432,13 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 		return nil, actual, err
 	}
 
-	pb, ok := obj.(proto.Message)
+	unmarshaler, ok := obj.(unmarshaler)
 	if !ok {
 		return nil, actual, errNotMarshalable{reflect.TypeOf(obj)}
 	}
-	if err := proto.Unmarshal(data, pb); err != nil {
+	// top-level unmarshal resets before delegating unmarshaling to the object
+	unmarshaler.Reset()
+	if err := unmarshaler.Unmarshal(data); err != nil {
 		return nil, actual, err
 	}
 	if actual != nil {
@@ -428,6 +466,39 @@ func (s *RawSerializer) encode(obj runtime.Object, w io.Writer, memAlloc runtime
 }
 
 func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.MemoryAllocator) error {
+	_, err := doEncode(obj, w, nil, memAlloc)
+	return err
+}
+
+func doEncodeWithHeader(obj any, w io.Writer, field byte, precomputedSize int, memAlloc runtime.MemoryAllocator) (size int, err error) {
+	// Field identifier
+	n, err := w.Write([]byte{field})
+	size += n
+	if err != nil {
+		return size, err
+	}
+	// Size
+	n, err = writeVarintGenerated(w, precomputedSize)
+	size += n
+	if err != nil {
+		return size, err
+	}
+	// Obj
+	n, err = doEncode(obj, w, &precomputedSize, memAlloc)
+	size += n
+	if err != nil {
+		return size, err
+	}
+	if n != precomputedSize {
+		return size, fmt.Errorf("the size value was %d, but doEncode wrote %d bytes to data", precomputedSize, n)
+	}
+	return size, nil
+}
+
+// doEncode encodes provided object into writer using a allocator if possible.
+// Avoids call by object Size if precomputedObjSize is provided.
+// precomputedObjSize should not include header bytes (field identifier, size).
+func doEncode(obj any, w io.Writer, precomputedObjSize *int, memAlloc runtime.MemoryAllocator) (int, error) {
 	if memAlloc == nil {
 		klog.Error("a mandatory memory allocator wasn't provided, this might have a negative impact on performance, check invocations of EncodeWithAllocator method, falling back on runtime.SimpleAllocator")
 		memAlloc = &runtime.SimpleAllocator{}
@@ -436,40 +507,43 @@ func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runti
 	case bufferedReverseMarshaller:
 		// this path performs a single allocation during write only when the Allocator wasn't provided
 		// it also requires the caller to implement the more efficient Size and MarshalToSizedBuffer methods
-		encodedSize := uint64(t.Size())
-		data := memAlloc.Allocate(encodedSize)
+		if precomputedObjSize == nil {
+			s := t.Size()
+			precomputedObjSize = &s
+		}
+		data := memAlloc.Allocate(uint64(*precomputedObjSize))
 
 		n, err := t.MarshalToSizedBuffer(data)
 		if err != nil {
-			return err
+			return 0, err
 		}
-		_, err = w.Write(data[:n])
-		return err
+		return w.Write(data[:n])
 
 	case bufferedMarshaller:
 		// this path performs a single allocation during write only when the Allocator wasn't provided
 		// it also requires the caller to implement the more efficient Size and MarshalTo methods
-		encodedSize := uint64(t.Size())
-		data := memAlloc.Allocate(encodedSize)
+		if precomputedObjSize == nil {
+			s := t.Size()
+			precomputedObjSize = &s
+		}
+		data := memAlloc.Allocate(uint64(*precomputedObjSize))
 
 		n, err := t.MarshalTo(data)
 		if err != nil {
-			return err
+			return 0, err
 		}
-		_, err = w.Write(data[:n])
-		return err
+		return w.Write(data[:n])
 
-	case proto.Marshaler:
+	case unbufferedMarshaller:
 		// this path performs extra allocations
 		data, err := t.Marshal()
 		if err != nil {
-			return err
+			return 0, err
 		}
-		_, err = w.Write(data)
-		return err
+		return w.Write(data)
 
 	default:
-		return errNotMarshalable{reflect.TypeOf(obj)}
+		return 0, errNotMarshalable{reflect.TypeOf(obj)}
 	}
 }
 

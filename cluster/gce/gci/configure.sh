@@ -24,17 +24,18 @@ set -o nounset
 set -o pipefail
 
 ### Hardcoded constants
-DEFAULT_CNI_VERSION='v1.5.0'
-DEFAULT_CNI_HASH='7e3d34d2de37a8fe72278ea796fcbe763e9e7f241ed1a6d3c5a9f613fe5895bf3bbea05e0b651d9e4d0e1c427a7b42f0ff5c07d29abfc2aee9967136347451bd'
-DEFAULT_NPD_VERSION='v0.8.19'
-DEFAULT_NPD_HASH_AMD64='41e7816614a1e30c94cbe37a1d09c2ef6c3f2ad336b40d95378528deac9a8b811356e46bae268dab006132f2bdce22668a640517f000853109d1e3be77aef25e'
-DEFAULT_NPD_HASH_ARM64='678352d0544c166e86d3435c4f49b1ea5ce19c2d6f083f51f7688599377928e5b1425d1733006981d17e94ddede67f9fc1d2035577a87687701044950f697390'
-DEFAULT_CRICTL_VERSION='v1.30.0'
-DEFAULT_CRICTL_AMD64_SHA512='2bd1e85ab6abd2ac59e6d1a4ccb316fd08e3b025f8de85a6c8396defb7df5ee4e8daf884c4ad9d6451477ef9754240ec786cc5c5ccf1e9a2f616450f2a98a0d0'
-DEFAULT_CRICTL_ARM64_SHA512='bf2d18b781fd4072058862e23e787dd9b1c6c18626bfc5140fbbf34b78b4fca4b3243eff42d28f0a10f1054b4547405a82afae319c9d9975669ef9a7e27a6b42'
+DEFAULT_CNI_VERSION='v1.9.0'
+# CNI HASH for amd64 sha512
+DEFAULT_CNI_HASH='fe6adcc7319f2d7f2307bb66a580789b24daf3e7856e41d0468324c40d5cf7a540dbecbc5ddb9ef5a12aac49ed94c63b36d926b332f2e2217475db1ab0b576b7'
+DEFAULT_NPD_VERSION='v1.34.0'
+DEFAULT_NPD_HASH_AMD64='3c55ff6ffadd77dbc3df3774d13164587103ca87c8b6914f5c71c87d8f498b78621e0c96538bb3c69f8f1b4194a6da553aa56b1b52001a7d9a67776ac24e80bd'
+DEFAULT_NPD_HASH_ARM64='ca1d34e64b80f6b2bdf86cfde95154122d6e14c707a748ea6fc414a55f391b1bb572a96b6b2c285996af0232917fa87e14e037125aa03a62247383af3e48c095'
+DEFAULT_CRICTL_VERSION='v1.35.0'
+DEFAULT_CRICTL_AMD64_SHA512='99c86c3d6fd63e6bdd6bac75ca16401517c59aa78ce30554e15bfca7bc775aef54066889aa9855c500772c1ff2a5efe35d543270966f27adbbb80fef2f037ba1'
+DEFAULT_CRICTL_ARM64_SHA512='710a1455a926333731d817bde38b010dddbd5a338ccf209ee33625015ca3ce6f671d9bad8f4c918e0ad0332391b226b3d6e6834049c11e88dc0edb32a956f1a2'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
-AUTH_PROVIDER_GCP_HASH_LINUX_AMD64="${AUTH_PROVIDER_GCP_HASH_LINUX_AMD64:-156058e5b3994cba91c23831774033e0d505d6d8b80f43541ef6af91b320fd9dfaabe42ec8a8887b51d87104c2b57e1eb895649d681575ffc80dd9aee8e563db}"
-AUTH_PROVIDER_GCP_HASH_LINUX_ARM64="${AUTH_PROVIDER_GCP_HASH_LINUX_ARM64:-1aa3b0bea10a9755231989ffc150cbfa770f1d96932db7535473f7bfeb1108bafdae80202ae738d59495982512e716ff7366d5f414d0e76dd50519f98611f9ab}"
+AUTH_PROVIDER_GCP_HASH_LINUX_AMD64="${AUTH_PROVIDER_GCP_HASH_LINUX_AMD64:-a3d00131ddd427db2f99a3c355bf416f9872dbdf445992ae56fc51c28ff5e50f0d225f3cd76eab2e89cb9a179f30af00d8a04fc209e43be70cf00525a7daeeae}"
+AUTH_PROVIDER_GCP_HASH_LINUX_ARM64="${AUTH_PROVIDER_GCP_HASH_LINUX_ARM64:-d0466ae554fef91165260b7ae3ef5c8bce3607015ec31461c3413de6a1257b7f305bd0ce30cddc112f6707420d5012600918f249e808d0c8ff262692a76ad30d}"
 ###
 
 # Standard curl flags.
@@ -224,6 +225,36 @@ function download-or-bust {
   done
 }
 
+# Robust download with retry and exponential backoff
+function download-robust {
+  local description="$1" dest_dir="$2" url="$3"
+  
+  local max_attempts=5 attempt=1 delay=5
+  local file="${url##*/}"
+  local temp_file="${dest_dir}/.${file}.tmp"
+  
+  while [[ ${attempt} -le ${max_attempts} ]]; do
+    rm -f "${temp_file}"
+    
+    if curl --fail --location --silent --show-error --connect-timeout 20 --max-time 900 \
+       --retry 3 --retry-delay 2 -o "${temp_file}" "${url}"; then
+      mv "${temp_file}" "${dest_dir}/${file}"
+      echo "== Downloaded ${description} from ${url}"
+      return 0
+    fi
+    rm -f "${temp_file}"
+    
+    if [[ ${attempt} -lt ${max_attempts} ]]; then
+      sleep "${delay}"
+      delay=$((delay * 2))
+    fi
+    ((attempt++))
+  done
+  
+  echo "ERROR: Failed to download ${description} after ${max_attempts} attempts from ${url}"
+  return 1
+}
+
 function is-preloaded {
   local -r key=$1
   local -r value=$2
@@ -253,7 +284,7 @@ function install-gci-mounter-tools {
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
-  download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
+  download-or-bust "${mounter_tar_sha}" "https://dl.k8s.io/gci-mounter/mounter.tar"
   cp "${KUBE_HOME}/kubernetes/server/bin/mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
@@ -373,7 +404,7 @@ EOF
   fi
 
   echo "Downloading crictl"
-  local -r crictl_path="https://storage.googleapis.com/k8s-artifacts-cri-tools/release/${crictl_version}"
+  local -r crictl_path="https://github.com/kubernetes-sigs/cri-tools/releases/download/${crictl_version}"
   download-or-bust "${crictl_hash}" "${crictl_path}/${crictl}"
   tar xf "${crictl}"
   mv crictl "${KUBE_BIN}/crictl"
@@ -417,8 +448,6 @@ function install-kube-manifests {
   if [[ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" ]]; then
     cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" "${KUBE_BIN}/"
   fi
-
-  cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_BIN}/health-monitor.sh"
 
   rm -f "${KUBE_HOME}/${manifests_tar}"
   rm -f "${KUBE_HOME}/${manifests_tar}.sha512"
@@ -481,65 +510,94 @@ function load-docker-images {
   fi
 }
 
-# If we are on ubuntu we can try to install containerd
+# Create containerd systemd service (needed when skipping apt install)
+function ensure-containerd-systemd-service {
+  local -r svc="/etc/systemd/system/containerd.service"
+  [[ -f "${svc}" ]] && return 0
+  cat > "${svc}" <<'EOF'
+[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target local-fs.target
+[Service]
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/bin/containerd
+Type=notify
+Delegate=yes
+KillMode=process
+Restart=always
+RestartSec=5
+LimitNPROC=infinity
+LimitCORE=infinity
+LimitNOFILE=infinity
+TasksMax=infinity
+OOMScoreAdjust=-999
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload && systemctl enable containerd
+}
+
+# Download and install containerd binary from GitHub
+function install-containerd-binary {
+  local -r version="$1" temp_dir="$(mktemp -d)"
+  local -r url="https://github.com/containerd/containerd/releases/download/${version}/containerd-${version#v}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"
+  if download-robust "containerd ${version}" "${temp_dir}" "${url}"; then
+    tar --overwrite -xzf "${temp_dir}"/containerd-*.tar.gz -C /usr/
+    rm -rf "${temp_dir}"; return 0
+  fi
+  rm -rf "${temp_dir}"; return 1
+}
+
+# Download and install runc binary from GitHub
+function install-runc-binary {
+  local -r version="$1" temp_dir="$(mktemp -d)"
+  local -r url="https://github.com/opencontainers/runc/releases/download/${version}/runc.${HOST_ARCH}"
+  if download-robust "runc ${version}" "${temp_dir}" "${url}"; then
+    cp "${temp_dir}/runc.${HOST_ARCH}" /usr/sbin/runc && chmod 755 /usr/sbin/runc
+    rm -rf "${temp_dir}"; return 0
+  fi
+  rm -rf "${temp_dir}"; return 1
+}
+
+# Install containerd on Ubuntu. When both UBUNTU_INSTALL_CONTAINERD_VERSION and
+# UBUNTU_INSTALL_RUNC_VERSION are set, skips apt and downloads binaries directly.
 function install-containerd-ubuntu {
-  # bailout if we are not on ubuntu
   if [[ -z "$(command -v lsb_release)" || $(lsb_release -si) != "Ubuntu" ]]; then
-    echo "Unable to automatically install containerd in non-ubuntu image. Bailing out..."
-    exit 2
+    echo "Unable to automatically install containerd in non-ubuntu image. Bailing out..."; exit 2
   fi
 
-  # Install dependencies, some of these are already installed in the image but
-  # that's fine since they won't re-install and we can reuse the code below
-  # for another image someday.
-  apt-get update
-  apt-get install -y --no-install-recommends \
-    apt-transport-https \
-    ca-certificates \
-    socat \
-    curl \
-    gnupg2 \
-    software-properties-common \
-    lsb-release
+  local -r custom_containerd="${UBUNTU_INSTALL_CONTAINERD_VERSION:-}"
+  local -r custom_runc="${UBUNTU_INSTALL_RUNC_VERSION:-}"
 
-  release=$(lsb_release -cs)
+  # Both versions specified: skip apt, install binaries directly
+  if [[ -n "${custom_containerd}" && -n "${custom_runc}" ]]; then
+    echo "Installing containerd ${custom_containerd} and runc ${custom_runc} (skipping apt)"
+    ensure-containerd-systemd-service
+    install-containerd-binary "${custom_containerd}" || { echo "ERROR: containerd download failed"; exit 1; }
+    install-runc-binary "${custom_runc}" || { echo "ERROR: runc download failed"; exit 1; }
+    systemctl start containerd
+    return
+  fi
 
-  # Add the Docker apt-repository (as we install containerd from there)
+  # Install from Docker apt repo, optionally override binaries
+  local -r release="$(lsb_release -cs)"
+  local -r keyring="/etc/apt/keyrings/docker.gpg"
+  mkdir -p "$(dirname "${keyring}")"
   # shellcheck disable=SC2086
-  curl ${CURL_FLAGS} \
-    --location \
-    "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
-  | apt-key add -
-  add-apt-repository \
-    "deb [arch=${HOST_ARCH}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") \
-    $release stable"
+  curl ${CURL_FLAGS} -fsSL "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
+    | gpg --batch --dearmor -o "${keyring}"
+  chmod a+r "${keyring}"
+  echo "deb [arch=${HOST_ARCH} signed-by=${keyring}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") ${release} stable" \
+    > /etc/apt/sources.list.d/docker.list
 
-  # Install containerd from Docker repo
-  apt-get update && \
-    apt-get install -y --no-install-recommends containerd
+  apt-get update && apt-get install -y --no-install-recommends containerd.io
   rm -rf /var/lib/apt/lists/*
 
-  # Override to latest versions of containerd and runc
   systemctl stop containerd
-  if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
-    # containerd versions have slightly different url(s), so try both
-    # shellcheck disable=SC2086
-    ( curl ${CURL_FLAGS} \
-        --location \
-        "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" \
-      || curl ${CURL_FLAGS} \
-        --location \
-        "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" ) \
-    | tar --overwrite -xzv -C /usr/
-  fi
-  if [[ -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-    # shellcheck disable=SC2086
-    curl ${CURL_FLAGS} \
-      --location \
-      "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}" --output /usr/sbin/runc \
-    && chmod 755 /usr/sbin/runc
-  fi
-  sudo systemctl start containerd
+  [[ -n "${custom_containerd}" ]] && install-containerd-binary "${custom_containerd}"
+  [[ -n "${custom_runc}" ]] && install-runc-binary "${custom_runc}"
+  systemctl start containerd
 }
 
 # If we are on cos we can try to install containerd
@@ -556,27 +614,30 @@ function install-containerd-cos {
   mount --bind /home/containerd /home/containerd
   mount -o remount,exec /home/containerd
   if [[ -n "${COS_INSTALL_CONTAINERD_VERSION:-}" ]]; then
-    # containerd versions have slightly different url(s), so try both
-    # shellcheck disable=SC2086
-    ( curl ${CURL_FLAGS} \
-        --location \
-        "https://github.com/containerd/containerd/releases/download/${COS_INSTALL_CONTAINERD_VERSION}/containerd-${COS_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" \
-      || curl ${CURL_FLAGS} \
-        --location \
-        "https://github.com/containerd/containerd/releases/download/${COS_INSTALL_CONTAINERD_VERSION}/containerd-${COS_INSTALL_CONTAINERD_VERSION:1}.${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" ) \
-    | tar --overwrite -xzv -C /home/containerd/
-    cp /usr/lib/systemd/system/containerd.service /etc/systemd/system/containerd.service
-    # fix the path of the new containerd binary
-    sed -i 's|ExecStart=.*|ExecStart=/home/containerd/bin/containerd|' /etc/systemd/system/containerd.service
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    
+    # Download containerd
+    if download-robust "containerd ${COS_INSTALL_CONTAINERD_VERSION}" "${temp_dir}" \
+       "https://github.com/containerd/containerd/releases/download/${COS_INSTALL_CONTAINERD_VERSION}/containerd-${COS_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"; then
+      tar --overwrite -xzv -C /home/containerd/ -f "${temp_dir}"/containerd-*.tar.gz
+      cp /usr/lib/systemd/system/containerd.service /etc/systemd/system/containerd.service
+      sed -i 's|ExecStart=.*|ExecStart=/home/containerd/bin/containerd|' /etc/systemd/system/containerd.service
+    fi
+    rm -rf "${temp_dir}"
   fi
   if [[ -n "${COS_INSTALL_RUNC_VERSION:-}" ]]; then
-    # shellcheck disable=SC2086
-    curl ${CURL_FLAGS} \
-      --location \
-      "https://github.com/opencontainers/runc/releases/download/${COS_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}" --output /home/containerd/bin/runc \
-    && chmod 755 /home/containerd/bin/runc
-    # ensure runc gets picked up from the correct location
-    sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:$PATH" /etc/systemd/system/containerd.service
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    mkdir -p /home/containerd/bin
+    
+    # Download and install runc
+    if download-robust "runc ${COS_INSTALL_RUNC_VERSION}" "${temp_dir}" \
+       "https://github.com/opencontainers/runc/releases/download/${COS_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}"; then
+      cp "${temp_dir}/runc.${HOST_ARCH}" /home/containerd/bin/runc && chmod 755 /home/containerd/bin/runc
+      sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:$PATH" /etc/systemd/system/containerd.service
+    fi
+    rm -rf "${temp_dir}"
   fi
   systemctl daemon-reload
   sudo systemctl start containerd
@@ -584,7 +645,7 @@ function install-containerd-cos {
 
 function install-auth-provider-gcp {
   local -r filename="auth-provider-gcp"
-  local -r auth_provider_storage_full_path="${AUTH_PROVIDER_GCP_STORAGE_PATH}/${AUTH_PROVIDER_GCP_VERSION}/${HOST_PLATFORM}_${HOST_ARCH}/${filename}"
+  local -r auth_provider_storage_full_path="${AUTH_PROVIDER_GCP_STORAGE_PATH}/${AUTH_PROVIDER_GCP_VERSION}/auth-provider-gcp/${HOST_PLATFORM}/${HOST_ARCH}/${filename}"
   echo "Downloading auth-provider-gcp ${auth_provider_storage_full_path}" .
 
   case "${HOST_ARCH}" in
@@ -604,7 +665,7 @@ function install-auth-provider-gcp {
   mv "${KUBE_HOME}/${filename}" "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}"
   chmod a+x "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}/${filename}"
 
-  cat >> "${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}" << EOF
+  cat > "${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}" << EOF
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1
 providers:
@@ -624,7 +685,7 @@ EOF
 
 function ensure-containerd-runtime {
   # Install containerd/runc if requested
-  if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
+  if [[ ( -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ) && "$(lsb_release -si)" == "Ubuntu" ]]; then
     log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
   fi
   if [[ -n "${COS_INSTALL_CONTAINERD_VERSION:-}" || -n "${COS_INSTALL_RUNC_VERSION:-}" ]]; then

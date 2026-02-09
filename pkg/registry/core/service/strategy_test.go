@@ -21,18 +21,17 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -135,6 +134,18 @@ func TestServiceStatusStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
 	}
+
+	warnings := StatusStrategy.WarningsOnUpdate(ctx, newService, oldService)
+	if len(warnings) != 0 {
+		t.Errorf("Unexpected warnings %v", errs)
+	}
+
+	// Bad IP warning (leading zeros)
+	newService.Status.LoadBalancer.Ingress[0].IP = "127.000.000.002"
+	warnings = StatusStrategy.WarningsOnUpdate(ctx, newService, oldService)
+	if len(warnings) != 1 {
+		t.Errorf("Did not get warning for bad IP")
+	}
 }
 
 func makeServiceWithConditions(conditions []metav1.Condition) *api.Service {
@@ -236,251 +247,6 @@ func TestDropDisabledField(t *testing.T) {
 		}()
 	}
 
-}
-
-func TestDropServiceStatusDisabledFields(t *testing.T) {
-	ipModeVIP := api.LoadBalancerIPModeVIP
-	ipModeProxy := api.LoadBalancerIPModeProxy
-
-	testCases := []struct {
-		name          string
-		ipModeEnabled bool
-		svc           *api.Service
-		oldSvc        *api.Service
-		compareSvc    *api.Service
-	}{
-		/*LoadBalancerIPMode disabled*/
-		{
-			name:          "LoadBalancerIPMode disabled, ipMode not used in old, not used in new",
-			ipModeEnabled: false,
-			svc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{}
-			}),
-			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-		}, {
-			name:          "LoadBalancerIPMode disabled, ipMode used in old and in new",
-			ipModeEnabled: false,
-			svc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				}
-			}),
-			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeVIP,
-					}},
-				}
-			}),
-			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				}
-			}),
-		}, {
-			name:          "LoadBalancerIPMode disabled, ipMode not used in old, used in new",
-			ipModeEnabled: false,
-			svc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeVIP,
-					}},
-				}
-			}),
-			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-		}, {
-			name:          "LoadBalancerIPMode disabled, ipMode used in old, not used in new",
-			ipModeEnabled: false,
-			svc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				}
-			}),
-			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-		},
-		/*LoadBalancerIPMode enabled*/
-		{
-			name:          "LoadBalancerIPMode enabled, ipMode not used in old, not used in new",
-			ipModeEnabled: true,
-			svc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-			oldSvc: nil,
-			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-		}, {
-			name:          "LoadBalancerIPMode enabled, ipMode used in old and in new",
-			ipModeEnabled: true,
-			svc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				}
-			}),
-			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeVIP,
-					}},
-				}
-			}),
-			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				}
-			}),
-		}, {
-			name:          "LoadBalancerIPMode enabled, ipMode not used in old, used in new",
-			ipModeEnabled: true,
-			svc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeVIP,
-					}},
-				}
-			}),
-			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeVIP,
-					}},
-				}
-			}),
-		}, {
-			name:          "LoadBalancerIPMode enabled, ipMode used in old, not used in new",
-			ipModeEnabled: true,
-			svc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				}
-			}),
-			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
-				svc.Spec.Type = api.ServiceTypeLoadBalancer
-				svc.Status.LoadBalancer = api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				}
-			}),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
-			dropServiceStatusDisabledFields(tc.svc, tc.oldSvc)
-
-			if !reflect.DeepEqual(tc.svc, tc.compareSvc) {
-				t.Errorf("%v: unexpected svc spec: %v", tc.name, cmp.Diff(tc.svc, tc.compareSvc))
-			}
-		})
-	}
 }
 
 func TestDropTypeDependentFields(t *testing.T) {
@@ -789,10 +555,16 @@ func TestDropTypeDependentFields(t *testing.T) {
 }
 
 func TestMatchService(t *testing.T) {
+	noHeadlessServiceRequirement, err := labels.NewRequirement(v1.IsHeadlessService, selection.DoesNotExist, nil)
+	if err != nil {
+		t.Fatalf("Error creating no headless service requirement: %v", err)
+	}
+	noHeadlessServiceLabelSelector := labels.NewSelector().Add(*noHeadlessServiceRequirement)
 	testCases := []struct {
 		name          string
 		in            *api.Service
 		fieldSelector fields.Selector
+		labelSelector labels.Selector
 		expectMatch   bool
 	}{
 		{
@@ -805,6 +577,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("metadata.name=test"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -817,6 +590,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=testns"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -829,6 +603,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("metadata.name=nomatch"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -841,6 +616,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=nomatch"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -849,6 +625,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.type=LoadBalancer"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -857,6 +634,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.type=LoadBalancer"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -865,6 +643,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=None"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -873,6 +652,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=None"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -881,6 +661,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=192.168.1.1"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -889,6 +670,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=None"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -897,6 +679,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=\"\""),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -905,6 +688,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "2001:db2::1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=2001:db2::1"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -913,6 +697,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=192.168.1.1"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -921,18 +706,49 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=2001:db2::1"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
 			name:          "no match on empty service",
 			in:            &api.Service{},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=None"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
+		},
+		{
+			name: "no match on headless service",
+			in: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.IsHeadlessService: "",
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=None"),
+			labelSelector: noHeadlessServiceLabelSelector,
+			expectMatch:   false,
+		},
+		{
+			name: "no match on headless service",
+			in: &api.Service{
+				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=None"),
+			labelSelector: noHeadlessServiceLabelSelector,
+			expectMatch:   false,
+		},
+		{
+			name:          "match on empty service",
+			in:            &api.Service{},
+			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=None"),
+			labelSelector: noHeadlessServiceLabelSelector,
+			expectMatch:   true,
 		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			m := Matcher(labels.Everything(), testCase.fieldSelector)
+			m := Matcher(testCase.labelSelector, testCase.fieldSelector)
 			result, err := m.Matches(testCase.in)
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)

@@ -19,18 +19,24 @@ package resourceslice
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // resourceSliceStrategy implements behavior for ResourceSlice objects
@@ -46,15 +52,30 @@ func (resourceSliceStrategy) NamespaceScoped() bool {
 }
 
 func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	slice := obj.(*resource.ResourceSlice)
+	slice.Generation = 1
+
+	dropDisabledFields(slice, nil)
 }
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	slice := obj.(*resource.ResourceSlice)
-	return validation.ValidateResourceSlice(slice)
+	errorList := validation.ValidateResourceSlice(slice)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, slice, nil, errorList, operation.Create, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
+
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
 func (resourceSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	newResourceSlice := obj.(*resource.ResourceSlice)
+	var warnings []string
+
+	if newResourceSlice.Spec.Driver != strings.ToLower(newResourceSlice.Spec.Driver) {
+		warnings = append(warnings,
+			fmt.Sprintf("spec.driver: driver names should be lowercase; %q contains uppercase characters", newResourceSlice.Spec.Driver))
+	}
+
+	return warnings
 }
 
 func (resourceSliceStrategy) Canonicalize(obj runtime.Object) {
@@ -65,14 +86,33 @@ func (resourceSliceStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	slice := obj.(*resource.ResourceSlice)
+	oldSlice := old.(*resource.ResourceSlice)
+
+	// Any changes to the spec increment the generation number.
+	if !apiequality.Semantic.DeepEqual(oldSlice.Spec, slice.Spec) {
+		slice.Generation = oldSlice.Generation + 1
+	}
+
+	dropDisabledFields(slice, oldSlice)
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
+	errorList := validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, errorList, operation.Update, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
 }
 
+// WarningsOnUpdate returns warnings for the given update.
 func (resourceSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	newResourceSlice := obj.(*resource.ResourceSlice)
+	var warnings []string
+
+	if newResourceSlice.Spec.Driver != strings.ToLower(newResourceSlice.Spec.Driver) {
+		warnings = append(warnings,
+			fmt.Sprintf("spec.driver: driver names should be lowercase; %q contains uppercase characters", newResourceSlice.Spec.Driver))
+	}
+
+	return warnings
 }
 
 func (resourceSliceStrategy) AllowUnconditionalUpdate() bool {
@@ -82,17 +122,22 @@ func (resourceSliceStrategy) AllowUnconditionalUpdate() bool {
 var TriggerFunc = map[string]storage.IndexerFunc{
 	// Only one index is supported:
 	// https://github.com/kubernetes/kubernetes/blob/3aa8c59fec0bf339e67ca80ea7905c817baeca85/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go#L346-L350
-	"nodeName": nodeNameTriggerFunc,
+	resource.ResourceSliceSelectorNodeName: nodeNameTriggerFunc,
 }
 
 func nodeNameTriggerFunc(obj runtime.Object) string {
-	return obj.(*resource.ResourceSlice).NodeName
+	rs := obj.(*resource.ResourceSlice)
+	if rs.Spec.NodeName == nil {
+		return ""
+	} else {
+		return *rs.Spec.NodeName
+	}
 }
 
 // Indexers returns the indexers for ResourceSlice.
 func Indexers() *cache.Indexers {
 	return &cache.Indexers{
-		storage.FieldIndex("nodeName"): nodeNameIndexFunc,
+		storage.FieldIndex(resource.ResourceSliceSelectorNodeName): nodeNameIndexFunc,
 	}
 }
 
@@ -101,7 +146,10 @@ func nodeNameIndexFunc(obj interface{}) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("not a ResourceSlice")
 	}
-	return []string{slice.NodeName}, nil
+	if slice.Spec.NodeName == nil {
+		return []string{""}, nil
+	}
+	return []string{*slice.Spec.NodeName}, nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
@@ -119,7 +167,7 @@ func Match(label labels.Selector, field fields.Selector) storage.SelectionPredic
 		Label:       label,
 		Field:       field,
 		GetAttrs:    GetAttrs,
-		IndexFields: []string{"nodeName"},
+		IndexFields: []string{resource.ResourceSliceSelectorNodeName},
 	}
 }
 
@@ -131,9 +179,148 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
 	fields := make(fields.Set, 3)
-	fields["nodeName"] = slice.NodeName
-	fields["driverName"] = slice.DriverName
+	if slice.Spec.NodeName == nil {
+		fields[resource.ResourceSliceSelectorNodeName] = ""
+	} else {
+		fields[resource.ResourceSliceSelectorNodeName] = *slice.Spec.NodeName
+	}
+	fields[resource.ResourceSliceSelectorDriver] = slice.Spec.Driver
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)
+}
+
+// dropDisabledFields removes fields which are covered by a feature gate.
+func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
+	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
+	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
+	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
+	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
+}
+
+func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) || draDeviceTaintsFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].Taints = nil
+	}
+}
+
+func draDeviceTaintsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if len(device.Taints) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices) || draPartitionableDevicesFeatureInUse(oldSlice) {
+		return
+	}
+
+	newSlice.Spec.SharedCounters = nil
+	newSlice.Spec.PerDeviceNodeSelection = nil
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].ConsumesCounters = nil
+		newSlice.Spec.Devices[i].NodeName = nil
+		newSlice.Spec.Devices[i].NodeSelector = nil
+		newSlice.Spec.Devices[i].AllNodes = nil
+	}
+}
+
+func dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) ||
+		draBindingConditionsFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].BindingConditions = nil
+		newSlice.Spec.Devices[i].BindingFailureConditions = nil
+		newSlice.Spec.Devices[i].BindsToNode = nil
+	}
+}
+
+func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	spec := slice.Spec
+	if len(spec.SharedCounters) > 0 || spec.PerDeviceNodeSelection != nil {
+		return true
+	}
+
+	for _, device := range spec.Devices {
+		if len(device.ConsumesCounters) > 0 {
+			return true
+		}
+		if device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func draBindingConditionsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if len(device.BindingConditions) > 0 ||
+			len(device.BindingFailureConditions) > 0 ||
+			device.BindsToNode != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func draConsumableCapacityFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	spec := slice.Spec
+	for _, device := range spec.Devices {
+		if device.AllowMultipleAllocations != nil {
+			return true
+		}
+		for _, capacity := range device.Capacity {
+			if capacity.RequestPolicy != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// dropDisabledDRAConsumableCapacityFields drops AllowMultipleAllocations and RequestPolicy
+// fields from the new slice if they were not used in the old slice.
+func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
+		draConsumableCapacityFeatureInUse(oldSlice) {
+		// No need to drop anything.
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].AllowMultipleAllocations = nil
+		if newSlice.Spec.Devices[i].Capacity != nil {
+			for ci, capacity := range newSlice.Spec.Devices[i].Capacity {
+				capacity.RequestPolicy = nil
+				newSlice.Spec.Devices[i].Capacity[ci] = capacity
+			}
+		}
+	}
 }

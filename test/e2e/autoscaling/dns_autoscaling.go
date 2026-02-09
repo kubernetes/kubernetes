@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -49,7 +49,7 @@ const (
 	DNSLabelName         = "kube-dns"
 )
 
-var _ = SIGDescribe("DNS horizontal autoscaling", func() {
+var _ = SIGDescribe(feature.KubeDNSAutoscaler, "DNS horizontal autoscaling", func() {
 	f := framework.NewDefaultFramework("dns-autoscaling")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
@@ -61,7 +61,6 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	var DNSParams3 DNSParamsLinear
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		c = f.ClientSet
 
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
@@ -73,7 +72,9 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		// Check if we are running coredns or kube-dns, the only difference is the name of the autoscaling CM.
 		// The test should be have identically on both dns providers
 		provider, err := detectDNSProvider(ctx, c)
-		framework.ExpectNoError(err)
+		if err != nil {
+			e2eskipper.Skipf("Test expects DNS provider: %s", err)
+		}
 
 		originDNSReplicasCount, err = getDNSReplicas(ctx, c)
 		framework.ExpectNoError(err)
@@ -119,9 +120,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 	// This test is separated because it is slow and need to run serially.
 	// Will take around 5 minutes to run on a 4 nodes cluster.
-	// TODO(upodroid) This test will be removed in 1.33 when kubeup is removed
-	// TODO: make it cloud provider agnostic or move it to cloud-provider-gcp repository
-	f.It(f.WithSerial(), f.WithSlow(), f.WithLabel("KubeUp"), f.WithLabel("sig-cloud-provider-gcp"), "kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func(ctx context.Context) {
+	f.It(f.WithSerial(), f.WithSlow(), "kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func(ctx context.Context) {
 		numNodes, err := e2enode.TotalRegistered(ctx, c)
 		framework.ExpectNoError(err)
 
@@ -150,22 +149,10 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		err = waitForDNSReplicasSatisfied(ctx, c, getExpectReplicasLinear, DNSdefaultTimeout)
 		framework.ExpectNoError(err)
 
-		originalSizes := make(map[string]int)
-		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
-			size, err := framework.GroupSize(mig)
-			framework.ExpectNoError(err)
-			ginkgo.By(fmt.Sprintf("Initial size of %s: %d", mig, size))
-			originalSizes[mig] = size
-		}
-
 		ginkgo.By("Manually increase cluster size")
-		increasedSizes := make(map[string]int)
-		for key, val := range originalSizes {
-			increasedSizes[key] = val + 1
-		}
-		setMigSizes(increasedSizes)
+		cleanupIncreasedSizeFunc := increaseClusterSize(ctx, f, c, numNodes+1)
 		err = WaitForClusterSizeFunc(ctx, c,
-			func(size int) bool { return size == numNodes+len(originalSizes) }, scaleUpTimeout)
+			func(size int) bool { return size == numNodes+1 }, scaleUpTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Wait for kube-dns scaled to expected number")
@@ -183,9 +170,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Restoring cluster size")
-		setMigSizes(originalSizes)
-		err = e2enode.WaitForReadyNodes(ctx, c, numNodes, scaleDownTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(cleanupIncreasedSizeFunc())
 
 		ginkgo.By("Wait for kube-dns scaled to expected number")
 		err = waitForDNSReplicasSatisfied(ctx, c, getExpectReplicasLinear, DNSdefaultTimeout)

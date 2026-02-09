@@ -13,6 +13,7 @@ https://git.k8s.io/community/contributors/devel/sig-release/release.md#issuepr-k
 <!--
 Add one of the following kinds:
 /kind bug
+/kind dependency
 /kind cleanup
 /kind documentation
 /kind feature
@@ -27,13 +28,23 @@ Optionally add one or more of the following kinds if applicable:
 
 #### What this PR does / why we need it:
 
-#### Which issue(s) this PR fixes:
+#### Which issue(s) this PR is related to:
 <!--
-*Automatically closes linked issue when PR is merged.
-Usage: `Fixes #<issue number>`, or `Fixes (paste link of issue)`.
-_If PR is about `failing-tests or flakes`, please post the related issues/tests in a comment and do not use `Fixes`_*
+Please link relevant issues to help with tracking.
+
+To automatically close the linked issue(s) when this PR is merged,
+add the word "Fixes" before the issue number or link.
+Do not use "Fixes" if the PR is of kind `failing-test` or `flake`.
+
+Reference KEPs when applicable in addition to specific issues.
+
+Examples:
+Fixes #<issue number>
+<issue link> (issue in a different repository)
+KEP: https://github.com/kubernetes/enhancements/issues/<kep-issue-number>
+
+If there is no associated issue, then write "N/A".
 -->
-Fixes #
 
 #### Special notes for your reviewer:
 

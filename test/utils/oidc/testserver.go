@@ -32,7 +32,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/go-jose/go-jose.v2"
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
 )
 
@@ -136,7 +136,9 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 		writer.WriteHeader(http.StatusOK)
 
 		err = json.NewEncoder(writer).Encode(token)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	})
 
 	mux.HandleFunc(authWebPath, func(writer http.ResponseWriter, request *http.Request) {
@@ -150,7 +152,9 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 		writer.WriteHeader(http.StatusOK)
 
 		err := json.NewEncoder(writer).Encode(keySet)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	})
 
 	return oidcServer

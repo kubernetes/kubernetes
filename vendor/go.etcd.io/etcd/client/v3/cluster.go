@@ -17,10 +17,10 @@ package clientv3
 import (
 	"context"
 
+	"google.golang.org/grpc"
+
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/client/pkg/v3/types"
-
-	"google.golang.org/grpc"
 )
 
 type (
@@ -34,7 +34,7 @@ type (
 
 type Cluster interface {
 	// MemberList lists the current cluster membership.
-	MemberList(ctx context.Context) (*MemberListResponse, error)
+	MemberList(ctx context.Context, opts ...OpOption) (*MemberListResponse, error)
 
 	// MemberAdd adds a new member into the cluster.
 	MemberAdd(ctx context.Context, peerAddrs []string) (*MemberAddResponse, error)
@@ -93,7 +93,7 @@ func (c *cluster) memberAdd(ctx context.Context, peerAddrs []string, isLearner b
 	}
 	resp, err := c.remote.MemberAdd(ctx, r, c.callOpts...)
 	if err != nil {
-		return nil, toErr(ctx, err)
+		return nil, ContextError(ctx, err)
 	}
 	return (*MemberAddResponse)(resp), nil
 }
@@ -102,7 +102,7 @@ func (c *cluster) MemberRemove(ctx context.Context, id uint64) (*MemberRemoveRes
 	r := &pb.MemberRemoveRequest{ID: id}
 	resp, err := c.remote.MemberRemove(ctx, r, c.callOpts...)
 	if err != nil {
-		return nil, toErr(ctx, err)
+		return nil, ContextError(ctx, err)
 	}
 	return (*MemberRemoveResponse)(resp), nil
 }
@@ -119,23 +119,23 @@ func (c *cluster) MemberUpdate(ctx context.Context, id uint64, peerAddrs []strin
 	if err == nil {
 		return (*MemberUpdateResponse)(resp), nil
 	}
-	return nil, toErr(ctx, err)
+	return nil, ContextError(ctx, err)
 }
 
-func (c *cluster) MemberList(ctx context.Context) (*MemberListResponse, error) {
-	// it is safe to retry on list.
-	resp, err := c.remote.MemberList(ctx, &pb.MemberListRequest{Linearizable: true}, c.callOpts...)
+func (c *cluster) MemberList(ctx context.Context, opts ...OpOption) (*MemberListResponse, error) {
+	opt := OpGet("", opts...)
+	resp, err := c.remote.MemberList(ctx, &pb.MemberListRequest{Linearizable: !opt.serializable}, c.callOpts...)
 	if err == nil {
 		return (*MemberListResponse)(resp), nil
 	}
-	return nil, toErr(ctx, err)
+	return nil, ContextError(ctx, err)
 }
 
 func (c *cluster) MemberPromote(ctx context.Context, id uint64) (*MemberPromoteResponse, error) {
 	r := &pb.MemberPromoteRequest{ID: id}
 	resp, err := c.remote.MemberPromote(ctx, r, c.callOpts...)
 	if err != nil {
-		return nil, toErr(ctx, err)
+		return nil, ContextError(ctx, err)
 	}
 	return (*MemberPromoteResponse)(resp), nil
 }

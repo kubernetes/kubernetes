@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -22,22 +21,33 @@ package validation
 import (
 	"fmt"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
 func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
-	message := "invalid configuration: %v (%v) %v is not supported on Windows"
-	allErrors := []error{}
+	message := "ignored configuration option: %v (%v) %v is not supported on Windows"
 
 	if kc.CgroupsPerQOS {
-		allErrors = append(allErrors, fmt.Errorf(message, "CgroupsPerQOS", "--cgroups-per-qos", kc.CgroupsPerQOS))
+		klog.Warningf(message, "CgroupsPerQOS", "--cgroups-per-qos", kc.CgroupsPerQOS)
 	}
 
-	if len(kc.EnforceNodeAllocatable) > 0 {
-		allErrors = append(allErrors, fmt.Errorf(message, "EnforceNodeAllocatable", "--enforce-node-allocatable", kc.EnforceNodeAllocatable))
+	if kc.SingleProcessOOMKill != nil {
+		return fmt.Errorf("invalid configuration: singleProcessOOMKill is not supported on Windows")
 	}
 
-	return utilerrors.NewAggregate(allErrors)
+	enforceNodeAllocatableWithoutNone := sets.New(kc.EnforceNodeAllocatable...).Delete(kubetypes.NodeAllocatableNoneKey)
+	if len(enforceNodeAllocatableWithoutNone) > 0 {
+		klog.Warningf(message, "EnforceNodeAllocatable", "--enforce-node-allocatable", kc.EnforceNodeAllocatable)
+	}
+
+	if kc.UserNamespaces != nil {
+		return fmt.Errorf("invalid configuration: userNamespaces is not supported on Windows")
+	}
+
+	return nil
 }

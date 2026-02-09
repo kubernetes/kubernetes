@@ -19,14 +19,25 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // SchedulingApplyConfiguration represents a declarative configuration of the Scheduling type for use
 // with apply.
+//
+// Scheduling specifies the scheduling constraints for nodes supporting a
+// RuntimeClass.
 type SchedulingApplyConfiguration struct {
-	NodeSelector map[string]string                 `json:"nodeSelector,omitempty"`
-	Tolerations  []v1.TolerationApplyConfiguration `json:"tolerations,omitempty"`
+	// nodeSelector lists labels that must be present on nodes that support this
+	// RuntimeClass. Pods using this RuntimeClass can only be scheduled to a
+	// node matched by this selector. The RuntimeClass nodeSelector is merged
+	// with a pod's existing nodeSelector. Any conflicts will cause the pod to
+	// be rejected in admission.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// tolerations are appended (excluding duplicates) to pods running with this
+	// RuntimeClass during admission, effectively unioning the set of nodes
+	// tolerated by the pod and the RuntimeClass.
+	Tolerations []corev1.TolerationApplyConfiguration `json:"tolerations,omitempty"`
 }
 
 // SchedulingApplyConfiguration constructs a declarative configuration of the Scheduling type for use with
@@ -52,7 +63,7 @@ func (b *SchedulingApplyConfiguration) WithNodeSelector(entries map[string]strin
 // WithTolerations adds the given value to the Tolerations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Tolerations field.
-func (b *SchedulingApplyConfiguration) WithTolerations(values ...*v1.TolerationApplyConfiguration) *SchedulingApplyConfiguration {
+func (b *SchedulingApplyConfiguration) WithTolerations(values ...*corev1.TolerationApplyConfiguration) *SchedulingApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTolerations")

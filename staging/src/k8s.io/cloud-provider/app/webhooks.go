@@ -138,7 +138,7 @@ func (h WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	admissionResponse, err = h.AdmissionHandler(in.Request)
 	if err != nil {
 		e := fmt.Sprintf("error generating admission response: %v", err)
-		klog.Errorf(e)
+		klog.Error(e)
 		statusCode = http.StatusInternalServerError
 		http.Error(w, e, statusCode)
 		return

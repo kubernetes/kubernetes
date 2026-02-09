@@ -15,6 +15,8 @@
 package cel
 
 import (
+	"sort"
+
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
@@ -46,8 +48,8 @@ func NewStaticOptimizer(optimizers ...ASTOptimizer) *StaticOptimizer {
 // If issues are encountered, the Issues.Err() return value will be non-nil.
 func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 	// Make a copy of the AST to be optimized.
-	optimized := ast.Copy(a.impl)
-	ids := newIDGenerator(ast.MaxID(a.impl))
+	optimized := ast.Copy(a.NativeRep())
+	ids := newIDGenerator(ast.MaxID(a.NativeRep()))
 
 	// Create the optimizer context, could be pooled in the future.
 	issues := NewIssues(common.NewErrors(a.Source()))
@@ -84,7 +86,7 @@ func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 		if iss.Err() != nil {
 			return nil, iss
 		}
-		optimized = checked.impl
+		optimized = checked.NativeRep()
 	}
 
 	// Return the optimized result.
@@ -98,14 +100,21 @@ func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 // that the ids within the expression correspond to the ids within macros.
 func normalizeIDs(idGen ast.IDGenerator, optimized ast.Expr, info *ast.SourceInfo) {
 	optimized.RenumberIDs(idGen)
-
 	if len(info.MacroCalls()) == 0 {
 		return
 	}
 
+	// Sort the macro ids to make sure that the renumbering of macro-specific variables
+	// is stable across normalization calls.
+	sortedMacroIDs := []int64{}
+	for id := range info.MacroCalls() {
+		sortedMacroIDs = append(sortedMacroIDs, id)
+	}
+	sort.Slice(sortedMacroIDs, func(i, j int) bool { return sortedMacroIDs[i] < sortedMacroIDs[j] })
+
 	// First, update the macro call ids themselves.
 	callIDMap := map[int64]int64{}
-	for id := range info.MacroCalls() {
+	for _, id := range sortedMacroIDs {
 		callIDMap[id] = idGen(id)
 	}
 	// Then update the macro call definitions which refer to these ids, but
@@ -116,7 +125,8 @@ func normalizeIDs(idGen ast.IDGenerator, optimized ast.Expr, info *ast.SourceInf
 		call ast.Expr
 	}
 	macroUpdates := []macroUpdate{}
-	for oldID, newID := range callIDMap {
+	for _, oldID := range sortedMacroIDs {
+		newID := callIDMap[oldID]
 		call, found := info.GetMacroCall(oldID)
 		if !found {
 			continue
@@ -134,6 +144,7 @@ func cleanupMacroRefs(expr ast.Expr, info *ast.SourceInfo) {
 	if len(info.MacroCalls()) == 0 {
 		return
 	}
+
 	// Sanitize the macro call references once the optimized expression has been computed
 	// and the ids normalized between the expression and the macros.
 	exprRefMap := make(map[int64]struct{})
@@ -200,6 +211,16 @@ type OptimizerContext struct {
 	*Issues
 }
 
+// ExtendEnv auguments the context's environment with the additional options.
+func (opt *OptimizerContext) ExtendEnv(opts ...EnvOption) error {
+	e, err := opt.Env.Extend(opts...)
+	if err != nil {
+		return err
+	}
+	opt.Env = e
+	return nil
+}
+
 // ASTOptimizer applies an optimization over an AST and returns the optimized result.
 type ASTOptimizer interface {
 	// Optimize optimizes a type-checked AST within an Environment and accumulates any issues.
@@ -251,6 +272,11 @@ func (opt *optimizerExprFactory) ClearMacroCall(id int64) {
 // metadata.
 func (opt *optimizerExprFactory) SetMacroCall(id int64, expr ast.Expr) {
 	opt.sourceInfo.SetMacroCall(id, expr)
+}
+
+// MacroCalls returns the map of macro calls currently in the context.
+func (opt *optimizerExprFactory) MacroCalls() map[int64]ast.Expr {
+	return opt.sourceInfo.MacroCalls()
 }
 
 // NewBindMacro creates an AST expression representing the expanded bind() macro, and a macro expression

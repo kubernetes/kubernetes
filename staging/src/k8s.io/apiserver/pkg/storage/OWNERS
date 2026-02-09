@@ -3,6 +3,7 @@
 approvers:
   - liggitt
   - wojtek-t
+  - serathius
 reviewers:
   - smarterclayton
   - wojtek-t
@@ -10,12 +11,14 @@ reviewers:
   - caesarxuchao
   - mikedanese
   - liggitt
-  - ncdc
   - ingvagabund
   - enj
   - stevekuznetsov
   - MadhavJivrajani
+  - serathius
 emeritus_approvers:
   - xiang90
   - timothysc
   - lavalamp
+emeritus_reviewers:
+  - ncdc

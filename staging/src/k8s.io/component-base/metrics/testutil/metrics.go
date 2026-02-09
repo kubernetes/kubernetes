@@ -38,8 +38,20 @@ var (
 	QuantileLabel model.LabelName = model.QuantileLabel
 )
 
-// Metrics is generic metrics for other specific metrics
-type Metrics map[string]model.Samples
+// Metrics is generic metrics for other specific metrics.
+// This directly exposes Prometheus types. Test code may
+// use those via type aliases provided by this package
+// instead of imorting the Prometheus packages (https://github.com/kubernetes/kubernetes/issues/89267).
+type Metrics map[string]Samples
+type Samples = model.Samples
+type Sample = model.Sample
+type Metric = model.Metric
+type LabelValue = model.LabelValue
+type LabelName = model.LabelName
+type SampleHistogram = model.SampleHistogram
+type FloatString = model.FloatString
+type HistogramBuckets = model.HistogramBuckets
+type HistogramBucket = model.HistogramBucket
 
 // Equal returns true if all metrics are the same as the arguments.
 func (m *Metrics) Equal(o Metrics) bool {
@@ -97,7 +109,7 @@ func ParseMetrics(data string, output *Metrics) error {
 // proto messages in a map where the metric names are the keys, along with any
 // error encountered.
 func TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricFamily, error) {
-	var textParser expfmt.TextParser
+	textParser := expfmt.NewTextParser(model.UTF8Validation)
 	return textParser.TextToMetricFamilies(in)
 }
 
@@ -258,12 +270,8 @@ func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, l
 	if err != nil {
 		return nil, err
 	}
-	for _, mFamily := range m {
-		if mFamily.GetName() == metricName {
-			metricFamily = mFamily
-			break
-		}
-	}
+
+	metricFamily = findMetricFamily(m, metricName)
 
 	if metricFamily == nil {
 		return nil, fmt.Errorf("metric %q not found", metricName)
@@ -282,10 +290,6 @@ func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, l
 		}
 	}
 	return vec, nil
-}
-
-func uint64Ptr(u uint64) *uint64 {
-	return &u
 }
 
 // Bucket of a histogram
@@ -432,4 +436,48 @@ func LabelsMatch(metric *dto.Metric, labelFilter map[string]string) bool {
 	}
 
 	return true
+}
+
+// GetCounterVecFromGatherer collects a counter that matches the given name
+// from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
+// It returns all counter values that had a label with a certain name in a map
+// that uses the label value as keys.
+//
+// Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
+func GetCounterValuesFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string, labelName string) (map[string]float64, error) {
+	m, err := gatherer.Gather()
+	if err != nil {
+		return nil, err
+	}
+
+	metricFamily := findMetricFamily(m, metricName)
+	if metricFamily == nil {
+		return nil, fmt.Errorf("metric %q not found", metricName)
+	}
+	if len(metricFamily.GetMetric()) == 0 {
+		return nil, fmt.Errorf("metric %q is empty", metricName)
+	}
+
+	values := make(map[string]float64)
+	for _, metric := range metricFamily.GetMetric() {
+		if LabelsMatch(metric, lvMap) {
+			if counter := metric.GetCounter(); counter != nil {
+				for _, labelPair := range metric.Label {
+					if labelPair.GetName() == labelName {
+						values[labelPair.GetValue()] = counter.GetValue()
+					}
+				}
+			}
+		}
+	}
+	return values, nil
+}
+
+func findMetricFamily(metricFamilies []*dto.MetricFamily, metricName string) *dto.MetricFamily {
+	for _, mFamily := range metricFamilies {
+		if mFamily.GetName() == metricName {
+			return mFamily
+		}
+	}
+	return nil
 }

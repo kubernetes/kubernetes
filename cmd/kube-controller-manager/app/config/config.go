@@ -18,19 +18,23 @@ package config
 
 import (
 	apiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/flagz"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	basecompatibility "k8s.io/component-base/compatibility"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	"time"
 )
 
 // Config is the main context object for the controller manager.
 type Config struct {
+	// Flagz is the Reader interface to get flags for the flagz page.
+	Flagz flagz.Reader
+
 	ComponentConfig kubectrlmgrconfig.KubeControllerManagerConfiguration
 
 	SecureServing *apiserver.SecureServingInfo
-	// LoopbackClientConfig is a config for a privileged loopback connection
-	LoopbackClientConfig *restclient.Config
 
 	Authentication apiserver.AuthenticationInfo
 	Authorization  apiserver.AuthorizationInfo
@@ -43,6 +47,11 @@ type Config struct {
 
 	EventBroadcaster record.EventBroadcaster
 	EventRecorder    record.EventRecorder
+
+	ControllerShutdownTimeout time.Duration
+
+	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
+	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
 }
 
 type completedConfig struct {
@@ -58,8 +67,6 @@ type CompletedConfig struct {
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() *CompletedConfig {
 	cc := completedConfig{c}
-
-	apiserver.AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 
 	return &CompletedConfig{&cc}
 }

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -81,7 +82,7 @@ func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")
 	desc, _ := e2ekubectl.RunKubectl(
 		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
-	framework.Logf(desc)
+	framework.Logf("%s", desc)
 }
 
 // CheckSCTPModuleLoadedOnNodes checks whether any node on the list has the
@@ -204,7 +205,7 @@ func createSecondNodePortService(ctx context.Context, f *framework.Framework, co
 
 	createdService := config.CreateService(ctx, svc)
 
-	err := framework.WaitForServiceEndpointsNum(ctx, f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	err := e2eendpointslice.WaitForEndpointCount(ctx, f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods))
 	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", secondNodePortSvcName, config.Namespace)
 
 	var httpPort int

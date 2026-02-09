@@ -20,16 +20,13 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -39,20 +36,19 @@ const (
 
 	// IPv6ZeroCIDR is the CIDR block for the whole IPv6 address space
 	IPv6ZeroCIDR = "::/0"
-)
 
-// isValidEndpoint checks that the given host / port pair are valid endpoint
-func isValidEndpoint(host string, port int) bool {
-	return host != "" && port > 0
-}
+	// FullSyncPeriod is iptables and nftables proxier full sync period
+	FullSyncPeriod = 1 * time.Hour
+)
 
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR
-func IsZeroCIDR(cidr string) bool {
-	if cidr == IPv4ZeroCIDR || cidr == IPv6ZeroCIDR {
-		return true
+func IsZeroCIDR(cidr *net.IPNet) bool {
+	if cidr == nil {
+		return false
 	}
-	return false
+	prefixLen, _ := cidr.Mask.Size()
+	return prefixLen == 0
 }
 
 // ShouldSkipService checks if a given service should skip proxying
@@ -89,21 +85,6 @@ func AddressSet(isValid func(ip net.IP) bool, addrs []net.Addr) sets.Set[string]
 		}
 	}
 	return ips
-}
-
-// LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
-func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
-	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
-	klog.ErrorS(nil, "Incorrect IP version", "service", klog.KRef(svcNamespace, svcName), "field", fieldName, "value", fieldValue)
-	if recorder != nil {
-		recorder.Eventf(
-			&v1.ObjectReference{
-				Kind:      "Service",
-				Name:      svcName,
-				Namespace: svcNamespace,
-				UID:       svcUID,
-			}, nil, v1.EventTypeWarning, "KubeProxyIncorrectIPVersion", "GatherEndpoints", errMsg)
-	}
 }
 
 // MapIPsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
@@ -233,9 +214,6 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 }
 
 func IsVIPMode(ing v1.LoadBalancerIngress) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
-		return true // backwards compat
-	}
 	if ing.IPMode == nil {
 		return true
 	}

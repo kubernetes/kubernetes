@@ -19,14 +19,26 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 )
 
 // StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration represents a declarative configuration of the StatefulSetPersistentVolumeClaimRetentionPolicy type for use
 // with apply.
+//
+// StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
+// created from the StatefulSet VolumeClaimTemplates.
 type StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration struct {
-	WhenDeleted *v1beta1.PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
-	WhenScaled  *v1beta1.PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
+	// whenDeleted specifies what happens to PVCs created from StatefulSet
+	// VolumeClaimTemplates when the StatefulSet is deleted. The default policy
+	// of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
+	// `Delete` policy causes those PVCs to be deleted.
+	WhenDeleted *appsv1beta1.PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
+	// whenScaled specifies what happens to PVCs created from StatefulSet
+	// VolumeClaimTemplates when the StatefulSet is scaled down. The default
+	// policy of `Retain` causes PVCs to not be affected by a scaledown. The
+	// `Delete` policy causes the associated PVCs for any excess pods above
+	// the replica count to be deleted.
+	WhenScaled *appsv1beta1.PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
 }
 
 // StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration constructs a declarative configuration of the StatefulSetPersistentVolumeClaimRetentionPolicy type for use with
@@ -38,7 +50,7 @@ func StatefulSetPersistentVolumeClaimRetentionPolicy() *StatefulSetPersistentVol
 // WithWhenDeleted sets the WhenDeleted field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the WhenDeleted field is set to the value of the last call.
-func (b *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration) WithWhenDeleted(value v1beta1.PersistentVolumeClaimRetentionPolicyType) *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration {
+func (b *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration) WithWhenDeleted(value appsv1beta1.PersistentVolumeClaimRetentionPolicyType) *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration {
 	b.WhenDeleted = &value
 	return b
 }
@@ -46,7 +58,7 @@ func (b *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration) With
 // WithWhenScaled sets the WhenScaled field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the WhenScaled field is set to the value of the last call.
-func (b *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration) WithWhenScaled(value v1beta1.PersistentVolumeClaimRetentionPolicyType) *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration {
+func (b *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration) WithWhenScaled(value appsv1beta1.PersistentVolumeClaimRetentionPolicyType) *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration {
 	b.WhenScaled = &value
 	return b
 }

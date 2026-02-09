@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -204,7 +205,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esCache := NewEndpointSliceCache(tc.hostname, v1.IPv4Protocol, nil, nil)
+			esCache := NewEndpointSliceCache(tc.hostname, nil)
 
 			cmc := newCacheMutationCheck(tc.endpointSlices)
 			for _, endpointSlice := range tc.endpointSlices {
@@ -310,11 +311,53 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 				},
 			},
 		},
+		"with duplicate Endpoints, prefer non-terminating": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				func() *discovery.EndpointSlice {
+					es := generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 1, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80)})
+
+					// Duplicate the endpoint
+					ep1 := es.Endpoints[0]
+					ep1.Conditions.Ready = ptr.To(false)
+					ep1.Conditions.Serving = ptr.To(true)
+					ep1.Conditions.Terminating = ptr.To(true)
+
+					ep2 := es.Endpoints[0]
+					ep2.Conditions.Ready = ptr.To(true)
+					ep2.Conditions.Serving = ptr.To(true)
+					ep2.Conditions.Terminating = ptr.To(false)
+
+					ep3 := es.Endpoints[0]
+					ep3.Conditions.Ready = ptr.To(false)
+					ep3.Conditions.Serving = ptr.To(false)
+					ep3.Conditions.Terminating = ptr.To(true)
+
+					//  ep2 should win since it's the non-terminating one
+					es.Endpoints = []discovery.Endpoint{ep1, ep2, ep3}
+					return es
+				}(),
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						ip:          "10.0.1.1",
+						port:        80,
+						endpoint:    "10.0.1.1:80",
+						isLocal:     true,
+						ready:       true,
+						serving:     true,
+						terminating: false,
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esCache := NewEndpointSliceCache(tc.hostname, v1.IPv4Protocol, nil, nil)
+			esCache := NewEndpointSliceCache(tc.hostname, nil)
 
 			for _, endpointSlice := range tc.endpointSlices {
 				esCache.updatePending(endpointSlice, false)
@@ -349,7 +392,7 @@ func TestEsDataChanged(t *testing.T) {
 		expectChanged bool
 	}{
 		"identical slices, ports only": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", nil),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port80},
@@ -361,7 +404,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: false,
 		},
 		"identical slices, ports out of order": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", nil),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443, port80},
@@ -373,7 +416,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: true,
 		},
 		"port removed": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", nil),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443, port80},
@@ -385,7 +428,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: true,
 		},
 		"port added": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", nil),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443},
@@ -397,7 +440,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: true,
 		},
 		"identical with endpoints": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", nil),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443},
@@ -411,7 +454,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: false,
 		},
 		"identical with endpoints out of order": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", nil),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443},
@@ -425,7 +468,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: true,
 		},
 		"identical with endpoint added": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", nil),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443},
@@ -557,5 +600,107 @@ func (cmc *cacheMutationCheck) Check(t *testing.T) {
 			// copied before changed in any way.
 			t.Errorf("Cached object was unexpectedly mutated. Original: %+v, Mutated: %+v", o.deepCopy, o.original)
 		}
+	}
+}
+
+func TestEndpointSliceCacheClearedCorrectly(t *testing.T) {
+	initEndpointsPorts := func(eps *discovery.EndpointSlice) {
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+			NodeName:  ptr.To(testHostname),
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To("n1"),
+			Port:     ptr.To[int32](11),
+			Protocol: ptr.To(v1.ProtocolUDP),
+		}}
+	}
+
+	testCases := []struct {
+		name               string
+		currEndpointSlices []*discovery.EndpointSlice
+	}{
+		{
+			name: "one endpoint slice",
+			currEndpointSlices: []*discovery.EndpointSlice{
+				makeTestEndpointSlice("ns1", "ep1", 1, initEndpointsPorts),
+			},
+		},
+		{
+			name: "two endpoint slices, same namespace",
+			currEndpointSlices: []*discovery.EndpointSlice{
+				makeTestEndpointSlice("ns1", "ep1", 1, initEndpointsPorts),
+				makeTestEndpointSlice("ns1", "ep2", 2, initEndpointsPorts),
+			},
+		},
+		{
+			name: "two endpoint slices, same service",
+			currEndpointSlices: []*discovery.EndpointSlice{
+				makeTestEndpointSlice("ns1", "ep1", 1, initEndpointsPorts),
+				makeTestEndpointSlice("ns1", "ep1", 2, initEndpointsPorts),
+			},
+		},
+		{
+			name: "two endpoint slices, different namespace",
+			currEndpointSlices: []*discovery.EndpointSlice{
+				makeTestEndpointSlice("ns1", "ep1", 1, initEndpointsPorts),
+				makeTestEndpointSlice("ns2", "ep1", 2, initEndpointsPorts),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+
+			for _, epSlice := range tc.currEndpointSlices {
+				fp.addEndpointSlice(epSlice)
+			}
+			fp.endpointsMap.Update(fp.endpointsChanges)
+
+			for _, epSlice := range tc.currEndpointSlices {
+				fp.deleteEndpointSlice(epSlice)
+			}
+			fp.endpointsMap.Update(fp.endpointsChanges)
+
+			if len(fp.endpointsChanges.endpointSliceCache.trackerByServiceMap) != 0 {
+				t.Errorf("expected: endpointSliceCache does not have any entries, got: %v", fp.endpointsChanges.endpointSliceCache.trackerByServiceMap)
+			}
+		})
+	}
+}
+
+func TestSameServiceEndpointSliceCacheClearedCorrectly(t *testing.T) {
+	initEndpointsPorts := func(eps *discovery.EndpointSlice) {
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+			NodeName:  ptr.To(testHostname),
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To("n1"),
+			Port:     ptr.To[int32](11),
+			Protocol: ptr.To(v1.ProtocolUDP),
+		}}
+	}
+
+	currEndpointSlices := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "svc1", 1, initEndpointsPorts),
+		makeTestEndpointSlice("ns1", "svc1", 2, initEndpointsPorts),
+	}
+
+	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+
+	for _, epSlice := range currEndpointSlices {
+		fp.addEndpointSlice(epSlice)
+	}
+	fp.endpointsMap.Update(fp.endpointsChanges)
+
+	// only delete the first endpoint slice
+	fp.deleteEndpointSlice(currEndpointSlices[0])
+
+	fp.endpointsMap.Update(fp.endpointsChanges)
+
+	if len(fp.endpointsChanges.endpointSliceCache.trackerByServiceMap) != 1 {
+		t.Errorf("expected: endpointSliceCache to have one entries, got: %v", fp.endpointsChanges.endpointSliceCache.trackerByServiceMap)
 	}
 }

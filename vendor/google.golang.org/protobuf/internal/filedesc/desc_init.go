@@ -284,6 +284,13 @@ func (ed *Enum) unmarshalSeed(b []byte, sb *strs.Builder, pf *File, pd protorefl
 			case genid.EnumDescriptorProto_Value_field_number:
 				numValues++
 			}
+		case protowire.VarintType:
+			v, m := protowire.ConsumeVarint(b)
+			b = b[m:]
+			switch num {
+			case genid.EnumDescriptorProto_Visibility_field_number:
+				ed.L1.Visibility = int32(v)
+			}
 		default:
 			m := protowire.ConsumeFieldValue(num, typ, b)
 			b = b[m:]
@@ -365,6 +372,13 @@ func (md *Message) unmarshalSeed(b []byte, sb *strs.Builder, pf *File, pd protor
 				md.unmarshalSeedOptions(v)
 			}
 			prevField = num
+		case protowire.VarintType:
+			v, m := protowire.ConsumeVarint(b)
+			b = b[m:]
+			switch num {
+			case genid.DescriptorProto_Visibility_field_number:
+				md.L1.Visibility = int32(v)
+			}
 		default:
 			m := protowire.ConsumeFieldValue(num, typ, b)
 			b = b[m:]
@@ -495,6 +509,8 @@ func (xd *Extension) unmarshalOptions(b []byte) {
 			switch num {
 			case genid.FieldOptions_Packed_field_number:
 				xd.L1.EditionFeatures.IsPacked = protowire.DecodeBool(v)
+			case genid.FieldOptions_Lazy_field_number:
+				xd.L1.IsLazy = protowire.DecodeBool(v)
 			}
 		case protowire.BytesType:
 			v, m := protowire.ConsumeBytes(b)

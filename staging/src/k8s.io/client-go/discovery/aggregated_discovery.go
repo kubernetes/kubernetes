@@ -156,7 +156,7 @@ func convertAPISubresource(parent metav1.APIResource, in apidiscovery.APISubreso
 	return result, nil
 }
 
-// Please note the functions below will be removed in v1.33. They facilitate conversion
+// Please note the functions below will be removed in v1.35. They facilitate conversion
 // between the deprecated type apidiscoveryv2beta1.APIGroupDiscoveryList.
 
 // SplitGroupsAndResourcesV2Beta1 transforms "aggregated" discovery top-level structure into

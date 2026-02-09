@@ -19,8 +19,6 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -31,8 +29,8 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var (
@@ -45,7 +43,7 @@ var (
 
 	uploadKubeadmConfigExample = cmdutil.Examples(`
 		# upload the configuration of your cluster
-		kubeadm init phase upload-config --config=myConfig.yaml
+		kubeadm init phase upload-config kubeadm --config=myConfig.yaml
 		`)
 
 	uploadKubeletConfigLongDesc = cmdutil.LongDesc(`
@@ -65,7 +63,6 @@ func NewUploadConfigPhase() workflow.Phase {
 		Name:    "upload-config",
 		Aliases: []string{"uploadconfig"},
 		Short:   "Upload the kubeadm and kubelet configuration to a ConfigMap",
-		Long:    cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",
@@ -128,10 +125,6 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
-	klog.V(1).Infoln("[upload-config] Preserving the CRISocket information for the control-plane node")
-	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		return errors.Wrap(err, "Error writing Crisocket information for the control-plane node")
-	}
 	return nil
 }
 

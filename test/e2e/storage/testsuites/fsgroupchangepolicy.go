@@ -31,7 +31,7 @@ import (
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -113,8 +113,6 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		l = local{}
 		l.driver = driver
 		l.config = driver.PrepareTest(ctx, f)
-		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = storageframework.CreateVolumeResource(ctx, l.driver, l.config, pattern, testVolumeSizeRange)
 	}
 
 	cleanup := func(ctx context.Context) {
@@ -128,6 +126,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
 	}
+
+	rwopAccessMode := v1.ReadWriteOncePod
 
 	tests := []struct {
 		name                              string // Test case name
@@ -143,6 +143,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		// * OnRootMismatch policy is not supported.
 		// * It may not be possible to chgrp after mounting a volume.
 		supportsVolumeMountGroup bool
+		volumeAccessMode         *v1.PersistentVolumeAccessMode
 	}{
 		// Test cases for 'Always' policy
 		{
@@ -153,6 +154,16 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			finalExpectedRootDirFileOwnership: 2000,
 			finalExpectedSubDirFileOwnership:  2000,
 			supportsVolumeMountGroup:          true,
+		},
+		{
+			name:                              "rwop pod created with an initial fsgroup, new pod fsgroup applied to volume contents",
+			podfsGroupChangePolicy:            "Always",
+			initialPodFsGroup:                 1000,
+			secondPodFsGroup:                  2000,
+			finalExpectedRootDirFileOwnership: 2000,
+			finalExpectedSubDirFileOwnership:  2000,
+			supportsVolumeMountGroup:          true,
+			volumeAccessMode:                  &rwopAccessMode,
 		},
 		{
 			name:                              "pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup applied to the volume contents",
@@ -218,12 +229,19 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			}
 
 			init(ctx)
+			testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
+			if test.volumeAccessMode != nil {
+				accessModes := []v1.PersistentVolumeAccessMode{*test.volumeAccessMode}
+				l.resource = storageframework.CreateVolumeResourceWithAccessModes(ctx, l.driver, l.config, pattern, testVolumeSizeRange, accessModes, nil)
+			} else {
+				l.resource = storageframework.CreateVolumeResource(ctx, l.driver, l.config, pattern, testVolumeSizeRange)
+			}
 			ginkgo.DeferCleanup(cleanup)
 			podConfig := e2epod.Config{
 				NS:                     f.Namespace.Name,
 				NodeSelection:          l.config.ClientNodeSelection,
 				PVCs:                   []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				FsGroup:                utilpointer.Int64Ptr(int64(test.initialPodFsGroup)),
+				FsGroup:                ptr.To[int64](int64(test.initialPodFsGroup)),
 				PodFSGroupChangePolicy: &policy,
 			}
 			// Create initial pod and create files in root and sub-directory and verify ownership.
@@ -232,19 +250,19 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			// Change the ownership of files in the initial pod.
 			if test.changedRootDirFileOwnership != 0 {
 				ginkgo.By(fmt.Sprintf("Changing the root directory file ownership to %s", strconv.Itoa(test.changedRootDirFileOwnership)))
-				storageutils.ChangeFilePathGidInPod(f, rootDirFilePath, strconv.Itoa(test.changedRootDirFileOwnership), pod)
+				storageutils.ChangeFilePathGIDInPod(ctx, f, rootDirFilePath, strconv.Itoa(test.changedRootDirFileOwnership), pod)
 			}
 
 			if test.changedSubDirFileOwnership != 0 {
 				ginkgo.By(fmt.Sprintf("Changing the sub-directory file ownership to %s", strconv.Itoa(test.changedSubDirFileOwnership)))
-				storageutils.ChangeFilePathGidInPod(f, subDirFilePath, strconv.Itoa(test.changedSubDirFileOwnership), pod)
+				storageutils.ChangeFilePathGIDInPod(ctx, f, subDirFilePath, strconv.Itoa(test.changedSubDirFileOwnership), pod)
 			}
 
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
 			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
 
 			// Create a second pod with existing volume and verify the contents ownership.
-			podConfig.FsGroup = utilpointer.Int64Ptr(int64(test.secondPodFsGroup))
+			podConfig.FsGroup = ptr.To[int64](int64(test.secondPodFsGroup))
 			pod = createPodAndVerifyContentGid(ctx, l.config.Framework, &podConfig, false /* createInitialFiles */, strconv.Itoa(test.finalExpectedRootDirFileOwnership), strconv.Itoa(test.finalExpectedSubDirFileOwnership))
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
 			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
@@ -263,24 +281,24 @@ func createPodAndVerifyContentGid(ctx context.Context, f *framework.Framework, p
 		ginkgo.By(fmt.Sprintf("Creating a sub-directory and file, and verifying their ownership is %s", podFsGroup))
 		cmd := fmt.Sprintf("touch %s", rootDirFilePath)
 		var err error
-		_, _, err = e2evolume.PodExec(f, pod, cmd)
+		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 		framework.ExpectNoError(err)
-		storageutils.VerifyFilePathGidInPod(f, rootDirFilePath, podFsGroup, pod)
+		storageutils.VerifyFilePathGIDInPod(ctx, f, rootDirFilePath, podFsGroup, pod)
 
 		cmd = fmt.Sprintf("mkdir %s", subdir)
-		_, _, err = e2evolume.PodExec(f, pod, cmd)
+		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 		framework.ExpectNoError(err)
 		cmd = fmt.Sprintf("touch %s", subDirFilePath)
-		_, _, err = e2evolume.PodExec(f, pod, cmd)
+		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 		framework.ExpectNoError(err)
-		storageutils.VerifyFilePathGidInPod(f, subDirFilePath, podFsGroup, pod)
+		storageutils.VerifyFilePathGIDInPod(ctx, f, subDirFilePath, podFsGroup, pod)
 		return pod
 	}
 
 	// Verify existing contents of the volume
 	ginkgo.By(fmt.Sprintf("Verifying the ownership of root directory file is %s", expectedRootDirFileOwnership))
-	storageutils.VerifyFilePathGidInPod(f, rootDirFilePath, expectedRootDirFileOwnership, pod)
+	storageutils.VerifyFilePathGIDInPod(ctx, f, rootDirFilePath, expectedRootDirFileOwnership, pod)
 	ginkgo.By(fmt.Sprintf("Verifying the ownership of sub directory file is %s", expectedSubDirFileOwnership))
-	storageutils.VerifyFilePathGidInPod(f, subDirFilePath, expectedSubDirFileOwnership, pod)
+	storageutils.VerifyFilePathGIDInPod(ctx, f, subDirFilePath, expectedSubDirFileOwnership, pod)
 	return pod
 }

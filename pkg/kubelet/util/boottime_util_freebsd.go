@@ -1,5 +1,4 @@
 //go:build freebsd
-// +build freebsd
 
 /*
 Copyright 2020 The Kubernetes Authors.

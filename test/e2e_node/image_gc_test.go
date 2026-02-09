@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -41,7 +40,7 @@ const (
 	checkGCFreq  time.Duration = 30 * time.Second
 )
 
-var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.WithNodeFeature("GarbageCollect"), func() {
+var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("image-garbage-collect-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var is internalapi.ImageManagerService
@@ -50,17 +49,13 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 		_, is, err = getCRIClient()
 		framework.ExpectNoError(err)
 	})
-	ginkgo.AfterEach(func() {
-		framework.ExpectNoError(PrePullAllImages())
+	ginkgo.AfterEach(func(ctx context.Context) {
+		framework.ExpectNoError(PrePullAllImages(ctx))
 	})
 	ginkgo.Context("when ImageMaximumGCAge is set", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.ImageMaximumGCAge = metav1.Duration{Duration: time.Duration(time.Minute * 1)}
 			initialConfig.ImageMinimumGCAge = metav1.Duration{Duration: time.Duration(time.Second * 1)}
-			if initialConfig.FeatureGates == nil {
-				initialConfig.FeatureGates = make(map[string]bool)
-			}
-			initialConfig.FeatureGates[string(kubefeatures.ImageMaximumGCAge)] = true
 		})
 		ginkgo.It("should GC unused images", func(ctx context.Context) {
 			pod := innocentPod()
@@ -72,7 +67,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			allImages, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
 			framework.ExpectNoError(err)
 
-			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			// Even though the image gc max timing is less, we are bound by the kubelet's
 			// ImageGCPeriod, which is hardcoded to 5 minutes.
@@ -92,10 +87,9 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			allImages, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
 			framework.ExpectNoError(err)
 
-			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
-			restartKubelet(true)
-			waitForKubeletToStart(ctx, f)
+			restartKubelet(ctx, true)
 
 			// Wait until the maxAge of the image after the kubelet is restarted to ensure it doesn't
 			// GC too early.

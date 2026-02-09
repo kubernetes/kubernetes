@@ -18,8 +18,11 @@ package authorizer
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -62,6 +65,16 @@ type Attributes interface {
 
 	// GetPath returns the path of the request
 	GetPath() string
+
+	// ParseFieldSelector is lazy, thread-safe, and stores the parsed result and error.
+	// It returns an error if the field selector cannot be parsed.
+	// The returned requirements must be treated as readonly and not modified.
+	GetFieldSelector() (fields.Requirements, error)
+
+	// ParseLabelSelector is lazy, thread-safe, and stores the parsed result and error.
+	// It returns an error if the label selector cannot be parsed.
+	// The returned requirements must be treated as readonly and not modified.
+	GetLabelSelector() (labels.Requirements, error)
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -80,7 +93,7 @@ func (f AuthorizerFunc) Authorize(ctx context.Context, a Attributes) (Decision, 
 // RuleResolver provides a mechanism for resolving the list of rules that apply to a given user within a namespace.
 type RuleResolver interface {
 	// RulesFor get the list of cluster wide rules, the list of rules in the specific namespace, incomplete status and errors.
-	RulesFor(user user.Info, namespace string) ([]ResourceRuleInfo, []NonResourceRuleInfo, bool, error)
+	RulesFor(ctx context.Context, user user.Info, namespace string) ([]ResourceRuleInfo, []NonResourceRuleInfo, bool, error)
 }
 
 // RequestAttributesGetter provides a function that extracts Attributes from an http.Request
@@ -100,6 +113,11 @@ type AttributesRecord struct {
 	Name            string
 	ResourceRequest bool
 	Path            string
+
+	FieldSelectorRequirements fields.Requirements
+	FieldSelectorParsingErr   error
+	LabelSelectorRequirements labels.Requirements
+	LabelSelectorParsingErr   error
 }
 
 func (a AttributesRecord) GetUser() user.Info {
@@ -146,6 +164,14 @@ func (a AttributesRecord) GetPath() string {
 	return a.Path
 }
 
+func (a AttributesRecord) GetFieldSelector() (fields.Requirements, error) {
+	return a.FieldSelectorRequirements, a.FieldSelectorParsingErr
+}
+
+func (a AttributesRecord) GetLabelSelector() (labels.Requirements, error) {
+	return a.LabelSelectorRequirements, a.LabelSelectorParsingErr
+}
+
 type Decision int
 
 const (
@@ -157,3 +183,16 @@ const (
 	// to allow or deny an action.
 	DecisionNoOpinion
 )
+
+func (d Decision) String() string {
+	switch d {
+	case DecisionDeny:
+		return "Deny"
+	case DecisionAllow:
+		return "Allow"
+	case DecisionNoOpinion:
+		return "NoOpinion"
+	default:
+		return fmt.Sprintf("Unknown (%d)", int(d))
+	}
+}

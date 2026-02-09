@@ -19,19 +19,26 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ReplicaSetConditionApplyConfiguration represents a declarative configuration of the ReplicaSetCondition type for use
 // with apply.
+//
+// ReplicaSetCondition describes the state of a replica set at a certain point.
 type ReplicaSetConditionApplyConfiguration struct {
-	Type               *v1beta2.ReplicaSetConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus              `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                     `json:"lastTransitionTime,omitempty"`
-	Reason             *string                          `json:"reason,omitempty"`
-	Message            *string                          `json:"message,omitempty"`
+	// Type of replica set condition.
+	Type *appsv1beta2.ReplicaSetConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *v1.ConditionStatus `json:"status,omitempty"`
+	// The last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // ReplicaSetConditionApplyConfiguration constructs a declarative configuration of the ReplicaSetCondition type for use with
@@ -43,7 +50,7 @@ func ReplicaSetCondition() *ReplicaSetConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *ReplicaSetConditionApplyConfiguration) WithType(value v1beta2.ReplicaSetConditionType) *ReplicaSetConditionApplyConfiguration {
+func (b *ReplicaSetConditionApplyConfiguration) WithType(value appsv1beta2.ReplicaSetConditionType) *ReplicaSetConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

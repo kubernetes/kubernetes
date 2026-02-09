@@ -22,6 +22,8 @@ import (
 
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+
+	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
@@ -226,5 +228,13 @@ func TestFormat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			testQuantity(t, tc.expr, tc.expectValue, tc.expectedRuntimeErr, tc.expectedCompileErr)
 		})
+	}
+}
+
+func TestSizeLimit(t *testing.T) {
+	for name := range library.ConstantFormats {
+		if len(name) > cel.MaxFormatSize {
+			t.Fatalf("All formats must be <= %d chars in length", cel.MaxFormatSize)
+		}
 	}
 }

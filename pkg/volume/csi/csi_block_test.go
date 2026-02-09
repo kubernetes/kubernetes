@@ -18,6 +18,7 @@ package csi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,7 +43,6 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 	mapper, err := plug.NewBlockVolumeMapper(
 		spec,
 		&api.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod}},
-		volume.VolumeOptions{},
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to make a new Mapper: %w", err)
@@ -489,6 +489,46 @@ func TestBlockMapperMapPodDeviceNoClientError(t *testing.T) {
 		t.Errorf("test should fail, but no error occurred")
 	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
 		t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
+	}
+}
+
+func TestBlockMapperMapPodDeviceGetStageSecretsError(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
+	}
+
+	// set a stage secret for the pv
+	pv.Spec.PersistentVolumeSource.CSI.NodePublishSecretRef = &api.SecretReference{
+		Name:      "foo",
+		Namespace: "default",
+	}
+	pvName := pv.GetName()
+	nodeName := string(plug.host.GetNodeName())
+
+	csiMapper.csiClient = setupClient(t, true)
+
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
+	attachment := makeTestAttachment(attachID, nodeName, pvName)
+	attachment.Status.Attached = true
+	if _, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to setup VolumeAttachment: %v", err)
+	}
+	t.Log("created attachment ", attachID)
+
+	_, err = csiMapper.MapPodDevice()
+	if err == nil {
+		t.Errorf("test should fail, but no error occurred")
+	} else if !errors.As(err, &transientError) {
+		t.Errorf("expected a transient error but got %v", err)
 	}
 }
 

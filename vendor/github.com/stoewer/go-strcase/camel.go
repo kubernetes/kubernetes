@@ -27,6 +27,9 @@ func camelCase(s string, upper bool) string {
 				buffer = append(buffer, toUpper(curr))
 			} else if isLower(prev) {
 				buffer = append(buffer, curr)
+			} else if isUpper(prev) && isUpper(curr) && isLower(next) {
+				// Assume a case like "R" for "XRequestId"
+				buffer = append(buffer, curr)
 			} else {
 				buffer = append(buffer, toLower(curr))
 			}

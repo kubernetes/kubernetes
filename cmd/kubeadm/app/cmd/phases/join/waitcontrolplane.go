@@ -20,24 +20,21 @@ import (
 	"io"
 	"time"
 
-	"github.com/pkg/errors"
-
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 // NewWaitControlPlanePhase is a hidden phase that runs after the control-plane and etcd phases
 func NewWaitControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
-		Name: "wait-control-plane",
-		// TODO: remove this EXPERIMENTAL prefix once WaitForAllControlPlaneComponents goes GA:
-		// https://github.com/kubernetes/kubeadm/issues/2907
-		Short: "EXPERIMENTAL: Wait for the control plane to start",
+		Name:  "wait-control-plane",
+		Short: "Wait for the control plane to start",
 		Run:   runWaitControlPlanePhase,
 	}
 	return phase
@@ -53,26 +50,26 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return nil
 	}
 
-	initCfg, err := data.InitCfg()
+	client, err := data.WaitControlPlaneClient()
 	if err != nil {
-		return errors.Wrap(err, "could not obtain InitConfiguration during the wait-control-plane phase")
+		return err
 	}
 
-	// TODO: remove this check once WaitForAllControlPlaneComponents goes GA
-	// https://github.com/kubernetes/kubeadm/issues/2907
-	if !features.Enabled(initCfg.ClusterConfiguration.FeatureGates, features.WaitForAllControlPlaneComponents) {
-		klog.V(5).Infof("[wait-control-plane] Skipping phase as the feature gate WaitForAllControlPlaneComponents is disabled")
-		return nil
-	}
-
-	waiter, err := newControlPlaneWaiter(data.DryRun(), 0, nil, data.OutputWriter())
+	waiter, err := newControlPlaneWaiter(data.DryRun(), 0, client, data.OutputWriter())
 	if err != nil {
 		return errors.Wrap(err, "error creating waiter")
 	}
 
 	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
-	if err := waiter.WaitForControlPlaneComponents(&initCfg.ClusterConfiguration); err != nil {
+	pods, err := staticpodutil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
+		constants.ControlPlaneComponents...)
+	if err != nil {
 		return err
+	}
+	if err = waiter.WaitForControlPlaneComponents(pods,
+		data.Cfg().ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
+		apiclient.PrintControlPlaneErrorHelpScreen(data.OutputWriter(), data.Cfg().NodeRegistration.CRISocket)
+		return errors.Wrap(err, "failed while waiting for the control plane to start")
 	}
 
 	return nil

@@ -149,7 +149,6 @@ func testFixtureFile(t *testing.T, dir, name string, pod *corev1.Pod) string {
 	}
 
 	// clean up noise in fixtures
-	yamlData = []byte(strings.ReplaceAll(string(yamlData), "  creationTimestamp: null\n", ""))
 	yamlData = []byte(strings.ReplaceAll(string(yamlData), "    resources: {}\n", ""))
 	yamlData = []byte(strings.ReplaceAll(string(yamlData), "status: {}\n", ""))
 

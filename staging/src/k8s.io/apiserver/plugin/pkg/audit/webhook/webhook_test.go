@@ -20,7 +20,6 @@ import (
 	stdjson "encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -38,14 +37,14 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/client-go/tools/clientcmd/api/v1"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 // newWebhookHandler returns a handler which receives webhook events and decodes the
 // request body. The caller passes a callback which is called on each webhook POST.
 // The object passed to cb is of the same type as list.
 func newWebhookHandler(t *testing.T, list runtime.Object, cb func(events runtime.Object)) http.Handler {
-	s := json.NewSerializer(json.DefaultMetaFactory, audit.Scheme, audit.Scheme, false)
+	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, audit.Scheme, audit.Scheme, json.SerializerOptions{})
 	return &testWebhookHandler{
 		t:          t,
 		list:       list,
@@ -65,7 +64,7 @@ type testWebhookHandler struct {
 
 func (t *testWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := func() error {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			return fmt.Errorf("read webhook request body: %v", err)
 		}
@@ -96,7 +95,7 @@ func newWebhook(t *testing.T, endpoint string, groupVersion schema.GroupVersion)
 			{Cluster: v1.Cluster{Server: endpoint, InsecureSkipTLSVerify: true}},
 		},
 	}
-	f, err := ioutil.TempFile("", "k8s_audit_webhook_test_")
+	f, err := os.CreateTemp("", "k8s_audit_webhook_test_")
 	require.NoError(t, err, "creating temp file")
 
 	defer func() {
@@ -133,7 +132,7 @@ func TestWebhook(t *testing.T) {
 
 		// Ensure this doesn't return a serialization error.
 		event := &auditinternal.Event{}
-		require.NoError(t, backend.processEvents(event), fmt.Sprintf("failed to send events, apiVersion: %s", version))
-		require.True(t, gotEvents, fmt.Sprintf("no events received, apiVersion: %s", version))
+		require.NoErrorf(t, backend.processEvents(event), "failed to send events, apiVersion: %s", version)
+		require.Truef(t, gotEvents, "no events received, apiVersion: %s", version)
 	}
 }

@@ -19,14 +19,25 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // AppArmorProfileApplyConfiguration represents a declarative configuration of the AppArmorProfile type for use
 // with apply.
+//
+// AppArmorProfile defines a pod or container's AppArmor settings.
 type AppArmorProfileApplyConfiguration struct {
-	Type             *v1.AppArmorProfileType `json:"type,omitempty"`
-	LocalhostProfile *string                 `json:"localhostProfile,omitempty"`
+	// type indicates which kind of AppArmor profile will be applied.
+	// Valid options are:
+	// Localhost - a profile pre-loaded on the node.
+	// RuntimeDefault - the container runtime's default profile.
+	// Unconfined - no AppArmor enforcement.
+	Type *corev1.AppArmorProfileType `json:"type,omitempty"`
+	// localhostProfile indicates a profile loaded on the node that should be used.
+	// The profile must be preconfigured on the node to work.
+	// Must match the loaded name of the profile.
+	// Must be set if and only if type is "Localhost".
+	LocalhostProfile *string `json:"localhostProfile,omitempty"`
 }
 
 // AppArmorProfileApplyConfiguration constructs a declarative configuration of the AppArmorProfile type for use with
@@ -38,7 +49,7 @@ func AppArmorProfile() *AppArmorProfileApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *AppArmorProfileApplyConfiguration) WithType(value v1.AppArmorProfileType) *AppArmorProfileApplyConfiguration {
+func (b *AppArmorProfileApplyConfiguration) WithType(value corev1.AppArmorProfileType) *AppArmorProfileApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"sync"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,7 +33,7 @@ const (
 // Summary is our internal representation for our wrapping struct around prometheus
 // summaries. Summary implements both kubeCollector and ObserverMetric
 //
-// DEPRECATED: as per the metrics overhaul KEP
+// Deprecated: as per the metrics overhaul KEP
 type Summary struct {
 	ObserverMetric
 	*SummaryOpts
@@ -43,7 +44,7 @@ type Summary struct {
 // NewSummary returns an object which is Summary-like. However, nothing
 // will be measured until the summary is registered somewhere.
 //
-// DEPRECATED: as per the metrics overhaul KEP
+// Deprecated: as per the metrics overhaul KEP
 func NewSummary(opts *SummaryOpts) *Summary {
 	opts.StabilityLevel.setDefaults()
 
@@ -90,7 +91,7 @@ func (s *Summary) WithContext(ctx context.Context) ObserverMetric {
 // SummaryVec is the internal representation of our wrapping struct around prometheus
 // summaryVecs.
 //
-// DEPRECATED: as per the metrics overhaul KEP
+// Deprecated: as per the metrics overhaul KEP
 type SummaryVec struct {
 	*prometheus.SummaryVec
 	*SummaryOpts
@@ -104,16 +105,11 @@ type SummaryVec struct {
 // and only members extracted after
 // registration will actually measure anything.
 //
-// DEPRECATED: as per the metrics overhaul KEP
+// Deprecated: as per the metrics overhaul KEP
 func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
 	opts.StabilityLevel.setDefaults()
 
 	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
-	allowListLock.RLock()
-	if allowList, ok := labelValueAllowLists[fqName]; ok {
-		opts.LabelValueAllowLists = allowList
-	}
-	allowListLock.RUnlock()
 
 	v := &SummaryVec{
 		SummaryOpts:    opts,
@@ -158,6 +154,17 @@ func (v *SummaryVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+
+	// Initialize label allow lists if not already initialized
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
+	// Constrain label values to allowed values
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
 	}
@@ -172,6 +179,15 @@ func (v *SummaryVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
@@ -199,6 +215,13 @@ func (v *SummaryVec) Reset() {
 	}
 
 	v.SummaryVec.Reset()
+}
+
+// ResetLabelAllowLists resets the label allow list for the SummaryVec.
+// NOTE: This should only be used in test.
+func (v *SummaryVec) ResetLabelAllowLists() {
+	v.initializeLabelAllowListsOnce = sync.Once{}
+	v.LabelValueAllowLists = nil
 }
 
 // WithContext returns wrapped SummaryVec with context

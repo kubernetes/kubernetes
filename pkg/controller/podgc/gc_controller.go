@@ -29,7 +29,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -38,7 +37,6 @@ import (
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/podgc/metrics"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
@@ -94,20 +92,25 @@ func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podIn
 }
 
 func (gcc *PodGCController) Run(ctx context.Context) {
+	defer utilruntime.HandleCrashWithContext(ctx)
+
 	logger := klog.FromContext(ctx)
-
-	defer utilruntime.HandleCrash()
-
 	logger.Info("Starting GC controller")
-	defer gcc.nodeQueue.ShutDown()
-	defer logger.Info("Shutting down GC controller")
 
-	if !cache.WaitForNamedCacheSync("GC", ctx.Done(), gcc.podListerSynced, gcc.nodeListerSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down GC controller")
+		gcc.nodeQueue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, gcc.podListerSynced, gcc.nodeListerSynced) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, gcc.gc, gcc.gcCheckPeriod)
-
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, gcc.gc, gcc.gcCheckPeriod)
+	})
 	<-ctx.Done()
 }
 
@@ -179,7 +182,7 @@ func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 			metrics.DeletingPodsTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminatingOutOfService).Inc()
 			if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 				// ignore not founds
-				utilruntime.HandleError(err)
+				utilruntime.HandleErrorWithContext(ctx, err, "Failed to delete terminating pod on out-of-service node", "pod", klog.KObj(pod))
 				metrics.DeletingPodsErrorTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminatingOutOfService).Inc()
 			}
 		}(terminatingPods[i])
@@ -213,7 +216,7 @@ func (gcc *PodGCController) gcTerminated(ctx context.Context, pods []*v1.Pod) {
 			defer wait.Done()
 			if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 				// ignore not founds
-				defer utilruntime.HandleError(err)
+				defer utilruntime.HandleErrorWithContext(ctx, err, "Failed to delete terminated pod", "pod", klog.KObj(pod))
 				metrics.DeletingPodsErrorTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminated).Inc()
 			}
 			metrics.DeletingPodsTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminated).Inc()
@@ -248,13 +251,14 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 		}
 		logger.V(2).Info("Found orphaned Pod assigned to the Node, deleting", "pod", klog.KObj(pod), "node", klog.KRef("", pod.Spec.NodeName))
 		condition := &v1.PodCondition{
-			Type:    v1.DisruptionTarget,
-			Status:  v1.ConditionTrue,
-			Reason:  "DeletionByPodGC",
-			Message: "PodGC: node no longer exists",
+			Type:               v1.DisruptionTarget,
+			ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.DisruptionTarget),
+			Status:             v1.ConditionTrue,
+			Reason:             "DeletionByPodGC",
+			Message:            "PodGC: node no longer exists",
 		}
 		if err := gcc.markFailedAndDeletePodWithCondition(ctx, pod, condition); err != nil {
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to delete orphaned pod", "pod", klog.KObj(pod))
 			metrics.DeletingPodsErrorTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonOrphaned).Inc()
 		} else {
 			logger.Info("Forced deletion of orphaned Pod succeeded", "pod", klog.KObj(pod))
@@ -306,7 +310,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(ctx context.Context, pods [
 
 		logger.V(2).Info("Found unscheduled terminating Pod not assigned to any Node, deleting", "pod", klog.KObj(pod))
 		if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to delete unscheduled terminating pod", "pod", klog.KObj(pod))
 			metrics.DeletingPodsErrorTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminatingUnscheduled).Inc()
 		} else {
 			logger.Info("Forced deletion of unscheduled terminating Pod succeeded", "pod", klog.KObj(pod))
@@ -343,23 +347,19 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 	logger := klog.FromContext(ctx)
 	logger.Info("PodGC is force deleting Pod", "pod", klog.KObj(pod))
 	// Patch the pod to make sure it is transitioned to the Failed phase before deletion.
-	// This is needed for the JobPodReplacementPolicy feature to make sure Job replacement pods are created.
-	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-apps/3939-allow-replacement-when-fully-terminated#risks-and-mitigations
-	// for more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) || utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-
-		// Mark the pod as failed - this is especially important in case the pod
-		// is orphaned, in which case the pod would remain in the Running phase
-		// forever as there is no kubelet running to change the phase.
-		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-			newStatus := pod.Status.DeepCopy()
-			newStatus.Phase = v1.PodFailed
-			if condition != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-				apipod.UpdatePodCondition(newStatus, condition)
-			}
-			if _, _, _, err := utilpod.PatchPodStatus(ctx, gcc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
-				return err
-			}
+	//
+	// Mark the pod as failed - this is especially important in case the pod
+	// is orphaned, in which case the pod would remain in the Running phase
+	// forever as there is no kubelet running to change the phase.
+	if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
+		newStatus := pod.Status.DeepCopy()
+		newStatus.Phase = v1.PodFailed
+		newStatus.ObservedGeneration = apipod.CalculatePodStatusObservedGeneration(pod)
+		if condition != nil {
+			apipod.UpdatePodCondition(newStatus, condition)
+		}
+		if _, _, _, err := utilpod.PatchPodStatus(ctx, gcc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
+			return err
 		}
 	}
 	return gcc.kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))

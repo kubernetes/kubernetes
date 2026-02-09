@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -125,7 +126,7 @@ func (t *EtcdUpgradeTest) listUsers() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf(string(b))
+		return nil, errors.New(string(b))
 	}
 	var names []string
 	if err := json.NewDecoder(r.Body).Decode(&names); err != nil {
@@ -146,7 +147,7 @@ func (t *EtcdUpgradeTest) addUser(name string) error {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf(string(b))
+		return errors.New(string(b))
 	}
 	return nil
 }

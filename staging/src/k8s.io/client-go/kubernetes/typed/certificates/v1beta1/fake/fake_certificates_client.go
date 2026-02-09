@@ -29,7 +29,15 @@ type FakeCertificatesV1beta1 struct {
 }
 
 func (c *FakeCertificatesV1beta1) CertificateSigningRequests() v1beta1.CertificateSigningRequestInterface {
-	return &FakeCertificateSigningRequests{c}
+	return newFakeCertificateSigningRequests(c)
+}
+
+func (c *FakeCertificatesV1beta1) ClusterTrustBundles() v1beta1.ClusterTrustBundleInterface {
+	return newFakeClusterTrustBundles(c)
+}
+
+func (c *FakeCertificatesV1beta1) PodCertificateRequests(namespace string) v1beta1.PodCertificateRequestInterface {
+	return newFakePodCertificateRequests(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

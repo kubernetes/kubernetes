@@ -22,7 +22,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,25 +30,25 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.IngressClass{}, func(obj interface{}) { SetObjectDefaults_IngressClass(obj.(*v1.IngressClass)) })
-	scheme.AddTypeDefaultingFunc(&v1.IngressClassList{}, func(obj interface{}) { SetObjectDefaults_IngressClassList(obj.(*v1.IngressClassList)) })
-	scheme.AddTypeDefaultingFunc(&v1.NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*v1.NetworkPolicy)) })
-	scheme.AddTypeDefaultingFunc(&v1.NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*v1.NetworkPolicyList)) })
+	scheme.AddTypeDefaultingFunc(&networkingv1.IngressClass{}, func(obj interface{}) { SetObjectDefaults_IngressClass(obj.(*networkingv1.IngressClass)) })
+	scheme.AddTypeDefaultingFunc(&networkingv1.IngressClassList{}, func(obj interface{}) { SetObjectDefaults_IngressClassList(obj.(*networkingv1.IngressClassList)) })
+	scheme.AddTypeDefaultingFunc(&networkingv1.NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*networkingv1.NetworkPolicy)) })
+	scheme.AddTypeDefaultingFunc(&networkingv1.NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*networkingv1.NetworkPolicyList)) })
 	return nil
 }
 
-func SetObjectDefaults_IngressClass(in *v1.IngressClass) {
+func SetObjectDefaults_IngressClass(in *networkingv1.IngressClass) {
 	SetDefaults_IngressClass(in)
 }
 
-func SetObjectDefaults_IngressClassList(in *v1.IngressClassList) {
+func SetObjectDefaults_IngressClassList(in *networkingv1.IngressClassList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_IngressClass(a)
 	}
 }
 
-func SetObjectDefaults_NetworkPolicy(in *v1.NetworkPolicy) {
+func SetObjectDefaults_NetworkPolicy(in *networkingv1.NetworkPolicy) {
 	SetDefaults_NetworkPolicy(in)
 	for i := range in.Spec.Ingress {
 		a := &in.Spec.Ingress[i]
@@ -66,7 +66,7 @@ func SetObjectDefaults_NetworkPolicy(in *v1.NetworkPolicy) {
 	}
 }
 
-func SetObjectDefaults_NetworkPolicyList(in *v1.NetworkPolicyList) {
+func SetObjectDefaults_NetworkPolicyList(in *networkingv1.NetworkPolicyList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_NetworkPolicy(a)

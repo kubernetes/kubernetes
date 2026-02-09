@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -17,6 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package users contains utilities for managing the users.
 package users
 
 import (
@@ -31,11 +31,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // EntryMap holds a map of user or group entries.
@@ -53,7 +52,7 @@ type UsersAndGroups struct {
 }
 
 // entry is a structure that holds information about a UNIX user or group.
-// It partialially conforms parsing of both users from /etc/passwd and groups from /etc/group.
+// It partially conforms parsing of both users from /etc/passwd and groups from /etc/group.
 type entry struct {
 	name      string
 	id        int64
@@ -239,12 +238,17 @@ func addUsersAndGroupsImpl(pathLoginDef, pathUsers, pathGroups string) (*UsersAn
 	}
 
 	// Prepare the maps of users and groups.
-	usersConcat := append(users, usersToCreate...)
+	var usersConcat []*entry
+	usersConcat = append(usersConcat, users...)
+	usersConcat = append(usersConcat, usersToCreate...)
 	mapUsers, err := entriesToEntryMap(usersConcat, usersToCreateSpec)
 	if err != nil {
 		return nil, err
 	}
-	groupsConcat := append(groups, groupsToCreate...)
+
+	var groupsConcat []*entry
+	groupsConcat = append(groupsConcat, groups...)
+	groupsConcat = append(groupsConcat, groupsToCreate...)
 	mapGroups, err := entriesToEntryMap(groupsConcat, groupsToCreateSpec)
 	if err != nil {
 		return nil, err
@@ -568,7 +572,7 @@ func entriesToString(entries []*entry) string {
 	return strings.Join(lines, ",")
 }
 
-// openFileWithLock opens the file at path by acquiring an exclive write lock.
+// openFileWithLock opens the file at path by acquiring an exclusive write lock.
 // The returned close() function should be called to release the lock and close the file.
 // If a lock cannot be obtained the function fails after a period of time.
 func openFileWithLock(path string) (f *os.File, close func(), err error) {
@@ -594,15 +598,15 @@ func openFileWithLock(path string) (f *os.File, close func(), err error) {
 		}
 	}
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, nil, err
 	}
 	close = func() {
 		// This function should be called once operations with the file are finished.
 		// It unlocks the file and closes it.
 		unlock := syscall.Flock_t{Type: syscall.F_UNLCK}
-		syscall.FcntlFlock(f.Fd(), syscall.F_SETLK, &unlock)
-		f.Close()
+		_ = syscall.FcntlFlock(f.Fd(), syscall.F_SETLK, &unlock)
+		_ = f.Close()
 	}
 	return f, close, nil
 }

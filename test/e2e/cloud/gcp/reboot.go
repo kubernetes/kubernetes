@@ -79,17 +79,6 @@ var _ = SIGDescribe("Reboot", framework.WithDisruptive(), feature.Reboot, func()
 				framework.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
 			}
 		}
-		// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
-		// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.  Most tests
-		// make use of some proxy feature to verify functionality. So, if a reboot test runs right before a test
-		// that tries to get logs, for example, we may get unlucky and try to use a closed tunnel to a node that
-		// was recently rebooted. There's no good way to framework.Poll for proxies being closed, so we sleep.
-		//
-		// TODO(cjcullen) reduce this sleep (#19314)
-		if framework.ProviderIs("gke") {
-			ginkgo.By("waiting 5 minutes for all dead tunnels to be dropped")
-			time.Sleep(5 * time.Minute)
-		}
 	})
 
 	f = framework.NewDefaultFramework("reboot")

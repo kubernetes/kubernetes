@@ -26,9 +26,13 @@ import (
 )
 
 // getLoggingCmd returns the journalctl cmd and arguments for the given nodeLogQuery and boot. Note that
-// services are explicitly passed here to account for the heuristics
-func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error) {
-	args := []string{
+// services are explicitly passed here to account for the heuristics.
+// The return values are:
+// - cmd: the command to be executed
+// - args: arguments to the command
+// - cmdEnv: environment variables when the command will be executed
+func getLoggingCmd(n *nodeLogQuery, services []string) (cmd string, args []string, cmdEnv []string, err error) {
+	args = []string{
 		"--utc",
 		"--no-pager",
 		"--output=short-precise",
@@ -55,7 +59,7 @@ func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error)
 		args = append(args, "--boot", fmt.Sprintf("%d", *n.Boot))
 	}
 
-	return "journalctl", args, nil
+	return "journalctl", args, nil, nil
 }
 
 // checkForNativeLogger checks journalctl output for a service

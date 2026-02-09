@@ -22,15 +22,190 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ipprfeature "k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+func TestPodTopologyLabels(t *testing.T) {
+	tests := []podTopologyTestCase{
+		{
+			name: "zone and region topology labels copied from assigned Node",
+			targetNodeLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+			},
+			expectedPodLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+			},
+		},
+		{
+			name: "subdomains of topology.kubernetes.io are not copied",
+			targetNodeLabels: map[string]string{
+				"sub.topology.kubernetes.io/zone": "zone",
+				"topology.kubernetes.io/region":   "region",
+			},
+			expectedPodLabels: map[string]string{
+				"topology.kubernetes.io/region": "region",
+			},
+		},
+		{
+			name: "custom topology.kubernetes.io labels are not copied",
+			targetNodeLabels: map[string]string{
+				"topology.kubernetes.io/custom": "thing",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+			},
+			expectedPodLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+			},
+		},
+		{
+			name: "labels from Bindings overwriting existing labels on Pod",
+			existingPodLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "bad-zone",
+				"topology.kubernetes.io/region": "bad-region",
+				"topology.kubernetes.io/abc":    "123",
+			},
+			targetNodeLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+				"topology.kubernetes.io/abc":    "456", // this label isn't in (zone, region) so isn't copied
+			},
+			expectedPodLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+				"topology.kubernetes.io/abc":    "123",
+			},
+		},
+	}
+	// Enable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
+	// on start up and not on each invocation at runtime.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodTopologyLabelsAdmission, true)
+	testPodTopologyLabels(t, tests)
+}
+
+func TestPodTopologyLabels_FeatureDisabled(t *testing.T) {
+	tests := []podTopologyTestCase{
+		{
+			name: "does nothing when the feature is not enabled",
+			targetNodeLabels: map[string]string{
+				"topology.kubernetes.io/zone":     "zone",
+				"topology.kubernetes.io/region":   "region",
+				"topology.kubernetes.io/custom":   "thing",
+				"sub.topology.kubernetes.io/zone": "zone",
+			},
+			expectedPodLabels: map[string]string{},
+		},
+	}
+	// Disable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
+	// on start up and not on each invocation at runtime.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodTopologyLabelsAdmission, false)
+	testPodTopologyLabels(t, tests)
+}
+
+// podTopologyTestCase is defined outside of TestPodTopologyLabels to allow us to re-use the test implementation logic
+// between the feature enabled and feature disabled tests.
+// This will no longer be required once the feature gate graduates to GA/locked to being enabled.
+type podTopologyTestCase struct {
+	name              string
+	targetNodeLabels  map[string]string
+	existingPodLabels map[string]string
+	expectedPodLabels map[string]string
+}
+
+func testPodTopologyLabels(t *testing.T, tests []podTopologyTestCase) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-topology-labels", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	prototypePod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "pod-topology-test-",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+	prototypeNode := func() *v1.Node {
+		return &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "podtopology-test-node-",
+			},
+		}
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create the Node we are going to bind to.
+			node := prototypeNode()
+			// Set the labels on the Node we are going to create.
+			node.Labels = test.targetNodeLabels
+			ctx := context.Background()
+
+			var err error
+			if node, err = client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to create node: %v", err)
+			}
+
+			pod := prototypePod()
+			pod.Labels = test.existingPodLabels
+			if pod, err = client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to create pod: %v", err)
+			}
+
+			binding := &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.Name, Namespace: pod.Namespace},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: node.Name,
+				},
+			}
+			if err := client.CoreV1().Pods(pod.Namespace).Bind(ctx, binding, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to bind pod to node: %v", err)
+			}
+
+			if pod, err = client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{}); err != nil {
+				t.Errorf("Failed to fetch bound Pod: %v", err)
+			}
+
+			if !apiequality.Semantic.DeepEqual(pod.Labels, test.expectedPodLabels) {
+				t.Errorf("Unexpected label values: %v", cmp.Diff(pod.Labels, test.expectedPodLabels))
+			}
+		})
+	}
+}
 
 func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
@@ -675,6 +850,357 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 	}
 }
 
+func TestPodResizeRBAC(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil,
+		append(framework.DefaultTestServerFlags(), "--authorization-mode=RBAC"), framework.SharedEtcd())
+	defer server.TearDownFn()
+	adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(adminClient, "pod-resize", t)
+	defer framework.DeleteNamespaceOrDie(adminClient, ns, t)
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("100m"),
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	testcases := []struct {
+		name               string
+		serviceAccountFn   func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
+		serviceAccountRBAC rbacv1.PolicyRule
+		allowResize        bool
+		allowUpdate        bool
+	}{
+		{
+			name:               "pod-mutator",
+			serviceAccountFn:   authutil.ServiceAccountClient(ns.Name, "pod-mutator"),
+			serviceAccountRBAC: rbachelper.NewRule("get", "update", "patch").Groups("").Resources("pods").RuleOrDie(),
+			allowResize:        false,
+			allowUpdate:        true,
+		},
+		{
+			name:               "pod-resizer",
+			serviceAccountFn:   authutil.ServiceAccountClient(ns.Name, "pod-resizer"),
+			serviceAccountRBAC: rbachelper.NewRule("get", "update", "patch").Groups("").Resources("pods/resize").RuleOrDie(),
+			allowResize:        true,
+			allowUpdate:        false,
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. Create a test pod.
+			pod := testPod(fmt.Sprintf("resize-%d", i))
+			resp, err := adminClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error when creating pod: %v", err)
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+
+			// 2. Create a service account and fetch its client.
+			saClient := tc.serviceAccountFn(t, adminClient, server.ClientConfig, []rbacv1.PolicyRule{tc.serviceAccountRBAC})
+
+			// 3. Update pod and check whether it should be allowed.
+			resp.Spec.Containers[0].Image = "updated-image"
+			if _, err := saClient.CoreV1().Pods(ns.Name).Update(context.TODO(), resp, metav1.UpdateOptions{}); err == nil && !tc.allowUpdate {
+				t.Fatalf("Unexpected allowed pod update")
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			} else if err != nil && tc.allowUpdate {
+				t.Fatalf("Unexpected error when updating pod container resources: %v", err)
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+
+			// 4. Resize pod container resource and check whether it should be allowed.
+			resp, err = adminClient.CoreV1().Pods(ns.Name).Get(context.TODO(), resp.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error when fetching the pod: %v", err)
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+			resp.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("200m"),
+				},
+			}
+			_, err = saClient.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
+			if tc.allowResize && err != nil {
+				t.Fatalf("Unexpected pod resize failure: %v", err)
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+			if !tc.allowResize && err == nil {
+				t.Fatalf("Unexpected pod resize success")
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+
+			// 5. Delete the test pod.
+			integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+		})
+	}
+}
+
+func TestPodResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-resize", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+
+	resizeCases := []struct {
+		name        string
+		originalRes v1.ResourceRequirements
+		resize      v1.ResourceRequirements
+		valid       bool
+	}{
+		{
+			name: "cpu request change",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			resize: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("20m"),
+				},
+			},
+			valid: true,
+		},
+		{
+			name: "memory request change",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+			resize: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+			},
+			valid: true,
+		},
+		{
+			name: "storage request change",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+			resize: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+			},
+			valid: false,
+		},
+	}
+
+	for _, tc := range resizeCases {
+		pod := testPod("resize")
+		pod.Spec.Containers[0].Resources = tc.originalRes
+		resp, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Unexpected error when creating pod: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		// Part 1. Resize
+		resp.Spec.Containers[0].Resources = tc.resize
+		if _, err := client.CoreV1().Pods(ns.Name).Update(context.TODO(), resp, metav1.UpdateOptions{}); err == nil {
+			t.Fatalf("Unexpected allowed pod update")
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		} else if !strings.Contains(err.Error(), "spec: Forbidden: pod updates may not change fields other than") {
+			t.Fatalf("Unexpected error when updating pod container resources: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		resp, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
+		if tc.valid && err != nil {
+			t.Fatalf("Unexpected pod resize failure: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+		if !tc.valid && err == nil {
+			t.Fatalf("Unexpected pod resize success")
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		// Part 2. Rollback
+		if !tc.valid {
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+			continue
+		}
+		resp.Spec.Containers[0].Resources = tc.originalRes
+		_, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
+		if tc.valid && err != nil {
+			t.Fatalf("Unexpected pod resize failure: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+		if !tc.valid && err == nil {
+			t.Fatalf("Unexpected pod resize success")
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+
+	patchCases := []struct {
+		name        string
+		originalRes v1.ResourceRequirements
+		patchBody   string
+		patchType   types.PatchType
+		valid       bool
+	}{
+		{
+			name: "cpu request change (strategic)",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			patchType: types.StrategicMergePatchType,
+			patchBody: `{
+				"spec":{
+					"containers":[
+						{
+							"name":"fake-name",
+							"resources": {
+								"requests": {
+									"cpu":"20m"
+								}
+							}
+						}
+					]
+				}
+			}`,
+			valid: true,
+		},
+		{
+			name: "cpu request change (merge)",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			patchType: types.MergePatchType,
+			patchBody: `{
+				"spec":{
+					"containers":[
+						{
+							"name":"fake-name",
+							"resources": {
+								"requests": {
+									"cpu":"20m"
+								}
+							}
+						}
+					]
+				}
+			}`,
+			valid: true,
+		},
+		{
+			name: "cpu request change (JSON)",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			patchType: types.JSONPatchType,
+			patchBody: `[{
+				"op":"add",
+				"path":"/spec/containers",
+				"value":[{
+					"name":"fake-name",
+					"resources": {
+						"requests": {
+							"cpu":"20m"
+						}
+					}
+				}]
+			}]`,
+			valid: true,
+		},
+		{
+			name: "storage request change (merge)",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			patchType: types.MergePatchType,
+			patchBody: `{
+				"spec":{
+					"containers":[
+						{
+							"name":"fake-name",
+							"resources": {
+								"requests": {
+									"ephemeral-storage":"20m"
+								}
+							}
+						}
+					]
+				}
+			}`,
+			valid: false,
+		},
+	}
+
+	for _, tc := range patchCases {
+		pod := testPod("resize")
+		pod.Spec.Containers[0].Resources = tc.originalRes
+		if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Unexpected error when creating pod: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		if _, err := client.CoreV1().Pods(ns.Name).Patch(context.TODO(), pod.Name, tc.patchType, []byte(tc.patchBody), metav1.PatchOptions{}, "resize"); tc.valid && err != nil {
+			t.Fatalf("Unexpected pod resize failure: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		} else if !tc.valid && err == nil {
+			t.Fatalf("Unexpected pod resize success")
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+}
+
 func TestMutablePodSchedulingDirectives(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -870,5 +1396,246 @@ func TestMutablePodSchedulingDirectives(t *testing.T) {
 			t.Errorf("Unexpected error: got %q, want %q", err.Error(), err)
 		}
 		integration.DeletePodOrErrorf(t, client, ns.Name, tc.update.Name)
+	}
+}
+
+// Test disabling of RelaxedDNSSearchValidation after a Pod has been created
+func TestRelaxedDNSSearchValidation(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil,
+		append(framework.DefaultTestServerFlags(), "--emulated-version=1.32"), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-update-dns-search", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name               string
+		original           *v1.PodDNSConfig
+		valid              bool
+		featureGateEnabled bool
+		update             bool
+	}{
+		{
+			name:               "new pod with underscore - feature gate enabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+			valid:              true,
+			featureGateEnabled: true,
+		},
+		{
+			name:               "new pod with dot - feature gate enabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"."}},
+			valid:              true,
+			featureGateEnabled: true,
+		},
+
+		{
+			name:               "new pod without underscore - feature gate enabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"example.com"}},
+			valid:              true,
+			featureGateEnabled: true,
+		},
+		{
+			name:               "new pod with underscore - feature gate disabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+			valid:              false,
+			featureGateEnabled: false,
+		},
+		{
+			name:               "new pod with dot - feature gate disabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"."}},
+			valid:              false,
+			featureGateEnabled: false,
+		},
+		{
+			name:               "new pod without underscore - feature gate disabled",
+			original:           &v1.PodDNSConfig{Searches: []string{"example.com"}},
+			valid:              true,
+			featureGateEnabled: false,
+		},
+	}
+
+	for _, tc := range cases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedDNSSearchValidation, tc.featureGateEnabled)
+		pod := testPod("dns")
+		pod.Spec.DNSConfig = tc.original
+		_, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if tc.valid && err != nil {
+			t.Errorf("%v: %v", tc.name, err)
+		} else if !tc.valid && err == nil {
+			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
+		}
+
+		// Disable gate and perform update
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedDNSSearchValidation, false)
+		pod.ObjectMeta.Labels = map[string]string{"label": "value"}
+		_, err = client.CoreV1().Pods(ns.Name).Update(context.TODO(), pod, metav1.UpdateOptions{})
+
+		if tc.valid && err != nil {
+			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
+		} else if !tc.valid && err == nil {
+			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
+		}
+
+		if tc.valid {
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+	}
+}
+
+func TestNodeDeclaredFeatureAdmission(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.NodeDeclaredFeatures:      true,
+		features.InPlacePodVerticalScaling: true,
+	})
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-resize-feature-admission", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	nodeName := "test-node"
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-pod-",
+		},
+		Spec: v1.PodSpec{
+			NodeName: nodeName,
+			Containers: []v1.Container{
+				{
+					Name:  "test-container",
+					Image: "fakeimage",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyAlways,
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:  "test-container",
+					Ready: true,
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1"),
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                 string
+		nodeDeclaredFeatures []string
+		nodeVersion          string
+		podUpdateFn          func(pod *v1.Pod)
+		expectError          string
+	}{
+		{
+			name:                 "admission fails when required feature is not declared on node",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+			},
+			expectError: "pod update requires features GuaranteedQoSPodCPUResize which are not available on node",
+		},
+
+		{
+			name:                 "admission succeeds when required feature is declared on node",
+			nodeDeclaredFeatures: []string{ipprfeature.GuaranteedQoSPodCPUResize},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+			},
+			expectError: "",
+		},
+
+		{
+			name:                 "admission succeeds when pod update does not require any declared feature",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.ObjectMeta.Labels = map[string]string{"foo": "bar"}
+			},
+			expectError: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+				},
+				Status: v1.NodeStatus{
+					NodeInfo:         v1.NodeSystemInfo{KubeletVersion: tc.nodeVersion},
+					DeclaredFeatures: tc.nodeDeclaredFeatures,
+				},
+			}
+			_, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Nodes().Delete(context.TODO(), nodeName, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatalf("Failed to delete Node %v", err)
+				}
+			}()
+
+			createdPod, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), testPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Pods(ns.Name).Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatalf("Failed to delete Node %v", err)
+				}
+			}()
+
+			podToUpdate := createdPod.DeepCopy()
+			tc.podUpdateFn(podToUpdate)
+
+			_, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), podToUpdate.Name, podToUpdate, metav1.UpdateOptions{})
+
+			if tc.expectError == "" {
+				if err != nil {
+					t.Errorf("Expected no error, but got: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Expected error containing %q, but got no error", tc.expectError)
+				} else if !strings.Contains(err.Error(), tc.expectError) {
+					t.Errorf("Expected error containing %q, but got: %v", tc.expectError, err)
+				}
+			}
+		})
 	}
 }

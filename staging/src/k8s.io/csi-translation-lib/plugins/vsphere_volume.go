@@ -74,7 +74,7 @@ func NewvSphereCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassToCSI translates InTree vSphere storage class parameters to CSI storage class
-func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(logger klog.Logger, sc *storage.StorageClass) (*storage.StorageClass, error) {
 	if sc == nil {
 		return nil, fmt.Errorf("sc is nil")
 	}
@@ -102,7 +102,7 @@ func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.Stor
 		case "iopslimit":
 			params[paramIopslimit] = v
 		default:
-			klog.V(2).Infof("StorageClass parameter [name:%q, value:%q] is not supported", k, v)
+			logger.V(2).Info("StorageClass parameter is not supported", "name", k, "value", v)
 		}
 	}
 
@@ -124,7 +124,7 @@ func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.Stor
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with VsphereVolume set from in-tree
 // and converts the VsphereVolume source to a CSIPersistentVolumeSource
-func (t *vSphereCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
+func (t *vSphereCSITranslator) TranslateInTreeInlineVolumeToCSI(logger klog.Logger, volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.VsphereVolume == nil {
 		return nil, fmt.Errorf("volume is nil or VsphereVolume not defined on volume")
 	}
@@ -154,7 +154,7 @@ func (t *vSphereCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volum
 
 // TranslateInTreePVToCSI takes a PV with VsphereVolume set from in-tree
 // and converts the VsphereVolume source to a CSIPersistentVolumeSource
-func (t *vSphereCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (t *vSphereCSITranslator) TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil || pv.Spec.VsphereVolume == nil {
 		return nil, fmt.Errorf("pv is nil or VsphereVolume not defined on pv")
 	}

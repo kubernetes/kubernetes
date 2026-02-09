@@ -19,6 +19,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -82,7 +83,7 @@ type nodeMemory struct {
 // checks that a calculated value for NodeAllocatable is equal to the reported value
 func checkNodeAllocatableTest(ctx context.Context, f *framework.Framework) {
 
-	nodeMem := getNodeMemory(ctx, f)
+	nodeMem := getFirstNodeMemory(ctx, f)
 	framework.Logf("nodeMem says: %+v", nodeMem)
 
 	// calculate the allocatable mem based on capacity - reserved amounts
@@ -162,38 +163,25 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 	framework.Logf("Ensuring that pod %s fails to schedule", podName)
 	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, failurePod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	gomega.Eventually(ctx, func() bool {
+	gomega.Eventually(ctx, func() error {
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		if err != nil {
+			return fmt.Errorf("error getting events: %w", err)
+		}
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
 			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePod.ObjectMeta.Name {
 				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
-				return true
+				return nil
 			}
 		}
-		return false
-	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrue())
+		return fmt.Errorf("did not find any FailedScheduling event for pod %s", failurePod.ObjectMeta.Name)
+	}, 3*time.Minute, 10*time.Second).Should(gomega.Succeed())
 }
 
-// getNodeMemory populates a nodeMemory struct with information from the first
-func getNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory {
-	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: selector.String(),
-	})
-	framework.ExpectNoError(err)
-
-	// Assuming that agent nodes have the same config
-	// Make sure there is >0 agent nodes, then use the first one for info
-	gomega.Expect(nodeList.Items).ToNot(gomega.BeEmpty())
-
-	ginkgo.By("Getting memory details from node status and kubelet config")
-	status := nodeList.Items[0].Status
-	nodeName := nodeList.Items[0].ObjectMeta.Name
-
-	framework.Logf("Getting configuration details for node %s", nodeName)
-	request := f.ClientSet.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("configz")
+func getNodeMemory(ctx context.Context, f *framework.Framework, node v1.Node) nodeMemory {
+	framework.Logf("Getting memory details for node %s", node.ObjectMeta.Name)
+	request := f.ClientSet.CoreV1().RESTClient().Get().Resource("nodes").Name(node.ObjectMeta.Name).SubResource("proxy").Suffix("configz")
 	rawbytes, err := request.DoRaw(ctx)
 	framework.ExpectNoError(err)
 	kubeletConfig, err := decodeConfigz(rawbytes)
@@ -217,16 +205,32 @@ func getNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory {
 	}
 
 	nodeMem := nodeMemory{
-		capacity:      status.Capacity[v1.ResourceMemory],
-		allocatable:   status.Allocatable[v1.ResourceMemory],
+		capacity:      node.Status.Capacity[v1.ResourceMemory],
+		allocatable:   node.Status.Allocatable[v1.ResourceMemory],
 		systemReserve: systemReserve,
 		hardEviction:  hardEviction,
-		// these are not implemented and are here for future use - will always be 0 at the moment
-		kubeReserve:  kubeReserve,
-		softEviction: softEviction,
+		kubeReserve:   kubeReserve,
+		softEviction:  softEviction,
 	}
 
 	return nodeMem
+}
+
+// getNodeMemory populates a nodeMemory struct with information from the first Windows node
+// that is found in the cluster.
+func getFirstNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory {
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	framework.ExpectNoError(err)
+
+	// Assuming that agent nodes have the same config
+	// Make sure there is >0 agent nodes, then use the first one for info
+	gomega.Expect(nodeList.Items).ToNot(gomega.BeEmpty())
+
+	ginkgo.By("Getting memory details from first Windows")
+	return getNodeMemory(ctx, f, nodeList.Items[0])
 }
 
 // modified from https://github.com/kubernetes/kubernetes/blob/master/test/e2e/framework/kubelet/config.go#L110

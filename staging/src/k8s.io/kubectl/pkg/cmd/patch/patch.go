@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	"k8s.io/klog/v2"
@@ -45,7 +44,6 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
-	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -107,8 +105,6 @@ var (
 		kubectl patch deployment nginx-deployment --subresource='scale' --type='merge' -p '{"spec":{"replicas":2}}'`))
 )
 
-var supportedSubresources = []string{"status", "scale"}
-
 func NewPatchOptions(ioStreams genericiooptions.IOStreams) *PatchOptions {
 	return &PatchOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -140,12 +136,12 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 
 	cmd.Flags().StringVarP(&o.Patch, "patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.Flags().StringVar(&o.PatchFile, "patch-file", "", "A file containing a patch to be applied to the resource.")
-	cmd.Flags().StringVar(&o.PatchType, "type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
+	cmd.Flags().StringVar(&o.PatchType, "type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.List(sets.KeySet(patchTypes))))
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-patch")
-	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, patch will operate on the subresource of the requested object.", supportedSubresources...)
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, patch will operate on the subresource of the requested object.")
 
 	return cmd
 }
@@ -197,11 +193,8 @@ func (o *PatchOptions) Validate() error {
 	}
 	if len(o.PatchType) != 0 {
 		if _, ok := patchTypes[strings.ToLower(o.PatchType)]; !ok {
-			return fmt.Errorf("--type must be one of %v, not %q", sets.StringKeySet(patchTypes).List(), o.PatchType)
+			return fmt.Errorf("--type must be one of %v, not %q", sets.List(sets.KeySet(patchTypes)), o.PatchType)
 		}
-	}
-	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
-		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
 	}
 	return nil
 }
@@ -266,7 +259,7 @@ func (o *PatchOptions) RunPatch() error {
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
 				if apierrors.IsUnsupportedMediaType(err) {
-					return errors.Wrap(err, fmt.Sprintf("%s is not supported by %s", patchType, mapping.GroupVersionKind))
+					return fmt.Errorf("%s is not supported by %s: %w", patchType, mapping.GroupVersionKind, err)
 				}
 				return err
 			}

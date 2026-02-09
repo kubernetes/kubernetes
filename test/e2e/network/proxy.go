@@ -29,20 +29,21 @@ import (
 	"sync"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -83,20 +84,18 @@ var _ = common.SIGDescribe("Proxy", func() {
 			Test for Proxy, logs port endpoint
 			Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs endpoint. This endpoint MUST be reachable.
 		*/
-		ginkgo.It("should proxy logs on node with explicit kubelet port using proxy subresource ", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", ":10250/proxy/logs/") })
+		ginkgo.It("should proxy logs on node with explicit kubelet port using proxy subresource", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", ":10250/proxy/logs/") })
 
 		/*
 			Test for Proxy, logs endpoint
 			Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs endpoint. This endpoint MUST be reachable.
 		*/
-		ginkgo.It("should proxy logs on node using proxy subresource ", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", "/proxy/logs/") })
+		ginkgo.It("should proxy logs on node using proxy subresource", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", "/proxy/logs/") })
 
-		// using the porter image to serve content, access the content
-		// (of multiple pods?) from multiple (endpoints/services?)
 		/*
 			Release: v1.9
-			Testname: Proxy, logs service endpoint
-			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
+			Testname: Proxy through apiserver to a Service
+			Description: The apiserver will proxy a connection to a Service.
 		*/
 		framework.ConformanceIt("should proxy through a service and a pod", func(ctx context.Context) {
 			start := time.Now()
@@ -133,54 +132,97 @@ var _ = common.SIGDescribe("Proxy", func() {
 			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			// Make an RC with a single pod. The 'porter' image is
+			// Make a deployment with a single pod. 'agnhost porter' is
 			// a simple server which serves the values of the
 			// environmental variables below.
 			ginkgo.By("starting an echo server on multiple ports")
-			pods := []*v1.Pod{}
-			cfg := testutils.RCConfig{
-				Client:       f.ClientSet,
-				Image:        imageutils.GetE2EImage(imageutils.Agnhost),
-				Command:      []string{"/agnhost", "porter"},
-				Name:         service.Name,
-				Namespace:    f.Namespace.Name,
-				Replicas:     1,
-				PollInterval: time.Second,
-				Env: map[string]string{
-					"SERVE_PORT_80":   `<a href="/rewriteme">test</a>`,
-					"SERVE_PORT_1080": `<a href="/rewriteme">test</a>`,
-					"SERVE_PORT_160":  "foo",
-					"SERVE_PORT_162":  "bar",
 
-					"SERVE_TLS_PORT_443": `<a href="/tlsrewriteme">test</a>`,
-					"SERVE_TLS_PORT_460": `tls baz`,
-					"SERVE_TLS_PORT_462": `tls qux`,
+			deploymentConfig := e2edeployment.NewDeployment(service.Name,
+				1,
+				labels,
+				service.Name,
+				imageutils.GetE2EImage(imageutils.Agnhost),
+				appsv1.RecreateDeploymentStrategyType)
+			deploymentConfig.Spec.Template.Spec.Containers[0].Command = []string{"/agnhost", "porter"}
+			deploymentConfig.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{
+				{
+					Name:  "SERVE_PORT_80",
+					Value: `<a href="/rewriteme">test</a>`,
 				},
-				Ports: map[string]int{
-					"dest1": 160,
-					"dest2": 162,
-
-					"tlsdest1": 460,
-					"tlsdest2": 462,
+				{
+					Name:  "SERVE_PORT_1080",
+					Value: `<a href="/rewriteme">test</a>`,
 				},
-				ReadinessProbe: &v1.Probe{
-					ProbeHandler: v1.ProbeHandler{
-						HTTPGet: &v1.HTTPGetAction{
-							Port: intstr.FromInt32(80),
-						},
-					},
-					InitialDelaySeconds: 1,
-					TimeoutSeconds:      5,
-					PeriodSeconds:       10,
+				{
+					Name:  "SERVE_PORT_160",
+					Value: "foo",
 				},
-				Labels:      labels,
-				CreatedPods: &pods,
+				{
+					Name:  "SERVE_PORT_162",
+					Value: "bar",
+				},
+				{
+					Name:  "SERVE_TLS_PORT_443",
+					Value: `<a href="/tlsrewriteme">test</a>`,
+				},
+				{
+					Name:  "SERVE_TLS_PORT_460",
+					Value: "tls baz",
+				},
+				{
+					Name:  "SERVE_TLS_PORT_462",
+					Value: "tls qux",
+				},
 			}
-			err = e2erc.RunRC(ctx, cfg)
-			framework.ExpectNoError(err)
-			ginkgo.DeferCleanup(e2erc.DeleteRCAndWaitForGC, f.ClientSet, f.Namespace.Name, cfg.Name)
+			deploymentConfig.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{
+				{
+					ContainerPort: 80,
+				},
+				{
+					Name:          "dest1",
+					ContainerPort: 160,
+				},
+				{
+					Name:          "dest2",
+					ContainerPort: 162,
+				},
+				{
+					Name:          "tlsdest1",
+					ContainerPort: 460,
+				},
+				{
+					Name:          "tlsdest2",
+					ContainerPort: 462,
+				},
+			}
+			deploymentConfig.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Port: intstr.FromInt32(80),
+					},
+				},
+				InitialDelaySeconds: 1,
+				TimeoutSeconds:      5,
+				PeriodSeconds:       10,
+			}
 
-			err = waitForEndpoint(ctx, f.ClientSet, f.Namespace.Name, service.Name)
+			deployment, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Create(ctx,
+				deploymentConfig,
+				metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
+				return f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Delete(ctx, name, metav1.DeleteOptions{})
+			}, deployment.Name)
+
+			err = e2edeployment.WaitForDeploymentComplete(f.ClientSet, deployment)
+			framework.ExpectNoError(err)
+
+			podList, err := e2edeployment.GetPodsForDeployment(ctx, f.ClientSet, deployment)
+			framework.ExpectNoError(err)
+			pods := podList.Items
+
+			err = e2eendpointslice.WaitForEndpointCount(ctx, f.ClientSet, f.Namespace.Name, service.Name, 1)
 			framework.ExpectNoError(err)
 
 			// table constructors
@@ -217,6 +259,16 @@ var _ = common.SIGDescribe("Proxy", func() {
 				// podPrefix + ":dest1": "foo",
 				// podPrefix + ":dest2": "bar",
 			}
+
+			// Poll until the apiserver is aware of the service and its endpoints,
+			// before starting the main part of the test.
+			pollTestPath := subresourceServiceProxyURL("", "portname1") + "/"
+			pollTestBody := "foo"
+			err = wait.PollUntilContextTimeout(ctx, time.Second, e2eservice.ServiceEndpointsTimeout, true, func(ctx context.Context) (bool, error) {
+				body, _, _, _ := doProxy(ctx, f, pollTestPath, 0)
+				return string(body) == pollTestBody, nil
+			})
+			framework.ExpectNoError(err, "Unable to reach service through proxy")
 
 			wg := sync.WaitGroup{}
 			errs := []string{}
@@ -271,7 +323,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				framework.Failf(strings.Join(errs, "\n"))
+				framework.Fail(strings.Join(errs, "\n"))
 			}
 		})
 
@@ -596,24 +648,4 @@ func nodeProxyTest(ctx context.Context, f *framework.Framework, prefix, nodeDest
 	}
 	maxFailures := int(math.Floor(0.1 * float64(proxyAttempts)))
 	gomega.Expect(serviceUnavailableErrors).To(gomega.BeNumerically("<", maxFailures))
-}
-
-// waitForEndpoint waits for the specified endpoint to be ready.
-func waitForEndpoint(ctx context.Context, c clientset.Interface, ns, name string) error {
-	// registerTimeout is how long to wait for an endpoint to be registered.
-	registerTimeout := time.Minute
-	for t := time.Now(); time.Since(t) < registerTimeout; time.Sleep(framework.Poll) {
-		endpoint, err := c.CoreV1().Endpoints(ns).Get(ctx, name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
-			continue
-		}
-		framework.ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
-		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
-			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
-			continue
-		}
-		return nil
-	}
-	return fmt.Errorf("failed to get endpoints for %s/%s", ns, name)
 }

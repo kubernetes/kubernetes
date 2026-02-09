@@ -19,14 +19,16 @@ package dryrun
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -74,9 +76,10 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 		if len(outputFilePath) == 0 {
 			outputFilePath = file.RealPath
 		}
+		outputFilePath = filepath.ToSlash(outputFilePath)
 
 		fmt.Fprintf(w, "[dryrun] Would write file %q with content:\n", outputFilePath)
-		apiclient.PrintBytesWithLinePrefix(w, fileBytes, "\t")
+		fmt.Fprintf(w, "%s", fileBytes)
 	}
 	return errorsutil.NewAggregate(errs)
 }
@@ -90,13 +93,7 @@ func NewWaiter() apiclient.Waiter {
 }
 
 // WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) error {
-	return nil
-}
-
-// WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForAPI() error {
-	fmt.Println("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
+func (w *Waiter) WaitForControlPlaneComponents(podsMap map[string]*v1.Pod, apiServerAddress string) error {
 	return nil
 }
 
@@ -106,15 +103,13 @@ func (w *Waiter) WaitForPodsWithLabel(kvLabel string) error {
 	return nil
 }
 
-// WaitForPodToDisappear just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForPodToDisappear(podName string) error {
-	fmt.Printf("[dryrun] Would wait for the %q Pod in the %s namespace to be deleted\n", podName, metav1.NamespaceSystem)
-	return nil
-}
-
 // WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 func (w *Waiter) WaitForKubelet(healthzAddress string, healthzPort int32) error {
-	fmt.Printf("[dryrun] Would make sure the kubelet returns 'ok' at http://%s:%d/healthz\n", healthzAddress, healthzPort)
+	var (
+		addrPort        = net.JoinHostPort(healthzAddress, strconv.Itoa(int(healthzPort)))
+		healthzEndpoint = fmt.Sprintf("http://%s/healthz", addrPort)
+	)
+	fmt.Printf("[dryrun] Would make sure the kubelet returns 'ok' at %s\n", healthzEndpoint)
 	return nil
 }
 

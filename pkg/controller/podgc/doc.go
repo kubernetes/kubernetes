@@ -22,4 +22,4 @@ limitations under the License.
 // prioritizes pods to delete by sorting by creation timestamp and deleting the
 // oldest objects first. The PodGCController will not delete non-terminated
 // pods.
-package podgc // import "k8s.io/kubernetes/pkg/controller/podgc"
+package podgc

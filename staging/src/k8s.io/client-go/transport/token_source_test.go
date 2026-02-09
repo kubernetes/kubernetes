@@ -220,7 +220,10 @@ func TestTokenSourceTransportRoundTrip(t *testing.T) {
 			cachedTokenSource.tok = test.cachedToken
 
 			rt := ResettableTokenSourceWrapTransport(cachedTokenSource)(&testTransport{})
-
+			// workaround for https://github.com/golang/oauth2/pull/779
+			if test.header == nil {
+				test.header = make(http.Header)
+			}
 			rt.RoundTrip(&http.Request{Header: test.header})
 			if tts.calls != test.wantCalls {
 				t.Errorf("RoundTrip() called Token() = %d times, want %d", tts.calls, test.wantCalls)

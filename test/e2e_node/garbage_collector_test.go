@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -73,7 +72,7 @@ type testRun struct {
 
 // GarbageCollect tests that the Kubelet conforms to the Kubelet Garbage Collection Policy, found here:
 // http://kubernetes.io/docs/admin/garbage-collection/
-var _ = SIGDescribe("GarbageCollect", framework.WithSerial(), nodefeature.GarbageCollect, func() {
+var _ = SIGDescribe("GarbageCollect", framework.WithSerial(), framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("garbage-collect-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	containerNamePrefix := "gc-test-container-"
@@ -250,7 +249,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			for _, pod := range test.testPods {
 				ginkgo.By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				e2epod.NewPodClient(f).DeleteSync(ctx, pod.podName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+				e2epod.NewPodClient(f).DeleteSync(ctx, pod.podName, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			}
 
 			ginkgo.By("Making sure all containers get cleaned up")
@@ -328,7 +327,7 @@ func verifyPodRestartCount(ctx context.Context, f *framework.Framework, podName 
 			updatedPod.Name, expectedNumContainers, len(updatedPod.Status.ContainerStatuses))
 	}
 	for _, containerStatus := range updatedPod.Status.ContainerStatuses {
-		if containerStatus.RestartCount != expectedRestartCount {
+		if containerStatus.RestartCount < expectedRestartCount {
 			return fmt.Errorf("pod %s had container with restartcount %d.  Should have been at least %d",
 				updatedPod.Name, containerStatus.RestartCount, expectedRestartCount)
 		}

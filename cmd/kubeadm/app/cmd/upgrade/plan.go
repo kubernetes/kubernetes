@@ -24,7 +24,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -41,6 +40,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -120,7 +120,7 @@ func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer ou
 		return cmdutil.TypeMismatchErr("allowExperimentalUpgrades", "bool")
 	}
 
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, client, printer)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, printer)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
@@ -139,15 +139,19 @@ func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer ou
 	}
 
 	// Generate and print the upgrade plan
-	plan := genUpgradePlan(availUpgrades, configVersionStates)
+	etcdUpgrade, ok := cmdutil.ValueFromFlagsOrConfig(flagSet, options.EtcdUpgrade, upgradeCfg.Plan.EtcdUpgrade, &flags.etcdUpgrade).(*bool)
+	if !ok {
+		return cmdutil.TypeMismatchErr("etcdUpgrade", "bool")
+	}
+	plan := genUpgradePlan(availUpgrades, configVersionStates, *etcdUpgrade)
 	return printer.PrintObj(plan, os.Stdout)
 }
 
 // genUpgradePlan generates upgrade plan from available upgrades and component config version states
-func genUpgradePlan(availUpgrades []upgrade.Upgrade, configVersions []outputapiv1alpha3.ComponentConfigVersionState) *outputapiv1alpha3.UpgradePlan {
+func genUpgradePlan(availUpgrades []upgrade.Upgrade, configVersions []outputapiv1alpha3.ComponentConfigVersionState, etcdUpgrade bool) *outputapiv1alpha3.UpgradePlan {
 	plan := &outputapiv1alpha3.UpgradePlan{ConfigVersions: configVersions}
 	for _, up := range availUpgrades {
-		plan.AvailableUpgrades = append(plan.AvailableUpgrades, genAvailableUpgrade(&up))
+		plan.AvailableUpgrades = append(plan.AvailableUpgrades, genAvailableUpgrade(&up, etcdUpgrade))
 	}
 	return plan
 }
@@ -176,7 +180,7 @@ func appendKubeadmComponent(components []outputapiv1alpha3.ComponentUpgradePlan,
 }
 
 // genAvailableUpgrade generates available upgrade from upgrade object.
-func genAvailableUpgrade(up *upgrade.Upgrade) outputapiv1alpha3.AvailableUpgrade {
+func genAvailableUpgrade(up *upgrade.Upgrade, etcdUpgrade bool) outputapiv1alpha3.AvailableUpgrade {
 	components := []outputapiv1alpha3.ComponentUpgradePlan{}
 
 	if up.CanUpgradeKubelets() {
@@ -216,10 +220,12 @@ func genAvailableUpgrade(up *upgrade.Upgrade) outputapiv1alpha3.AvailableUpgrade
 	components = appendKubeadmComponent(components, up, constants.Kubeadm)
 
 	// If etcd is not external, we should include it in the upgrade plan
-	for _, oldVersion := range sortedSliceFromStringStringArrayMap(up.Before.EtcdVersions) {
-		nodeNames := up.Before.EtcdVersions[oldVersion]
-		for _, nodeName := range nodeNames {
-			components = append(components, newComponentUpgradePlan(constants.Etcd, oldVersion, up.After.EtcdVersion, nodeName))
+	if etcdUpgrade {
+		for _, oldVersion := range sortedSliceFromStringStringArrayMap(up.Before.EtcdVersions) {
+			nodeNames := up.Before.EtcdVersions[oldVersion]
+			for _, nodeName := range nodeNames {
+				components = append(components, newComponentUpgradePlan(constants.Etcd, oldVersion, up.After.EtcdVersion, nodeName))
+			}
 		}
 	}
 
@@ -228,7 +234,7 @@ func genAvailableUpgrade(up *upgrade.Upgrade) outputapiv1alpha3.AvailableUpgrade
 
 // sortedSliceFromStringStringArrayMap returns a slice of the keys in the map sorted alphabetically
 func sortedSliceFromStringStringArrayMap(strMap map[string][]string) []string {
-	strSlice := []string{}
+	strSlice := make([]string, 0, len(strMap))
 	for k := range strMap {
 		strSlice = append(strSlice, k)
 	}

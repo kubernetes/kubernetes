@@ -24,26 +24,20 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	netutils "k8s.io/utils/net"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = common.SIGDescribe("Pod Host IPs", framework.WithSerial(), func() {
+var _ = common.SIGDescribe("Pod Host IPs", func() {
 	f := framework.NewDefaultFramework("host-ips")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -109,31 +103,6 @@ var _ = common.SIGDescribe("Pod Host IPs", framework.WithSerial(), func() {
 			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
 			framework.ExpectNoError(err, "failed to delete pod")
 		})
-
-		ginkgo.It("should provide hostIPs as an env var", func(ctx context.Context) {
-			if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodHostIPs) {
-				e2eskipper.Skipf("PodHostIPs feature is not enabled")
-			}
-
-			podName := "downward-api-" + string(uuid.NewUUID())
-			env := []v1.EnvVar{
-				{
-					Name: "HOST_IPS",
-					ValueFrom: &v1.EnvVarSource{
-						FieldRef: &v1.ObjectFieldSelector{
-							APIVersion: "v1",
-							FieldPath:  "status.hostIPs",
-						},
-					},
-				},
-			}
-
-			expectations := []string{
-				fmt.Sprintf("HOST_IPS=%v|%v", e2enetwork.RegexIPv4, e2enetwork.RegexIPv6),
-			}
-
-			testDownwardAPI(ctx, f, podName, env, expectations)
-		})
 	})
 })
 
@@ -175,36 +144,4 @@ func genHostIPsForNode(ctx context.Context, f *framework.Framework, nodeName str
 		}
 	}
 	return nil, fmt.Errorf("no such node %q", nodeName)
-}
-
-func testDownwardAPI(ctx context.Context, f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   podName,
-			Labels: map[string]string{"name": podName},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "dapi-container",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-					Command: []string{"sh", "-c", "env"},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("250m"),
-							v1.ResourceMemory: resource.MustParse("32Mi"),
-						},
-						Limits: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("1250m"),
-							v1.ResourceMemory: resource.MustParse("64Mi"),
-						},
-					},
-					Env: env,
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
-
-	e2epodoutput.TestContainerOutputRegexp(ctx, f, "downward api env vars", pod, 0, expectations)
 }

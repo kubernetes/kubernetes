@@ -24,5 +24,5 @@ import (
 )
 
 func TestRoundTrip(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, scheme, fuzzer.Funcs)
+	roundtrip.RoundTripTestForScheme(t, Scheme, fuzzer.Funcs)
 }

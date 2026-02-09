@@ -21,10 +21,13 @@ keep track of registered plugins.
 package cache
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog/v2"
 )
 
@@ -36,7 +39,7 @@ type DesiredStateOfWorld interface {
 	// AddOrUpdatePlugin add the given plugin in the cache if it doesn't already exist.
 	// If it does exist in the cache, then the timestamp of the PluginInfo object in the cache will be updated.
 	// An error will be returned if socketPath is empty.
-	AddOrUpdatePlugin(socketPath string) error
+	AddOrUpdatePlugin(ctx context.Context, socketPath string) error
 
 	// RemovePlugin deletes the plugin with the given socket path from the desired
 	// state of world.
@@ -100,7 +103,7 @@ func (plugin *PluginInfo) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, d
 // that can be used in logs.
 // The msg format follows the pattern "<prefixMsg> <plugin details>: <err> ",
 func (plugin *PluginInfo) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(plugin.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(plugin.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for plugins to register
@@ -108,7 +111,7 @@ func (plugin *PluginInfo) GenerateErrorDetailed(prefixMsg string, err error) (de
 // The msg format follows the pattern "<prefixMsg> <plugin details>: <err> ".
 func (plugin *PluginInfo) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := plugin.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 // Generates an error string with the format ": <err>" if err exists
@@ -120,24 +123,27 @@ func errSuffix(err error) string {
 	return errStr
 }
 
-func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
+func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(ctx context.Context, socketPath string) error {
 	dsw.Lock()
 	defer dsw.Unlock()
+
+	logger := klog.FromContext(ctx)
 
 	if socketPath == "" {
 		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := dsw.socketFileToInfo[socketPath]; ok {
-		klog.V(2).InfoS("Plugin exists in desired state cache, timestamp will be updated", "path", socketPath)
+		logger.V(2).Info("Plugin exists in desired state cache, timestamp will be updated", "path", socketPath)
 	}
 
 	// Update the PluginInfo object.
-	// Note that we only update the timestamp in the desired state of world, not the actual state of world
+	// Note that we only update the timestamp and UUID in the desired state of world, not the actual state of world
 	// because in the reconciler, we need to check if the plugin in the actual state of world is the same
 	// version as the plugin in the desired state of world
 	dsw.socketFileToInfo[socketPath] = PluginInfo{
 		SocketPath: socketPath,
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 	}
 	return nil
 }

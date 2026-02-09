@@ -21,3 +21,15 @@ package v1beta1
 // CertificateSigningRequestListerExpansion allows custom methods to be added to
 // CertificateSigningRequestLister.
 type CertificateSigningRequestListerExpansion interface{}
+
+// ClusterTrustBundleListerExpansion allows custom methods to be added to
+// ClusterTrustBundleLister.
+type ClusterTrustBundleListerExpansion interface{}
+
+// PodCertificateRequestListerExpansion allows custom methods to be added to
+// PodCertificateRequestLister.
+type PodCertificateRequestListerExpansion interface{}
+
+// PodCertificateRequestNamespaceListerExpansion allows custom methods to be added to
+// PodCertificateRequestNamespaceLister.
+type PodCertificateRequestNamespaceListerExpansion interface{}

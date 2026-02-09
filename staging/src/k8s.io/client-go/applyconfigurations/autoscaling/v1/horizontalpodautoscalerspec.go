@@ -20,11 +20,23 @@ package v1
 
 // HorizontalPodAutoscalerSpecApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerSpec type for use
 // with apply.
+//
+// specification of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerSpecApplyConfiguration struct {
-	ScaleTargetRef                 *CrossVersionObjectReferenceApplyConfiguration `json:"scaleTargetRef,omitempty"`
-	MinReplicas                    *int32                                         `json:"minReplicas,omitempty"`
-	MaxReplicas                    *int32                                         `json:"maxReplicas,omitempty"`
-	TargetCPUUtilizationPercentage *int32                                         `json:"targetCPUUtilizationPercentage,omitempty"`
+	// reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption
+	// and will set the desired number of pods by using its Scale subresource.
+	ScaleTargetRef *CrossVersionObjectReferenceApplyConfiguration `json:"scaleTargetRef,omitempty"`
+	// minReplicas is the lower limit for the number of replicas to which the autoscaler
+	// can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the
+	// alpha feature gate HPAScaleToZero is enabled and at least one Object or External
+	// metric is configured.  Scaling is active as long as at least one metric value is
+	// available.
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	// maxReplicas is the upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
+	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
+	// targetCPUUtilizationPercentage is the target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
+	// if not specified the default autoscaling policy will be used.
+	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty"`
 }
 
 // HorizontalPodAutoscalerSpecApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerSpec type for use with

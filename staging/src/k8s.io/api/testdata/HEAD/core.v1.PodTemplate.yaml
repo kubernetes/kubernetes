@@ -213,6 +213,11 @@ template:
           fieldRef:
             apiVersion: apiVersionValue
             fieldPath: fieldPathValue
+          fileKeyRef:
+            key: keyValue
+            optional: true
+            path: pathValue
+            volumeName: volumeNameValue
           resourceFieldRef:
             containerName: containerNameValue
             divisor: "0"
@@ -266,6 +271,7 @@ template:
           tcpSocket:
             host: hostValue
             port: portValue
+        stopSignal: stopSignalValue
       livenessProbe:
         exec:
           command:
@@ -327,11 +333,18 @@ template:
       resources:
         claims:
         - name: nameValue
+          request: requestValue
         limits:
           limitsKey: "0"
         requests:
           requestsKey: "0"
       restartPolicy: restartPolicyValue
+      restartPolicyRules:
+      - action: actionValue
+        exitCodes:
+          operator: operatorValue
+          values:
+          - 2
       securityContext:
         allowPrivilegeEscalation: true
         appArmorProfile:
@@ -428,6 +441,11 @@ template:
           fieldRef:
             apiVersion: apiVersionValue
             fieldPath: fieldPathValue
+          fileKeyRef:
+            key: keyValue
+            optional: true
+            path: pathValue
+            volumeName: volumeNameValue
           resourceFieldRef:
             containerName: containerNameValue
             divisor: "0"
@@ -481,6 +499,7 @@ template:
           tcpSocket:
             host: hostValue
             port: portValue
+        stopSignal: stopSignalValue
       livenessProbe:
         exec:
           command:
@@ -542,11 +561,18 @@ template:
       resources:
         claims:
         - name: nameValue
+          request: requestValue
         limits:
           limitsKey: "0"
         requests:
           requestsKey: "0"
       restartPolicy: restartPolicyValue
+      restartPolicyRules:
+      - action: actionValue
+        exitCodes:
+          operator: operatorValue
+          values:
+          - 2
       securityContext:
         allowPrivilegeEscalation: true
         appArmorProfile:
@@ -627,6 +653,7 @@ template:
     hostPID: true
     hostUsers: true
     hostname: hostnameValue
+    hostnameOverride: hostnameOverrideValue
     imagePullSecrets:
     - name: nameValue
     initContainers:
@@ -645,6 +672,11 @@ template:
           fieldRef:
             apiVersion: apiVersionValue
             fieldPath: fieldPathValue
+          fileKeyRef:
+            key: keyValue
+            optional: true
+            path: pathValue
+            volumeName: volumeNameValue
           resourceFieldRef:
             containerName: containerNameValue
             divisor: "0"
@@ -698,6 +730,7 @@ template:
           tcpSocket:
             host: hostValue
             port: portValue
+        stopSignal: stopSignalValue
       livenessProbe:
         exec:
           command:
@@ -759,11 +792,18 @@ template:
       resources:
         claims:
         - name: nameValue
+          request: requestValue
         limits:
           limitsKey: "0"
         requests:
           requestsKey: "0"
       restartPolicy: restartPolicyValue
+      restartPolicyRules:
+      - action: actionValue
+        exitCodes:
+          operator: operatorValue
+          values:
+          - 2
       securityContext:
         allowPrivilegeEscalation: true
         appArmorProfile:
@@ -850,6 +890,14 @@ template:
     - name: nameValue
       resourceClaimName: resourceClaimNameValue
       resourceClaimTemplateName: resourceClaimTemplateNameValue
+    resources:
+      claims:
+      - name: nameValue
+        request: requestValue
+      limits:
+        limitsKey: "0"
+      requests:
+        requestsKey: "0"
     restartPolicy: restartPolicyValue
     runtimeClassName: runtimeClassNameValue
     schedulerName: schedulerNameValue
@@ -864,6 +912,7 @@ template:
       runAsGroup: 6
       runAsNonRoot: true
       runAsUser: 2
+      seLinuxChangePolicy: seLinuxChangePolicyValue
       seLinuxOptions:
         level: levelValue
         role: roleValue
@@ -1073,6 +1122,9 @@ template:
       hostPath:
         path: pathValue
         type: typeValue
+      image:
+        pullPolicy: pullPolicyValue
+        reference: referenceValue
       iscsi:
         chapAuthDiscovery: true
         chapAuthSession: true
@@ -1136,6 +1188,15 @@ template:
                 containerName: containerNameValue
                 divisor: "0"
                 resource: resourceValue
+          podCertificate:
+            certificateChainPath: certificateChainPathValue
+            credentialBundlePath: credentialBundlePathValue
+            keyPath: keyPathValue
+            keyType: keyTypeValue
+            maxExpirationSeconds: 3
+            signerName: signerNameValue
+            userAnnotations:
+              userAnnotationsKey: userAnnotationsValue
           secret:
             items:
             - key: keyValue
@@ -1197,3 +1258,7 @@ template:
         storagePolicyID: storagePolicyIDValue
         storagePolicyName: storagePolicyNameValue
         volumePath: volumePathValue
+    workloadRef:
+      name: nameValue
+      podGroup: podGroupValue
+      podGroupReplicaKey: podGroupReplicaKeyValue

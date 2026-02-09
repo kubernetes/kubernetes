@@ -39,7 +39,7 @@ import (
 func NewDryRunnableTestStorage(t *testing.T) (DryRunnableStorage, func()) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, destroy, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "")
+	s, destroy, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -65,12 +65,12 @@ func TestDryRunCreateDoesntCreate(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, true)
+	err := s.Create(context.Background(), "/pods/key", obj, out, 0, true)
 	if err != nil {
 		t.Fatalf("Failed to create new dry-run object: %v", err)
 	}
 
-	err = s.Get(context.Background(), "key", storage.GetOptions{}, out)
+	err = s.Get(context.Background(), "/pods/key", storage.GetOptions{}, out)
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeKeyNotFound {
 		t.Errorf("Expected key to be not found, error: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestDryRunCreateReturnsObject(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, true)
+	err := s.Create(context.Background(), "/pods/key", obj, out, 0, true)
 	if err != nil {
 		t.Fatalf("Failed to create new dry-run object: %v", err)
 	}
@@ -100,12 +100,12 @@ func TestDryRunCreateExistingObjectFails(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "/pods/key", obj, out, 0, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
 
-	err = s.Create(context.Background(), "key", obj, out, 0, true)
+	err = s.Create(context.Background(), "/pods/key", obj, out, 0, true)
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeKeyExists {
 		t.Errorf("Expected KeyExists error: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestDryRunUpdateMissingObjectFails(t *testing.T) {
 		return input, nil, errors.New("UpdateFunction shouldn't be called")
 	}
 
-	err := s.GuaranteedUpdate(context.Background(), "key", obj, false, nil, updateFunc, true, nil)
+	err := s.GuaranteedUpdate(context.Background(), "/pods/key", obj, false, nil, updateFunc, true, nil)
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeKeyNotFound {
 		t.Errorf("Expected key to be not found, error: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestDryRunUpdatePreconditions(t *testing.T) {
 
 	obj := UnstructuredOrDie(`{"kind": "Pod", "metadata": {"uid": "my-uid"}}`)
 	out := UnstructuredOrDie(`{}`)
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "/pods/key", obj, out, 0, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
@@ -149,12 +149,12 @@ func TestDryRunUpdatePreconditions(t *testing.T) {
 	}
 	wrongID := types.UID("wrong-uid")
 	myID := types.UID("my-uid")
-	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, &storage.Preconditions{UID: &wrongID}, updateFunc, true, nil)
+	err = s.GuaranteedUpdate(context.Background(), "/pods/key", obj, false, &storage.Preconditions{UID: &wrongID}, updateFunc, true, nil)
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeInvalidObj {
 		t.Errorf("Expected invalid object, error: %v", err)
 	}
 
-	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, &storage.Preconditions{UID: &myID}, updateFunc, true, nil)
+	err = s.GuaranteedUpdate(context.Background(), "/pods/key", obj, false, &storage.Preconditions{UID: &myID}, updateFunc, true, nil)
 	if err != nil {
 		t.Fatalf("Failed to update with valid precondition: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestDryRunUpdateDoesntUpdate(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	created := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, created, 0, false)
+	err := s.Create(context.Background(), "/pods/key", obj, created, 0, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
@@ -181,12 +181,12 @@ func TestDryRunUpdateDoesntUpdate(t *testing.T) {
 		return u, nil, nil
 	}
 
-	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, nil, updateFunc, true, nil)
+	err = s.GuaranteedUpdate(context.Background(), "/pods/key", obj, false, nil, updateFunc, true, nil)
 	if err != nil {
 		t.Fatalf("Failed to dry-run update: %v", err)
 	}
 	out := UnstructuredOrDie(`{}`)
-	err = s.Get(context.Background(), "key", storage.GetOptions{}, out)
+	err = s.Get(context.Background(), "/pods/key", storage.GetOptions{}, out)
 	if err != nil {
 		t.Fatalf("Failed to get storage: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestDryRunUpdateReturnsObject(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "/pods/key", obj, out, 0, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestDryRunUpdateReturnsObject(t *testing.T) {
 		return u, nil, nil
 	}
 
-	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, nil, updateFunc, true, nil)
+	err = s.GuaranteedUpdate(context.Background(), "/pods/key", obj, false, nil, updateFunc, true, nil)
 	if err != nil {
 		t.Fatalf("Failed to dry-run update: %v", err)
 	}
@@ -233,17 +233,17 @@ func TestDryRunDeleteDoesntDelete(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "/pods/key", obj, out, 0, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
 
-	err = s.Delete(context.Background(), "key", out, nil, rest.ValidateAllObjectFunc, true, nil)
+	err = s.Delete(context.Background(), "/pods/key", out, nil, rest.ValidateAllObjectFunc, true, nil, storage.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to dry-run delete the object: %v", err)
 	}
 
-	err = s.Get(context.Background(), "key", storage.GetOptions{}, out)
+	err = s.Get(context.Background(), "/pods/key", storage.GetOptions{}, out)
 	if err != nil {
 		t.Fatalf("Failed to retrieve dry-run deleted object: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestDryRunDeleteMissingObjectFails(t *testing.T) {
 	defer destroy()
 
 	out := UnstructuredOrDie(`{}`)
-	err := s.Delete(context.Background(), "key", out, nil, rest.ValidateAllObjectFunc, true, nil)
+	err := s.Delete(context.Background(), "/pods/key", out, nil, rest.ValidateAllObjectFunc, true, nil, storage.DeleteOptions{})
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeKeyNotFound {
 		t.Errorf("Expected key to be not found, error: %v", err)
 	}
@@ -267,14 +267,14 @@ func TestDryRunDeleteReturnsObject(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "/pods/key", obj, out, 0, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
 
 	out = UnstructuredOrDie(`{}`)
 	expected := UnstructuredOrDie(`{"kind": "Pod", "metadata": {"resourceVersion": "2"}}`)
-	err = s.Delete(context.Background(), "key", out, nil, rest.ValidateAllObjectFunc, true, nil)
+	err = s.Delete(context.Background(), "/pods/key", out, nil, rest.ValidateAllObjectFunc, true, nil, storage.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete with valid precondition: %v", err)
 	}
@@ -290,19 +290,19 @@ func TestDryRunDeletePreconditions(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod", "metadata": {"uid": "my-uid"}}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "/pods/key", obj, out, 0, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
 
 	wrongID := types.UID("wrong-uid")
 	myID := types.UID("my-uid")
-	err = s.Delete(context.Background(), "key", out, &storage.Preconditions{UID: &wrongID}, rest.ValidateAllObjectFunc, true, nil)
+	err = s.Delete(context.Background(), "/pods/key", out, &storage.Preconditions{UID: &wrongID}, rest.ValidateAllObjectFunc, true, nil, storage.DeleteOptions{})
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeInvalidObj {
 		t.Errorf("Expected invalid object, error: %v", err)
 	}
 
-	err = s.Delete(context.Background(), "key", out, &storage.Preconditions{UID: &myID}, rest.ValidateAllObjectFunc, true, nil)
+	err = s.Delete(context.Background(), "/pods/key", out, &storage.Preconditions{UID: &myID}, rest.ValidateAllObjectFunc, true, nil, storage.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete with valid precondition: %v", err)
 	}

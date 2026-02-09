@@ -17,12 +17,11 @@ limitations under the License.
 package fuzzer
 
 import (
-	fuzz "github.com/google/gofuzz"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/randfill"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -38,6 +37,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzDNS,
 		fuzzNodeRegistration,
 		fuzzLocalEtcd,
+		fuzzExternalEtcd,
 		fuzzNetworking,
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
@@ -46,8 +46,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	}
 }
 
-func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c randfill.Continue) {
+	c.FillNoCustom(obj)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 
@@ -71,16 +71,16 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }
 
-func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c randfill.Continue) {
+	c.FillNoCustom(obj)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.IgnorePreflightErrors = nil
 	obj.ImagePullSerial = ptr.To(true)
 }
 
-func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c randfill.Continue) {
+	c.FillNoCustom(obj)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CertificatesDir = "foo"
@@ -100,33 +100,42 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.CACertificateValidityPeriod = &metav1.Duration{Duration: constants.CACertificateValidityPeriod}
 }
 
-func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzDNS(obj *kubeadm.DNS, c randfill.Continue) {
+	c.FillNoCustom(obj)
 	obj.Disabled = false
 }
 
-func fuzzComponentConfigMap(obj *kubeadm.ComponentConfigMap, c fuzz.Continue) {
+func fuzzComponentConfigMap(obj *kubeadm.ComponentConfigMap, c randfill.Continue) {
 	// This is intentionally empty because component config does not exists in the public api
 	// (empty mean all ComponentConfigs fields nil, and this is necessary for getting roundtrip passing)
 }
 
-func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c randfill.Continue) {
+	c.FillNoCustom(obj)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.DataDir = "foo"
 }
 
-func fuzzNetworking(obj *kubeadm.Networking, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+// TODO: Remove this once v1beta3 API was removed.
+func fuzzExternalEtcd(obj *kubeadm.ExternalEtcd, c randfill.Continue) {
+	c.FillNoCustom(obj)
+
+	// Ensure HTTPEndpoints equals Endpoints to maintain roundtrip compatibility
+	// with v1beta3 which doesn't have HTTPEndpoints field
+	obj.HTTPEndpoints = obj.Endpoints
+}
+
+func fuzzNetworking(obj *kubeadm.Networking, c randfill.Continue) {
+	c.FillNoCustom(obj)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.DNSDomain = "foo"
 	obj.ServiceSubnet = "bar"
 }
 
-func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c randfill.Continue) {
+	c.FillNoCustom(obj)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CACertPath = "foo"
@@ -143,20 +152,20 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }
 
-func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c randfill.Continue) {
+	c.FillNoCustom(obj)
 }
 
-func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c randfill.Continue) {
+	c.FillNoCustom(obj)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CertificatesDir = "/tmp"
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }
 
-func fuzzUpgradeConfiguration(obj *kubeadm.UpgradeConfiguration, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzUpgradeConfiguration(obj *kubeadm.UpgradeConfiguration, c randfill.Continue) {
+	c.FillNoCustom(obj)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.Node.EtcdUpgrade = ptr.To(true)
@@ -168,6 +177,8 @@ func fuzzUpgradeConfiguration(obj *kubeadm.UpgradeConfiguration, c fuzz.Continue
 	obj.Apply.CertificateRenewal = ptr.To(false)
 	obj.Apply.ImagePullPolicy = corev1.PullIfNotPresent
 	obj.Apply.ImagePullSerial = ptr.To(true)
+
+	obj.Plan.EtcdUpgrade = ptr.To(true)
 
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }

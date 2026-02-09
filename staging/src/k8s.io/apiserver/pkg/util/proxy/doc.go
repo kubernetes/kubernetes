@@ -33,4 +33,4 @@ limitations under the License.
 // the TunnelingConnection. A lot of the other code in streamtunnel.go
 // is for properly upgrading both the upstream SPDY connection and the
 // downstream WebSocket connection before streaming begins.
-package proxy // import "k8s.io/apiserver/pkg/util/proxy"
+package proxy

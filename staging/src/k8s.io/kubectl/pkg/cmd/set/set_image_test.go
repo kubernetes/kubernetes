@@ -641,7 +641,7 @@ func TestSetImageRemote(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						assert.Contains(t, string(bytes), `"image":`+`"`+"thingy"+`"`, fmt.Sprintf("image not updated for %#v", input.object))
+						assert.Containsf(t, string(bytes), `"image":`+`"`+"thingy"+`"`, "image not updated for %#v", input.object)
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)
@@ -753,8 +753,8 @@ func TestSetImageRemoteWithSpecificContainers(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						assert.Contains(t, string(bytes), `"image":"`+"thingy"+`","name":`+`"nginx"`, fmt.Sprintf("image not updated for %#v", input.object))
-						assert.NotContains(t, string(bytes), `"image":"`+"thingy"+`","name":`+`"busybox"`, fmt.Sprintf("image updated for %#v", input.object))
+						assert.Containsf(t, string(bytes), `"image":"`+"thingy"+`","name":`+`"nginx"`, "image not updated for %#v", input.object)
+						assert.NotContainsf(t, string(bytes), `"image":"`+"thingy"+`","name":`+`"busybox"`, "image updated for %#v", input.object)
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)

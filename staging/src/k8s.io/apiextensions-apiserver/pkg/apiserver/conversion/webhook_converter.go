@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -76,9 +77,14 @@ type webhookConverter struct {
 
 func webhookClientConfigForCRD(crd *v1.CustomResourceDefinition) *webhook.ClientConfig {
 	apiConfig := crd.Spec.Conversion.Webhook.ClientConfig
+	caBundle := apiConfig.CABundle
+	if len(caBundle) > 0 && len(bytes.TrimSpace(caBundle)) == 0 {
+		// treat whitespace-only caBundle as empty
+		caBundle = nil
+	}
 	ret := webhook.ClientConfig{
 		Name:     fmt.Sprintf("conversion_webhook_for_%s", crd.Name),
-		CABundle: apiConfig.CABundle,
+		CABundle: caBundle,
 	}
 	if apiConfig.URL != nil {
 		ret.URL = *apiConfig.URL

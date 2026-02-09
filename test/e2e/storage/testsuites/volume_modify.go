@@ -19,20 +19,25 @@ package testsuites
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
-	e2efeature "k8s.io/kubernetes/test/e2e/feature"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -40,11 +45,11 @@ import (
 )
 
 const (
-	modifyPollInterval               = 2 * time.Second
-	setVACWaitPeriod                 = 30 * time.Second
-	modifyingConditionSyncWaitPeriod = 2 * time.Minute
-	modifyVolumeWaitPeriod           = 10 * time.Minute
-	vacCleanupWaitPeriod             = 30 * time.Second
+	modifyPollInterval     = 2 * time.Second
+	setVACWaitPeriod       = 30 * time.Second
+	modifyVolumeWaitPeriod = 10 * time.Minute
+	vacCleanupWaitPeriod   = 30 * time.Second
+	claimDeletingTimeout   = 3 * time.Minute
 )
 
 type volumeModifyTestSuite struct {
@@ -61,7 +66,7 @@ func InitCustomVolumeModifyTestSuite(patterns []storageframework.TestPattern) st
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Gi",
 			},
-			TestTags: []interface{}{e2efeature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass)},
+			TestTags: []interface{}{framework.WithFeatureGate(features.VolumeAttributesClass), feature.VolumeAttributesClass},
 		},
 	}
 }
@@ -98,7 +103,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		config *storageframework.PerTestConfig
 
 		resource *storageframework.VolumeResource
-		vac      *storagev1alpha1.VolumeAttributesClass
+		vac      *storagev1.VolumeAttributesClass
 	}
 	var l local
 
@@ -119,7 +124,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 
 		ginkgo.By("Creating VolumeAttributesClass")
-		_, err := f.ClientSet.StorageV1alpha1().VolumeAttributesClasses().Create(ctx, l.vac, metav1.CreateOptions{})
+		_, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Create(ctx, l.vac, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "While creating VolumeAttributesClass")
 
 		ginkgo.By("Creating volume")
@@ -164,10 +169,9 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
 		framework.ExpectNoError(err, "While creating test pod with VAC")
 
-		createdPVC, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(ctx, l.resource.Pvc.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "While getting created PVC")
-		// Check VAC matches on created PVC, but not current VAC in status
-		gomega.Expect(vacMatches(createdPVC, l.vac.Name, false)).To(gomega.BeTrueBecause("Created PVC should match expected VAC"))
+		ginkgo.By("Checking PVC status")
+		err = e2epv.WaitForPersistentVolumeClaimModified(ctx, f.ClientSet, l.resource.Pvc, modifyVolumeWaitPeriod)
+		framework.ExpectNoError(err, "While waiting for PVC to have expected VAC")
 	})
 
 	ginkgo.It("should modify volume with no VAC", func(ctx context.Context) {
@@ -188,15 +192,12 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		framework.ExpectNoError(err, "While creating pod for modifying")
 
 		ginkgo.By("Modifying PVC via VAC")
-		newPVC := SetPVCVACName(ctx, l.resource.Pvc, l.vac.Name, f.ClientSet, setVACWaitPeriod)
-		l.resource.Pvc = newPVC
+		l.resource.Pvc = SetPVCVACName(ctx, l.resource.Pvc, l.vac.Name, f.ClientSet, setVACWaitPeriod)
 		gomega.Expect(l.resource.Pvc).NotTo(gomega.BeNil())
 
-		ginkgo.By("Waiting for modification to finish")
-		WaitForVolumeModification(ctx, l.resource.Pvc, f.ClientSet, modifyVolumeWaitPeriod)
-
-		pvcConditions := l.resource.Pvc.Status.Conditions
-		gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "PVC should not have conditions")
+		ginkgo.By("Checking PVC status")
+		err = e2epv.WaitForPersistentVolumeClaimModified(ctx, f.ClientSet, l.resource.Pvc, modifyVolumeWaitPeriod)
+		framework.ExpectNoError(err, "While waiting for PVC to have expected VAC")
 	})
 
 	ginkgo.It("should modify volume that already has a VAC", func(ctx context.Context) {
@@ -206,7 +207,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		vacDriver, _ := driver.(storageframework.VolumeAttributesClassTestDriver)
 		newVAC := vacDriver.GetVolumeAttributesClass(ctx, l.config)
 		gomega.Expect(newVAC).NotTo(gomega.BeNil())
-		_, err := f.ClientSet.StorageV1alpha1().VolumeAttributesClasses().Create(ctx, newVAC, metav1.CreateOptions{})
+		_, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Create(ctx, newVAC, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "While creating new VolumeAttributesClass")
 		ginkgo.DeferCleanup(CleanupVAC, newVAC, f.ClientSet, vacCleanupWaitPeriod)
 
@@ -223,16 +224,174 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		framework.ExpectNoError(err, "While creating pod for modifying")
 
 		ginkgo.By("Modifying PVC via VAC")
-		newPVC := SetPVCVACName(ctx, l.resource.Pvc, newVAC.Name, f.ClientSet, setVACWaitPeriod)
+		l.resource.Pvc = SetPVCVACName(ctx, l.resource.Pvc, newVAC.Name, f.ClientSet, setVACWaitPeriod)
+		gomega.Expect(l.resource.Pvc).NotTo(gomega.BeNil())
+
+		ginkgo.By("Checking PVC status")
+		err = e2epv.WaitForPersistentVolumeClaimModified(ctx, f.ClientSet, l.resource.Pvc, modifyVolumeWaitPeriod)
+		framework.ExpectNoError(err, "While waiting for PVC to have expected VAC")
+	})
+
+	// Marked as flaky until https://github.com/kubernetes-csi/external-resizer/issues/483 is solved.
+	framework.It("should recover from invalid target VAC by updating PVC to new valid VAC", framework.WithFlaky(), func(ctx context.Context) {
+		init(ctx, false /* volume created without VAC */)
+		ginkgo.DeferCleanup(cleanup)
+
+		// Create VAC with unsupported parameter
+		invalidVAC := MakeInvalidVAC(l.config)
+		_, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Create(ctx, invalidVAC, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "While creating new VolumeAttributesClass")
+		ginkgo.DeferCleanup(CleanupVAC, invalidVAC, f.ClientSet, vacCleanupWaitPeriod)
+
+		ginkgo.By("Creating a pod with dynamically provisioned volume")
+		podConfig := e2epod.Config{
+			NS:            f.Namespace.Name,
+			PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+			SeLinuxLabel:  e2epod.GetLinuxLabel(),
+			NodeSelection: l.config.ClientNodeSelection,
+			ImageID:       e2epod.GetDefaultTestImageID(),
+		}
+		pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, f.ClientSet, &podConfig, f.Timeouts.PodStart)
+		ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
+		framework.ExpectNoError(err, "While creating pod for modifying")
+
+		ginkgo.By("Attempting to modify PVC via VolumeAttributeClass that contains unsupported parameters")
+		newPVC := SetPVCVACName(ctx, l.resource.Pvc, invalidVAC.Name, f.ClientSet, setVACWaitPeriod)
 		l.resource.Pvc = newPVC
 		gomega.Expect(l.resource.Pvc).NotTo(gomega.BeNil())
 
-		ginkgo.By("Waiting for modification to finish")
-		WaitForVolumeModification(ctx, l.resource.Pvc, f.ClientSet, modifyVolumeWaitPeriod)
+		ginkgo.By("Waiting for modification to fail")
+		err = e2epv.WaitForPersistentVolumeClaimModificationFailure(ctx, f.ClientSet, l.resource.Pvc, modifyVolumeWaitPeriod)
+		framework.ExpectNoError(err, "While waiting for PVC to have conditions")
 
-		pvcConditions := l.resource.Pvc.Status.Conditions
-		gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "PVC should not have conditions")
+		ginkgo.By("Modifying PVC to new valid VAC")
+		l.resource.Pvc = SetPVCVACName(ctx, l.resource.Pvc, l.vac.Name, f.ClientSet, setVACWaitPeriod)
+		gomega.Expect(l.resource.Pvc).NotTo(gomega.BeNil())
+
+		ginkgo.By("Checking PVC status")
+		err = e2epv.WaitForPersistentVolumeClaimModified(ctx, f.ClientSet, l.resource.Pvc, modifyVolumeWaitPeriod)
+		framework.ExpectNoError(err, "While waiting for PVC to have expected VAC")
 	})
+
+	ginkgo.It("should be protected by vac-protection finalizer", func(ctx context.Context) {
+		init(ctx, false /* volume created without VAC */)
+		ginkgo.DeferCleanup(cleanup)
+
+		vacDriver, _ := driver.(storageframework.VolumeAttributesClassTestDriver)
+		newVAC := vacDriver.GetVolumeAttributesClass(ctx, l.config)
+		gomega.Expect(newVAC).NotTo(gomega.BeNil())
+		createdVAC, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Create(ctx, newVAC, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "While creating new VolumeAttributesClass")
+		ginkgo.DeferCleanup(CleanupVAC, newVAC, f.ClientSet, vacCleanupWaitPeriod)
+
+		ginkgo.By("Verifying that the vac-protection finalizer is set when it is created")
+		gomega.Expect(createdVAC.Finalizers).Should(gomega.ContainElement(volumeutil.VACProtectionFinalizer),
+			"vac-protection finalizer was not set for VolumeAttributesClass %q", createdVAC.Name)
+
+		ginkgo.By("Creating a pod with dynamically provisioned volume")
+		podConfig := e2epod.Config{
+			NS:            f.Namespace.Name,
+			PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+			SeLinuxLabel:  e2epod.GetLinuxLabel(),
+			NodeSelection: l.config.ClientNodeSelection,
+			ImageID:       e2epod.GetDefaultTestImageID(),
+		}
+		pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, f.ClientSet, &podConfig, f.Timeouts.PodStart)
+		ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
+		framework.ExpectNoError(err, "While creating pod for modifying")
+
+		ginkgo.By("Modifying PVC via VAC")
+		l.resource.Pvc = SetPVCVACName(ctx, l.resource.Pvc, newVAC.Name, f.ClientSet, setVACWaitPeriod)
+		gomega.Expect(l.resource.Pvc).NotTo(gomega.BeNil())
+
+		ginkgo.By("Checking PVC status")
+		err = e2epv.WaitForPersistentVolumeClaimModified(ctx, f.ClientSet, l.resource.Pvc, modifyVolumeWaitPeriod)
+		framework.ExpectNoError(err, "While waiting for PVC to have expected VAC")
+
+		ginkgo.By("Attempting to delete the VolumeAttributesClass should be stuck and the vac-protection finalizer is consistently exists")
+		err = f.ClientSet.StorageV1().VolumeAttributesClasses().Delete(ctx, newVAC.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "Failed to delete VolumeAttributesClass %q", newVAC.Name)
+		// Check that the finalizer is consistently exists
+		gomega.Consistently(ctx, framework.GetObject(f.ClientSet.StorageV1().VolumeAttributesClasses().Get, createdVAC.Name, metav1.GetOptions{})).
+			WithPolling(framework.Poll).WithTimeout(vacCleanupWaitPeriod).Should(gomega.HaveField("Finalizers",
+			gomega.ContainElement(volumeutil.VACProtectionFinalizer)), "finalizer %s was unexpectedly removed", volumeutil.VACProtectionFinalizer)
+
+		ginkgo.By("Deleting the pod gracefully")
+		err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
+		framework.ExpectNoError(err, "failed to delete pod")
+
+		ginkgo.By("Update the PV reclaim policy to retain")
+		pvc, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(ctx, l.resource.Pvc.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get PVC %q", l.resource.Pvc.Name)
+		pvName := pvc.Spec.VolumeName
+		pv, err := f.ClientSet.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get PV %q", pvName)
+		originPv := pv.DeepCopy()
+		pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
+		_, err = f.ClientSet.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+		ginkgo.DeferCleanup(recoverPvReclaimPolicy, f.ClientSet, originPv)
+		framework.ExpectNoError(err, "Failed to update PV %q reclaim policy", pvName)
+
+		// The vac_protection_controller make sure there is a VolumeAttributesClass that is not used by any PVC/PV
+		// and the VolumeAttributesClass has the vac-protection finalizer, so the VolumeAttributesClass should not be deleted
+		// after the PVC is deleted since the PVC bound PV which with the same vac is retained.
+		ginkgo.By(fmt.Sprintf("Deleting PVC %q to make the vac unused for the PVC", newVAC.Name))
+		err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(ctx, l.resource.Pvc.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "Failed to delete PVC %q", l.resource.Pvc.Name)
+
+		ginkgo.By(fmt.Sprintf("Waiting for PVC %q to be fully deleted", l.resource.Pvc.Name))
+		gomega.Eventually(ctx, func() bool {
+			_, err := f.ClientSet.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Name).Get(ctx, l.resource.Pvc.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err)
+		}).
+			WithPolling(framework.Poll).
+			WithTimeout(claimDeletingTimeout).
+			Should(gomega.BeTrueBecause("pvc unexpectedly still exists"))
+
+		ginkgo.By(fmt.Sprintf("Waiting for PV %q to be released", pvName))
+		gomega.Eventually(func() v1.PersistentVolumePhase {
+			pv, err := f.ClientSet.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+			if err != nil {
+				framework.Logf("Failed to get PV %q: %v", pvName, err)
+				return ""
+			}
+			return pv.Status.Phase
+		}).
+			WithPolling(framework.Poll).
+			WithTimeout(claimDeletingTimeout).
+			Should(gomega.Equal(v1.VolumeReleased))
+
+		ginkgo.By(fmt.Sprintf("Checking the vac-protection finalizer is still consistently exists on VolumeAttributesClass %q", newVAC.Name))
+		gomega.Consistently(ctx, framework.GetObject(f.ClientSet.StorageV1().VolumeAttributesClasses().Get, createdVAC.Name, metav1.GetOptions{})).
+			WithPolling(framework.Poll).
+			WithTimeout(vacCleanupWaitPeriod).
+			Should(gomega.HaveField("Finalizers",
+				gomega.ContainElement(volumeutil.VACProtectionFinalizer)), "finalizer %s was unexpectedly removed", volumeutil.VACProtectionFinalizer)
+
+		ginkgo.By(fmt.Sprintf("Deleting PV %q to make the vac unused for the PV", newVAC.Name))
+		pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimDelete
+		recoverPvReclaimPolicy(ctx, f.ClientSet, pv)
+
+		ginkgo.By(fmt.Sprintf("Waiting for PV %q to be deleted", pvName))
+		gomega.Eventually(func() bool {
+			_, err := f.ClientSet.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+			return apierrors.IsNotFound(err)
+		}).
+			WithPolling(framework.Poll).
+			WithTimeout(claimDeletingTimeout).
+			Should(gomega.BeTrueBecause("pv unexpectedly still exists"))
+
+		ginkgo.By(fmt.Sprintf("Confirming final deletion of VolumeAttributesClass %q", newVAC.Name))
+		gomega.Eventually(ctx, func(ctx context.Context) bool {
+			_, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Get(ctx, newVAC.Name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err)
+		}).
+			WithPolling(framework.Poll).
+			WithTimeout(vacCleanupWaitPeriod).
+			Should(gomega.BeTrueBecause("vac unexpectedly still exists"))
+
+	})
+
 }
 
 // SetPVCVACName sets the VolumeAttributesClassName on a PVC object
@@ -240,55 +399,58 @@ func SetPVCVACName(ctx context.Context, origPVC *v1.PersistentVolumeClaim, name 
 	pvcName := origPVC.Name
 	var patchedPVC *v1.PersistentVolumeClaim
 
-	gomega.Eventually(ctx, func(g gomega.Gomega) {
+	gomega.Eventually(ctx, func() error {
 		var err error
 		patch := []map[string]interface{}{{"op": "replace", "path": "/spec/volumeAttributesClassName", "value": name}}
 		patchBytes, _ := json.Marshal(patch)
 
 		patchedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Patch(ctx, pvcName, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "While patching PVC to add VAC name")
+		return err
 	}, timeout, modifyPollInterval).Should(gomega.Succeed())
 
 	return patchedPVC
 }
 
-// WaitForVolumeModification waits for the volume to be modified
-// The input PVC is assumed to have a VolumeAttributesClassName set
-func WaitForVolumeModification(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface, timeout time.Duration) {
-	pvName := pvc.Spec.VolumeName
-	gomega.Eventually(ctx, func(g gomega.Gomega) {
-		pv, err := c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "While getting existing PV")
-		g.Expect(pv.Spec.VolumeAttributesClassName).NotTo(gomega.BeNil())
-		newPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "While getting new PVC")
-		g.Expect(vacMatches(newPVC, *pv.Spec.VolumeAttributesClassName, true)).To(gomega.BeTrueBecause("Modified PVC should match expected VAC"))
-	}, timeout, modifyPollInterval).Should(gomega.Succeed())
+// MakeInvalidVAC creates a VolumeAttributesClass with an invalid parameter
+func MakeInvalidVAC(config *storageframework.PerTestConfig) *storagev1.VolumeAttributesClass {
+	return storageframework.CopyVolumeAttributesClass(&storagev1.VolumeAttributesClass{
+		DriverName: config.GetUniqueDriverName(),
+		Parameters: map[string]string{
+			"xxInvalidParameterKey": "xxInvalidParameterValue",
+		},
+	}, config.Framework.Namespace.Name, "e2e-vac-invalid")
 }
 
-func CleanupVAC(ctx context.Context, vac *storagev1alpha1.VolumeAttributesClass, c clientset.Interface, timeout time.Duration) {
+// CleanupVAC cleans up the test VolumeAttributesClass
+func CleanupVAC(ctx context.Context, vac *storagev1.VolumeAttributesClass, c clientset.Interface, timeout time.Duration) {
 	gomega.Eventually(ctx, func() error {
-		return c.StorageV1alpha1().VolumeAttributesClasses().Delete(ctx, vac.Name, metav1.DeleteOptions{})
+		err := c.StorageV1().VolumeAttributesClasses().Delete(ctx, vac.Name, metav1.DeleteOptions{})
+		if apierrors.IsNotFound(err) {
+			framework.Logf("VolumeAttributesClass %q is already cleaned up", vac.Name)
+			return nil
+		}
+		return err
 	}, timeout, modifyPollInterval).Should(gomega.BeNil())
 }
 
-func vacMatches(pvc *v1.PersistentVolumeClaim, expectedVac string, checkStatusCurrentVac bool) bool {
-	// Check the following to ensure the VAC matches and that all pending modifications are complete:
-	// 1. VAC Name matches Expected
-	// 2. PVC Modify Volume status is either nil or has an empty status string
-	// 3. PVC Status Current VAC Matches Expected (only if checkStatusCurrentVac is true)
-	// (3) is only expected to be true after a VAC is modified, but not when a VAC is used to create a volume
-	if pvc.Spec.VolumeAttributesClassName == nil || *pvc.Spec.VolumeAttributesClassName != expectedVac {
-		return false
-	}
-	if pvc.Status.ModifyVolumeStatus != nil && (pvc.Status.ModifyVolumeStatus.Status != "" || pvc.Status.ModifyVolumeStatus.TargetVolumeAttributesClassName != expectedVac) {
-		return false
-	}
-	if checkStatusCurrentVac {
-		if pvc.Status.CurrentVolumeAttributesClassName == nil || *pvc.Status.CurrentVolumeAttributesClassName != expectedVac {
-			return false
+// recoverPvReclaimPolicy recovers the test pv's reclaim policy to expected used for clean up test PV
+func recoverPvReclaimPolicy(ctx context.Context, c clientset.Interface, expectedPv *v1.PersistentVolume) {
+	setPvReclaimPolicyErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pv, err := c.CoreV1().PersistentVolumes().Get(ctx, expectedPv.Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				framework.Logf("PV %q is already cleaned up", expectedPv.Name)
+				return nil
+			}
+			return err
 		}
-	}
-
-	return true
+		if pv.Spec.PersistentVolumeReclaimPolicy == expectedPv.Spec.PersistentVolumeReclaimPolicy {
+			framework.Logf("PV %q reclaim policy is already recovered to %q", expectedPv.Name, expectedPv.Spec.PersistentVolumeReclaimPolicy)
+			return nil
+		}
+		pv.Spec.PersistentVolumeReclaimPolicy = expectedPv.Spec.PersistentVolumeReclaimPolicy
+		_, err = c.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+		return err
+	})
+	framework.ExpectNoError(setPvReclaimPolicyErr, "Failed to set PV %q reclaim policy to %q", expectedPv.Name, expectedPv.Spec.PersistentVolumeReclaimPolicy)
 }

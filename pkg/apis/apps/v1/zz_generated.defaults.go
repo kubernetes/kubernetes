@@ -22,7 +22,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -32,18 +32,18 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*v1.DaemonSet)) })
-	scheme.AddTypeDefaultingFunc(&v1.DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*v1.DaemonSetList)) })
-	scheme.AddTypeDefaultingFunc(&v1.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*v1.Deployment)) })
-	scheme.AddTypeDefaultingFunc(&v1.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*v1.DeploymentList)) })
-	scheme.AddTypeDefaultingFunc(&v1.ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*v1.ReplicaSet)) })
-	scheme.AddTypeDefaultingFunc(&v1.ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*v1.ReplicaSetList)) })
-	scheme.AddTypeDefaultingFunc(&v1.StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*v1.StatefulSet)) })
-	scheme.AddTypeDefaultingFunc(&v1.StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*v1.StatefulSetList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1.DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*appsv1.DaemonSet)) })
+	scheme.AddTypeDefaultingFunc(&appsv1.DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*appsv1.DaemonSetList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*appsv1.Deployment)) })
+	scheme.AddTypeDefaultingFunc(&appsv1.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*appsv1.DeploymentList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1.ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*appsv1.ReplicaSet)) })
+	scheme.AddTypeDefaultingFunc(&appsv1.ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*appsv1.ReplicaSetList)) })
+	scheme.AddTypeDefaultingFunc(&appsv1.StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*appsv1.StatefulSet)) })
+	scheme.AddTypeDefaultingFunc(&appsv1.StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*appsv1.StatefulSetList)) })
 	return nil
 }
 
-func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
+func SetObjectDefaults_DaemonSet(in *appsv1.DaemonSet) {
 	SetDefaults_DaemonSet(in)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -149,6 +149,12 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -216,6 +222,12 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -285,6 +297,12 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
@@ -339,16 +357,20 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 		}
 	}
 	apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
-func SetObjectDefaults_DaemonSetList(in *v1.DaemonSetList) {
+func SetObjectDefaults_DaemonSetList(in *appsv1.DaemonSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_DaemonSet(a)
 	}
 }
 
-func SetObjectDefaults_Deployment(in *v1.Deployment) {
+func SetObjectDefaults_Deployment(in *appsv1.Deployment) {
 	SetDefaults_Deployment(in)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -454,6 +476,12 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -521,6 +549,12 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -590,6 +624,12 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
@@ -644,16 +684,20 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 		}
 	}
 	apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
-func SetObjectDefaults_DeploymentList(in *v1.DeploymentList) {
+func SetObjectDefaults_DeploymentList(in *appsv1.DeploymentList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Deployment(a)
 	}
 }
 
-func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
+func SetObjectDefaults_ReplicaSet(in *appsv1.ReplicaSet) {
 	SetDefaults_ReplicaSet(in)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -759,6 +803,12 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -826,6 +876,12 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -895,6 +951,12 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
@@ -949,16 +1011,20 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 		}
 	}
 	apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
-func SetObjectDefaults_ReplicaSetList(in *v1.ReplicaSetList) {
+func SetObjectDefaults_ReplicaSetList(in *appsv1.ReplicaSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicaSet(a)
 	}
 }
 
-func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
+func SetObjectDefaults_StatefulSet(in *appsv1.StatefulSet) {
 	SetDefaults_StatefulSet(in)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -1064,6 +1130,12 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -1131,6 +1203,12 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -1200,6 +1278,12 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
@@ -1254,6 +1338,10 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 		}
 	}
 	apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
 		apiscorev1.SetDefaults_PersistentVolumeClaim(a)
@@ -1265,7 +1353,7 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 	}
 }
 
-func SetObjectDefaults_StatefulSetList(in *v1.StatefulSetList) {
+func SetObjectDefaults_StatefulSetList(in *appsv1.StatefulSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_StatefulSet(a)

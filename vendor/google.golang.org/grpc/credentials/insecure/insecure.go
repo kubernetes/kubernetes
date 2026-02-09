@@ -30,7 +30,7 @@ import (
 // NewCredentials returns a credentials which disables transport security.
 //
 // Note that using this credentials with per-RPC credentials which require
-// transport security is incompatible and will cause grpc.Dial() to fail.
+// transport security is incompatible and will cause RPCs to fail.
 func NewCredentials() credentials.TransportCredentials {
 	return insecureTC{}
 }
@@ -40,7 +40,7 @@ func NewCredentials() credentials.TransportCredentials {
 // NoSecurity.
 type insecureTC struct{}
 
-func (insecureTC) ClientHandshake(ctx context.Context, _ string, conn net.Conn) (net.Conn, credentials.AuthInfo, error) {
+func (insecureTC) ClientHandshake(_ context.Context, _ string, conn net.Conn) (net.Conn, credentials.AuthInfo, error) {
 	return conn, info{credentials.CommonAuthInfo{SecurityLevel: credentials.NoSecurity}}, nil
 }
 
@@ -69,6 +69,12 @@ type info struct {
 // AuthType returns the type of info as a string.
 func (info) AuthType() string {
 	return "insecure"
+}
+
+// ValidateAuthority allows any value to be overridden for the :authority
+// header.
+func (info) ValidateAuthority(string) error {
+	return nil
 }
 
 // insecureBundle implements an insecure bundle.

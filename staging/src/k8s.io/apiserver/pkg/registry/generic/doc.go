@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package generic provides a generic object store interface and a
 // generic label/field matching type.
-package generic // import "k8s.io/apiserver/pkg/registry/generic"
+package generic

@@ -398,6 +398,9 @@ func Durationp(key string, val *time.Duration) Field {
 // struct-like user-defined types to the logging context. The struct's
 // MarshalLogObject method is called lazily.
 func Object(key string, val zapcore.ObjectMarshaler) Field {
+	if val == nil {
+		return nilField(key)
+	}
 	return Field{Key: key, Type: zapcore.ObjectMarshalerType, Interface: val}
 }
 
@@ -431,6 +434,13 @@ func (d dictObject) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
+// DictObject constructs a [zapcore.ObjectMarshaler] with the given list of fields.
+// The resulting object marshaler can be used as input to [Object], [Objects], or
+// any other functions that expect an object marshaler.
+func DictObject(val ...Field) zapcore.ObjectMarshaler {
+	return dictObject(val)
+}
+
 // We discovered an issue where zap.Any can cause a performance degradation
 // when used in new goroutines.
 //
@@ -460,6 +470,8 @@ func (d dictObject) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 // - https://github.com/uber-go/zap/pull/1304
 // - https://github.com/uber-go/zap/pull/1305
 // - https://github.com/uber-go/zap/pull/1308
+//
+// See https://github.com/golang/go/issues/62077 for upstream issue.
 type anyFieldC[T any] func(string, T) Field
 
 func (f anyFieldC[T]) Any(key string, val any) Field {

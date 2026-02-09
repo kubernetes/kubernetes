@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -32,6 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 var (
@@ -559,9 +561,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			}}),
 		},
 		{
-			name: "[VolumeCapacityPriority=off] shape should be nil when the feature is off",
+			name: "[StorageCapacityScoring=off] shape should be nil when the feature is off",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: false,
+				features.StorageCapacityScoring: false,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
@@ -569,9 +571,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "[VolumeCapacityPriority=off] error if the shape is not nil when the feature is off",
+			name: "[StorageCapacityScoring=off] error if the shape is not nil when the feature is off",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: false,
+				features.StorageCapacityScoring: false,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
@@ -586,9 +588,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			}}),
 		},
 		{
-			name: "[VolumeCapacityPriority=on] shape should not be empty",
+			name: "[StorageCapacityScoring=on] shape should not be empty",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: true,
+				features.StorageCapacityScoring: true,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
@@ -600,9 +602,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			}}),
 		},
 		{
-			name: "[VolumeCapacityPriority=on] shape points must be sorted in increasing order",
+			name: "[StorageCapacityScoring=on] shape points must be sorted in increasing order",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: true,
+				features.StorageCapacityScoring: true,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
@@ -618,9 +620,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			}}),
 		},
 		{
-			name: "[VolumeCapacityPriority=on] shape point: invalid utilization and score",
+			name: "[StorageCapacityScoring=on] shape point: invalid utilization and score",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: true,
+				features.StorageCapacityScoring: true,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
@@ -654,9 +656,7 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			for k, v := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
-			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
 			err := ValidateVolumeBindingArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateVolumeBindingArgs returned err (-want,+got):\n%s", diff)
@@ -684,7 +684,7 @@ func TestValidateFitArgs(t *testing.T) {
 				IgnoredResources: []string{fmt.Sprintf("longvalue%s", strings.Repeat("a", 64))},
 				ScoringStrategy:  defaultScoringStrategy,
 			},
-			expect: "name part must be no more than 63 characters",
+			expect: "name part must be no more than 63 bytes",
 		},
 		{
 			name: "IgnoredResources: name is empty",
@@ -700,7 +700,7 @@ func TestValidateFitArgs(t *testing.T) {
 				IgnoredResources: []string{"example.com/aaa/bbb"},
 				ScoringStrategy:  defaultScoringStrategy,
 			},
-			expect: "a qualified name must consist of alphanumeric characters",
+			expect: "a valid label key must consist of",
 		},
 		{
 			name: "IgnoredResources: valid args",
@@ -730,7 +730,7 @@ func TestValidateFitArgs(t *testing.T) {
 				IgnoredResourceGroups: []string{strings.Repeat("a", 64)},
 				ScoringStrategy:       defaultScoringStrategy,
 			},
-			expect: "name part must be no more than 63 characters",
+			expect: "name part must be no more than 63 bytes",
 		},
 		{
 			name: "IgnoredResourceGroups: name cannot be contain slash",
@@ -754,12 +754,28 @@ func TestValidateFitArgs(t *testing.T) {
 			},
 			expect: `Unsupported value: "Invalid"`,
 		},
+		{
+			name: "ScoringStrategy: requestedToCapacityRatio field is missing",
+			args: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type: config.RequestedToCapacityRatio,
+				},
+			},
+			expect: "must be specified when type is RequestedToCapacityRatio",
+		},
 	}
 
 	for _, test := range argsTest {
 		t.Run(test.name, func(t *testing.T) {
-			if err := ValidateNodeResourcesFitArgs(nil, &test.args); err != nil && (!strings.Contains(err.Error(), test.expect)) {
-				t.Errorf("case[%v]: error details do not include %v", test.name, err)
+			err := ValidateNodeResourcesFitArgs(nil, &test.args)
+			if err != nil {
+				if test.expect == "" {
+					t.Errorf("case[%v]: unexpected validation error %v", test.name, err)
+				} else if !strings.Contains(err.Error(), test.expect) {
+					t.Errorf("case[%v]: error details do not include %v", test.name, err)
+				}
+			} else if test.expect != "" {
+				t.Errorf("case[%v]: expected validation error", test.name)
 			}
 		})
 	}
@@ -974,7 +990,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeRequired,
-					Field: "scoringStrategy.shape",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape",
 				},
 			},
 		},
@@ -1026,7 +1042,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[0].utilization",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].utilization",
 				},
 			},
 		},
@@ -1041,7 +1057,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[0].utilization",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].utilization",
 				},
 			},
 		},
@@ -1060,7 +1076,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[1].utilization",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[1].utilization",
 				},
 			},
 		},
@@ -1101,7 +1117,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[2].utilization",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[2].utilization",
 				},
 			},
 		},
@@ -1116,7 +1132,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[0].score",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].score",
 				},
 			},
 		},
@@ -1131,7 +1147,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.shape[0].score",
+					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].score",
 				},
 			},
 		},
@@ -1151,6 +1167,125 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			err := ValidateNodeResourcesFitArgs(nil, &args)
 			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateNodeResourcesFitArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateDynamicResourcesArgs(t *testing.T) {
+	cases := map[string]struct {
+		args                      config.DynamicResourcesArgs
+		wantErrs                  field.ErrorList
+		filterTimeoutDisabled     bool
+		bindingConditionsDisabled bool
+		deviceStatusDisabled      bool
+	}{
+		"valid args (default)": {
+			args: config.DynamicResourcesArgs{
+				FilterTimeout:  &metav1.Duration{Duration: config.DynamicResourcesFilterTimeoutDefault},
+				BindingTimeout: &metav1.Duration{Duration: config.DynamicResourcesBindingTimeoutDefault},
+			},
+		},
+		"valid args (disabled)": {
+			args: config.DynamicResourcesArgs{},
+		},
+		"negative FilterTimeout": {
+			args: config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: -time.Second},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "filterTimeout",
+					Detail: "must be zero or positive",
+				},
+			},
+		},
+		"negative FilterTimeout, disabled": {
+			args: config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: -time.Second},
+			},
+			filterTimeoutDisabled: true,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeForbidden,
+					Field:  "filterTimeout",
+					Detail: "DRASchedulingFilterTimeout feature is disabled",
+				},
+			},
+		},
+
+		// BindingTimeout tests
+		"valid BindingTimeout": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: 30 * time.Second},
+			},
+		},
+		"BindingTimeout < 1s (0s)": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: 0},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "bindingTimeout",
+					Detail: "must be at least 1 second",
+				},
+			},
+		},
+		"BindingTimeout < 1s (negative)": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: -time.Second},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "bindingTimeout",
+					Detail: "must be at least 1 second",
+				},
+			},
+		},
+		"BindingTimeout set but DRADeviceBindingConditions disabled": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: time.Second},
+			},
+			bindingConditionsDisabled: true,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeForbidden,
+					Field:  "bindingTimeout",
+					Detail: "requires DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates to be enabled",
+				},
+			},
+		},
+		"BindingTimeout set but DRAResourceClaimDeviceStatus disabled": {
+			args: config.DynamicResourcesArgs{
+				BindingTimeout: &metav1.Duration{Duration: time.Second},
+			},
+			deviceStatusDisabled: true,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeForbidden,
+					Field:  "bindingTimeout",
+					Detail: "requires DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates to be enabled",
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateDynamicResourcesArgs(
+				nil,
+				&tc.args,
+				schedfeature.Features{
+					EnableDRASchedulerFilterTimeout:    !tc.filterTimeoutDisabled,
+					EnableDRADeviceBindingConditions:   !tc.bindingConditionsDisabled,
+					EnableDRAResourceClaimDeviceStatus: !tc.deviceStatusDisabled,
+				},
+			)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Errorf("ValidateDynamicResourcesArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -47,8 +46,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 var (
@@ -104,9 +105,9 @@ func newCmdCertsUtility(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "certs",
 		Aliases: []string{"certificates"},
-		Short:   "Commands related to handling kubernetes certificates",
-		Run:     cmdutil.SubCmdRun(),
+		Short:   "Commands related to handling Kubernetes certificates",
 	}
+	cmdutil.RequireSubcommand(cmd)
 
 	cmd.AddCommand(newCmdCertsRenewal(out))
 	cmd.AddCommand(newCmdCertsExpiration(out, kubeadmconstants.KubernetesDir))
@@ -215,9 +216,8 @@ func newCmdCertsRenewal(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "renew",
 		Short: "Renew certificates for a Kubernetes cluster",
-		Long:  cmdutil.MacroCommandLongDescription,
-		Run:   cmdutil.SubCmdRun(),
 	}
+	cmdutil.RequireSubcommand(cmd)
 
 	cmd.AddCommand(getRenewSubCommands(out, kubeadmconstants.KubernetesDir)...)
 
@@ -347,7 +347,10 @@ func getInternalCfg(cfgPath string, client kubernetes.Interface, cfg kubeadmapiv
 	// In case the user is not providing a custom config, try to get current config from the cluster.
 	// NB. this operation should not block, because we want to allow certificate renewal also in case of not-working clusters
 	if cfgPath == "" && client != nil {
-		internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, false, false)
+		getNodeRegistration := true
+		getAPIEndpoint := staticpodutil.IsControlPlaneNode()
+		getComponentConfigs := true
+		internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, getNodeRegistration, getAPIEndpoint, getComponentConfigs)
 		if err == nil {
 			printer.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
 			// certificate renewal or expiration checking doesn't depend on a running cluster, which means the CertificatesDir

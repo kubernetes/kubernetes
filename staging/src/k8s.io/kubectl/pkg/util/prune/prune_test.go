@@ -144,7 +144,7 @@ func TestParsePruneResources(t *testing.T) {
 		if tc.err {
 			assert.NotEmptyf(t, err, "parsePruneResources error expected but not fired")
 		} else {
-			assert.Equal(t, actual, tc.expected, "parsePruneResources failed expected %v actual %v", tc.expected, actual)
+			assert.Equalf(t, tc.expected, actual, "parsePruneResources failed expected %v actual %v", tc.expected, actual)
 		}
 	}
 }

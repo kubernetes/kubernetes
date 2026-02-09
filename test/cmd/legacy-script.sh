@@ -48,6 +48,7 @@ source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
 source "${KUBE_ROOT}/test/cmd/help.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
+source "${KUBE_ROOT}/test/cmd/kuberc.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
 source "${KUBE_ROOT}/test/cmd/plugins.sh"
 source "${KUBE_ROOT}/test/cmd/proxy.sh"
@@ -1041,20 +1042,27 @@ runTests() {
   # kubectl debug    #
   ####################
   if kube::test::if_supports_resource "${pods}" ; then
-    record_command run_kubectl_debug_pod_tests
-    record_command run_kubectl_debug_general_tests
+    record_command run_kubectl_debug_tests
+    record_command run_kubectl_debug_legacy_tests
     record_command run_kubectl_debug_baseline_tests
     record_command run_kubectl_debug_restricted_tests
     record_command run_kubectl_debug_netadmin_tests
     record_command run_kubectl_debug_custom_profile_tests
+    record_command run_kubectl_debug_warning_tests
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     record_command run_kubectl_debug_node_tests
-    record_command run_kubectl_debug_general_node_tests
+    record_command run_kubectl_debug_legacy_node_tests
     record_command run_kubectl_debug_baseline_node_tests
     record_command run_kubectl_debug_restricted_node_tests
     record_command run_kubectl_debug_netadmin_node_tests
   fi
+
+  #######################
+  # kuberc              #
+  #######################
+
+  record_command run_kuberc_tests
 
   cleanup_tests
 }

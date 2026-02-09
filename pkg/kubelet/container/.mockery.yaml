@@ -1,18 +1,19 @@
 ---
 dir: testing
-filename: "mock_{{.InterfaceName | snakecase}}.go"
-boilerplate-file: ../../../hack/boilerplate/boilerplate.generatego.txt
-outpkg: testing
-with-expecter: true
+pkgname: testing
+template: testify
+template-data:
+  boilerplate-file: ../../../hack/boilerplate/boilerplate.generatego.txt
+  unroll-variadic: true
 packages:
   io/fs:
+    config:
+      filename: mockdirentry.go
     interfaces:
-      DirEntry:
-        config:
-          filename: mockdirentry.go
+      DirEntry: {}
   k8s.io/kubernetes/pkg/kubelet/container:
+    config:
+      filename: mocks.go
     interfaces:
-      Runtime:
-        config:
-          filename: runtime_mock.go
-      RuntimeCache:
+      Runtime: {}
+      RuntimeCache: {}

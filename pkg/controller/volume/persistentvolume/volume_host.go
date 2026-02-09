@@ -18,11 +18,9 @@ package persistentvolume
 
 import (
 	"fmt"
-	"net"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -65,7 +63,7 @@ func (ctrl *PersistentVolumeController) GetKubeClient() clientset.Interface {
 	return ctrl.kubeClient
 }
 
-func (ctrl *PersistentVolumeController) NewWrapperMounter(volName string, spec vol.Spec, pod *v1.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
+func (ctrl *PersistentVolumeController) NewWrapperMounter(volName string, spec vol.Spec, pod *v1.Pod) (vol.Mounter, error) {
 	return nil, fmt.Errorf("PersistentVolumeController.NewWrapperMounter is not implemented")
 }
 
@@ -73,16 +71,8 @@ func (ctrl *PersistentVolumeController) NewWrapperUnmounter(volName string, spec
 	return nil, fmt.Errorf("PersistentVolumeController.NewWrapperMounter is not implemented")
 }
 
-func (ctrl *PersistentVolumeController) GetMounter(pluginName string) mount.Interface {
+func (ctrl *PersistentVolumeController) GetMounter() mount.Interface {
 	return nil
-}
-
-func (ctrl *PersistentVolumeController) GetHostName() string {
-	return ""
-}
-
-func (ctrl *PersistentVolumeController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("PersistentVolumeController.GetHostIP() is not implemented")
 }
 
 func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, error) {
@@ -116,10 +106,6 @@ func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(typ
 		//nolint:logcheck
 		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in PersistentVolumeController")
 	}
-}
-
-func (adc *PersistentVolumeController) GetExec(pluginName string) utilexec.Interface {
-	return utilexec.New()
 }
 
 func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {

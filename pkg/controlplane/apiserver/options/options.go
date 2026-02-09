@@ -18,6 +18,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -26,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
+	"k8s.io/apiserver/pkg/server/flagz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/util/keyutil"
@@ -36,14 +38,17 @@ import (
 	"k8s.io/klog/v2"
 	netutil "k8s.io/utils/net"
 
+	"k8s.io/kubernetes/pkg/apis/authentication/validation"
 	_ "k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin"
 )
 
 // Options define the flags and validation for a generic controlplane. If the
 // structs are nil, the options are not added to the command line and not validated.
 type Options struct {
+	Flagz                   flagz.Reader
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptionsWithLoopback
@@ -85,6 +90,12 @@ type Options struct {
 	ShowHiddenMetricsForVersion string
 
 	SystemNamespaces []string
+
+	ServiceAccountSigningEndpoint string
+
+	CoordinatedLeadershipLeaseDuration time.Duration
+	CoordinatedLeadershipRenewDeadline time.Duration
+	CoordinatedLeadershipRetryPeriod   time.Duration
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
@@ -118,6 +129,9 @@ func NewOptions() *Options {
 		EventTTL:                            1 * time.Hour,
 		AggregatorRejectForwardingRedirects: true,
 		SystemNamespaces:                    []string{metav1.NamespaceSystem, metav1.NamespacePublic, metav1.NamespaceDefault},
+		CoordinatedLeadershipLeaseDuration:  15 * time.Second,
+		CoordinatedLeadershipRenewDeadline:  10 * time.Second,
+		CoordinatedLeadershipRetryPeriod:    2 * time.Second,
 	}
 
 	// Overwrite the default for storage data format.
@@ -150,7 +164,8 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
-	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.33") //nolint:errcheck
+	fs.MarkDeprecated("enable-logs-handler", "Log handler functionality is deprecated") //nolint:errcheck
+	fs.Lookup("enable-logs-handler").Hidden = false
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
@@ -191,9 +206,19 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key.")
+
+	fs.StringVar(&s.ServiceAccountSigningEndpoint, "service-account-signing-endpoint", s.ServiceAccountSigningEndpoint, ""+
+		"Path to socket where a external JWT signer is listening. This flag is mutually exclusive with --service-account-signing-key-file and --service-account-key-file. Requires enabling feature gate (ExternalServiceAccountTokenSigner)")
+
+	fs.DurationVar(&s.CoordinatedLeadershipLeaseDuration, "coordinated-leadership-lease-duration", s.CoordinatedLeadershipLeaseDuration,
+		"The duration of the lease used for Coordinated Leader Election.")
+	fs.DurationVar(&s.CoordinatedLeadershipRenewDeadline, "coordinated-leadership-renew-deadline", s.CoordinatedLeadershipRenewDeadline,
+		"The deadline for renewing a coordinated leader election lease.")
+	fs.DurationVar(&s.CoordinatedLeadershipRetryPeriod, "coordinated-leadership-retry-period", s.CoordinatedLeadershipRetryPeriod,
+		"The period for retrying to renew a coordinated leader election lease.")
 }
 
-func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {
+func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {
 	if o == nil {
 		return CompletedOptions{completedOptions: &completedOptions{}}, nil
 	}
@@ -215,6 +240,16 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 		return CompletedOptions{}, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
+	if o.GenericServerRunOptions.RequestTimeout > 0 {
+		// Setting the EventsHistoryWindow as a maximum of the value set in the
+		// watchcache-specific options and the value of the request timeout plus
+		// some epsilon.
+		// This is done to make sure that the list+watch pattern can still be
+		// usable in large clusters with the elevated request timeout where the
+		// initial list can take a considerable amount of time.
+		completed.Etcd.StorageConfig.EventsHistoryWindow = max(completed.Etcd.StorageConfig.EventsHistoryWindow, completed.GenericServerRunOptions.RequestTimeout+15*time.Second)
+	}
+
 	if len(completed.GenericServerRunOptions.ExternalHost) == 0 {
 		if len(completed.GenericServerRunOptions.AdvertiseAddress) > 0 {
 			completed.GenericServerRunOptions.ExternalHost = completed.GenericServerRunOptions.AdvertiseAddress.String()
@@ -233,36 +268,9 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 	// adjust authentication for completed authorization
 	completed.Authentication.ApplyAuthorization(completed.Authorization)
 
-	// verify and adjust ServiceAccountTokenMaxExpiration
-	if completed.Authentication.ServiceAccounts.MaxExpiration != 0 {
-		lowBound := time.Hour
-		upBound := time.Duration(1<<32) * time.Second
-		if completed.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
-			completed.Authentication.ServiceAccounts.MaxExpiration > upBound {
-			return CompletedOptions{}, fmt.Errorf("the service-account-max-token-expiration must be between 1 hour and 2^32 seconds")
-		}
-		if completed.Authentication.ServiceAccounts.ExtendExpiration {
-			if completed.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.WarnOnlyBoundTokenExpirationSeconds*time.Second {
-				klog.Warningf("service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than %d seconds (currently %s)", serviceaccount.WarnOnlyBoundTokenExpirationSeconds, completed.Authentication.ServiceAccounts.MaxExpiration)
-			}
-			if completed.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.ExpirationExtensionSeconds*time.Second {
-				klog.Warningf("service-account-extend-token-expiration is true, enabling tokens valid up to %d seconds, which is longer than service-account-max-token-expiration set to %s seconds", serviceaccount.ExpirationExtensionSeconds, completed.Authentication.ServiceAccounts.MaxExpiration)
-			}
-		}
-	}
-	completed.ServiceAccountTokenMaxExpiration = completed.Authentication.ServiceAccounts.MaxExpiration
-
-	if len(completed.Authentication.ServiceAccounts.Issuers) != 0 && completed.Authentication.ServiceAccounts.Issuers[0] != "" {
-		if completed.ServiceAccountSigningKeyFile != "" {
-			sk, err := keyutil.PrivateKeyFromFile(completed.ServiceAccountSigningKeyFile)
-			if err != nil {
-				return CompletedOptions{}, fmt.Errorf("failed to parse service-account-issuer-key-file: %w", err)
-			}
-			completed.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(completed.Authentication.ServiceAccounts.Issuers[0], sk)
-			if err != nil {
-				return CompletedOptions{}, fmt.Errorf("failed to build token generator: %w", err)
-			}
-		}
+	err := o.completeServiceAccountOptions(ctx, &completed)
+	if err != nil {
+		return CompletedOptions{}, err
 	}
 
 	for key, value := range completed.APIEnablement.RuntimeConfig {
@@ -279,6 +287,76 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 	return CompletedOptions{
 		completedOptions: &completed,
 	}, nil
+}
+
+func (o *Options) completeServiceAccountOptions(ctx context.Context, completed *completedOptions) error {
+	transitionWarningFmt := "service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than %d seconds (currently %s)"
+	expExtensionWarningFmt := "service-account-extend-token-expiration is true, enabling tokens valid up to %d seconds, which is longer than service-account-max-token-expiration set to %s"
+	// verify service-account-max-token-expiration
+	if completed.Authentication.ServiceAccounts.MaxExpiration != 0 {
+		lowBound := time.Hour
+		upBound := time.Duration(1<<32) * time.Second
+		if completed.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
+			completed.Authentication.ServiceAccounts.MaxExpiration > upBound {
+			return fmt.Errorf("the service-account-max-token-expiration must be between 1 hour and 2^32 seconds")
+		}
+	}
+
+	if len(completed.Authentication.ServiceAccounts.Issuers) != 0 && completed.Authentication.ServiceAccounts.Issuers[0] != "" {
+		switch {
+		case completed.ServiceAccountSigningEndpoint != "" && completed.ServiceAccountSigningKeyFile != "":
+			return fmt.Errorf("service-account-signing-key-file and service-account-signing-endpoint are mutually exclusive and cannot be set at the same time")
+		case completed.ServiceAccountSigningKeyFile != "":
+			sk, err := keyutil.PrivateKeyFromFile(completed.ServiceAccountSigningKeyFile)
+			if err != nil {
+				return fmt.Errorf("failed to parse service-account-issuer-key-file: %w", err)
+			}
+			completed.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(completed.Authentication.ServiceAccounts.Issuers[0], sk)
+			if err != nil {
+				return fmt.Errorf("failed to build token generator: %w", err)
+			}
+		case completed.ServiceAccountSigningEndpoint != "":
+			plugin, cache, err := plugin.New(ctx, completed.Authentication.ServiceAccounts.Issuers[0], completed.ServiceAccountSigningEndpoint, 60*time.Second, false)
+			if err != nil {
+				return fmt.Errorf("while setting up external-jwt-signer: %w", err)
+			}
+			timedContext, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			metadata, err := plugin.GetServiceMetadata(timedContext)
+			if err != nil {
+				return fmt.Errorf("while setting up external-jwt-signer: %w", err)
+			}
+			if metadata.MaxTokenExpirationSeconds < validation.MinTokenAgeSec {
+				return fmt.Errorf("max token life supported by external-jwt-signer (%ds) is less than acceptable (min %ds)", metadata.MaxTokenExpirationSeconds, validation.MinTokenAgeSec)
+			}
+			maxExternalExpiration := time.Duration(metadata.MaxTokenExpirationSeconds) * time.Second
+			switch {
+			case completed.Authentication.ServiceAccounts.MaxExpiration == 0:
+				completed.Authentication.ServiceAccounts.MaxExpiration = maxExternalExpiration
+			case completed.Authentication.ServiceAccounts.MaxExpiration > maxExternalExpiration:
+				return fmt.Errorf("service-account-max-token-expiration cannot be set longer than the token expiration supported by service-account-signing-endpoint: %s > %s", completed.Authentication.ServiceAccounts.MaxExpiration, maxExternalExpiration)
+			}
+			transitionWarningFmt = "service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, token lifetime supported by external-jwt-signer must be longer than %d seconds (currently %s)"
+			expExtensionWarningFmt = "service-account-extend-token-expiration is true, tokens validity will be caped at the smaller of %d seconds and maximum token lifetime supported by external-jwt-signer (%s)"
+			completed.ServiceAccountIssuer = plugin
+			completed.Authentication.ServiceAccounts.ExternalPublicKeysGetter = cache
+			// shorten ExtendedExpiration, if needed, to fit within the external signer's max expiration
+			completed.Authentication.ServiceAccounts.MaxExtendedExpiration = min(maxExternalExpiration, completed.Authentication.ServiceAccounts.MaxExtendedExpiration)
+		}
+	}
+
+	// Set Max expiration and warn on conflicting configuration.
+	if completed.Authentication.ServiceAccounts.ExtendExpiration && completed.Authentication.ServiceAccounts.MaxExpiration != 0 {
+		if completed.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.WarnOnlyBoundTokenExpirationSeconds*time.Second {
+			klog.Warningf(transitionWarningFmt, serviceaccount.WarnOnlyBoundTokenExpirationSeconds, completed.Authentication.ServiceAccounts.MaxExpiration)
+		}
+		if completed.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.ExpirationExtensionSeconds*time.Second {
+			klog.Warningf(expExtensionWarningFmt, serviceaccount.ExpirationExtensionSeconds, completed.Authentication.ServiceAccounts.MaxExpiration)
+		}
+	}
+	completed.ServiceAccountTokenMaxExpiration = completed.Authentication.ServiceAccounts.MaxExpiration
+
+	return nil
 }
 
 // ServiceIPRange checks if the serviceClusterIPRange flag is nil, raising a warning if so and

@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	capi "k8s.io/api/certificates/v1beta1"
+	"k8s.io/utils/ptr"
 )
 
 func TestIsKubeletServingCSR(t *testing.T) {
@@ -85,7 +86,7 @@ func TestIsKubeletServingCSR(t *testing.T) {
 			exp:    false,
 		},
 		"does not default to kubelet-serving if it specifies an emailAddress SAN": {
-			req:    newCSR(kubeletServerPEMOptions, pemOptions{emailAddresses: []string{"something"}}),
+			req:    newCSR(kubeletServerPEMOptions, pemOptions{emailAddresses: []string{"something@example.com"}}),
 			usages: kubeletServerUsages,
 			exp:    false,
 		},
@@ -130,7 +131,7 @@ func TestIsKubeletClientCSR(t *testing.T) {
 			exp:    false,
 		},
 		"does not default to kube-apiserver-client-kubelet if an emailAddress is set": {
-			req:    newCSR(kubeletClientPEMOptions, pemOptions{emailAddresses: []string{"something"}}),
+			req:    newCSR(kubeletClientPEMOptions, pemOptions{emailAddresses: []string{"something@example.com"}}),
 			usages: kubeletClientUsages,
 			exp:    false,
 		},
@@ -213,7 +214,6 @@ var (
 )
 
 func TestSetDefaults_CertificateSigningRequestSpec(t *testing.T) {
-	strPtr := func(s string) *string { return &s }
 	tests := map[string]struct {
 		csr                capi.CertificateSigningRequestSpec
 		expectedSignerName string
@@ -230,14 +230,14 @@ func TestSetDefaults_CertificateSigningRequestSpec(t *testing.T) {
 			csr: capi.CertificateSigningRequestSpec{
 				Request:    csrWithOpts(kubeletServerPEMOptions),
 				Usages:     kubeletServerUsages,
-				SignerName: strPtr("example.com/not-kubelet-serving"),
+				SignerName: ptr.To("example.com/not-kubelet-serving"),
 			},
 			expectedSignerName: "example.com/not-kubelet-serving",
 		},
 		"defaults usages if not set": {
 			csr: capi.CertificateSigningRequestSpec{
 				Request:    csrWithOpts(kubeletServerPEMOptions),
-				SignerName: strPtr("example.com/test"),
+				SignerName: ptr.To("example.com/test"),
 			},
 			expectedSignerName: "example.com/test",
 			expectedUsages:     []capi.KeyUsage{capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
@@ -326,7 +326,7 @@ func TestSetDefaults_CertificateSigningRequestSpec_KubeletServing(t *testing.T) 
 		},
 		"does not default to kubelet-serving if it specifies an emailAddress SAN": {
 			csr: capi.CertificateSigningRequestSpec{
-				Request:  csrWithOpts(kubeletServerPEMOptions, pemOptions{emailAddresses: []string{"something"}}),
+				Request:  csrWithOpts(kubeletServerPEMOptions, pemOptions{emailAddresses: []string{"something@example.com"}}),
 				Usages:   kubeletServerUsages,
 				Username: kubeletServerPEMOptions.cn,
 			},

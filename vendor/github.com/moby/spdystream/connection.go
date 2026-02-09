@@ -712,7 +712,9 @@ func (s *Connection) shutdown(closeTimeout time.Duration) {
 
 	var timeout <-chan time.Time
 	if closeTimeout > time.Duration(0) {
-		timeout = time.After(closeTimeout)
+		timer := time.NewTimer(closeTimeout)
+		defer timer.Stop()
+		timeout = timer.C
 	}
 	streamsClosed := make(chan bool)
 
@@ -739,7 +741,15 @@ func (s *Connection) shutdown(closeTimeout time.Duration) {
 	}
 
 	if err != nil {
-		duration := 10 * time.Minute
+		// default to 1 second
+		duration := time.Second
+		// if a closeTimeout was given, use that, clipped to 1s-10m
+		if closeTimeout > time.Second {
+			duration = closeTimeout
+		}
+		if duration > 10*time.Minute {
+			duration = 10 * time.Minute
+		}
 		timer := time.NewTimer(duration)
 		defer timer.Stop()
 		select {
@@ -806,7 +816,9 @@ func (s *Connection) CloseWait() error {
 func (s *Connection) Wait(waitTimeout time.Duration) error {
 	var timeout <-chan time.Time
 	if waitTimeout > time.Duration(0) {
-		timeout = time.After(waitTimeout)
+		timer := time.NewTimer(waitTimeout)
+		defer timer.Stop()
+		timeout = timer.C
 	}
 
 	select {

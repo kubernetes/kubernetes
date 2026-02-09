@@ -16,7 +16,10 @@
 
 package ttrpc
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 type serverConfig struct {
 	handshaker  Handshaker
@@ -44,9 +47,40 @@ func WithServerHandshaker(handshaker Handshaker) ServerOpt {
 func WithUnaryServerInterceptor(i UnaryServerInterceptor) ServerOpt {
 	return func(c *serverConfig) error {
 		if c.interceptor != nil {
-			return errors.New("only one interceptor allowed per server")
+			return errors.New("only one unchained interceptor allowed per server")
 		}
 		c.interceptor = i
 		return nil
+	}
+}
+
+// WithChainUnaryServerInterceptor sets the provided chain of server interceptors
+func WithChainUnaryServerInterceptor(interceptors ...UnaryServerInterceptor) ServerOpt {
+	return func(c *serverConfig) error {
+		if len(interceptors) == 0 {
+			return nil
+		}
+		if c.interceptor != nil {
+			interceptors = append([]UnaryServerInterceptor{c.interceptor}, interceptors...)
+		}
+		c.interceptor = func(
+			ctx context.Context,
+			unmarshal Unmarshaler,
+			info *UnaryServerInfo,
+			method Method) (interface{}, error) {
+			return interceptors[0](ctx, unmarshal, info,
+				chainUnaryServerInterceptors(info, method, interceptors[1:]))
+		}
+		return nil
+	}
+}
+
+func chainUnaryServerInterceptors(info *UnaryServerInfo, method Method, interceptors []UnaryServerInterceptor) Method {
+	if len(interceptors) == 0 {
+		return method
+	}
+	return func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+		return interceptors[0](ctx, unmarshal, info,
+			chainUnaryServerInterceptors(info, method, interceptors[1:]))
 	}
 }

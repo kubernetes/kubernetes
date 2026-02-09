@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/reference"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -187,7 +188,15 @@ func FindMatchingVolume(
 	volumes []*v1.PersistentVolume,
 	node *v1.Node,
 	excludedVolumes map[string]*v1.PersistentVolume,
-	delayBinding bool) (*v1.PersistentVolume, error) {
+	delayBinding bool,
+	vacEnabled bool) (*v1.PersistentVolume, error) {
+
+	if !vacEnabled {
+		claimVAC := ptr.Deref(claim.Spec.VolumeAttributesClassName, "")
+		if claimVAC != "" {
+			return nil, fmt.Errorf("unsupported volumeAttributesClassName is set on claim %s when the feature-gate VolumeAttributesClass is disabled", claimToClaimKey(claim))
+		}
+	}
 
 	var smallestVolume *v1.PersistentVolume
 	var smallestVolumeQty resource.Quantity
@@ -224,6 +233,18 @@ func FindMatchingVolume(
 		}
 		// filter out mismatching volumeModes
 		if CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
+			continue
+		}
+
+		claimVAC := ptr.Deref(claim.Spec.VolumeAttributesClassName, "")
+		volumeVAC := ptr.Deref(volume.Spec.VolumeAttributesClassName, "")
+
+		// filter out mismatching volumeAttributesClassName
+		if vacEnabled && claimVAC != volumeVAC {
+			continue
+		}
+		if !vacEnabled && volumeVAC != "" {
+			// when the feature gate is disabled, the PV object has VAC set, then we should not bind at all.
 			continue
 		}
 

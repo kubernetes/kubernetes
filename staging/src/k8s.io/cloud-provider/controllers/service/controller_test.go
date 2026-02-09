@@ -52,8 +52,7 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	_ "k8s.io/controller-manager/pkg/features/register"
 	"k8s.io/klog/v2/ktesting"
-
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const region = "us-central"
@@ -250,7 +249,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		expectPatchFinalizer: true,
 	}, {
 		desc:                 "service specifies loadBalancerClass",
-		service:              newService("with-external-balancer", v1.ServiceTypeLoadBalancer, tweakAddLBClass(utilpointer.String("custom-loadbalancer"))),
+		service:              newService("with-external-balancer", v1.ServiceTypeLoadBalancer, tweakAddLBClass(ptr.To("custom-loadbalancer"))),
 		expectOp:             deleteLoadBalancer,
 		expectCreateAttempt:  false,
 		expectPatchStatus:    false,
@@ -1498,12 +1497,8 @@ func TestNeedsUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			controller, _, _ := newController(ctx)
 			oldSvc, newSvc := tc.updateFn()
-			obtainedResult := controller.needsUpdate(oldSvc, newSvc)
+			obtainedResult := needsUpdate(oldSvc, newSvc)
 			if obtainedResult != tc.expectedNeedsUpdate {
 				t.Errorf("%v needsUpdate() should have returned %v but returned %v", tc.testName, tc.expectedNeedsUpdate, obtainedResult)
 			}
@@ -1833,6 +1828,9 @@ func Test_respectsPredicates(t *testing.T) {
 		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}},
 		{want: true, input: &v1.Node{Spec: v1.NodeSpec{ProviderID: providerID}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
 		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}}},
+		{want: true, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelNodeExcludeBalancers: "false"}}}},
+		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelNodeExcludeBalancers: "true"}}}},
+		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelNodeExcludeBalancers: "foo"}}}},
 
 		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}},
 			Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: ToBeDeletedTaint, Value: fmt.Sprint(time.Now().Unix()), Effect: v1.TaintEffectNoSchedule}}}}},

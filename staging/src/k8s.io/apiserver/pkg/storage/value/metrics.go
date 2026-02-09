@@ -61,10 +61,10 @@ var (
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "transformation_operations_total",
-			Help:           "Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption",
+			Help:           "Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. The status, resource, and transformation_type fields can be used for alerting purposes. For example, you can monitor for encryption/decryption failures using the transformation_type (e.g., from_storage for decryption and to_storage for encryption). Additionally, these fields can be used to ensure that the correct transformers are applied to each resource.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"transformation_type", "transformer_prefix", "status"},
+		[]string{"resource", "transformation_type", "transformer_prefix", "status"},
 	)
 
 	envelopeTransformationCacheMissTotal = metrics.NewCounter(
@@ -113,8 +113,8 @@ func RegisterMetrics() {
 
 // RecordTransformation records latencies and count of TransformFromStorage and TransformToStorage operations.
 // Note that transformation_failures_total metric is deprecated, use transformation_operations_total instead.
-func RecordTransformation(transformationType, transformerPrefix string, elapsed time.Duration, err error) {
-	transformerOperationsTotal.WithLabelValues(transformationType, transformerPrefix, getErrorCode(err)).Inc()
+func RecordTransformation(resource, transformationType, transformerPrefix string, elapsed time.Duration, err error) {
+	transformerOperationsTotal.WithLabelValues(resource, transformationType, transformerPrefix, getErrorCode(err)).Inc()
 
 	if err == nil {
 		transformerLatencies.WithLabelValues(transformationType, transformerPrefix).Observe(elapsed.Seconds())

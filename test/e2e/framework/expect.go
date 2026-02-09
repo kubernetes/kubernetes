@@ -294,12 +294,22 @@ func (f *FailureError) backtrace() {
 var ErrFailure error = FailureError{}
 
 // ExpectNoError checks if "err" is set, and if so, fails assertion while logging the error.
+//
+// As in [gomega.Expect], the explain parameters can be used to provide
+// additional information in case of a failure in one of these two ways:
+//   - A single string is used as first line of the failure message directly.
+//   - A string with additional parameters is passed through [fmt.Sprintf].
 func ExpectNoError(err error, explain ...interface{}) {
 	ExpectNoErrorWithOffset(1, err, explain...)
 }
 
 // ExpectNoErrorWithOffset checks if "err" is set, and if so, fails assertion while logging the error at "offset" levels above its caller
 // (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
+//
+// As in [gomega.Expect], the explain parameters can be used to provide
+// additional information in case of a failure in one of these two ways:
+//   - A single string is used as first line of the failure message directly.
+//   - A string with additional parameters is passed through [fmt.Sprintf].
 func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	if err == nil {
 		return

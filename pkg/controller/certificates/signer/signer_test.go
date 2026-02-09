@@ -23,15 +23,16 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	capi "k8s.io/api/certificates/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/cert"
@@ -40,6 +41,44 @@ import (
 	"k8s.io/kubernetes/pkg/controller/certificates"
 	testingclock "k8s.io/utils/clock/testing"
 )
+
+// ignoreUnset is an option that ignores fields that are unset on the right
+// hand side of a comparison. This is useful in testing to assert that an
+// object is a derivative.
+func ignoreUnset() cmp.Option {
+	return cmp.Options{
+		// ignore unset fields in v2
+		cmp.FilterPath(func(path cmp.Path) bool {
+			_, v2 := path.Last().Values()
+			switch v2.Kind() {
+			case reflect.Slice, reflect.Map:
+				if v2.IsNil() || v2.Len() == 0 {
+					return true
+				}
+			case reflect.String:
+				if v2.Len() == 0 {
+					return true
+				}
+			case reflect.Interface, reflect.Pointer:
+				if v2.IsNil() {
+					return true
+				}
+			}
+			return false
+		}, cmp.Ignore()),
+		// ignore map entries that aren't set in v2
+		cmp.FilterPath(func(path cmp.Path) bool {
+			switch i := path.Last().(type) {
+			case cmp.MapIndex:
+				if _, v2 := i.Values(); !v2.IsValid() {
+					fmt.Println("E")
+					return true
+				}
+			}
+			return false
+		}, cmp.Ignore()),
+	}
+}
 
 func TestSigner(t *testing.T) {
 	fakeClock := testingclock.FakeClock{}
@@ -99,8 +138,8 @@ func TestSigner(t *testing.T) {
 		MaxPathLen:            -1,
 	}
 
-	if !cmp.Equal(*certs[0], want, diff.IgnoreUnset()) {
-		t.Errorf("unexpected diff: %v", cmp.Diff(certs[0], want, diff.IgnoreUnset()))
+	if !cmp.Equal(*certs[0], want, ignoreUnset()) {
+		t.Errorf("unexpected diff: %v", cmp.Diff(certs[0], want, ignoreUnset()))
 	}
 }
 

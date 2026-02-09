@@ -26,14 +26,17 @@ import (
 )
 
 const (
-	// GoSeperator is used to split go import paths.
+	// GoSeparator is used to split go import paths.
 	// Forward slash is used instead of filepath.Seperator because it is the
 	// only universally-accepted path delimiter and the only delimiter not
 	// potentially forbidden by Go compilers. (In particular gc does not allow
 	// the use of backslashes in import paths.)
 	// See https://golang.org/ref/spec#Import_declarations.
 	// See also https://github.com/kubernetes/gengo/issues/83#issuecomment-367040772.
-	GoSeperator = "/"
+	GoSeparator = "/"
+	// GoSeperator is a typo for GoSeparator.
+	// Deprecated: use GoSeparator instead.
+	GoSeperator = GoSeparator
 )
 
 // Returns whether a name is a private Go name.
@@ -200,7 +203,7 @@ var (
 
 // filters out unwanted directory names and sanitizes remaining names.
 func (ns *NameStrategy) filterDirs(path string) []string {
-	allDirs := strings.Split(path, GoSeperator)
+	allDirs := strings.Split(path, GoSeparator)
 	dirs := make([]string, 0, len(allDirs))
 	for _, p := range allDirs {
 		if ns.IgnoreWords == nil || !ns.IgnoreWords[p] {
@@ -281,12 +284,12 @@ func (ns *NameStrategy) Name(t *types.Type) string {
 	case types.Func:
 		// TODO: add to name test
 		parts := []string{"Func"}
-		for _, pt := range t.Signature.Parameters {
-			parts = append(parts, ns.removePrefixAndSuffix(ns.Name(pt)))
+		for _, param := range t.Signature.Parameters {
+			parts = append(parts, ns.removePrefixAndSuffix(ns.Name(param.Type)))
 		}
 		parts = append(parts, "Returns")
-		for _, rt := range t.Signature.Results {
-			parts = append(parts, ns.removePrefixAndSuffix(ns.Name(rt)))
+		for _, result := range t.Signature.Results {
+			parts = append(parts, ns.removePrefixAndSuffix(ns.Name(result.Type)))
 		}
 		name = ns.Join(ns.Prefix, parts, ns.Suffix)
 	default:
@@ -370,16 +373,20 @@ func (r *rawNamer) Name(t *types.Type) string {
 			// TODO: include function signature
 			elems = append(elems, m.Name.Name)
 		}
-		name = "interface{" + strings.Join(elems, "; ") + "}"
+		if len(elems) == 0 {
+			name = "any"
+		} else {
+			name = "interface{" + strings.Join(elems, "; ") + "}"
+		}
 	case types.Func:
 		// TODO: add to name test
 		params := []string{}
-		for _, pt := range t.Signature.Parameters {
-			params = append(params, r.Name(pt))
+		for _, param := range t.Signature.Parameters {
+			params = append(params, r.Name(param.Type))
 		}
 		results := []string{}
-		for _, rt := range t.Signature.Results {
-			results = append(results, r.Name(rt))
+		for _, result := range t.Signature.Results {
+			results = append(results, r.Name(result.Type))
 		}
 		name = "func(" + strings.Join(params, ",") + ")"
 		if len(results) == 1 {

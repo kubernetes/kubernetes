@@ -23,19 +23,19 @@ package v1alpha1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	configv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1alpha1.KubeProxyConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_KubeProxyConfiguration(obj.(*v1alpha1.KubeProxyConfiguration))
+	scheme.AddTypeDefaultingFunc(&configv1alpha1.KubeProxyConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_KubeProxyConfiguration(obj.(*configv1alpha1.KubeProxyConfiguration))
 	})
 	return nil
 }
 
-func SetObjectDefaults_KubeProxyConfiguration(in *v1alpha1.KubeProxyConfiguration) {
+func SetObjectDefaults_KubeProxyConfiguration(in *configv1alpha1.KubeProxyConfiguration) {
 	SetDefaults_KubeProxyConfiguration(in)
 }

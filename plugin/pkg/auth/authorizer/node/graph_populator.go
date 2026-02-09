@@ -21,14 +21,18 @@ import (
 
 	"k8s.io/klog/v2"
 
+	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	certsv1beta1informers "k8s.io/client-go/informers/certificates/v1beta1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
-	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	"k8s.io/utils/ptr"
 )
 
 type graphPopulator struct {
@@ -41,7 +45,8 @@ func AddGraphEventHandlers(
 	pods corev1informers.PodInformer,
 	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
-	slices resourcev1alpha2informers.ResourceSliceInformer,
+	slices resourceinformers.ResourceSliceInformer,
+	pcrs certsv1beta1informers.PodCertificateRequestInformer,
 ) {
 	g := &graphPopulator{
 		graph: graph,
@@ -78,6 +83,15 @@ func AddGraphEventHandlers(
 		synced = append(synced, sliceHandler.HasSynced)
 	}
 
+	if pcrs != nil {
+		pcrHandler, _ := pcrs.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    g.addPCR,
+			UpdateFunc: nil, // Not needed, spec fields are immutable.
+			DeleteFunc: g.deletePCR,
+		})
+		synced = append(synced, pcrHandler.HasSynced)
+	}
+
 	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop, synced...)
 }
 
@@ -93,8 +107,11 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 		return
 	}
 	if oldPod, ok := oldObj.(*corev1.Pod); ok && oldPod != nil {
+		// Ephemeral containers can add new secret or config map references to the pod.
+		hasNewEphemeralContainers := len(pod.Spec.EphemeralContainers) > len(oldPod.Spec.EphemeralContainers)
 		if (pod.Spec.NodeName == oldPod.Spec.NodeName) && (pod.UID == oldPod.UID) &&
-			resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, pod.Status.ResourceClaimStatuses) {
+			!hasNewEphemeralContainers &&
+			resourceclaim.PodStatusEqual(oldPod.Status.ResourceClaimStatuses, pod.Status.ResourceClaimStatuses) {
 			// Node and uid are unchanged, all object references in the pod spec are immutable respectively unmodified (claim statuses).
 			klog.V(5).Infof("updatePod %s/%s, node unchanged", pod.Namespace, pod.Name)
 			return
@@ -105,29 +122,6 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 	startTime := time.Now()
 	g.graph.AddPod(pod)
 	klog.V(5).Infof("updatePod %s/%s for node %s completed in %v", pod.Namespace, pod.Name, pod.Spec.NodeName, time.Since(startTime))
-}
-
-func resourceClaimStatusesEqual(statusA, statusB []corev1.PodResourceClaimStatus) bool {
-	if len(statusA) != len(statusB) {
-		return false
-	}
-	// In most cases, status entries only get added once and not modified.
-	// But this cannot be guaranteed, so for the sake of correctness in all
-	// cases this code here has to check.
-	for i := range statusA {
-		if statusA[i].Name != statusB[i].Name {
-			return false
-		}
-		claimNameA := statusA[i].ResourceClaimName
-		claimNameB := statusB[i].ResourceClaimName
-		if (claimNameA == nil) != (claimNameB == nil) {
-			return false
-		}
-		if claimNameA != nil && *claimNameA != *claimNameB {
-			return false
-		}
-	}
-	return true
 }
 
 func (g *graphPopulator) deletePod(obj interface{}) {
@@ -201,22 +195,43 @@ func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
 }
 
 func (g *graphPopulator) addResourceSlice(obj interface{}) {
-	slice, ok := obj.(*resourcev1alpha2.ResourceSlice)
+	slice, ok := obj.(*resourceapi.ResourceSlice)
 	if !ok {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.AddResourceSlice(slice.Name, slice.NodeName)
+	g.graph.AddResourceSlice(slice.Name, ptr.Deref(slice.Spec.NodeName, ""))
 }
 
 func (g *graphPopulator) deleteResourceSlice(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	slice, ok := obj.(*resourcev1alpha2.ResourceSlice)
+	slice, ok := obj.(*resourceapi.ResourceSlice)
 	if !ok {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
 	g.graph.DeleteResourceSlice(slice.Name)
+}
+
+func (g *graphPopulator) addPCR(obj any) {
+	pcr, ok := obj.(*certsv1beta1.PodCertificateRequest)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.graph.AddPodCertificateRequest(pcr)
+}
+
+func (g *graphPopulator) deletePCR(obj any) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	pcr, ok := obj.(*certsv1beta1.PodCertificateRequest)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.graph.DeletePodCertificateRequest(pcr)
 }

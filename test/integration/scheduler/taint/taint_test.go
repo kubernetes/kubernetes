@@ -26,10 +26,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -72,8 +75,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
-	testCtx = testutils.InitTestScheduler(t, testCtx)
-
 	cs := testCtx.ClientSet
 	nsName := testCtx.NS.Name
 
@@ -101,11 +102,9 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Waiting for all controllers to sync
 	externalInformers.Start(testCtx.Ctx.Done())
 	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
-	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	// Run all controllers
+	// Run node lifecycle controller
 	go nc.Run(testCtx.Ctx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.
@@ -157,6 +156,53 @@ func TestTaintNodeByCondition(t *testing.T) {
 		Effect:   v1.TaintEffectNoSchedule,
 	}
 
+	priorityClassTaint := v1.Taint{Key: "node.example.com/priority-class", Value: "950", Effect: v1.TaintEffectNoSchedule}
+	priorityClassPreferTaint := v1.Taint{Key: "node.example.com/priority-class", Value: "950", Effect: v1.TaintEffectPreferNoSchedule}
+	errorRateTaint := v1.Taint{Key: "node.example.com/error-rate", Value: "5", Effect: v1.TaintEffectNoSchedule}
+	cpuUtilizationTaint := v1.Taint{Key: "node.example.com/cpu-utilization", Value: "75", Effect: v1.TaintEffectNoExecute}
+
+	priorityClassGtToleration := v1.Toleration{
+		Key:      "node.example.com/priority-class",
+		Operator: v1.TolerationOpGt,
+		Value:    "900",
+		Effect:   v1.TaintEffectNoSchedule,
+	}
+
+	errorRateLtToleration := v1.Toleration{
+		Key:      "node.example.com/error-rate",
+		Operator: v1.TolerationOpLt,
+		Value:    "10",
+		Effect:   v1.TaintEffectNoSchedule,
+	}
+
+	cpuUtilizationGtToleration := v1.Toleration{
+		Key:      "node.example.com/cpu-utilization",
+		Operator: v1.TolerationOpGt,
+		Value:    "50",
+		Effect:   v1.TaintEffectNoExecute,
+	}
+
+	cpuUtilizationLtToleration := v1.Toleration{
+		Key:      "node.example.com/cpu-utilization",
+		Operator: v1.TolerationOpLt,
+		Value:    "90",
+		Effect:   v1.TaintEffectNoExecute,
+	}
+
+	priorityClassGtPreferToleration := v1.Toleration{
+		Key:      "node.example.com/priority-class",
+		Operator: v1.TolerationOpGt,
+		Value:    "900",
+		Effect:   v1.TaintEffectPreferNoSchedule,
+	}
+
+	errorRateLtPreferToleration := v1.Toleration{
+		Key:      "node.example.com/error-rate",
+		Operator: v1.TolerationOpLt,
+		Value:    "10",
+		Effect:   v1.TaintEffectPreferNoSchedule,
+	}
+
 	bestEffortPod := newPod(nsName, "besteffort-pod", nil, nil)
 	burstablePod := newPod(nsName, "burstable-pod", podRes, nil)
 	guaranteePod := newPod(nsName, "guarantee-pod", podRes, podRes)
@@ -169,12 +215,13 @@ func TestTaintNodeByCondition(t *testing.T) {
 
 	// switch to table driven testings
 	tests := []struct {
-		name           string
-		existingTaints []v1.Taint
-		nodeConditions []v1.NodeCondition
-		unschedulable  bool
-		expectedTaints []v1.Taint
-		pods           []podCase
+		name                                       string
+		existingTaints                             []v1.Taint
+		nodeConditions                             []v1.NodeCondition
+		unschedulable                              bool
+		expectedTaints                             []v1.Taint
+		pods                                       []podCase
+		enableTaintTolerationComparisonOperatorsFG []bool
 	}{
 		{
 			name: "not-ready node",
@@ -499,67 +546,219 @@ func TestTaintNodeByCondition(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:           "node with numeric priority-class taint - pods with Gt toleration",
+			existingTaints: []v1.Taint{priorityClassTaint},
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{priorityClassTaint},
+			pods: []podCase{
+				{
+					pod:  bestEffortPod,
+					fits: false,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{priorityClassGtToleration},
+					fits:        true,
+				},
+			},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
+		},
+		{
+			name:           "node with numeric error-rate taint - pods with Lt toleration",
+			existingTaints: []v1.Taint{errorRateTaint},
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{errorRateTaint},
+			pods: []podCase{
+				{
+					pod:  burstablePod,
+					fits: false,
+				},
+				{
+					pod:         burstablePod,
+					tolerations: []v1.Toleration{errorRateLtToleration},
+					fits:        true,
+				},
+			},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
+		},
+		{
+			name:           "node with multiple numeric taints - mixed tolerations",
+			existingTaints: []v1.Taint{priorityClassTaint, errorRateTaint},
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{priorityClassTaint, errorRateTaint},
+			pods: []podCase{
+				{
+					pod:  guaranteePod,
+					fits: false,
+				},
+				{
+					pod:         guaranteePod,
+					tolerations: []v1.Toleration{priorityClassGtToleration},
+					fits:        false,
+				},
+				{
+					pod: guaranteePod,
+					tolerations: []v1.Toleration{
+						priorityClassGtToleration,
+						errorRateLtToleration,
+					},
+					fits: true,
+				},
+			},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
+		},
+		{
+			name:           "node with numeric taint - pods with Lt or Gt tolerations, and NoExecute effect",
+			existingTaints: []v1.Taint{cpuUtilizationTaint},
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{cpuUtilizationTaint},
+			pods: []podCase{
+				{
+					pod:  guaranteePod,
+					fits: false,
+				},
+				{
+					pod:         guaranteePod,
+					tolerations: []v1.Toleration{cpuUtilizationLtToleration},
+					fits:        true,
+				},
+				{
+					pod:         guaranteePod,
+					tolerations: []v1.Toleration{cpuUtilizationGtToleration},
+					fits:        true,
+				},
+			},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
+		},
+		{
+			name:           "node with numeric taint - pods with PreferNoSchedule effect and Gt toleration",
+			existingTaints: []v1.Taint{priorityClassPreferTaint},
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{priorityClassPreferTaint},
+			pods: []podCase{
+				{
+					pod:  bestEffortPod,
+					fits: true,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{priorityClassGtPreferToleration},
+					fits:        true,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{errorRateLtPreferToleration},
+					fits:        true,
+				},
+			},
+			enableTaintTolerationComparisonOperatorsFG: []bool{true},
+		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			node := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node-1",
-				},
-				Spec: v1.NodeSpec{
-					Unschedulable: test.unschedulable,
-					Taints:        test.existingTaints,
-				},
-				Status: v1.NodeStatus{
-					Capacity:    nodeRes,
-					Allocatable: nodeRes,
-					Conditions:  test.nodeConditions,
-				},
-			}
+		featureGateEnabled := []bool{true, false}
+		if len(test.enableTaintTolerationComparisonOperatorsFG) != 0 {
+			featureGateEnabled = test.enableTaintTolerationComparisonOperatorsFG
+		}
+		for _, enabled := range featureGateEnabled {
+			t.Run(fmt.Sprintf("%s (TaintToleration Comparison Operators enabled: %v)", test.name, enabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.TaintTolerationComparisonOperators: enabled,
+				})
 
-			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
-				t.Errorf("Failed to create node, err: %v", err)
-			}
-			if err := testutils.WaitForNodeTaints(testCtx.Ctx, cs, node, test.expectedTaints); err != nil {
-				node, err = cs.CoreV1().Nodes().Get(testCtx.Ctx, node.Name, metav1.GetOptions{})
-				if err != nil {
-					t.Errorf("Failed to get node <%s>", node.Name)
+				testCtx := testutils.InitTestScheduler(t, testCtx)
+				testutils.SyncSchedulerInformerFactory(testCtx)
+				go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+
+				node := &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-1",
+					},
+					Spec: v1.NodeSpec{
+						Unschedulable: test.unschedulable,
+						Taints:        test.existingTaints,
+					},
+					Status: v1.NodeStatus{
+						Capacity:    nodeRes,
+						Allocatable: nodeRes,
+						Conditions:  test.nodeConditions,
+					},
 				}
 
-				t.Errorf("Failed to taint node <%s>, expected: %v, got: %v, err: %v", node.Name, test.expectedTaints, node.Spec.Taints, err)
-			}
+				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+					t.Errorf("Failed to create node, err: %v", err)
+				}
+				if err := testutils.WaitForNodeTaints(testCtx.Ctx, cs, node, test.expectedTaints); err != nil {
+					node, err = cs.CoreV1().Nodes().Get(testCtx.Ctx, node.Name, metav1.GetOptions{})
+					if err != nil {
+						t.Errorf("Failed to get node <%s>", node.Name)
+					}
 
-			var pods []*v1.Pod
-			for i, p := range test.pods {
-				pod := p.pod.DeepCopy()
-				pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
-				pod.Spec.Tolerations = p.tolerations
-
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Failed to create pod %s/%s, error: %v",
-						pod.Namespace, pod.Name, err)
+					t.Errorf("Failed to taint node <%s>, expected: %v, got: %v, err: %v", node.Name, test.expectedTaints, node.Spec.Taints, err)
 				}
 
-				pods = append(pods, createdPod)
+				var pods []*v1.Pod
+				for i, p := range test.pods {
+					pod := p.pod.DeepCopy()
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					pod.Spec.Tolerations = p.tolerations
 
-				if p.fits {
-					if err := testutils.WaitForPodToSchedule(cs, createdPod); err != nil {
-						t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
+					createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+					if err != nil {
+						t.Fatalf("Failed to create pod %s/%s, error: %v",
 							pod.Namespace, pod.Name, err)
 					}
-				} else {
-					if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, createdPod); err != nil {
-						t.Errorf("Unschedulable pod %s/%s gets scheduled on the node, err: %v",
-							pod.Namespace, pod.Name, err)
+
+					pods = append(pods, createdPod)
+
+					if p.fits {
+						if err := testutils.WaitForPodToSchedule(testCtx.Ctx, cs, createdPod); err != nil {
+							t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
+								pod.Namespace, pod.Name, err)
+						}
+					} else {
+						if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, createdPod); err != nil {
+							t.Errorf("Unschedulable pod %s/%s gets scheduled on the node, err: %v",
+								pod.Namespace, pod.Name, err)
+						}
 					}
 				}
-			}
 
-			testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
-			testutils.CleanupNodes(cs, t)
-			testutils.WaitForSchedulerCacheCleanup(testCtx.Ctx, testCtx.Scheduler, t)
-		})
+				testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
+				testutils.CleanupNodes(cs, t)
+				testutils.WaitForSchedulerCacheCleanup(testCtx.Ctx, testCtx.Scheduler, t)
+
+				// Clean up scheduler context
+				if testCtx.SchedulerCloseFn != nil {
+					testCtx.SchedulerCloseFn()
+				}
+			})
+		}
 	}
 }

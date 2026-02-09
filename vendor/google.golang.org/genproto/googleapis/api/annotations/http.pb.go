@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -102,7 +102,7 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 	return false
 }
 
-// # gRPC Transcoding
+// gRPC Transcoding
 //
 // gRPC Transcoding is a feature for mapping between a gRPC method and one or
 // more HTTP REST endpoints. It allows developers to build a single API service
@@ -143,9 +143,8 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 //
 // This enables an HTTP REST to gRPC mapping as below:
 //
-// HTTP | gRPC
-// -----|-----
-// `GET /v1/messages/123456`  | `GetMessage(name: "messages/123456")`
+// - HTTP: `GET /v1/messages/123456`
+// - gRPC: `GetMessage(name: "messages/123456")`
 //
 // Any fields in the request message which are not bound by the path template
 // automatically become HTTP query parameters if there is no HTTP request body.
@@ -169,11 +168,9 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 //
 // This enables a HTTP JSON to RPC mapping as below:
 //
-// HTTP | gRPC
-// -----|-----
-// `GET /v1/messages/123456?revision=2&sub.subfield=foo` |
-// `GetMessage(message_id: "123456" revision: 2 sub: SubMessage(subfield:
-// "foo"))`
+// - HTTP: `GET /v1/messages/123456?revision=2&sub.subfield=foo`
+// - gRPC: `GetMessage(message_id: "123456" revision: 2 sub:
+// SubMessage(subfield: "foo"))`
 //
 // Note that fields which are mapped to URL query parameters must have a
 // primitive type or a repeated primitive type or a non-repeated message type.
@@ -203,10 +200,8 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 // representation of the JSON in the request body is determined by
 // protos JSON encoding:
 //
-// HTTP | gRPC
-// -----|-----
-// `PATCH /v1/messages/123456 { "text": "Hi!" }` | `UpdateMessage(message_id:
-// "123456" message { text: "Hi!" })`
+// - HTTP: `PATCH /v1/messages/123456 { "text": "Hi!" }`
+// - gRPC: `UpdateMessage(message_id: "123456" message { text: "Hi!" })`
 //
 // The special name `*` can be used in the body mapping to define that
 // every field not bound by the path template should be mapped to the
@@ -228,10 +223,8 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 //
 // The following HTTP JSON to RPC mapping is enabled:
 //
-// HTTP | gRPC
-// -----|-----
-// `PATCH /v1/messages/123456 { "text": "Hi!" }` | `UpdateMessage(message_id:
-// "123456" text: "Hi!")`
+// - HTTP: `PATCH /v1/messages/123456 { "text": "Hi!" }`
+// - gRPC: `UpdateMessage(message_id: "123456" text: "Hi!")`
 //
 // Note that when using `*` in the body mapping, it is not possible to
 // have HTTP parameters, as all fields not bound by the path end in
@@ -259,13 +252,13 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 //
 // This enables the following two alternative HTTP JSON to RPC mappings:
 //
-// HTTP | gRPC
-// -----|-----
-// `GET /v1/messages/123456` | `GetMessage(message_id: "123456")`
-// `GET /v1/users/me/messages/123456` | `GetMessage(user_id: "me" message_id:
-// "123456")`
+// - HTTP: `GET /v1/messages/123456`
+// - gRPC: `GetMessage(message_id: "123456")`
 //
-// ## Rules for HTTP mapping
+// - HTTP: `GET /v1/users/me/messages/123456`
+// - gRPC: `GetMessage(user_id: "me" message_id: "123456")`
+//
+// # Rules for HTTP mapping
 //
 //  1. Leaf request fields (recursive expansion nested messages in the request
 //     message) are classified into three categories:
@@ -284,7 +277,7 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 //     request body, all
 //     fields are passed via URL path and URL query parameters.
 //
-// ### Path template syntax
+// Path template syntax
 //
 //	Template = "/" Segments [ Verb ] ;
 //	Segments = Segment { "/" Segment } ;
@@ -323,7 +316,7 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 // Document](https://developers.google.com/discovery/v1/reference/apis) as
 // `{+var}`.
 //
-// ## Using gRPC API Service Configuration
+// # Using gRPC API Service Configuration
 //
 // gRPC API Service Configuration (service config) is a configuration language
 // for configuring a gRPC service to become a user-facing product. The
@@ -338,15 +331,14 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 // specified in the service config will override any matching transcoding
 // configuration in the proto.
 //
-// Example:
+// The following example selects a gRPC method and applies an `HttpRule` to it:
 //
 //	http:
 //	  rules:
-//	    # Selects a gRPC method and applies HttpRule to it.
 //	    - selector: example.v1.Messaging.GetMessage
 //	      get: /v1/messages/{message_id}/{sub.subfield}
 //
-// ## Special notes
+// # Special notes
 //
 // When gRPC Transcoding is used to map a gRPC to JSON REST endpoints, the
 // proto to JSON conversion must follow the [proto3
@@ -671,14 +663,14 @@ var file_google_api_http_proto_rawDesc = []byte{
 	0x75, 0x73, 0x74, 0x6f, 0x6d, 0x48, 0x74, 0x74, 0x70, 0x50, 0x61, 0x74, 0x74, 0x65, 0x72, 0x6e,
 	0x12, 0x12, 0x0a, 0x04, 0x6b, 0x69, 0x6e, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04,
 	0x6b, 0x69, 0x6e, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x61, 0x74, 0x68, 0x18, 0x02, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x04, 0x70, 0x61, 0x74, 0x68, 0x42, 0x6a, 0x0a, 0x0e, 0x63, 0x6f, 0x6d, 0x2e,
+	0x28, 0x09, 0x52, 0x04, 0x70, 0x61, 0x74, 0x68, 0x42, 0x67, 0x0a, 0x0e, 0x63, 0x6f, 0x6d, 0x2e,
 	0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x61, 0x70, 0x69, 0x42, 0x09, 0x48, 0x74, 0x74, 0x70,
 	0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x41, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e,
 	0x67, 0x6f, 0x6c, 0x61, 0x6e, 0x67, 0x2e, 0x6f, 0x72, 0x67, 0x2f, 0x67, 0x65, 0x6e, 0x70, 0x72,
 	0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x61, 0x70, 0x69, 0x73, 0x2f, 0x61,
 	0x70, 0x69, 0x2f, 0x61, 0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x3b, 0x61,
-	0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0xf8, 0x01, 0x01, 0xa2, 0x02, 0x04,
-	0x47, 0x41, 0x50, 0x49, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0xa2, 0x02, 0x04, 0x47, 0x41, 0x50,
+	0x49, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (

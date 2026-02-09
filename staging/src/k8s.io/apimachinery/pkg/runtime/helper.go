@@ -284,3 +284,21 @@ func (e *encoderWithAllocator) Encode(obj Object, w io.Writer) error {
 func (e *encoderWithAllocator) Identifier() Identifier {
 	return e.encoder.Identifier()
 }
+
+type nondeterministicEncoderToEncoderAdapter struct {
+	NondeterministicEncoder
+}
+
+func (e nondeterministicEncoderToEncoderAdapter) Encode(obj Object, w io.Writer) error {
+	return e.EncodeNondeterministic(obj, w)
+}
+
+// UseNondeterministicEncoding returns an Encoder that encodes objects using the provided Encoder's
+// EncodeNondeterministic method if it implements NondeterministicEncoder, otherwise it returns the
+// provided Encoder as-is.
+func UseNondeterministicEncoding(encoder Encoder) Encoder {
+	if nondeterministic, ok := encoder.(NondeterministicEncoder); ok {
+		return nondeterministicEncoderToEncoderAdapter{nondeterministic}
+	}
+	return encoder
+}

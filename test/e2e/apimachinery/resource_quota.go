@@ -25,6 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	quota "k8s.io/apiserver/pkg/quota/v1"
@@ -45,16 +47,22 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/utils/crd"
+	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
+	gomegatypes "github.com/onsi/gomega/types"
 )
 
 const (
@@ -64,6 +72,7 @@ const (
 )
 
 var classGold = "gold"
+var classSilver = "silver"
 var extendedResourceName = "example.com/dongle"
 
 var _ = SIGDescribe("ResourceQuota", func() {
@@ -490,6 +499,56 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 
 	/*
+		Release: v1.31
+		Testname: ResourceQuota, object count quota, ResourceClaim
+		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
+		Create ResourceClaim. Creation MUST be successful and resource usage count against the ResourceClaim object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
+		Delete the ResourceClaim. Deletion MUST succeed and resource usage count against the ResourceClaim object MUST be released from ResourceQuotaStatus of the ResourceQuota.
+		[NotConformancePromotable] alpha feature
+	*/
+	f.It("should create a ResourceQuota and capture the life of a ResourceClaim", f.WithFeatureGate(features.DynamicResourceAllocation), f.WithLabel("DRA"), func(ctx context.Context) {
+		ginkgo.By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(ctx, f.ClientSet, f.Namespace.Name)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a ResourceQuota")
+		quotaName := "test-quota"
+		resourceQuota := newTestResourceQuotaDRA(quotaName)
+		_, err = createResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuota)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
+		usedResources[core.ClaimObjectCountName] = resource.MustParse("0")
+		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("0")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a ResourceClaim")
+		claim := newTestResourceClaimForQuota("test-claim")
+		claim, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status captures resource claim creation")
+		usedResources = v1.ResourceList{}
+		usedResources[core.ClaimObjectCountName] = resource.MustParse("1")
+		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("1")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Deleting a ResourceClaim")
+		err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status released usage")
+		usedResources[core.ClaimObjectCountName] = resource.MustParse("0")
+		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("0")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		framework.ExpectNoError(err)
+	})
+
+	/*
 		Release: v1.16
 		Testname: ResourceQuota, object count quota, pvc
 		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
@@ -740,7 +799,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
-		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		err = ensureResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
@@ -780,6 +839,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		framework.ExpectNoError(err)
+		err = ensureResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
@@ -973,6 +1034,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 		gomega.Expect(resourceQuotaResult.Spec.Hard[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse("1")))
 		gomega.Expect(resourceQuotaResult.Spec.Hard[v1.ResourceMemory]).To(gomega.Equal(resource.MustParse("500Mi")))
+		gomega.Expect(resourceQuotaResult).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("Listing all ResourceQuotas with LabelSelector")
 		rq, err := client.CoreV1().ResourceQuotas("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
@@ -985,6 +1047,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err, "failed to patch ResourceQuota %s in namespace %s", rqName, ns)
 		gomega.Expect(patchedResourceQuota.Labels[rqName]).To(gomega.Equal("patched"), "Failed to find the label for this ResourceQuota. Current labels: %v", patchedResourceQuota.Labels)
 		gomega.Expect(*patchedResourceQuota.Spec.Hard.Memory()).To(gomega.Equal(resource.MustParse("750Mi")), "Hard memory value for ResourceQuota %q is %s not 750Mi.", patchedResourceQuota.ObjectMeta.Name, patchedResourceQuota.Spec.Hard.Memory().String())
+		gomega.Expect(resourceversion.CompareResourceVersion(rq.Items[0].ResourceVersion, patchedResourceQuota.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("Deleting a Collection of ResourceQuotas")
 		err = client.CoreV1().ResourceQuotas(ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector})
@@ -1219,6 +1282,156 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 })
 
+var _ = SIGDescribe("ResourceQuota", framework.WithFeatureGate(features.VolumeAttributesClass), func() {
+	f := framework.NewDefaultFramework("resourcequota-volumeattributesclass")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	ginkgo.It("should verify ResourceQuota's volume attributes class scope (quota set to pvc count: 1) against 2 pvcs with same volume attributes class.", func(ctx context.Context) {
+		hard := v1.ResourceList{}
+		hard[v1.ResourceRequestsStorage] = resource.MustParse("5Gi")
+		hard[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+
+		ginkgo.By("Creating a ResourceQuota with volume attributes class scope")
+		quota, err := createResourceQuota(ctx, f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForVolumeAttributesClass("quota-volumeattributesclass", hard, v1.ScopeSelectorOpIn, []string{classGold}))
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quota.Name, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a pvc with volume attributes class")
+		pvc1 := newTestPersistentVolumeClaimForQuota("test-claim-1")
+		pvc1.Spec.StorageClassName = ptr.To("")
+		pvc1.Spec.VolumeAttributesClassName = &classGold
+		pvc1, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc1, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota with volume attributes class scope captures the pvc usage")
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("1Gi")
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quota.Name, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating 2nd pod with priority class should fail")
+		pvc2 := newTestPersistentVolumeClaimForQuota("test-claim-2")
+		pvc2.Spec.StorageClassName = ptr.To("")
+		pvc2.Spec.VolumeAttributesClassName = &classGold
+		_, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc2, metav1.CreateOptions{})
+		gomega.Expect(err).To(gomega.MatchError(apierrors.IsForbidden, "expect a forbidden error when creating a PVC that exceeds quota"))
+
+		ginkgo.By("Deleting first pvc")
+		err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(ctx, pvc1.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status released the pvc usage")
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quota.Name, usedResources)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("should verify ResourceQuota's volume attributes class scope (quota set to pvc count: 1) against a pvc with different volume attributes class.", func(ctx context.Context) {
+		hard := v1.ResourceList{}
+		hard[v1.ResourceRequestsStorage] = resource.MustParse("5Gi")
+		hard[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+
+		ginkgo.By("Creating 2 ResourceQuotas with volume attributes class scope")
+		quotaGold, err := createResourceQuota(ctx, f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForVolumeAttributesClass("quota-volumeattributesclass-gold", hard, v1.ScopeSelectorOpIn, []string{classGold}))
+		framework.ExpectNoError(err)
+		quotaSilver, err := createResourceQuota(ctx, f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForVolumeAttributesClass("quota-volumeattributesclass-silver", hard, v1.ScopeSelectorOpIn, []string{classSilver}))
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring all ResourceQuotas status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaGold.Name, usedResources)
+		framework.ExpectNoError(err)
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaSilver.Name, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a pvc with volume attributes class gold")
+		pvcName := "test-claim"
+		pvc, pv := newTestPersistentVolumeClaimWithFakeCSIVolumeForQuota(f.Namespace.Name, pvcName, &classGold)
+		_, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		_, err = f.ClientSet.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.CoreV1().PersistentVolumes().Delete), pv.Name, metav1.DeleteOptions{})
+
+		ginkgo.By("Waiting for the PVC to be bound")
+		pvs, err := e2epv.WaitForPVClaimBoundPhase(ctx, f.ClientSet, []*v1.PersistentVolumeClaim{pvc}, framework.ClaimProvisionTimeout)
+		framework.ExpectNoError(err)
+		gomega.Expect(pvs).To(gomega.HaveLen(1))
+		gomega.Expect(pvs[0].Name).To(gomega.Equal(pv.Name), "Expected PV %q to be bound to PVC %q", pv.Name, pvc.Name)
+
+		ginkgo.By("Ensuring resource quota with volume attributes class scope captures the pvc usage")
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("1Gi")
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaGold.Name, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Updating the desired volume attributes class of the pvc to silver")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			gotPVC, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(ctx, pvcName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			gotPVC.Spec.VolumeAttributesClassName = &classSilver
+			_, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Update(ctx, gotPVC, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota with volume attributes class scope captures the pvc usage")
+		// the pvc references two different classes, one is in the spec which represents the desired class
+		// and another is in the status which represents the current class. so the actual usage is 1 for each quota.
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("1Gi")
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaSilver.Name, usedResources)
+		framework.ExpectNoError(err)
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaGold.Name, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Update the pv to have the volume attributes class silver")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			gotPV, err := f.ClientSet.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			gotPV.Spec.VolumeAttributesClassName = &classSilver
+			_, err = f.ClientSet.CoreV1().PersistentVolumes().Update(ctx, gotPV, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Update the current volume attributes class of the pvc to silver")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error { // no real driver, so we have to simulate the driver behavior
+			gotPVC, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(ctx, pvcName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			gotPVC.Status.CurrentVolumeAttributesClassName = &classSilver
+			_, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).UpdateStatus(ctx, gotPVC, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota with volume attributes class scope captures the pvc usage")
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaGold.Name, usedResources)
+		framework.ExpectNoError(err)
+		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("1Gi")
+		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaSilver.Name, usedResources)
+		framework.ExpectNoError(err)
+	})
+})
+
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("scope-selectors")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
@@ -1316,16 +1529,23 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Creating a long running pod")
-		podName := "test-pod"
 		requests := v1.ResourceList{}
 		requests[v1.ResourceCPU] = resource.MustParse("500m")
 		requests[v1.ResourceMemory] = resource.MustParse("200Mi")
 		limits := v1.ResourceList{}
 		limits[v1.ResourceCPU] = resource.MustParse("1")
 		limits[v1.ResourceMemory] = resource.MustParse("400Mi")
-		pod := newTestPodForQuota(f, podName, requests, limits)
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+
+		podName1 := "test-pod"
+		pod1 := newTestPodForQuota(f, podName1, requests, limits)
+
+		podName2 := "terminating-pod"
+		pod2 := newTestPodForQuota(f, podName2, requests, limits)
+		activeDeadlineSeconds := int64(3600)
+		pod2.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+
+		ginkgo.By("Creating a long running pod")
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod1, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota with not terminating scope captures the pod usage")
@@ -1343,14 +1563,35 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = ensureResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Updating the pod to have an active deadline")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			gotPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, podName1, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			gotPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(ctx, gotPod, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating second terminating pod")
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
+		gomega.Expect(err).To(gomega.MatchError(apierrors.IsForbidden, "expect a forbidden error when creating a Pod that exceeds quota"))
+
+		ginkgo.By("Ensuring resource quota with terminating scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		usedResources[v1.ResourceRequestsCPU] = requests[v1.ResourceCPU]
+		usedResources[v1.ResourceRequestsMemory] = requests[v1.ResourceMemory]
+		usedResources[v1.ResourceLimitsCPU] = limits[v1.ResourceCPU]
+		usedResources[v1.ResourceLimitsMemory] = limits[v1.ResourceMemory]
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName, *metav1.NewDeleteOptions(0))
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Ensuring resource quota status released the pod usage")
+		ginkgo.By("Ensuring resource quota with not terminating scope ignored the pod usage")
 		usedResources[v1.ResourcePods] = resource.MustParse("0")
 		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
@@ -1359,12 +1600,21 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
+		ginkgo.By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName1, *metav1.NewDeleteOptions(0))
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		framework.ExpectNoError(err)
+
 		ginkgo.By("Creating a terminating pod")
-		podName = "terminating-pod"
-		pod = newTestPodForQuota(f, podName, requests, limits)
-		activeDeadlineSeconds := int64(3600)
-		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota with terminating scope captures the pod usage")
@@ -1386,7 +1636,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName, *metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName2, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -1823,6 +2073,7 @@ func newTestResourceQuotaWithScopeSelector(name string, scope v1.ResourceQuotaSc
 	hard[v1.ResourcePods] = resource.MustParse("5")
 	switch scope {
 	case v1.ResourceQuotaScopeTerminating, v1.ResourceQuotaScopeNotTerminating:
+		hard[v1.ResourcePods] = resource.MustParse("1")
 		hard[v1.ResourceRequestsCPU] = resource.MustParse("1")
 		hard[v1.ResourceRequestsMemory] = resource.MustParse("500Mi")
 		hard[v1.ResourceLimitsCPU] = resource.MustParse("2")
@@ -1878,6 +2129,25 @@ func newTestResourceQuotaWithScopeForPriorityClass(name string, hard v1.Resource
 	}
 }
 
+// newTestResourceQuotaWithScopeForVolumeAttributesClass returns a quota
+// that enforces default constraints for testing with ResourceQuotaScopeVolumeAttributesClass scope
+func newTestResourceQuotaWithScopeForVolumeAttributesClass(name string, hard v1.ResourceList, op v1.ScopeSelectorOperator, values []string) *v1.ResourceQuota {
+	return &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: v1.ResourceQuotaSpec{Hard: hard,
+			ScopeSelector: &v1.ScopeSelector{
+				MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+					{
+						ScopeName: v1.ResourceQuotaScopeVolumeAttributesClass,
+						Operator:  op,
+						Values:    values,
+					},
+				},
+			},
+		},
+	}
+}
+
 // newTestResourceQuota returns a quota that enforces default constraints for testing
 func newTestResourceQuota(name string) *v1.ResourceQuota {
 	hard := v1.ResourceList{}
@@ -1904,6 +2174,14 @@ func newTestResourceQuota(name string) *v1.ResourceQuota {
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       v1.ResourceQuotaSpec{Hard: hard},
 	}
+}
+
+// newTestResourceQuotaDRA returns a quota that includes hard limits for ResourceClaim objects.
+func newTestResourceQuotaDRA(name string) *v1.ResourceQuota {
+	quota := newTestResourceQuota(name)
+	quota.Spec.Hard[core.ClaimObjectCountName] = resource.MustParse("1")
+	quota.Spec.Hard[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("1")
+	return quota
 }
 
 // newTestPodForQuota returns a pod that has the specified requests and limits
@@ -2003,6 +2281,83 @@ func newTestPersistentVolumeClaimForQuota(name string) *v1.PersistentVolumeClaim
 	}
 }
 
+func newTestPersistentVolumeClaimWithFakeCSIVolumeForQuota(namespace, name string, vacName *string) (*v1.PersistentVolumeClaim, *v1.PersistentVolume) {
+	volumeName := fmt.Sprintf("quota-fake-volume-%s-%s", namespace, name)
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			StorageClassName:          ptr.To(""), // avoid binding to a real storage class
+			VolumeAttributesClassName: vacName,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					// prevent disruption to other test workloads in parallel test runs by ensuring the quota
+					// test claims don't get bound to a volume in use by other tests
+					"x-test.k8s.io/satisfiable": "fake-volume",
+				},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources: v1.VolumeResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
+				},
+			},
+			VolumeName: volumeName,
+		},
+	}
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volumeName,
+			Labels: map[string]string{
+				"x-test.k8s.io/satisfiable": "fake-volume",
+			},
+		},
+		Spec: v1.PersistentVolumeSpec{
+			StorageClassName:              "",
+			VolumeAttributesClassName:     vacName,
+			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+			AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
+			},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:       "fake.csi.k8s.io",
+					VolumeHandle: "volume-handle",
+				},
+			},
+			ClaimRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "PersistentVolumeClaim",
+				Namespace:  namespace,
+				Name:       name,
+			},
+		},
+	}
+	return pvc, pv
+}
+
+// newTestResourceClaimForQuota returns a simple resource claim
+func newTestResourceClaimForQuota(name string) *resourceapi.ResourceClaim {
+	return &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{{
+					Name: "req-0",
+					Exactly: &resourceapi.ExactDeviceRequest{
+						DeviceClassName: classGold,
+					},
+				}},
+			},
+		},
+	}
+}
+
 // newTestReplicationControllerForQuota returns a simple replication controller
 func newTestReplicationControllerForQuota(name, image string, replicas int32) *v1.ReplicationController {
 	return &v1.ReplicationController{
@@ -2010,7 +2365,7 @@ func newTestReplicationControllerForQuota(name, image string, replicas int32) *v
 			Name: name,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(replicas),
+			Replicas: ptr.To[int32](replicas),
 			Selector: map[string]string{
 				"name": name,
 			},
@@ -2135,12 +2490,33 @@ func countResourceQuota(ctx context.Context, c clientset.Interface, namespace st
 	})
 }
 
-// wait for resource quota status to show the expected used resources value
+// Wait for resource quota status to show the expected used resources value.
+// Other resources are ignored.
 func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
-	return wait.PollUntilContextTimeout(ctx, framework.Poll, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
-		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
+	var lastResourceQuota *v1.ResourceQuota
+	err := framework.Gomega().Eventually(ctx, framework.GetObject(c.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).Should(haveUsedResources(used, &lastResourceQuota))
+	if lastResourceQuota != nil && err == nil {
+		framework.Logf("Got expected ResourceQuota:\n%s", format.Object(lastResourceQuota, 1))
+	}
+	return err
+}
+
+// Ensure that the resource quota status shows the expected used resources value and does not change.
+// Other resources are ignored.
+func ensureResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
+	// The longer we check the higher the confidence that it really remains the same.
+	// But we don't want to delay too long because it makes the test slower.
+	err := framework.Gomega().Consistently(ctx, framework.GetObject(c.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).WithTimeout(10 * time.Second).Should(haveUsedResources(used, nil))
+	return err
+}
+
+func haveUsedResources(used v1.ResourceList, lastResourceQuota **v1.ResourceQuota) gomegatypes.GomegaMatcher {
+	// The template emits the actual ResourceQuota object as YAML.
+	// In particular the ManagedFields are interesting because both
+	// kube-apiserver and kube-controller-manager set the status.
+	return gcustom.MakeMatcher(func(resourceQuota *v1.ResourceQuota) (bool, error) {
+		if lastResourceQuota != nil {
+			*lastResourceQuota = resourceQuota
 		}
 		// used may not yet be calculated
 		if resourceQuota.Status.Used == nil {
@@ -2149,12 +2525,11 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 		// verify that the quota shows the expected used resource values
 		for k, v := range used {
 			if actualValue, found := resourceQuota.Status.Used[k]; !found || (actualValue.Cmp(v) != 0) {
-				framework.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
 				return false, nil
 			}
 		}
 		return true, nil
-	})
+	}).WithTemplate("Expected:\n{{.FormattedActual}}\n{{.To}} have the following .status.used entries:\n{{range $key, $value := .Data}}    {{$key}}: \"{{$value.ToUnstructured}}\"\n{{end}}").WithTemplateData(used /* Formatting of the map is done inside the template. */)
 }
 
 // updateResourceQuotaUntilUsageAppears updates the resource quota object until the usage is populated

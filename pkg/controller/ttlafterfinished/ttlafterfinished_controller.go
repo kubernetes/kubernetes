@@ -19,6 +19,7 @@ package ttlafterfinished
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	batch "k8s.io/api/batch/v1"
@@ -29,13 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchlisters "k8s.io/client-go/listers/batch/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/controller"
 	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished/metrics"
@@ -106,20 +107,26 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 // Run starts the workers to clean up Jobs.
 func (tc *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer tc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting TTL after finished controller")
-	defer logger.Info("Shutting down TTL after finished controller")
 
-	if !cache.WaitForNamedCacheSync("TTL after finished", ctx.Done(), tc.jListerSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down TTL after finished controller")
+		tc.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.jListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, tc.worker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, tc.worker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

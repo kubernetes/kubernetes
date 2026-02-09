@@ -72,8 +72,6 @@ func (mi *MessageInfo) makeKnownFieldsFunc(si structInfo) {
 			fi = fieldInfoForMap(fd, fs, mi.Exporter)
 		case fd.IsList():
 			fi = fieldInfoForList(fd, fs, mi.Exporter)
-		case fd.IsWeak():
-			fi = fieldInfoForWeakMessage(fd, si.weakOffset)
 		case fd.Message() != nil:
 			fi = fieldInfoForMessage(fd, fs, mi.Exporter)
 		default:
@@ -205,6 +203,11 @@ func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 		case fd.IsList():
 			if fd.Enum() != nil || fd.Message() != nil {
 				ft = fs.Type.Elem()
+
+				if ft.Kind() == reflect.Slice {
+					ft = ft.Elem()
+				}
+
 			}
 			isMessage = fd.Message() != nil
 		case fd.Enum() != nil:
@@ -214,9 +217,6 @@ func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 			}
 		case fd.Message() != nil:
 			ft = fs.Type
-			if fd.IsWeak() {
-				ft = nil
-			}
 			isMessage = true
 		}
 		if isMessage && ft != nil && ft.Kind() != reflect.Ptr {

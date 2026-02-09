@@ -20,6 +20,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -61,8 +62,8 @@ func TestCancelAutomatic(t *testing.T) {
 func TestCancelCtx(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	var discardLogger klog.Logger
-	tCtx = ktesting.WithLogger(tCtx, discardLogger)
-	tCtx = ktesting.WithRESTConfig(tCtx, new(rest.Config))
+	tCtx = tCtx.WithLogger(discardLogger)
+	tCtx = tCtx.WithRESTConfig(new(rest.Config))
 	baseCtx := tCtx
 
 	tCtx.Cleanup(func() {
@@ -86,7 +87,24 @@ func TestCancelCtx(t *testing.T) {
 	tCtx.Cancel("test is complete")
 }
 
-func TestWithTB(t *testing.T) {
+func TestParallel(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	tCtx := ktesting.Init(t)
+
+	// Each sub-test runs in parallel to the others and waits for the other two.
+	test := func(tCtx ktesting.TContext) {
+		tCtx.Parallel()
+		wg.Done()
+		wg.Wait()
+	}
+	tCtx.Run("one", test)
+	tCtx.Run("two", test)
+	tCtx.Run("three", test)
+}
+
+func TestRun(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
 	cfg := new(rest.Config)
@@ -94,11 +112,9 @@ func TestWithTB(t *testing.T) {
 	client := clientset.New(nil)
 	dynamic := dynamic.New(nil)
 	apiextensions := apiextensions.New(nil)
-	tCtx = ktesting.WithClients(tCtx, cfg, mapper, client, dynamic, apiextensions)
+	tCtx = tCtx.WithClients(cfg, mapper, client, dynamic, apiextensions)
 
-	t.Run("sub", func(t *testing.T) {
-		tCtx := ktesting.WithTB(tCtx, t)
-
+	tCtx.Run("sub", func(tCtx ktesting.TContext) {
 		assert.Equal(t, cfg, tCtx.RESTConfig(), "RESTConfig")
 		assert.Equal(t, mapper, tCtx.RESTMapper(), "RESTMapper")
 		assert.Equal(t, client, tCtx.Client(), "Client")
@@ -106,9 +122,17 @@ func TestWithTB(t *testing.T) {
 		assert.Equal(t, apiextensions, tCtx.APIExtensions(), "APIExtensions")
 
 		tCtx.Cancel("test is complete")
+		<-tCtx.Done()
 	})
 
 	if err := tCtx.Err(); err != nil {
 		t.Errorf("parent TContext should not have been cancelled: %v", err)
 	}
+}
+
+func TestWithNamespace(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	namespace := "foo"
+	tCtxWithNamespace := tCtx.WithNamespace(namespace)
+	tCtx.Expect(tCtxWithNamespace.Namespace()).To(gomega.Equal(namespace))
 }

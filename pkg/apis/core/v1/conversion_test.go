@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -52,6 +52,8 @@ func TestPodLogOptions(t *testing.T) {
 	sinceTime := metav1.NewTime(time.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC).Local())
 	tailLines := int64(2)
 	limitBytes := int64(3)
+	v1StreamStderr := v1.LogStreamStderr
+	coreStreamStderr := core.LogStreamStderr
 
 	versionedLogOptions := &v1.PodLogOptions{
 		Container:    "mycontainer",
@@ -62,6 +64,7 @@ func TestPodLogOptions(t *testing.T) {
 		Timestamps:   true,
 		TailLines:    &tailLines,
 		LimitBytes:   &limitBytes,
+		Stream:       &v1StreamStderr,
 	}
 	unversionedLogOptions := &core.PodLogOptions{
 		Container:    "mycontainer",
@@ -72,6 +75,7 @@ func TestPodLogOptions(t *testing.T) {
 		Timestamps:   true,
 		TailLines:    &tailLines,
 		LimitBytes:   &limitBytes,
+		Stream:       &coreStreamStderr,
 	}
 	expectedParameters := url.Values{
 		"container":    {"mycontainer"},
@@ -82,6 +86,7 @@ func TestPodLogOptions(t *testing.T) {
 		"timestamps":   {"true"},
 		"tailLines":    {"2"},
 		"limitBytes":   {"3"},
+		"stream":       {"Stderr"},
 	}
 
 	codec := runtime.NewParameterCodec(legacyscheme.Scheme)
@@ -247,7 +252,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 				Namespace: "namespace",
 			},
 			Spec: v1.ReplicationControllerSpec{
-				Replicas:        utilpointer.Int32(1),
+				Replicas:        ptr.To[int32](1),
 				MinReadySeconds: 32,
 				Selector:        map[string]string{"foo": "bar", "bar": "foo"},
 				Template: &v1.PodTemplateSpec{
@@ -287,7 +292,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 	apiObjectFuzzer := fuzzer.FuzzerFor(fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, corefuzzer.Funcs), rand.NewSource(152), legacyscheme.Codecs)
 	for i := 0; i < 100; i++ {
 		rc := &v1.ReplicationController{}
-		apiObjectFuzzer.Fuzz(rc)
+		apiObjectFuzzer.Fill(rc)
 		// Sometimes the fuzzer decides to leave Spec.Template nil.
 		// We can't support that because Spec.Template is not a pointer in RS,
 		// so it will round-trip as non-nil but empty.
@@ -324,7 +329,106 @@ func TestReplicationControllerConversion(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(in, out) {
 			instr, _ := json.MarshalIndent(in, "", "  ")
 			outstr, _ := json.MarshalIndent(out, "", "  ")
-			t.Errorf("RC-RS conversion round-trip failed:\nin:\n%s\nout:\n%s", instr, outstr)
+			t.Errorf("RC-RS conversion round-trip failed:\nin:\n%s\nout:\n%s\ndiff:\n%s", instr, outstr, cmp.Diff(in, out))
+		}
+	}
+}
+
+func TestReplicaSetConversion(t *testing.T) {
+	inputs := []*apps.ReplicaSet{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "name",
+				Namespace: "namespace",
+				Labels:    map[string]string{"foo": "bar", "bar": "foo"}, // labels have to be defined everywhere not to trigger RC defaulting
+			},
+			Spec: apps.ReplicaSetSpec{
+				Replicas:        1,
+				MinReadySeconds: 32,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"foo": "bar", "bar": "foo"},
+				},
+				Template: core.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"foo": "bar", "bar": "foo"},
+					},
+					Spec: core.PodSpec{
+						Containers: []core.Container{
+							{
+								Name:  "container",
+								Image: "image",
+							},
+						},
+					},
+				},
+			},
+			Status: apps.ReplicaSetStatus{
+				Replicas:             1,
+				FullyLabeledReplicas: 2,
+				ReadyReplicas:        3,
+				AvailableReplicas:    4,
+				TerminatingReplicas:  nil, // ReplicationController does not support .status.terminatingReplicas
+				ObservedGeneration:   5,
+				Conditions: []apps.ReplicaSetCondition{
+					{
+						Type:               apps.ReplicaSetReplicaFailure,
+						Status:             core.ConditionTrue,
+						LastTransitionTime: metav1.NewTime(time.Unix(123456789, 0)),
+						Reason:             "Reason",
+						Message:            "Message",
+					},
+				},
+			},
+		},
+	}
+
+	// Add some fuzzed ReplicaSets.
+	apiObjectFuzzer := fuzzer.FuzzerFor(fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, corefuzzer.Funcs), rand.NewSource(152), legacyscheme.Codecs)
+	for i := 0; i < 100; i++ {
+		rs := &apps.ReplicaSet{}
+		apiObjectFuzzer.Fill(rs)
+		// if we have labels, they have to be set to satisfy RC defaulting
+		if labels := rs.Spec.Template.Labels; len(labels) > 0 {
+			rs.Labels = labels
+
+			// forcefully set label selector, since the RC has only partial selector support (MatchLabels)
+			rs.Spec.Selector = &metav1.LabelSelector{
+				MatchLabels: labels,
+			}
+		} else {
+			rs.Spec.Selector = nil
+		}
+
+		// ReplicationController does not support .status.terminatingReplicas
+		if rs.Status.TerminatingReplicas != nil {
+			rs.Status.TerminatingReplicas = nil
+		}
+		inputs = append(inputs, rs)
+	}
+
+	// Round-trip the input RSs before converting to RC.
+	for i := range inputs {
+		inputs[i] = roundTripRS(t, inputs[i])
+	}
+
+	for _, in := range inputs {
+		rc := &v1.ReplicationController{}
+		// Use in.DeepCopy() to avoid sharing pointers with `in`.
+		if err := corev1.Convert_apps_ReplicaSet_To_v1_ReplicationController(in.DeepCopy(), rc, nil); err != nil {
+			t.Errorf("can't convert RS to RC: %v", err)
+			continue
+		}
+		// Round-trip RC before converting back to RS.
+		rc = roundTrip(t, rc).(*v1.ReplicationController)
+		out := &apps.ReplicaSet{}
+		if err := corev1.Convert_v1_ReplicationController_To_apps_ReplicaSet(rc, out, nil); err != nil {
+			t.Errorf("can't convert RC to RS: %v", err)
+			continue
+		}
+		if !apiequality.Semantic.DeepEqual(in, out) {
+			instr, _ := json.MarshalIndent(in, "", "  ")
+			outstr, _ := json.MarshalIndent(out, "", "  ")
+			t.Errorf("RS-RC conversion round-trip failed:\nin:\n%s\nout:\n%s\ndiff:\n%s", instr, outstr, cmp.Diff(in, out))
 		}
 	}
 }
@@ -721,14 +825,14 @@ func TestConvert_v1_Pod_To_core_Pod(t *testing.T) {
 			args: args{
 				in: &v1.Pod{
 					Spec: v1.PodSpec{
-						TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+						TerminationGracePeriodSeconds: ptr.To[int64](-1),
 					},
 				},
 				out: &core.Pod{},
 			},
 			wantOut: &core.Pod{
 				Spec: core.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64(1),
+					TerminationGracePeriodSeconds: ptr.To[int64](1),
 					SecurityContext:               &core.PodSecurityContext{},
 				},
 			},
@@ -761,14 +865,14 @@ func TestConvert_core_Pod_To_v1_Pod(t *testing.T) {
 			args: args{
 				in: &core.Pod{
 					Spec: core.PodSpec{
-						TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+						TerminationGracePeriodSeconds: ptr.To[int64](-1),
 					},
 				},
 				out: &v1.Pod{},
 			},
 			wantOut: &v1.Pod{
 				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64(1),
+					TerminationGracePeriodSeconds: ptr.To[int64](1),
 				},
 			},
 		},

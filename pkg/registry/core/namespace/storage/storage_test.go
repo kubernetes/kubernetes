@@ -151,7 +151,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	key := "namespaces/foo"
+	key := "/namespaces/foo"
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 	now := metav1.Now()
 	namespace := &api.Namespace{
@@ -188,7 +188,7 @@ func TestUpdateDeletingNamespaceWithIncompleteMetadataFinalizers(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	key := "namespaces/foo"
+	key := "/namespaces/foo"
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 	now := metav1.Now()
 	namespace := &api.Namespace{
@@ -224,7 +224,7 @@ func TestUpdateDeletingNamespaceWithIncompleteSpecFinalizers(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	key := "namespaces/foo"
+	key := "/namespaces/foo"
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 	now := metav1.Now()
 	namespace := &api.Namespace{
@@ -259,7 +259,7 @@ func TestUpdateDeletingNamespaceWithCompleteFinalizers(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	key := "namespaces/foo"
+	key := "/namespaces/foo"
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 	now := metav1.Now()
 	namespace := &api.Namespace{
@@ -301,7 +301,7 @@ func TestFinalizeDeletingNamespaceWithCompleteFinalizers(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
 	defer finalizeStorage.store.DestroyFunc()
-	key := "namespaces/foo"
+	key := "/namespaces/foo"
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 	now := metav1.Now()
 	namespace := &api.Namespace{
@@ -345,7 +345,7 @@ func TestFinalizeDeletingNamespaceWithIncompleteMetadataFinalizers(t *testing.T)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
 	defer finalizeStorage.store.DestroyFunc()
-	key := "namespaces/foo"
+	key := "/namespaces/foo"
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 	now := metav1.Now()
 	namespace := &api.Namespace{
@@ -382,7 +382,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	key := "namespaces/foo"
+	key := "/namespaces/foo"
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 	now := metav1.Now()
 	namespace := &api.Namespace{
@@ -585,7 +585,7 @@ func TestDeleteWithGCFinalizers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		key := "namespaces/" + test.name
+		key := "/namespaces/" + test.name
 		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 		namespace := &api.Namespace{
 			ObjectMeta: metav1.ObjectMeta{

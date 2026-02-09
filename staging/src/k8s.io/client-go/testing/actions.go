@@ -29,6 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// All NewRoot... functions return non-namespaced actions, and are equivalent to
+// calling the corresponding New... function with an empty namespace.
+// This is assumed by the fake client generator.
+
 func NewRootGetAction(resource schema.GroupVersionResource, name string) GetActionImpl {
 	return NewRootGetActionWithOptions(resource, name, metav1.GetOptions{})
 }

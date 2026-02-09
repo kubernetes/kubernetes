@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// MutatingAdmissionPolicyListerExpansion allows custom methods to be added to
+// MutatingAdmissionPolicyLister.
+type MutatingAdmissionPolicyListerExpansion interface{}
+
+// MutatingAdmissionPolicyBindingListerExpansion allows custom methods to be added to
+// MutatingAdmissionPolicyBindingLister.
+type MutatingAdmissionPolicyBindingListerExpansion interface{}
+
 // ValidatingAdmissionPolicyListerExpansion allows custom methods to be added to
 // ValidatingAdmissionPolicyLister.
 type ValidatingAdmissionPolicyListerExpansion interface{}

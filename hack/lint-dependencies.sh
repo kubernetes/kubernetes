@@ -47,6 +47,19 @@ rc=0
 # The array and map in `unwanted-dependencies.json` are in alphabetical order.
 go run k8s.io/kubernetes/cmd/dependencyverifier "${KUBE_ROOT}/hack/unwanted-dependencies.json"
 
+k8s_module_regex="k8s[.]io/(kubernetes"
+for repo in $(kube::util::list_staging_repos); do
+  k8s_module_regex="${k8s_module_regex}|${repo}"
+done
+k8s_module_regex="${k8s_module_regex})"
+
+recursive_dependencies=$(go mod graph | grep -E " ${k8s_module_regex}" | grep -E -v "^${k8s_module_regex}" || true)
+if [[ -n "${recursive_dependencies}" ]]; then
+  echo "These external modules depend on k8s.io/kubernetes or staging modules, which is not allowed:"
+  echo ""
+  echo "${recursive_dependencies}"
+fi
+
 outdated=$(go list -m -json all | jq -r "
   select(.Replace.Version != null) |
   select(.Version != .Replace.Version) |
@@ -90,7 +103,7 @@ if [[ -n "${unused}" ]]; then
   echo "${unused}" | xargs -L 1 echo 'go mod edit -dropreplace'
 fi
 
-if [[ -n "${unused}${outdated}${noncanonical}" ]]; then
+if [[ -n "${unused}${outdated}${noncanonical}${recursive_dependencies}" ]]; then
   rc=1
 else
   echo "All pinned versions of checked dependencies match their preferred version."

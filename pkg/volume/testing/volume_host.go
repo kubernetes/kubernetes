@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -45,8 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/mount-utils"
-	"k8s.io/utils/exec"
-	testingexec "k8s.io/utils/exec/testing"
 )
 
 type FakeVolumeHost interface {
@@ -63,7 +60,6 @@ type fakeVolumeHost struct {
 	pluginMgr              *VolumePluginMgr
 	mounter                mount.Interface
 	hostUtil               hostutil.HostUtils
-	exec                   *testingexec.FakeExec
 	nodeLabels             map[string]string
 	nodeName               string
 	subpather              subpath.Interface
@@ -94,7 +90,6 @@ func newFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interf
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, nodeName: nodeName, csiDriverLister: driverLister, volumeAttachmentLister: volumeAttachLister}
 	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
-	host.exec = &testingexec.FakeExec{DisableScripts: true}
 	host.pluginMgr = &VolumePluginMgr{}
 	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
 		t.Fatalf("Failed to init plugins while creating fake volume host: %v", err)
@@ -136,7 +131,7 @@ func (f *fakeVolumeHost) GetKubeClient() clientset.Interface {
 	return f.kubeClient
 }
 
-func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
+func (f *fakeVolumeHost) GetMounter() mount.Interface {
 	return f.mounter
 }
 
@@ -152,7 +147,7 @@ func (f *fakeVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolume
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
+func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod) (Mounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
@@ -162,7 +157,7 @@ func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Po
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewMounter(&spec, pod, opts)
+	return plug.NewMounter(&spec, pod)
 }
 
 func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error) {
@@ -178,16 +173,6 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 	return plug.NewUnmounter(spec.Name(), podUID)
 }
 
-// Returns the hostname of the host kubelet is running on
-func (f *fakeVolumeHost) GetHostName() string {
-	return "fakeHostName"
-}
-
-// Returns host IP or nil in the case of error.
-func (f *fakeVolumeHost) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not implemented")
-}
-
 func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
@@ -196,10 +181,6 @@ func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secre
 	return func(namespace, name string) (*v1.Secret, error) {
 		return f.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	}
-}
-
-func (f *fakeVolumeHost) GetExec(pluginName string) exec.Interface {
-	return f.exec
 }
 
 func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
@@ -233,10 +214,6 @@ func (f *fakeVolumeHost) GetEventRecorder() record.EventRecorder {
 	return nil
 }
 
-func (f *fakeVolumeHost) ScriptCommands(scripts []CommandScript) {
-	ScriptCommands(f.exec, scripts)
-}
-
 func (f *fakeVolumeHost) WaitForKubeletErrNil() error {
 	return wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
 		f.mux.Lock()
@@ -265,7 +242,6 @@ func newFakeAttachDetachVolumeHost(t *testing.T, rootDir string, kubeClient clie
 	host.volumeAttachmentLister = volumeAttachLister
 	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
-	host.exec = &testingexec.FakeExec{DisableScripts: true}
 	host.pluginMgr = &VolumePluginMgr{}
 	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
 		t.Fatalf("Failed to init plugins while creating fake volume host: %v", err)
@@ -344,7 +320,6 @@ func newFakeKubeletVolumeHost(t *testing.T, rootDir string, kubeClient clientset
 	host.volumeAttachmentLister = volumeAttachLister
 	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
-	host.exec = &testingexec.FakeExec{DisableScripts: true}
 	host.pluginMgr = &VolumePluginMgr{}
 	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
 		t.Fatalf("Failed to init plugins while creating fake volume host: %v", err)
@@ -427,7 +402,7 @@ func (f *fakeKubeletVolumeHost) GetHostUtil() hostutil.HostUtils {
 }
 
 func (f *fakeKubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
-	ctb, err := f.kubeClient.CertificatesV1alpha1().ClusterTrustBundles().Get(context.Background(), name, metav1.GetOptions{})
+	ctb, err := f.kubeClient.CertificatesV1beta1().ClusterTrustBundles().Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("while getting ClusterTrustBundle %s: %w", name, err)
 	}
@@ -437,7 +412,7 @@ func (f *fakeKubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing 
 
 // Note: we do none of the deduplication and sorting that the real deal should do.
 func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
-	ctbList, err := f.kubeClient.CertificatesV1alpha1().ClusterTrustBundles().List(context.Background(), metav1.ListOptions{})
+	ctbList, err := f.kubeClient.CertificatesV1beta1().ClusterTrustBundles().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("while listing all ClusterTrustBundles: %w", err)
 	}
@@ -451,4 +426,8 @@ func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, label
 	}
 
 	return fullSet.Bytes(), nil
+}
+
+func (f *fakeKubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
+	return []byte("key\n"), []byte("cert\n"), nil
 }

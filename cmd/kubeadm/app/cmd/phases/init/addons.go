@@ -19,7 +19,6 @@ package phases
 import (
 	"io"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,6 +29,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var (
@@ -56,7 +56,6 @@ func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "addon",
 		Short: "Install required addons for passing conformance tests",
-		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",

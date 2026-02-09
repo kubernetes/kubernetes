@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hnslib"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,24 +32,41 @@ import (
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 type fakeNetworkStatsProvider struct {
 	containers []containerStats
 }
 
-type containerStats struct {
-	container hcsshim.ContainerProperties
-	hcsStats  []hcsshim.NetworkStats
+// NetworkStats holds the network statistics for a container
+type fakeNetworkStats struct {
+	BytesReceived          uint64
+	BytesSent              uint64
+	PacketsReceived        uint64
+	PacketsSent            uint64
+	DroppedPacketsIncoming uint64
+	DroppedPacketsOutgoing uint64
+	EndpointId             string
+	InstanceId             string
 }
 
-func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error) {
-	eps := hcsshim.HNSEndpointStats{}
+type fakeContainerProperties struct {
+	ID string
+}
+type containerStats struct {
+	container fakeContainerProperties
+	hcsStats  []fakeNetworkStats
+}
+
+func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpointStats, error) {
+	eps := hnslib.HNSEndpointStats{}
 	for _, c := range s.containers {
 		for _, stat := range c.hcsStats {
 			if endpointName == stat.InstanceId {
-				eps = hcsshim.HNSEndpointStats{
+				eps = hnslib.HNSEndpointStats{
 					EndpointID:      stat.EndpointId,
 					BytesSent:       stat.BytesSent,
 					BytesReceived:   stat.BytesReceived,
@@ -63,8 +80,8 @@ func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hcs
 	return &eps, nil
 }
 
-func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoint, error) {
-	uniqueEndpoints := map[string]*hcsshim.HNSEndpoint{}
+func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hnslib.HNSEndpoint, error) {
+	uniqueEndpoints := map[string]*hnslib.HNSEndpoint{}
 
 	for _, c := range s.containers {
 		for _, stat := range c.hcsStats {
@@ -75,7 +92,7 @@ func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoin
 				continue
 			}
 
-			uniqueEndpoints[stat.EndpointId] = &hcsshim.HNSEndpoint{
+			uniqueEndpoints[stat.EndpointId] = &hnslib.HNSEndpoint{
 				Name:             stat.EndpointId,
 				Id:               stat.EndpointId,
 				SharedContainers: []string{c.container.ID},
@@ -83,7 +100,7 @@ func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoin
 		}
 	}
 
-	eps := []hcsshim.HNSEndpoint{}
+	eps := []hnslib.HNSEndpoint{}
 	for _, ep := range uniqueEndpoints {
 		eps = append(eps, *ep)
 	}
@@ -105,9 +122,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -117,9 +134,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -135,15 +152,15 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
-						RxBytes: toP(1),
-						TxBytes: toP(10),
+						RxBytes: ptr.To[uint64](1),
+						TxBytes: ptr.To[uint64](10),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test",
-							RxBytes: toP(1),
+							RxBytes: ptr.To[uint64](1),
 
-							TxBytes: toP(10),
+							TxBytes: ptr.To[uint64](10),
 						},
 					},
 				},
@@ -151,14 +168,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -170,9 +187,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -182,9 +199,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -194,9 +211,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c3",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 3,
 								BytesSent:     30,
@@ -212,15 +229,15 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
-						RxBytes: toP(1),
-						TxBytes: toP(10),
+						RxBytes: ptr.To[uint64](1),
+						TxBytes: ptr.To[uint64](10),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test",
-							RxBytes: toP(1),
+							RxBytes: ptr.To[uint64](1),
 
-							TxBytes: toP(10),
+							TxBytes: ptr.To[uint64](10),
 						},
 					},
 				},
@@ -228,14 +245,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -243,14 +260,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -262,9 +279,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -280,9 +297,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -298,15 +315,15 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
-						RxBytes: toP(1),
-						TxBytes: toP(10),
+						RxBytes: ptr.To[uint64](1),
+						TxBytes: ptr.To[uint64](10),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test",
-							RxBytes: toP(1),
+							RxBytes: ptr.To[uint64](1),
 
-							TxBytes: toP(10),
+							TxBytes: ptr.To[uint64](10),
 						},
 					},
 				},
@@ -314,14 +331,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -333,9 +350,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -351,9 +368,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -369,21 +386,21 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
-						RxBytes: toP(1),
-						TxBytes: toP(10),
+						RxBytes: ptr.To[uint64](1),
+						TxBytes: ptr.To[uint64](10),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test",
-							RxBytes: toP(1),
+							RxBytes: ptr.To[uint64](1),
 
-							TxBytes: toP(10),
+							TxBytes: ptr.To[uint64](10),
 						},
 						{
 							Name:    "test3",
-							RxBytes: toP(3),
+							RxBytes: ptr.To[uint64](3),
 
-							TxBytes: toP(30),
+							TxBytes: ptr.To[uint64](30),
 						},
 					},
 				},
@@ -391,14 +408,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -407,6 +424,7 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			skipped: true,
 		},
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// TODO: Remove skip once https://github.com/kubernetes/kubernetes/issues/116692 is fixed.
@@ -419,7 +437,7 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 				},
 				clock: fakeClock,
 			}
-			got, err := p.listContainerNetworkStats()
+			got, err := p.listContainerNetworkStats(logger)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("listContainerNetworkStats() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -429,10 +447,6 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			}
 		})
 	}
-}
-
-func toP(i uint64) *uint64 {
-	return &i
 }
 
 func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
@@ -445,6 +459,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	memoryUsageTimestamp := int64(666666)
 	memoryUsageWorkingSetBytes := uint64(0x11223344)
 	memoryUsageAvailableBytes := uint64(0x55667788)
+	memoryCommitBytes := uint64(0x99AABBCC)
 	memoryUsagePageFaults := uint64(200)
 	logStatsUsed := uint64(5000)
 	logStatsInodesUsed := uint64(5050)
@@ -488,6 +503,9 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 			WorkingSetBytes: &runtimeapi.UInt64Value{
 				Value: memoryUsageWorkingSetBytes,
 			},
+			CommitMemoryBytes: &runtimeapi.UInt64Value{
+				Value: memoryCommitBytes,
+			},
 			PageFaults: &runtimeapi.UInt64Value{
 				Value: memoryUsagePageFaults,
 			},
@@ -510,27 +528,29 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 		Uid:       "sb0-uid",
 	}
 
-	got, err := p.makeWinContainerStats(inputStats, inputContainer, inputRootFsInfo, make(map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo), inputPodSandboxMetadata)
+	logger, _ := ktesting.NewTestContext(t)
+	got, err := p.makeWinContainerStats(logger, inputStats, inputContainer, inputRootFsInfo, make(map[string]*cadvisorapiv2.FsInfo), inputPodSandboxMetadata)
 
 	expected := &statsapi.ContainerStats{
 		Name:      "c0",
 		StartTime: v1.NewTime(time.Unix(0, containerStartTime.Unix())),
 		CPU: &statsapi.CPUStats{
 			Time:                 v1.NewTime(time.Unix(0, cpuUsageTimestamp)),
-			UsageNanoCores:       toP(cpuUsageNanoCores),
-			UsageCoreNanoSeconds: toP(cpuUsageNanoSeconds),
+			UsageNanoCores:       ptr.To[uint64](cpuUsageNanoCores),
+			UsageCoreNanoSeconds: ptr.To[uint64](cpuUsageNanoSeconds),
 		},
 		Memory: &statsapi.MemoryStats{
 			Time:            v1.NewTime(time.Unix(0, memoryUsageTimestamp)),
-			AvailableBytes:  toP(memoryUsageAvailableBytes),
-			WorkingSetBytes: toP(memoryUsageWorkingSetBytes),
-			PageFaults:      toP(memoryUsagePageFaults),
+			AvailableBytes:  ptr.To[uint64](memoryUsageAvailableBytes),
+			UsageBytes:      ptr.To[uint64](memoryCommitBytes),
+			WorkingSetBytes: ptr.To[uint64](memoryUsageWorkingSetBytes),
+			PageFaults:      ptr.To[uint64](memoryUsagePageFaults),
 		},
 		Rootfs: &statsapi.FsStats{},
 		Logs: &statsapi.FsStats{
 			Time:       c0LogStats.Time,
-			UsedBytes:  toP(logStatsUsed),
-			InodesUsed: toP(logStatsInodesUsed),
+			UsedBytes:  ptr.To[uint64](logStatsUsed),
+			InodesUsed: ptr.To[uint64](logStatsInodesUsed),
 		},
 	}
 

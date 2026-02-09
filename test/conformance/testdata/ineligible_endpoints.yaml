@@ -274,3 +274,30 @@
 - endpoint: getStoragemigrationAPIGroup
   reason: The endpoint is part of a group that has no stable endpoints yet, reporting as a stable endpoint in apisnoop.
   link: https://github.com/kubernetes/issues/124248
+- endpoint: createNetworkingV1ServiceCIDR
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/enhancements/pull/4983#issuecomment-2541699445
+- endpoint: deleteNetworkingV1CollectionServiceCIDR
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/enhancements/pull/4983#issuecomment-2541699445
+- endpoint: deleteNetworkingV1ServiceCIDR
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/enhancements/pull/4983#issuecomment-2541699445
+- endpoint: patchNetworkingV1ServiceCIDR
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/enhancements/pull/4983#issuecomment-2541699445
+- endpoint: patchNetworkingV1ServiceCIDRStatus
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/enhancements/pull/4983#issuecomment-2541699445
+- endpoint: replaceNetworkingV1ServiceCIDR
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/enhancements/pull/4983#issuecomment-2541699445
+- endpoint: replaceNetworkingV1ServiceCIDRStatus
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/enhancements/pull/4983#issuecomment-2541699445
+- endpoint: connectCoreV1PostNamespacedPodExec
+  reason: Deprecated and uses a sometime unreliable SPDY protocol
+  link: https://github.com/kubernetes/kubernetes/issues/133689#issuecomment-3233952615
+- endpoint: connectCoreV1PostNamespacedPodPortforward
+  reason: Deprecated and uses a sometime unreliable SPDY protocol
+  link: https://github.com/kubernetes/kubernetes/issues/133689#issuecomment-3233952615
