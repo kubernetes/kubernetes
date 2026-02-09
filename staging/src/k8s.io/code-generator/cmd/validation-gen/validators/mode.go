@@ -119,7 +119,7 @@ func (mtv *modeTagValidator) GetValidations(context Context, tag codetags.Tag) (
 func (mtv *modeTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mtv.TagName(),
-		StabilityLevel: Alpha,
+		StabilityLevel: TagStabilityLevelAlpha,
 		Scopes:         mtv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that this field is a discriminator for state-based validation.",
 		Args: []TagArgDoc{{
@@ -133,11 +133,11 @@ func (mtv *modeTagValidator) Docs() TagDoc {
 
 type memberTagValidator struct {
 	shared    map[string]modeGroups
-	validator Validator
+	validator TagValidationExtractor
 }
 
 func (mtv *memberTagValidator) Init(cfg Config) {
-	mtv.validator = cfg.Validator
+	mtv.validator = cfg.TagValidator
 }
 
 func (mtv *memberTagValidator) TagName() string {
@@ -214,7 +214,7 @@ func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag)
 func (mtv *memberTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mtv.TagName(),
-		StabilityLevel: Alpha,
+		StabilityLevel: TagStabilityLevelAlpha,
 		Scopes:         mtv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that this field's validation depends on a discriminator.",
 		Args: []TagArgDoc{{
