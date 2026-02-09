@@ -187,7 +187,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	tCtx.ExpectNoError(err, "add binding failure condition to second claim")
 
 	// Then wait until the scheduler has cleared the device statuses again.
-	waitForClaim(tCtx, namespace, claim2.Name, 30*time.Second,
+	waitForClaim(tCtx, namespace, claim2.Name, schedulingTimeout,
 		gomega.HaveField("Status.Devices", gomega.HaveLen(0)),
 		"claim should have cleared device conditions after rescheduling",
 	)
@@ -358,7 +358,7 @@ func testDeviceBindingFailureConditionsReschedule(tCtx ktesting.TContext, useTai
 	tCtx.ExpectNoError(err, "add binding failure condition to claim")
 
 	// Then wait until the scheduler has cleared the device statuses again.
-	waitForClaim(tCtx, namespace, claim1.Name, 30*time.Second,
+	waitForClaim(tCtx, namespace, claim1.Name, schedulingTimeout,
 		gomega.HaveField("Status.Devices", gomega.HaveLen(0)),
 		"claim should have cleared device conditions after rescheduling",
 	)
