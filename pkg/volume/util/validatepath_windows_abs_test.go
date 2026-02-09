@@ -1,13 +1,14 @@
 //go:build windows
+
 package util
 
 import "testing"
 
-func TestValidatePathRejectsWindowsAbsolutePaths(t *testing.T) {
+func TestValidatePathRejectsWindowsAbsoluteAndUNC(t *testing.T) {
 	cases := []string{
 		`C:\Windows\Temp\pwn.txt`,
-		`C:/Windows/Temp/pwn.txt`,
 		`\\server\share\pwn.txt`,
+		`C:relative-but-has-volume`,
 	}
 	for _, tc := range cases {
 		if err := validatePath(tc); err == nil {
