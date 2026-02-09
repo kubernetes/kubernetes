@@ -298,13 +298,13 @@ func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.Er
 // incrementing the panic metric, and logging an error message
 // if shouldFail=false, and adding a validation error if shouldFail=true.
 func panicSafeValidateFunc(
-	validateUpdateFunc func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList,
+	validateFunc func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList,
 	shouldFail bool, validationIdentifier string,
 ) func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
 	return func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) (errs field.ErrorList) {
 		defer createDeclarativeValidationPanicHandler(ctx, &errs, shouldFail, validationIdentifier)()
 
-		return validateUpdateFunc(ctx, scheme, obj, oldObj, o)
+		return validateFunc(ctx, scheme, obj, oldObj, o)
 	}
 }
 
