@@ -210,184 +210,147 @@ func (p Pod) DeepCopyObject() runtime.Object {
 // scenarios across imperative and declarative errors for
 // the gatherDeclarativeValidationMismatches function
 func TestGatherDeclarativeValidationMismatches(t *testing.T) {
-	replicasPath := field.NewPath("spec").Child("replicas")
-	minReadySecondsPath := field.NewPath("spec").Child("minReadySeconds")
-	selectorPath := field.NewPath("spec").Child("selector")
+	pathStandard := field.NewPath("spec", "standard")
+	pathBeta := field.NewPath("spec", "beta")
+	pathAlpha := field.NewPath("spec", "alpha")
+	pathOther := field.NewPath("spec", "other")
 
-	errA := field.Invalid(replicasPath, nil, "regular error A")
-	errB := field.Invalid(minReadySecondsPath, -1, "covered error B").WithOrigin("minimum")
-	coveredErrB := field.Invalid(minReadySecondsPath, -1, "covered error B").WithOrigin("minimum")
-	errBWithDiffDetail := field.Invalid(minReadySecondsPath, -1, "covered error B - different detail").WithOrigin("minimum")
-	errBWithDiffPath := field.Invalid(field.NewPath("spec").Child("fakeminReadySeconds"), -1, "covered error B").WithOrigin("minimum")
-	coveredErrB.CoveredByDeclarative = true
-	errC := field.Invalid(replicasPath, nil, "covered error C").WithOrigin("minimum")
-	coveredErrC := field.Invalid(replicasPath, nil, "covered error C").WithOrigin("minimum")
-	coveredErrC.CoveredByDeclarative = true
-	errCWithDiffOrigin := field.Invalid(replicasPath, nil, "covered error C").WithOrigin("maximum")
-	errD := field.Invalid(selectorPath, nil, "regular error D")
+	// Standard Errors
+	errHVStandard := field.Invalid(pathStandard, "val", "impStandard").MarkCoveredByDeclarative().WithOrigin("min")
+	errDVStandard := field.Invalid(pathStandard, "val", "decStandard").WithOrigin("min")
+
+	// Beta Errors
+	errHVBeta := field.Invalid(pathBeta, "val", "impBeta").MarkCoveredByDeclarative().MarkBeta().WithOrigin("min")
+
+	// Alpha Errors
+	errDVAlpha := field.Invalid(pathAlpha, "val", "decAlpha").MarkAlpha().WithOrigin("min")
+	// Note: No HV Alpha by convention, so if it exists it would be a mismatch if DV is missing.
+	// But we usually don't mark HV as covered for Alpha rules.
+
+	// Normalization / Fuzzy match helpers
+	errDVStandardDiffDetail := field.Invalid(pathStandard, "val", "decStandardDiffDetail").WithOrigin("min")
+	errDVStandardDiffPath := field.Invalid(field.NewPath("spec", "standardAliased"), "val", "decStandard").WithOrigin("min")
+
+	const (
+		authoritativeMsg = "This difference should not affect system operation since hand written validation is authoritative."
+		disableBetaMsg   = "Consider disabling the DeclarativeValidationBeta feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes."
+	)
 
 	testCases := []struct {
 		name                    string
 		imperativeErrors        field.ErrorList
 		declarativeErrors       field.ErrorList
-		takeover                bool
+		enforced                bool
 		expectMismatches        bool
 		expectDetailsContaining []string
 		normalizedRules         []field.NormalizationRule
 	}{
 		{
-			name:                    "Declarative and imperative return 0 errors - no mismatch",
-			imperativeErrors:        field.ErrorList{},
-			declarativeErrors:       field.ErrorList{},
-			takeover:                false,
-			expectMismatches:        false,
-			expectDetailsContaining: []string{},
-		},
-		{
-			name: "Declarative returns multiple errors with different origins, errors match - no mismatch",
-			imperativeErrors: field.ErrorList{
-				errA,
-				coveredErrB,
-				coveredErrC,
-				errD,
-			},
-			declarativeErrors: field.ErrorList{
-				errB,
-				errC,
-			},
-			takeover:                false,
-			expectMismatches:        false,
-			expectDetailsContaining: []string{},
-		},
-		{
-			name: "Declarative returns multiple errors with different origins, errors don't match - mismatch case",
-			imperativeErrors: field.ErrorList{
-				errA,
-				coveredErrB,
-				coveredErrC,
-			},
-			declarativeErrors: field.ErrorList{
-				errB,
-				errCWithDiffOrigin,
-			},
-			takeover:         true,
-			expectMismatches: true,
-			expectDetailsContaining: []string{
-				"Unexpected difference between hand written validation and declarative validation error results",
-				"unmatched error(s) found",
-				"extra error(s) found",
-				"replicas",
-				"Consider disabling the DeclarativeValidationTakeover feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes",
-			},
-		},
-		{
-			name: "Declarative and imperative return exactly 1 error, errors match - no mismatch",
-			imperativeErrors: field.ErrorList{
-				coveredErrB,
-			},
-			declarativeErrors: field.ErrorList{
-				errB,
-			},
-			takeover:                false,
-			expectMismatches:        false,
-			expectDetailsContaining: []string{},
-		},
-		{
-			name: "Declarative and imperative exactly 1 error, errors don't match - mismatch",
-			imperativeErrors: field.ErrorList{
-				coveredErrB,
-			},
-			declarativeErrors: field.ErrorList{
-				errC,
-			},
-			takeover:         false,
-			expectMismatches: true,
-			expectDetailsContaining: []string{
-				"Unexpected difference between hand written validation and declarative validation error results",
-				"unmatched error(s) found",
-				"minReadySeconds",
-				"extra error(s) found",
-				"replicas",
-				"This difference should not affect system operation since hand written validation is authoritative",
-			},
-		},
-		{
-			name: "Declarative returns 0 errors, imperative returns 1 covered error - mismatch",
-			imperativeErrors: field.ErrorList{
-				coveredErrB,
-			},
+			name:              "No errors - no mismatch",
+			imperativeErrors:  field.ErrorList{},
 			declarativeErrors: field.ErrorList{},
-			takeover:          true,
+			expectMismatches:  false,
+		},
+		{
+			name:              "Clean match - no mismatch",
+			imperativeErrors:  field.ErrorList{errHVStandard},
+			declarativeErrors: field.ErrorList{errDVStandard},
+			expectMismatches:  false,
+		},
+		{
+			name:              "Mismatch: Missing DV (Standard) + Enforced -> Disable Beta Gate",
+			imperativeErrors:  field.ErrorList{errHVStandard},
+			declarativeErrors: field.ErrorList{},
+			enforced:          true,
 			expectMismatches:  true,
 			expectDetailsContaining: []string{
-				"Unexpected difference between hand written validation and declarative validation error results",
 				"unmatched error(s) found",
-				"minReadySeconds",
-				"Consider disabling the DeclarativeValidationTakeover feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes",
+				"spec.standard",
+				disableBetaMsg,
 			},
 		},
 		{
-			name: "Declarative returns 0 errors, imperative returns 1 uncovered error - no mismatch",
-			imperativeErrors: field.ErrorList{
-				errB,
-			},
-			declarativeErrors:       field.ErrorList{},
-			takeover:                false,
-			expectMismatches:        false,
-			expectDetailsContaining: []string{},
-		},
-		{
-			name:             "Declarative returns 1 error, imperative returns 0 error - mismatch",
-			imperativeErrors: field.ErrorList{},
-			declarativeErrors: field.ErrorList{
-				errB,
-			},
-			takeover:         false,
-			expectMismatches: true,
+			name:              "Mismatch: Extra DV (Standard) + Not Enforced -> HV Authoritative",
+			imperativeErrors:  field.ErrorList{},
+			declarativeErrors: field.ErrorList{errDVStandard},
+			enforced:          false,
+			expectMismatches:  true,
 			expectDetailsContaining: []string{
-				"Unexpected difference between hand written validation and declarative validation error results",
 				"extra error(s) found",
-				"minReadySeconds",
-				"This difference should not affect system operation since hand written validation is authoritative",
+				"spec.standard",
+				authoritativeMsg,
 			},
 		},
 		{
-			name: "Declarative returns 1 error, imperative returns 3 matching errors  - no mismatch",
-			imperativeErrors: field.ErrorList{
-				coveredErrB,
+			name:              "Mismatch: Missing DV (Beta) + Enforced -> Disable Beta Gate",
+			imperativeErrors:  field.ErrorList{errHVBeta},
+			declarativeErrors: field.ErrorList{},
+			enforced:          true,
+			expectMismatches:  true,
+			expectDetailsContaining: []string{
+				"unmatched error(s) found",
+				"spec.beta",
+				disableBetaMsg,
 			},
-			declarativeErrors: field.ErrorList{
-				errB,
-				errB,
-				errBWithDiffDetail,
-			},
-			takeover:                false,
-			expectMismatches:        false,
-			expectDetailsContaining: []string{},
 		},
 		{
-			name: "Field normalization, errors don't match - mismatch",
-			imperativeErrors: field.ErrorList{
-				coveredErrB,
+			name:              "Mismatch: Extra DV (Alpha) + Enforced -> HV Authoritative (Override)",
+			imperativeErrors:  field.ErrorList{},
+			declarativeErrors: field.ErrorList{errDVAlpha},
+			enforced:          true,
+			expectMismatches:  true,
+			expectDetailsContaining: []string{
+				"extra error(s) found",
+				"spec.alpha",
+				authoritativeMsg,
 			},
-			declarativeErrors: field.ErrorList{
-				errBWithDiffPath,
-			},
+		},
+		{
+			name:              "Fuzzy matching (different detail) - no mismatch",
+			imperativeErrors:  field.ErrorList{errHVStandard},
+			declarativeErrors: field.ErrorList{errDVStandardDiffDetail},
+			expectMismatches:  false,
+		},
+		{
+			name:              "Field normalization - no mismatch",
+			imperativeErrors:  field.ErrorList{errHVStandard},
+			declarativeErrors: field.ErrorList{errDVStandardDiffPath},
 			normalizedRules: []field.NormalizationRule{
 				{
-					Regexp:      regexp.MustCompile(`spec.fakeminReadySeconds`),
-					Replacement: "spec.minReadySeconds",
+					Regexp:      regexp.MustCompile(`spec.standardAliased`),
+					Replacement: "spec.standard",
 				},
 			},
-			takeover:                false,
-			expectMismatches:        false,
-			expectDetailsContaining: []string{},
+			expectMismatches: false,
+		},
+		{
+			name:              "Multiple mismatches - combined log info",
+			imperativeErrors:  field.ErrorList{errHVBeta},
+			declarativeErrors: field.ErrorList{errDVAlpha},
+			enforced:          true,
+			expectMismatches:  true,
+			expectDetailsContaining: []string{
+				"unmatched error(s) found",
+				"spec.beta",
+				disableBetaMsg,
+				"extra error(s) found",
+				"spec.alpha",
+				authoritativeMsg,
+			},
+		},
+		{
+			name: "Uncovered HV error - no mismatch (ignored)",
+			imperativeErrors: field.ErrorList{
+				field.Invalid(pathOther, "val", "other").WithOrigin("min"),
+			},
+			declarativeErrors: field.ErrorList{},
+			expectMismatches:  false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			details := gatherDeclarativeValidationMismatches(tc.imperativeErrors, tc.declarativeErrors, tc.takeover, tc.normalizedRules)
+			details := gatherDeclarativeValidationMismatches(tc.imperativeErrors, tc.declarativeErrors, tc.enforced, tc.normalizedRules)
 			// Check if mismatches were found if expected
 			if tc.expectMismatches && len(details) == 0 {
 				t.Errorf("Expected mismatches but got none")
@@ -423,7 +386,7 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 		name            string
 		imperativeErrs  field.ErrorList
 		declarativeErrs field.ErrorList
-		takeover        bool
+		enforced        bool
 		expectLogs      bool
 		expectedRegex   string
 	}{
@@ -431,16 +394,16 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 			name:            "mismatched errors, log info",
 			imperativeErrs:  field.ErrorList{coveredErrB},
 			declarativeErrs: field.ErrorList{errA},
-			takeover:        true,
+			enforced:        true,
 			expectLogs:      true,
 			// logs have a prefix of the form - E0309 21:05:33.865030 1926106 validate.go:199]
-			expectedRegex: "E.*Unexpected difference between hand written validation and declarative validation error results.*Consider disabling the DeclarativeValidationTakeover feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes",
+			expectedRegex: "E.*Unexpected difference between hand written validation and declarative validation error results.*Consider disabling the DeclarativeValidationBeta feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes",
 		},
 		{
 			name:            "matching errors, don't log info",
 			imperativeErrs:  field.ErrorList{coveredErrB},
 			declarativeErrs: field.ErrorList{errB},
-			takeover:        true,
+			enforced:        true,
 			expectLogs:      false,
 			expectedRegex:   "",
 		},
@@ -454,7 +417,7 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 			defer klog.LogToStderr(true)
 			ctx := context.Background()
 
-			compareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.takeover, "test_validationIdentifier", nil)
+			compareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.enforced, "test_validationIdentifier", nil)
 
 			klog.Flush()
 			logOutput := buf.String()

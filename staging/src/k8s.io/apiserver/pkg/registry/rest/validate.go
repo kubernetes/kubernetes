@@ -166,9 +166,9 @@ func parseSubresourcePath(subresourcePath string) ([]string, error) {
 
 // compareDeclarativeErrorsAndEmitMismatches checks for mismatches between imperative and declarative validation
 // and logs + emits metrics when inconsistencies are found
-func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool, validationIdentifier string, normalizationRules []field.NormalizationRule) {
+func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, enforced bool, validationIdentifier string, normalizationRules []field.NormalizationRule) {
 	logger := klog.FromContext(ctx)
-	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, takeover, normalizationRules)
+	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, enforced, normalizationRules)
 	for _, detail := range mismatchDetails {
 		// Log information about the mismatch using contextual logger
 		logger.Error(nil, detail)
@@ -180,17 +180,23 @@ func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeEr
 
 // gatherDeclarativeValidationMismatches compares imperative and declarative validation errors
 // and returns detailed information about any mismatches found. Errors are compared via type, field, and origin
-func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field.ErrorList, takeover bool, normalizationRules []field.NormalizationRule) []string {
+func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field.ErrorList, enforced bool, normalizationRules []field.NormalizationRule) []string {
 	var mismatchDetails []string
 	// short circuit here to minimize allocs for usual case of 0 validation errors
 	if len(imperativeErrs) == 0 && len(declarativeErrs) == 0 {
 		return mismatchDetails
 	}
-	// recommendation based on takeover status
-	recommendation := "This difference should not affect system operation since hand written validation is authoritative."
-	if takeover {
-		recommendation = "Consider disabling the DeclarativeValidationTakeover feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes."
+	// default recommendation based on enforcement status
+	const (
+		authoritativeMsg = "This difference should not affect system operation since hand written validation is authoritative."
+		disableBetaMsg   = "Consider disabling the DeclarativeValidationBeta feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes."
+	)
+
+	defaultRecommendation := authoritativeMsg
+	if enforced {
+		defaultRecommendation = disableBetaMsg
 	}
+
 	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(normalizationRules)
 	exactMatcher := field.ErrorMatcher{}.Exactly()
 
@@ -244,12 +250,18 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 		}
 
 		if matchCount == 0 {
+			rec := defaultRecommendation
+			// If the imperative error is explicitly Alpha, it is never enforced, so HV is authoritative.
+			if iErr.ValidationStabilityLevel.String() == "alpha" {
+				rec = authoritativeMsg
+			}
+
 			mismatchDetails = append(mismatchDetails,
 				fmt.Sprintf(
 					"Unexpected difference between hand written validation and declarative validation error results, unmatched error(s) found %s. "+
 						"This indicates an issue with declarative validation. %s",
 					fuzzyMatcher.Render(iErr),
-					recommendation,
+					rec,
 				),
 			)
 		}
@@ -259,12 +271,18 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 
 	// Any remaining unmatched declarative errors are considered "extra"
 	for _, dErr := range remaining {
+		rec := defaultRecommendation
+		// If the declarative error is Alpha, it is never enforced (shadowed), so HV is authoritative.
+		if dErr.ValidationStabilityLevel.String() == "alpha" {
+			rec = authoritativeMsg
+		}
+
 		mismatchDetails = append(mismatchDetails,
 			fmt.Sprintf(
 				"Unexpected difference between hand written validation and declarative validation error results, extra error(s) found %s. "+
 					"This indicates an issue with declarative validation. %s",
 				fuzzyMatcher.Render(dErr),
-				recommendation,
+				rec,
 			),
 		)
 	}
