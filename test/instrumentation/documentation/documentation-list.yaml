@@ -5268,7 +5268,7 @@
     their serving certificate OR the number of connection failures due to the insecure
     SHA1 signatures (either/or, based on the runtime environment)
   type: Counter
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
 - name: x509_missing_san_total
   subsystem: webhooks
   namespace: apiserver
@@ -5276,7 +5276,7 @@
     certificate OR the number of connection failures due to the lack of x509 certificate
     SAN extension missing (either/or, based on the runtime environment)
   type: Counter
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
 - name: current_executing_requests
   subsystem: flowcontrol
   namespace: apiserver
