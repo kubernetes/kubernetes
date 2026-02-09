@@ -75,6 +75,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -455,12 +456,6 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		}
 	}
 
-	manifests := []string{
-		// The code below matches the content of this manifest (ports,
-		// container names, etc.).
-		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
-	}
-
 	// Create service account and corresponding RBAC rules.
 	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + d.InstanceSuffix + "-service-account"
 	content := example.PluginPermissions
@@ -468,16 +463,52 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
 	d.createFromYAML(tCtx, []byte(content), tCtx.Namespace())
 
+	// Figure out which hostpathplugin to use: basically the latest one
+	// from the test/e2e/testing-manifests/storage-csi manifests. That is
+	// where SIG Storage maintains the versions of the hostpath image which
+	// are part of Kubernetes E2E testing. test/utils/image parses those files.
+	//
+	// We piggy-back on that instead of controlling the version ourselves
+	// because it reduces effort, at the risk of unexpected
+	// breakage. Another benefit is that -list-images and registry patching
+	// via test/utils/image + KUBE_TEST_REPO_LIST work.
+	hostPathImage := "registry.k8s.io/sig-storage/hostpathplugin"
+	hostPathVersion := ""
+	for _, config := range image.GetOriginalImageConfigs() {
+		parts := strings.SplitN(config.GetE2EImage(), ":", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		image, version := parts[0], parts[1]
+		if image != hostPathImage {
+			continue
+		}
+		// "Dumb" string comparison is good enough for e.g. v1.16.1 < v1.17.0.
+		// It seems unlikely that any major/patch will need more than one digit
+		// or that version grow beyond 99.
+		if hostPathVersion == "" || hostPathVersion < version {
+			hostPathVersion = version
+		}
+	}
+	origImageURL := hostPathImage + ":" + hostPathVersion
+	patchedImageURL, err := image.ReplaceRegistryInImageURL(origImageURL)
+	tCtx.ExpectNoError(err, "look up E2E image")
+
 	// Using a ReplicaSet instead of a DaemonSet has the advantage that we can control
 	// the lifecycle explicitly, in particular run two pods per node long enough to
 	// run checks.
+	manifests := []string{
+		// The code below matches the content of this manifest (ports,
+		// container names, etc.).
+		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
+	}
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
 	numNodes := int32(len(nodes.NodeNames))
 	pluginDataDirectoryPath := path.Join(kubeletRootDir, "plugins", d.Name)
 	registrarDirectoryPath := path.Join(kubeletRootDir, "plugins_registry")
 	instanceName := d.Name + d.InstanceSuffix
-	err := utils.CreateFromManifestsTCtx(tCtx, func(item interface{}) error {
+	err = utils.CreateFromManifestsTCtx(tCtx, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
 			item.Name += d.NameSuffix + d.InstanceSuffix
@@ -485,6 +516,7 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 			item.Spec.Replicas = &numNodes
 			item.Spec.Selector.MatchLabels[instanceKey] = instanceName
 			item.Spec.Template.Labels[instanceKey] = instanceName
+			item.Spec.Template.Spec.Containers[0].Image = patchedImageURL
 			item.Spec.Template.Spec.ServiceAccountName = d.serviceAccountName
 			item.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchLabels[instanceKey] = instanceName
 			item.Spec.Template.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{
