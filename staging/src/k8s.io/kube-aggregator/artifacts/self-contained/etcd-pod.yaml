@@ -1,0 +1,50 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: etcd
+  labels:
+    etcd: "true"
+spec:
+  replicas: 1
+  selector:
+    etcd: "true"
+  template:
+    metadata:
+      labels:
+        etcd: "true"
+    spec:
+      containers:
+      - name: etcd
+        image: gcr.io/etcd-development/etcd:v3.0.15
+        command:
+        - "etcd"
+        - "--listen-client-urls=https://0.0.0.0:4001"
+        - "--advertise-client-urls=https://etcd.kube-public.svc:4001"
+        - "--trusted-ca-file=/var/run/serving-ca/ca.crt"
+        - "--cert-file=/var/run/serving-cert/tls.crt"
+        - "--key-file=/var/run/serving-cert/tls.key"
+        - "--client-cert-auth=true"
+        - "--listen-peer-urls=https://0.0.0.0:7001"
+        - "--initial-advertise-peer-urls=https://etcd.kube-public.svc:7001"
+        - "--peer-trusted-ca-file=/var/run/serving-ca/ca.crt"
+        - "--peer-cert-file=/var/run/serving-cert/tls.crt"
+        - "--peer-key-file=/var/run/serving-cert/tls.key"
+        - "--peer-client-cert-auth=true"
+        - "--initial-cluster=default=https://etcd.kube-public.svc:7001"
+        ports:
+        - containerPort: 4001
+        volumeMounts:
+        - mountPath: /var/run/serving-cert
+          name: volume-serving-cert
+        - mountPath: /var/run/serving-ca
+          name: volume-etcd-ca
+      volumes:
+      - secret:
+          defaultMode: 420
+          secretName: serving-etcd
+        name: volume-serving-cert
+      - configMap:
+          defaultMode: 420
+          name: etcd-ca
+        name: volume-etcd-ca
+

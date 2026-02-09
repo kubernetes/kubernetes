@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pod-security-webhook
+subjects:
+  - kind: ServiceAccount
+    name: pod-security-webhook
+    namespace: pod-security-webhook
+roleRef:
+  kind: ClusterRole
+  name: pod-security-webhook
+  apiGroup: rbac.authorization.k8s.io

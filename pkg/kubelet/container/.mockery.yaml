@@ -1,0 +1,19 @@
+---
+dir: testing
+pkgname: testing
+template: testify
+template-data:
+  boilerplate-file: ../../../hack/boilerplate/boilerplate.generatego.txt
+  unroll-variadic: true
+packages:
+  io/fs:
+    config:
+      filename: mockdirentry.go
+    interfaces:
+      DirEntry: {}
+  k8s.io/kubernetes/pkg/kubelet/container:
+    config:
+      filename: mocks.go
+    interfaces:
+      Runtime: {}
+      RuntimeCache: {}

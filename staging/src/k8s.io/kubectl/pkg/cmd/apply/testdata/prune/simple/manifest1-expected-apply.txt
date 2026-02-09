@@ -1,0 +1,2 @@
+namespace/foo created
+namespace/bar created

@@ -1,0 +1,27 @@
+run:
+  deadline: 2m
+
+linters:
+  disable-all: true
+  enable:
+    - misspell
+    - govet
+    - staticcheck
+    - errcheck
+    - unparam
+    - ineffassign
+    - nakedret
+    - gocyclo
+    - dupl
+    - goimports
+    - revive
+    - gosec
+    - gosimple
+    - typecheck
+    - unused
+
+linters-settings:
+  gofmt:
+    simplify: true
+  dupl:
+    threshold: 600

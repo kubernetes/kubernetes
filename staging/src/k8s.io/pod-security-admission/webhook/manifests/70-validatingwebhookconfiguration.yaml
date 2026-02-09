@@ -1,0 +1,74 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: "pod-security-webhook.kubernetes.io"
+webhooks:
+  # Audit annotations will be prefixed with this name
+  - name: "pod-security-webhook.kubernetes.io"
+    # Fail-closed admission webhooks can present operational challenges.
+    # You may want to consider using a failure policy of Ignore, but should 
+    # consider the security tradeoffs.
+    failurePolicy: Fail
+    namespaceSelector:
+      # Exempt the webhook itself to avoid a circular dependency.
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: ["pod-security-webhook"]
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources:
+          - namespaces
+          - pods
+          - pods/ephemeralcontainers
+    clientConfig:
+      # Populate with the CA for the serving certificate
+      caBundle: ""
+      service:
+        namespace: "pod-security-webhook"
+        name: "webhook"
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 5
+
+  # Audit annotations will be prefixed with this name
+  - name: "advisory.pod-security-webhook.kubernetes.io"
+    # Non-enforcing resources can safely fail-open.
+    failurePolicy: Ignore
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: ["pod-security-webhook"]
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources:
+          - podtemplates
+          - replicationcontrollers
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources:
+          - daemonsets
+          - deployments
+          - replicasets
+          - statefulsets
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources:
+          - cronjobs
+          - jobs
+    clientConfig:
+      # Populate with the CA for the serving certificate
+      caBundle: ""
+      service:
+        namespace: "pod-security-webhook"
+        name: "webhook"
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 5

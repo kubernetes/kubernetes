@@ -1,0 +1,113 @@
+{
+  "kind": "AdmissionReview",
+  "apiVersion": "admission.k8s.io/v1beta1",
+  "request": {
+    "uid": "uidValue",
+    "kind": {
+      "group": "groupValue",
+      "version": "versionValue",
+      "kind": "kindValue"
+    },
+    "resource": {
+      "group": "groupValue",
+      "version": "versionValue",
+      "resource": "resourceValue"
+    },
+    "subResource": "subResourceValue",
+    "requestKind": {
+      "group": "groupValue",
+      "version": "versionValue",
+      "kind": "kindValue"
+    },
+    "requestResource": {
+      "group": "groupValue",
+      "version": "versionValue",
+      "resource": "resourceValue"
+    },
+    "requestSubResource": "requestSubResourceValue",
+    "name": "nameValue",
+    "namespace": "namespaceValue",
+    "operation": "operationValue",
+    "userInfo": {
+      "username": "usernameValue",
+      "uid": "uidValue",
+      "groups": [
+        "groupsValue"
+      ],
+      "extra": {
+        "extraKey": [
+          "extraValue"
+        ]
+      }
+    },
+    "object": {
+      "apiVersion": "example.com/v1",
+      "kind": "CustomType",
+      "spec": {
+        "replicas": 1
+      },
+      "status": {
+        "available": 1
+      }
+    },
+    "oldObject": {
+      "apiVersion": "example.com/v1",
+      "kind": "CustomType",
+      "spec": {
+        "replicas": 1
+      },
+      "status": {
+        "available": 1
+      }
+    },
+    "dryRun": true,
+    "options": {
+      "apiVersion": "example.com/v1",
+      "kind": "CustomType",
+      "spec": {
+        "replicas": 1
+      },
+      "status": {
+        "available": 1
+      }
+    }
+  },
+  "response": {
+    "uid": "uidValue",
+    "allowed": true,
+    "status": {
+      "metadata": {
+        "selfLink": "selfLinkValue",
+        "resourceVersion": "resourceVersionValue",
+        "continue": "continueValue",
+        "remainingItemCount": 4
+      },
+      "status": "statusValue",
+      "message": "messageValue",
+      "reason": "reasonValue",
+      "details": {
+        "name": "nameValue",
+        "group": "groupValue",
+        "kind": "kindValue",
+        "uid": "uidValue",
+        "causes": [
+          {
+            "reason": "reasonValue",
+            "message": "messageValue",
+            "field": "fieldValue"
+          }
+        ],
+        "retryAfterSeconds": 5
+      },
+      "code": 6
+    },
+    "patch": "BA==",
+    "patchType": "patchTypeValue",
+    "auditAnnotations": {
+      "auditAnnotationsKey": "auditAnnotationsValue"
+    },
+    "warnings": [
+      "warningsValue"
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+inverseRules:
+  - selectorRegexp: k8s[.]io
+    forbiddenPrefixes:
+      - k8s.io/kubernetes/cmd/import-boss/testdata/transitive/aaa
+    transitive: true

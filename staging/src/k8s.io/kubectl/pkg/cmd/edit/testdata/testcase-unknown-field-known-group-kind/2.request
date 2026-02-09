@@ -1,0 +1,11 @@
+{
+	"metadata": {
+		"labels": {
+			"label2": "value2"
+		}
+	},
+	"unknownClientField": {
+		"clientdata": true
+	},
+	"unknownServerField2": null
+}
