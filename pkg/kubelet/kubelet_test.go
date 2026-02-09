@@ -419,7 +419,7 @@ func newTestKubeletWithImageList(
 	handlers = append(handlers, shutdownManager)
 
 	// Add this as cleanup predicate pod admitter
-	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources, lifecycle.NewNodeInfoProviderStub()))
+	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources, kubelet.nodeInfoCache))
 
 	if !excludeAdmitHandlers {
 		kubelet.allocationManager.AddPodAdmitHandlers(handlers)

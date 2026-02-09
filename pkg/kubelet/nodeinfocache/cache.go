@@ -33,8 +33,12 @@ type Cache struct {
 
 // New creates a new empty NodeInfo cache.
 func New() *Cache {
+	ni := framework.NewNodeInfo()
+	// Set a placeholder node so that NodeInfo.RemovePod error messages
+	// can safely access Node().Name before SetNode is called.
+	ni.SetNode(&v1.Node{})
 	return &Cache{
-		nodeInfo: framework.NewNodeInfo(),
+		nodeInfo: ni,
 	}
 }
 
@@ -53,22 +57,24 @@ func (c *Cache) AddPod(pod *v1.Pod) {
 }
 
 // RemovePod removes a pod from the cache.
-func (c *Cache) RemovePod(logger klog.Logger, pod *v1.Pod) error {
+// If the pod is not found (e.g. it was rejected during admission), the error is logged and ignored.
+func (c *Cache) RemovePod(logger klog.Logger, pod *v1.Pod) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.nodeInfo.RemovePod(logger, pod)
+	if err := c.nodeInfo.RemovePod(logger, pod); err != nil {
+		logger.V(4).Info("Pod not found in cache during remove", "pod", klog.KObj(pod), "err", err)
+	}
 }
 
 // UpdatePod updates a pod in the cache (remove old, add new).
-func (c *Cache) UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error {
+// If the old pod is not found (e.g. it was rejected during admission), the error is logged and ignored.
+func (c *Cache) UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err := c.nodeInfo.RemovePod(logger, oldPod); err != nil {
-		// Pod may not exist if it was rejected during admission
 		logger.V(4).Info("Pod not found in cache during update", "pod", klog.KObj(oldPod), "err", err)
 	}
 	c.nodeInfo.AddPod(newPod)
-	return nil
 }
 
 // Snapshot returns a deep copy of the cached NodeInfo for safe concurrent use.
