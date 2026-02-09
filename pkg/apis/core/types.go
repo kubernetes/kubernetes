@@ -5529,7 +5529,6 @@ type NodeRuntimeHandlerFeatures struct {
 	// +optional
 	RecursiveReadOnlyMounts *bool
 	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
-	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *bool
 }

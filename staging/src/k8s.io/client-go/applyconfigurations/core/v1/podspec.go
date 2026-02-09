@@ -233,7 +233,6 @@ type PodSpecApplyConfiguration struct {
 	// When set to false, a new userns is created for the pod. Setting false is useful for
 	// mitigating container breakout vulnerabilities even allowing users to run their
 	// containers as root without actually having root privileges on the host.
-	// This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.
 	HostUsers *bool `json:"hostUsers,omitempty"`
 	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
 	// If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the

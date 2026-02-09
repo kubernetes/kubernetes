@@ -4399,7 +4399,6 @@ type PodSpec struct {
 	// When set to false, a new userns is created for the pod. Setting false is useful for
 	// mitigating container breakout vulnerabilities even allowing users to run their
 	// containers as root without actually having root privileges on the host.
-	// This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.
 	// +k8s:conversion-gen=false
 	// +optional
 	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
