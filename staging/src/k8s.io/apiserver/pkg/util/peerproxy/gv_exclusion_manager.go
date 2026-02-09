@@ -42,11 +42,11 @@ type GVExtractor func(obj interface{}) []schema.GroupVersion
 // - recentlyDeletedGVs: GVs belonging to CRDs and aggregated APIServices that were recently deleted,
 // tracked with deletion timestamp for grace period
 //
-// It runs two workers and a periodic ticker:
-//  1. Active GV Tracker: Triggered on CRD/APIService events or reaper ticks,
-//     rebuilds active GVs and reaps expired deleted GVs
+// It runs two workers:
+//  1. Active GV Tracker: Triggered on CRD/APIService events, rebuilds active GVs
+//     and reaps expired deleted GVs. When a GV is deleted, a delayed sync is scheduled
+//     after the grace period to reap it.
 //  2. Peer Discovery Re-filter: Rate-limited worker that filters peer cache
-//  3. Reaper Ticker: Periodically triggers the Active GV Tracker to reap expired GVs
 type GVExclusionManager struct {
 	// Atomic maps for lock-free access
 	currentlyActiveGVs atomic.Value // map[schema.GroupVersion]struct{}
@@ -58,11 +58,10 @@ type GVExclusionManager struct {
 	apiServiceInformer  cache.SharedIndexInformer
 	apiServiceExtractor GVExtractor
 
-	// Worker 1: triggered by CRD/APIService events or reaper ticks
+	// Worker 1: triggered by CRD/APIService events or delayed reap scheduling
 	activeGVQueue workqueue.TypedRateLimitingInterface[string]
-	// Reaper ticker configuration
+	// Grace period before reaping deleted GVs from the exclusion set
 	exclusionGracePeriod time.Duration
-	reaperCheckInterval  time.Duration
 	// Worker 2: triggered by Active/Deleted GV changes
 	refilterQueue workqueue.TypedRateLimitingInterface[string]
 
@@ -78,13 +77,11 @@ type GVExclusionManager struct {
 // NewGVExclusionManager creates a new GV exclusion manager.
 func NewGVExclusionManager(
 	exclusionGracePeriod time.Duration,
-	reaperCheckInterval time.Duration,
 	rawPeerDiscoveryCache *atomic.Value,
 	invalidationCallback *atomic.Pointer[func()],
 ) *GVExclusionManager {
 	mgr := &GVExclusionManager{
 		exclusionGracePeriod:  exclusionGracePeriod,
-		reaperCheckInterval:   reaperCheckInterval,
 		rawPeerDiscoveryCache: rawPeerDiscoveryCache,
 		invalidationCallback:  invalidationCallback,
 		activeGVQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -196,7 +193,6 @@ func (m *GVExclusionManager) handleGVUpdate() {
 // RunPeerDiscoveryActiveGVTracker runs the Active GV Tracker worker.
 // This worker is triggered by CRD/APIService events and
 // rebuilds the active GV set and reaps expired GVs.
-// Only a single worker is used to avoid race conditions on atomic store operations.
 func (m *GVExclusionManager) RunPeerDiscoveryActiveGVTracker(ctx context.Context) {
 	defer m.activeGVQueue.ShutDown()
 
@@ -301,7 +297,11 @@ func (m *GVExclusionManager) updateRecentlyDeletedGVs(deletedGVs []schema.GroupV
 		}
 	}
 
-	// Add newly deleted GVs
+	// Schedule a delayed sync to reap expired GVs after the grace period.
+	if len(deletedGVs) > 0 {
+		m.activeGVQueue.AddAfter("sync", m.exclusionGracePeriod)
+	}
+
 	for _, gv := range deletedGVs {
 		newDeletedMap[gv] = now
 		klog.V(4).Infof("GV %s deleted: moved to recentlyDeletedGVs", gv.String())
@@ -330,25 +330,6 @@ func diffGVs(old, new map[schema.GroupVersion]struct{}) ([]schema.GroupVersion, 
 	}
 
 	return deletedGVs, hasChanges
-}
-
-// RunPeerDiscoveryReaper runs Worker 2: Reaper
-// This worker periodically triggers reconciliation which also reaps expired GVs.
-func (m *GVExclusionManager) RunPeerDiscoveryReaper(ctx context.Context) {
-	klog.Infof("Starting GV Reaper with %s interval", m.reaperCheckInterval)
-	ticker := time.NewTicker(m.reaperCheckInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			// Trigger reconciliation which will also reap expired GVs
-			m.activeGVQueue.Add("sync")
-		case <-ctx.Done():
-			klog.Info("GV Reaper stopped")
-			return
-		}
-	}
 }
 
 // RunPeerDiscoveryRefilter runs the Peer Discovery Re-filter worker.

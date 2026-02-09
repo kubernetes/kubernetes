@@ -17,6 +17,7 @@ limitations under the License.
 package peerproxy
 
 import (
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -102,7 +103,7 @@ func TestGetExclusionSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mgr := NewGVExclusionManager(5*time.Minute, 1*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
+			mgr := NewGVExclusionManager(5*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
 
 			if tt.activeGVs != nil {
 				mgr.currentlyActiveGVs.Store(tt.activeGVs)
@@ -166,7 +167,7 @@ func TestReapExpiredGVs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mgr := NewGVExclusionManager(tt.gracePeriod, 50*time.Millisecond, &atomic.Value{}, &atomic.Pointer[func()]{})
+			mgr := NewGVExclusionManager(tt.gracePeriod, &atomic.Value{}, &atomic.Pointer[func()]{})
 			mgr.recentlyDeletedGVs.Store(tt.deletedGVs)
 			mgr.updateRecentlyDeletedGVs(nil)
 			result := mgr.loadRecentlyDeletedGVs()
@@ -181,7 +182,7 @@ func TestReapExpiredGVs(t *testing.T) {
 }
 
 func TestDetectDiff(t *testing.T) {
-	_ = NewGVExclusionManager(5*time.Minute, 1*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
+	_ = NewGVExclusionManager(5*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
 
 	tests := []struct {
 		name        string
@@ -259,15 +260,8 @@ func TestDetectDiff(t *testing.T) {
 				t.Errorf("diffGVs() deleted count = %d, want %d", len(deletedGVs), len(tt.wantDeleted))
 			}
 			for _, wantGV := range tt.wantDeleted {
-				found := false
-				for _, gotGV := range deletedGVs {
-					if gotGV == wantGV {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("diffGVs() missing deleted GV %v", wantGV)
+				if !slices.Contains(deletedGVs, wantGV) {
+					t.Errorf("diffGVs() deleted missing GV %v", wantGV)
 				}
 			}
 		})
@@ -376,7 +370,7 @@ func TestFilterPeerDiscoveryCache(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mgr := NewGVExclusionManager(5*time.Minute, 1*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
+			mgr := NewGVExclusionManager(5*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
 
 			if tt.activeGVs != nil {
 				mgr.currentlyActiveGVs.Store(tt.activeGVs)
@@ -483,7 +477,7 @@ func TestFilterPeerCacheEntry(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mgr := NewGVExclusionManager(5*time.Minute, 1*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
+			mgr := NewGVExclusionManager(5*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
 
 			filtered := mgr.filterPeerCacheEntry(tt.entry, tt.exclusionSet)
 
@@ -555,7 +549,7 @@ func TestFilterGroupDiscovery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mgr := NewGVExclusionManager(5*time.Minute, 1*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
+			mgr := NewGVExclusionManager(5*time.Minute, &atomic.Value{}, &atomic.Pointer[func()]{})
 
 			filtered := mgr.filterGroupDiscovery(tt.groupDiscoveries, tt.exclusionSet)
 			for groupName, wantVersionStrs := range tt.wantGroups {

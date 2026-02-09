@@ -55,9 +55,6 @@ const (
 	// the deleted CRD or aggregated API before this server stops excluding it
 	// in peer-aggregated discovery and while proxying requests to peers.
 	defaultExclusionGracePeriod = 5 * time.Minute
-	// defaultExclusionReaperInterval is the interval at which the we
-	// clean up deleted groups from the exclusion list.
-	defaultExclusionReaperInterval = 1 * time.Minute
 )
 
 // Interface defines how the Mixed Version Proxy filter interacts with the underlying system.
@@ -100,15 +97,9 @@ type Interface interface {
 	// RunPeerDiscoveryActiveGVTracker starts a worker that processes CRD/APIService informer
 	// events to rebuild the set of actively served GroupVersions. This worker is triggered
 	// whenever a CRD or APIService is added or updated and updates the exclusion
-	// set accordingly.
+	// set accordingly. When a GV is deleted, a delayed sync is automatically scheduled
+	// after the grace period to reap expired GVs from the exclusion set.
 	RunPeerDiscoveryActiveGVTracker(ctx context.Context)
-
-	// RunPeerDiscoveryReaper starts a background worker that periodically removes expired
-	// GroupVersions from the exclusion set. When a CRD/APIService is deleted, its GV remains
-	// in the exclusion set for a grace period (default 5 minutes) to allow all peer API servers
-	// to observe the deletion. The reaper runs at a configured interval (default 1 minute)
-	// and removes GVs whose grace period has elapsed.
-	RunPeerDiscoveryReaper(ctx context.Context)
 
 	// RunPeerDiscoveryRefilter starts a worker that re-applies exclusion filtering to the
 	// cached peer discovery data whenever the exclusion set changes. This ensures that
@@ -149,7 +140,6 @@ func NewPeerProxyHandler(
 
 	h.gvExclusionManager = NewGVExclusionManager(
 		defaultExclusionGracePeriod,
-		defaultExclusionReaperInterval,
 		&h.rawPeerDiscoveryCache,
 		&h.cacheInvalidationCallback,
 	)
@@ -232,13 +222,6 @@ func (h *peerProxyHandler) RegisterAPIServiceInformerHandlers(apiServiceInformer
 func (h *peerProxyHandler) RunPeerDiscoveryActiveGVTracker(ctx context.Context) {
 	if h.gvExclusionManager != nil {
 		h.gvExclusionManager.RunPeerDiscoveryActiveGVTracker(ctx)
-	}
-}
-
-// RunPeerDiscoveryReaper starts the worker that removes expired GVs from the exclusion set.
-func (h *peerProxyHandler) RunPeerDiscoveryReaper(ctx context.Context) {
-	if h.gvExclusionManager != nil {
-		h.gvExclusionManager.RunPeerDiscoveryReaper(ctx)
 	}
 }
 
