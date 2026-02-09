@@ -75,6 +75,11 @@ func TestRangeStreamList(t *testing.T) {
 	if err := verifyRangeStreamMetric(tCtx, clientSet, "secrets", 200); err != nil {
 		t.Errorf("Failed to verify RangeStream metric: %v", err)
 	}
+
+	// Verify WatchCacheInitializationDuration was recorded
+	if err := verifyWatchCacheInitDurationMetric(tCtx, clientSet, "secrets"); err != nil {
+		t.Errorf("Failed to verify WatchCacheInitializationDuration metric: %v", err)
+	}
 }
 
 func verifyRangeStreamMetric(ctx context.Context, client clientset.Interface, resource string, expectedCount int) error {
@@ -99,6 +104,37 @@ func verifyRangeStreamMetric(ctx context.Context, client clientset.Interface, re
 						return false, fmt.Errorf("failed to parse metric value: %v", err)
 					}
 					if int(val) == expectedCount {
+						return true, nil
+					}
+				}
+			}
+		}
+		return false, nil
+	})
+}
+
+func verifyWatchCacheInitDurationMetric(ctx context.Context, client clientset.Interface, resource string) error {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		body, err := client.CoreV1().RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
+		if err != nil {
+			return false, err
+		}
+
+		// Look for etcd_watch_cache_initialization_duration_seconds_count{group="",resource="secrets"}
+		for _, line := range strings.Split(string(body), "\n") {
+			if strings.HasPrefix(line, "etcd_watch_cache_initialization_duration_seconds_count") {
+				// Check for presence of key labels independent of order
+				if strings.Contains(line, fmt.Sprintf("resource=\"%s\"", resource)) {
+					// Parse value
+					parts := strings.Split(line, " ")
+					if len(parts) != 2 {
+						return false, fmt.Errorf("unexpected metric format: %s", line)
+					}
+					val, err := strconv.ParseFloat(parts[1], 64)
+					if err != nil {
+						return false, fmt.Errorf("failed to parse metric value: %v", err)
+					}
+					if val > 0 {
 						return true, nil
 					}
 				}
