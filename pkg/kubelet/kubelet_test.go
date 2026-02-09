@@ -3442,6 +3442,7 @@ func TestSyncPodSpans(t *testing.T) {
 	kubelet.containerRuntime, _, err = kuberuntime.NewKubeGenericRuntimeManager(
 		tCtx,
 		kubelet.recorder,
+		nil,
 		kubelet.livenessManager,
 		kubelet.readinessManager,
 		kubelet.startupManager,
