@@ -49,6 +49,7 @@ type CertificateSigningRequest struct {
 	// spec contains the certificate request, and is immutable after creation.
 	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
 	// Other fields are derived by Kubernetes and cannot be modified by users.
+	// +required
 	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status contains information about whether the request is approved or denied,
@@ -61,6 +62,7 @@ type CertificateSigningRequest struct {
 type CertificateSigningRequestSpec struct {
 	// request contains an x509 certificate signing request encoded in a "CERTIFICATE REQUEST" PEM block.
 	// When serialized as JSON or YAML, the data is additionally base64-encoded.
+	// +required
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// signerName indicates the requested signer, and is a qualified name.
@@ -84,6 +86,7 @@ type CertificateSigningRequestSpec struct {
 	//  4. Required, permitted, or forbidden key usages / extended key usages.
 	//  5. Expiration/certificate lifetime: whether it is fixed by the signer, configurable by the admin.
 	//  6. Whether or not requests for CA certificates are allowed.
+	// +required
 	SignerName string `json:"signerName" protobuf:"bytes,7,opt,name=signerName"`
 
 	// expirationSeconds is the requested duration of validity of the issued
@@ -123,6 +126,7 @@ type CertificateSigningRequestSpec struct {
 	//  "ipsec end system", "ipsec tunnel", "ipsec user",
 	//  "timestamping", "ocsp signing", "microsoft sgc", "netscape sgc"
 	// +listType=atomic
+	// +optional
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// username contains the name of the user that created the CertificateSigningRequest.
@@ -248,9 +252,11 @@ type CertificateSigningRequestCondition struct {
 	// Approved, Denied, and Failed conditions cannot be removed once added.
 	//
 	// Only one condition of a given type is allowed.
+	// +required
 	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
 	// status of the condition, one of True, False, Unknown.
 	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
+	// +required
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,6,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// reason indicates a brief reason for the request state
 	// +optional
@@ -278,6 +284,7 @@ type CertificateSigningRequestList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items is a collection of CertificateSigningRequest objects
+	// +required
 	Items []CertificateSigningRequest `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 

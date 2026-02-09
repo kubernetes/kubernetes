@@ -564,7 +564,7 @@ func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 }
 
 func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (bool, error) {
-	allocatedPod, updated := m.UpdatePodFromAllocation(pod)
+	_, updated := m.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Desired resources == allocated resources. Pod allocation does not need to be updated.
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
@@ -578,7 +578,6 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 		if err := m.SetAllocatedResources(pod); err != nil {
 			return false, err
 		}
-		allocatedPod = pod
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
 
 		// Clear any errors that may have been surfaced from a previous resize and update the
@@ -586,9 +585,8 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 		m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
 		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
-		msg := events.PodResizeStartedMsg(logger, allocatedPod, pod.Generation)
+		msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
 		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, msg)
-
 		return true, nil
 	}
 
