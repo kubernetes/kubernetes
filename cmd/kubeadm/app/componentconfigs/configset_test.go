@@ -58,7 +58,7 @@ func TestFromCluster(t *testing.T) {
 			kind: KubeletConfiguration
 		`),
 	}
-	client := clientsetfake.NewClientset(objects...)
+	client := clientsetfake.NewSimpleClientset(objects...)
 	clusterCfg := testClusterCfg()
 
 	if err := FetchFromCluster(clusterCfg, client); err != nil {

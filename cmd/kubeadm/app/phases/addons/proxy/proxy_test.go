@@ -126,7 +126,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fake client and set up default test configuration
-			client := clientsetfake.NewClientset()
+			client := clientsetfake.NewSimpleClientset()
 
 			// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
 			initConfiguration, err := configutil.DefaultedStaticInitConfiguration()
@@ -296,7 +296,7 @@ bar
 }
 
 func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
-	client := clientsetfake.NewClientset()
+	client := clientsetfake.NewSimpleClientset()
 	_, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Create(context.TODO(), &apps.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
