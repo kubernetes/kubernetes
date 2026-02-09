@@ -464,7 +464,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		Timeout:        effectiveTimeout,
 
 		Printer:     printers.NewDiscardingPrinter(),
-		ConditionFn: cmdwait.IsDeleted,
+		ConditionFn: []cmdwait.ConditionFunc{cmdwait.IsDeleted},
 		IOStreams:   o.IOStreams,
 	}
 	err = waitOptions.RunWaitContext(context.Background())
