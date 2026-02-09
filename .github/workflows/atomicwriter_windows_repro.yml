@@ -6,10 +6,17 @@ jobs:
   test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
-      - name: Run unit tests for volume util
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run volume util tests
+        shell: pwsh
         run: |
+          go version
           go test ./pkg/volume/util -count=1 -v
