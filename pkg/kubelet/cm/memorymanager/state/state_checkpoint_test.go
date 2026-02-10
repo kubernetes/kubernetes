@@ -22,8 +22,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -45,16 +49,18 @@ func assertStateEqual(t *testing.T, restoredState, expectedState State) {
 func TestCheckpointStateRestore(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
-		description       string
-		checkpointContent string
-		expectedError     string
-		expectedState     *stateMemory
+		description                     string
+		checkpointContent               string
+		expectedError                   string
+		expectedState                   *stateMemory
+		podLevelResourceManagersEnabled bool
 	}{
 		{
 			"Restore non-existing checkpoint",
 			"",
 			"",
 			&stateMemory{},
+			false,
 		},
 		{
 			"Restore valid checkpoint",
@@ -91,6 +97,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 					},
 				},
 			},
+			false,
 		},
 		{
 			"Restore checkpoint with invalid checksum",
@@ -102,12 +109,186 @@ func TestCheckpointStateRestore(t *testing.T) {
 			}`,
 			"checkpoint is corrupted",
 			&stateMemory{},
+			false,
 		},
 		{
 			"Restore checkpoint with invalid JSON",
 			`{`,
 			"unexpected end of JSON input",
 			&stateMemory{},
+			false,
+		},
+		{
+			"Restore checkpoint from v1 (migration) with PodLevelResourceManagers enabled",
+			`{
+				"policyName":"static",
+				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
+				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
+				"checksum": 4215593881
+			}`,
+			"",
+			&stateMemory{
+				assignments: ContainerMemoryAssignments{
+					"pod": map[string][]Block{
+						"container1": {
+							{
+								NUMAAffinity: []int{0},
+								Type:         v1.ResourceMemory,
+								Size:         512,
+							},
+						},
+					},
+				},
+				machineState: NUMANodeMap{
+					0: &NUMANodeState{
+						MemoryMap: map[v1.ResourceName]*MemoryTable{
+							v1.ResourceMemory: {
+								Allocatable:    1536,
+								Free:           1024,
+								Reserved:       512,
+								SystemReserved: 512,
+								TotalMemSize:   2048,
+							},
+						},
+					},
+				},
+			},
+			true,
+		},
+		{
+			"Restore checkpoint from v1 (migration) with PodLevelResourceManagers disabled",
+			`{
+				"policyName":"static",
+				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
+				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
+				"checksum": 4215593881
+			}`,
+			"",
+			&stateMemory{
+				assignments: ContainerMemoryAssignments{
+					"pod": map[string][]Block{
+						"container1": {
+							{
+								NUMAAffinity: []int{0},
+								Type:         v1.ResourceMemory,
+								Size:         512,
+							},
+						},
+					},
+				},
+				machineState: NUMANodeMap{
+					0: &NUMANodeState{
+						MemoryMap: map[v1.ResourceName]*MemoryTable{
+							v1.ResourceMemory: {
+								Allocatable:    1536,
+								Free:           1024,
+								Reserved:       512,
+								SystemReserved: 512,
+								TotalMemSize:   2048,
+							},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"Restore checkpoint from v2 with PodLevelResourceManagers enabled",
+			`{
+					"policyName":"static",
+					"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
+					"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
+					"podEntries":{"pod":{"memoryBlocks":[{"numaAffinity":[0],"type":"memory","size":512}]}},
+					"checksum": 1278640530
+        }`,
+			"",
+			&stateMemory{
+				assignments: ContainerMemoryAssignments{
+					"pod": map[string][]Block{
+						"container1": {
+							{
+								NUMAAffinity: []int{0},
+								Type:         v1.ResourceMemory,
+								Size:         512,
+							},
+						},
+					},
+				},
+				podAssignments: PodMemoryAssignments{
+					"pod": PodEntry{
+						MemoryBlocks: []Block{
+							{
+								NUMAAffinity: []int{0},
+								Type:         v1.ResourceMemory,
+								Size:         512,
+							},
+						},
+					},
+				},
+				machineState: NUMANodeMap{
+					0: &NUMANodeState{
+						MemoryMap: map[v1.ResourceName]*MemoryTable{
+							v1.ResourceMemory: {
+								Allocatable:    1536,
+								Free:           1024,
+								Reserved:       512,
+								SystemReserved: 512,
+								TotalMemSize:   2048,
+							},
+						},
+					},
+				},
+			},
+			true,
+		},
+		{
+			"Restore checkpoint from v2 with PodLevelResourceManagers disabled",
+			`{
+					"policyName":"static",
+					"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
+					"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
+					"podEntries":{"pod":{"memoryBlocks":[{"numaAffinity":[0],"type":"memory","size":512}]}},
+					"checksum": 1278640530
+        }`,
+			"checkpoint is corrupted, please drain this node and delete the memory manager checkpoint file",
+			&stateMemory{
+				assignments: ContainerMemoryAssignments{
+					"pod": map[string][]Block{
+						"container1": {
+							{
+								NUMAAffinity: []int{0},
+								Type:         v1.ResourceMemory,
+								Size:         512,
+							},
+						},
+					},
+				},
+				podAssignments: PodMemoryAssignments{
+					"pod": PodEntry{
+						MemoryBlocks: []Block{
+							{
+								NUMAAffinity: []int{0},
+								Type:         v1.ResourceMemory,
+								Size:         512,
+							},
+						},
+					},
+				},
+				machineState: NUMANodeMap{
+					0: &NUMANodeState{
+						MemoryMap: map[v1.ResourceName]*MemoryTable{
+							v1.ResourceMemory: {
+								Allocatable:    1536,
+								Free:           1024,
+								Reserved:       512,
+								SystemReserved: 512,
+								TotalMemSize:   2048,
+							},
+						},
+					},
+				},
+			},
+			false,
 		},
 	}
 
@@ -124,6 +305,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			if tc.podLevelResourceManagersEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, true)
+			}
+
 			// ensure there is no previous checkpoint
 			assert.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
 
@@ -138,7 +324,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				assert.Error(t, err)
 				assert.ErrorContains(t, err, "could not restore state from checkpoint: "+tc.expectedError)
 			} else {
-				assert.NoError(t, err, "unexpected error while creating checkpointState")
+				require.NoError(t, err, "unexpected error while creating checkpointState")
 				// compare state after restoration with the one expected
 				assertStateEqual(t, restoredState, tc.expectedState)
 			}

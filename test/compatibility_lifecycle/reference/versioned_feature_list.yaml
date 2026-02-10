@@ -1239,6 +1239,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.22"
+- name: PodLevelResourceManagers
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: PodLevelResources
   versionedSpecs:
   - default: false
