@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package workloadmanager
+package cache
 
 import (
 	"testing"
@@ -26,11 +26,11 @@ import (
 )
 
 func TestPodGroupState_AssumeForget(t *testing.T) {
-	pgs := newPodGroupState()
+	pgs := NewPodGroupState()
 	pod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
 		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
 
-	pgs.addPod(pod)
+	pgs.AddPod(pod)
 	if pgs.AssumedPods().Has(pod.UID) {
 		t.Fatal("AssumedPods should be initially empty")
 	}
@@ -56,7 +56,7 @@ func TestPodGroupState_AssumeForget(t *testing.T) {
 }
 
 func TestPodGroupState_SchedulingTimeout(t *testing.T) {
-	pgs := newPodGroupState()
+	pgs := NewPodGroupState()
 
 	timeout := pgs.SchedulingTimeout()
 	if pgs.schedulingDeadline == nil {

@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package workloadmanager
+package cache
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -25,37 +26,37 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/utils/ptr"
 )
 
 // DefaultSchedulingTimeoutDuration defines how long the gang pods should wait at the
 // Permit stage for a quorum before being rejected.
-// Variable is exported only for testing purposes.
 var DefaultSchedulingTimeoutDuration = 5 * time.Minute
 
-// podGroupKey uniquely identifies a specific instance of a PodGroup.
-type podGroupKey struct {
+// PodGroupKey uniquely identifies a specific instance of a PodGroup.
+type PodGroupKey struct {
 	namespace    string
 	workloadName string
 	podGroupName string
 	replicaKey   string
 }
 
-func (pgk podGroupKey) GetName() string {
+func (pgk PodGroupKey) GetName() string {
 	if pgk.replicaKey == "" {
 		return fmt.Sprintf("%s-%s", pgk.workloadName, pgk.podGroupName)
 	}
 	return fmt.Sprintf("%s-%s-%s", pgk.workloadName, pgk.podGroupName, pgk.replicaKey)
 }
 
-func (pgk podGroupKey) GetNamespace() string {
+func (pgk PodGroupKey) GetNamespace() string {
 	return pgk.namespace
 }
 
-var _ klog.KMetadata = &podGroupKey{}
+var _ klog.KMetadata = &PodGroupKey{}
 
-func newPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) podGroupKey {
-	return podGroupKey{
+func NewPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) PodGroupKey {
+	return PodGroupKey{
 		namespace:    namespace,
 		workloadName: workloadRef.Name,
 		podGroupName: workloadRef.PodGroup,
@@ -63,8 +64,8 @@ func newPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) podGrou
 	}
 }
 
-// podGroupState holds the runtime state of a pod group.
-type podGroupState struct {
+// PodGroupState holds the runtime state of a pod group.
+type PodGroupState struct {
 	lock sync.RWMutex
 	// allPods tracks all pods belonging to the group that are known to the scheduler.
 	allPods map[types.UID]*v1.Pod
@@ -81,8 +82,10 @@ type podGroupState struct {
 	schedulingDeadline *time.Time
 }
 
-func newPodGroupState() *podGroupState {
-	return &podGroupState{
+var _ fwk.PodGroupState = &PodGroupState{}
+
+func NewPodGroupState() *PodGroupState {
+	return &PodGroupState{
 		allPods:         make(map[types.UID]*v1.Pod),
 		unscheduledPods: sets.New[types.UID](),
 		assumedPods:     sets.New[types.UID](),
@@ -90,9 +93,9 @@ func newPodGroupState() *podGroupState {
 	}
 }
 
-// addPod adds the pod to this group.
+// AddPod adds the pod to this group.
 // Depending on the NodeName, it can insert the pod to assignedPods set.
-func (pgs *podGroupState) addPod(pod *v1.Pod) {
+func (pgs *PodGroupState) AddPod(pod *v1.Pod) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -104,9 +107,9 @@ func (pgs *podGroupState) addPod(pod *v1.Pod) {
 	}
 }
 
-// updatePod updates the pod in this group.
+// UpdatePod updates the pod in this group.
 // In case of binding, it moves the pod to assignedPods.
-func (pgs *podGroupState) updatePod(oldPod, newPod *v1.Pod) {
+func (pgs *PodGroupState) UpdatePod(oldPod, newPod *v1.Pod) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -119,8 +122,27 @@ func (pgs *podGroupState) updatePod(oldPod, newPod *v1.Pod) {
 	}
 }
 
-// deletePod completely deletes the pod from this group.
-func (pgs *podGroupState) deletePod(podUID types.UID) {
+// Clone returns a deep copy of the pod group state.
+func (pgs *PodGroupState) Clone() *PodGroupState {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	clone := &PodGroupState{
+		allPods:         maps.Clone(pgs.allPods),
+		unscheduledPods: pgs.unscheduledPods.Clone(),
+		assumedPods:     pgs.assumedPods.Clone(),
+		assignedPods:    pgs.assignedPods.Clone(),
+	}
+
+	if pgs.schedulingDeadline != nil {
+		clone.schedulingDeadline = ptr.To(*pgs.schedulingDeadline)
+	}
+
+	return clone
+}
+
+// DeletePod completely deletes the pod from this group.
+func (pgs *PodGroupState) DeletePod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -130,8 +152,8 @@ func (pgs *podGroupState) deletePod(podUID types.UID) {
 	pgs.assignedPods.Delete(podUID)
 }
 
-// empty returns true when the group is empty.
-func (pgs *podGroupState) empty() bool {
+// Empty returns true when the group is empty.
+func (pgs *PodGroupState) Empty() bool {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -139,7 +161,7 @@ func (pgs *podGroupState) empty() bool {
 }
 
 // AllPods returns the UIDs of all pods known to the scheduler for this group.
-func (pgs *podGroupState) AllPods() sets.Set[types.UID] {
+func (pgs *PodGroupState) AllPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -149,7 +171,7 @@ func (pgs *podGroupState) AllPods() sets.Set[types.UID] {
 // UnscheduledPods returns all pods that are unscheduled for this group,
 // i.e., are neither assumed nor assigned.
 // The returned map type corresponds to the argument of the PodActivator.Activate method.
-func (pgs *podGroupState) UnscheduledPods() map[string]*v1.Pod {
+func (pgs *PodGroupState) UnscheduledPods() map[string]*v1.Pod {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -163,7 +185,7 @@ func (pgs *podGroupState) UnscheduledPods() map[string]*v1.Pod {
 
 // AssumedPods returns the UIDs of all pods for this group in the assumed state,
 // i.e., passed the Reserve gate.
-func (pgs *podGroupState) AssumedPods() sets.Set[types.UID] {
+func (pgs *PodGroupState) AssumedPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -171,7 +193,7 @@ func (pgs *podGroupState) AssumedPods() sets.Set[types.UID] {
 }
 
 // AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
-func (pgs *podGroupState) AssignedPods() sets.Set[types.UID] {
+func (pgs *PodGroupState) AssignedPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 
@@ -180,7 +202,7 @@ func (pgs *podGroupState) AssignedPods() sets.Set[types.UID] {
 
 // SchedulingTimeout returns the remaining time until the pod group scheduling times out.
 // A new deadline is created if one doesn't exist, or if the previous one has expired.
-func (pgs *podGroupState) SchedulingTimeout() time.Duration {
+func (pgs *PodGroupState) SchedulingTimeout() time.Duration {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -194,7 +216,7 @@ func (pgs *podGroupState) SchedulingTimeout() time.Duration {
 }
 
 // AssumePod marks a pod as having reached the Reserve stage.
-func (pgs *podGroupState) AssumePod(podUID types.UID) {
+func (pgs *PodGroupState) AssumePod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -203,7 +225,7 @@ func (pgs *podGroupState) AssumePod(podUID types.UID) {
 }
 
 // ForgetPod removes a pod from the assumed state.
-func (pgs *podGroupState) ForgetPod(podUID types.UID) {
+func (pgs *PodGroupState) ForgetPod(podUID types.UID) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 

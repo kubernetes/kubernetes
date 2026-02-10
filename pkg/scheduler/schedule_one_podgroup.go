@@ -120,7 +120,7 @@ func (sched *Scheduler) podGroupInfoForPod(ctx context.Context, pInfo *framework
 	logger := klog.FromContext(ctx)
 
 	// Get the actual pod group state
-	podGroupState, err := sched.WorkloadManager.PodGroupState(pInfo.Pod.Namespace, pInfo.Pod.Spec.WorkloadRef)
+	podGroupState, err := sched.Cache.GetLivePodGroupState(pInfo.Pod.Namespace, pInfo.Pod.Spec.WorkloadRef)
 	if err != nil {
 		return nil, fmt.Errorf("error while retrieving pod group state: %w", err)
 	}

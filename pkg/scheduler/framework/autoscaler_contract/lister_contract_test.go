@@ -21,6 +21,8 @@ limitations under the License.
 package contract
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +35,8 @@ var _ fwk.NodeInfoLister = &nodeInfoListerContract{}
 var _ fwk.StorageInfoLister = &storageInfoListerContract{}
 var _ fwk.SharedLister = &shareListerContract{}
 var _ fwk.ResourceSliceLister = &resourceSliceListerContract{}
+var _ fwk.PodGroupStateLister = &podGroupStateListerContract{}
+var _ fwk.PodGroupState = &podGroupStateContract{}
 var _ fwk.DeviceClassLister = &deviceClassListerContract{}
 var _ fwk.ResourceClaimTracker = &resourceClaimTrackerContract{}
 var _ fwk.DeviceClassResolver = &deviceClassResolverContract{}
@@ -70,6 +74,44 @@ func (c *shareListerContract) NodeInfos() fwk.NodeInfoLister {
 
 func (c *shareListerContract) StorageInfos() fwk.StorageInfoLister {
 	return nil
+}
+
+func (c *shareListerContract) PodGroupStatesInfo() fwk.PodGroupStateLister {
+	return nil
+}
+
+type podGroupStateListerContract struct{}
+
+func (c *podGroupStateListerContract) GetPodGroupState(_ string, _ *v1.WorkloadReference) (fwk.PodGroupState, error) {
+	return nil, nil
+}
+
+type podGroupStateContract struct{}
+
+func (c *podGroupStateContract) AllPods() sets.Set[types.UID] {
+	return nil
+}
+
+func (c *podGroupStateContract) UnscheduledPods() map[string]*v1.Pod {
+	return nil
+}
+
+func (c *podGroupStateContract) AssumedPods() sets.Set[types.UID] {
+	return nil
+}
+
+func (c *podGroupStateContract) AssignedPods() sets.Set[types.UID] {
+	return nil
+}
+
+func (c *podGroupStateContract) AssumePod(_ types.UID) {
+}
+
+func (c *podGroupStateContract) ForgetPod(_ types.UID) {
+}
+
+func (c *podGroupStateContract) SchedulingTimeout() time.Duration {
+	return 0
 }
 
 type resourceSliceListerContract struct{}

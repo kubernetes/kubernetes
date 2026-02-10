@@ -53,11 +53,11 @@ type Snapshot struct {
 	// usedPVCSet contains a set of PVC names that have one or more scheduled pods using them,
 	// keyed in the format "namespace/name".
 	usedPVCSet sets.Set[string]
-	generation int64
 	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
-	assumedPods map[string]*v1.Pod
-
+	assumedPods    map[string]*v1.Pod
+	podGroupStates map[PodGroupKey]*PodGroupState
+	generation     int64
 	// placementNodes stores nodes that are present in the current placement.
 	// If placement is not set, this is nil.
 	// It should only be set in the pod group scheduling cycle, when checking if pod group can be scheduled within the placement.
@@ -70,9 +70,10 @@ var _ fwk.SharedLister = &Snapshot{}
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
-		nodeInfoMap: make(map[string]*framework.NodeInfo),
-		usedPVCSet:  sets.New[string](),
-		assumedPods: make(map[string]*v1.Pod),
+		nodeInfoMap:    make(map[string]*framework.NodeInfo),
+		usedPVCSet:     sets.New[string](),
+		assumedPods:    make(map[string]*v1.Pod),
+		podGroupStates: make(map[PodGroupKey]*PodGroupState),
 	}
 }
 
@@ -188,6 +189,19 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 	return s
 }
 
+// PodGroupStatesInfo returns a PodGroupStateLister.
+func (s *Snapshot) PodGroupStatesInfo() fwk.PodGroupStateLister {
+	return s
+}
+
+func (s *Snapshot) GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
+	state, ok := s.podGroupStates[NewPodGroupKey(namespace, workloadRef)]
+	if !ok {
+		return nil, fmt.Errorf("pod group state not found for workload %s/%s", namespace, workloadRef.Name)
+	}
+	return state, nil
+}
+
 // NumNodesInPlacement returns the number of nodes in the snapshot for the current placement.
 // If no placement is set, it returns the number of nodes in the snapshot.
 // This function is not thread safe so it should be executed when no other routines can write to the snapshot.
@@ -195,6 +209,11 @@ func (s *Snapshot) NumNodesInPlacement() int {
 	if s.placementNodes != nil {
 		return len(s.placementNodes.nodeInfoList)
 	}
+	return len(s.nodeInfoList)
+}
+
+// NumNodes returns the number of nodes in the snapshot.
+func (s *Snapshot) NumNodes() int {
 	return len(s.nodeInfoList)
 }
 

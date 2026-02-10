@@ -50,6 +50,12 @@ type StorageInfoLister interface {
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
+	PodGroupStatesInfo() PodGroupStateLister
+}
+
+type PodGroupStateLister interface {
+	// Get returns the PodGroupState of the given workload.
+	GetPodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
 }
 
 type CSINodeLister interface {
@@ -146,11 +152,10 @@ type CSIManager interface {
 	CSINodes() CSINodeLister
 }
 
-// WorkloadManager provides an interface for scheduling plugins to provide workload-aware scheduling.
-// It acts as the central source of truth for runtime information about workloads.
-type WorkloadManager interface {
-	// PodGroupState retrieves the runtime state for a specific pod group, identified by workload's namespace and reference.
-	PodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
+// Cache provides an interface for accessing the scheduler's internal cache.
+// It is used primarily to access pod group state information for workload-aware scheduling.
+type Cache interface {
+	GetLivePodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
 }
 
 // PodGroupState provides an interface to view and modify the state of a single pod group.
