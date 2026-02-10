@@ -409,7 +409,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 
 				for _, ps := range summary.Pods {
 					if ps.PodRef.Name == podName && ps.PodRef.Namespace == f.Namespace.Name {
-						for _, cs:=	range ps.Containers {
+						for _, cs := range ps.Containers {
 							if cs.Rootfs != nil && cs.Rootfs.UsedBytes != nil {
 								return true
 							}
