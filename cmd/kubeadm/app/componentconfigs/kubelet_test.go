@@ -271,7 +271,7 @@ func TestKubeletFromDocumentMap(t *testing.T) {
 
 func TestKubeletFromCluster(t *testing.T) {
 	runKubeletFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
-		client := clientsetfake.NewClientset(
+		client := clientsetfake.NewSimpleClientset(
 			testKubeletConfigMap(yaml),
 		)
 		return kubeletHandler.FromCluster(client, testClusterCfg())

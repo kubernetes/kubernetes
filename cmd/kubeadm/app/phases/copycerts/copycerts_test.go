@@ -172,7 +172,7 @@ func TestUploadCerts(t *testing.T) {
 		t.Fatalf("error creating PKI assets: %v", err)
 	}
 
-	cs := fakeclient.NewClientset()
+	cs := fakeclient.NewSimpleClientset()
 	if err := UploadCerts(cs, initConfiguration, secretKey); err != nil {
 		t.Fatalf("error uploading certs: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestDownloadCerts(t *testing.T) {
 	}
 
 	kubeadmCertsSecret := createKubeadmCertsSecret(t, initConfiguration, secretKey)
-	cs := fakeclient.NewClientset(kubeadmCertsSecret)
+	cs := fakeclient.NewSimpleClientset(kubeadmCertsSecret)
 	if err := DownloadCerts(cs, initForDownloadConfiguration, secretKey); err != nil {
 		t.Fatalf("error downloading certs: %v", err)
 	}

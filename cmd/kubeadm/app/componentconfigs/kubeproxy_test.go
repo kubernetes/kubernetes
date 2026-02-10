@@ -159,7 +159,7 @@ func TestKubeProxyFromDocumentMap(t *testing.T) {
 
 func TestKubeProxyFromCluster(t *testing.T) {
 	runKubeProxyFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
-		client := clientsetfake.NewClientset(
+		client := clientsetfake.NewSimpleClientset(
 			testKubeProxyConfigMap(yaml),
 		)
 

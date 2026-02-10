@@ -525,7 +525,7 @@ func TestCreateCoreDNSAddon(t *testing.T) {
 }
 
 func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion string) *clientsetfake.Clientset {
-	client := clientsetfake.NewClientset()
+	client := clientsetfake.NewSimpleClientset()
 	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.CoreDNSConfigMap,
@@ -1608,7 +1608,7 @@ func TestGetCoreDNSInfo(t *testing.T) {
 				t.Errorf("GetCoreDNSInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(normalizeConfigMap(got), tt.wantConfigMap) {
+			if !reflect.DeepEqual(got, tt.wantConfigMap) {
 				t.Errorf("GetCoreDNSInfo() got = %v, want %v", got, tt.wantConfigMap)
 			}
 			if got1 != tt.wantCorefile {
@@ -1619,18 +1619,6 @@ func TestGetCoreDNSInfo(t *testing.T) {
 			}
 		})
 	}
-}
-
-// normalizeConfigMap remove metadata (e.g., ManagedFields) so DeepEqual
-// assertions compare only the ConfigMap content returned by fake clients.
-func normalizeConfigMap(cm *v1.ConfigMap) *v1.ConfigMap {
-	if cm == nil {
-		return nil
-	}
-
-	clone := cm.DeepCopy()
-	clone.ManagedFields = nil
-	return clone
 }
 
 func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
@@ -1690,7 +1678,7 @@ func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, imag
 	if image == "" {
 		image = "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion
 	}
-	client := clientsetfake.NewClientset()
+	client := clientsetfake.NewSimpleClientset()
 	for i := 0; i < deploymentSize; i++ {
 		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
 			TypeMeta: metav1.TypeMeta{
