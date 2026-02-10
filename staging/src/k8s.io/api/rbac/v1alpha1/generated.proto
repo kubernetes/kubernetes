@@ -188,9 +188,11 @@ message RoleList {
 // RoleRef contains information that points to the role being used
 message RoleRef {
   // APIGroup is the group for the resource being referenced
+  // +required
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced
+  // +required
   optional string kind = 2;
 
   // Name is the name of resource being referenced
@@ -204,6 +206,7 @@ message RoleRef {
 message Subject {
   // Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
   // If the Authorizer does not recognized the kind value, the Authorizer should report an error.
+  // +required
   optional string kind = 1;
 
   // APIVersion holds the API group and version of the referenced subject.
