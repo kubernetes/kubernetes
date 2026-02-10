@@ -2208,6 +2208,30 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff, restartingAllContainers)
 	kl.reasonCache.Update(pod.UID, result)
 
+	// If we just performed a RestartAllContainers reset, we want to immediately
+	// trigger another sync to start the containers, rather than waiting for PLEG
+	// or the periodic resync.
+	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) &&
+		restartingAllContainers && result.Error() == nil {
+		shouldRequeue := false
+		for _, r := range result.SyncResults {
+			if r.Action == kubecontainer.RemoveContainer && r.Error == nil {
+				shouldRequeue = true
+				break
+			}
+		}
+		if shouldRequeue {
+			// This will not cause an infinite loop because UpdatePod merges concurrent updates
+			// to the same pod. Because all containers are removed, the subsequent SyncPod
+			// execution will unset the AllContainersRestarting condition and break the cycle.
+			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
+				Pod:        pod,
+				MirrorPod:  mirrorPod,
+				UpdateType: kubetypes.SyncPodUpdate,
+			})
+		}
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		for _, r := range result.SyncResults {
 			if r.Action == kubecontainer.ResizePodInPlace && r.Error != nil {

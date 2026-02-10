@@ -5109,3 +5109,76 @@ func generateCAAndCertKeyWithOptions(host string, alternateIPs []net.IP, alterna
 
 	return caCertBytes, leafCertBytes, key, err
 }
+
+func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, true)
+
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: "bar",
+				RestartPolicyRules: []v1.ContainerRestartRule{
+					{
+						Action: v1.ContainerRestartRuleActionRestartAllContainers,
+					},
+				},
+			},
+		},
+	})
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+
+	logger := klog.FromContext(context.Background())
+	kubelet.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+		Phase: v1.PodRunning,
+		Conditions: []v1.PodCondition{
+			{
+				Type:   v1.AllContainersRestarting,
+				Status: v1.ConditionTrue,
+			},
+		},
+	})
+
+	testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
+		SyncResults: []*kubecontainer.SyncResult{{
+			Action: kubecontainer.RemoveContainer,
+			Target: pod.UID,
+			Error:  nil,
+		}},
+	}
+
+	callCount := 0
+	kubelet.podWorkers = &fakePodWorkers{
+		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
+			callCount++
+			if callCount > 1 {
+				// In the second call the SyncResult will not include the RemoveContainer.
+				// This ensures no infinite loop.
+				testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{}
+			}
+			return kubelet.SyncPod(ctx, updateType, pod, mirrorPod, podStatus)
+		},
+		cache: kubelet.podCache,
+		t:     t,
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name: "bar",
+			},
+		},
+	}
+
+	isTerminal, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, podStatus)
+	require.False(t, isTerminal)
+	require.NoError(t, err)
+
+	// We expect SyncPod to be called once by us, and once recursively via UpdatePod -> fakePodWorkers.syncPodFn
+	// because the SyncResults contained a successful RemoveContainer action.
+	require.Equal(t, 1, callCount)
+}
