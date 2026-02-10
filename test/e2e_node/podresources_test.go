@@ -2074,7 +2074,7 @@ func getOnlineCPUs() (cpuset.CPUSet, error) {
 func setupSampleDevicePluginOrFail(ctx context.Context, f *framework.Framework) *v1.Pod {
 	e2enode.WaitForNodeToBeReady(ctx, f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
 
-	dp := getSampleDevicePluginPod(kubeletdevicepluginv1beta1.DevicePluginPath)
+	dp := getSampleDevicePluginPod(kubeletdevicepluginv1beta1.DevicePluginPath, "dp")
 	dp.Spec.NodeName = framework.TestContext.NodeName
 
 	ginkgo.By("Create the sample device plugin pod")

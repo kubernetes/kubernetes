@@ -270,7 +270,6 @@ func (m *ManagerImpl) PluginDisconnected(logger klog.Logger, resourceName string
 	m.endpoints[resourceName].e.setStopTime(time.Now())
 	last := len(endpoints) == 1
 	if last {
-		// delete(m.endpoints, resourceName)
 		delete(m.endpointStore, resourceName)
 		m.markResourceUnhealthy(logger, resourceName)
 		logger.V(2).Info("Last DP for this resource disconnected", "resource", resourceName)
