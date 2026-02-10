@@ -2436,7 +2436,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	WindowsHostNetwork: {},
 
-	PodGroupDesiredCount: {},
+	PodGroupDesiredCount: {GenericWorkload},
 
 	apiextensionsfeatures.CRDObservedGenerationTracking: {},
 

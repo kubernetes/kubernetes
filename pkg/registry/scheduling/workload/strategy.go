@@ -24,9 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // workloadStrategy implements behavior for Workload objects.
@@ -42,7 +44,20 @@ func (workloadStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (workloadStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
+func (workloadStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	workload := obj.(*scheduling.Workload)
+
+	if !feature.DefaultFeatureGate.Enabled(features.PodGroupDesiredCount) {
+		for _, podGroup := range workload.Spec.PodGroups {
+			if podGroup.Policy.Basic != nil {
+				podGroup.Policy.Basic.DesiredCount = nil
+			}
+			if podGroup.Policy.Gang != nil {
+				podGroup.Policy.Gang.DesiredCount = nil
+			}
+		}
+	}
+}
 
 func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	workloadScheduling := obj.(*scheduling.Workload)
