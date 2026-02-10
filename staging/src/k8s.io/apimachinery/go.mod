@@ -8,7 +8,6 @@ godebug default=go1.25
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
@@ -24,7 +23,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4
-	k8s.io/utils v0.0.0-20260108192941-914a6e750570
+	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/randfill v1.0.0
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
@@ -32,6 +31,7 @@ require (
 )
 
 require (
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect

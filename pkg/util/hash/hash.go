@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"hash"
 
-	"k8s.io/apimachinery/pkg/util/dump"
+	"k8s.io/utils/dump"
 )
 
 // DeepHashObject writes specified object to hash using the spew library

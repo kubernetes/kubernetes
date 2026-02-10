@@ -20,10 +20,10 @@ import (
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/cloud-provider/app/config"
 	cpconfig "k8s.io/cloud-provider/config"
 	"k8s.io/cloud-provider/fake"
+	"k8s.io/utils/dump"
 )
 
 func TestWebhookEnableDisable(t *testing.T) {

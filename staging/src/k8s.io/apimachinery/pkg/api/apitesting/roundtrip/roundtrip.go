@@ -38,8 +38,8 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/dump"
 )
 
 type InstallFunc func(scheme *runtime.Scheme)

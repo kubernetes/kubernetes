@@ -22,7 +22,7 @@ require (
 	k8s.io/component-helpers v0.0.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubelet v0.0.0
-	k8s.io/utils v0.0.0-20260108192941-914a6e750570
+	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 )
 
 require (

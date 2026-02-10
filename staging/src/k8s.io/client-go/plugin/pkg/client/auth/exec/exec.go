@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/dump"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
@@ -51,6 +50,7 @@ import (
 	"k8s.io/client-go/util/connrotation"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/dump"
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"

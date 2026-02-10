@@ -30,13 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/dump"
 )
 
 type reaction struct {

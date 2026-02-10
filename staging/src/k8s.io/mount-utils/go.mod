@@ -11,7 +11,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.40.0
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20260108192941-914a6e750570
+	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 )
 
 require (

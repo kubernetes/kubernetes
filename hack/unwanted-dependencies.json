@@ -127,7 +127,6 @@
         "go.uber.org/goleak",
         "go.uber.org/multierr",
         "go.uber.org/zap",
-        "k8s.io/apimachinery",
         "k8s.io/kube-openapi",
         "k8s.io/utils",
         "sigs.k8s.io/kustomize/api",
