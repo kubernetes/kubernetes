@@ -7080,14 +7080,14 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 				Properties: map[string]spec.Schema{
 					"apiServerID": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The ID of the reporting API server.",
+							Description: "apiServerID is the ID of the reporting API server.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"encodingVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The API server encodes the object to this version when persisting it in the backend (e.g., etcd).",
+							Description: "encodingVersion is the version the API server encodes the object to when persisting it in the backend (e.g., etcd).",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -7099,7 +7099,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The API server can decode objects encoded in these versions. The encodingVersion must be included in the decodableVersions.",
+							Description: "decodableVersions are the encoding versions the API server can handle to decode. The API server can decode objects encoded in these versions. The encodingVersion must be included in the decodableVersions.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -7119,7 +7119,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The API server can serve these versions. DecodableVersions must include all ServedVersions.",
+							Description: "servedVersions lists all versions the API server can serve. DecodableVersions must include all ServedVersions.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -7161,21 +7161,21 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersion(ref common.Refer
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The name is <group>.<resource>.",
+							Description: "metadata is the standard object metadata. The name is <group>.<resource>.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec is an empty spec. It is here to comply with Kubernetes API style.",
+							Description: "spec is an empty spec. It is here to comply with Kubernetes API style.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(apiserverinternalv1alpha1.StorageVersionSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "API server instances report the version they can decode and the version they encode objects to when persisting objects in the backend.",
+							Description: "status hold the StorageVersionStatus, reporting the version an API server instance can decode and the version it encodes objects to when persisting objects in the backend.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(apiserverinternalv1alpha1.StorageVersionStatus{}.OpenAPIModelName()),
 						},
@@ -7198,7 +7198,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionCondition(ref com
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Type of the condition.",
+							Description: "type of the condition.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -7206,7 +7206,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionCondition(ref com
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status of the condition, one of True, False, Unknown.",
+							Description: "status of the condition, one of True, False, Unknown.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -7214,20 +7214,20 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionCondition(ref com
 					},
 					"observedGeneration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "If set, this represents the .metadata.generation that the condition was set based upon.",
+							Description: "observedGeneration represents the .metadata.generation that the condition was set based upon, if field is set.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Last time the condition transitioned from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transitioned from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The reason for the condition's last transition.",
+							Description: "reason for the condition's last transition.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -7235,7 +7235,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionCondition(ref com
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "A human readable message indicating details about the transition.",
+							Description: "message is a human readable string indicating details about the transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -7328,7 +7328,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionStatus(ref common
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The reported versions per API server instance.",
+							Description: "storageVersions lists the reported versions per API server instance.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -7342,7 +7342,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionStatus(ref common
 					},
 					"commonEncodingVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "If all API server instances agree on the same encoding storage version, then this field is set to that version. Otherwise this field is left empty. API servers should finish updating its storageVersionStatus entry before serving write operations, so that this field will be in sync with the reality.",
+							Description: "commonEncodingVersion is set to an encoding storage version if all API server instances share that same version. If they don't share one storage version, this field is left empty. API servers should finish updating its storageVersionStatus entry before serving write operations, so that this field will be in sync with the reality.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -7357,7 +7357,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionStatus(ref common
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The latest available observations of the storageVersion's state.",
+							Description: "conditions lists the latest available observations of the storageVersion's state.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

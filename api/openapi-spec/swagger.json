@@ -1670,11 +1670,11 @@
       "description": "An API server instance reports the version it can decode and the version it encodes objects to when persisting objects in the backend.",
       "properties": {
         "apiServerID": {
-          "description": "The ID of the reporting API server.",
+          "description": "apiServerID is the ID of the reporting API server.",
           "type": "string"
         },
         "decodableVersions": {
-          "description": "The API server can decode objects encoded in these versions. The encodingVersion must be included in the decodableVersions.",
+          "description": "decodableVersions are the encoding versions the API server can handle to decode. The API server can decode objects encoded in these versions. The encodingVersion must be included in the decodableVersions.",
           "items": {
             "type": "string"
           },
@@ -1682,11 +1682,11 @@
           "x-kubernetes-list-type": "set"
         },
         "encodingVersion": {
-          "description": "The API server encodes the object to this version when persisting it in the backend (e.g., etcd).",
+          "description": "encodingVersion is the version the API server encodes the object to when persisting it in the backend (e.g., etcd).",
           "type": "string"
         },
         "servedVersions": {
-          "description": "The API server can serve these versions. DecodableVersions must include all ServedVersions.",
+          "description": "servedVersions lists all versions the API server can serve. DecodableVersions must include all ServedVersions.",
           "items": {
             "type": "string"
           },
@@ -1709,15 +1709,15 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "The name is <group>.<resource>."
+          "description": "metadata is the standard object metadata. The name is <group>.<resource>."
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.apiserverinternal.v1alpha1.StorageVersionSpec",
-          "description": "Spec is an empty spec. It is here to comply with Kubernetes API style."
+          "description": "spec is an empty spec. It is here to comply with Kubernetes API style."
         },
         "status": {
           "$ref": "#/definitions/io.k8s.api.apiserverinternal.v1alpha1.StorageVersionStatus",
-          "description": "API server instances report the version they can decode and the version they encode objects to when persisting objects in the backend."
+          "description": "status hold the StorageVersionStatus, reporting the version an API server instance can decode and the version it encodes objects to when persisting objects in the backend."
         }
       },
       "required": [
@@ -1738,27 +1738,27 @@
       "properties": {
         "lastTransitionTime": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
-          "description": "Last time the condition transitioned from one status to another."
+          "description": "lastTransitionTime is the last time the condition transitioned from one status to another."
         },
         "message": {
-          "description": "A human readable message indicating details about the transition.",
+          "description": "message is a human readable string indicating details about the transition.",
           "type": "string"
         },
         "observedGeneration": {
-          "description": "If set, this represents the .metadata.generation that the condition was set based upon.",
+          "description": "observedGeneration represents the .metadata.generation that the condition was set based upon, if field is set.",
           "format": "int64",
           "type": "integer"
         },
         "reason": {
-          "description": "The reason for the condition's last transition.",
+          "description": "reason for the condition's last transition.",
           "type": "string"
         },
         "status": {
-          "description": "Status of the condition, one of True, False, Unknown.",
+          "description": "status of the condition, one of True, False, Unknown.",
           "type": "string"
         },
         "type": {
-          "description": "Type of the condition.",
+          "description": "type of the condition.",
           "type": "string"
         }
       },
@@ -1813,11 +1813,11 @@
       "description": "API server instances report the versions they can decode and the version they encode objects to when persisting objects in the backend.",
       "properties": {
         "commonEncodingVersion": {
-          "description": "If all API server instances agree on the same encoding storage version, then this field is set to that version. Otherwise this field is left empty. API servers should finish updating its storageVersionStatus entry before serving write operations, so that this field will be in sync with the reality.",
+          "description": "commonEncodingVersion is set to an encoding storage version if all API server instances share that same version. If they don't share one storage version, this field is left empty. API servers should finish updating its storageVersionStatus entry before serving write operations, so that this field will be in sync with the reality.",
           "type": "string"
         },
         "conditions": {
-          "description": "The latest available observations of the storageVersion's state.",
+          "description": "conditions lists the latest available observations of the storageVersion's state.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.apiserverinternal.v1alpha1.StorageVersionCondition"
           },
@@ -1828,7 +1828,7 @@
           "x-kubernetes-list-type": "map"
         },
         "storageVersions": {
-          "description": "The reported versions per API server instance.",
+          "description": "storageVersions lists the reported versions per API server instance.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.apiserverinternal.v1alpha1.ServerStorageVersion"
           },
