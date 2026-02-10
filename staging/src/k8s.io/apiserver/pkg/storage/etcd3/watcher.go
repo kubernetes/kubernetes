@@ -359,7 +359,7 @@ func (wc *watchChan) sync() error {
 
 			// no more results remain
 			if !getResp.More {
-				// metrics.RecordWatchCacheInitialization(wc.watcher.groupResource, syncStartTime)
+				metrics.RecordWatchCacheInitialization(wc.watcher.groupResource, syncStartTime)
 				return nil
 			}
 
