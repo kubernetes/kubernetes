@@ -329,6 +329,7 @@ readonly KUBE_STATIC_BINARIES=(
   kubectl-convert
   kubemark
   mounter
+  go-runner
 )
 
 # Fully-qualified package names that we want to instrument for coverage information.
