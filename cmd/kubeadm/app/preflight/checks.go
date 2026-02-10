@@ -132,10 +132,10 @@ func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
 		return nil, []error{errors.Wrap(err, "could not check if the runtime config is available")}
 	}
 	if !ok {
-		// TODO: return an error once the kubelet version is 1.36 or higher.
+		// TODO: return an error once the kubelet version is 1.37 or higher.
 		// https://github.com/kubernetes/kubeadm/issues/3229
 		err := errors.New("You must update your container runtime to a version that supports the CRI method RuntimeConfig. " +
-			"Falling back to using cgroupDriver from kubelet config will be removed in 1.36. " +
+			"Falling back to using cgroupDriver from kubelet config will be removed in 1.37. " +
 			"For more information, see https://git.k8s.io/enhancements/keps/sig-node/4033-group-driver-detection-over-cri")
 		warnings = append(warnings, err)
 	}
