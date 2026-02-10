@@ -2023,3 +2023,9 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
+- name: WorkloadPodGroupResourceClaimTemplate
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
