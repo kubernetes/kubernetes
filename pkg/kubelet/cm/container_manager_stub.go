@@ -49,7 +49,7 @@ type containerManagerStub struct {
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(ctx context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
+func (cm *containerManagerStub) Start(ctx context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ kubecontainer.RuntimeHelper, _ bool) error {
 	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Starting stub container manager")
 	cm.memoryManager = memorymanager.NewFakeManager(logger)
@@ -161,8 +161,16 @@ func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
 	return nil
 }
 
+func (cm *containerManagerStub) GetAssignments(podUID, containerName string) string {
+	return "null"
+}
+
 func (cm *containerManagerStub) GetAllocatableCPUs() []int64 {
 	return nil
+}
+
+func (cm *containerManagerStub) IsCPUSetUpdateInProgress(pod *v1.Pod) bool {
+	return false
 }
 
 func (cm *containerManagerStub) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {

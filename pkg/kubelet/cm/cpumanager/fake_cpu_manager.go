@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type fakeManager struct {
@@ -35,7 +36,7 @@ type fakeManager struct {
 	state  state.State
 }
 
-func (m *fakeManager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *fakeManager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, runtimeHelper kubecontainer.RuntimeHelper, initialContainers containermap.ContainerMap) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Start()")
 	return nil
@@ -88,9 +89,19 @@ func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {
 	return cpuset.CPUSet{}
 }
 
+func (m *fakeManager) IsCPUSetUpdateInProgress(pod *v1.Pod) bool {
+	m.logger.Info("Is CPUSet Update In Progress")
+	return false
+}
+
 func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	m.logger.Info("GetCPUAffinity", "podUID", podUID, "containerName", containerName)
 	return cpuset.CPUSet{}
+}
+
+func (m *fakeManager) GetAssignments(podUID, containerName string) string {
+	m.logger.Info("GetAssignments", "podUID", podUID, "containerName", containerName)
+	return "null"
 }
 
 func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {

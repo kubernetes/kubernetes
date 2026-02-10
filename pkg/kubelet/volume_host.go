@@ -228,6 +228,13 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	return node.Status.Allocatable, nil
 }
 
+func (kvh *kubeletVolumeHost) GetAssignments(podUID, containerName string) string {
+    if kvh.kubelet.containerManager != nil {
+        return kvh.kubelet.containerManager.GetAssignments(podUID, containerName)
+    }
+    return "null"
+}
+
 func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	if kvh.secretManager != nil {
 		return kvh.secretManager.GetSecret
