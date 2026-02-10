@@ -51,32 +51,42 @@ if err != nil {
 }
 ```
 
-(If you want to operate on multiple tables or multiple nftables
-families, you will need separate `Interface` objects for each. If you
-need to check whether the system supports an nftables feature as with
-`nft --check`, use `nft.Check()`, which works the same as `nft.Run()`
-below.)
+`knftables.New` also takes a comma-separated list of options after the
+family and table name; see the documentation for that function for
+more information.
 
-You can use the `List`, `ListRules`, and `ListElements` methods on the
-`Interface` to check if objects exist. `List` returns the names of
-`"chains"`, `"sets"`, or `"maps"` in the table, while `ListElements`
-returns `Element` objects and `ListRules` returns *partial* `Rule`
-objects.
+(If you want to operate on multiple tables or multiple nftables
+families, you have two options: you can either create separate
+`Interface` objects for each table, or you can create a single
+`Interface` and pass `""` for the family and table. In that case, you
+will need to explicitly fill in the `Family` and `Table` fields of
+every `Chain`, `Rule`, etc, object you create.)
+
+You can use the various `List*` methods on the `Interface` to check if
+objects exist. `ListAll` returns a map of the names of top-level
+objects in the table, sorted by object type, while `List` returns just
+the names of objects of a single type. `ListElements`, `ListRules`,
+and `ListCounters` returned parsed objects of the given types. Note
+that `ListRules` returns *partial* `Rule` objects; it does not fill in
+the `Rule` field.
 
 ```golang
-chains, err := nft.List(ctx, "chains")
+allChains, err := nft.List(ctx, "chains")
 if err != nil {
         return fmt.Errorf("could not list chains: %v", err)
 }
+for chain := range sets.New(allChains...).Difference(expectedChains) {
+        tx.Delete(&knftables.Chain{Name: chain})
+}
 
-FIXME
+// ...
 
 elements, err := nft.ListElements(ctx, "map", "mymap")
 if err != nil {
         return fmt.Errorf("could not list map elements: %v", err)
 }
 
-FIXME
+...
 ```
 
 To make changes, create a `Transaction`, add the appropriate
@@ -116,17 +126,81 @@ methods to check for those well-known error types. In a large
 transaction, there is no supported way to determine exactly which
 operation failed.
 
+(You can also pass a transaction to `nft.Check()`, which uses `nft
+--check`, but otherwise behaves the same as `nft.Run()`.)
+
 ## `knftables.Transaction` operations
 
 `knftables.Transaction` operations correspond to the top-level commands
 in the `nft` binary. Currently-supported operations are:
 
-- `tx.Add()`: adds an object, which may already exist, as with `nft add`
+- `tx.Add()`: creates an object if it does not already exist, as with `nft add`
 - `tx.Create()`: creates an object, which must not already exist, as with `nft create`
 - `tx.Flush()`: flushes the contents of a table/chain/set/map, as with `nft flush`
-- `tx.Delete()`: deletes an object, as with `nft delete`
-- `tx.Insert()`: inserts a rule before another rule, as with `nft insert rule`
+- `tx.Reset()`: resets a counter, as with `nft reset`
+- `tx.Delete()`: deletes an object, which must exist, as with `nft delete`
+- `tx.Destroy()`: deletes an object if it exists, as with `nft destroy`
+
+For `Rule` objects the semantics and operations are slightly different:
+
+- `tx.Add()`: appends a rule to a chain or adds it after an existing rule, as with `nft add rule`
+- `tx.Insert()`: prepends a rule to a chain or inserts it before another rule, as with `nft insert rule`
 - `tx.Replace()`: replaces a rule, as with `nft replace rule`
+- `tx.Delete()`/`tx.Destroy()`: deletes the rule with the given `Handle`, as with `nft delete rule`/`nft destroy rule`
+
+### `Destroy` operations
+
+Actually doing `nft destroy` requires a fairly new kernel (6.3 or
+later) and `nft` binary (1.0.8 or later). Trying to run a transaction
+containing a `Destroy` operation on an older host will result in an
+error.
+
+There are two construct-time options to help out with this. First, you
+can specify `RequireDestroy`, if you want knftables construction to
+fail on older hosts:
+
+```golang
+nft, err := knftables.New(knftables.IPv4Family, "my-table", knftables.RequireDestroy)
+if err != nil {
+        ...
+```
+
+Alternatively, you can construct the `Interface` with the
+`EmulateDestroy` option:
+
+```golang
+nft, err := knftables.New(knftables.IPv4Family, "my-table", knftables.EmulateDestroy)
+```
+
+in which case knftables will attempt to emulate `nft destroy` if it is
+not available by doing a combination of an `add` and a `delete` (where
+the `add` will succeed whether the object previously existed or not,
+and then the `delete` will succeed because the object definitely
+exists at that point). To ensure that this emulation will work, if
+`EmulateDestroy` is in effect then `tx.Destroy()` will require that
+you pass it an object that is suitable for passing to both `tx.Add()`
+and `tx.Delete()` (even if the system you are currently on supports
+`nft destroy`). In particular, this means that when `EmulateDestroy`
+is in effect:
+
+  - You can only `Destroy()` objects by `Name` or `Key`, not by
+    `Handle`.
+
+  - You can't `Destroy()` a `Rule` (since `Rule`s can only be deleted
+    by `Handle`).
+
+  - If you include optional fields in the object (e.g. base chain
+    properties), they need to be correct (since an `Add()` would fail
+    if you passed different values). However, note that you *can* just
+    leave the optional fields unset.
+
+  - When `Destroy()`ing a `Set` or `Map` you must include the correct
+    `Type` (since an `Add()` would fail if you did not specify it or
+    specified it incorrectly).
+
+  - When `Destroy()`ing a `Map` `Element` you must include the correct
+    `Value` (since an `Add()` would fail if you did not specify it or
+    specified it incorrectly).
 
 ## Objects
 
@@ -134,11 +208,13 @@ The `Transaction` methods take arguments of type `knftables.Object`.
 The currently-supported objects are:
 
 - `Table`
+- `Flowtable`
 - `Chain`
 - `Rule`
 - `Set`
 - `Map`
 - `Element`
+- `Counter`
 
 Optional fields in objects can be filled in with the help of the
 `PtrTo()` function, which just returns a pointer to its argument.
@@ -159,8 +235,7 @@ the current state of the fake nftables database.
 
 ## Missing APIs
 
-Various top-level object types are not yet supported (notably the
-"stateful objects" like `counter`).
+Various top-level object types are not yet supported.
 
 Most IPTables libraries have an API for "add this rule only if it
 doesn't already exist", but that does not seem as useful in nftables
@@ -169,11 +244,6 @@ aren't just blindly copying over old iptables APIs"), because chains
 tend to have static rules and dynamic sets/maps, rather than having
 dynamic rules. If you aren't sure if a chain has the correct rules,
 you can just `Flush` it and recreate all of the rules.
-
-The "destroy" (delete-without-ENOENT) command that exists in newer
-versions of `nft` is not currently supported because it would be
-unexpectedly heavyweight to emulate on systems that don't have it, so
-it is better (for now) to force callers to implement it by hand.
 
 `ListRules` returns `Rule` objects without the `Rule` field filled in,
 because it uses the JSON API to list the rules, but there is no easy

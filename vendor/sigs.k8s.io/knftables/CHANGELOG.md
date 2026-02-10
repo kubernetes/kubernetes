@@ -1,5 +1,60 @@
 # ChangeLog
 
+## v0.0.20
+
+- `List()` has been changed to use `nft list table` rather than, e.g.,
+  `nft list sets`, to ensure that it doesn't try to parse objects in
+  other tables (which may have been created by newer versions of `nft`
+  and might trigger crashes in older versions of `nft`; see
+  https://issues.k8s.io/136786). (`@danwinship` based on a previous PR
+  from `@kairosci`).
+
+- A new `ListAll()` method has been added to help work around the fact
+  that `List()` is now much less efficient with large tables.
+  (`@danwinship`).
+
+- `ListElements()` now correctly handles maps/sets with concatenated
+  keys/values including CIDR values. (`@danwinship`)
+
+## v0.0.19
+
+- Added the ability to use a single `knftables.Interface` (and a
+  single `knftables.Transaction`) with multiple tables/families. To do
+  this, pass `""` for the family and table name to `knftables.New`,
+  and then manually fill in the `Table` and `Family` fields in all
+  `Object`s you create. (`@danwinship`)
+
+- Added `tx.Destroy()`, corresponding to `nft destroy`. Since `nft
+  destroy` requires a new-ish kernel (6.3) and CLI (1.0.8), there are
+  also two new `knftables.New()` options: `RequireDestroy` if you want
+  construction to fail on older systems, or `EmulateDestroy` if you
+  want knftables to try to emulate "destroy" on older systems, with
+  some limitations. See [README.md](./README.md#destroy-operations)
+  for more details. (`@danwinship`)
+
+- Added `Counter` objects and the `tx.Reset()` verb, to support
+  nftables counters. (`@aroradaman`)
+
+- Added `Table.Flags` and `Chain.Policy`. (Note that at this time the
+  "owner" and "persist" table flags can't usefully be used with
+  knftables, since knftables opens a new connection to the kernel for
+  each transaction and so the table would become un-owned immediately
+  after it was created.) (`@danwinship`)
+
+- Fixed `Fake.ParseDump()` to correctly parse rules with raw payload
+  expressions (`@danwinship`) and `flow add` rules (`hongliangl`).
+
+## v0.0.18
+
+- Added locking to `Fake` to allow it to be safely used concurrently.
+  (`@npinaeva`)
+
+- Added a `Flowtable` object, and `Fake` support for correctly parsing
+  flowtable references. (`@aojea`)
+
+- Fixed a bug in `Fake.ParseDump`, which accidentally required the
+  table to have a comment. (`@danwinship`)
+
 ## v0.0.17
 
 - `ListRules()` now accepts `""` for the chain name, meaning to list
