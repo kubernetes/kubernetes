@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -56,9 +57,9 @@ func deployDevicePlugin(ctx context.Context, f *framework.Framework, nodeNames [
 			}
 		}
 		return nil
-	}, "test/e2e/testing-manifests/sample-device-plugin/sample-device-plugin.yaml")
+	}, e2enode.SampleDevicePluginDSYAML)
 	framework.ExpectNoError(err, "deploy example device plugin DaemonSet")
 
 	// Hard-coded in https://github.com/kubernetes/kubernetes/blob/111a2a0d2dfe13639724506f674bc4f342ccfbab/test/images/sample-device-plugin/sampledeviceplugin.go#L34C17-L34C39.
-	return "example.com/resource"
+	return e2enode.SampleDeviceResourceName
 }

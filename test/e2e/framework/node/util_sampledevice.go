@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2enode
+package node
 
 import (
 	v1 "k8s.io/api/core/v1"
@@ -32,6 +32,10 @@ const (
 	SampleDeviceResourceName = "example.com/resource"
 
 	SampleDeviceEnvVarNamePluginSockDir = "PLUGIN_SOCK_DIR"
+
+	// SampleDevsAmount is an amount of devices provided by the sample device plugin:
+	// https://github.com/kubernetes/kubernetes/blob/111a2a0d2dfe13639724506f674bc4f342ccfbab/test/images/sample-device-plugin/sampledeviceplugin.go#L100-L101
+	SampleDevsAmount int64 = 2
 )
 
 // CountSampleDeviceCapacity returns the number of devices of SampleDeviceResourceName advertised by a node capacity

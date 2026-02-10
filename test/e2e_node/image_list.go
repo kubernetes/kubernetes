@@ -32,6 +32,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -78,12 +79,12 @@ func updateImageAllowList(ctx context.Context) {
 	} else {
 		e2epod.ImagePrePullList.Insert(sriovDevicePluginImage)
 	}
-	if samplePluginImage, err := getContainerImageFromE2ETestDaemonset(SampleDevicePluginDSYAML); err != nil {
+	if samplePluginImage, err := getContainerImageFromE2ETestDaemonset(e2enode.SampleDevicePluginDSYAML); err != nil {
 		klog.Errorln(err)
 	} else {
 		e2epod.ImagePrePullList.Insert(samplePluginImage)
 	}
-	if samplePluginImageCtrlReg, err := getContainerImageFromE2ETestDaemonset(SampleDevicePluginControlRegistrationDSYAML); err != nil {
+	if samplePluginImageCtrlReg, err := getContainerImageFromE2ETestDaemonset(e2enode.SampleDevicePluginControlRegistrationDSYAML); err != nil {
 		klog.Errorln(err)
 	} else {
 		e2epod.ImagePrePullList.Insert(samplePluginImageCtrlReg)
