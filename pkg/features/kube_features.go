@@ -1079,6 +1079,12 @@ const (
 	//
 	// Enables support for joining Windows containers to a hosts' network namespace.
 	WindowsHostNetwork featuregate.Feature = "WindowsHostNetwork"
+
+	// owner: @nojnhuh
+	// kep: https://kep.k8s.io/5729
+	//
+	// Enables support for reserving ResourceClaims for an entire PodGroup.
+	WorkloadPodGroupResourceClaimTemplate featuregate.Feature = "WorkloadPodGroupResourceClaimTemplate"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -1881,6 +1887,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
+	WorkloadPodGroupResourceClaimTemplate: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	apiextensionsfeatures.CRDObservedGenerationTracking: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Beta},
 	},
@@ -2418,6 +2428,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	WindowsGracefulNodeShutdown: {GracefulNodeShutdown},
 
 	WindowsHostNetwork: {},
+
+	WorkloadPodGroupResourceClaimTemplate: {DynamicResourceAllocation, GenericWorkload},
 
 	apiextensionsfeatures.CRDObservedGenerationTracking: {},
 
