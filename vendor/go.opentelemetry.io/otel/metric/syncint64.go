@@ -25,6 +25,12 @@ type Int64Counter interface {
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
 	Add(ctx context.Context, incr int64, options ...AddOption)
+
+	// Enabled reports whether the instrument will process measurements for the given context.
+	//
+	// This function can be used in places where measuring an instrument
+	// would result in computationally expensive operations.
+	Enabled(context.Context) bool
 }
 
 // Int64CounterConfig contains options for synchronous counter instruments that
@@ -78,6 +84,12 @@ type Int64UpDownCounter interface {
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
 	Add(ctx context.Context, incr int64, options ...AddOption)
+
+	// Enabled reports whether the instrument will process measurements for the given context.
+	//
+	// This function can be used in places where measuring an instrument
+	// would result in computationally expensive operations.
+	Enabled(context.Context) bool
 }
 
 // Int64UpDownCounterConfig contains options for synchronous counter
@@ -131,6 +143,12 @@ type Int64Histogram interface {
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
 	Record(ctx context.Context, incr int64, options ...RecordOption)
+
+	// Enabled reports whether the instrument will process measurements for the given context.
+	//
+	// This function can be used in places where measuring an instrument
+	// would result in computationally expensive operations.
+	Enabled(context.Context) bool
 }
 
 // Int64HistogramConfig contains options for synchronous histogram instruments
@@ -189,6 +207,12 @@ type Int64Gauge interface {
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
 	Record(ctx context.Context, value int64, options ...RecordOption)
+
+	// Enabled reports whether the instrument will process measurements for the given context.
+	//
+	// This function can be used in places where measuring an instrument
+	// would result in computationally expensive operations.
+	Enabled(context.Context) bool
 }
 
 // Int64GaugeConfig contains options for synchronous gauge instruments that

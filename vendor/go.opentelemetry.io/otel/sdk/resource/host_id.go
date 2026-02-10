@@ -8,7 +8,7 @@ import (
 	"errors"
 	"strings"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
 
 type hostIDProvider func() (string, error)
@@ -51,17 +51,16 @@ type hostIDReaderDarwin struct {
 	execCommand commandExecutor
 }
 
-// read executes `ioreg -rd1 -c "IOPlatformExpertDevice"` and parses host id
+// read executes `/usr/sbin/ioreg -rd1 -c "IOPlatformExpertDevice"` and parses host id
 // from the IOPlatformUUID line. If the command fails or the uuid cannot be
 // parsed an error will be returned.
 func (r *hostIDReaderDarwin) read() (string, error) {
-	result, err := r.execCommand("ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
+	result, err := r.execCommand("/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
 	if err != nil {
 		return "", err
 	}
 
-	lines := strings.Split(result, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(result, "\n") {
 		if strings.Contains(line, "IOPlatformUUID") {
 			parts := strings.Split(line, " = ")
 			if len(parts) == 2 {

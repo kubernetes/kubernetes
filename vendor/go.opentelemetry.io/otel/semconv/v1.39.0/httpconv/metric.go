@@ -67,6 +67,8 @@ var (
 	RequestMethodPut RequestMethodAttr = "PUT"
 	// RequestMethodTrace is the TRACE method.
 	RequestMethodTrace RequestMethodAttr = "TRACE"
+	// RequestMethodQuery is the QUERY method.
+	RequestMethodQuery RequestMethodAttr = "QUERY"
 	// RequestMethodOther is the any HTTP method that the instrumentation has no
 	// prior knowledge of.
 	RequestMethodOther RequestMethodAttr = "_OTHER"
@@ -1318,8 +1320,9 @@ func (ServerRequestBodySize) AttrResponseStatusCode(val int) attribute.KeyValue 
 }
 
 // AttrRoute returns an optional attribute for the "http.route" semantic
-// convention. It represents the matched route, that is, the path template in the
-// format used by the respective server framework.
+// convention. It represents the matched route template for the request. This
+// MUST be low-cardinality and include all static path segments, with dynamic
+// path segments represented with placeholders.
 func (ServerRequestBodySize) AttrRoute(val string) attribute.KeyValue {
 	return attribute.String("http.route", val)
 }
@@ -1494,8 +1497,9 @@ func (ServerRequestDuration) AttrResponseStatusCode(val int) attribute.KeyValue 
 }
 
 // AttrRoute returns an optional attribute for the "http.route" semantic
-// convention. It represents the matched route, that is, the path template in the
-// format used by the respective server framework.
+// convention. It represents the matched route template for the request. This
+// MUST be low-cardinality and include all static path segments, with dynamic
+// path segments represented with placeholders.
 func (ServerRequestDuration) AttrRoute(val string) attribute.KeyValue {
 	return attribute.String("http.route", val)
 }
@@ -1684,8 +1688,9 @@ func (ServerResponseBodySize) AttrResponseStatusCode(val int) attribute.KeyValue
 }
 
 // AttrRoute returns an optional attribute for the "http.route" semantic
-// convention. It represents the matched route, that is, the path template in the
-// format used by the respective server framework.
+// convention. It represents the matched route template for the request. This
+// MUST be low-cardinality and include all static path segments, with dynamic
+// path segments represented with placeholders.
 func (ServerResponseBodySize) AttrRoute(val string) attribute.KeyValue {
 	return attribute.String("http.route", val)
 }

@@ -122,48 +122,6 @@ var (
 	SpanSamplingResultRecordAndSample SpanSamplingResultAttr = "RECORD_AND_SAMPLE"
 )
 
-// RPCGRPCStatusCodeAttr is an attribute conforming to the rpc.grpc.status_code
-// semantic conventions. It represents the gRPC status code of the last gRPC
-// requests performed in scope of this export call.
-type RPCGRPCStatusCodeAttr int64
-
-var (
-	// RPCGRPCStatusCodeOk is the OK.
-	RPCGRPCStatusCodeOk RPCGRPCStatusCodeAttr = 0
-	// RPCGRPCStatusCodeCancelled is the CANCELLED.
-	RPCGRPCStatusCodeCancelled RPCGRPCStatusCodeAttr = 1
-	// RPCGRPCStatusCodeUnknown is the UNKNOWN.
-	RPCGRPCStatusCodeUnknown RPCGRPCStatusCodeAttr = 2
-	// RPCGRPCStatusCodeInvalidArgument is the INVALID_ARGUMENT.
-	RPCGRPCStatusCodeInvalidArgument RPCGRPCStatusCodeAttr = 3
-	// RPCGRPCStatusCodeDeadlineExceeded is the DEADLINE_EXCEEDED.
-	RPCGRPCStatusCodeDeadlineExceeded RPCGRPCStatusCodeAttr = 4
-	// RPCGRPCStatusCodeNotFound is the NOT_FOUND.
-	RPCGRPCStatusCodeNotFound RPCGRPCStatusCodeAttr = 5
-	// RPCGRPCStatusCodeAlreadyExists is the ALREADY_EXISTS.
-	RPCGRPCStatusCodeAlreadyExists RPCGRPCStatusCodeAttr = 6
-	// RPCGRPCStatusCodePermissionDenied is the PERMISSION_DENIED.
-	RPCGRPCStatusCodePermissionDenied RPCGRPCStatusCodeAttr = 7
-	// RPCGRPCStatusCodeResourceExhausted is the RESOURCE_EXHAUSTED.
-	RPCGRPCStatusCodeResourceExhausted RPCGRPCStatusCodeAttr = 8
-	// RPCGRPCStatusCodeFailedPrecondition is the FAILED_PRECONDITION.
-	RPCGRPCStatusCodeFailedPrecondition RPCGRPCStatusCodeAttr = 9
-	// RPCGRPCStatusCodeAborted is the ABORTED.
-	RPCGRPCStatusCodeAborted RPCGRPCStatusCodeAttr = 10
-	// RPCGRPCStatusCodeOutOfRange is the OUT_OF_RANGE.
-	RPCGRPCStatusCodeOutOfRange RPCGRPCStatusCodeAttr = 11
-	// RPCGRPCStatusCodeUnimplemented is the UNIMPLEMENTED.
-	RPCGRPCStatusCodeUnimplemented RPCGRPCStatusCodeAttr = 12
-	// RPCGRPCStatusCodeInternal is the INTERNAL.
-	RPCGRPCStatusCodeInternal RPCGRPCStatusCodeAttr = 13
-	// RPCGRPCStatusCodeUnavailable is the UNAVAILABLE.
-	RPCGRPCStatusCodeUnavailable RPCGRPCStatusCodeAttr = 14
-	// RPCGRPCStatusCodeDataLoss is the DATA_LOSS.
-	RPCGRPCStatusCodeDataLoss RPCGRPCStatusCodeAttr = 15
-	// RPCGRPCStatusCodeUnauthenticated is the UNAUTHENTICATED.
-	RPCGRPCStatusCodeUnauthenticated RPCGRPCStatusCodeAttr = 16
-)
-
 // SDKExporterLogExported is an instrument used to record metric values
 // conforming to the "otel.sdk.exporter.log.exported" semantic conventions. It
 // represents the number of log records for which the export has finished, either
@@ -906,11 +864,11 @@ func (SDKExporterOperationDuration) AttrComponentType(val ComponentTypeAttr) att
 	return attribute.String("otel.component.type", string(val))
 }
 
-// AttrRPCGRPCStatusCode returns an optional attribute for the
-// "rpc.grpc.status_code" semantic convention. It represents the gRPC status code
-// of the last gRPC requests performed in scope of this export call.
-func (SDKExporterOperationDuration) AttrRPCGRPCStatusCode(val RPCGRPCStatusCodeAttr) attribute.KeyValue {
-	return attribute.Int64("rpc.grpc.status_code", int64(val))
+// AttrRPCResponseStatusCode returns an optional attribute for the
+// "rpc.response.status_code" semantic convention. It represents the gRPC status
+// code of the last gRPC request performed in scope of this export call.
+func (SDKExporterOperationDuration) AttrRPCResponseStatusCode(val string) attribute.KeyValue {
+	return attribute.String("rpc.response.status_code", val)
 }
 
 // AttrServerAddress returns an optional attribute for the "server.address"

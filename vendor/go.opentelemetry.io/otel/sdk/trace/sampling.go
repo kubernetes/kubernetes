@@ -280,3 +280,31 @@ func (pb parentBased) Description() string {
 		pb.config.localParentNotSampled.Description(),
 	)
 }
+
+// AlwaysRecord returns a sampler decorator which ensures that every span
+// is passed to the SpanProcessor, even those that would be normally dropped.
+// It converts `Drop` decisions from the root sampler into `RecordOnly` decisions,
+// allowing processors to see all spans without sending them to exporters. This is
+// typically used to enable accurate span-to-metrics processing.
+func AlwaysRecord(root Sampler) Sampler {
+	return alwaysRecord{root}
+}
+
+type alwaysRecord struct {
+	root Sampler
+}
+
+func (ar alwaysRecord) ShouldSample(p SamplingParameters) SamplingResult {
+	rootSamplerSamplingResult := ar.root.ShouldSample(p)
+	if rootSamplerSamplingResult.Decision == Drop {
+		return SamplingResult{
+			Decision:   RecordOnly,
+			Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
+		}
+	}
+	return rootSamplerSamplingResult
+}
+
+func (ar alwaysRecord) Description() string {
+	return "AlwaysRecord{root:" + ar.root.Description() + "}"
+}
