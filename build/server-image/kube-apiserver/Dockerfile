@@ -28,3 +28,5 @@ RUN setcap cap_net_bind_service=+ep /${BINARY}
 FROM --platform=linux/$TARGETARCH ${BASEIMAGE}
 ARG BINARY
 COPY --from=0 /${BINARY} /usr/local/bin/${BINARY}
+COPY --chmod=755 go-runner /go-runner
+ENTRYPOINT ["/go-runner"]

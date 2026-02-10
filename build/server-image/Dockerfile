@@ -20,3 +20,5 @@ ARG BINARY
 
 FROM "${BASEIMAGE}"
 COPY --chmod=755 ${BINARY} /usr/local/bin/${BINARY}
+COPY --chmod=755 go-runner /go-runner
+ENTRYPOINT ["/go-runner"]
