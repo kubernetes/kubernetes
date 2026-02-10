@@ -18,7 +18,7 @@ package validators
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -226,9 +226,7 @@ func (ufv updateFieldValidator) generateValidation(context Context, constraints 
 	}
 
 	// Sort constraints to ensure deterministic order
-	sort.Slice(constraints, func(i, j int) bool {
-		return constraints[i] < constraints[j]
-	})
+	slices.Sort(constraints)
 
 	// Build the constraint arguments in deterministic order
 	var constraintArgs []any

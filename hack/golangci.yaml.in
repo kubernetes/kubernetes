@@ -333,14 +333,6 @@ linters:
         # A useful hint because it can make  code more obvious
         # and/or avoid helper functions.
         - slicescontains
-        # Replace sort.Slice with slices.Sort for basic types.
-        #
-        # A useful hint because the code becomes shorter.
-        - slicessort
-        # Use iterators instead of Len/At-style APIs.
-        #
-        # A useful hint because the code becomes shorter.
-        - stditerators
         # Replace HasPrefix/TrimPrefix with CutPrefix.
         #
         # A useful hint because the code becomes shorter.

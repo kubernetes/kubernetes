@@ -16,12 +16,10 @@ limitations under the License.
 
 package slice
 
-import (
-	"sort"
-)
+import "slices"
 
 // SortInts64 sorts []int64 in increasing order
-func SortInts64(a []int64) { sort.Slice(a, func(i, j int) bool { return a[i] < a[j] }) }
+func SortInts64(a []int64) { slices.Sort(a) }
 
 // Contains checks if a given slice of type T contains the provided item.
 // If a modifier func is provided, it is called with the slice item before the comparation.
