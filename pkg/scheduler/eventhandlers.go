@@ -140,7 +140,7 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		sched.WorkloadManager.AddPod(pod)
 	}
 	if assignedPod(pod) {
-		sched.addAssignedPodToCache(pod)
+		sched.addAssignedPodToCache(pod, nil)
 	} else if responsibleForPod(pod, sched.Profiles) {
 		sched.addPodToSchedulingQueue(pod)
 	}
@@ -166,9 +166,11 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 	if assignedPod(oldPod) {
 		sched.updateAssignedPodInCache(oldPod, newPod)
 	} else if assignedPod(newPod) {
+
 		// This update means binding operation. We can treat it as adding the pod to a cache
 		// (addition to the cache will handle this binding appropriately).
-		sched.addAssignedPodToCache(newPod)
+		sched.addAssignedPodToCache(newPod, oldPod)
+
 		if responsibleForPod(oldPod, sched.Profiles) {
 			// Pod shouldn't be in the scheduling queue, but in unlikely event that the pod has been bound
 			// by another component, it should be removed from scheduling queue for correctness.
@@ -353,9 +355,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	sched.SchedulingQueue.Delete(pod)
 	if inBinding {
 		// In the case of a binding, the rest can be skipped because it is not really a pod removal operation, but a binding.
-		// Any necessary notifications will be sent by the binding process, unless it was an unlikely external binding.
-		// In that case, we need to notify about the release of resources that were held by different assume/nomination
-		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
+		// Any necessary notifications will be sent by the binding process, including external binding.
 		return
 	}
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
@@ -382,11 +382,29 @@ func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
 	}
 }
 
-func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
+func (sched *Scheduler) wakeUpPodsWhenExternalBinding(oldPod *v1.Pod, newPod *v1.Pod, assumedPod *v1.Pod, assumedPodErr error) {
+	logger := sched.logger
+	if assumedPodErr == nil && assumedPod.Spec.NodeName != newPod.Spec.NodeName {
+		// The pod was assumed on a different node. Wake up pods waiting for resources on the old node.
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, assumedPod, nil, nil)
+	} else if oldPod.Status.NominatedNodeName != "" && oldPod.Status.NominatedNodeName != newPod.Spec.NodeName {
+		// The pod was nominated for a different node. Wake up pods waiting for resources on the nominated node.
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(oldPod)))
+	}
+}
+
+func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod, oldPod *v1.Pod) {
 	start := time.Now()
 	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodAdd.Label()).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
+
+	var assumedPod *v1.Pod
+	var assumedPodErr error
+	if oldPod != nil {
+		// Get the assumed pod from the cache before it is updated.
+		assumedPod, assumedPodErr = sched.Cache.GetPod(oldPod)
+	}
 
 	logger.V(3).Info("Add event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.AddPod(logger, pod); err != nil {
@@ -406,6 +424,13 @@ func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodAdd, nil, pod, nil)
 	} else {
 		sched.SchedulingQueue.AssignedPodAdded(logger, pod)
+	}
+
+	// If external binding happen to a pod that is already in the scheduling queue
+	//  and has either NNN or assumed NN different from the binding one,
+	//  we need to wake up other pods waiting on releasing these resources by a deletion event.
+	if oldPod != nil {
+		sched.wakeUpPodsWhenExternalBinding(oldPod, pod, assumedPod, assumedPodErr)
 	}
 }
 
