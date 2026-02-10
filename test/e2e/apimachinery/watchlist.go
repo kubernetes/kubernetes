@@ -263,7 +263,23 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = "watchlist=true"
-				return dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Watch(context.TODO(), options)
+				return dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Watch(ctx, options)
+			},
+		}
+		verifyReflectorRejectsTableResources(ctx, f, lw)
+	})
+
+	ginkgo.It("reflector using standard List doesn't support receiving resources as Tables", func(ctx context.Context) {
+		dynamicClient := setupDynamicTableClient(f)
+		lw := &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.LabelSelector = "watchlist=true"
+				return dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				// a dummy error triggers the fallback logic
+				// which uses a standard LIST call
+				return nil, fmt.Errorf("dummy error")
 			},
 		}
 		verifyReflectorRejectsTableResources(ctx, f, lw)
