@@ -403,17 +403,21 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			)
 
 			ginkgo.By("Validating terminated container storage stats appear in summary")
-			gomega.Eventually(ctx, func() *kubeletstatsv1alpha1.PodStats {
+			gomega.Eventually(ctx, func() bool {
 				summary, err := getNodeSummary(ctx)
 				framework.ExpectNoError(err)
 
 				for _, ps := range summary.Pods {
 					if ps.PodRef.Name == podName && ps.PodRef.Namespace == f.Namespace.Name {
-						return &ps
+						for _, cs:=	range ps.Containers {
+							if cs.Rootfs != nil && cs.Rootfs.UsedBytes != nil {
+								return true
+							}
+						}
 					}
 				}
-				return nil
-			}, 2*time.Minute, 10*time.Second).ShouldNot(gomega.BeNil())
+				return false
+			}, 2*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 			summary, err := getNodeSummary(ctx)
 			framework.ExpectNoError(err)
