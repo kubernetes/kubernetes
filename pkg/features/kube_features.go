@@ -250,6 +250,12 @@ const (
 	// scheduler plugin configuration).
 	DRASchedulerFilterTimeout featuregate.Feature = "DRASchedulerFilterTimeout"
 
+	// owner: @nojnhuh
+	// kep: https://kep.k8s.io/5729
+	//
+	// Enables support for reserving ResourceClaims for an entire PodGroup.
+	DRAWorkloadResourceClaims featuregate.Feature = "DRAWorkloadResourceClaims"
+
 	// owner: @atiratree
 	// kep: http://kep.k8s.io/3973
 	//
@@ -1283,6 +1289,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	DRAWorkloadResourceClaims: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DeploymentReplicaSetTerminatingReplicas: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2256,6 +2266,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAResourceClaimDeviceStatus: {}, // Soft dependency on DynamicResourceAllocation due to on/off-by-default conflict.
 
 	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
+
+	DRAWorkloadResourceClaims: {DynamicResourceAllocation, GenericWorkload},
 
 	DeploymentReplicaSetTerminatingReplicas: {},
 
