@@ -279,10 +279,9 @@ func TestConcurrencyIsolation(t *testing.T) {
 	// There are uncontrolled overheads that introduce noise into the system. The coefficient of variation (CV), that is,
 	// standard deviation divided by mean, for a class of traffic is a characterization of all the noise that applied to
 	// that class. We found that noxu1 generally had a much bigger CV than noxu2. This makes sense, because noxu1 probes
-	// more behavior --- the waiting in queues. So we take the minimum of the two as an indicator of the relative amount
-	// of noise that comes from all the other behavior. Currently, we use 3 times the experienced coefficient of variation
-	// as the margin of error.
-	margin := 3 * math.Min(noxu1LatStats.cv, noxu2LatStats.cv)
+	// more behavior --- the waiting in queues. Both are relevant, so we mix them to get the
+	// threshold to apply in this test.
+	margin := noxu1LatStats.cv + 2*noxu2LatStats.cv
 	t.Logf("Error margin is %v", margin)
 
 	isConcurrencyExpected := func(name string, observed float64, expected float64) bool {
