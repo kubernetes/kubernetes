@@ -34,7 +34,7 @@ type ReadyFunc func() bool
 // Handler is a base for admission control handlers that
 // support a predefined set of operations
 type Handler struct {
-	operations sets.String
+	operations sets.Set[string]
 	readyFunc  ReadyFunc
 }
 
@@ -46,7 +46,7 @@ func (h *Handler) Handles(operation Operation) bool {
 // NewHandler creates a new base handler that handles the passed
 // in operations
 func NewHandler(ops ...Operation) *Handler {
-	operations := sets.NewString()
+	operations := sets.New[string]()
 	for _, op := range ops {
 		operations.Insert(string(op))
 	}
