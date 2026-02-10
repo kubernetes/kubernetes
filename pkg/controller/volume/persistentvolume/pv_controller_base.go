@@ -651,18 +651,67 @@ func (ctrl *PersistentVolumeController) resync(ctx context.Context) {
 		logger.Info("Cannot list claims", "err", err)
 		return
 	}
+	claimsEnqueued := 0
 	for _, pvc := range pvcs {
-		ctrl.enqueueWork(ctx, ctrl.claimQueue, pvc)
+		if ctrl.shouldEnqueueClaimForResync(pvc) {
+			ctrl.enqueueWork(ctx, ctrl.claimQueue, pvc)
+			claimsEnqueued++
+		}
 	}
 
 	pvs, err := ctrl.volumeLister.List(labels.NewSelector())
 	if err != nil {
-		logger.Info("Cannot list persistent volumes", "err", err)
+		logger.Info("Cannot list persistent volumes", "err", err, "claimsListed", len(pvcs), "claimsEnqueued", claimsEnqueued)
 		return
 	}
+	volumesEnqueued := 0
 	for _, pv := range pvs {
-		ctrl.enqueueWork(ctx, ctrl.volumeQueue, pv)
+		if ctrl.shouldEnqueueVolumeForResync(pv) {
+			ctrl.enqueueWork(ctx, ctrl.volumeQueue, pv)
+			volumesEnqueued++
+		}
 	}
+	logger.V(4).Info("Resyncing PV controller completed", "claimsListed", len(pvcs), "claimsEnqueued", claimsEnqueued, "volumesListed", len(pvs), "volumesEnqueued", volumesEnqueued)
+}
+
+func isClaimFullyBound(claim *v1.PersistentVolumeClaim) bool {
+	return claim.Spec.VolumeName != "" && metav1.HasAnnotation(claim.ObjectMeta, storagehelpers.AnnBindCompleted)
+}
+
+func (ctrl *PersistentVolumeController) shouldEnqueueClaimForResync(claim *v1.PersistentVolumeClaim) bool {
+	if !isClaimFullyBound(claim) {
+		return true
+	}
+
+	volume, err := ctrl.volumeLister.Get(claim.Spec.VolumeName)
+	if err != nil {
+		return true
+	}
+	if !storagehelpers.IsVolumeBoundToClaim(volume, claim) {
+		return true
+	}
+	return claim.Status.Phase != v1.ClaimBound || volume.Status.Phase != v1.VolumeBound
+}
+
+func (ctrl *PersistentVolumeController) shouldEnqueueVolumeForResync(volume *v1.PersistentVolume) bool {
+	if volume.Spec.ClaimRef == nil {
+		return volume.Status.Phase != v1.VolumeAvailable
+	}
+
+	claim, err := ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
+	if err != nil {
+		return true
+	}
+	if !storagehelpers.IsVolumeBoundToClaim(volume, claim) {
+		return true
+	}
+	if !isClaimFullyBound(claim) {
+		return true
+	}
+	if claim.Spec.VolumeName != volume.Name {
+		return true
+	}
+	return claim.Status.Phase != v1.ClaimBound || volume.Status.Phase != v1.VolumeBound
 }
 
 // setClaimProvisioner saves
