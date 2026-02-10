@@ -914,6 +914,30 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 	}
+	addPodGroupClaim := func(pod *api.Pod, claimName string) {
+		podGroupClaim := api.ResourceClaim{Name: claimName}
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, api.PodResourceClaim{
+			Name:                  podGroupClaim.Name,
+			PodGroupResourceClaim: new("podgroup-claim"),
+		})
+		pod.Spec.Containers[0].Resources.Claims = append(pod.Spec.Containers[0].Resources.Claims, podGroupClaim)
+		pod.Spec.InitContainers[0].Resources.Claims = append(pod.Spec.InitContainers[0].Resources.Claims, podGroupClaim)
+		pod.Spec.EphemeralContainers[0].Resources.Claims = append(pod.Spec.EphemeralContainers[0].Resources.Claims, podGroupClaim)
+		pod.Status.ResourceClaimStatuses = append(pod.Status.ResourceClaimStatuses, api.PodResourceClaimStatus{
+			Name:              podGroupClaim.Name,
+			ResourceClaimName: ptr.To("claim-for-podgroup"),
+		})
+	}
+	podWithPodGroupClaims := func() *api.Pod {
+		pod := podWithClaims.DeepCopy()
+		addPodGroupClaim(pod, "pg-claim")
+		return pod
+	}()
+	podWithMorePodGroupClaims := func() *api.Pod {
+		pod := podWithPodGroupClaims.DeepCopy()
+		addPodGroupClaim(pod, "pg-claim-2")
+		return pod
+	}()
 
 	var noPod *api.Pod
 
@@ -921,6 +945,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		description     string
 		enabled         bool
 		extendedEnabled bool
+		podGroupEnabled bool
 		oldPod          *api.Pod
 		newPod          *api.Pod
 		wantPod         *api.Pod
@@ -1054,17 +1079,86 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			newPod:          podWithExtendedResource,
 			wantPod:         podWithExtendedResource,
 		},
+		{
+			description:     "podgroup / no old pod / new with podgroup claim / disabled",
+			enabled:         false,
+			podGroupEnabled: false,
+			oldPod:          noPod,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithoutClaims,
+		},
+		{
+			description:     "podgroup / old without claim / new with podgroup claim / disabled",
+			enabled:         false,
+			podGroupEnabled: false,
+			oldPod:          podWithoutClaims,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithoutClaims,
+		},
+		{
+			description:     "podgroup / no old pod / new with podgroup claim / podgroup disabled only",
+			enabled:         true,
+			podGroupEnabled: false,
+			oldPod:          noPod,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithClaims,
+		},
+		{
+			description:     "podgroup / old without claim / new with podgroup claim / podgroup disabled only",
+			enabled:         true,
+			podGroupEnabled: false,
+			oldPod:          podWithoutClaims,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithClaims,
+		},
+		{
+			description:     "podgroup / old with podgroup claim / new with new podgroup claim / podgroup disabled only",
+			enabled:         true,
+			podGroupEnabled: false,
+			oldPod:          podWithPodGroupClaims,
+			newPod:          podWithMorePodGroupClaims,
+			wantPod:         podWithPodGroupClaims,
+		},
+		{
+			description:     "podgroup / no old pod / new with podgroup claim / enabled",
+			enabled:         true,
+			podGroupEnabled: true,
+			oldPod:          noPod,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithPodGroupClaims,
+		},
+		{
+			description:     "podgroup / old without claim / new with podgroup claim / enabled",
+			enabled:         true,
+			podGroupEnabled: true,
+			oldPod:          podWithoutClaims,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithPodGroupClaims,
+		},
+		{
+			description:     "podgroup / old with podgroup claim / new with new podgroup claim / enabled",
+			enabled:         true,
+			podGroupEnabled: true,
+			oldPod:          podWithMorePodGroupClaims,
+			newPod:          podWithMorePodGroupClaims,
+			wantPod:         podWithMorePodGroupClaims,
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
-			if !tc.enabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			featureOverrides := featuregatetesting.FeatureOverrides{
 				features.DynamicResourceAllocation: tc.enabled,
 				features.DRAExtendedResource:       tc.extendedEnabled,
-			})
+			}
+			if !tc.enabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			} else {
+				// These features can't be set for pre-1.34 emulation.
+				featureOverrides[features.DRAWorkloadResourceClaims] = tc.podGroupEnabled
+				featureOverrides[features.GenericWorkload] = tc.podGroupEnabled
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureOverrides)
 
 			oldPod := tc.oldPod.DeepCopy()
 			newPod := tc.newPod.DeepCopy()
@@ -1182,7 +1276,7 @@ func TestDropDisabledPodStatusFields_HostIPs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{})
+			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{}, &api.PodSpec{})
 
 			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
 				t.Errorf("dropDisabledStatusFields() = %v, want %v", tt.podStatus, tt.wantPodStatus)
@@ -1275,7 +1369,7 @@ func TestDropDisabledPodStatusFields_ObservedGeneration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{})
+			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{}, &api.PodSpec{})
 			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
 				t.Errorf("dropDisabledStatusFields() = %v, want %v", tt.podStatus, tt.wantPodStatus)
 			}
@@ -3002,8 +3096,9 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 							oldPodSpec = &oldPod.Spec
 							oldPodStatus = &oldPod.Status
 						}
+						podSpecBeforeDropping := newPod.Spec.DeepCopy()
 						dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
+						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec, podSpecBeforeDropping)
 
 						// old pod should never be changed
 						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -4074,8 +4169,9 @@ func TestDropSupplementalGroupsPolicy(t *testing.T) {
 							oldPodSpec = &oldPod.Spec
 							oldPodStatus = &oldPod.Status
 						}
+						podSpecBeforeDropping := newPod.Spec.DeepCopy()
 						dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
+						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec, podSpecBeforeDropping)
 
 						// old pod should never be changed
 						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -6705,7 +6801,8 @@ func TestDropDisabledPodStatusFields_InPlacePodLevelResourcesVerticalScaling(t *
 							oldPodSpec = &oldPod.Spec
 							oldPodStatus = &oldPod.Status
 						}
-						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
+						podSpecBeforeDropping := newPod.Spec.DeepCopy()
+						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec, podSpecBeforeDropping)
 
 						// old pod should never be changed
 						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {

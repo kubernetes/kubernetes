@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -175,6 +176,7 @@ func TestDRA(t *testing.T) {
 				})
 				tCtx.Run("ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				tCtx.Run("UsesAllResources", testUsesAllResources)
+				tCtx.Run("WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, false) })
 			},
 		},
 		"v1beta1": {
@@ -228,6 +230,8 @@ func TestDRA(t *testing.T) {
 				features.DRAPrioritizedList:           true,
 				features.DRAResourceClaimDeviceStatus: true,
 				features.DRAExtendedResource:          true,
+				features.DRAWorkloadResourceClaims:    true,
+				features.GenericWorkload:              true, // dependency of DRAWorkloadResourceClaims
 			},
 			f: func(tCtx ktesting.TContext) {
 				// These tests must run in parallel as much as possible to keep overall runtime low!
@@ -253,6 +257,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
 				tCtx.Run("ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				tCtx.Run("UsesAllResources", testUsesAllResources)
+				tCtx.Run("WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, true) })
 			},
 		},
 	} {
@@ -1843,5 +1848,39 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 				}))))
 			}
 		})
+	}
+}
+
+// testWorkloadResourceClaims creates a PodGroup with resource claims and a
+// Pod referencing those claims and then checks whether those claims getting
+// dropped when the DRAWorkloadResourceClaims feature is enabled.
+func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadResourceClaimsEnabled bool) {
+	tCtx.Parallel()
+
+	namespace := createTestNamespace(tCtx, nil)
+
+	podGroupClaimName := "podgroup-claim"
+	podGroupName := "podgroup"
+
+	podClaimName := "podgroup-" + resourceName
+	podWithClaimName := podWithClaimName.DeepCopy()
+	podWithClaimName.Namespace = namespace
+	// Add a claim to the Pod referencing a claim made by its PodGroup.
+	podWithClaimName.Spec.ResourceClaims = append(podWithClaimName.Spec.ResourceClaims, v1.PodResourceClaim{Name: podClaimName, PodGroupResourceClaim: &podGroupClaimName})
+	podWithClaimName.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+		PodGroupName: &podGroupName,
+	}
+	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, podWithClaimName, metav1.CreateOptions{FieldValidation: "Strict"})
+	tCtx.ExpectNoError(err, "create pod")
+
+	hasPodGroupClaim := slices.ContainsFunc(pod.Spec.ResourceClaims, func(claim v1.PodResourceClaim) bool {
+		return claim.Name == podClaimName
+	})
+	if workloadResourceClaimsEnabled {
+		assert.True(tCtx, hasPodGroupClaim, "should store PodGroup claim in Pod spec")
+	} else {
+		assert.False(tCtx, hasPodGroupClaim, "should drop PodGroup claim from Pod spec")
+		// only the PodGroup claim should be dropped
+		assert.NotEmpty(tCtx, pod.Spec.ResourceClaims, "should not drop non-PodGroup claims from Pod spec")
 	}
 }

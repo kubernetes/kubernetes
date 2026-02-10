@@ -2026,7 +2026,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			workload := b.Workload()
 			podGroupTemplate := workload.Spec.PodGroupTemplates[0]
 			podGroup := b.PodGroup(workload, podGroupTemplate)
-			pod := b.GroupedPod(podGroup)
+			pod := b.GroupedPodWithClaim(podGroup, "todo")
 			b.Create(tCtx, workload, podGroup, pod)
 		})
 	}

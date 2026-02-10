@@ -3190,11 +3190,11 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	return allErrs
 }
 
-func validatePodResourceClaims(podMeta *metav1.ObjectMeta, claims []core.PodResourceClaim, fldPath *field.Path) field.ErrorList {
+func validatePodResourceClaims(podMeta *metav1.ObjectMeta, claims []core.PodResourceClaim, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	podClaimNames := sets.New[string]()
 	for i, claim := range claims {
-		allErrs = append(allErrs, validatePodResourceClaim(podMeta, claim, &podClaimNames, fldPath.Index(i))...)
+		allErrs = append(allErrs, validatePodResourceClaim(podMeta, claim, &podClaimNames, fldPath.Index(i), opts)...)
 	}
 	return allErrs
 }
@@ -3212,7 +3212,7 @@ func gatherPodResourceClaimNames(claims []core.PodResourceClaim) sets.Set[string
 	return podClaimNames
 }
 
-func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResourceClaim, podClaimNames *sets.Set[string], fldPath *field.Path) field.ErrorList {
+func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResourceClaim, podClaimNames *sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	// static pods don't support resource claims
 	if podMeta != nil {
 		if _, ok := podMeta.Annotations[core.MirrorPodAnnotationKey]; ok {
@@ -3229,11 +3229,30 @@ func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResource
 		allErrs = append(allErrs, ValidateDNS1123Label(claim.Name, fldPath.Child("name"))...)
 		podClaimNames.Insert(claim.Name)
 	}
-	if claim.ResourceClaimName != nil && claim.ResourceClaimTemplateName != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, claim, "at most one of `resourceClaimName` or `resourceClaimTemplateName` may be specified"))
+	setFields := 0
+	if claim.ResourceClaimName != nil {
+		setFields++
 	}
-	if claim.ResourceClaimName == nil && claim.ResourceClaimTemplateName == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, claim, "must specify one of: `resourceClaimName`, `resourceClaimTemplateName`"))
+	if claim.ResourceClaimTemplateName != nil {
+		setFields++
+	}
+	if claim.PodGroupResourceClaim != nil {
+		setFields++
+	}
+	expectedFields := []string{
+		"`resourceClaimName`",
+		"`resourceClaimTemplateName`",
+	}
+	if opts.AllowPodGroupResourceClaims {
+		expectedFields = append(expectedFields, "`podGroupResourceClaim`")
+	}
+	switch setFields {
+	case 1:
+		// ok
+	case 0:
+		allErrs = append(allErrs, field.Invalid(fldPath, claim, "must specify one of: "+strings.Join(expectedFields, ", ")))
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, claim, "at most one of "+strings.Join(expectedFields, " or ")+" may be specified"))
 	}
 	if claim.ResourceClaimName != nil {
 		for _, detail := range ValidateResourceClaimName(*claim.ResourceClaimName, false) {
@@ -3244,6 +3263,9 @@ func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResource
 		for _, detail := range ValidateResourceClaimTemplateName(*claim.ResourceClaimTemplateName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimTemplateName"), *claim.ResourceClaimTemplateName, detail))
 		}
+	}
+	if claim.PodGroupResourceClaim != nil {
+		allErrs = append(allErrs, ValidateDNS1123Label(*claim.PodGroupResourceClaim, fldPath.Child("podGroupResourceClaim"))...)
 	}
 	return allErrs
 }
@@ -4487,6 +4509,8 @@ type PodValidationOptions struct {
 	AllowRestartAllContainers bool
 	// Allows container statuses to contain image volume digest
 	AllowImageVolumeWithDigest bool
+	// Indicates whether the podGroupResourceClaim field in a PodResourceClaim can be set.
+	AllowPodGroupResourceClaims bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4631,7 +4655,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"), opts)
 	allErrs = append(allErrs, vErrs...)
 	podClaimNames := gatherPodResourceClaimNames(spec.ResourceClaims)
-	allErrs = append(allErrs, validatePodResourceClaims(podMeta, spec.ResourceClaims, fldPath.Child("resourceClaims"))...)
+	allErrs = append(allErrs, validatePodResourceClaims(podMeta, spec.ResourceClaims, fldPath.Child("resourceClaims"), opts)...)
 	allErrs = append(allErrs, validateContainers(spec.Containers, spec.OS, vols, podClaimNames, gracePeriod, fldPath.Child("containers"), opts, &spec.RestartPolicy, hostUsers)...)
 	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.OS, spec.Containers, vols, podClaimNames, gracePeriod, fldPath.Child("initContainers"), opts, &spec.RestartPolicy, hostUsers)...)
 	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts, &spec.RestartPolicy, hostUsers)...)
@@ -4721,6 +4745,16 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	if spec.SchedulingGroup != nil {
 		allErrs = append(allErrs, validateSchedulingGroup(spec.SchedulingGroup, fldPath.Child("schedulingGroup"))...)
+	}
+	hasPodGroupClaim := false
+	for _, claim := range spec.ResourceClaims {
+		if claim.PodGroupResourceClaim != nil {
+			hasPodGroupClaim = true
+			break
+		}
+	}
+	if hasPodGroupClaim && (spec.SchedulingGroup == nil || spec.SchedulingGroup.PodGroupName == nil) {
+		allErrs = append(allErrs, field.Required(fldPath.Child("schedulingGroup", "podGroupName"), "must be set when any resource claim references a podGroupResourceClaim"))
 	}
 
 	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)

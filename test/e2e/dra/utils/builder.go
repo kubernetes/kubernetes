@@ -343,6 +343,22 @@ func (b *Builder) GroupedPod(podGroup *schedulingv1alpha2.PodGroup) *v1.Pod {
 	return pod
 }
 
+// GroupedPodWithClaim returns a pod that is a member of the given PodGroup and
+// refers to its given resource claim.
+func (b *Builder) GroupedPodWithClaim(podGroup *schedulingv1alpha2.PodGroup, podGroupClaimName string) *v1.Pod {
+	pod := b.GroupedPod(podGroup)
+	pod.Spec.Containers[0].Name = "with-resource"
+	podClaimName := "resource-claim"
+	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
+		{
+			Name:                  podClaimName,
+			PodGroupResourceClaim: &podGroupClaimName,
+		},
+	}
+	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: podClaimName}}
+	return pod
+}
+
 // Workload creates a Workload with one PodGroupTemplate and no ResourceClaims.
 func (b *Builder) Workload() *schedulingv1alpha2.Workload {
 	workload := &schedulingv1alpha2.Workload{
