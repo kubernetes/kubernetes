@@ -818,6 +818,7 @@ func newQueueFIFO(clientState Store, transform TransformFunc, identifier Informe
 		// store to an atomic fifo.
 		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO) {
 			options.AtomicEvents = true
+			options.UnlockWhileProcessing = clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.UnlockWhileProcessingFIFO)
 		} else {
 			options.KnownObjects = clientState
 		}
