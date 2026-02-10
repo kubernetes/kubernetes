@@ -251,7 +251,7 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 		if matchCount == 0 {
 			rec := defaultRecommendation
 			// If the imperative error is explicitly Alpha, it is never enforced, so HV is authoritative.
-			if iErr.ValidationStabilityLevel.String() == "alpha" {
+			if iErr.IsAlpha() {
 				rec = authoritativeMsg
 			}
 
@@ -272,7 +272,7 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 	for _, dErr := range remaining {
 		rec := defaultRecommendation
 		// If the declarative error is Alpha, it is never enforced (shadowed), so HV is authoritative.
-		if dErr.ValidationStabilityLevel.String() == "alpha" {
+		if dErr.IsAlpha() {
 			rec = authoritativeMsg
 		}
 
@@ -408,8 +408,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		if cfg.declarativeEnforcement {
 			mismatchCandidateErrs = nil
 			for _, err := range declarativeErrs {
-				level := err.ValidationStabilityLevel.String()
-				if level == "alpha" || level == "beta" {
+				if err.IsAlpha() || err.IsBeta() {
 					mismatchCandidateErrs = append(mismatchCandidateErrs, err)
 				}
 			}
@@ -433,8 +432,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		}
 
 		// Explicit Strategy
-		level := fe.ValidationStabilityLevel.String()
-		if level == "beta" {
+		if fe.IsBeta() {
 			// Beta validations are enforced only if the Beta feature gate is enabled.
 			return betaEnabled
 		}
@@ -445,23 +443,16 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 
 	// Append Enforced DV errors
 	for _, dvErr := range declarativeErrs {
-		// Internal errors should always fail validation.
-		if dvErr.Type == field.ErrorTypeInternal {
+		switch {
+		case dvErr.Type == field.ErrorTypeInternal:
 			errs = append(errs, dvErr)
-			continue
-		}
-
-		level := dvErr.ValidationStabilityLevel.String()
-		if level == "beta" {
+		case dvErr.IsBeta():
 			if betaEnabled {
 				errs = append(errs, dvErr)
 			}
-			continue
+		case !dvErr.IsAlpha():
+			errs = append(errs, dvErr) // Standard
 		}
-		if level == "alpha" {
-			continue // Always shadowed
-		}
-		errs = append(errs, dvErr) // Standard
 	}
 
 	return errs

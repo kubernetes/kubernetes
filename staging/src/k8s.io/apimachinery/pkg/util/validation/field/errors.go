@@ -61,19 +61,19 @@ type Error struct {
 	DeclarativeNative bool
 
 	// ValidationStabilityLevel denotes the validation stability level of the declarative validation from this error is returned. This should be used in the declarative validations only.
-	ValidationStabilityLevel validationStabilityLevel
+	ValidationStabilityLevel ValidationStabilityLevel
 }
 
-// ValidationLevel denotes the stability level of a validation.
-type validationStabilityLevel int
+// ValidationStabilityLevel denotes the stability level of a validation.
+type ValidationStabilityLevel int
 
 const (
-	unknown validationStabilityLevel = iota
+	stabilityLevelUnknown ValidationStabilityLevel = iota
 	stabilityLevelAlpha
 	stabilityLevelBeta
 )
 
-func (v validationStabilityLevel) String() string {
+func (v ValidationStabilityLevel) String() string {
 	switch v {
 	case stabilityLevelAlpha:
 		return "alpha"
@@ -85,6 +85,16 @@ func (v validationStabilityLevel) String() string {
 }
 
 var _ error = &Error{}
+
+// IsAlpha returns true if the error is an alpha validation error.
+func (e *Error) IsAlpha() bool {
+	return e.ValidationStabilityLevel == stabilityLevelAlpha
+}
+
+// IsBeta returns true if the error is a beta validation error.
+func (e *Error) IsBeta() bool {
+	return e.ValidationStabilityLevel == stabilityLevelBeta
+}
 
 // Error implements the error interface.
 func (e *Error) Error() string {
