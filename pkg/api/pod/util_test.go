@@ -914,6 +914,22 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 	}
+	podWithPodGroupClaims := func() *api.Pod {
+		podGroupClaim := api.ResourceClaim{Name: "pg-claim"}
+		pod := podWithClaims.DeepCopy()
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, api.PodResourceClaim{
+			Name:                  podGroupClaim.Name,
+			PodGroupResourceClaim: ptr.To("podgroup-claim"),
+		})
+		pod.Spec.Containers[0].Resources.Claims = append(pod.Spec.Containers[0].Resources.Claims, podGroupClaim)
+		pod.Spec.InitContainers[0].Resources.Claims = append(pod.Spec.InitContainers[0].Resources.Claims, podGroupClaim)
+		pod.Spec.EphemeralContainers[0].Resources.Claims = append(pod.Spec.EphemeralContainers[0].Resources.Claims, podGroupClaim)
+		pod.Status.ResourceClaimStatuses = append(pod.Status.ResourceClaimStatuses, api.PodResourceClaimStatus{
+			Name:              podGroupClaim.Name,
+			ResourceClaimName: ptr.To("claim-for-podgroup"),
+		})
+		return pod
+	}()
 
 	var noPod *api.Pod
 
@@ -921,6 +937,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		description     string
 		enabled         bool
 		extendedEnabled bool
+		podGroupEnabled bool
 		oldPod          *api.Pod
 		newPod          *api.Pod
 		wantPod         *api.Pod
@@ -1054,17 +1071,70 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			newPod:          podWithExtendedResource,
 			wantPod:         podWithExtendedResource,
 		},
+		{
+			description:     "podgroup / no old pod / new with podgroup claim / disabled",
+			enabled:         false,
+			podGroupEnabled: false,
+			oldPod:          noPod,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithoutClaims,
+		},
+		{
+			description:     "podgroup / old without claim / new with podgroup claim / disabled",
+			enabled:         false,
+			podGroupEnabled: false,
+			oldPod:          podWithoutClaims,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithoutClaims,
+		},
+		{
+			description:     "podgroup / no old pod / new with podgroup claim / podgroup disabled only",
+			enabled:         true,
+			podGroupEnabled: false,
+			oldPod:          noPod,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithClaims,
+		},
+		{
+			description:     "podgroup / old without claim / new with podgroup claim / podgroup disabled only",
+			enabled:         true,
+			podGroupEnabled: false,
+			oldPod:          podWithoutClaims,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithClaims,
+		},
+		{
+			description:     "podgroup / no old pod / new with podgroup claim / enabled",
+			enabled:         true,
+			podGroupEnabled: true,
+			oldPod:          noPod,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithPodGroupClaims,
+		},
+		{
+			description:     "podgroup / old without claim / new with podgroup claim / enabled",
+			enabled:         true,
+			podGroupEnabled: true,
+			oldPod:          podWithoutClaims,
+			newPod:          podWithPodGroupClaims,
+			wantPod:         podWithPodGroupClaims,
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
-			if !tc.enabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			featureOverrides := featuregatetesting.FeatureOverrides{
 				features.DynamicResourceAllocation: tc.enabled,
 				features.DRAExtendedResource:       tc.extendedEnabled,
-			})
+			}
+			if !tc.enabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			} else {
+				// These features can't be set for pre-1.34 emulation.
+				featureOverrides[features.WorkloadPodGroupResourceClaimTemplate] = tc.podGroupEnabled
+				featureOverrides[features.GenericWorkload] = tc.podGroupEnabled
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureOverrides)
 
 			oldPod := tc.oldPod.DeepCopy()
 			newPod := tc.newPod.DeepCopy()
