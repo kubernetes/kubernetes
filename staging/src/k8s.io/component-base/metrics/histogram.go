@@ -19,6 +19,7 @@ package metrics
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -214,6 +215,21 @@ func (v *HistogramVec) With(labels map[string]string) ObserverMetric {
 	return v.HistogramVec.With(labels)
 }
 
+// ObserveSince returns a function that observes the duration since the given start time.
+// This is intended to be used with defer to measure the time elapsed since a given point:
+//
+//	start := time.Now()
+//	defer metricVec.ObserveSince(start, "label1", "label2")()
+//
+// The returned function must be called (typically via defer) to record the observation.
+// This pattern avoids the common pitfall where arguments to deferred functions are evaluated
+// immediately, which would result in incorrect timing measurements.
+func (v *HistogramVec) ObserveSince(start time.Time, lvs ...string) func() {
+	return func() {
+		v.WithLabelValues(lvs...).Observe(time.Since(start).Seconds())
+	}
+}
+
 // Delete deletes the metric where the variable labels are the same as those
 // passed in as labels. It returns true if a metric was deleted.
 //
@@ -291,4 +307,9 @@ func (vc *HistogramVecWithContext) With(labels map[string]string) *exemplarHisto
 		HistogramVecWithContext: vc,
 		observer:                vc.HistogramVec.With(labels),
 	}
+}
+
+// ObserveSince is the wrapper of HistogramVec.ObserveSince.
+func (vc *HistogramVecWithContext) ObserveSince(start time.Time, lvs ...string) func() {
+	return vc.HistogramVec.ObserveSince(start, lvs...)
 }
