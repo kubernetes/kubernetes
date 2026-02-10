@@ -258,8 +258,8 @@ func MoreImportantVictim(vi1, vi2 []*v1.Pod, enableWorkloadPreemption bool) bool
 		return p[0].Spec.WorkloadRef != nil
 	}
 
-	p1 := *vi1[0].Spec.Priority
-	p2 := *vi2[0].Spec.Priority
+	p1 := corev1helpers.PodPriority(vi1[0])
+	p2 := corev1helpers.PodPriority(vi2[0])
 	if p1 != p2 {
 		return p1 > p2
 	}

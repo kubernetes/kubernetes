@@ -370,9 +370,9 @@ func TestDryRunPreemption(t *testing.T) {
 					PluginName:                    "FakePostFilter",
 					Handler:                       fwk,
 					Interface:                     fakePostPlugin,
-					EnableWorkloadAwarePreemption: tt.workloadAwarePreemption,
+					enableWorkloadAwarePreemption: tt.workloadAwarePreemption,
 				}
-				got, _, _ := pe.DryRunPreemption(ctx, state, preemptor, pe.NewDomains(preemptor, nodeInfos), nil, 0, int32(len(nodeInfos)))
+				got, _, _ := pe.DryRunPreemption(ctx, state, preemptor, NewDomainsForTest(pe, preemptor, nodeInfos, tt.workloadAwarePreemption), nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -513,9 +513,9 @@ func TestSelectCandidate(t *testing.T) {
 					PluginName:                    "FakePreemptionScorePostFilter",
 					Handler:                       fwk,
 					Interface:                     fakePreemptionScorePostFilterPlugin,
-					EnableWorkloadAwarePreemption: tt.workloadAwarePreemption,
+					enableWorkloadAwarePreemption: tt.workloadAwarePreemption,
 				}
-				candidates, _, _ := pe.DryRunPreemption(ctx, state, preemptor, pe.NewDomains(preemptor, nodeInfos), nil, 0, int32(len(nodeInfos)))
+				candidates, _, _ := pe.DryRunPreemption(ctx, state, preemptor, NewDomainsForTest(pe, preemptor, nodeInfos, tt.workloadAwarePreemption), nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
 				if s == nil || len(s.Name()) == 0 {
 					t.Errorf("expect any node in %v, but no candidate selected", tt.expected)
@@ -806,16 +806,6 @@ func TestBuildPodGroupIndex(t *testing.T) {
 		expectedCounts map[util.PodGroupKey]int
 	}{
 		{
-			nodeNames: []string{"node1"},
-			name:      "Disabled: Returns empty index regardless of pods",
-			enable:    false,
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Priority(highPriority).WorkloadRef(w1).Node("node1").Obj(),
-				st.MakePod().Name("p2").UID("p2").Priority(highPriority).WorkloadRef(w1).Node("node1").Obj(),
-			},
-			expectedKeys: []util.PodGroupKey{},
-		},
-		{
 			name:   "Basic: Groups pods by WorkloadRef",
 			enable: true,
 			pods: []*v1.Pod{
@@ -893,10 +883,12 @@ func TestBuildPodGroupIndex(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			index, err := buildPodGroupIndex(fh, tt.enable)
+			nodeInfos, err := fh.SnapshotSharedLister().NodeInfos().List()
 			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
+				t.Fatal(err)
 			}
+
+			index := buildPodGroupIndex(nodeInfos)
 
 			if len(index) != len(tt.expectedKeys) {
 				t.Errorf("Expected %d groups, got %d", len(tt.expectedKeys), len(index))

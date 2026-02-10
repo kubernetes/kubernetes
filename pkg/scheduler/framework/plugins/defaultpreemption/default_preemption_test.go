@@ -164,12 +164,6 @@ const (
 	LabelValueNonViolatingPDB = "non-violating"
 )
 
-type blockingRule struct {
-	nodeName        string
-	blockingVictims []string
-	capacity        int
-}
-
 type podGroupPreemptor struct {
 	preemption.Preemptor
 	priority         int32
@@ -583,6 +577,25 @@ type candidate struct {
 	name    string
 }
 
+type blockingRule struct {
+	// nodeName identifies the node this rule applies to.
+	nodeName string
+	// blockingVictims is a list of Pod names that, if present on the node,
+	// prevent any new pods from being scheduled there (capacity = 0).
+	blockingVictims []string
+	// capacity is the number of incoming pods this node can accept
+	// only when all blockingVictims are removed. Defaults to 1.
+	capacity int
+}
+
+// getMockCanPlacePodsFunc creates a mock predicate that simulates resource contention
+// based on the presence of specific "blocking" pods, rather than actual resource usage.
+//
+// Semantics:
+//  1. Blocked State: A node provides 0 capacity if any of its 'blockingVictims' are still present.
+//  2. Unblocked State: If all 'blockingVictims' are removed, the node provides 'capacity' slots.
+//  3. Global Success: The predicate passes if the sum of slots from all "unblocked" nodes
+//     is greater than or equal to the number of incoming pods.
 func getMockCanPlacePodsFunc(blockingRules []blockingRule) CanPlacePodsFunc {
 	mockCanPlacePods := func(ctx context.Context,
 		state fwk.CycleState,
@@ -640,19 +653,19 @@ func TestDryRunPreemption(t *testing.T) {
 	)
 
 	tests := []struct {
-		name                    string
-		args                    *config.DefaultPreemptionArgs
-		nodeNames               []string
-		preemptors              []preemption.Preemptor
-		initPods                []*v1.Pod
-		registerPlugins         []tf.RegisterPluginFunc
-		pdbs                    []*policy.PodDisruptionBudget
-		fakeFilterRC            fwk.Code // return code for fake filter plugin
-		disableParallelism      bool
-		expected                [][]candidate
-		expectedNumFilterCalled []int32
-		blockingRules           []blockingRule
-		workloadAwarePreemption bool
+		name                          string
+		args                          *config.DefaultPreemptionArgs
+		nodeNames                     []string
+		preemptors                    []preemption.Preemptor
+		initPods                      []*v1.Pod
+		registerPlugins               []tf.RegisterPluginFunc
+		pdbs                          []*policy.PodDisruptionBudget
+		fakeFilterRC                  fwk.Code // return code for fake filter plugin
+		disableParallelism            bool
+		expected                      [][]candidate
+		expectedNumFilterCalled       []int32
+		blockingRules                 []blockingRule
+		enableWorkloadAwarePreemption bool
 	}{
 		{
 			name: "a pod that does not fit on any node",
@@ -733,7 +746,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{8},
+			expectedNumFilterCalled: []int32{6},
 		},
 		{
 			name: "a pod that would fit on the nodes, but other pods running are higher priority, no preemption would happen",
@@ -782,7 +795,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{10},
+			expectedNumFilterCalled: []int32{8},
 		},
 		{
 			name: "mixed priority pods are preempted",
@@ -813,7 +826,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{8},
+			expectedNumFilterCalled: []int32{6},
 		},
 		{
 			name: "mixed priority pods are preempted, pick later StartTime one when priorities are equal",
@@ -844,7 +857,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{8}, // no preemption would happen on node2 and no filter call is counted.
+			expectedNumFilterCalled: []int32{6}, // no preemption would happen on node2 and no filter call is counted.
 		},
 		{
 			name: "pod with anti-affinity is preempted",
@@ -876,7 +889,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{5}, // no preemption would happen on node2 and no filter call is counted.
+			expectedNumFilterCalled: []int32{4}, // no preemption would happen on node2 and no filter call is counted.
 		},
 		{
 			name: "preemption to resolve pod topology spread filter failure",
@@ -913,7 +926,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{9},
+			expectedNumFilterCalled: []int32{7},
 		},
 		{
 			name: "get Unschedulable in the preemption phase when the filter plugins filtering the nodes",
@@ -965,7 +978,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6},
+			expectedNumFilterCalled: []int32{5},
 		},
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim doesn't belong to DisruptedPods",
@@ -1000,7 +1013,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6},
+			expectedNumFilterCalled: []int32{5},
 		},
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim belongs to DisruptedPods",
@@ -1035,7 +1048,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{6},
+			expectedNumFilterCalled: []int32{4},
 		},
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim which belongs to DisruptedPods is treated as 'nonViolating'",
@@ -1072,7 +1085,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{8},
+			expectedNumFilterCalled: []int32{6},
 		},
 		{
 			name: "all nodes are possible candidates, but DefaultPreemptionArgs limits to 2",
@@ -1109,7 +1122,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{8},
+			expectedNumFilterCalled: []int32{6},
 		},
 		{
 			name: "some nodes are not possible candidates, DefaultPreemptionArgs limits to 2",
@@ -1146,7 +1159,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{8},
+			expectedNumFilterCalled: []int32{6},
 		},
 		{
 			name: "preemption offset across multiple scheduling cycles and wrap around",
@@ -1215,7 +1228,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{8, 8, 8},
+			expectedNumFilterCalled: []int32{6, 6, 6},
 		},
 		{
 			name: "preemption looks past numCandidates until a non-PDB violating node is found",
@@ -1272,7 +1285,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{13},
+			expectedNumFilterCalled: []int32{12},
 		},
 		{
 			name: "gang of 2 pods fits by preempting victims on two different nodes",
@@ -1312,7 +1325,7 @@ func TestDryRunPreemption(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"victim-n1"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"victim-n2"}, capacity: 1},
 			},
-			workloadAwarePreemption: true,
+			enableWorkloadAwarePreemption: true,
 		},
 		{
 			name:      "gang of 2 pods fails because one member is blocked by non-preemptible pod",
@@ -1372,7 +1385,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			workloadAwarePreemption: true,
+			enableWorkloadAwarePreemption: true,
 		},
 		{
 			name:      "gang of 2 pods requires preempting a Medium priority victim because Low alone is insufficient",
@@ -1396,7 +1409,7 @@ func TestDryRunPreemption(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"low-p-victim"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"mid-p-victim"}, capacity: 1},
 			},
-			workloadAwarePreemption: true,
+			enableWorkloadAwarePreemption: true,
 			expected: [][]candidate{
 				{
 					candidate{
@@ -1438,7 +1451,7 @@ func TestDryRunPreemption(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"w1-p1"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"w1-p2"}, capacity: 1},
 			},
-			workloadAwarePreemption: true,
+			enableWorkloadAwarePreemption: true,
 			expected: [][]candidate{
 				{
 					// Scenario A: Scheduler tries to fit preemptor on Node 1
@@ -1555,7 +1568,7 @@ func TestDryRunPreemption(t *testing.T) {
 				tt.args = getDefaultDefaultPreemptionArgs()
 			}
 			pl, err := New(ctx, tt.args, testingFwk, feature.Features{
-				EnableWorkloadAwarePreemption: tt.workloadAwarePreemption,
+				EnableWorkloadAwarePreemption: tt.enableWorkloadAwarePreemption,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -1577,7 +1590,7 @@ func TestDryRunPreemption(t *testing.T) {
 
 				offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
 
-				domains := pl.Evaluator.NewDomains(preemptor, nodeInfos)
+				domains := preemption.NewDomainsForTest(*pl.Evaluator, preemptor, nodeInfos, tt.enableWorkloadAwarePreemption)
 
 				if tt.blockingRules != nil {
 					pl.CanPlacePods = getMockCanPlacePodsFunc(tt.blockingRules)
@@ -1617,14 +1630,14 @@ func TestSelectBestCandidate(t *testing.T) {
 		w3 = &v1.WorkloadReference{PodGroup: "pg3"}
 	)
 	tests := []struct {
-		name                    string
-		registerPlugin          tf.RegisterPluginFunc
-		nodeNames               []string
-		preemptor               preemption.Preemptor
-		pods                    []*v1.Pod
-		expected                []string
-		blockingRules           []blockingRule
-		workloadAwarePreemption bool
+		name                          string
+		registerPlugin                tf.RegisterPluginFunc
+		nodeNames                     []string
+		preemptor                     preemption.Preemptor
+		pods                          []*v1.Pod
+		expected                      []string
+		blockingRules                 []blockingRule
+		enableWorkloadAwarePreemption bool
 	}{
 		{
 			name:           "node with min highest priority pod is picked",
@@ -1781,8 +1794,8 @@ func TestSelectBestCandidate(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"w2-p1", "w2-p2"}, capacity: 2},
 				{nodeName: "node2", blockingVictims: []string{"w3-p1", "w3-p2"}, capacity: 2},
 			},
-			workloadAwarePreemption: true,
-			expected:                []string{"Cluster-Scope-pg1"},
+			enableWorkloadAwarePreemption: true,
+			expected:                      []string{"Cluster-Scope-pg1"},
 		},
 		{
 			name:           "gang preemptor prefers node with FEWER victims (when priorities equal)",
@@ -1804,8 +1817,8 @@ func TestSelectBestCandidate(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"p1.1", "p1.2"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"p2.1"}, capacity: 1},
 			},
-			workloadAwarePreemption: true,
-			expected:                []string{"Cluster-Scope-pg1"},
+			enableWorkloadAwarePreemption: true,
+			expected:                      []string{"Cluster-Scope-pg1"},
 		},
 		{
 			name:           "gang preemptor prefers node with NEWER victims (break tie with StartTime)",
@@ -1827,8 +1840,8 @@ func TestSelectBestCandidate(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"old-p1"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"new-p1"}, capacity: 1},
 			},
-			workloadAwarePreemption: true,
-			expected:                []string{"Cluster-Scope-pg1"},
+			enableWorkloadAwarePreemption: true,
+			expected:                      []string{"Cluster-Scope-pg1"},
 		},
 		{
 			name:           "distributed gang victim: selection accounts for TOTAL victims across cluster (Side-Effect Check)",
@@ -1855,7 +1868,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			// EXPECTED: Pick Node1 (1 Victim) over Node2 (2 Victims).
 			expected: []string{"node1"},
 
-			workloadAwarePreemption: true,
+			enableWorkloadAwarePreemption: true,
 		},
 	}
 	for _, tt := range tests {
@@ -1913,7 +1926,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			}
 
 			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, feature.Features{
-				EnableWorkloadAwarePreemption: tt.workloadAwarePreemption,
+				EnableWorkloadAwarePreemption: tt.enableWorkloadAwarePreemption,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -1923,7 +1936,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			}
 
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			domains := pl.Evaluator.NewDomains(tt.preemptor, nodeInfos)
+			domains := preemption.NewDomainsForTest(*pl.Evaluator, tt.preemptor, nodeInfos, tt.enableWorkloadAwarePreemption)
 			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.preemptor, domains, nil, offset, numCandidates)
 			s := pl.Evaluator.SelectCandidate(ctx, candidates)
 			if s == nil || len(s.Name()) == 0 {
@@ -1998,14 +2011,14 @@ func TestCustomSelection(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                    string
-		eligiblePreemptor       IsEligiblePreemptorFunc
-		nodeNames               []string
-		preemptor               preemption.Preemptor
-		pods                    []*v1.Pod
-		expected                map[string][]string
-		blockingRules           []blockingRule
-		workloadAwarePreemption bool
+		name                          string
+		eligiblePreemptor             IsEligiblePreemptorFunc
+		nodeNames                     []string
+		preemptor                     preemption.Preemptor
+		pods                          []*v1.Pod
+		expected                      map[string][]string
+		blockingRules                 []blockingRule
+		enableWorkloadAwarePreemption bool
 	}{
 		{
 			name:              "filter for matching pod label: high priority",
@@ -2125,8 +2138,8 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
 			// the lowPriority pod can be preempted but not the midPriority pod
-			expected:                map[string][]string{"node2": {"v2"}, "node3": {"v3"}},
-			workloadAwarePreemption: true,
+			expected:                      map[string][]string{"node2": {"v2"}, "node3": {"v3"}},
+			enableWorkloadAwarePreemption: true,
 		},
 		{
 			name:              "workload: filter for matching pod label: high priority",
@@ -2147,8 +2160,8 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node3", blockingVictims: []string{"v3"}, capacity: 1},
 				{nodeName: "node4", blockingVictims: []string{"v4"}, capacity: 1},
 			},
-			expected:                map[string][]string{"Cluster-Scope-pg1": {"v3"}},
-			workloadAwarePreemption: true,
+			expected:                      map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			enableWorkloadAwarePreemption: true,
 		},
 		{
 			name:              "workload: filter for matching pod label: mid priority",
@@ -2170,8 +2183,8 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node3", blockingVictims: []string{"v3"}, capacity: 1},
 				{nodeName: "node4", blockingVictims: []string{"v4"}, capacity: 1},
 			},
-			workloadAwarePreemption: true,
-			expected:                map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			enableWorkloadAwarePreemption: true,
+			expected:                      map[string][]string{"Cluster-Scope-pg1": {"v3"}},
 		},
 		{
 			name:              "workload: filter for matching victim node: high priority",
@@ -2192,8 +2205,8 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node2", blockingVictims: []string{"v4"}, capacity: 1},
 				{nodeName: "node3", blockingVictims: []string{"v5"}, capacity: 1},
 			},
-			workloadAwarePreemption: true,
-			expected:                map[string][]string{"Cluster-Scope-pg1": {"v2", "v3"}},
+			enableWorkloadAwarePreemption: true,
+			expected:                      map[string][]string{"Cluster-Scope-pg1": {"v2", "v3"}},
 		},
 		{
 			name:              "workload: only pods at or above specified priority can be preemptor",
@@ -2212,8 +2225,8 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node2", blockingVictims: []string{"v2"}, capacity: 1},
 				{nodeName: "node3", blockingVictims: []string{"v3"}, capacity: 1},
 			},
-			expected:                map[string][]string{"Cluster-Scope-pg1": {"v3"}},
-			workloadAwarePreemption: true,
+			expected:                      map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			enableWorkloadAwarePreemption: true,
 		},
 		{
 			name:              "workload: only pods at or below specified priority can be preempted",
@@ -2232,8 +2245,8 @@ func TestCustomSelection(t *testing.T) {
 				{nodeName: "node2", blockingVictims: []string{"v2"}, capacity: 1},
 				{nodeName: "node3", blockingVictims: []string{"v3"}, capacity: 1},
 			},
-			expected:                map[string][]string{"Cluster-Scope-pg1": {"v3"}},
-			workloadAwarePreemption: true,
+			expected:                      map[string][]string{"Cluster-Scope-pg1": {"v3"}},
+			enableWorkloadAwarePreemption: true,
 		},
 	}
 	for _, tt := range tests {
@@ -2291,7 +2304,7 @@ func TestCustomSelection(t *testing.T) {
 			}
 
 			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, feature.Features{
-				EnableWorkloadAwarePreemption: tt.workloadAwarePreemption,
+				EnableWorkloadAwarePreemption: tt.enableWorkloadAwarePreemption,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -2305,7 +2318,7 @@ func TestCustomSelection(t *testing.T) {
 				pl.IsEligiblePreemptor = tt.eligiblePreemptor
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			domains := pl.Evaluator.NewDomains(tt.preemptor, nodeInfos)
+			domains := preemption.NewDomainsForTest(*pl.Evaluator, tt.preemptor, nodeInfos, tt.enableWorkloadAwarePreemption)
 			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.preemptor, domains, nil, offset, numCandidates)
 			// check that the candidates match what's expected
 			if len(tt.expected) != len(candidates) {
@@ -2494,7 +2507,7 @@ func TestCustomOrdering(t *testing.T) {
 				pl.MoreImportantVictim = tt.orderVictims
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			domains := pl.Evaluator.NewDomains(tt.preemptor, nodeInfos)
+			domains := preemption.NewDomainsForTest(*pl.Evaluator, tt.preemptor, nodeInfos, false)
 			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.preemptor, domains, nil, offset, numCandidates)
 			if len(candidates) != 1 {
 				t.Fatalf("expected exactly one node but got %+v", candidates)
@@ -2606,16 +2619,16 @@ func TestPreempt(t *testing.T) {
 
 	metrics.Register()
 	tests := []struct {
-		name                    string
-		preemptor               preemption.Preemptor
-		pods                    []*v1.Pod
-		extenders               []*tf.FakeExtender
-		nodeNames               []string
-		registerPlugin          tf.RegisterPluginFunc
-		want                    *fwk.PostFilterResult
-		blockingRules           []blockingRule
-		expectedPods            []string // list of preempted pods
-		workloadAwarePreemption bool
+		name                          string
+		preemptor                     preemption.Preemptor
+		pods                          []*v1.Pod
+		extenders                     []*tf.FakeExtender
+		nodeNames                     []string
+		registerPlugin                tf.RegisterPluginFunc
+		want                          *fwk.PostFilterResult
+		blockingRules                 []blockingRule
+		expectedPods                  []string // list of preempted pods
+		enableWorkloadAwarePreemption bool
 	}{
 		{
 			name:      "basic preemption logic",
@@ -2791,9 +2804,9 @@ func TestPreempt(t *testing.T) {
 				{nodeName: "node2", blockingVictims: []string{}, capacity: 0},
 			},
 			// Expected: Node1 nominated. Both victims preempted.
-			want:                    framework.NewPostFilterResultWithNominatedNode("Cluster-Scope-pg1"),
-			expectedPods:            []string{"victim-n1-1", "victim-n1-2"},
-			workloadAwarePreemption: true,
+			want:                          framework.NewPostFilterResultWithNominatedNode("Cluster-Scope-pg1"),
+			expectedPods:                  []string{"victim-n1-1", "victim-n1-2"},
+			enableWorkloadAwarePreemption: true,
 		},
 		{
 			name: "workload: distributed success - gang fits by clearing TWO different nodes (atomic check)",
@@ -2820,9 +2833,9 @@ func TestPreempt(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"victim-n1"}, capacity: 1},
 				{nodeName: "node2", blockingVictims: []string{"victim-n2"}, capacity: 1},
 			},
-			want:                    framework.NewPostFilterResultWithNominatedNode("Cluster-Scope-pg1"),
-			expectedPods:            []string{"victim-n1", "victim-n2"},
-			workloadAwarePreemption: true,
+			want:                          framework.NewPostFilterResultWithNominatedNode("Cluster-Scope-pg1"),
+			expectedPods:                  []string{"victim-n1", "victim-n2"},
+			enableWorkloadAwarePreemption: true,
 		},
 		{
 			name: "workload: partial failure - gang needs 2 slots, only 1 node can be cleared",
@@ -2871,9 +2884,9 @@ func TestPreempt(t *testing.T) {
 				{nodeName: "node1", blockingVictims: []string{"w1-p1", "w1-p2"}, capacity: 1},
 			},
 			// Expected: Node1 selected. BOTH pods preempted (including collateral damage on Node2).
-			want:                    framework.NewPostFilterResultWithNominatedNode("node1"),
-			expectedPods:            []string{"w1-p1", "w1-p2"},
-			workloadAwarePreemption: true,
+			want:                          framework.NewPostFilterResultWithNominatedNode("node1"),
+			expectedPods:                  []string{"w1-p1", "w1-p2"},
+			enableWorkloadAwarePreemption: true,
 		},
 	}
 
@@ -3026,7 +3039,7 @@ func TestPreempt(t *testing.T) {
 					// Call preempt and check the expected results.
 					features := feature.Features{
 						EnableAsyncPreemption:         asyncPreemptionEnabled,
-						EnableWorkloadAwarePreemption: test.workloadAwarePreemption,
+						EnableWorkloadAwarePreemption: test.enableWorkloadAwarePreemption,
 					}
 					pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), schedFramework, features)
 					if err != nil {
@@ -3145,16 +3158,16 @@ func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod)
 
 func TestSelectVictimsOnDomain(t *testing.T) {
 	tests := []struct {
-		name                       string
-		nodeNames                  []string
-		initPods                   []*v1.Pod
-		preemptor                  preemption.Preemptor
-		workloadAwarePreemption    bool
-		pdbs                       []*policy.PodDisruptionBudget
-		blockingRules              []blockingRule
-		expectedPods               [][]string
-		expectedNumViolatingVictim []int
-		expectedStatus             []*fwk.Status
+		name                          string
+		nodeNames                     []string
+		initPods                      []*v1.Pod
+		preemptor                     preemption.Preemptor
+		enableWorkloadAwarePreemption bool
+		pdbs                          []*policy.PodDisruptionBudget
+		blockingRules                 []blockingRule
+		expectedPods                  [][]string
+		expectedNumViolatingVictim    []int
+		expectedStatus                []*fwk.Status
 	}{
 		{
 			name:      "Basic: Preempt single lower priority pod",
@@ -3251,9 +3264,9 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 			expectedStatus:             []*fwk.Status{fwk.NewStatus(fwk.Success)},
 		},
 		{
-			name:                    "Workload Aware: Atomic preemption of PodGroup",
-			nodeNames:               []string{"node1"},
-			workloadAwarePreemption: true,
+			name:                          "Workload Aware: Atomic preemption of PodGroup",
+			nodeNames:                     []string{"node1"},
+			enableWorkloadAwarePreemption: true,
 			initPods: []*v1.Pod{
 				st.MakePod().Name("g1-1").UID("g1").Node("node1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(lowPriority).Obj(),
 				st.MakePod().Name("g1-2").UID("g2").Node("node1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(lowPriority).Obj(),
@@ -3267,9 +3280,9 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 			expectedStatus:             []*fwk.Status{fwk.NewStatus(fwk.Success)},
 		},
 		{
-			name:                    "Workload Aware: prefer single pod over podGroup for preemption candidate",
-			nodeNames:               []string{"node1"},
-			workloadAwarePreemption: true,
+			name:                          "Workload Aware: prefer single pod over podGroup for preemption candidate",
+			nodeNames:                     []string{"node1"},
+			enableWorkloadAwarePreemption: true,
 			initPods: []*v1.Pod{
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(lowPriority).Obj(),
 				st.MakePod().Name("g1-1").UID("g1").Node("node1").WorkloadRef(&v1.WorkloadReference{PodGroup: "wg1"}).Priority(lowPriority).Obj(),
@@ -3285,9 +3298,9 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 			expectedStatus:             []*fwk.Status{fwk.NewStatus(fwk.Success)},
 		},
 		{
-			name:                    "Workload Aware: prefer single pod over podGroup for preemption candidate, on corresponding node",
-			nodeNames:               []string{"node1", "node2"},
-			workloadAwarePreemption: true,
+			name:                          "Workload Aware: prefer single pod over podGroup for preemption candidate, on corresponding node",
+			nodeNames:                     []string{"node1", "node2"},
+			enableWorkloadAwarePreemption: true,
 			initPods: []*v1.Pod{
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(lowPriority).Obj(),
@@ -3401,7 +3414,7 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 			})
 
 			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), testingFwk, feature.Features{
-				EnableWorkloadAwarePreemption: tt.workloadAwarePreemption,
+				EnableWorkloadAwarePreemption: tt.enableWorkloadAwarePreemption,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -3409,7 +3422,7 @@ func TestSelectVictimsOnDomain(t *testing.T) {
 			pl.CanPlacePods = getMockCanPlacePodsFunc(tt.blockingRules)
 
 			state := framework.NewCycleState()
-			domains := pl.Evaluator.NewDomains(tt.preemptor, nodeInfos)
+			domains := preemption.NewDomainsForTest(*pl.Evaluator, tt.preemptor, nodeInfos, tt.enableWorkloadAwarePreemption)
 
 			for i, domain := range domains {
 				t.Logf("Checking Domain: %s", domain.GetName())
