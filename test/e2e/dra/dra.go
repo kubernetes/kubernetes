@@ -1084,7 +1084,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// Serial because the example device plugin can only be deployed with one instance at a time.
 			f.It("supports extended resources together with ResourceClaim", f.WithSerial(), func(ctx context.Context) {
 				tCtx := f.TContext(ctx)
-				extendedResourceName := deployDevicePlugin(ctx, f, nodes.NodeNames[0:1])
+				extendedResourceName := deployDevicePlugin(tCtx, f, nodes.NodeNames[0:1], false)
 
 				pod := b.PodExternal()
 				resources := v1.ResourceList{extendedResourceName: resource.MustParse("1")}
@@ -2484,31 +2484,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		f.It("process extended resources after device plugin uninstall", f.WithSerial(), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 			resourceName := b.ExtendedResourceName(drautils.SingletonIndex)
-			extendedResourceName := deployDevicePlugin(ctx, f, nodes.NodeNames[0:1])
+			extendedResourceName := deployDevicePlugin(tCtx, f, nodes.NodeNames[0:1], false)
 			gomega.Expect(string(extendedResourceName)).To(gomega.Equal(resourceName))
 
-			getAllocatable := func() int {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodes.NodeNames[0], metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				for name, quantity := range node.Status.Allocatable {
-					if string(name) == resourceName {
-						return int(quantity.Value())
-					}
-				}
-				return -1
-			}
-			gomega.Eventually(ctx, getAllocatable).WithTimeout(f.Timeouts.PodStart).Should(gomega.Equal(2))
-
 			ginkgo.By("Uninstall Device Plugin")
-			err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).DeleteCollection(
-				ctx,
-				metav1.DeleteOptions{},
-				metav1.ListOptions{LabelSelector: "k8s-app=sample-device-plugin"},
-			)
-			framework.ExpectNoError(err, "uninstall device plugin")
-
-			ginkgo.By("Wait for NodeStatus.Allocatable = 0")
-			gomega.Eventually(ctx, getAllocatable).WithTimeout(f.Timeouts.PodDelete).Should(gomega.BeZero())
+			undeployDevicePlugin(tCtx, f, nodes.NodeNames[0:1])
 
 			ginkgo.By("Create test pod")
 			pod := b.Pod()
@@ -2521,7 +2501,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			b.Create(tCtx, b.Class(drautils.SingletonIndex), pod)
 
-			err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(err, "start pod")
 
 			ginkgo.By("Check that pod is processed by the DRA driver")
@@ -2678,7 +2658,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		f.It("must run pods with extended resource on dra nodes and device plugin nodes", f.WithSerial(), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 			var objects []klog.KMetadata
-			extendedResourceName := deployDevicePlugin(ctx, f, nodes.ExtraNodeNames)
+			extendedResourceName := deployDevicePlugin(tCtx, f, nodes.ExtraNodeNames, false)
 			// b.ExtendedResourceName(SingletonIndex) must be the same as the returned extendedResourceName.
 			// b.ExtendedResourceName(SingletonIndex) is used for DRA drivers whereas
 			// extendedResourceName is used for device plugin.
