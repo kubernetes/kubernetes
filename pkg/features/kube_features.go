@@ -292,6 +292,12 @@ const (
 	// based on "structured parameters".
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
+	// owner: @oliverguenther
+	// kep: https://kep.k8s.io/5502
+	//
+	// Allows setting the sticky bit on emptyDir volumes.
+	EmptyDirStickyBit featuregate.Feature = "EmptyDirStickyBit"
+
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/3721
 	//
@@ -1265,6 +1271,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 		// TODO (https://github.com/kubernetes/kubernetes/issues/134459): remove completely in 1.38
 	},
+	EmptyDirStickyBit: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
 	EnvFiles: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2174,6 +2183,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DisableNodeKubeProxyVersion: {},
 
 	DynamicResourceAllocation: {},
+
+	EmptyDirStickyBit: {},
 
 	EnvFiles: {},
 

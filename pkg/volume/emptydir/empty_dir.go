@@ -49,7 +49,7 @@ import (
 // https://issue.k8s.io/2630
 const (
 	defaultPerm   os.FileMode = 0777
-	stickyBitMode os.FileMode = 01000
+	stickyBitMode os.FileMode = os.ModeSticky
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -157,7 +157,7 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 		}
 
-		if spec.Volume.EmptyDir.StickyBit != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirStickyBit) && spec.Volume.EmptyDir.StickyBit != nil {
 			stickyBit = *spec.Volume.EmptyDir.StickyBit
 		}
 	}

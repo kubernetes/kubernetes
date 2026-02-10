@@ -575,6 +575,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
+- name: EmptyDirStickyBit
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: EnvFiles
   versionedSpecs:
   - default: false

@@ -4262,6 +4262,112 @@ func TestDropImageVolumes(t *testing.T) {
 	}
 }
 
+func TestDropEmptyDirStickyBit(t *testing.T) {
+	stickyBitTrue := true
+	podWithStickyBit := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{StickyBit: &stickyBitTrue}}},
+			},
+		},
+	}
+	podWithoutStickyBit := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			},
+		},
+	}
+	noPod := &api.Pod{}
+
+	testcases := []struct {
+		description string
+		enabled     bool
+		oldPod      *api.Pod
+		newPod      *api.Pod
+		wantPod     *api.Pod
+	}{
+		{
+			description: "old with stickyBit / new with stickyBit / disabled",
+			oldPod:      podWithStickyBit,
+			newPod:      podWithStickyBit,
+			wantPod:     podWithStickyBit,
+		},
+		{
+			description: "old without stickyBit / new with stickyBit / disabled",
+			oldPod:      podWithoutStickyBit,
+			newPod:      podWithStickyBit,
+			wantPod:     podWithoutStickyBit,
+		},
+		{
+			description: "no old pod / new with stickyBit / disabled",
+			oldPod:      noPod,
+			newPod:      podWithStickyBit,
+			wantPod:     podWithoutStickyBit,
+		},
+		{
+			description: "nil old pod / new with stickyBit / disabled",
+			oldPod:      nil,
+			newPod:      podWithStickyBit,
+			wantPod:     podWithoutStickyBit,
+		},
+		{
+			description: "old without stickyBit / new without stickyBit / disabled",
+			oldPod:      podWithoutStickyBit,
+			newPod:      podWithoutStickyBit,
+			wantPod:     podWithoutStickyBit,
+		},
+
+		{
+			description: "old with stickyBit / new with stickyBit / enabled",
+			enabled:     true,
+			oldPod:      podWithStickyBit,
+			newPod:      podWithStickyBit,
+			wantPod:     podWithStickyBit,
+		},
+		{
+			description: "old without stickyBit / new with stickyBit / enabled",
+			enabled:     true,
+			oldPod:      podWithoutStickyBit,
+			newPod:      podWithStickyBit,
+			wantPod:     podWithStickyBit,
+		},
+		{
+			description: "no old pod / new with stickyBit / enabled",
+			enabled:     true,
+			oldPod:      noPod,
+			newPod:      podWithStickyBit,
+			wantPod:     podWithStickyBit,
+		},
+		{
+			description: "old without stickyBit / new without stickyBit / enabled",
+			enabled:     true,
+			oldPod:      podWithoutStickyBit,
+			newPod:      podWithoutStickyBit,
+			wantPod:     podWithoutStickyBit,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirStickyBit, tc.enabled)
+
+			oldPod := tc.oldPod.DeepCopy()
+			newPod := tc.newPod.DeepCopy()
+			wantPod := tc.wantPod
+			DropDisabledPodFields(newPod, oldPod)
+
+			if diff := cmp.Diff(oldPod, tc.oldPod); diff != "" {
+				t.Errorf("old pod changed: %s", diff)
+			}
+
+			if diff := cmp.Diff(wantPod, newPod); diff != "" {
+				t.Errorf("new pod changed (- want, + got): %s", diff)
+			}
+		})
+	}
+}
+
 func TestDropSELinuxChangePolicy(t *testing.T) {
 	podRecursive := &api.Pod{
 		Spec: api.PodSpec{
