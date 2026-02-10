@@ -1079,6 +1079,12 @@ const (
 	//
 	// Enables support for joining Windows containers to a hosts' network namespace.
 	WindowsHostNetwork featuregate.Feature = "WindowsHostNetwork"
+
+	// owner: @44past4
+	// kep: https://kep.k8s.io/5732
+	//
+	// Enables support for 'DesiredCount' optional field for basic and gang policy scheduling.
+	PodGroupDesiredCount featuregate.Feature = "PodGroupDesiredCount"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -1882,6 +1888,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
+	PodGroupDesiredCount: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	apiextensionsfeatures.CRDObservedGenerationTracking: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Beta},
 	},
@@ -2425,6 +2435,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	WindowsGracefulNodeShutdown: {GracefulNodeShutdown},
 
 	WindowsHostNetwork: {},
+
+	PodGroupDesiredCount: {},
 
 	apiextensionsfeatures.CRDObservedGenerationTracking: {},
 
