@@ -89,7 +89,11 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 # The set of server targets we build docker images for
 kube::golang::server_image_targets() {
   # NOTE: this contains cmd targets for kube::build::get_docker_wrapped_binaries
+  # NOTE: kube-log-runner should NOT be in kube::build::get_docker_wrapped_binaries
+  # This binary is used across all images
+  # kube-log-runner should be the first target so it can be skipped
   local targets=(
+    staging/src/k8s.io/component-base/logs/kube-log-runner
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/kube-scheduler

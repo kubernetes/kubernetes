@@ -175,6 +175,10 @@ function kube::release::package_node_tarballs() {
 function kube::release::build_server_images() {
   kube::util::ensure-docker-buildx
 
+  # exclude kube-log-runner
+  local wrapped_binaries
+  wrapped_binaries=("${KUBE_SERVER_IMAGE_BINARIES[@]:1}")
+
   # Clean out any old images
   rm -rf "${RELEASE_IMAGES}"
   local platform
@@ -192,8 +196,8 @@ function kube::release::build_server_images() {
 
     # This fancy expression will expand to prepend a path
     # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-    # KUBE_SERVER_IMAGE_BINARIES array.
-    cp "${KUBE_SERVER_IMAGE_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+    # wrapped_binaries array.
+    cp "${wrapped_binaries[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
     kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
@@ -318,6 +322,15 @@ function kube::release::create_docker_images_for_server() {
         docker_build_opts='--pull'
     fi
 
+    # kube-log--runner from build_server_images
+    # TODO: Windows (NOTE: We don't build windows images currently)
+    local kube_log_runner_path="${LOCAL_OUTPUT_BINPATH}/linux/${arch}/kube-log-runner"
+    # warn if someone attempts to call this shell utility directly without building kube-log-runner ...
+    if [[ ! -f "${kube_log_runner_path}" ]]; then
+      kube::log::error "kube-log-runner missing, add staging/src/k8s.io/component-base/logs/kube-log-runner to server build targets if calling kube::build:: images functions directly"
+      return 1
+    fi
+
     for wrappable in $binaries; do
 
       local binary_name=${wrappable%%,*}
@@ -336,6 +349,7 @@ function kube::release::create_docker_images_for_server() {
       (
         rm -rf "${docker_build_path}"
         mkdir -p "${docker_build_path}"
+        ln "${kube_log_runner_path}" "${docker_build_path}/kube-log-runner"
         ln "${binary_file_path}" "${docker_build_path}/${binary_name}"
 
         local build_log="${docker_build_path}/build.log"
