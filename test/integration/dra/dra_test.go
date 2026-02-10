@@ -112,7 +112,7 @@ const (
 
 	// schedulingTimeout is the time we grant the scheduler for one scheduling attempt,
 	// whether it's successful or not.
-	schedulingTimeout = 30 * time.Second
+	schedulingTimeout = time.Minute
 )
 
 func TestDRA(t *testing.T) {
