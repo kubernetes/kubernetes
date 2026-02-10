@@ -23,7 +23,6 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // Preemptor abstracts the entity that initiates preemption.
@@ -175,7 +174,6 @@ type domain struct {
 	Domain
 	nodes              []fwk.NodeInfo
 	name               string
-	podGroupIndex      map[util.PodGroupKey][]fwk.PodInfo
 	allPossibleVictims []PreemptionUnit
 }
 

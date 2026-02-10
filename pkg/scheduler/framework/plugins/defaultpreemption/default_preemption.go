@@ -334,7 +334,7 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 
 	sort.Slice(potentialVictims, func(i, j int) bool {
-		return pl.moreImportantVictim(potentialVictims[i], potentialVictims[j], util.MoreImportantVictim)
+		return pl.moreImportantVictim(potentialVictims[i], potentialVictims[j], pl.MoreImportantVictim)
 	})
 
 	violatingVictims, nonViolatingVictims := filterVictimsWithPDBViolation(potentialVictims, pdbs)
@@ -372,70 +372,100 @@ func (pl *DefaultPreemption) SelectVictimsOnDomain(
 	}
 
 	if len(nonViolatingVictims) > 0 {
-		currentReprievedCount := 0
+		// 1. Sort Victims: Highest Priority -> Lowest Priority
+		// Allows O(1) lookups for victims to preempt by unique priority.
+		sort.Slice(nonViolatingVictims, func(i, j int) bool {
+			return pl.moreImportantVictim(nonViolatingVictims[i], nonViolatingVictims[j], util.MoreImportantVictim)
+		})
 
+		// 2. Identify "Breakpoints" (Indices where priority changes)
+		var breakpoints []int
+		currentPrio := nonViolatingVictims[0].Priority()
+
+		for i, v := range nonViolatingVictims {
+			p := v.Priority()
+			if p != currentPrio {
+				breakpoints = append(breakpoints, i) // Record the start of the NEW priority tier
+				currentPrio = p
+			}
+		}
+		breakpoints = append(breakpoints, len(nonViolatingVictims)) // Final breakpoint is the end of list
+
+		currentCutoffIndex := 0
 		var searchErr error
 
-		cutoff := sort.Search(len(nonViolatingVictims)+1, func(targetCount int) bool {
+		// 3. Binary Search over breakpoints
+		idx := sort.Search(len(breakpoints), func(i int) bool {
+			targetCutoffIndex := breakpoints[i]
 
-			// Move Right: We need to reprieve MORE victims (Add them back to snapshot)
-			if targetCount > currentReprievedCount {
-				for i := currentReprievedCount; i < targetCount; i++ {
-					if err := addPods(nonViolatingVictims[i]); err != nil {
+			// Efficient State Update: Only touch the delta
+			if targetCutoffIndex > currentCutoffIndex {
+				// Moving Right: We are saving more victims (Adding back High Prio ones)
+				// Range: [currentCutoffIndex, targetCutoffIndex)
+				for k := currentCutoffIndex; k < targetCutoffIndex; k++ {
+					if err := addPods(nonViolatingVictims[k]); err != nil {
+						searchErr = err
+						return true
+					}
+				}
+			} else if targetCutoffIndex < currentCutoffIndex {
+				// Moving Left: We are sacrificing more victims (Removing High Prio ones)
+				// Range: [targetCutoffIndex, currentCutoffIndex)
+				for k := targetCutoffIndex; k < currentCutoffIndex; k++ {
+					if err := removePods(nonViolatingVictims[k]); err != nil {
 						searchErr = err
 						return true
 					}
 				}
 			}
 
-			// Move Left: We went too far, need to preempt victims again (Remove from snapshot)
-			if targetCount < currentReprievedCount {
-				for i := targetCount; i < currentReprievedCount; i++ {
-					if err := removePods(nonViolatingVictims[i]); err != nil {
-						searchErr = err
-						return true
-					}
-				}
-			}
+			currentCutoffIndex = targetCutoffIndex
 
-			// Update Cursor
-			currentReprievedCount = targetCount
-
-			// Check Feasibility
-			fits := pl.CanPlacePods(ctx, state, preemptor.Members(), domain.Nodes())
-
-			// Return true if we FAILED (to force search to go lower/left)
-			return !fits.IsSuccess()
+			// Check
+			return !pl.CanPlacePods(ctx, state, preemptor.Members(), domain.Nodes()).IsSuccess()
 		})
 
 		if searchErr != nil {
 			return nil, 0, fwk.AsStatus(searchErr)
 		}
 
-		// 'cutoff' is the first count that caused a failure.
-		// Therefore, the maximum safe count is 'cutoff - 1'.
-		maxSafeReprieveCount := max(cutoff-1, 0)
+		safeBreakpointIndex := 0
+		if idx > 0 {
+			safeBreakpointIndex = breakpoints[idx-1]
+		}
 
-		for i, v := range nonViolatingVictims {
-			var err error
-			if i < maxSafeReprieveCount {
-				// This victim is safe.
-				// Ensure it is added back to snapshot if you plan to reuse this domain state.
-				if currentReprievedCount <= i {
-					err = addPods(v)
-				}
-			} else {
-				// This victim must die.
-				victimsToPreempt = append(victimsToPreempt, v)
-				// Ensure it is removed from snapshot
-				if currentReprievedCount > i {
-					err = removePods(v)
+		// Re-align state to the safe breakpoint:
+		// Everything < safeBreakpointIndex should be added.
+		// Everything >= safeBreakpointIndex should be removed.
+		if currentCutoffIndex > safeBreakpointIndex {
+			for k := safeBreakpointIndex; k < currentCutoffIndex; k++ {
+				if err := removePods(nonViolatingVictims[k]); err != nil {
+					return nil, 0, fwk.AsStatus(err)
 				}
 			}
+		} else if currentCutoffIndex < safeBreakpointIndex {
+			for k := currentCutoffIndex; k < safeBreakpointIndex; k++ {
+				if err := addPods(nonViolatingVictims[k]); err != nil {
+					return nil, 0, fwk.AsStatus(err)
+				}
+			}
+		}
+
+		for i := safeBreakpointIndex; i < len(nonViolatingVictims); i++ {
+			v := nonViolatingVictims[i]
+
+			// Try to add it back
+			fits, err := reprieveVictim(v)
 			if err != nil {
 				return nil, 0, fwk.AsStatus(err)
 			}
+
+			if !fits {
+				// If it doesn't fit, it must go.
+				victimsToPreempt = append(victimsToPreempt, v)
+			}
 		}
+
 	}
 
 	sort.Slice(victimsToPreempt, func(i, j int) bool {

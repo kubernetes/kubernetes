@@ -782,7 +782,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{9},
+			expectedNumFilterCalled: []int32{10},
 		},
 		{
 			name: "mixed priority pods are preempted",
@@ -813,7 +813,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{7},
+			expectedNumFilterCalled: []int32{8},
 		},
 		{
 			name: "mixed priority pods are preempted, pick later StartTime one when priorities are equal",
@@ -844,7 +844,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{7}, // no preemption would happen on node2 and no filter call is counted.
+			expectedNumFilterCalled: []int32{8}, // no preemption would happen on node2 and no filter call is counted.
 		},
 		{
 			name: "pod with anti-affinity is preempted",
@@ -876,7 +876,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{4}, // no preemption would happen on node2 and no filter call is counted.
+			expectedNumFilterCalled: []int32{5}, // no preemption would happen on node2 and no filter call is counted.
 		},
 		{
 			name: "preemption to resolve pod topology spread filter failure",
@@ -913,7 +913,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{8},
+			expectedNumFilterCalled: []int32{9},
 		},
 		{
 			name: "get Unschedulable in the preemption phase when the filter plugins filtering the nodes",
@@ -1035,7 +1035,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{5},
+			expectedNumFilterCalled: []int32{6},
 		},
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim which belongs to DisruptedPods is treated as 'nonViolating'",
@@ -1072,7 +1072,7 @@ func TestDryRunPreemption(t *testing.T) {
 					},
 				},
 			},
-			expectedNumFilterCalled: []int32{7},
+			expectedNumFilterCalled: []int32{8},
 		},
 		{
 			name: "all nodes are possible candidates, but DefaultPreemptionArgs limits to 2",
