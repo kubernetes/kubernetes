@@ -13,6 +13,12 @@ import (
 	"time"
 )
 
+// This test is intended to PASS after hardening validatePath/validatePayload on Windows.
+// Expectations after the fix:
+// - drive-absolute keys (C:\...) are rejected before filesystem operations.
+// - rooted keys without a volume (\Users\...) are rejected.
+// - forward-slash rooted keys (/Users/...) are normalized then rejected.
+// - No marker is written outside targetDir and no marker is materialized under targetDir.
 func TestAtomicWriter_WindowsPathForms_FindWhereDataLands(t *testing.T) {
 	type tc struct {
 		name    string
@@ -46,10 +52,10 @@ func TestAtomicWriter_WindowsPathForms_FindWhereDataLands(t *testing.T) {
 	for _, c := range cases {
 		c := c
 		t.Run(c.name, func(t *testing.T) {
-			// ✅ عزل كامل لكل case: targetDir مستقل (يمنع أي تداخل marker_hits)
+			// ✅ Full isolation per-case: independent targetDir avoids any marker_hits bleed.
 			targetDir := t.TempDir()
 
-			// ملف "خارج targetDir" لكن داخل Temp (آمن) — فقط لكشف خارج-الهدف لو حدث
+			// A file outside targetDir (but still in temp) to detect any unexpected outside write.
 			baseTemp := os.TempDir()
 			outsideDir := filepath.Join(baseTemp, "aw_"+c.name+"_"+time.Now().UTC().Format("20060102_150405.000000000"))
 			outsideFile := filepath.Join(outsideDir, "pwn.txt")
@@ -70,35 +76,34 @@ func TestAtomicWriter_WindowsPathForms_FindWhereDataLands(t *testing.T) {
 
 			writeErr := w.Write(payload, nil)
 
-			// (A) drive-absolute: دليل DoS حتمي (\C:: ...) — اجعله IMPACT واضح
-			if c.name == "drive-absolute" {
-				if writeErr == nil {
-					t.Fatalf("IMPACT: drive-absolute unexpectedly succeeded (expected deterministic failure)\nwriteErr=<nil>\ntargetDir=%q\npayloadKey=%q",
-						targetDir, payloadKey)
-				}
-				// نتحقق من البصمة المعروفة في اللوج: \C:: + syntax is incorrect
-				msg := writeErr.Error()
-				if !strings.Contains(msg, "C::") && !strings.Contains(strings.ToLower(msg), "syntax is incorrect") {
-					t.Fatalf("IMPACT: drive-absolute failed but missing expected Windows path syntax signature\nwriteErr=%v\ntargetDir=%q\npayloadKey=%q",
-						writeErr, targetDir, payloadKey)
-				}
-				t.Fatalf("IMPACT: drive-absolute path reaches filesystem ops and triggers deterministic Windows path syntax failure (\\C:: ... syntax is incorrect)\nwriteErr=%v\ntargetDir=%q\npayloadKey=%q\noutsideFile=%q",
-					writeErr, targetDir, payloadKey, outsideFile)
+			// After hardening, ALL these path forms must be rejected.
+			if writeErr == nil {
+				t.Fatalf("expected invalid-path error, got nil\ncase=%s\ntargetDir=%q\npayloadKey=%q\noutsideFile=%q",
+					c.name, targetDir, payloadKey, outsideFile)
 			}
 
-			// (B) rooted-forwardslash: غالبًا يجب أن يُرفض (must be relative path)
-			if c.name == "rooted-forwardslash-no-volume" && writeErr == nil {
-				t.Fatalf("IMPACT: rooted forward-slash path unexpectedly accepted (expected rejection on Windows)\ntargetDir=%q\npayloadKey=%q",
-					targetDir, payloadKey)
+			msgLower := strings.ToLower(writeErr.Error())
+
+			// We expect a "must be relative path" class of rejection (from validatePath).
+			if !strings.Contains(msgLower, "must be relative path") {
+				t.Fatalf("unexpected error text (expected 'must be relative path')\ncase=%s\nwriteErr=%v\ntargetDir=%q\npayloadKey=%q\noutsideFile=%q",
+					c.name, writeErr, targetDir, payloadKey, outsideFile)
 			}
 
-			// (1) هل حصلت كتابة فعلية خارج targetDir؟ (لو حدث → HIGH-IMPACT)
+			// Defense-in-depth: if we ever see the old signature "C::" or "syntax is incorrect",
+			// it likely means the input reached filesystem ops (regression).
+			if strings.Contains(msgLower, "c::") || strings.Contains(msgLower, "syntax is incorrect") {
+				t.Fatalf("regression: drive/path input appears to have reached filesystem ops\ncase=%s\nwriteErr=%v\ntargetDir=%q\npayloadKey=%q\noutsideFile=%q",
+					c.name, writeErr, targetDir, payloadKey, outsideFile)
+			}
+
+			// (1) Ensure no outside write occurred.
 			if b, readErr := os.ReadFile(outsideFile); readErr == nil && bytes.Contains(b, marker) {
-				t.Fatalf("HIGH-IMPACT: outside write observed (%s)\nwriteErr=%v\ntargetDir=%q\npayloadKey=%q\noutsideFile=%q\noutsideFile_content=%q",
+				t.Fatalf("outside write observed (should never happen)\ncase=%s\nwriteErr=%v\ntargetDir=%q\npayloadKey=%q\noutsideFile=%q\noutsideFile_content=%q",
 					c.name, writeErr, targetDir, payloadKey, outsideFile, string(b))
 			}
 
-			// (2) Forensics داخل targetDir: أين انتهى المحتوى؟
+			// (2) Forensics inside targetDir: ensure marker never materialized anywhere under targetDir.
 			var hits []string
 			_ = filepath.WalkDir(targetDir, func(p string, d fs.DirEntry, err error) error {
 				if err != nil || d.IsDir() {
@@ -111,14 +116,13 @@ func TestAtomicWriter_WindowsPathForms_FindWhereDataLands(t *testing.T) {
 				return nil
 			})
 
-			// ✅ هذا هو الدليل الأساسي الذي نريده لـ rooted-backslash: كتابة داخل targetDir بمسار مشوّه
 			if len(hits) > 0 {
-				t.Fatalf("IMPACT: payload accepted and written under targetDir with path confusion (%s)\nwriteErr=%v\ntargetDir=%q\npayloadKey=%q\nmarker_hits=%v",
+				t.Fatalf("marker unexpectedly written under targetDir (should be rejected pre-write)\ncase=%s\nwriteErr=%v\ntargetDir=%q\npayloadKey=%q\nmarker_hits=%v",
 					c.name, writeErr, targetDir, payloadKey, hits)
 			}
 
-			t.Logf("No marker written (%s). writeErr=%v targetDir=%q payloadKey=%q outsideFile=%q",
-				c.name, writeErr, targetDir, payloadKey, outsideFile)
+			// Keep a helpful breadcrumb in logs without failing.
+			t.Logf("OK: rejected invalid payload key (%s). writeErr=%v payloadKey=%q", c.name, writeErr, payloadKey)
 		})
 	}
 }
