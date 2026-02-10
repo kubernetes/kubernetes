@@ -348,6 +348,9 @@ function kube::build::clean() {
     if [[ -d "${LOCAL_OUTPUT_ROOT}/local/go/cache" ]]; then
       chmod -R +w "${LOCAL_OUTPUT_ROOT}/local/go/cache"
     fi
+    if [[ -d "${LOCAL_OUTPUT_ROOT}/dockerized/go/cache" ]]; then
+      chmod -R +w "${LOCAL_OUTPUT_ROOT}/dockerized/go/cache"
+    fi
     rm -rf "${LOCAL_OUTPUT_ROOT}"
   fi
 }
