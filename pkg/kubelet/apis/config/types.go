@@ -546,6 +546,13 @@ type KubeletConfiguration struct {
 	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces
+
+	// CAdvisor contains configuration for the embedded cAdvisor metrics collector.
+	// This allows disabling expensive metric collectors like ProcessMetrics
+	// which can reduce kubelet CPU usage significantly on high-density nodes.
+	// +featureGate=ConfigurableCAdvisorMetrics
+	// +optional
+	CAdvisor CAdvisorConfiguration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

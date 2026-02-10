@@ -40,13 +40,13 @@ API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/core/v1,PodSpec,DeprecatedServiceAccount
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,CephMonitors
+API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RBDImage
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RBDPool
-API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,CephMonitors
+API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RBDImage
 API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RBDPool
-API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/networking/v1,ServiceCIDRSpec,CIDRs
@@ -97,12 +97,12 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrBool,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrStringArray,Property
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrStringArray,Schema
-API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,Quantity,Format
-API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,Quantity,d
-API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,Quantity,i
-API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,Quantity,s
 API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,int64Amount,scale
 API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,int64Amount,value
+API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,Quantity,d
+API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,Quantity,Format
+API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,Quantity,i
+API rule violation: names_match,k8s.io/apimachinery/pkg/api/resource,Quantity,s
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,APIResourceList,APIResources
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Duration,Duration
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Object
@@ -150,8 +150,8 @@ API rule violation: names_match,k8s.io/cloud-provider/controllers/node/config/v1
 API rule violation: names_match,k8s.io/cloud-provider/controllers/service/config/v1alpha1,ServiceControllerConfiguration,ConcurrentServiceSyncs
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Address
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,ClientConnection
-API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,ControllerStartInterval
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,ControllerStartInterval
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Debugging
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderElection
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderMigration
@@ -160,6 +160,7 @@ API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,Generi
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Port
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,AttachDetachControllerConfiguration,DisableAttachDetachReconcilerSync
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,AttachDetachControllerConfiguration,ReconcilerSyncLoopPeriod
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CronJobControllerConfiguration,ConcurrentCronJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningConfiguration,CertFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningConfiguration,KeyFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,ClusterSigningCertFile
@@ -169,7 +170,6 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,C
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,KubeletClientSignerConfiguration
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,KubeletServingSignerConfiguration
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,LegacyUnknownSignerConfiguration
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CronJobControllerConfiguration,ConcurrentCronJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DaemonSetControllerConfiguration,ConcurrentDaemonSetSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeploymentControllerConfiguration,ConcurrentDeploymentSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeviceTaintEvictionControllerConfiguration,ConcurrentSyncs
@@ -195,8 +195,8 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,H
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerTolerance
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,JobControllerConfiguration,ConcurrentJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,AttachDetachController
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CSRSigningController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CronJobController
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CSRSigningController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,DaemonSetController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,DeploymentController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,DeprecatedController
@@ -270,6 +270,7 @@ API rule violation: names_match,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfi
 API rule violation: names_match,k8s.io/kubectl/pkg/config/v1alpha1,AliasOverride,Options
 API rule violation: names_match,k8s.io/kubectl/pkg/config/v1alpha1,CommandDefaults,Options
 API rule violation: names_match,k8s.io/kubectl/pkg/config/v1alpha1,Preference,Defaults
+API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,CAdvisor
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesDropBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ResolverConfig

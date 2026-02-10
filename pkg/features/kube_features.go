@@ -127,6 +127,15 @@ const (
 	// Enabling this feature gate will cause the pod's status to change due to a kubelet restart.
 	ChangeContainerStatusOnKubeletRestart featuregate.Feature = "ChangeContainerStatusOnKubeletRestart"
 
+	// owner: @NahumLitvin
+	// kep: https://kep.k8s.io/5000
+	// alpha: v1.33
+	//
+	// ConfigurableCAdvisorMetrics allows configuring which cAdvisor metrics
+	// are collected by kubelet. Disabling ProcessMetrics significantly reduces
+	// CPU usage on high-density nodes by avoiding /proc scans.
+	ConfigurableCAdvisorMetrics featuregate.Feature = "ConfigurableCAdvisorMetrics"
+
 	// owner: @sanposhiho @wojtek-t
 	// kep: https://kep.k8s.io/5278
 	//
@@ -1158,6 +1167,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
+	ConfigurableCAdvisorMetrics: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ClearingNominatedNodeNameAfterBinding: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2128,6 +2141,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CSIVolumeHealth: {},
 
 	ChangeContainerStatusOnKubeletRestart: {},
+
+	ConfigurableCAdvisorMetrics: {},
 
 	ClearingNominatedNodeNameAfterBinding: {},
 

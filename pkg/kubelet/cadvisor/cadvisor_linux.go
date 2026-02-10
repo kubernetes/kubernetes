@@ -49,6 +49,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/utils/ptr"
 )
 
@@ -88,27 +89,12 @@ func init() {
 }
 
 // New creates a new cAdvisor Interface for linux systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+// The cadvisorConfig parameter allows configuring which metrics are collected.
+// If nil, all metrics are collected for backward compatibility.
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool, cadvisorConfig *kubeletconfig.CAdvisorConfiguration) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
-	includedMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.CpuUsageMetrics:     struct{}{},
-		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
-		cadvisormetrics.CpuLoadMetrics:      struct{}{},
-		cadvisormetrics.DiskIOMetrics:       struct{}{},
-		cadvisormetrics.NetworkUsageMetrics: struct{}{},
-		cadvisormetrics.AppMetrics:          struct{}{},
-		cadvisormetrics.ProcessMetrics:      struct{}{},
-		cadvisormetrics.OOMMetrics:          struct{}{},
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
-	}
-
-	if usingLegacyStats || localStorageCapacityIsolation {
-		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
-	}
+	includedMetrics := determineIncludedMetrics(cadvisorConfig, usingLegacyStats, localStorageCapacityIsolation)
 
 	duration := maxHousekeepingInterval
 	housekeepingConfig := manager.HousekeepingConfig{
@@ -137,6 +123,39 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		rootPath:            rootPath,
 		Manager:             m,
 	}, nil
+}
+
+// determineIncludedMetrics builds the cadvisor MetricSet based on feature gates and config.
+func determineIncludedMetrics(cadvisorConfig *kubeletconfig.CAdvisorConfiguration, usingLegacyStats, localStorageCapacityIsolation bool) cadvisormetrics.MetricSet {
+	includedMetrics := cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:     struct{}{},
+		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
+		cadvisormetrics.CpuLoadMetrics:      struct{}{},
+		cadvisormetrics.DiskIOMetrics:       struct{}{},
+		cadvisormetrics.NetworkUsageMetrics: struct{}{},
+		cadvisormetrics.AppMetrics:          struct{}{},
+		cadvisormetrics.OOMMetrics:          struct{}{},
+	}
+
+	// ProcessMetrics is feature-gated and configurable via KubeletConfiguration.CAdvisor.IncludedMetrics.ProcessMetrics.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableCAdvisorMetrics) {
+		if cadvisorConfig.ProcessMetricsEnabled() {
+			includedMetrics[cadvisormetrics.ProcessMetrics] = struct{}{}
+		}
+	} else {
+		// Feature gate disabled - always collect ProcessMetrics for backward compatibility
+		includedMetrics[cadvisormetrics.ProcessMetrics] = struct{}{}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+	}
+
+	if usingLegacyStats || localStorageCapacityIsolation {
+		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
+	}
+
+	return includedMetrics
 }
 
 func (cc *cadvisorClient) Start() error {
