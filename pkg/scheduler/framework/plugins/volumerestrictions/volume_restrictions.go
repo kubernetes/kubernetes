@@ -343,7 +343,7 @@ func (pl *VolumeRestrictions) EventsToRegister(_ context.Context) ([]fwk.Cluster
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
 		// Due to immutable fields `spec.volumes`, pod update events are ignored.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		// A new Node may make a pod schedulable.
 		// We intentionally don't set QueueingHint since all Node/Add events could make Pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},

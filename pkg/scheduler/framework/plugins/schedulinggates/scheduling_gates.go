@@ -68,7 +68,7 @@ func (pl *SchedulingGates) EventsToRegister(_ context.Context) ([]fwk.ClusterEve
 	// https://github.com/kubernetes/kubernetes/pull/122234
 	return []fwk.ClusterEventWithHint{
 		// Pods can be more schedulable once it's gates are removed
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodSchedulingGatesEliminated}, QueueingHintFn: pl.isSchedulableAfterUpdatePodSchedulingGatesEliminated},
+		{Event: fwk.ClusterEvent{Resource: fwk.PodItself, ActionType: fwk.UpdatePodSchedulingGatesEliminated}, QueueingHintFn: pl.isSchedulableAfterUpdatePodSchedulingGatesEliminated},
 	}, nil
 }
 

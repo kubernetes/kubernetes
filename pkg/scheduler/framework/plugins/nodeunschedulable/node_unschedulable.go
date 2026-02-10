@@ -71,7 +71,7 @@ func (pl *NodeUnschedulable) EventsToRegister(_ context.Context) ([]fwk.ClusterE
 		// the scheduling queue uses Pod/Update Queueing Hint
 		// to determine whether a Pod's update makes the Pod schedulable or not.
 		// https://github.com/kubernetes/kubernetes/pull/122234
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.PodItself, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
 	}, nil
 }
 

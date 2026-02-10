@@ -147,7 +147,7 @@ func (pl *DefaultPreemption) EventsToRegister(_ context.Context) ([]fwk.ClusterE
 	if pl.fts.EnableAsyncPreemption {
 		return []fwk.ClusterEventWithHint{
 			// We need to register the event to tell the scheduling queue that the pod could be un-gated after some Pods' deletion.
-			{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isPodSchedulableAfterPodDeletion},
+			{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isPodSchedulableAfterPodDeletion},
 		}, nil
 	}
 
