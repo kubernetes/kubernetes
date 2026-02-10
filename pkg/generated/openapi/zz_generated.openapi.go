@@ -27054,7 +27054,7 @@ func schema_k8sio_api_core_v1_PodCondition(ref common.ReferenceCallback) common.
 					},
 					"observedGeneration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "If set, this represents the .metadata.generation that the pod condition was set based upon. The PodObservedGenerationTracking feature gate must be enabled to use this field.",
+							Description: "If set, this represents the .metadata.generation that the pod condition was set based upon.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
