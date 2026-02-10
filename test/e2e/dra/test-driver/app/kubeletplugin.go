@@ -462,6 +462,8 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimRef kub
 
 	logger := klog.FromContext(ctx)
 
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
 	claimID := ClaimID{Name: claimRef.Name, UID: claimRef.UID}
 	devices, ok := ex.prepared[claimID]
 	if !ok {
