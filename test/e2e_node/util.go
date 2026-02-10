@@ -596,6 +596,7 @@ func nodeNameOrIP() string {
 }
 
 func deletePodSyncByName(ctx context.Context, f *framework.Framework, podName string) {
+	ginkgo.GinkgoHelper()
 	gp := int64(0)
 	delOpts := metav1.DeleteOptions{
 		GracePeriodSeconds: &gp,

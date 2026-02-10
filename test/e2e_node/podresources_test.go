@@ -337,6 +337,7 @@ func newTestPodData() *testPodData {
 }
 
 func (tpd *testPodData) createPodsForTest(ctx context.Context, f *framework.Framework, podReqs []podDesc) {
+	ginkgo.GinkgoHelper()
 	for _, podReq := range podReqs {
 		pod := makePodResourcesTestPod(podReq)
 		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
@@ -348,11 +349,13 @@ func (tpd *testPodData) createPodsForTest(ctx context.Context, f *framework.Fram
 
 /* deletePodsForTest clean up all the pods run for a testcase. Must ensure proper cleanup */
 func (tpd *testPodData) deletePodsForTest(ctx context.Context, f *framework.Framework) {
+	ginkgo.GinkgoHelper()
 	deletePodsAsync(ctx, f, tpd.PodMap)
 }
 
 /* deletePod removes pod during a test. Should do a best-effort clean up */
 func (tpd *testPodData) deletePod(ctx context.Context, f *framework.Framework, podName string) {
+	ginkgo.GinkgoHelper()
 	_, ok := tpd.PodMap[podName]
 	if !ok {
 		return
@@ -499,8 +502,9 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 	return nil
 }
 
-func expectPodResources(ctx context.Context, offset int, cli kubeletpodresourcesv1.PodResourcesListerClient, expected []podDesc) {
-	gomega.EventuallyWithOffset(1+offset, ctx, func(ctx context.Context) error {
+func expectPodResources(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient, expected []podDesc) {
+	ginkgo.GinkgoHelper()
+	gomega.Eventually(ctx, func(ctx context.Context) error {
 		found, err := getPodResourcesValues(ctx, cli)
 		if err != nil {
 			return err
@@ -521,6 +525,8 @@ func filterOutDesc(descs []podDesc, name string) []podDesc {
 }
 
 func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, sidecarContainersEnabled bool) {
+	ginkgo.GinkgoHelper()
+
 	var tpd *testPodData
 
 	var found podResMap
@@ -552,7 +558,7 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 	}
 
 	tpd.createPodsForTest(ctx, f, expected)
-	expectPodResources(ctx, 1, cli, expected)
+	expectPodResources(ctx, cli, expected)
 	tpd.deletePodsForTest(ctx, f)
 
 	tpd = newTestPodData()
@@ -608,7 +614,7 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 
 	}
 	tpd.createPodsForTest(ctx, f, expected)
-	expectPodResources(ctx, 1, cli, expected)
+	expectPodResources(ctx, cli, expected)
 	tpd.deletePodsForTest(ctx, f)
 
 	tpd = newTestPodData()
@@ -652,7 +658,7 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 	}
 
 	tpd.createPodsForTest(ctx, f, expected)
-	expectPodResources(ctx, 1, cli, expected)
+	expectPodResources(ctx, cli, expected)
 
 	if sd != nil {
 		extra = podDesc{
@@ -676,7 +682,7 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 	})
 
 	expected = append(expected, extra)
-	expectPodResources(ctx, 1, cli, expected)
+	expectPodResources(ctx, cli, expected)
 	tpd.deletePodsForTest(ctx, f)
 
 	tpd = newTestPodData()
@@ -732,11 +738,11 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 		}
 	}
 	tpd.createPodsForTest(ctx, f, expected)
-	expectPodResources(ctx, 1, cli, expected)
+	expectPodResources(ctx, cli, expected)
 
 	tpd.deletePod(ctx, f, "pod-01")
 	expectedPostDelete := filterOutDesc(expected, "pod-01")
-	expectPodResources(ctx, 1, cli, expectedPostDelete)
+	expectPodResources(ctx, cli, expectedPostDelete)
 	tpd.deletePodsForTest(ctx, f)
 
 	tpd = newTestPodData()
@@ -767,7 +773,7 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 
 	}
 	tpd.createPodsForTest(ctx, f, expected)
-	expectPodResources(ctx, 1, cli, expected)
+	expectPodResources(ctx, cli, expected)
 	tpd.deletePodsForTest(ctx, f)
 
 	if sidecarContainersEnabled {
@@ -834,7 +840,7 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 		}
 
 		tpd.createPodsForTest(ctx, f, expected)
-		expectPodResources(ctx, 1, cli, expected)
+		expectPodResources(ctx, cli, expected)
 		tpd.deletePodsForTest(ctx, f)
 	}
 }
@@ -885,7 +891,8 @@ func demuxCPUsAndDevicesFromGetAllocatableResources(resp *kubeletpodresourcesv1.
 }
 
 func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sidecarContainersEnabled bool) {
-	//var err error
+	ginkgo.GinkgoHelper()
+
 	ginkgo.By("checking the output when no pods are present")
 	expected := []podDesc{}
 	resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
@@ -1920,7 +1927,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 						desc,
 					})
 
-					expectPodResources(ctx, 0, cli, []podDesc{desc})
+					expectPodResources(ctx, cli, []podDesc{desc})
 
 					ginkgo.By("Restarting Kubelet")
 					restartKubelet(ctx, true)
@@ -1930,7 +1937,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					ginkgo.By("Wait for node to be ready")
 					waitForTopologyUnawareResources(ctx, f)
 
-					expectPodResources(ctx, 0, cli, []podDesc{desc})
+					expectPodResources(ctx, cli, []podDesc{desc})
 					tpd.deletePodsForTest(ctx, f)
 				})
 			})
@@ -1967,7 +1974,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			tpd.createPodsForTest(ctx, f, []podDesc{
 				desc,
 			})
-			expectPodResources(ctx, 1, cli, []podDesc{desc})
+			expectPodResources(ctx, cli, []podDesc{desc})
 
 			expected := []podDesc{}
 			resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
