@@ -139,9 +139,14 @@ func TestServiceAllocation(t *testing.T) {
 				t.Fatalf("got unexpected error: %v", err)
 			}
 
-			// This time creating the second service should work.
-			if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8), metav1.CreateOptions{}); err != nil {
-				t.Fatalf("got unexpected error: %v", err)
+			// The ipallocator has an informer, and it needs to wait for the deletion to be propagated before it can allocate the IP again.
+			// This time creating the second service should work, assume a maximum of 2 seconds for the informer to catch up.
+			err = wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+				_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, svc(8), metav1.CreateOptions{})
+				return err == nil, nil
+			})
+			if err != nil {
+				t.Fatalf("unexpected creation failure: %v", err)
 			}
 		})
 	}
