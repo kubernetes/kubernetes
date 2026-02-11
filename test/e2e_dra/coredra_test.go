@@ -31,7 +31,7 @@ import (
 func coreDRA(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
 	namespace := tCtx.Namespace()
 	claim := b.ExternalClaim()
-	pod := b.PodExternal()
+	pod := b.PodExternal(claim.Name)
 	b.Create(tCtx, claim, pod)
 	b.TestPod(tCtx, pod)
 
@@ -43,7 +43,7 @@ func coreDRA(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
 
 		// Create another claim and pod, this time using the latest Kubernetes.
 		claim = b.ExternalClaim()
-		pod = b.PodExternal()
+		pod = b.PodExternal(claim.Name)
 		pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
 		b.Create(tCtx, claim, pod)
 		b.TestPod(tCtx, pod)

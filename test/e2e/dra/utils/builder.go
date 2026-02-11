@@ -315,16 +315,11 @@ func (b *Builder) PodInlineMultiple() (*v1.Pod, *resourceapi.ResourceClaimTempla
 	return pod, template
 }
 
-// PodExternal adds a pod that references external resource claim with default class name and parameters.
-//
-// Note that this references *the initial* result of ExternalClaim. When generating multiple such
-// external claims, pod.Spec.ResourceClaims[0].ResourceClaimName must be adapted by the caller,
-// if desired.
-func (b *Builder) PodExternal() *v1.Pod {
+// PodExternal adds a pod that references the named resource claim.
+func (b *Builder) PodExternal(externalClaimName string) *v1.Pod {
 	pod := b.Pod()
 	pod.Spec.Containers[0].Name = "with-resource"
 	podClaimName := "resource-claim"
-	externalClaimName := "external-claim" + b.Driver.NameSuffix
 	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 		{
 			Name:              podClaimName,
@@ -335,9 +330,9 @@ func (b *Builder) PodExternal() *v1.Pod {
 	return pod
 }
 
-// podShared returns a pod with 3 containers that reference external resource claim with default class name and parameters.
-func (b *Builder) PodExternalMultiple() *v1.Pod {
-	pod := b.PodExternal()
+// podShared returns a pod with 3 containers that reference the named external resource claim.
+func (b *Builder) PodExternalMultiple(externalClaimName string) *v1.Pod {
+	pod := b.PodExternal(externalClaimName)
 	pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy(), *pod.Spec.Containers[0].DeepCopy())
 	pod.Spec.Containers[1].Name += "-1"
 	pod.Spec.Containers[2].Name += "-2"

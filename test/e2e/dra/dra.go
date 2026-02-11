@@ -272,7 +272,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		ginkgo.It("must not run a pod if a claim is not ready", func(ctx context.Context) {
 			claim := b.ExternalClaim()
 			b.Create(f.TContext(ctx), claim)
-			pod := b.PodExternal()
+			pod := b.PodExternal(claim.Name)
 
 			// This bypasses scheduling and therefore the pod gets
 			// to run on the node although the claim is not ready.
@@ -295,7 +295,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 		ginkgo.It("must unprepare resources for force-deleted pod", func(ctx context.Context) {
 			claim := b.ExternalClaim()
-			pod := b.PodExternal()
+			pod := b.PodExternal(claim.Name)
 			zero := int64(0)
 			pod.Spec.TerminationGracePeriodSeconds = &zero
 
@@ -361,7 +361,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			claimForContainer1.Spec.Devices.Config[1].Opaque.Parameters.Raw = []byte(`{"container1_config1":"true"}`)
 			claimForContainer1.Spec.Devices.Config[2].Opaque.Parameters.Raw = []byte(`{"container1_config2":"true"}`)
 
-			pod := b.PodExternal()
+			pod := b.PodExternal("")
 			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 				{
 					Name:              "all",
@@ -445,7 +445,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// that the race goes bad (old pod pending shutdown when
 			// new one arrives) and always schedules to the same node.
 			claim := b.ExternalClaim()
-			pod := b.PodExternal()
+			pod := b.PodExternal(claim.Name)
 			node := nodes.NodeNames[0]
 			pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": node}
 			oldClaim := b.Create(f.TContext(ctx), claim, pod)[0].(*resourceapi.ResourceClaim)
@@ -616,8 +616,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 
 		ginkgo.It("supports init containers with external claims", func(ctx context.Context) {
-			pod := b.PodExternal()
 			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
 			pod.Spec.InitContainers = []v1.Container{pod.Spec.Containers[0]}
 			pod.Spec.InitContainers[0].Name += "-init"
 			// This must succeed for the pod to start.
@@ -628,8 +628,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 
 		ginkgo.It("removes reservation from claim when pod is done", func(ctx context.Context) {
-			pod := b.PodExternal()
 			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
 			pod.Spec.Containers[0].Command = []string{"true"}
 			b.Create(f.TContext(ctx), claim, pod)
 
@@ -680,7 +680,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b := drautils.NewBuilderNow(tCtx, driver)
 
 			claim := b.ExternalClaim()
-			pod := b.PodExternal()
+			pod := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod)
 
 			// Cannot run pod, no devices.
@@ -725,7 +725,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// Build behaves the same for both driver instances.
 			b := drautils.NewBuilderNow(tCtx, oldDriver)
 			claim := b.ExternalClaim()
-			pod := b.PodExternal()
+			pod := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod)
 			b.TestPod(tCtx, pod)
 
@@ -768,7 +768,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// Build behaves the same for both driver instances.
 			b := drautils.NewBuilderNow(tCtx, oldDriver)
 			claim := b.ExternalClaim()
-			pod := b.PodExternal()
+			pod := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod)
 			b.TestPod(tCtx, pod)
 
@@ -814,7 +814,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// Build behaves the same for both driver instances.
 			b := drautils.NewBuilderNow(tCtx, oldDriver)
 			claim := b.ExternalClaim()
-			pod := b.PodExternal()
+			pod := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod)
 			b.TestPod(tCtx, pod)
 
@@ -901,10 +901,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		ginkgo.It("supports sharing a claim concurrently", func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 			var objects []klog.KMetadata
-			objects = append(objects, b.ExternalClaim())
+			claim := b.ExternalClaim()
+			objects = append(objects, claim)
 			pods := make([]*v1.Pod, numPods)
 			for i := 0; i < numPods; i++ {
-				pod := b.PodExternal()
+				pod := b.PodExternal(claim.Name)
 				pods[i] = pod
 				objects = append(objects, pod)
 			}
@@ -1015,18 +1016,18 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 		ginkgo.It("supports simple pod referencing external resource claim", func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
-			pod := b.PodExternal()
 			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod)
 			b.TestPod(tCtx, pod)
 		})
 
 		ginkgo.It("supports external claim referenced by multiple pods", func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
-			pod1 := b.PodExternal()
-			pod2 := b.PodExternal()
-			pod3 := b.PodExternal()
 			claim := b.ExternalClaim()
+			pod1 := b.PodExternal(claim.Name)
+			pod2 := b.PodExternal(claim.Name)
+			pod3 := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod1, pod2, pod3)
 
 			for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
@@ -1036,10 +1037,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 		ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
-			pod1 := b.PodExternalMultiple()
-			pod2 := b.PodExternalMultiple()
-			pod3 := b.PodExternalMultiple()
 			claim := b.ExternalClaim()
+			pod1 := b.PodExternalMultiple(claim.Name)
+			pod2 := b.PodExternalMultiple(claim.Name)
+			pod3 := b.PodExternalMultiple(claim.Name)
 			b.Create(tCtx, claim, pod1, pod2, pod3)
 
 			for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
@@ -1061,8 +1062,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 		ginkgo.It("must deallocate after use", func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
-			pod := b.PodExternal()
 			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod)
 
 			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
@@ -1086,11 +1087,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				tCtx := f.TContext(ctx)
 				extendedResourceName := deployDevicePlugin(ctx, f, nodes.NodeNames[0:1])
 
-				pod := b.PodExternal()
+				claim := b.ExternalClaim()
+				pod := b.PodExternal(claim.Name)
 				resources := v1.ResourceList{extendedResourceName: resource.MustParse("1")}
 				pod.Spec.Containers[0].Resources.Requests = resources
 				pod.Spec.Containers[0].Resources.Limits = resources
-				claim := b.ExternalClaim()
 				b.Create(tCtx, claim, pod)
 				b.TestPod(tCtx, pod)
 			})
@@ -1117,13 +1118,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.Create(tCtx, firstClaim, secondClaim)
 
 			// First pod uses only firstClaim
-			firstPod := b.PodExternal()
+			firstPod := b.PodExternal(firstClaim.Name)
 			b.Create(tCtx, firstPod)
 			b.TestPod(tCtx, firstPod)
 
 			// Second pod uses firstClaim (already prepared) + secondClaim (new)
-			secondPod := b.PodExternal()
-
+			secondPod := b.PodExternal("")
 			secondPod.Spec.ResourceClaims = []v1.PodResourceClaim{
 				{
 					Name:              "first",
@@ -1362,7 +1362,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					},
 				},
 			}
-			pod := b1.PodExternal()
+			pod := b1.PodExternal("")
 			podClaimName := "resource-claim"
 			externalClaimName := "external-multiclaim"
 			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
@@ -1453,7 +1453,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					},
 				},
 			}
-			pod := b1.PodExternal()
+			pod := b1.PodExternal("")
 			podClaimName := "resource-claim"
 			externalClaimName := "external-multiclaim"
 			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
@@ -1532,7 +1532,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					},
 				},
 			}
-			pod := b1.PodExternal()
+			pod := b1.PodExternal("")
 			podClaimName := "resource-claim"
 			externalClaimName := "external-multiclaim"
 			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
@@ -1750,7 +1750,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					},
 				},
 			}
-			pod := b.PodExternal()
+			pod := b.PodExternal("")
 			podClaimName := "resource-claim"
 			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 				{
@@ -1831,7 +1831,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					},
 				},
 			}
-			pod := b.PodExternal()
+			pod := b.PodExternal("")
 			podClaimName := "resource-claim"
 			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 				{
@@ -1904,7 +1904,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// available, there should be sufficient counters left to allocate
 			// a device.
 			claim := b.ExternalClaim()
-			pod := b.PodExternal()
+			pod := b.PodExternal(claim.Name)
 			pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
 			b.Create(tCtx, claim, pod)
 			b.TestPod(tCtx, pod)
@@ -1912,8 +1912,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// For the second pod, there should not be sufficient counters left, so
 			// it should not succeed. This means the pod should remain in the pending state.
 			claim2 := b.ExternalClaim()
-			pod2 := b.PodExternal()
-			pod2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+			pod2 := b.PodExternal(claim2.Name)
 			b.Create(tCtx, claim2, pod2)
 
 			gomega.Consistently(ctx, func(ctx context.Context) error {
@@ -1969,8 +1968,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					"memory": resource.MustParse("4Gi"),
 				},
 			}
-			pod := b.PodExternal()
-			pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+			pod := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod)
 			b.TestPod(tCtx, pod)
 
@@ -1981,8 +1979,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					"memory": resource.MustParse("8Gi"),
 				},
 			}
-			pod2 := b.PodExternal()
-			pod2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+			pod2 := b.PodExternal(claim2.Name)
 			b.Create(tCtx, claim2, pod2)
 
 			// The third pod should be able to use the rest 4Gi of the device.
@@ -1992,8 +1989,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					"memory": resource.MustParse("4Gi"),
 				},
 			}
-			pod3 := b.PodExternal()
-			pod3.Spec.ResourceClaims[0].ResourceClaimName = &claim3.Name
+			pod3 := b.PodExternal(claim3.Name)
 			b.Create(tCtx, claim3, pod3)
 			b.TestPod(tCtx, pod3)
 
@@ -2298,7 +2294,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			drautils.TestContainerEnv(tCtx, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
 
 			claim := b.ExternalClaim()
-			pod2 := b.PodExternal()
+			pod2 := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod2)
 			b.TestPod(tCtx, pod2)
 
@@ -2852,8 +2848,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 		f.It("must be possible for the driver to update the ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(features.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
-			pod := b.PodExternal()
 			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
 			b.Create(tCtx, claim, pod)
 
 			// Waits for the ResourceClaim to be allocated and the pod to be scheduled.
@@ -3093,7 +3089,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			claim1b := b1.ExternalClaim()
 			claim2 := b2.ExternalClaim()
 			claim2b := b2.ExternalClaim()
-			pod := b1.PodExternal()
+			pod := b1.PodExternal(claim1.Name)
 			for i, claim := range []*resourceapi.ResourceClaim{claim1b, claim2, claim2b} {
 				pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims,
 					v1.PodResourceClaim{

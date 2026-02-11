@@ -73,8 +73,7 @@ func deviceTaints(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc 
 
 	tCtx.Log("The pod wants exactly the tainted device -> not schedulable.")
 	claim := b.ExternalClaim()
-	pod := b.PodExternal()
-	pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+	pod := b.PodExternal(claim.Name)
 	claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{{
 		CEL: &resourceapi.CELDeviceSelector{
 			Expression: `device.attributes["example.com"].?type.orValue("") == "devicetaints"`,
