@@ -49,7 +49,6 @@ type ClusterTrustBundle struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec contains the signer (if any) and trust anchors.
-	// +required
 	Spec ClusterTrustBundleSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -88,7 +87,6 @@ type ClusterTrustBundleSpec struct {
 	// Users of ClusterTrustBundles, including Kubelet, are free to reorder and
 	// deduplicate certificate blocks in this file according to their own logic,
 	// as well as to drop PEM block headers and inter-block data.
-	// +required
 	TrustBundle string `json:"trustBundle" protobuf:"bytes,2,opt,name=trustBundle"`
 }
 
@@ -106,6 +104,5 @@ type ClusterTrustBundleList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items is a collection of ClusterTrustBundle objects
-	// +required
 	Items []ClusterTrustBundle `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

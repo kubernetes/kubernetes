@@ -37,6 +37,7 @@ type SubjectAccessReview struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated
+	// +required
 	Spec SubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the request is allowed or not
@@ -61,6 +62,7 @@ type SelfSubjectAccessReview struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated.  user and groups must be empty
+	// +required
 	Spec SelfSubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the request is allowed or not
@@ -85,6 +87,7 @@ type LocalSubjectAccessReview struct {
 
 	// spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
 	// you made the request against.  If empty, it is defaulted.
+	// +required
 	Spec SubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the request is allowed or not
@@ -240,6 +243,7 @@ type SelfSubjectAccessReviewSpec struct {
 // SubjectAccessReviewStatus
 type SubjectAccessReviewStatus struct {
 	// allowed is required. True if the action would be allowed, false otherwise.
+	// +required
 	Allowed bool `json:"allowed" protobuf:"varint,1,opt,name=allowed"`
 	// denied is optional. True if the action would be denied, otherwise
 	// false. If both allowed is false and denied is false, then the
@@ -277,6 +281,7 @@ type SelfSubjectRulesReview struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated.
+	// +required
 	Spec SelfSubjectRulesReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates the set of actions a user can perform.
@@ -287,6 +292,7 @@ type SelfSubjectRulesReview struct {
 // SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.
 type SelfSubjectRulesReviewSpec struct {
 	// namespace to evaluate rules for. Required.
+	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
 }
 
@@ -297,14 +303,17 @@ type SelfSubjectRulesReviewSpec struct {
 type SubjectRulesReviewStatus struct {
 	// resourceRules is the list of actions the subject is allowed to perform on resources.
 	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// +required
 	// +listType=atomic
 	ResourceRules []ResourceRule `json:"resourceRules" protobuf:"bytes,1,rep,name=resourceRules"`
 	// nonResourceRules is the list of actions the subject is allowed to perform on non-resources.
 	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// +required
 	// +listType=atomic
 	NonResourceRules []NonResourceRule `json:"nonResourceRules" protobuf:"bytes,2,rep,name=nonResourceRules"`
 	// incomplete is true when the rules returned by this call are incomplete. This is most commonly
 	// encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.
+	// +required
 	Incomplete bool `json:"incomplete" protobuf:"bytes,3,rep,name=incomplete"`
 	// evaluationError can appear in combination with Rules. It indicates an error occurred during
 	// rule evaluation, such as an authorizer that doesn't support rule evaluation, and that
@@ -317,6 +326,7 @@ type SubjectRulesReviewStatus struct {
 // may contain duplicates, and possibly be incomplete.
 type ResourceRule struct {
 	// verbs is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  "*" means all.
+	// +required
 	// +listType=atomic
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
@@ -339,6 +349,7 @@ type ResourceRule struct {
 // NonResourceRule holds information that describes a rule for the non-resource
 type NonResourceRule struct {
 	// verbs is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  "*" means all.
+	// +required
 	// +listType=atomic
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
