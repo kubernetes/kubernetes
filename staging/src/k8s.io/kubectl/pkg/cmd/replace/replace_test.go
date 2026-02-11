@@ -65,7 +65,7 @@ func TestReplaceObject(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -135,7 +135,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -238,7 +238,7 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")

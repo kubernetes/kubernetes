@@ -69,7 +69,7 @@ func TestCreateObject(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
-	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -106,7 +106,7 @@ func TestCreateMultipleObject(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
-	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
