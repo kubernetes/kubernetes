@@ -852,6 +852,7 @@ func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transfo
 		// store to an atomic fifo.
 		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO) {
 			options.AtomicEvents = true
+			options.UnlockWhileProcessing = clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.UnlockWhileProcessingFIFO)
 		} else {
 			options.KnownObjects = clientState
 		}
