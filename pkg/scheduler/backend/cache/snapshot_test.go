@@ -526,7 +526,7 @@ func TestSnapshot_AssumeForget(t *testing.T) {
 				err := snapshot.AssumePod(p)
 				if tt.expectAssumeErr {
 					if err == nil {
-						t.Fatalf("Exepcted AssumePod to fail but is hasn't")
+						t.Fatalf("Expected AssumePod to fail but is hasn't")
 					}
 					return
 				}
@@ -545,7 +545,7 @@ func TestSnapshot_AssumeForget(t *testing.T) {
 					err := snapshot.ForgetPod(logger, p)
 					if tt.expectForgetErr {
 						if err == nil {
-							t.Fatalf("Exepcted ForgetPod to fail but is hasn't")
+							t.Fatalf("Expected ForgetPod to fail but is hasn't")
 						}
 						return
 					}

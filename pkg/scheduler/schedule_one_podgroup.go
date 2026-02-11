@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 // errPodGroupUnschedulable is used to describe that the pod group is unschedulable.
 var errPodGroupUnschedulable = fmt.Errorf("other pods from a pod group are unschedulable")
 
-// scheduleOnePod does the entire workload-aware scheduling workflow for a single pod group.
+// scheduleOnePodGroup does the entire workload-aware scheduling workflow for a single pod group.
 func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo) {
 	logger := klog.FromContext(ctx)
 	// TODO(knelasevero): Remove duplicated keys from log entry calls
@@ -63,7 +63,6 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	// skipPodGroupPodSchedule could remove some pods from the pod group.
 	// Verify if it has any pods left.
 	if len(podGroupInfo.QueuedPodInfos) == 0 {
-		// TODO: Return to the queue?
 		return
 	}
 
@@ -130,7 +129,7 @@ func (sched *Scheduler) podGroupInfoForPod(ctx context.Context, pInfo *framework
 			WorkloadRef: pInfo.Pod.Spec.WorkloadRef,
 		},
 		QueuedPodInfos: make([]*framework.QueuedPodInfo, 0, len(unscheduledPods)+1),
-	} // TODO: Get the PodGroup object from the informer and write it to the PodGroupInfo, if needed
+	}
 	podGroupInfo.QueuedPodInfos = append(podGroupInfo.QueuedPodInfos, pInfo)
 
 	// Pop all unscheduled pods from the scheduling queue

@@ -368,7 +368,7 @@ func TestPodGroupScheduling(t *testing.T) {
 
 			workloadmanager.DefaultSchedulingTimeoutDuration = 5 * time.Second
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "gang-scheduling",
+			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
 				// disable backoff
 				scheduler.WithPodMaxBackoffSeconds(0),
 				scheduler.WithPodInitialBackoffSeconds(0))

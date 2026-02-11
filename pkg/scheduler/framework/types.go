@@ -26,7 +26,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -557,6 +556,7 @@ type QueuedPodInfo struct {
 	// NeedsPodGroupCycle says whether the pod needs to pass a pod group scheduling cycle or not.
 	// If set to false, it means that the pod either passed the pod group cycle
 	// or doesn't belong to any pod group.
+	// This field can only be set to true when GenericWorkload feature flag is enabled.
 	NeedsPodGroupCycle bool
 }
 
@@ -657,10 +657,6 @@ type PodGroupInfo struct {
 	// WorkloadManager.PodGroupState can be used for that.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	UnscheduledPods []*v1.Pod
-	// PodGroup is the API object that contains spec of the pod group, such as policy.
-	// Plugins will typically use it to determine what to do with the pods in the pod group.
-	// If needed, Workload API object can also be retrieved by passing one of the pod's WorkloadRef to WorkloadLister.
-	PodGroup *schedulingapi.PodGroup
 }
 
 func (pgi *PodGroupInfo) GetName() string {

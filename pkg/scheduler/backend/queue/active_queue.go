@@ -43,7 +43,7 @@ type activeQueuer interface {
 	len() int
 	has(pInfo *framework.QueuedPodInfo) bool
 
-	movePodToInFlight(logger klog.Logger, pInfo *framework.QueuedPodInfo) error
+	movePodToInFlight(pInfo *framework.QueuedPodInfo) error
 	listInFlightEvents() []interface{}
 	listInFlightPods() []*v1.Pod
 	clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) ([]*clusterEvent, error)
@@ -270,15 +270,15 @@ func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
 // movePodToInFlight moves the pod to the in-flight state.
 // It assumes the pod is already popped from the queue.
 // It updates the metrics and in-flight tracking.
-func (aq *activeQueue) movePodToInFlight(logger klog.Logger, pInfo *framework.QueuedPodInfo) error {
+func (aq *activeQueue) movePodToInFlight(pInfo *framework.QueuedPodInfo) error {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
-	return aq.unlockedMovePodToInFlight(logger, pInfo)
+	return aq.unlockedMovePodToInFlight(pInfo)
 }
 
 // unlockedMovePodToInFlight moves the pod to the in-flight state.
 // This method should be called under the lock.
-func (aq *activeQueue) unlockedMovePodToInFlight(logger klog.Logger, pInfo *framework.QueuedPodInfo) error {
+func (aq *activeQueue) unlockedMovePodToInFlight(pInfo *framework.QueuedPodInfo) error {
 	pInfo.Attempts++
 	// In flight, no concurrent events yet.
 	if aq.isSchedulingQueueHintEnabled {
@@ -339,7 +339,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Inc()
 	}
-	err = aq.unlockedMovePodToInFlight(logger, pInfo)
+	err = aq.unlockedMovePodToInFlight(pInfo)
 	if err != nil {
 		// Just report it as an error, but no need to stop the scheduler
 		// because it likely doesn't cause any visible issues from the scheduling perspective.

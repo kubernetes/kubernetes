@@ -210,6 +210,8 @@ type PriorityQueue struct {
 	isSchedulingQueueHintEnabled bool
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
+	// isGenericWorkloadEnabled indicates whether the feature gate GenericWorkload is enabled.
+	isGenericWorkloadEnabled bool
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
@@ -355,6 +357,7 @@ func NewPriorityQueue(
 
 	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
+	isGenericWorkloadEnabled := utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload)
 	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessFn, isPopFromBackoffQEnabled)
@@ -373,6 +376,7 @@ func NewPriorityQueue(
 		apiDispatcher:                     options.apiDispatcher,
 		isSchedulingQueueHintEnabled:      isSchedulingQueueHintEnabled,
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
+		isGenericWorkloadEnabled:          isGenericWorkloadEnabled,
 	}
 	var backoffQPopper backoffQPopper
 	if isPopFromBackoffQEnabled {
@@ -904,7 +908,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
 	// Pod with Workload reference should always need the cycle after got unschedulable for some reason.
-	pInfo.NeedsPodGroupCycle = pod.Spec.WorkloadRef != nil
+	pInfo.NeedsPodGroupCycle = p.isGenericWorkloadEnabled && pod.Spec.WorkloadRef != nil
 
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
@@ -1006,6 +1010,10 @@ func (p *PriorityQueue) PopSpecificPod(logger klog.Logger, pod *v1.Pod) *framewo
 		} else {
 			pInfo = p.unschedulablePods.get(pod)
 			if pInfo != nil {
+				if pInfo.Gated() {
+					// Gated pod shouldn't be popped.
+					return nil
+				}
 				p.unschedulablePods.delete(pod, pInfo.Gated())
 			} else {
 				// Not found in any queue
@@ -1014,7 +1022,7 @@ func (p *PriorityQueue) PopSpecificPod(logger klog.Logger, pod *v1.Pod) *framewo
 		}
 	}
 
-	err := p.activeQ.movePodToInFlight(logger, pInfo)
+	err := p.activeQ.movePodToInFlight(pInfo)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Discarding the popped pod")
 		return nil
@@ -1489,7 +1497,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 		Timestamp:               now,
 		InitialAttemptTimestamp: nil,
 		UnschedulablePlugins:    sets.New(plugins...),
-		NeedsPodGroupCycle:      pod.Spec.WorkloadRef != nil,
+		NeedsPodGroupCycle:      p.isGenericWorkloadEnabled && pod.Spec.WorkloadRef != nil,
 	}
 }
 

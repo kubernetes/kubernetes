@@ -1756,41 +1756,17 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleSta
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Permit, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	pluginsWaitTime := make(map[string]time.Duration)
-	statusCode := fwk.Success
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
 		logger = klog.LoggerWithName(logger, "Permit")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
-	for _, pl := range f.permitPlugins {
-		ctx := ctx
-		if verboseLogs {
-			logger := klog.LoggerWithName(logger, pl.Name())
-			ctx = klog.NewContext(ctx, logger)
-		}
-		status, timeout := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
-		if !status.IsSuccess() {
-			if status.IsRejected() {
-				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
-				return status.WithPlugin(pl.Name())
-			}
-			if status.IsWait() {
-				// Not allowed to be greater than maxTimeout.
-				if timeout > maxTimeout {
-					timeout = maxTimeout
-				}
-				pluginsWaitTime[pl.Name()] = timeout
-				statusCode = fwk.Wait
-			} else {
-				err := status.AsError()
-				logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
-				return fwk.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithPlugin(pl.Name())
-			}
-		}
+	pluginsWaitTime, status := f.runPermitPlugins(ctx, logger, state, pod, nodeName)
+	if !status.IsSuccess() && !status.IsWait() {
+		return status
 	}
-	if statusCode == fwk.Wait {
+	if status.IsWait() {
 		waitingPod := newWaitingPod(pod, pluginsWaitTime)
 		f.waitingPods.add(waitingPod)
 		msg := fmt.Sprintf("one or more plugins asked to wait and no plugin rejected pod %q", pod.Name)
@@ -1810,38 +1786,60 @@ func (f *frameworkImpl) RunPermitPluginsWithoutWaiting(ctx context.Context, stat
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Permit, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	var waitStatus *fwk.Status
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
 		logger = klog.LoggerWithName(logger, "Permit")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
+	_, status = f.runPermitPlugins(ctx, logger, state, pod, nodeName)
+	if !status.IsSuccess() && !status.IsWait() {
+		return status
+	}
+	if status.IsWait() {
+		logger.V(4).Info("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
+		// Return the wait status without overwriting the message and creating a waitingPod.
+		return status
+	}
+	return nil
+}
+
+// runPermitPlugin runs the set of configured permit plugins. If any of these
+// plugins returns a status other than "Success" or "Wait", it does not continue
+// running the remaining plugins and returns an error.
+// This is a helper function. RunPermitPlugins or RunPermitPluginsWithoutWaiting
+// should be used to run the permit plugins.
+func (f *frameworkImpl) runPermitPlugins(ctx context.Context, logger klog.Logger, state fwk.CycleState, pod *v1.Pod, nodeName string) (map[string]time.Duration, *fwk.Status) {
+	verboseLogs := logger.V(4).Enabled()
+	var waitStatus *fwk.Status
+	pluginsWaitTime := make(map[string]time.Duration)
 	for _, pl := range f.permitPlugins {
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		status, _ := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
+		status, timeout := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.IsRejected() {
 				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
-				return status.WithPlugin(pl.Name())
+				return nil, status.WithPlugin(pl.Name())
 			}
-			if !status.IsWait() {
+			if status.IsWait() {
+				// Not allowed to be greater than maxTimeout.
+				if timeout > maxTimeout {
+					timeout = maxTimeout
+				}
+				pluginsWaitTime[pl.Name()] = timeout
+				waitStatus = status
+			} else {
 				err := status.AsError()
 				logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
-				return fwk.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithPlugin(pl.Name())
+				return nil, fwk.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithPlugin(pl.Name())
 			}
-			waitStatus = status
 		}
 	}
-	if waitStatus != nil {
-		logger.V(4).Info("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
-		return waitStatus
-	}
-	return nil
+	return pluginsWaitTime, waitStatus
 }
 
 func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
