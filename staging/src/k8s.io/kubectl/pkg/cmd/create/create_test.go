@@ -69,7 +69,9 @@ func TestCreateObject(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
-	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
+	if err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -106,7 +108,9 @@ func TestCreateMultipleObject(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
-	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
+	if err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})

@@ -65,7 +65,9 @@ func TestReplaceObject(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
+	if err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -135,7 +137,9 @@ func TestReplaceMultipleObject(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
+	if err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -238,7 +242,9 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
+	if err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
