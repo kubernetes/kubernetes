@@ -737,16 +737,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
-- name: InPlacePodVerticalScalingAllocatedStatus
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.32"
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: "1.33"
 - name: InPlacePodVerticalScalingExclusiveCPUs
   versionedSpecs:
   - default: false

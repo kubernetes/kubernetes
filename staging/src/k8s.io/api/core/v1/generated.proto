@@ -1132,7 +1132,6 @@ message ContainerStatus {
   // AllocatedResources represents the compute resources allocated for this container by the
   // node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
   // and after successfully admitting desired pod resize.
-  // +featureGate=InPlacePodVerticalScalingAllocatedStatus
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 10;
 
