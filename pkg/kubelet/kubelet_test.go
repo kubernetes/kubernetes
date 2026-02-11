@@ -3542,7 +3542,7 @@ func TestSyncPodSpans(t *testing.T) {
 	}
 }
 
-func TestRecordAdmissionRejection(t *testing.T) {
+func TestObserveAdmissionRejection(t *testing.T) {
 	metrics.Register()
 
 	testCases := []struct {
@@ -3757,7 +3757,7 @@ func TestRecordAdmissionRejection(t *testing.T) {
 			metrics.AdmissionRejectionsTotal.Reset()
 
 			// Call the function.
-			recordAdmissionRejection(tc.reason)
+			observeAdmissionRejection(tc.reason)
 
 			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), "kubelet_admission_rejections_total"); err != nil {
 				t.Error(err)

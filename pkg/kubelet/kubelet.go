@@ -2131,7 +2131,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		var volumeAttachLimitErr *volumemanager.VolumeAttachLimitExceededError
 		if errors.As(err, &volumeAttachLimitErr) {
 			kl.rejectPod(ctx, pod, volumemanager.VolumeAttachmentLimitExceededReason, volumeAttachLimitErr.Error())
-			recordAdmissionRejection(volumemanager.VolumeAttachmentLimitExceededReason)
+			observeAdmissionRejection(volumemanager.VolumeAttachmentLimitExceededReason)
 			return true, nil
 		}
 		if !wait.Interrupted(err) {
@@ -2487,7 +2487,7 @@ func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message s
 		Message:  PodRejectionMessagePrefix + message})
 }
 
-func recordAdmissionRejection(reason string) {
+func observeAdmissionRejection(reason string) {
 	// It is possible that the "reason" label can have high cardinality.
 	// To avoid this metric from exploding, we create an allowlist of known
 	// reasons, and only record reasons from this list. Use "Other" reason
@@ -2766,7 +2766,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 				// repeatedly during a resize, which would inflate the metric.
 				// Instead, we record the metric here in HandlePodAdditions for new pods
 				// and capture resize events separately.
-				recordAdmissionRejection(reason)
+				observeAdmissionRejection(reason)
 				continue
 			}
 
