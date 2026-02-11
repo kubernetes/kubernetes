@@ -754,6 +754,19 @@ type PlacementStatePlugin interface {
 	RevertPlacement(ctx context.Context, state PodGroupCycleState, podGroup *PodGroupInfo, placement *PlacementInfo) *Status
 }
 
+type PlacementScore struct {
+	Placement *PlacementInfo
+	Score     int64
+}
+
+// ScoreExtensions is an interface for Score extended functionality.
+type PlacementScoreExtensions interface {
+	// NormalizePlacementScore is called for all placement scores produced by the same plugin's "ScorePlacement"
+	// method. A successful run of NormalizePlacementScore will update the scores list and return
+	// a success status.
+	NormalizePlacementScore(ctx context.Context, state PodGroupCycleState, podGroup *PodGroupInfo, placementScores []PlacementScore) *Status
+}
+
 // PlacementScorerPlugin is an interface for plugins that score feasible Placements.
 type PlacementScorerPlugin interface {
 	Plugin
@@ -765,7 +778,10 @@ type PlacementScorerPlugin interface {
 	// with higher scores generally indicating more preferable Placements.
 	// Plugins can implement various scoring strategies, such as bin packing to minimize
 	// resource fragmentation.
-	ScorePlacement(ctx context.Context, state PodGroupCycleState, podGroup *PodGroupInfo, placement *PlacementInfo, podGroupAssignments *PodGroupAssignments) (float64, *Status)
+	ScorePlacement(ctx context.Context, state PodGroupCycleState, podGroup *PodGroupInfo, placement *PlacementInfo, podGroupAssignments *PodGroupAssignments) (int64, *Status)
+
+	// PlacementScoreExtensions returns a PlacementScoreExtensions interface if it implements one, or nil if does not.
+	PlacementScoreExtensions() PlacementScoreExtensions
 }
 
 // Handle provides data and some tools that plugins can use. It is
