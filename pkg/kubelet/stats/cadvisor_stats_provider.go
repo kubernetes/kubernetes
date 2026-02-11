@@ -138,11 +138,18 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 		status, found := p.statusProvider.GetPodStatus(podUID)
 		if found && status.StartTime != nil && !status.StartTime.IsZero() {
 			podStats.StartTime = *status.StartTime
-			// only append stats if we were able to get the start time of the pod
+		} else if podStats.StartTime.IsZero() {
+			for _, c := range podStats.Containers {
+				if !c.StartTime.IsZero() {
+					podStats.StartTime = c.StartTime
+					break
+				}
+			}
+		}
+		if len(podStats.Containers) > 0 {
 			result = append(result, *podStats)
 		}
 	}
-
 	return result, nil
 }
 
