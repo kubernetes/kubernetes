@@ -159,11 +159,20 @@ type TestKubelet struct {
 	fakeMirrorClient     *podtest.FakeMirrorClient
 	fakeClock            *testingclock.FakeClock
 	mounter              mount.Interface
+	pluginManagerStopCh  chan struct{}
 	volumePlugin         *volumetest.FakeVolumePlugin
 }
 
 func (tk *TestKubelet) Cleanup() {
 	if tk.kubelet != nil {
+		// Signal the plugin manager to shutdown. This prevent reconciliation during cleanup.
+		if tk.pluginManagerStopCh != nil {
+			close(tk.pluginManagerStopCh)
+			// Wait for the plugin manager to fully stop before removing rootDirectory,
+			// so its goroutines no longer access the filesystem. Done() returns
+			// immediately if Run() was never started.
+			<-tk.kubelet.pluginManager.Done()
+		}
 		os.RemoveAll(tk.kubelet.rootDirectory)
 		tk.kubelet = nil
 	}
@@ -448,6 +457,8 @@ func newTestKubeletWithImageList(
 		kubelet.recorder,
 		volumetest.NewBlockVolumePathHandler())
 
+	pluginManagerStopCh := make(chan struct{})
+	kubelet.pluginManagerStopCh = pluginManagerStopCh
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
 		kubelet.recorder,
@@ -461,7 +472,7 @@ func newTestKubeletWithImageList(
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 	kubelet.kubeletConfiguration.LocalStorageCapacityIsolation = localStorageCapacityIsolation
-	return &TestKubelet{kubelet, fakeRuntime, fakeContainerManager, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
+	return &TestKubelet{kubelet, fakeRuntime, fakeContainerManager, fakeKubeClient, fakeMirrorClient, fakeClock, nil, pluginManagerStopCh, plug}
 }
 
 func newTestPods(count int) []*v1.Pod {

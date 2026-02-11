@@ -18,6 +18,7 @@ package pluginmanager
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -42,6 +43,10 @@ type PluginManager interface {
 	// the desired state of world cache in order to be used during plugin
 	// registration/deregistration
 	AddHandler(pluginType string, pluginHandler cache.PluginHandler)
+
+	// Done returns a channel that is closed once Run() has fully exited.
+	// If Run() was never called, the returned channel is already closed.
+	Done() <-chan struct{}
 }
 
 const (
@@ -102,11 +107,16 @@ type pluginManager struct {
 	// The data structure is populated by the desired state of the world
 	// populator (plugin watcher).
 	desiredStateOfWorld cache.DesiredStateOfWorld
+
+	// wg tracks whether Run() is currently executing
+	wg sync.WaitGroup
 }
 
 var _ PluginManager = &pluginManager{}
 
 func (pm *pluginManager) Run(ctx context.Context, sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+	pm.wg.Add(1)
+	defer pm.wg.Done()
 	defer runtime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
@@ -124,8 +134,23 @@ func (pm *pluginManager) Run(ctx context.Context, sourcesReady config.SourcesRea
 	metrics.Register(pm.actualStateOfWorld, pm.desiredStateOfWorld)
 	<-stopCh
 	logger.Info("Shutting down Kubelet Plugin Manager")
+
+	// Wait for both reconciler and plugin watcher to stop
+	<-pm.reconciler.Stopped()
+	<-pm.desiredStateOfWorldPopulator.Stopped()
 }
 
 func (pm *pluginManager) AddHandler(pluginType string, handler cache.PluginHandler) {
 	pm.reconciler.AddHandler(pluginType, handler)
+}
+
+// Done returns a channel that is closed once Run() has fully exited.
+// If Run() was never called, the returned channel is already closed.
+func (pm *pluginManager) Done() <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		pm.wg.Wait()
+		close(ch)
+	}()
+	return ch
 }

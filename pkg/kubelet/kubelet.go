@@ -987,6 +987,8 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.Recorder,
 	)
 
+	klet.pluginManagerStopCh = wait.NeverStop
+
 	// If the experimentalMounterPathFlag is set, we do not want to
 	// check node capabilities since the mount path is not the default
 	if len(experimentalMounterPath) != 0 {
@@ -1499,6 +1501,10 @@ type Kubelet struct {
 	// plugins need to be registered/unregistered based on this node and makes it so.
 	pluginManager pluginmanager.PluginManager
 
+	// pluginManagerStopCh allows to stop the plugin manager in tests.
+	// In production, this defaults to wait.NeverStop.
+	pluginManagerStopCh <-chan struct{}
+
 	// This flag sets a maximum number of images to report in the node status.
 	nodeStatusMaxImages int32
 
@@ -1767,7 +1773,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 
 	// Start the plugin manager
 	logger.V(4).Info("Starting plugin manager")
-	go kl.pluginManager.Run(ctx, kl.sourcesReady, wait.NeverStop)
+	go kl.pluginManager.Run(ctx, kl.sourcesReady, kl.pluginManagerStopCh)
 
 	err = kl.shutdownManager.Start(ctx)
 	if err != nil {

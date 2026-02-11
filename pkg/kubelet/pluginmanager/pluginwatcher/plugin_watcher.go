@@ -36,6 +36,7 @@ type Watcher struct {
 	fs                  utilfs.Filesystem
 	fsWatcher           *fsnotify.Watcher
 	desiredStateOfWorld cache.DesiredStateOfWorld
+	stopped             chan struct{}
 }
 
 // NewWatcher provides a new watcher for socket registration
@@ -44,6 +45,7 @@ func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld) *
 		path:                sockDir,
 		fs:                  &utilfs.DefaultFs{},
 		desiredStateOfWorld: desiredStateOfWorld,
+		stopped:             make(chan struct{}),
 	}
 }
 
@@ -70,6 +72,7 @@ func (w *Watcher) Start(ctx context.Context, stopCh <-chan struct{}) error {
 	}
 
 	go func(fsWatcher *fsnotify.Watcher) {
+		defer close(w.stopped)
 		for {
 			select {
 			case event := <-fsWatcher.Events:
@@ -96,6 +99,11 @@ func (w *Watcher) Start(ctx context.Context, stopCh <-chan struct{}) error {
 	}(fsWatcher)
 
 	return nil
+}
+
+// Stopped returns a channel that is closed when the watcher's goroutine has exited
+func (w *Watcher) Stopped() <-chan struct{} {
+	return w.stopped
 }
 
 func (w *Watcher) init(ctx context.Context) error {
