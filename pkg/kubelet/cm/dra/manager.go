@@ -117,7 +117,7 @@ type Manager struct {
 // - Don't include the namespace, it can be inferred from the context.
 // - Avoid repeated "failed to ...: failed to ..." when wrapping errors.
 // - Avoid wrapping when it does not provide relevant additional information to keep the user-visible error short.
-func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDirectory string) (*Manager, error) {
+func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDirectory string, reconcilePeriod time.Duration) (*Manager, error) {
 	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
 	if err != nil {
 		return nil, fmt.Errorf("create ResourceClaim cache: %w", err)
@@ -127,10 +127,6 @@ func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDir
 	if err != nil {
 		return nil, fmt.Errorf("failed to create healthInfo cache: %w", err)
 	}
-
-	// TODO: for now the reconcile period is not configurable.
-	// We should consider making it configurable in the future.
-	reconcilePeriod := defaultReconcilePeriod
 
 	manager := &Manager{
 		cache:           claimInfoCache,
