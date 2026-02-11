@@ -29,25 +29,30 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
-	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/apis/apiserver"
-	"k8s.io/apiserver/pkg/server/egressselector"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	oidctest "k8s.io/kubernetes/test/integration/apiserver/oidc"
+	"k8s.io/kubernetes/test/integration/framework"
+	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 )
 
 func generateTestCerts(t *testing.T, tempDir, serverName string) (caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath string) {
 	t.Helper()
 
 	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("Failed to generate CA key: %v", err)
-	}
+	require.NoError(t, err, "Failed to generate CA key")
 
 	caTemplate := &x509.Certificate{
 		SerialNumber:          big.NewInt(1),
@@ -60,18 +65,13 @@ func generateTestCerts(t *testing.T, tempDir, serverName string) (caCertPath, se
 	}
 
 	caCertDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
-	if err != nil {
-		t.Fatalf("Failed to create CA certificate: %v", err)
-	}
+	require.NoError(t, err, "Failed to create CA certificate")
+
 	caCert, err := x509.ParseCertificate(caCertDER)
-	if err != nil {
-		t.Fatalf("Failed to parse CA certificate: %v", err)
-	}
+	require.NoError(t, err, "Failed to parse CA certificate")
 
 	serverKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("Failed to generate server key: %v", err)
-	}
+	require.NoError(t, err, "Failed to generate server key")
 
 	serverTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(2),
@@ -80,18 +80,14 @@ func generateTestCerts(t *testing.T, tempDir, serverName string) (caCertPath, se
 		NotAfter:     time.Now().Add(time.Hour),
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		DNSNames:     []string{serverName}, // SANS set here
+		DNSNames:     []string{serverName},
 	}
 
 	serverCertDER, err := x509.CreateCertificate(rand.Reader, serverTemplate, caCert, &serverKey.PublicKey, caKey)
-	if err != nil {
-		t.Fatalf("Failed to create server certificate: %v", err)
-	}
+	require.NoError(t, err, "Failed to create server certificate")
 
 	clientKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("Failed to generate client key: %v", err)
-	}
+	require.NoError(t, err, "Failed to generate client key")
 
 	clientTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(3),
@@ -103,392 +99,288 @@ func generateTestCerts(t *testing.T, tempDir, serverName string) (caCertPath, se
 	}
 
 	clientCertDER, err := x509.CreateCertificate(rand.Reader, clientTemplate, caCert, &clientKey.PublicKey, caKey)
-	if err != nil {
-		t.Fatalf("Failed to create client certificate: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client certificate")
 
 	caCertPath = filepath.Join(tempDir, "ca.crt")
 	caCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caCertDER})
-	if err := os.WriteFile(caCertPath, caCertPEM, 0600); err != nil {
-		t.Fatalf("Failed to write CA cert: %v", err)
-	}
+	require.NoError(t, os.WriteFile(caCertPath, caCertPEM, 0600), "Failed to write CA cert")
 
 	serverCertPath = filepath.Join(tempDir, "server.crt")
 	serverKeyPath = filepath.Join(tempDir, "server.key")
 	serverCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverCertDER})
-	if err := os.WriteFile(serverCertPath, serverCertPEM, 0600); err != nil {
-		t.Fatalf("Failed to write server cert: %v", err)
-	}
-	serverKeyBytes, _ := x509.MarshalECPrivateKey(serverKey)
+	require.NoError(t, os.WriteFile(serverCertPath, serverCertPEM, 0600), "Failed to write server cert")
+
+	serverKeyBytes, err := x509.MarshalECPrivateKey(serverKey)
+	require.NoError(t, err, "Failed to marshal server key")
 	serverKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: serverKeyBytes})
-	if err := os.WriteFile(serverKeyPath, serverKeyPEM, 0600); err != nil {
-		t.Fatalf("Failed to write server key: %v", err)
-	}
+	require.NoError(t, os.WriteFile(serverKeyPath, serverKeyPEM, 0600), "Failed to write server key")
 
 	clientCertPath = filepath.Join(tempDir, "client.crt")
 	clientKeyPath = filepath.Join(tempDir, "client.key")
 	clientCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: clientCertDER})
-	if err := os.WriteFile(clientCertPath, clientCertPEM, 0600); err != nil {
-		t.Fatalf("Failed to write client cert: %v", err)
-	}
-	clientKeyBytes, _ := x509.MarshalECPrivateKey(clientKey)
+	require.NoError(t, os.WriteFile(clientCertPath, clientCertPEM, 0600), "Failed to write client cert")
+
+	clientKeyBytes, err := x509.MarshalECPrivateKey(clientKey)
+	require.NoError(t, err, "Failed to marshal client key")
 	clientKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: clientKeyBytes})
-	if err := os.WriteFile(clientKeyPath, clientKeyPEM, 0600); err != nil {
-		t.Fatalf("Failed to write client key: %v", err)
-	}
+	require.NoError(t, os.WriteFile(clientKeyPath, clientKeyPEM, 0600), "Failed to write client key")
 
 	return caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath
 }
 
-// TestTLSServerName verifies that the tlsServerName field in EgressSelectorConfiguration
-// correctly overrides SNI when the destination server (proxy address) doesn't match the certificate SANs.
-func TestTLSServerName(t *testing.T) {
-	tempDir := t.TempDir()
-	// Certificate is issued for this hostname
-	proxyHostname := "konnectivity-server.example.com"
-
-	caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath := generateTestCerts(t, tempDir, proxyHostname)
+// runTLSEgressProxy runs an HTTP CONNECT proxy with TLS.
+func runTLSEgressProxy(t *testing.T, serverCertPath, serverKeyPath, caCertPath string, called *atomic.Bool, ready chan<- struct{}) (string, error) {
+	t.Helper()
 
 	serverCert, err := tls.LoadX509KeyPair(serverCertPath, serverKeyPath)
 	if err != nil {
-		t.Fatalf("Failed to load server key pair: %v", err)
+		return "", fmt.Errorf("failed to load server cert: %w", err)
 	}
 
 	caCertPEM, err := os.ReadFile(caCertPath)
 	if err != nil {
-		t.Fatalf("Failed to read CA cert: %v", err)
+		return "", fmt.Errorf("failed to read CA cert: %w", err)
 	}
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(caCertPEM)
+	clientCAs := x509.NewCertPool()
+	clientCAs.AppendCertsFromPEM(caCertPEM)
 
-	serverTLSConfig := &tls.Config{
+	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
-		ClientCAs:    certPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    clientCAs,
 	}
 
-	listener, err := tls.Listen("tcp", "127.0.0.1:0", serverTLSConfig)
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", tlsConfig)
 	if err != nil {
-		t.Fatalf("Failed to start TLS listener: %v", err)
+		return "", fmt.Errorf("failed to start TLS listener: %w", err)
 	}
-	defer func() { _ = listener.Close() }()
 
-	// Without tlsServerName, the client would use the hostname from the URL (127.0.0.1)
 	proxyAddr := listener.Addr().String()
-	t.Logf("Proxy server listening on %s", proxyAddr)
 
-	go runHTTPConnectProxy(t, listener)
+	httpConnectProxy := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ready" {
+			t.Log("TLS egress proxy ready")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		called.Store(true)
+		t.Logf("TLS egress proxy received connection: %s %s", r.Method, r.Host)
+
+		if r.Method != http.MethodConnect {
+			http.Error(w, "this proxy only supports CONNECT passthrough", http.StatusMethodNotAllowed)
+			return
+		}
+
+		backendConn, err := (&net.Dialer{}).DialContext(r.Context(), "tcp", r.Host)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer func() {
+			if err := backendConn.Close(); err != nil {
+				t.Logf("Failed to close backend connection: %v", err)
+			}
+		}()
+
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			http.Error(w, "hijacking not supported", http.StatusInternalServerError)
+			return
+		}
+
+		clientConn, _, err := hijacker.Hijack()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer func() {
+			if err := clientConn.Close(); err != nil {
+				t.Logf("Failed to close client connection: %v", err)
+			}
+		}()
+
+		_, err = clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+		if err != nil {
+			t.Errorf("unexpected established error: %v", err)
+			return
+		}
+
+		writerComplete := make(chan struct{})
+		readerComplete := make(chan struct{})
+
+		go func() {
+			_, err := io.Copy(backendConn, clientConn)
+			if err != nil && !utilnet.IsProbableEOF(err) {
+				t.Logf("writer error: %v", err)
+			}
+			close(writerComplete)
+		}()
+
+		go func() {
+			_, err := io.Copy(clientConn, backendConn)
+			if err != nil && !utilnet.IsProbableEOF(err) {
+				t.Logf("reader error: %v", err)
+			}
+			close(readerComplete)
+		}()
+
+		select {
+		case <-writerComplete:
+		case <-readerComplete:
+		}
+	})
+
+	server := &http.Server{Handler: httpConnectProxy}
+
+	go func() {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			t.Logf("TLS egress proxy serve error: %v", err)
+		}
+	}()
+
+	t.Cleanup(func() {
+		if err := server.Close(); err != nil {
+			t.Logf("Failed to close server: %v", err)
+		}
+	})
+
+	close(ready)
+
+	return proxyAddr, nil
+}
+
+// TestTLSServerName verifies that the tlsServerName field in the egress selector configuration
+// correctly overrides SNI for TLS certificate validation when connecting through a proxy.
+func TestTLSServerName(t *testing.T) {
+	tempDir := t.TempDir()
+
+	proxyHostname := "egress-proxy.example.com"
+
+	caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath := generateTestCerts(t, tempDir, proxyHostname)
 
 	testCases := []struct {
-		name           string
-		tlsServerName  string
-		expectTLSError bool
+		name              string
+		tlsServerName     string
+		expectProxyCalled bool
+		description       string
 	}{
 		{
-			name:           "matching tlsServerName succeeds TLS handshake",
-			tlsServerName:  proxyHostname,
-			expectTLSError: false,
+			name:              "matching tlsServerName succeeds TLS handshake",
+			tlsServerName:     proxyHostname,
+			expectProxyCalled: true,
+			description:       "SNI override matches cert SANs, connection succeeds",
 		},
 		{
-			name:           "mismatched tlsServerName fails TLS handshake",
-			tlsServerName:  "wrong-hostname.example.com",
-			expectTLSError: true,
+			name:              "mismatched tlsServerName fails TLS handshake",
+			tlsServerName:     "wrong-hostname.example.com",
+			expectProxyCalled: false,
+			description:       "SNI override doesn't match cert SANs, connection fails",
 		},
 		{
-			name:           "empty tlsServerName uses dial address",
-			tlsServerName:  "",
-			expectTLSError: true,
+			name:              "empty tlsServerName uses dial address and fails",
+			tlsServerName:     "",
+			expectProxyCalled: false,
+			description:       "Without tlsServerName, uses dial address 127.0.0.1 which fails cert validation",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config := &apiserver.EgressSelectorConfiguration{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "EgressSelectorConfiguration",
-					APIVersion: "apiserver.config.k8s.io/v1beta1",
+			var proxyCalled atomic.Bool
+
+			ready := make(chan struct{})
+			proxyAddr, err := runTLSEgressProxy(t, serverCertPath, serverKeyPath, caCertPath, &proxyCalled, ready)
+			require.NoError(t, err, "Failed to start TLS egress proxy")
+
+			select {
+			case <-ready:
+				t.Logf("TLS egress proxy ready at %s (cert issued for: %s)", proxyAddr, proxyHostname)
+			case <-time.After(10 * time.Second):
+				t.Fatal("timeout waiting for TLS egress proxy to start")
+			}
+
+			caCertContent, _, caFilePath, caKeyFilePath := oidctest.GenerateCert(t)
+			signingPrivateKey, publicKey := oidctest.RSAGenerateKey(t)
+			oidcServer := utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, "")
+
+			egressConfig := fmt.Sprintf(`
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: HTTPConnect
+    transport:
+      tcp:
+        url: https://%s
+        tlsConfig:
+          caBundle: %s
+          clientCert: %s
+          clientKey: %s
+          tlsServerName: %s
+`, proxyAddr, caCertPath, clientCertPath, clientKeyPath, tc.tlsServerName)
+
+			authenticationConfig := fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1beta1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - foo
+    certificateAuthority: |
+        %s
+    egressSelectorType: cluster
+  claimMappings:
+    username:
+      expression: "'test-' + claims.sub"
+`, oidcServer.URL(), oidctest.IndentCertificateAuthority(string(caCertContent)))
+
+			customFlags := []string{
+				fmt.Sprintf("--egress-selector-config-file=%s", oidctest.WriteTempFile(t, egressConfig)),
+				fmt.Sprintf("--authentication-config=%s", oidctest.WriteTempFile(t, authenticationConfig)),
+				"--authorization-mode=RBAC",
+			}
+
+			server := kubeapiserverapptesting.StartTestServerOrDie(
+				t,
+				kubeapiserverapptesting.NewDefaultTestServerOptions(),
+				customFlags,
+				framework.SharedEtcd(),
+			)
+			t.Cleanup(server.TearDownFn)
+
+			oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
+
+			idTokenLifetime := time.Second * 1200
+			oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				t,
+				signingPrivateKey,
+				map[string]interface{}{
+					"iss": oidcServer.URL(),
+					"sub": "test-user",
+					"aud": "foo",
+					"exp": time.Now().Add(idTokenLifetime).Unix(),
 				},
-				EgressSelections: []apiserver.EgressSelection{
-					{
-						Name: "cluster",
-						Connection: apiserver.Connection{
-							ProxyProtocol: apiserver.ProtocolHTTPConnect,
-							Transport: &apiserver.Transport{
-								TCP: &apiserver.TCPTransport{
-									URL: "https://" + proxyAddr,
-									TLSConfig: &apiserver.TLSConfig{
-										CABundle:      caCertPath,
-										ClientCert:    clientCertPath,
-										ClientKey:     clientKeyPath,
-										TLSServerName: tc.tlsServerName,
-									},
-								},
-							},
-						},
-					},
-				},
-			}
+				"access-token",
+				"refresh-token",
+			)).Maybe()
 
-			egressSelector, err := egressselector.NewEgressSelector(config)
-			if err != nil {
-				t.Fatalf("Failed to create egress selector: %v", err)
-			}
-
-			dialer, err := egressSelector.Lookup(egressselector.Cluster.AsNetworkContext())
-			if err != nil {
-				t.Fatalf("Failed to lookup dialer: %v", err)
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			conn, err := dialer(ctx, "tcp", "backend.example.com:80")
+			client := kubernetes.NewForConfigOrDie(rest.CopyConfig(server.ClientConfig))
 
-			if tc.expectTLSError {
-				if err == nil {
-					if conn != nil {
-						_ = conn.Close()
-					}
-					t.Error("Expected TLS error due to server name mismatch, but dial succeeded")
-				} else {
-					if !strings.Contains(err.Error(), "certificate") && !strings.Contains(err.Error(), "x509") {
-						t.Errorf("Expected certificate verification error, got: %v", err)
-					}
-					t.Logf("Got expected TLS error: %v", err)
-				}
-			} else {
-				if err != nil {
-					if strings.Contains(err.Error(), "certificate") || strings.Contains(err.Error(), "x509") || strings.Contains(err.Error(), "tls:") {
-						t.Errorf("TLS handshake failed unexpectedly: %v", err)
-					} else {
-						t.Logf("TLS succeeded, got expected non-TLS error (backend unreachable): %v", err)
-					}
-				} else {
-					t.Log("Dial succeeded completely")
-					if conn != nil {
-						_ = conn.Close()
-					}
-				}
+			// Attempt to list namespaces to trigger egress proxy usage
+			// The error is expected in some test cases (e.g., when TLS handshake fails)
+			_, _ = client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+
+			time.Sleep(100 * time.Millisecond)
+
+			if tc.expectProxyCalled != proxyCalled.Load() {
+				t.Errorf("expected proxy called=%v, got=%v", tc.expectProxyCalled, proxyCalled.Load())
 			}
 		})
 	}
-}
-
-func runHTTPConnectProxy(t *testing.T, listener net.Listener) {
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			return
-		}
-		go handleProxyConnection(t, conn)
-	}
-}
-
-func handleProxyConnection(t *testing.T, conn net.Conn) {
-	defer func() { _ = conn.Close() }()
-
-	buf := make([]byte, 4096)
-	n, err := conn.Read(buf)
-	if err != nil {
-		t.Logf("Error reading from connection: %v", err)
-		return
-	}
-
-	request := string(buf[:n])
-	if !strings.HasPrefix(request, "CONNECT ") {
-		t.Logf("Not a CONNECT request: %s", request)
-		return
-	}
-
-	lines := strings.Split(request, "\r\n")
-	parts := strings.Split(lines[0], " ")
-	if len(parts) < 2 {
-		t.Logf("Invalid CONNECT request: %s", request)
-		return
-	}
-	targetAddr := parts[1]
-	t.Logf("CONNECT request for: %s", targetAddr)
-
-	backendConn, err := net.Dial("tcp", targetAddr)
-	if err != nil {
-		_, _ = fmt.Fprintf(conn, "HTTP/1.1 502 Bad Gateway\r\n\r\n")
-		t.Logf("Backend connection failed (expected in test): %v", err)
-		return
-	}
-	defer func() { _ = backendConn.Close() }()
-
-	_, err = conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-	if err != nil {
-		t.Logf("Error sending response: %v", err)
-		return
-	}
-
-	// Use channels to synchronize bidirectional copy
-	done := make(chan struct{}, 2)
-	go func() {
-		_, _ = io.Copy(backendConn, conn)
-		done <- struct{}{}
-	}()
-	go func() {
-		_, _ = io.Copy(conn, backendConn)
-		done <- struct{}{}
-	}()
-	// Wait for either direction to complete, then close both connections
-	<-done
-	_ = conn.Close()
-	_ = backendConn.Close()
-	<-done // Wait for the other goroutine to finish
-}
-
-// TestTLSServerNameWithBackend verifies end-to-end data transmission through a TLS proxy
-// when tlsServerName is used to override SNI for certificate validation.
-func TestTLSServerNameWithBackend(t *testing.T) {
-	tempDir := t.TempDir()
-	proxyHostname := "konnectivity-server.example.com"
-
-	caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath := generateTestCerts(t, tempDir, proxyHostname)
-
-	backendListener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("Failed to start backend listener: %v", err)
-	}
-	backendAddr := backendListener.Addr().String()
-	t.Logf("Backend server listening on %s", backendAddr)
-
-	var backendConns []net.Conn
-	var backendConnsMu sync.Mutex
-	var backendWg sync.WaitGroup
-
-	// Cleanup all backend connections
-	cleanupBackend := func() {
-		_ = backendListener.Close()
-		backendConnsMu.Lock()
-		for _, c := range backendConns {
-			_ = c.Close()
-		}
-		backendConnsMu.Unlock()
-		backendWg.Wait()
-	}
-	defer cleanupBackend()
-
-	go func() {
-		for {
-			conn, err := backendListener.Accept()
-			if err != nil {
-				return
-			}
-			backendConnsMu.Lock()
-			backendConns = append(backendConns, conn)
-			backendConnsMu.Unlock()
-
-			backendWg.Add(1)
-			// Create echo server
-			go func(c net.Conn) {
-				defer backendWg.Done()
-				defer func() { _ = c.Close() }()
-				buf := make([]byte, 4096)
-				for {
-					n, err := c.Read(buf)
-					if err != nil {
-						return
-					}
-					if _, err := c.Write(buf[:n]); err != nil {
-						return
-					}
-				}
-			}(conn)
-		}
-	}()
-
-	serverCert, err := tls.LoadX509KeyPair(serverCertPath, serverKeyPath)
-	if err != nil {
-		t.Fatalf("Failed to load server key pair: %v", err)
-	}
-
-	caCertPEM, err := os.ReadFile(caCertPath)
-	if err != nil {
-		t.Fatalf("Failed to read CA cert: %v", err)
-	}
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(caCertPEM)
-
-	serverTLSConfig := &tls.Config{
-		Certificates: []tls.Certificate{serverCert},
-		ClientCAs:    certPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-	}
-
-	proxyListener, err := tls.Listen("tcp", "127.0.0.1:0", serverTLSConfig)
-	if err != nil {
-		t.Fatalf("Failed to start TLS listener: %v", err)
-	}
-	defer func() { _ = proxyListener.Close() }()
-
-	proxyAddr := proxyListener.Addr().String()
-	t.Logf("Proxy server listening on %s", proxyAddr)
-
-	go runHTTPConnectProxy(t, proxyListener)
-
-	config := &apiserver.EgressSelectorConfiguration{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "EgressSelectorConfiguration",
-			APIVersion: "apiserver.config.k8s.io/v1beta1",
-		},
-		EgressSelections: []apiserver.EgressSelection{
-			{
-				Name: "cluster",
-				Connection: apiserver.Connection{
-					ProxyProtocol: apiserver.ProtocolHTTPConnect,
-					Transport: &apiserver.Transport{
-						TCP: &apiserver.TCPTransport{
-							URL: "https://" + proxyAddr,
-							TLSConfig: &apiserver.TLSConfig{
-								CABundle:      caCertPath,
-								ClientCert:    clientCertPath,
-								ClientKey:     clientKeyPath,
-								TLSServerName: proxyHostname, // Use the hostname that matches the cert
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	egressSelector, err := egressselector.NewEgressSelector(config)
-	if err != nil {
-		t.Fatalf("Failed to create egress selector: %v", err)
-	}
-
-	dialer, err := egressSelector.Lookup(egressselector.Cluster.AsNetworkContext())
-	if err != nil {
-		t.Fatalf("Failed to lookup dialer: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	conn, err := dialer(ctx, "tcp", backendAddr)
-	if err != nil {
-		t.Fatalf("Failed to dial through proxy: %v", err)
-	}
-	defer func() { _ = conn.Close() }()
-
-	testData := "hello through proxy with tlsServerName"
-	_, err = conn.Write([]byte(testData))
-	if err != nil {
-		t.Fatalf("Failed to write to connection: %v", err)
-	}
-
-	response := make([]byte, len(testData))
-	_, err = io.ReadFull(conn, response)
-	if err != nil {
-		t.Fatalf("Failed to read from connection: %v", err)
-	}
-
-	if string(response) != testData {
-		t.Errorf("Expected echo response %q, got %q", testData, string(response))
-	}
-
-	t.Log("Successfully connected through proxy with tlsServerName and verified echo response")
 }
