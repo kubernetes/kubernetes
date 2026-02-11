@@ -293,7 +293,9 @@ func TestDeleteObject(t *testing.T) {
 
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
+	if err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -615,7 +617,9 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
+	if err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Flags().Set("output", "name")
@@ -743,7 +747,9 @@ func TestDeleteMultipleObject(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
+	if err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
