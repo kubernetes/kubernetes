@@ -134,7 +134,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	}
 
 	f.Context("DevicePlugin", f.WithSerial(), f.WithDisruptive(), func() {
-		var devicePluginPod, dptemplate *v1.Pod
+		var devicePluginPod, devicePluginPod2, dptemplate, dptemplate2 *v1.Pod
 		var v1alphaPodResources *kubeletpodresourcesv1alpha1.ListPodResourcesResponse
 		var v1PodResources *kubeletpodresourcesv1.ListPodResourcesResponse
 		var err error
@@ -174,9 +174,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, f.Timeouts.PodDelete, f.Timeouts.Poll).Should(gomega.Succeed())
 
 			ginkgo.By("Scheduling a sample device plugin pod")
-			dp := getSampleDevicePluginPod(pluginSockDir)
+			dp := getSampleDevicePluginPod(pluginSockDir, "dp1")
+			dp2 := getSampleDevicePluginPod(pluginSockDir, "dp2")
 			dptemplate = dp.DeepCopy()
+			dptemplate2 = dp2.DeepCopy()
 			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dp)
+			devicePluginPod2 = e2epod.NewPodClient(f).CreateSync(ctx, dp2)
 
 			ginkgo.By("Waiting for devices to become available on the local node")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
@@ -197,6 +200,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("Deleting the device plugin pod")
 			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("Deleting any Pods created by the test")
 			l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
@@ -240,8 +244,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.Logf("len(v1alphaPodResources.PodResources):%+v", len(v1alphaPodResources.PodResources))
 			framework.Logf("len(v1PodResources.PodResources):%+v", len(v1PodResources.PodResources))
 
-			gomega.Expect(v1alphaPodResources.PodResources).To(gomega.HaveLen(2))
-			gomega.Expect(v1PodResources.PodResources).To(gomega.HaveLen(2))
+			gomega.Expect(v1alphaPodResources.PodResources).To(gomega.HaveLen(3))
+			gomega.Expect(v1PodResources.PodResources).To(gomega.HaveLen(3))
 
 			var v1alphaResourcesForOurPod *kubeletpodresourcesv1alpha1.PodResources
 			for _, res := range v1alphaPodResources.GetPodResources() {
@@ -344,6 +348,29 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err, "inconsistent device assignment after extra container restart - pod1")
 			err, _ = checkPodResourcesAssignment(v1PodResources, pod2.Namespace, pod2.Name, pod2.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID2})
 			framework.ExpectNoError(err, "inconsistent device assignment after extra container restart - pod2")
+		})
+
+		ginkgo.It("Keeps device plugin assignments after one of the device plugins is deleted", func(ctx context.Context) {
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(SampleDeviceResourceName, podRECMD))
+			deviceIDRE := "stub devices: (Dev-[0-9]+)"
+			devID1, err := parseLog(ctx, f, pod1.Name, pod1.Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
+			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
+
+			ginkgo.By("Deleting the first device plugin")
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
+
+			ginkgo.By("Verifying the device assignment is preserved after deleting one device plugin")
+			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(pod1.Status.Phase).To(gomega.Equal(v1.PodRunning))
+
+			v1PodResources, err = getV1NodeDevices(ctx)
+			framework.ExpectNoError(err)
+			err, _ = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
+			framework.ExpectNoError(err, "inconsistent device assignment after deleting second device plugin")
 		})
 
 		// simulate kubelet restart. A compliant device plugin is expected to re-register, while the pod and the container stays running.
@@ -491,6 +518,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)).To(gomega.Succeed())
 
 			ginkgo.By("Deleting the device plugin")
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			waitForContainerRemoval(ctx, devicePluginPod2.Spec.Containers[0].Name, devicePluginPod2.Name, devicePluginPod2.Namespace)
 			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 
@@ -540,11 +569,16 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, deleteOptions, f.Timeouts.PodDelete)
 			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod2.Name, deleteOptions, f.Timeouts.PodDelete)
+			waitForContainerRemoval(ctx, devicePluginPod2.Spec.Containers[0].Name, devicePluginPod2.Name, devicePluginPod2.Namespace)
 
 			ginkgo.By("Recreating the plugin pod")
-			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dptemplate)
-			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, devicePluginPod.Name, devicePluginPod.Namespace, 1*time.Minute)
-			framework.ExpectNoError(err)
+			devicePluginPod2 = e2epod.NewPodClient(f).CreateSync(ctx, dptemplate)
+			err1 := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, devicePluginPod2.Name, devicePluginPod2.Namespace, 1*time.Minute)
+			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dptemplate2)
+			err2 := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, devicePluginPod.Name, devicePluginPod.Namespace, 1*time.Minute)
+			framework.ExpectNoError(err1)
+			framework.ExpectNoError(err2)
 
 			ginkgo.By("Waiting for resource to become available on the local node after re-registration")
 			gomega.Eventually(ctx, func() bool {
@@ -617,9 +651,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, deleteOptions, f.Timeouts.PodDelete)
 			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod2.Name, deleteOptions, f.Timeouts.PodDelete)
+			waitForContainerRemoval(ctx, devicePluginPod2.Spec.Containers[0].Name, devicePluginPod2.Name, devicePluginPod2.Namespace)
 
 			ginkgo.By("Recreating the plugin pod")
 			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dptemplate)
+			devicePluginPod2 = e2epod.NewPodClient(f).CreateSync(ctx, dptemplate2)
 
 			ginkgo.By("Waiting for resource to become available on the local node after restart")
 			gomega.Eventually(ctx, func() bool {
@@ -759,7 +796,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.Logf("PodResources.PodResources:%+v\n", podResources.PodResources)
 			framework.Logf("len(PodResources.PodResources):%+v", len(podResources.PodResources))
 
-			gomega.Expect(podResources.PodResources).To(gomega.HaveLen(2))
+			gomega.Expect(podResources.PodResources).To(gomega.HaveLen(3))
 
 			var resourcesForOurPod *kubeletpodresourcesv1.PodResources
 			for _, res := range podResources.GetPodResources() {
@@ -794,7 +831,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 	f.Context("DevicePlugin", f.WithSerial(), f.WithDisruptive(), func() {
-		var devicePluginPod *v1.Pod
+		var devicePluginPod, devicePluginPod2 *v1.Pod
 		var v1PodResources *kubeletpodresourcesv1.ListPodResourcesResponse
 		var triggerPathFile, triggerPathDir string
 		var err error
@@ -867,14 +904,27 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				Spec: ds.Spec.Template.Spec,
 			}
 
+			dp2 := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: SampleDevicePluginName + "-2",
+				},
+				Spec: ds.Spec.Template.Spec,
+			}
+
+			devicePluginPod2 = e2epod.NewPodClient(f).CreateSync(ctx, dp2)
 			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dp)
 
 			framework.Logf("Waiting for device plugin pod to be Running")
-			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
-			if err != nil {
-				framework.Logf("Sample Device Pod %v took too long to enter running/ready: %v", dp.Name, err)
+			err1 := e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
+			err2 := e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPod2.Namespace, devicePluginPod2.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
+			if err1 != nil {
+				framework.Logf("Sample Device Pod %v took too long to enter running/ready: %v", dp.Name, err1)
 			}
-			framework.ExpectNoError(err, "WaitForPodCondition() failed err: %v", err)
+			if err2 != nil {
+				framework.Logf("Sample Device Pod %v took too long to enter running/ready: %v", dp2.Name, err2)
+			}
+			framework.ExpectNoError(err1, "WaitForPodCondition() failed err: %v", err1)
+			framework.ExpectNoError(err2, "WaitForPodCondition() failed err: %v", err2)
 
 			go func() {
 				// Since autoregistration is disabled for the device plugin (as REGISTER_CONTROL_FILE
@@ -908,6 +958,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("Deleting the device plugin pod")
 			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("Deleting any Pods created by the test")
 			l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
@@ -1115,7 +1166,7 @@ func matchContainerDevices(ident string, contDevs []*kubeletpodresourcesv1.Conta
 }
 
 // getSampleDevicePluginPod returns the Sample Device Plugin pod to be used e2e tests.
-func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
+func getSampleDevicePluginPod(pluginSockDir string, uniqueName string) *v1.Pod {
 	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
 	if err != nil {
 		framework.Fail(err.Error())
@@ -1124,7 +1175,7 @@ func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
 	ds := readDaemonSetV1OrDie(data)
 	dp := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: SampleDevicePluginName,
+			Name: SampleDevicePluginName + "-" + uniqueName,
 		},
 		Spec: ds.Spec.Template.Spec,
 	}
@@ -1135,6 +1186,7 @@ func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
 	}
 
 	dp.Spec.Containers[0].Env = append(dp.Spec.Containers[0].Env, v1.EnvVar{Name: "CDI_ENABLED", Value: "1"})
+	dp.Spec.Containers[0].Env = append(dp.Spec.Containers[0].Env, v1.EnvVar{Name: "UNIQUE_NAME", Value: uniqueName})
 
 	return dp
 }

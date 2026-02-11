@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -61,6 +62,8 @@ type ActivePodsFunc func() []*v1.Pod
 // ManagerImpl is the structure in charge of managing Device Plugins.
 type ManagerImpl struct {
 	checkpointdir string
+
+	endpointStore map[string][]*endpointInfo // Key is ResourceName
 
 	endpoints map[string]endpointInfo // Key is ResourceName
 	mutex     sync.Mutex
@@ -149,8 +152,8 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 	}
 
 	manager := &ManagerImpl{
-		endpoints: make(map[string]endpointInfo),
-
+		endpoints:             make(map[string]endpointInfo),
+		endpointStore:         make(map[string][]*endpointInfo),
 		allDevices:            NewResourceDeviceInstances(),
 		healthyDevices:        make(map[string]sets.Set[string]),
 		unhealthyDevices:      make(map[string]sets.Set[string]),
@@ -236,7 +239,16 @@ func (m *ManagerImpl) PluginConnected(ctx context.Context, resourceName string, 
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	if m.endpointStore == nil {
+		m.endpointStore = make(map[string][]*endpointInfo)
+	}
+	for _, oldEndpoint := range m.endpointStore[resourceName] {
+		if oldEndpoint.e.socketPath() == e.socketPath() {
+			return fmt.Errorf("device plugin already connected: %s", e.socketPath())
+		}
+	}
 	m.endpoints[resourceName] = endpointInfo{e, options}
+	m.endpointStore[resourceName] = append(m.endpointStore[resourceName], &endpointInfo{e, options})
 
 	logger.V(2).Info("Device plugin connected", "resourceName", resourceName)
 	return nil
@@ -244,15 +256,26 @@ func (m *ManagerImpl) PluginConnected(ctx context.Context, resourceName string, 
 
 // PluginDisconnected is to disconnect a plugin from an endpoint.
 // This is done as part of device plugin deregistration.
-func (m *ManagerImpl) PluginDisconnected(logger klog.Logger, resourceName string) {
+func (m *ManagerImpl) PluginDisconnected(logger klog.Logger, resourceName string, socketPath string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if ep, exists := m.endpoints[resourceName]; exists {
+	endpoints := m.endpointStore[resourceName]
+	i := slices.IndexFunc(endpoints, func(ep *endpointInfo) bool {
+		return ep.e.socketPath() == socketPath
+	})
+	if i == -1 {
+		return
+	}
+	m.endpoints[resourceName].e.setStopTime(time.Now())
+	last := len(endpoints) == 1
+	if last {
+		delete(m.endpointStore, resourceName)
 		m.markResourceUnhealthy(logger, resourceName)
-		logger.V(2).Info("Endpoint became unhealthy", "resourceName", resourceName)
-
-		ep.e.setStopTime(time.Now())
+		logger.V(2).Info("Last DP for this resource disconnected", "resource", resourceName)
+	} else {
+		m.endpointStore[resourceName] = slices.Delete(endpoints, i, i+1)
+		m.endpoints[resourceName] = *m.endpointStore[resourceName][len(m.endpointStore[resourceName])-1]
 	}
 }
 

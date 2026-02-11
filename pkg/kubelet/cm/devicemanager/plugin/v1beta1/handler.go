@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -54,10 +55,11 @@ func (s *server) RegisterPlugin(pluginName string, endpoint string, versions []s
 func (s *server) DeRegisterPlugin(pluginName, endpoint string) {
 	logger := klog.FromContext(context.TODO())
 	logger.V(2).Info("Deregistering plugin", "plugin", pluginName, "endpoint", endpoint)
-	client := s.getClient(pluginName)
+	// endpoint in DeRegisterPlugin is the socket path
+	client := s.getClient(pluginName, endpoint)
 	if client != nil {
 		if err := s.disconnectClient(logger, pluginName, client); err != nil {
-			logger.Error(err, "disconnecting client", "plugin", pluginName, "endpoing", endpoint)
+			logger.Error(err, "disconnecting client", "plugin", pluginName, "endpoint", endpoint)
 		}
 	}
 }
@@ -86,7 +88,7 @@ func (s *server) connectClient(ctx context.Context, name string, socketPath stri
 
 	s.registerClient(logger, name, c)
 	if err := c.Connect(ctx); err != nil {
-		s.deregisterClient(logger, name)
+		s.deregisterClient(logger, name, socketPath)
 		logger.Error(err, "Failed to connect to new client", "resource", name)
 		return err
 	}
@@ -100,30 +102,38 @@ func (s *server) connectClient(ctx context.Context, name string, socketPath stri
 }
 
 func (s *server) disconnectClient(logger klog.Logger, name string, c Client) error {
-	s.deregisterClient(logger, name)
+	s.deregisterClient(logger, name, c.SocketPath())
 	return c.Disconnect(logger)
 }
 func (s *server) registerClient(logger klog.Logger, name string, c Client) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.clients[name] = c
+	s.clients[name] = append(s.clients[name], c)
 	logger.V(2).Info("Registered client", "name", name)
 }
 
-func (s *server) deregisterClient(logger klog.Logger, name string) {
+func (s *server) deregisterClient(logger klog.Logger, name string, socketPath string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	delete(s.clients, name)
-	logger.V(2).Info("Deregistered client", "name", name)
+	for i, c := range s.clients[name] {
+		if c.SocketPath() == socketPath {
+			s.clients[name] = slices.Delete(s.clients[name], i, i+1)
+			if len(s.clients[name]) == 0 {
+				delete(s.clients, name)
+			}
+			logger.V(2).Info("Deregistered client", "name", name, "socketPath", socketPath)
+			break
+		}
+	}
 }
 
 func (s *server) runClient(ctx context.Context, name string, c Client) {
 	logger := klog.FromContext(ctx)
 	c.Run(ctx)
 
-	c = s.getClient(name)
+	c = s.getClient(name, c.SocketPath())
 	if c == nil {
 		return
 	}
@@ -133,8 +143,13 @@ func (s *server) runClient(ctx context.Context, name string, c Client) {
 	}
 }
 
-func (s *server) getClient(name string) Client {
+func (s *server) getClient(name string, socketPath string) Client {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	return s.clients[name]
+	for _, c := range s.clients[name] {
+		if c.SocketPath() == socketPath {
+			return c
+		}
+	}
+	return nil
 }
