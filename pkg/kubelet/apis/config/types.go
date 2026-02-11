@@ -263,6 +263,7 @@ type KubeletConfiguration struct {
 	// CPU Manager reconciliation period.
 	CPUManagerReconcilePeriod metav1.Duration
 	// DRA Manager reconciliation period.
+	// Default: "1m"
 	DRAManagerReconcilePeriod metav1.Duration
 	// MemoryManagerPolicy is the name of the policy to use.
 	// Requires the MemoryManager feature gate to be enabled.

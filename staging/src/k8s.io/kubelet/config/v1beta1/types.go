@@ -416,7 +416,7 @@ type KubeletConfiguration struct {
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
 	// draManagerReconcilePeriod is the reconciliation period for the DRA Manager.
-	// Default: "10s"
+	// Default: "1m"
 	// +optional
 	DRAManagerReconcilePeriod metav1.Duration `json:"draManagerReconcilePeriod,omitempty"`
 	// memoryManagerPolicy is the name of the policy to use by memory manager.

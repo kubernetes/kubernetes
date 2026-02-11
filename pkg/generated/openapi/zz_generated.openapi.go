@@ -70375,7 +70375,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"draManagerReconcilePeriod": {
 						SchemaProps: spec.SchemaProps{
-							Description: "draManagerReconcilePeriod is the reconciliation period for the DRA Manager. Default: \"10s\"",
+							Description: "draManagerReconcilePeriod is the reconciliation period for the DRA Manager. Default: \"1m\"",
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
