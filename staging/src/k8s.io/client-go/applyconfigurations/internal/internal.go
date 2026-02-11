@@ -6850,6 +6850,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: podGroupResourceClaim
+      type:
+        scalar: string
     - name: resourceClaimName
       type:
         scalar: string

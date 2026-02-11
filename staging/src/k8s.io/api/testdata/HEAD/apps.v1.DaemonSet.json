@@ -1829,7 +1829,8 @@
           {
             "name": "nameValue",
             "resourceClaimName": "resourceClaimNameValue",
-            "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+            "resourceClaimTemplateName": "resourceClaimTemplateNameValue",
+            "podGroupResourceClaim": "podGroupResourceClaimValue"
           }
         ],
         "resources": {

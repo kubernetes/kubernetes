@@ -4536,8 +4536,8 @@ type PodResourceClaim struct {
 	// Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
 	// PodGroupResourceClaim must be set.
 	//
-	// +featureGate=WorkloadPodGroupResourceClaimTemplate
-	PodGroupResourceClaim *string `json:"podGroupResourceClaim,omitempty"`
+	// +featureGate=DRAWorkloadResourceClaims
+	PodGroupResourceClaim *string `json:"podGroupResourceClaim,omitempty" protobuf:"bytes,5,opt,name=podGroupResourceClaim"`
 }
 
 // PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim

@@ -6865,6 +6865,7 @@ func autoConvert_v1_PodResourceClaim_To_core_PodResourceClaim(in *corev1.PodReso
 	out.Name = in.Name
 	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
 	out.ResourceClaimTemplateName = (*string)(unsafe.Pointer(in.ResourceClaimTemplateName))
+	out.PodGroupResourceClaim = (*string)(unsafe.Pointer(in.PodGroupResourceClaim))
 	return nil
 }
 
@@ -6877,6 +6878,7 @@ func autoConvert_core_PodResourceClaim_To_v1_PodResourceClaim(in *core.PodResour
 	out.Name = in.Name
 	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
 	out.ResourceClaimTemplateName = (*string)(unsafe.Pointer(in.ResourceClaimTemplateName))
+	out.PodGroupResourceClaim = (*string)(unsafe.Pointer(in.PodGroupResourceClaim))
 	return nil
 }
 
