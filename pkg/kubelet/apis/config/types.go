@@ -420,7 +420,7 @@ type KubeletConfiguration struct {
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information.
 	KubeReservedCgroup string
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
-	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
+	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved`, `system-reserved-compressible`, `kube-reserved`, and `kube-reserved-compressible`.
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information.
 	EnforceNodeAllocatable []string
 	// This option specifies the cpu list reserved for the host level system threads and kubernetes related threads.

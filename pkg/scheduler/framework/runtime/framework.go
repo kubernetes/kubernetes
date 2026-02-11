@@ -1800,6 +1800,50 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleSta
 	return nil
 }
 
+// RunPermitPluginsWithoutWaiting runs the set of configured permit plugins. If any of these
+// plugins returns a status other than "Success" or "Wait", it does not continue
+// running the remaining plugins and returns an error. If any of the
+// plugins returns "Wait", this function will NOT create a waiting pod object,
+// but just return status with "Wait" code. It's caller's responsibility to act on that code.
+func (f *frameworkImpl) RunPermitPluginsWithoutWaiting(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Permit, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+	var waitStatus *fwk.Status
+	logger := klog.FromContext(ctx)
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs {
+		logger = klog.LoggerWithName(logger, "Permit")
+		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
+	}
+	for _, pl := range f.permitPlugins {
+		ctx := ctx
+		if verboseLogs {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			ctx = klog.NewContext(ctx, logger)
+		}
+		status, _ := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
+		if !status.IsSuccess() {
+			if status.IsRejected() {
+				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
+				return status.WithPlugin(pl.Name())
+			}
+			if !status.IsWait() {
+				err := status.AsError()
+				logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
+				return fwk.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithPlugin(pl.Name())
+			}
+			waitStatus = status
+		}
+	}
+	if waitStatus != nil {
+		logger.V(4).Info("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
+		return waitStatus
+	}
+	return nil
+}
+
 func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Permit(ctx, state, pod, nodeName)

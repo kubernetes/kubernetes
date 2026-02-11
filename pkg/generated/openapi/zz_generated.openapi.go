@@ -40490,7 +40490,6 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -40614,7 +40613,6 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"allowed"},
 			},
 		},
 	}
@@ -53353,6 +53351,18 @@ func schema_k8sio_api_scheduling_v1alpha1_PodGroupPolicy(ref common.ReferenceCal
 					},
 				},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"basic": "Basic",
+								"gang":  "Gang",
+							},
+						},
+					},
+				},
+			},
 		},
 		Dependencies: []string{
 			schedulingv1alpha1.BasicSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha1.GangSchedulingPolicy{}.OpenAPIModelName()},
@@ -63046,7 +63056,7 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 				Properties: map[string]spec.Schema{
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Group is the name of the API group that contains the resources. The empty string represents the core API group.",
+							Description: "Group is the name of the API group that contains the resources. The empty string represents the core API group. `*` matches all groups",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -70772,7 +70782,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"enforceNodeAllocatable": {
 						SchemaProps: spec.SchemaProps{
-							Description: "This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform. This flag accepts a list of options. Acceptable options are `none`, `pods`, `system-reserved` and `kube-reserved`. If `none` is specified, no other options may be specified. When `system-reserved` is in the list, systemReservedCgroup must be specified. When `kube-reserved` is in the list, kubeReservedCgroup must be specified. This field is supported only when `cgroupsPerQOS` is set to true. Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) for more information. Default: [\"pods\"]",
+							Description: "This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform. This flag accepts a list of options. Acceptable options are `none`, `pods`, `system-reserved`, `system-reserved-compressible`, `kube-reserved`, and `kube-reserved-compressible`. If `none` is specified, no other options may be specified. When a `system-reserved` option is in the list, systemReservedCgroup must be specified. When a `kube-reserved` option is in the list, kubeReservedCgroup must be specified. If a `compressible` option is specified, the corresponding non-compressible option may not be specified. This field is supported only when `cgroupsPerQOS` is set to true. Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) for more information. Default: [\"pods\"]",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

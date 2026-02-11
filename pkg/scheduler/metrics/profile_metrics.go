@@ -43,6 +43,9 @@ func PodScheduleError(profile string, duration float64) {
 }
 
 func observeScheduleAttemptAndLatency(result, profile string, duration float64) {
-	schedulingLatency.WithLabelValues(result, profile).Observe(duration)
+	if duration >= 0 {
+		// Record the metric only for positive duration.
+		schedulingLatency.WithLabelValues(result, profile).Observe(duration)
+	}
 	scheduleAttempts.WithLabelValues(result, profile).Inc()
 }

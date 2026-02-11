@@ -36,6 +36,7 @@ message ImageReview {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the pod being evaluated
+  // +optional
   optional ImageReviewSpec spec = 2;
 
   // Status is filled in by the backend and indicates whether the pod should be allowed.
@@ -71,6 +72,7 @@ message ImageReviewSpec {
 // ImageReviewStatus is the result of the review for the pod creation request.
 message ImageReviewStatus {
   // Allowed indicates that all images were allowed to be run.
+  // +optional
   optional bool allowed = 1;
 
   // Reason should be empty unless Allowed is false in which case it
