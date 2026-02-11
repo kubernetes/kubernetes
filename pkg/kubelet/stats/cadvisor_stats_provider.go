@@ -108,9 +108,7 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 	// Ensure pods that only have terminated containers are also included
 	for podRef, terminatedPodStats := range podTerminatedContainersToStats {
 		if _, found := podToStats[podRef]; !found {
-			podToStats[podRef] = &statsapi.PodStats{
-				PodRef: terminatedPodStats.PodRef,
-			}
+			podToStats[podRef] = terminatedPodStats
 		}
 	}
 
