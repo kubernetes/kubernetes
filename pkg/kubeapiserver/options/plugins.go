@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
+	"k8s.io/kubernetes/plugin/pkg/admission/podresize"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
@@ -99,6 +100,7 @@ var AllOrderedPlugins = []string{
 	denyserviceexternalips.PluginName,       // DenyServiceExternalIPs
 	podtopologylabels.PluginName,            // PodTopologyLabels
 	nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator
+	podresize.PluginName,                    // PodResizeValidator
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -152,6 +154,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	certsubjectrestriction.Register(plugins)
 	podtopologylabels.Register(plugins)
 	nodedeclaredfeatures.Register(plugins)
+	podresize.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
@@ -180,6 +183,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		mutatingadmissionpolicy.PluginName,      // Mutatingadmissionpolicy, only active when feature gate MutatingAdmissionpolicy is enabled
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 		nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator, only active when feature gate NodeDeclaredFeatures is enabled
+		podresize.PluginName,                    // PodResizeValidator, only active when feature gate InPlacePodVerticalScaling is enabled
 	)
 
 	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)
