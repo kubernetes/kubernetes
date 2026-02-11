@@ -95,7 +95,7 @@ readonly __default_dynamic_base_image="$KUBE_BASE_IMAGE_REGISTRY/distroless-ipta
 # When the per-command env variable is set, that env variable is
 # used without considering KUBE_GORUNNER_IMAGE.
 # TODO: this should be replaced with a plan distroless base image
-readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
+readonly KUBE_GORUNNER_IMAGE="gcr.io/distroless/static-debian13"
 
 # __default_base_image takes the canonical build target for a Kubernetes command (e.g. k8s.io/kubernetes/cmd/kube-scheduler)
 # and prints the right default base image for it, depending on whether that command gets built dynamically or statically.
