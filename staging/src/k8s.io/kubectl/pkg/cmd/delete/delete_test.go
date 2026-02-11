@@ -73,7 +73,7 @@ func TestDeleteFlagValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error creating delete options: %s", err)
 		}
-		deleteOptions.Filenames = []string{"../../../testdata/redis-master-controller.yaml"}
+		deleteOptions.Filenames = []string{"../../../testdata/test-master-controller.yaml"}
 		err = deleteOptions.Complete(f, nil, cmd)
 		if err != nil {
 			t.Fatalf("unexpected error creating delete options: %s", err)
@@ -293,7 +293,7 @@ func TestDeleteObject(t *testing.T) {
 
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -314,7 +314,7 @@ func TestPreviewResultEqualToResult(t *testing.T) {
 	streams, _, _, _ := genericiooptions.NewTestIOStreams()
 
 	deleteOptions, err := deleteFlags.ToOptions(nil, streams)
-	deleteOptions.Filenames = []string{"../../../testdata/redis-master-controller.yaml"}
+	deleteOptions.Filenames = []string{"../../../testdata/test-master-controller.yaml"}
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -361,7 +361,7 @@ func TestDeleteObjectWithInteractive(t *testing.T) {
 	streams, in, buf, _ := genericiooptions.NewTestIOStreams()
 	fmt.Fprint(in, "y")
 	cmd := NewCmdDelete(tf, streams)
-	err := cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -382,7 +382,7 @@ func TestDeleteObjectWithInteractive(t *testing.T) {
 	streams, in, buf, _ = genericiooptions.NewTestIOStreams()
 	fmt.Fprint(in, "n")
 	cmd = NewCmdDelete(tf, streams)
-	err = cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	err = cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -578,7 +578,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 
 	options := &DeleteOptions{
 		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../testdata/redis-master-controller.yaml"},
+			Filenames: []string{"../../../testdata/test-master-controller.yaml"},
 		},
 		GracePeriod:       -1,
 		CascadingStrategy: metav1.DeletePropagationOrphan,
@@ -615,7 +615,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Flags().Set("output", "name")
@@ -743,7 +743,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
@@ -781,7 +781,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 
 	options := &DeleteOptions{
 		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../testdata/redis-master-controller.yaml", "../../../testdata/frontend-service.yaml"},
+			Filenames: []string{"../../../testdata/test-master-controller.yaml", "../../../testdata/frontend-service.yaml"},
 		},
 		GracePeriod:       -1,
 		CascadingStrategy: metav1.DeletePropagationOrphan,
@@ -997,7 +997,7 @@ func TestDeleteMessageOutput(t *testing.T) {
 
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
-	err := cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
