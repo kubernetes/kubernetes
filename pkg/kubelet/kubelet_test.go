@@ -588,7 +588,7 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 }
 
 func TestDispatchWorkOfCompletedPod(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -659,7 +659,7 @@ func TestDispatchWorkOfCompletedPod(t *testing.T) {
 		},
 	}
 	for _, pod := range pods {
-		kubelet.podWorkers.UpdatePod(tCtx, logger, UpdatePodOptions{
+		kubelet.podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodSync,
 			StartTime:  time.Now(),
@@ -672,7 +672,7 @@ func TestDispatchWorkOfCompletedPod(t *testing.T) {
 }
 
 func TestDispatchWorkOfActivePod(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -718,7 +718,7 @@ func TestDispatchWorkOfActivePod(t *testing.T) {
 	}
 
 	for _, pod := range pods {
-		kubelet.podWorkers.UpdatePod(tCtx, logger, UpdatePodOptions{
+		kubelet.podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodSync,
 			StartTime:  time.Now(),

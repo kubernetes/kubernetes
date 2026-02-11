@@ -4857,11 +4857,12 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	for _, test := range tests {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
 			t.Run(test.name, func(t *testing.T) {
-				logger, tCtx := ktesting.NewTestContext(t)
+				tCtx := ktesting.Init(t)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
 				kl := testKubelet.kubelet
+				logger, _ := ktesting.NewTestContext(t)
 				kl.statusManager.SetPodStatus(logger, test.pod, test.previousStatus)
 				for _, name := range test.unreadyContainer {
 					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
@@ -6304,7 +6305,7 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 }
 
 func TestKubelet_HandlePodCleanups(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	one := int64(1)
 	two := int64(2)
 	deleted := metav1.NewTime(time.Unix(2, 0).UTC())
@@ -6449,7 +6450,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			prepareWorker: func(t *testing.T, w *podWorkers, records map[types.UID][]syncPodRecord) {
 				// send a create
 				pod := simplePod()
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(1, 0).UTC(),
 					Pod:        pod,
@@ -6474,7 +6475,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 						},
 					},
 				}
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodKill,
 					StartTime:  time.Unix(3, 0).UTC(),
 					Pod:        updatedPod,
@@ -6850,7 +6851,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 						},
 					},
 				}
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(1, 0).UTC(),
 					Pod:        pod,
@@ -6873,7 +6874,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 						},
 					},
 				}
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodKill,
 					StartTime:  time.Unix(3, 0).UTC(),
 					Pod:        updatedPod,
@@ -6922,7 +6923,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				// block startup of the static pod due to full name collision
 				w.startedStaticPodsByFullname[kubecontainer.GetPodFullName(pod)] = types.UID("2")
 
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(1, 0).UTC(),
 					Pod:        pod,
@@ -6995,7 +6996,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				// block startup of the static pod due to full name collision
 				w.startedStaticPodsByFullname[kubecontainer.GetPodFullName(pod)] = types.UID("2")
 
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(1, 0).UTC(),
 					Pod:        pod,
@@ -7058,7 +7059,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				// block startup of the static pod due to full name collision
 				w.startedStaticPodsByFullname[kubecontainer.GetPodFullName(pod)] = types.UID("2")
 
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(1, 0).UTC(),
 					Pod:        pod,
@@ -7103,7 +7104,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				// send a create of a static pod
 				pod := staticPod()
 
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(1, 0).UTC(),
 					Pod:        pod,
@@ -7111,14 +7112,14 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				drainAllWorkers(w)
 
 				// terminate the pod (which won't complete) and then deliver a recreate by that same UID
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodKill,
 					StartTime:  time.Unix(2, 0).UTC(),
 					Pod:        pod,
 				})
 				pod = staticPod()
 				pod.Annotations["version"] = "2"
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(3, 0).UTC(),
 					Pod:        pod,
@@ -7212,7 +7213,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				// send a create of a static pod
 				pod := staticPod()
 
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(1, 0).UTC(),
 					Pod:        pod,
@@ -7255,7 +7256,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				// send a create of a static pod
 				pod := staticPod()
 
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(1, 0).UTC(),
 					Pod:        pod,
@@ -7342,19 +7343,19 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			prepareWorker: func(t *testing.T, w *podWorkers, records map[types.UID][]syncPodRecord) {
 				// simulate a delete and recreate of the static pod
 				pod := simplePod()
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					StartTime:  time.Unix(1, 0).UTC(),
 					Pod:        pod,
 				})
 				drainAllWorkers(w)
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodKill,
 					Pod:        pod,
 				})
 				pod2 := simplePod()
 				pod2.Annotations = map[string]string{"version": "2"}
-				w.UpdatePod(tCtx, logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					Pod:        pod2,
 				})

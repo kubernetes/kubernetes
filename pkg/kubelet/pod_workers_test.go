@@ -46,10 +46,6 @@ import (
 	clocktesting "k8s.io/utils/clock/testing"
 )
 
-func podWorkersTestCtx(t *testing.T) context.Context {
-	return ktesting.Init(t)
-}
-
 // fakePodWorkers runs sync pod function in serial, so we can have
 // deterministic behaviour in testing.
 type fakePodWorkers struct {
@@ -57,7 +53,6 @@ type fakePodWorkers struct {
 	syncPodFn syncPodFnType
 	cache     kubecontainer.Cache
 	t         TestingInterface
-	ctx       context.Context
 
 	triggeredDeletion []types.UID
 	triggeredTerminal []types.UID
@@ -73,7 +68,7 @@ type fakePodWorkers struct {
 	terminatingStaticPods map[string]bool
 }
 
-func (f *fakePodWorkers) UpdatePod(ctx context.Context, _ klog.Logger, options UpdatePodOptions) {
+func (f *fakePodWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	var uid types.UID
@@ -93,9 +88,6 @@ func (f *fakePodWorkers) UpdatePod(ctx context.Context, _ klog.Logger, options U
 	case kubetypes.SyncPodKill:
 		f.triggeredDeletion = append(f.triggeredDeletion, uid)
 	default:
-		if ctx == nil {
-			ctx = f.ctx
-		}
 		isTerminal, err := f.syncPodFn(ctx, options.UpdateType, options.Pod, options.MirrorPod, status)
 		if err != nil {
 			f.t.Errorf("Unexpected error: %v", err)
@@ -271,11 +263,11 @@ type timeIncrementingWorkers struct {
 // UpdatePod increments the clock after UpdatePod is called, but before the workers
 // are invoked, and then drains all workers before returning. The provided functions
 // are invoked while holding the lock to prevent workers from receiving updates.
-func (w *timeIncrementingWorkers) UpdatePod(ctx context.Context, logger klog.Logger, options UpdatePodOptions, afterFns ...func()) {
+func (w *timeIncrementingWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions, afterFns ...func()) {
 	func() {
 		w.lock.Lock()
 		defer w.lock.Unlock()
-		w.w.UpdatePod(ctx, logger, options)
+		w.w.UpdatePod(ctx, options)
 		w.w.clock.(*clocktesting.FakePassiveClock).SetTime(w.w.clock.Now().Add(time.Second))
 		for _, fn := range afterFns {
 			fn()
@@ -538,13 +530,13 @@ func drainAllWorkers(podWorkers *podWorkers) {
 }
 
 func TestUpdatePodParallel(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, processed := createPodWorkers(logger)
 
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
-			podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+			podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 				Pod:        newNamedPod(strconv.Itoa(j), "ns", strconv.Itoa(i), false),
 				UpdateType: kubetypes.SyncPodCreate,
 			})
@@ -572,7 +564,6 @@ func TestUpdatePodParallel(t *testing.T) {
 }
 
 func TestUpdatePod(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	one := int64(1)
 	hasCancelFn := func(status *podSyncStatus) *podSyncStatus {
 		status.cancelFn = func() {}
@@ -621,7 +612,7 @@ func TestUpdatePod(t *testing.T) {
 		name          string
 		update        UpdatePodOptions
 		runtimeStatus *kubecontainer.PodStatus
-		prepare       func(t *testing.T, w *timeIncrementingWorkers) (afterUpdateFn func())
+		prepare       func(t *testing.T, tCtx context.Context, w *timeIncrementingWorkers) (afterUpdateFn func())
 
 		expect                *podSyncStatus
 		expectBeforeWorker    *podSyncStatus
@@ -638,7 +629,7 @@ func TestUpdatePod(t *testing.T) {
 				syncedAt:  time.Unix(1, 0),
 				startedAt: time.Unix(3, 0),
 				activeUpdate: &UpdatePodOptions{
-					Pod:     newNamedPod("1", "ns", "running-pod", false),
+					Pod: newNamedPod("1", "ns", "running-pod", false),
 				},
 			}),
 		},
@@ -648,13 +639,13 @@ func TestUpdatePod(t *testing.T) {
 				UpdateType: kubetypes.SyncPodCreate,
 				Pod:        withLabel(newNamedPod("1", "ns", "running-pod", false), "updated", "value"),
 			},
-			prepare: func(t *testing.T, w *timeIncrementingWorkers) func() {
-				w.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+			prepare: func(t *testing.T, tCtx context.Context, w *timeIncrementingWorkers) func() {
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					Pod:        newNamedPod("1", "ns", "running-pod", false),
 				})
 				w.PauseWorkers("1")
-				w.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodKill,
 					Pod:        newNamedPod("1", "ns", "running-pod", false),
 				})
@@ -689,7 +680,7 @@ func TestUpdatePod(t *testing.T) {
 				syncedAt:  time.Unix(1, 0),
 				startedAt: time.Unix(3, 0),
 				activeUpdate: &UpdatePodOptions{
-					Pod:     newNamedPod("1", "ns", "running-pod", false),
+					Pod: newNamedPod("1", "ns", "running-pod", false),
 				},
 			}),
 		},
@@ -699,8 +690,8 @@ func TestUpdatePod(t *testing.T) {
 				UpdateType: kubetypes.SyncPodUpdate,
 				Pod:        withDeletionTimestamp(newNamedPod("1", "ns", "running-pod", false), time.Unix(1, 0), intp(15)),
 			},
-			prepare: func(t *testing.T, w *timeIncrementingWorkers) func() {
-				w.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+			prepare: func(t *testing.T, tCtx context.Context, w *timeIncrementingWorkers) func() {
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					Pod:        newNamedPod("1", "ns", "running-pod", false),
 				})
@@ -730,8 +721,8 @@ func TestUpdatePod(t *testing.T) {
 				Pod:            newNamedPod("1", "ns", "running-pod", false),
 				KillPodOptions: &KillPodOptions{Evict: true},
 			},
-			prepare: func(t *testing.T, w *timeIncrementingWorkers) func() {
-				w.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+			prepare: func(t *testing.T, tCtx context.Context, w *timeIncrementingWorkers) func() {
+				w.UpdatePod(tCtx, UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodCreate,
 					Pod:        newNamedPod("1", "ns", "running-pod", false),
 				})
@@ -748,7 +739,7 @@ func TestUpdatePod(t *testing.T) {
 				finished:           true,
 				evicted:            true,
 				activeUpdate: &UpdatePodOptions{
-					Pod:     newNamedPod("1", "ns", "running-pod", false),
+					Pod: newNamedPod("1", "ns", "running-pod", false),
 					KillPodOptions: &KillPodOptions{
 						PodTerminationGracePeriodSecondsOverride: intp(30),
 						Evict:                                    true,
@@ -864,7 +855,7 @@ func TestUpdatePod(t *testing.T) {
 
 			var fns []func()
 
-			logger, _ := ktesting.NewTestContext(t)
+			logger, tCtx := ktesting.NewTestContext(t)
 			podWorkers, _ := createTimeIncrementingPodWorkers(logger)
 
 			if tc.expectBeforeWorker != nil {
@@ -874,7 +865,7 @@ func TestUpdatePod(t *testing.T) {
 			}
 
 			if tc.prepare != nil {
-				if fn := tc.prepare(t, podWorkers); fn != nil {
+				if fn := tc.prepare(t, tCtx, podWorkers); fn != nil {
 					fns = append(fns, fn)
 				}
 			}
@@ -893,7 +884,7 @@ func TestUpdatePod(t *testing.T) {
 				podWorkers.runtime.Err = nil
 			})
 
-			podWorkers.UpdatePod(podWorkersTestCtx(t), logger, tc.update, fns...)
+			podWorkers.UpdatePod(tCtx, tc.update, fns...)
 
 			if podWorkers.w.IsPodKnownTerminated(uid) != tc.expectKnownTerminated {
 				t.Errorf("podWorker.IsPodKnownTerminated expected to be %t", tc.expectKnownTerminated)
@@ -1080,7 +1071,7 @@ func TestCompleteWork_PendingUpdate(t *testing.T) {
 		p.podUpdates[podUID] = make(chan struct{}, 1)
 
 		dummyUpdate := &UpdatePodOptions{
-			Pod:     newNamedPod("1", "ns", "running-pod", false),
+			Pod: newNamedPod("1", "ns", "running-pod", false),
 		}
 		p.podSyncStatuses[podUID] = &podSyncStatus{working: true, pendingUpdate: dummyUpdate}
 
@@ -1096,11 +1087,11 @@ func TestCompleteWork_PendingUpdate(t *testing.T) {
 }
 
 func TestUpdatePodForRuntimePod(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, processed := createPodWorkers(logger)
 
 	// ignores running pod of wrong sync type
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		UpdateType: kubetypes.SyncPodCreate,
 		RunningPod: &kubecontainer.Pod{ID: "1", Name: "1", Namespace: "test"},
 	})
@@ -1110,7 +1101,7 @@ func TestUpdatePodForRuntimePod(t *testing.T) {
 	}
 
 	// creates synthetic pod
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		UpdateType: kubetypes.SyncPodKill,
 		RunningPod: &kubecontainer.Pod{ID: "1", Name: "1", Namespace: "test"},
 	})
@@ -1128,7 +1119,7 @@ func TestUpdatePodForRuntimePod(t *testing.T) {
 }
 
 func TestUpdatePodForTerminatedRuntimePod(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, processed := createPodWorkers(logger)
 
 	now := time.Now()
@@ -1140,7 +1131,7 @@ func TestUpdatePodForTerminatedRuntimePod(t *testing.T) {
 	}
 
 	// creates synthetic pod
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		UpdateType: kubetypes.SyncPodKill,
 		RunningPod: &kubecontainer.Pod{ID: "1", Name: "1", Namespace: "test"},
 	})
@@ -1155,20 +1146,20 @@ func TestUpdatePodForTerminatedRuntimePod(t *testing.T) {
 }
 
 func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, processed := createPodWorkers(logger)
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		pod := newNamedPod(strconv.Itoa(i), "ns", strconv.Itoa(i), false)
-		podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+		podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodCreate,
 		})
-		podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+		podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodKill,
 		})
-		podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+		podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodUpdate,
 		})
@@ -1241,7 +1232,7 @@ func newTerminalPhaseSync(fn syncPodFnType) *terminalPhaseSync {
 }
 
 func TestTerminalPhaseTransition(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, _ := createPodWorkers(logger)
 	var channels WorkChannel
 	podWorkers.workerChannelFn = channels.Intercept
@@ -1249,7 +1240,7 @@ func TestTerminalPhaseTransition(t *testing.T) {
 	podWorkers.podSyncer.(*podSyncerFuncs).syncPod = terminalPhaseSyncer.SyncPod
 
 	// start pod
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("1", "test1", "pod1", false),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1262,7 +1253,7 @@ func TestTerminalPhaseTransition(t *testing.T) {
 	}
 
 	// send another update to the pod
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("1", "test1", "pod1", false),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1276,7 +1267,7 @@ func TestTerminalPhaseTransition(t *testing.T) {
 
 	// the next sync should result in a transition to terminal
 	terminalPhaseSyncer.SetTerminal(types.UID("1"))
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("1", "test1", "pod1", false),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1294,7 +1285,7 @@ func TestStaticPodExclusion(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, processed := createPodWorkers(logger)
 	var channels WorkChannel
 	podWorkers.workerChannelFn = channels.Intercept
@@ -1305,11 +1296,11 @@ func TestStaticPodExclusion(t *testing.T) {
 	}
 
 	// start two pods with the same name, one static, one apiserver
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("1-normal", "test1", "pod1", false),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("2-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1338,11 +1329,11 @@ func TestStaticPodExclusion(t *testing.T) {
 	}
 
 	// attempt to start a second and third static pod, which should not start
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("3-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("4-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1397,7 +1388,7 @@ func TestStaticPodExclusion(t *testing.T) {
 
 	// send a basic update for 3-static
 	podWorkers.workQueue.GetWork()
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("3-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1417,7 +1408,7 @@ func TestStaticPodExclusion(t *testing.T) {
 
 	// mark 3-static as deleted while 2-static is still running
 	podWorkers.workQueue.GetWork()
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("3-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodKill,
 	})
@@ -1442,7 +1433,7 @@ func TestStaticPodExclusion(t *testing.T) {
 	}
 
 	// terminate 2-static
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("2-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodKill,
 	})
@@ -1461,7 +1452,7 @@ func TestStaticPodExclusion(t *testing.T) {
 	}
 
 	// simulate a periodic event from the work queue for 4-static
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("4-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1524,18 +1515,18 @@ func TestStaticPodExclusion(t *testing.T) {
 
 	// start a static pod, kill it, then add another one, but ensure the pod worker
 	// for pod 5 doesn't see the kill event (so it remains waiting to start)
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("5-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
 	// Wait for the previous work to be delivered to the worker
 	drainAllWorkers(podWorkers)
 	channels.Channel("5-static").Hold()
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("5-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodKill,
 	})
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("6-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1554,12 +1545,12 @@ func TestStaticPodExclusion(t *testing.T) {
 	}
 
 	// terminate 4-static and wake 6-static
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("4-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodKill,
 	})
 	drainWorkersExcept(podWorkers, "5-static")
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("6-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1594,30 +1585,30 @@ func TestStaticPodExclusion(t *testing.T) {
 
 	// start three more static pods, kill the previous static pod blocking start,
 	// and simulate the second pod of three (8) getting to run first
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("7-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("8-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("9-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
 	drainAllWorkers(podWorkers)
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("6-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodKill,
 	})
 	drainAllWorkers(podWorkers)
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("6-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodCreate,
 	})
 	drainAllWorkers(podWorkers)
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("8-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1653,12 +1644,12 @@ func TestStaticPodExclusion(t *testing.T) {
 	}
 
 	// terminate 7-static and wake 8-static
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("7-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodKill,
 	})
 	drainAllWorkers(podWorkers)
-	podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+	podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 		Pod:        newNamedPod("8-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
@@ -1771,12 +1762,12 @@ func (w *WorkChannel) Intercept(uid types.UID, ch chan struct{}) (outCh <-chan s
 }
 
 func TestSyncKnownPods(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, _ := createPodWorkers(logger)
 
 	numPods := 20
 	for i := 0; i < numPods; i++ {
-		podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+		podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        newNamedPod(strconv.Itoa(i), "ns", "name", false),
 			UpdateType: kubetypes.SyncPodUpdate,
 		})
@@ -1802,7 +1793,7 @@ func TestSyncKnownPods(t *testing.T) {
 			now := metav1.Now()
 			pod.DeletionTimestamp = &now
 		}
-		podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+		podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodKill,
 		})
@@ -1892,7 +1883,7 @@ func TestSyncKnownPods(t *testing.T) {
 
 	for uid := range desiredPods {
 		pod := newNamedPod(string(uid), "ns", "name", false)
-		podWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+		podWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodKill,
 		})
@@ -1993,13 +1984,13 @@ func Test_removeTerminatedWorker(t *testing.T) {
 				finished:      false,
 				fullname:      "fake-fullname",
 				activeUpdate: &UpdatePodOptions{
-					Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
+					Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
 				},
 			},
 			orphan:  true,
 			removed: false,
 			expectPending: &UpdatePodOptions{
-				Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
+				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
 			},
 		},
 		{
@@ -2011,16 +2002,16 @@ func Test_removeTerminatedWorker(t *testing.T) {
 				fullname:      "fake-fullname",
 				working:       true,
 				pendingUpdate: &UpdatePodOptions{
-					Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "2"}},
+					Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "2"}},
 				},
 				activeUpdate: &UpdatePodOptions{
-					Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
+					Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
 				},
 			},
 			orphan:  true,
 			removed: false,
 			expectPending: &UpdatePodOptions{
-				Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "2"}},
+				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "2"}},
 			},
 		},
 		{
@@ -2044,13 +2035,13 @@ func Test_removeTerminatedWorker(t *testing.T) {
 				finished:      false,
 				fullname:      "fake-fullname",
 				activeUpdate: &UpdatePodOptions{
-					Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
+					Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
 				},
 			},
 			orphan:  true,
 			removed: false,
 			expectPending: &UpdatePodOptions{
-				Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
+				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
 			},
 		},
 		{
@@ -2063,16 +2054,16 @@ func Test_removeTerminatedWorker(t *testing.T) {
 				working:       true,
 				fullname:      "fake-fullname",
 				pendingUpdate: &UpdatePodOptions{
-					Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "2"}},
+					Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "2"}},
 				},
 				activeUpdate: &UpdatePodOptions{
-					Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
+					Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "1"}},
 				},
 			},
 			orphan:  true,
 			removed: false,
 			expectPending: &UpdatePodOptions{
-				Pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "2"}},
+				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "2"}},
 			},
 		},
 	}
@@ -2161,7 +2152,7 @@ func (kl *simpleFakeKubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod,
 // TestFakePodWorkers verifies that the fakePodWorkers behaves the same way as the real podWorkers
 // for their invocation of the syncPodFn.
 func TestFakePodWorkers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	fakeRecorder := &record.FakeRecorder{}
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
@@ -2184,7 +2175,6 @@ func TestFakePodWorkers(t *testing.T) {
 		syncPodFn: kubeletForFakeWorkers.SyncPod,
 		cache:     fakeCache,
 		t:         t,
-		ctx:       podWorkersTestCtx(t),
 	}
 
 	tests := []struct {
@@ -2207,12 +2197,12 @@ func TestFakePodWorkers(t *testing.T) {
 
 	for i, tt := range tests {
 		kubeletForRealWorkers.wg.Add(1)
-		realPodWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+		realPodWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        tt.pod,
 			MirrorPod:  tt.mirrorPod,
 			UpdateType: kubetypes.SyncPodUpdate,
 		})
-		fakePodWorkers.UpdatePod(podWorkersTestCtx(t), logger, UpdatePodOptions{
+		fakePodWorkers.UpdatePod(tCtx, UpdatePodOptions{
 			Pod:        tt.pod,
 			MirrorPod:  tt.mirrorPod,
 			UpdateType: kubetypes.SyncPodUpdate,

@@ -39,9 +39,8 @@ type podContainerDeletor struct {
 }
 
 type containerDeleteRequest struct {
-	logger klog.Logger
-	ctx    context.Context
-	id     kubecontainer.ContainerID
+	ctx context.Context
+	id  kubecontainer.ContainerID
 }
 
 func (a containerStatusbyCreatedList) Len() int      { return len(a) }
@@ -56,7 +55,7 @@ func newPodContainerDeletor(logger klog.Logger, runtime kubecontainer.Runtime, c
 		for {
 			req := <-buffer
 			if err := runtime.DeleteContainer(req.ctx, req.id); err != nil {
-				req.logger.Info("DeleteContainer returned error", "containerID", req.id, "err", err)
+				klog.FromContext(req.ctx).Info("DeleteContainer returned error", "containerID", req.id, "err", err)
 			}
 		}
 	}, 0, wait.NeverStop)
@@ -116,7 +115,7 @@ func (p *podContainerDeletor) deleteContainersInPod(ctx context.Context, filterC
 
 	for _, candidate := range getContainersToDeleteInPod(filterContainerID, podStatus, containersToKeep, logger) {
 		select {
-		case p.worker <- containerDeleteRequest{logger: logger, ctx: ctx, id: candidate.ID}:
+		case p.worker <- containerDeleteRequest{ctx: ctx, id: candidate.ID}:
 		default:
 			logger.Info("Failed to issue the request to remove container", "containerID", candidate.ID)
 		}
