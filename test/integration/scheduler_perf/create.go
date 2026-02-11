@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -152,13 +153,7 @@ func getSpecFromTextTemplateFile(path string, env map[string]any, spec interface
 	if err != nil {
 		return err
 	}
-	fm := template.FuncMap{"div": func(a, b int) int {
-		return a / b
-	}}
-	modFn := template.FuncMap{"mod": func(a, b int) int {
-		return a % b
-	}}
-	tmpl, err := template.New("object").Funcs(fm).Funcs(modFn).Parse(string(content))
+	tmpl, err := template.New("object").Funcs(getTemplateFuncs()).Parse(string(content))
 	if err != nil {
 		return err
 	}
@@ -186,4 +181,96 @@ func restMappingFromUnstructuredObj(tCtx ktesting.TContext, obj *unstructured.Un
 		return nil, fmt.Errorf("failed mapping %q to resource: %w", gk, err)
 	}
 	return mapping, nil
+}
+
+func getTemplateFuncs() template.FuncMap {
+	return template.FuncMap{
+		"AddFloat":         addFloat,
+		"AddInt":           addInt,
+		"DivideFloat":      divideFloat,
+		"DivideInt":        divideInt,
+		"Mod":              mod,
+		"MultiplyFloat":    multiplyFloat,
+		"MultiplyInt":      multiplyInt,
+		"SubtractFloat":    subtractFloat,
+		"SubtractInt":      subtractInt,
+	}
+}
+
+func toFloat64(val interface{}) float64 {
+	switch i := val.(type) {
+	case float64:
+		return i
+	case float32:
+		return float64(i)
+	case int64:
+		return float64(i)
+	case int32:
+		return float64(i)
+	case int:
+		return float64(i)
+	case uint64:
+		return float64(i)
+	case uint32:
+		return float64(i)
+	case uint:
+		return float64(i)
+	case string:
+		f, err := strconv.ParseFloat(i, 64)
+		if err == nil {
+			return f
+		}
+	}
+	panic(fmt.Sprintf("cannot cast %v to float64", val))
+}
+
+func addInt(numbers ...interface{}) int {
+	return int(addFloat(numbers...))
+}
+
+func subtractInt(i, j interface{}) int {
+	return int(subtractFloat(i, j))
+}
+
+func multiplyInt(numbers ...interface{}) int {
+	return int(multiplyFloat(numbers...))
+}
+
+func divideInt(i, j interface{}) int {
+	return int(divideFloat(i, j))
+}
+
+func addFloat(numbers ...interface{}) float64 {
+	sum := 0.0
+	for _, number := range numbers {
+		sum += toFloat64(number)
+	}
+	return sum
+}
+
+func subtractFloat(i, j interface{}) float64 {
+	typedI := toFloat64(i)
+	typedJ := toFloat64(j)
+	return typedI - typedJ
+}
+
+func multiplyFloat(numbers ...interface{}) float64 {
+	product := 1.0
+	for _, number := range numbers {
+		product *= toFloat64(number)
+	}
+	return product
+}
+
+func divideFloat(i, j interface{}) float64 {
+	typedI := toFloat64(i)
+	typedJ := toFloat64(j)
+	if typedJ == 0 {
+		panic("division by zero")
+	}
+	return typedI / typedJ
+}
+
+func mod(a interface{}, b interface{}) int {
+	return int(toFloat64(a)) % int(toFloat64(b))
 }

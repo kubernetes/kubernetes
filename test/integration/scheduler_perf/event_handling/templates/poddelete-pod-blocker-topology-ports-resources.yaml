@@ -18,8 +18,8 @@ spec:
   - image: registry.k8s.io/pause:3.10.1
     name: pause
     ports:
-    - hostPort: 8{{ mod .Index 12 }}
-      containerPort: 8{{ mod .Index 12 }}
+    - hostPort: 8{{ Mod .Index 12 }}
+      containerPort: 8{{ Mod .Index 12 }}
     resources:
       requests:
         cpu: 0.35

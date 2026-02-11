@@ -12,4 +12,4 @@ spec:
   resourceClaims:
   - name: resource
     # Five pods share access to the same claim.
-    resourceClaimName: test-claim-{{div .Index 5}}
+    resourceClaimName: test-claim-{{DivideInt .Index 5}}

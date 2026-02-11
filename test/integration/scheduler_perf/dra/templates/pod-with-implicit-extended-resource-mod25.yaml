@@ -11,6 +11,6 @@ spec:
     name: pause
     resources:
       requests:
-         deviceclass.resource.kubernetes.io/test-class-{{mod .Index 25}}: 1
+         deviceclass.resource.kubernetes.io/test-class-{{Mod .Index 25}}: 1
       limits:
-         deviceclass.resource.kubernetes.io/test-class-{{mod .Index 25}}: 1
+         deviceclass.resource.kubernetes.io/test-class-{{Mod .Index 25}}: 1
