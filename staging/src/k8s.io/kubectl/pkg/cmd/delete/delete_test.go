@@ -833,12 +833,21 @@ func TestDeleteObjectWithFinalizersWarning(t *testing.T) {
 
 	streams, _, _, errOut := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
-	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
-	cmd.Flags().Set("cascade", "false")
-	cmd.Flags().Set("output", "name")
+	err := cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("cascade", "false")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("output", "name")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
 	cmd.Run(cmd, []string{})
 
-	expectedWarningPart := "The resource \"redis-master\" has finalizers (foregroundDeletion, another-finalizer, third-finalizer, and 1 more) and will not be deleted until they are removed."
+	expectedWarningPart := "Warning: the resource \"redis-master\" has finalizers (foregroundDeletion, another-finalizer, third-finalizer, and 1 more) and will not be deleted until they are removed."
 	if !strings.Contains(errOut.String(), expectedWarningPart) {
 		t.Errorf("expected warning to contain %q, got %q", expectedWarningPart, errOut.String())
 	}
