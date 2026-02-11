@@ -46,6 +46,7 @@ type Snapshot struct {
 	// This map should be emptied before the next cycle starts.
 	assumedPods map[string]*v1.Pod
 
+	hasPlacement          bool
 	placementNodeInfoList []fwk.NodeInfo
 	placementNodeInfoSet  sets.Set[string]
 }
@@ -175,6 +176,9 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 
 // NumNodes returns the number of nodes in the snapshot for the current placement.
 func (s *Snapshot) NumNodesInPlacement() int {
+	if s.hasPlacement {
+		return len(s.placementNodeInfoList)
+	}
 	return len(s.nodeInfoList)
 }
 
@@ -261,17 +265,31 @@ func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
 	}
 }
 
-func (s *Snapshot) SetPlacement(placement *fwk.ParentPlacement) {
+func (s *Snapshot) SetPlacement(placement *fwk.PlacementInfo) {
+	s.placementNodeInfoList = placement.PlacementNodes
+	s.placementNodeInfoSet = sets.New[string]()
+	for _, node := range placement.PlacementNodes {
+		s.placementNodeInfoSet.Insert(node.Node().Name)
+	}
+	s.hasPlacement = true
 }
 
 func (s *Snapshot) UnsetPlacement() {
+	s.hasPlacement = false
 	s.placementNodeInfoList = nil
+	s.placementNodeInfoSet = nil
 }
 
 func (s *Snapshot) GetInPlacement(nodeName string) (fwk.NodeInfo, error) {
-
+	if !s.hasPlacement || s.placementNodeInfoSet.Has(nodeName) {
+		return s.Get(nodeName)
+	}
+	return nil, fmt.Errorf("Node %q not found in placement", nodeName)
 }
 
 func (s *Snapshot) ListInPlacement() ([]fwk.NodeInfo, error) {
-
+	if !s.hasPlacement {
+		return s.List()
+	}
+	return s.placementNodeInfoList, nil
 }
