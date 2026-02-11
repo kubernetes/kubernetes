@@ -39,6 +39,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	testingktesting "k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -71,7 +72,7 @@ func TestFeatureEnabled(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
 			activePodsFunc := func() []*v1.Pod {
 				return nil
 			}
@@ -228,11 +229,8 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := ktesting.NewLogger(t,
-				ktesting.NewConfig(
-					ktesting.BufferLogs(true),
-				),
-			)
+			tCtx := testingktesting.Init(t)
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
 			m := &managerImpl{
 				logger:                logger,
 				recorder:              tt.fields.recorder,
@@ -249,7 +247,7 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 					clock:                            tt.fields.clock,
 				},
 			}
-			if err := m.ProcessShutdownEvent(); (err != nil) != tt.wantErr {
+			if err := m.ProcessShutdownEvent(tCtx); (err != nil) != tt.wantErr {
 				t.Errorf("managerImpl.processShutdownEvent() error = %v, wantErr %v", err, tt.wantErr)
 			}
 

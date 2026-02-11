@@ -473,11 +473,10 @@ func ReadyCondition(
 	storageErrorsFunc func() error, // typically Kubelet.runtimeState.storageErrors
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
 	nodeShutdownManagerErrorsFunc func() error, // typically kubelet.shutdownManager.errors.
-	recordEventFunc func(logger klog.Logger, eventType, event string), // typically Kubelet.recordNodeStatusEvent
+	recordEventFunc func(ctx context.Context, eventType, event string), // typically Kubelet.recordNodeStatusEvent
 	localStorageCapacityIsolation bool,
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		logger := klog.FromContext(ctx)
 		// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
 		// This is due to an issue with version skewed kubelet and master components.
 		// ref: https://github.com/kubernetes/kubernetes/issues/16961
@@ -540,9 +539,9 @@ func ReadyCondition(
 		}
 		if needToRecordEvent {
 			if newNodeReadyCondition.Status == v1.ConditionTrue {
-				recordEventFunc(logger, v1.EventTypeNormal, events.NodeReady)
+				recordEventFunc(ctx, v1.EventTypeNormal, events.NodeReady)
 			} else {
-				recordEventFunc(logger, v1.EventTypeNormal, events.NodeNotReady)
+				recordEventFunc(ctx, v1.EventTypeNormal, events.NodeNotReady)
 				logger := klog.FromContext(ctx)
 				logger.Info("Node became not ready", "node", klog.KObj(node), "condition", newNodeReadyCondition)
 			}
@@ -554,10 +553,9 @@ func ReadyCondition(
 // MemoryPressureCondition returns a Setter that updates the v1.NodeMemoryPressure condition on the node.
 func MemoryPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderMemoryPressure
-	recordEventFunc func(logger klog.Logger, eventType, event string), // typically Kubelet.recordNodeStatusEvent
+	recordEventFunc func(ctx context.Context, eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		logger := klog.FromContext(ctx)
 		currentTime := metav1.NewTime(nowFunc())
 		var condition *v1.NodeCondition
 
@@ -596,14 +594,14 @@ func MemoryPressureCondition(nowFunc func() time.Time, // typically Kubelet.cloc
 				condition.Reason = "KubeletHasInsufficientMemory"
 				condition.Message = "kubelet has insufficient memory available"
 				condition.LastTransitionTime = currentTime
-				recordEventFunc(logger, v1.EventTypeNormal, "NodeHasInsufficientMemory")
+				recordEventFunc(ctx, v1.EventTypeNormal, "NodeHasInsufficientMemory")
 			}
 		} else if condition.Status != v1.ConditionFalse {
 			condition.Status = v1.ConditionFalse
 			condition.Reason = "KubeletHasSufficientMemory"
 			condition.Message = "kubelet has sufficient memory available"
 			condition.LastTransitionTime = currentTime
-			recordEventFunc(logger, v1.EventTypeNormal, "NodeHasSufficientMemory")
+			recordEventFunc(ctx, v1.EventTypeNormal, "NodeHasSufficientMemory")
 		}
 
 		if newCondition {
@@ -616,10 +614,9 @@ func MemoryPressureCondition(nowFunc func() time.Time, // typically Kubelet.cloc
 // PIDPressureCondition returns a Setter that updates the v1.NodePIDPressure condition on the node.
 func PIDPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderPIDPressure
-	recordEventFunc func(logger klog.Logger, eventType, event string), // typically Kubelet.recordNodeStatusEvent
+	recordEventFunc func(ctx context.Context, eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		logger := klog.FromContext(ctx)
 		currentTime := metav1.NewTime(nowFunc())
 		var condition *v1.NodeCondition
 
@@ -658,14 +655,14 @@ func PIDPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.N
 				condition.Reason = "KubeletHasInsufficientPID"
 				condition.Message = "kubelet has insufficient PID available"
 				condition.LastTransitionTime = currentTime
-				recordEventFunc(logger, v1.EventTypeNormal, "NodeHasInsufficientPID")
+				recordEventFunc(ctx, v1.EventTypeNormal, "NodeHasInsufficientPID")
 			}
 		} else if condition.Status != v1.ConditionFalse {
 			condition.Status = v1.ConditionFalse
 			condition.Reason = "KubeletHasSufficientPID"
 			condition.Message = "kubelet has sufficient PID available"
 			condition.LastTransitionTime = currentTime
-			recordEventFunc(logger, v1.EventTypeNormal, "NodeHasSufficientPID")
+			recordEventFunc(ctx, v1.EventTypeNormal, "NodeHasSufficientPID")
 		}
 
 		if newCondition {
@@ -678,10 +675,9 @@ func PIDPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.N
 // DiskPressureCondition returns a Setter that updates the v1.NodeDiskPressure condition on the node.
 func DiskPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderDiskPressure
-	recordEventFunc func(logger klog.Logger, eventType, event string), // typically Kubelet.recordNodeStatusEvent
+	recordEventFunc func(ctx context.Context, eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
-		logger := klog.FromContext(ctx)
 		currentTime := metav1.NewTime(nowFunc())
 		var condition *v1.NodeCondition
 
@@ -720,14 +716,14 @@ func DiskPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.
 				condition.Reason = "KubeletHasDiskPressure"
 				condition.Message = "kubelet has disk pressure"
 				condition.LastTransitionTime = currentTime
-				recordEventFunc(logger, v1.EventTypeNormal, "NodeHasDiskPressure")
+				recordEventFunc(ctx, v1.EventTypeNormal, "NodeHasDiskPressure")
 			}
 		} else if condition.Status != v1.ConditionFalse {
 			condition.Status = v1.ConditionFalse
 			condition.Reason = "KubeletHasNoDiskPressure"
 			condition.Message = "kubelet has no disk pressure"
 			condition.LastTransitionTime = currentTime
-			recordEventFunc(logger, v1.EventTypeNormal, "NodeHasNoDiskPressure")
+			recordEventFunc(ctx, v1.EventTypeNormal, "NodeHasNoDiskPressure")
 		}
 
 		if newCondition {

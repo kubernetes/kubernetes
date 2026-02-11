@@ -1256,6 +1256,7 @@ func TestReconcileState(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		tCtx := ktesting.Init(t)
 		logger, _ := ktesting.NewTestContext(t)
 		mgr := &manager{
 			policy: testCase.policy,
@@ -1277,7 +1278,7 @@ func TestReconcileState(t *testing.T) {
 			},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
-		success, failure := mgr.reconcileState(context.Background())
+		success, failure := mgr.reconcileState(tCtx)
 
 		if !reflect.DeepEqual(testCase.expectStAssignments, mgr.state.GetCPUAssignments()) {
 			t.Errorf("%v", testCase.description)

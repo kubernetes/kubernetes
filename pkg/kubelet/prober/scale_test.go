@@ -139,8 +139,8 @@ func TestTCPPortExhaustion(t *testing.T) {
 			}
 			t.Logf("Adding %d pods with %d containers each in %v", numTestPods, numContainers, time.Since(now))
 
-			ctx := tCtx.WithTimeout(59*time.Second, "timeout 59 Second")
-			defer ctx.Cancel("TestTCPPortExhaustion completed")
+			timeoutCtx := tCtx.WithTimeout(59*time.Second, "timeout 59 Second")
+			defer timeoutCtx.Cancel("TestTCPPortExhaustion completed")
 			var wg sync.WaitGroup
 
 			wg.Add(1)
@@ -156,7 +156,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 						probeType = "liveness"
 					case result = <-m.readinessManager.Updates():
 						probeType = "readiness"
-					case <-ctx.Done():
+					case <-timeoutCtx.Done():
 						return
 					}
 					switch result.Result.String() {

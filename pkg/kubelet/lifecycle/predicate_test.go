@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -624,6 +625,7 @@ func TestGeneralPredicates(t *testing.T) {
 	}
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			test.nodeInfo.SetNode(test.cachedNode)
 			w := &predicateAdmitHandler{getNodeAnyWayFunc: func(ctx context.Context, useCache bool) (*v1.Node, error) {
 				if useCache {
@@ -631,7 +633,7 @@ func TestGeneralPredicates(t *testing.T) {
 				}
 				return test.syncNode, nil
 			}}
-			reasons := w.generalFilter(context.Background(), test.pod, test.nodeInfo)
+			reasons := w.generalFilter(tCtx, test.pod, test.nodeInfo)
 			if diff := cmp.Diff(test.reasons, reasons); diff != "" {
 				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
 			}

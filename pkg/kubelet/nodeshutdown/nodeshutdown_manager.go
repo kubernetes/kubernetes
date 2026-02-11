@@ -71,7 +71,7 @@ func (managerStub) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmit
 }
 
 // Start is a no-op always returning nil for non linux platforms.
-func (managerStub) Start(context.Context) error {
+func (managerStub) Start(ctx context.Context) error {
 	return nil
 }
 
@@ -126,7 +126,7 @@ func newPodManager(conf *Config) *podManager {
 }
 
 // killPods terminates pods by priority.
-func (m *podManager) killPods(activePods []*v1.Pod) error {
+func (m *podManager) killPods(ctx context.Context, activePods []*v1.Pod) error {
 	groups := groupByPriority(m.shutdownGracePeriodByPodPriority, activePods)
 	for _, group := range groups {
 		// If there are no pods in a particular range,
@@ -176,9 +176,9 @@ func (m *podManager) killPods(activePods []*v1.Pod) error {
 		// to terminate before proceeding to the next group.
 		var groupTerminationWaitDuration = time.Duration(group.ShutdownGracePeriodSeconds) * time.Second
 		var (
-			doneCh         = make(chan struct{})
-			timer          = m.clock.NewTimer(groupTerminationWaitDuration)
-			ctx, ctxCancel = context.WithTimeout(context.Background(), groupTerminationWaitDuration)
+			doneCh              = make(chan struct{})
+			timer               = m.clock.NewTimer(groupTerminationWaitDuration)
+			groupCtx, ctxCancel = context.WithTimeout(ctx, groupTerminationWaitDuration)
 		)
 		go func() {
 			defer close(doneCh)
@@ -188,7 +188,7 @@ func (m *podManager) killPods(activePods []*v1.Pod) error {
 			// let's wait until all the volumes are unmounted from all the pods before
 			// continuing to the next group. This is done so that the CSI Driver (assuming
 			// that it's part of the highest group) has a chance to perform unmounts.
-			if err := m.volumeManager.WaitForAllPodsUnmount(ctx, group.Pods); err != nil {
+			if err := m.volumeManager.WaitForAllPodsUnmount(groupCtx, group.Pods); err != nil {
 				var podIdentifiers []string
 				for _, pod := range group.Pods {
 					podIdentifiers = append(podIdentifiers, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))

@@ -887,7 +887,7 @@ func NewMainKubelet(ctx context.Context,
 		return nil, err
 	}
 	klet.containerGC = containerGC
-	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
+	klet.containerDeletor = newPodContainerDeletor(logger, klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
 	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, postImageGCHooks, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
@@ -980,7 +980,7 @@ func NewMainKubelet(ctx context.Context,
 	// NewInitializedVolumePluginMgr initializes some storageErrors on the Kubelet runtimeState (in csi_plugin.go init)
 	// which affects node ready status. This function must be called before Kubelet is initialized so that the Node
 	// ReadyState is accurate with the storage state.
-	klet.volumePluginMgr, err = NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, clusterTrustBundleManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
+	klet.volumePluginMgr, err = NewInitializedVolumePluginMgr(klet, logger, secretManager, configMapManager, tokenManager, clusterTrustBundleManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
 	if err != nil {
 		return nil, err
 	}
@@ -1883,11 +1883,11 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 	}
 
 	// Start the pod lifecycle event generator.
-	kl.pleg.Start()
+	kl.pleg.Start(ctx)
 
 	// Start eventedPLEG only if EventedPLEG feature gate is enabled.
 	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-		kl.eventedPleg.Start()
+		kl.eventedPleg.Start(ctx)
 	}
 
 	if kl.healthChecker != nil {
@@ -2453,7 +2453,7 @@ func (kl *Kubelet) getPodsToSync() []*v1.Pod {
 //
 // deletePod returns an error if not all sources are ready or the pod is not
 // found in the runtime cache.
-func (kl *Kubelet) deletePod(logger klog.Logger, pod *v1.Pod) error {
+func (kl *Kubelet) deletePod(ctx context.Context, logger klog.Logger, pod *v1.Pod) error {
 	if pod == nil {
 		return fmt.Errorf("deletePod does not allow nil pod")
 	}
@@ -2464,6 +2464,8 @@ func (kl *Kubelet) deletePod(logger klog.Logger, pod *v1.Pod) error {
 	}
 	logger.V(3).Info("Pod has been deleted and must be killed", "pod", klog.KObj(pod), "podUID", pod.UID)
 	kl.podWorkers.UpdatePod(UpdatePodOptions{
+		Context:    ctx,
+		Logger:     logger,
 		Pod:        pod,
 		UpdateType: kubetypes.SyncPodKill,
 	})
@@ -2631,7 +2633,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 
 		if e.Type == pleg.ContainerDied {
 			if containerID, ok := e.Data.(string); ok {
-				kl.cleanUpContainersInPod(e.ID, containerID)
+				kl.cleanUpContainersInPod(ctx, e.ID, containerID)
 			}
 		}
 	case <-syncCh:
@@ -2737,6 +2739,8 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 				continue
 			}
 			kl.podWorkers.UpdatePod(UpdatePodOptions{
+				Context:    ctx,
+				Logger:     logger,
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
 				UpdateType: kubetypes.SyncPodUpdate,
@@ -2777,6 +2781,8 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			}
 		}
 		kl.podWorkers.UpdatePod(UpdatePodOptions{
+			Context:    ctx,
+			Logger:     logger,
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
 			UpdateType: kubetypes.SyncPodCreate,
@@ -2849,6 +2855,8 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		kl.podWorkers.UpdatePod(UpdatePodOptions{
+			Context:    ctx,
+			Logger:     logger,
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
 			UpdateType: kubetypes.SyncPodUpdate,
@@ -2960,6 +2968,8 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 				continue
 			}
 			kl.podWorkers.UpdatePod(UpdatePodOptions{
+				Context:    ctx,
+				Logger:     logger,
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
 				UpdateType: kubetypes.SyncPodUpdate,
@@ -2970,7 +2980,7 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 
 		// Deletion is allowed to fail because the periodic cleanup routine
 		// will trigger deletion again.
-		if err := kl.deletePod(logger, pod); err != nil {
+		if err := kl.deletePod(ctx, logger, pod); err != nil {
 			logger.V(2).Info("Failed to delete pod", "pod", klog.KObj(pod), "err", err)
 		}
 	}
@@ -3036,6 +3046,8 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// needsReconcile in kubelet/config, here, and in status_manager.
 		if status.NeedToReconcilePodReadiness(pod) {
 			kl.podWorkers.UpdatePod(UpdatePodOptions{
+				Context:    ctx,
+				Logger:     logger,
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
 				UpdateType: kubetypes.SyncPodSync,
@@ -3050,7 +3062,7 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// can do better. If it's about preserving pod status info we can also do better.
 		if eviction.PodIsEvicted(pod.Status) {
 			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
-				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
+				kl.containerDeletor.deleteContainersInPod(ctx, "", podStatus, true)
 			}
 		}
 	}
@@ -3081,6 +3093,8 @@ func (kl *Kubelet) HandlePodSyncs(ctx context.Context, pods []*v1.Pod) {
 			continue
 		}
 		kl.podWorkers.UpdatePod(UpdatePodOptions{
+			Context:    ctx,
+			Logger:     logger,
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
 			UpdateType: kubetypes.SyncPodSync,
@@ -3220,11 +3234,11 @@ func (kl *Kubelet) ListenAndServePodResources(ctx context.Context) {
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
-func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID string) {
+func (kl *Kubelet) cleanUpContainersInPod(ctx context.Context, podID types.UID, exitedContainerID string) {
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
 		// When an evicted or deleted pod has already synced, all containers can be removed.
 		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
-		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+		kl.containerDeletor.deleteContainersInPod(ctx, exitedContainerID, podStatus, removeAll)
 	}
 }
 

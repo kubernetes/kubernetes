@@ -888,7 +888,7 @@ func TestParallelPuller(t *testing.T) {
 	useSerializedEnv := false
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			pod := &v1.Pod{
@@ -916,7 +916,7 @@ func TestParallelPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, msg, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+				_, msg, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded[pod.UID])
@@ -934,7 +934,7 @@ func TestSerializedPuller(t *testing.T) {
 	useSerializedEnv := true
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			pod := &v1.Pod{
@@ -962,7 +962,7 @@ func TestSerializedPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, msg, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+				_, msg, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded[pod.UID])
@@ -1029,19 +1029,19 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
-		ctx := ktesting.Init(t)
+		tCtx := ktesting.Init(t)
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
 
-		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+		_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded[pod.UID])
 		assert.Equal(t, c.expected[0].shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded[pod.UID])
 
-		images, _ := fakeRuntime.ListImages(ctx)
+		images, _ := fakeRuntime.ListImages(tCtx)
 		assert.Len(t, images, 1, "ListImages() count")
 
 		image := images[0]
@@ -1093,19 +1093,19 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
-		ctx := ktesting.Init(t)
+		tCtx := ktesting.Init(t)
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
 
-		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, runtimeHandler, container.ImagePullPolicy)
+		_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, runtimeHandler, container.ImagePullPolicy)
 		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded[pod.UID])
 		assert.Equal(t, c.expected[0].shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded[pod.UID])
 
-		images, _ := fakeRuntime.ListImages(ctx)
+		images, _ := fakeRuntime.ListImages(tCtx)
 		assert.Len(t, images, 1, "ListImages() count")
 
 		image := images[0]
@@ -1125,7 +1125,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 }
 
 func TestMaxParallelImagePullsLimit(t *testing.T) {
-	ctx := ktesting.Init(t)
+	tCtx := ktesting.Init(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
@@ -1165,7 +1165,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < maxParallelImagePulls; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}()
@@ -1177,7 +1177,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}()
@@ -1198,7 +1198,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 }
 
 func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	pod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod1",
@@ -1256,7 +1256,7 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func(i int) {
-			_, _, _ = puller.EnsureImageExists(ctx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
+			_, _, _ = puller.EnsureImageExists(tCtx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
 			wg.Done()
 		}(i)
 	}
@@ -1284,7 +1284,7 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func(i int) {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}(i)
@@ -1379,7 +1379,7 @@ func TestImagePullPrecheck(t *testing.T) {
 	useSerializedEnv := true
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			puller, fakeClock, fakeRuntime, container, _, fakeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			for _, expected := range c.expected {
@@ -1387,7 +1387,7 @@ func TestImagePullPrecheck(t *testing.T) {
 				fakeRecorder.Events = []*v1.Event{}
 				fakeClock.Step(time.Second)
 
-				_, _, err := puller.EnsureImageExists(ctx, &v1.ObjectReference{}, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
+				_, _, err := puller.EnsureImageExists(tCtx, &v1.ObjectReference{}, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
 				var recorderEvents []v1.Event
 				for _, event := range fakeRecorder.Events {
@@ -1397,7 +1397,7 @@ func TestImagePullPrecheck(t *testing.T) {
 					t.Errorf("unexpected events diff (-want +got):\n%s", diff)
 				}
 				if diff := cmp.Diff(expected.err, err, cmpopts.EquateErrors()); diff != "" {
-					ctx.Errorf("did not get expected error: %v\ndiff (-want, +got):\n%s", err, diff)
+					tCtx.Errorf("did not get expected error: %v\ndiff (-want, +got):\n%s", err, diff)
 				}
 			}
 		})
@@ -1489,9 +1489,9 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, tc.enableEnsureSecretImages)
 
-			ctx := context.Background()
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			fakeRuntime := &ctest.FakeRuntime{T: t}
 			fakeRecorder := testutil.NewFakeRecorder()
@@ -1543,7 +1543,7 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 				ImagePullPolicy: tc.policy,
 			}
 
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
 			require.NoError(t, err)
 
 			if tc.shouldCallMustAttemptPull {
@@ -1582,7 +1582,7 @@ func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	fakeRuntime := &ctest.FakeRuntime{T: t}
 	fakeRecorder := testutil.NewFakeRecorder()
@@ -1625,7 +1625,7 @@ func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
 		ImagePullPolicy: v1.PullIfNotPresent,
 	}
 
-	_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
+	_, _, err := puller.EnsureImageExists(tCtx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
 	require.NoError(t, err)
 
 	// Verify that MustAttemptImagePull was called with empty secrets and service accounts

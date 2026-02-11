@@ -57,7 +57,7 @@ const (
 )
 
 func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	_, tCtx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name            string
 		pvMode, podMode v1.PersistentVolumeMode
@@ -105,20 +105,20 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-			tCtx := ktesting.Init(t)
-			defer tCtx.Cancel("test has completed")
+			runCtx := ktesting.Init(t)
+			defer runCtx.Cancel("test has completed")
 			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
-			go manager.Run(tCtx, sourcesReady)
+			go manager.Run(runCtx, sourcesReady)
 
 			podManager.SetPods([]*v1.Pod{pod})
 
 			// Fake node status update
 			go simulateVolumeInUseUpdate(
 				v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
-				tCtx.Done(),
+				runCtx.Done(),
 				manager)
 
-			err = manager.WaitForAttachAndMount(ctx, pod)
+			err = manager.WaitForAttachAndMount(tCtx, pod)
 			if err != nil && !test.expectError {
 				t.Errorf("Expected success: %v", err)
 			}
@@ -151,7 +151,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestWaitForAttachAndMountError(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	_, tCtx := ktesting.NewTestContext(t)
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
@@ -232,14 +232,14 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, nil)
 
-	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
+	runCtx := ktesting.Init(t)
+	defer runCtx.Cancel("test has completed")
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
-	go manager.Run(tCtx, sourcesReady)
+	go manager.Run(runCtx, sourcesReady)
 
 	podManager.SetPods([]*v1.Pod{pod})
 
-	err = manager.WaitForAttachAndMount(ctx, pod)
+	err = manager.WaitForAttachAndMount(tCtx, pod)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -327,7 +327,7 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 	go manager.Run(tCtx, sourcesReady)
 	podManager.SetPods([]*v1.Pod{pod})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(tCtx, 1*time.Second)
 	defer cancel()
 	err = manager.WaitForAttachAndMount(ctx, pod)
 
@@ -389,7 +389,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	_, tCtx := ktesting.NewTestContext(t)
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
@@ -449,20 +449,20 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 
 		manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-		tCtx := ktesting.Init(t)
-		defer tCtx.Cancel("test has completed")
+		runCtx := ktesting.Init(t)
+		defer runCtx.Cancel("test has completed")
 		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
-		go manager.Run(tCtx, sourcesReady)
+		go manager.Run(runCtx, sourcesReady)
 
 		podManager.SetPods([]*v1.Pod{pod})
 
 		// Fake node status update
 		go simulateVolumeInUseUpdate(
 			v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
-			tCtx.Done(),
+			runCtx.Done(),
 			manager)
 
-		err = manager.WaitForAttachAndMount(ctx, pod)
+		err = manager.WaitForAttachAndMount(tCtx, pod)
 		if err != nil {
 			t.Errorf("Expected success: %v", err)
 			continue
@@ -741,7 +741,7 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 
 				for _, pod := range pods {
 					go func() {
-						err := manager.WaitForAttachAndMount(context.Background(), pod)
+						err := manager.WaitForAttachAndMount(ctx, pod)
 						resultChan <- attachResult{
 							podName: pod.Name,
 							err:     err,

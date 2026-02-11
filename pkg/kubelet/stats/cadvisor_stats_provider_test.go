@@ -17,7 +17,6 @@ limitations under the License.
 package stats
 
 import (
-	"context"
 	"runtime"
 	"testing"
 
@@ -119,7 +118,7 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 
 func TestCadvisorListPodStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	const (
 		namespace0 = "test0"
 		namespace2 = "test2"
@@ -253,7 +252,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	mockCadvisor := cadvisortest.NewMockInterface(t)
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
-	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imagefs, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(tCtx).Return(imagefs, nil)
 
 	mockRuntime := containertest.NewMockRuntime(t)
 
@@ -278,7 +277,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, mockRuntime, mockStatus, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
-	pods, err := p.ListPodStats(ctx)
+	pods, err := p.ListPodStats(tCtx)
 	assert.NoError(t, err)
 
 	assert.Len(t, pods, 4)
@@ -465,7 +464,7 @@ func TestCadvisorPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
-	ctx := ktesting.Init(t)
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	const (
 		namespace0 = "test0"
@@ -557,7 +556,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
-	pods, err := p.ListPodCPUAndMemoryStats(ctx)
+	pods, err := p.ListPodCPUAndMemoryStats(tCtx)
 	assert.NoError(t, err)
 
 	assert.Len(t, pods, 3)
@@ -644,7 +643,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	var (
 		assert       = assert.New(t)
 		mockCadvisor = cadvisortest.NewMockInterface(t)
@@ -657,11 +656,11 @@ func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, false)
 
-	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
-	mockRuntime.EXPECT().ImageStats(ctx).Return(imageStats, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(tCtx).Return(imageFsInfo, nil)
+	mockRuntime.EXPECT().ImageStats(tCtx).Return(imageStats, nil)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
-	stats, _, err := provider.ImageFsStats(ctx)
+	stats, _, err := provider.ImageFsStats(tCtx)
 	assert.NoError(err)
 
 	assert.Equal(imageFsInfo.Timestamp, stats.Time.Time)
@@ -730,19 +729,19 @@ func TestImageFsStatsCustomResponse(t *testing.T) {
 			shouldErr:           false,
 		},
 	} {
-		ctx := context.Background()
+		tCtx := ktesting.Init(t)
 		mockCadvisor := cadvisortest.NewMockInterface(t)
 		mockRuntime := containertest.NewMockRuntime(t)
 
 		res := getTestFsInfo(1000)
-		mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(res, nil)
-		mockRuntime.EXPECT().ImageFsInfo(ctx).Return(tc.response, nil)
+		mockCadvisor.EXPECT().ImagesFsInfo(tCtx).Return(res, nil)
+		mockRuntime.EXPECT().ImageFsInfo(tCtx).Return(tc.response, nil)
 		if tc.callContainerFsInfo {
-			mockCadvisor.EXPECT().ContainerFsInfo(ctx).Return(res, nil)
+			mockCadvisor.EXPECT().ContainerFsInfo(tCtx).Return(res, nil)
 		}
 
 		provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
-		stats, containerfs, err := provider.ImageFsStats(ctx)
+		stats, containerfs, err := provider.ImageFsStats(tCtx)
 		if tc.shouldErr {
 			require.Error(t, err, desc)
 			assert.Nil(t, stats)
@@ -754,7 +753,7 @@ func TestImageFsStatsCustomResponse(t *testing.T) {
 }
 
 func TestCadvisorImagesFsStats(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	var (
 		assert       = assert.New(t)
 		mockCadvisor = cadvisortest.NewMockInterface(t)
@@ -775,11 +774,11 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
-	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
-	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(tCtx).Return(imageFsInfo, nil)
+	mockRuntime.EXPECT().ImageFsInfo(tCtx).Return(imageFsInfoResponse, nil)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
-	stats, containerfs, err := provider.ImageFsStats(ctx)
+	stats, containerfs, err := provider.ImageFsStats(tCtx)
 	assert.NoError(err)
 
 	assert.Equal(imageFsInfo.Timestamp, stats.Time.Time)
@@ -799,7 +798,7 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 }
 
 func TestCadvisorSplitImagesFsStats(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	var (
 		assert       = assert.New(t)
 		mockCadvisor = cadvisortest.NewMockInterface(t)
@@ -827,13 +826,13 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 		ContainerFilesystems: []*runtimeapi.FilesystemUsage{containerFsInfoCRI},
 	}
 
-	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
-	mockCadvisor.EXPECT().ContainerFsInfo(ctx).Return(containerFsInfo, nil)
-	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(tCtx).Return(imageFsInfo, nil)
+	mockCadvisor.EXPECT().ContainerFsInfo(tCtx).Return(containerFsInfo, nil)
+	mockRuntime.EXPECT().ImageFsInfo(tCtx).Return(imageFsInfoResponse, nil)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
-	stats, containerfs, err := provider.ImageFsStats(ctx)
+	stats, containerfs, err := provider.ImageFsStats(tCtx)
 	assert.NoError(err)
 
 	assert.Equal(imageFsInfo.Timestamp, stats.Time.Time)
@@ -852,7 +851,7 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 }
 
 func TestCadvisorSameDiskDifferentLocations(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	var (
 		assert       = assert.New(t)
 		mockCadvisor = cadvisortest.NewMockInterface(t)
@@ -880,13 +879,13 @@ func TestCadvisorSameDiskDifferentLocations(t *testing.T) {
 		ContainerFilesystems: []*runtimeapi.FilesystemUsage{containerFsInfoCRI},
 	}
 
-	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
-	mockCadvisor.EXPECT().ContainerFsInfo(ctx).Return(containerFsInfo, nil)
-	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(tCtx).Return(imageFsInfo, nil)
+	mockCadvisor.EXPECT().ContainerFsInfo(tCtx).Return(containerFsInfo, nil)
+	mockRuntime.EXPECT().ImageFsInfo(tCtx).Return(imageFsInfoResponse, nil)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
-	stats, containerfs, err := provider.ImageFsStats(ctx)
+	stats, containerfs, err := provider.ImageFsStats(tCtx)
 	require.NoError(t, err, "imageFsStats should have no error")
 
 	assert.Equal(imageFsInfo.Timestamp, stats.Time.Time)
@@ -905,7 +904,7 @@ func TestCadvisorSameDiskDifferentLocations(t *testing.T) {
 }
 
 func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	const (
 		namespace0 = "test0"
 	)
@@ -984,10 +983,10 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	mockCadvisor := cadvisortest.NewMockInterface(t)
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
-	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imagefs, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(tCtx).Return(imagefs, nil)
 
 	mockRuntime := containertest.NewMockRuntime(t)
-	mockRuntime.EXPECT().ImageStats(ctx).Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).Maybe()
+	mockRuntime.EXPECT().ImageStats(tCtx).Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).Maybe()
 
 	volumeStats := serverstats.PodVolumeStats{}
 	p0Time := metav1.Now()
@@ -997,7 +996,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, mockRuntime, mockStatus, NewFakeHostStatsProviderWithData(fakeStats, fakeOS), nil)
-	pods, err := p.ListPodStats(ctx)
+	pods, err := p.ListPodStats(tCtx)
 	assert.NoError(t, err)
 
 	assert.Len(t, pods, 1)

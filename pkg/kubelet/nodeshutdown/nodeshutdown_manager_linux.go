@@ -151,11 +151,27 @@ func (m *managerImpl) Start(ctx context.Context) error {
 	}
 	go func() {
 		for {
-			if stop != nil {
-				<-stop
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
 
-			time.Sleep(dbusReconnectPeriod)
+			if stop != nil {
+				select {
+				case <-stop:
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			t := time.NewTimer(dbusReconnectPeriod)
+			select {
+			case <-t.C:
+			case <-ctx.Done():
+				t.Stop()
+				return
+			}
 			m.logger.V(1).Info("Restarting watch for node shutdown events")
 			stop, err = m.start(ctx)
 			if err != nil {
@@ -248,6 +264,9 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 		// 3. When shutdown(false) event is received, this indicates a previous shutdown was cancelled. In this case, acquire the inhibit lock again.
 		for {
 			select {
+			case <-ctx.Done():
+				close(stop)
+				return
 			case isShuttingDown, ok := <-events:
 				if !ok {
 					m.logger.Error(err, "Ended to watching the node for shutdown events")
@@ -277,7 +296,9 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 					// Update node status and ready condition
 					go m.syncNodeStatus(ctx)
 
-					m.processShutdownEvent()
+					if err := m.processShutdownEvent(ctx); err != nil {
+						m.logger.Error(err, "Shutdown manager failed to process shutdown event")
+					}
 				} else {
 					_ = m.acquireInhibitLock()
 				}
@@ -310,7 +331,7 @@ func (m *managerImpl) ShutdownStatus() error {
 	return nil
 }
 
-func (m *managerImpl) processShutdownEvent() error {
+func (m *managerImpl) processShutdownEvent(ctx context.Context) error {
 	m.logger.V(1).Info("Shutdown manager processing shutdown event")
 	activePods := m.getPods()
 
@@ -343,5 +364,5 @@ func (m *managerImpl) processShutdownEvent() error {
 		}()
 	}
 
-	return m.podManager.killPods(activePods)
+	return m.podManager.killPods(ctx, activePods)
 }

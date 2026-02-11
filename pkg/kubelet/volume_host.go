@@ -53,13 +53,13 @@ import (
 // plugins - used to initialize volumePluginMgr
 func NewInitializedVolumePluginMgr(
 	kubelet *Kubelet,
+	logger klog.Logger,
 	secretManager secret.Manager,
 	configMapManager configmap.Manager,
 	tokenManager *token.Manager,
 	clusterTrustBundleManager clustertrustbundle.Manager,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
-
 	// Initialize csiDriverLister before calling InitPlugins
 	var informerFactory informers.SharedInformerFactory
 	var csiDriverLister storagelisters.CSIDriverLister
@@ -73,7 +73,7 @@ func NewInitializedVolumePluginMgr(
 		csiDriversSynced = csiDriverInformer.Informer().HasSynced
 
 	} else {
-		klog.InfoS("KubeClient is nil. Skip initialization of CSIDriverLister")
+		logger.Info("KubeClient is nil. Skip initialization of CSIDriverLister")
 	}
 
 	kvh := &kubeletVolumeHost{
@@ -173,14 +173,16 @@ func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
+	// TODO: VolumeHost interface should be updated to accept context or logger parameters.
+	logger := klog.TODO()
 	if kvh.csiDriversSynced == nil {
-		klog.ErrorS(nil, "CsiDriversSynced not found on KubeletVolumeHost")
+		logger.Error(nil, "CsiDriversSynced not found on KubeletVolumeHost")
 		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
 	}
 
 	synced := []cache.InformerSynced{kvh.csiDriversSynced}
 	if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
-		klog.InfoS("Failed to wait for cache sync for CSIDriverLister")
+		logger.Info("Failed to wait for cache sync for CSIDriverLister")
 		return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
 	}
 
@@ -191,13 +193,15 @@ func (kvh *kubeletVolumeHost) NewWrapperMounter(
 	volName string,
 	spec volume.Spec,
 	pod *v1.Pod) (volume.Mounter, error) {
+	// TODO: VolumeHost interface should be updated to accept context or logger parameters.
+	logger := klog.TODO()
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
 		spec.Volume.Name = wrapperVolumeName
 	}
 
-	return kvh.kubelet.newVolumeMounterFromPlugins(&spec, pod)
+	return kvh.kubelet.newVolumeMounterFromPlugins(logger, &spec, pod)
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
@@ -221,7 +225,9 @@ func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.getNodeAnyWay(context.TODO())
+	logger := klog.TODO()
+	ctx := klog.NewContext(context.TODO(), logger)
+	node, err := kvh.kubelet.getNodeAnyWay(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
@@ -268,7 +274,9 @@ func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Cont
 
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.GetNode(context.TODO())
+	logger := klog.TODO()
+	ctx := klog.NewContext(context.TODO(), logger)
+	node, err := kvh.kubelet.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
@@ -277,7 +285,9 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 
 func (kvh *kubeletVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
 	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.GetNode(context.TODO())
+	logger := klog.TODO()
+	ctx := klog.NewContext(context.TODO(), logger)
+	node, err := kvh.kubelet.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}

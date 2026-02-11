@@ -21,11 +21,12 @@ package validation
 import (
 	"fmt"
 
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
-func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
+func validateKubeletOSConfiguration(logger klog.Logger, kc *kubeletconfig.KubeletConfiguration) error {
 	if kc.SingleProcessOOMKill != nil {
 		return fmt.Errorf("invalid configuration: singleProcessOOMKill is only supported on linux")
 	}

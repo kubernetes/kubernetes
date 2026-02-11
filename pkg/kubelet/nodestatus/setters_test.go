@@ -40,7 +40,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/version"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -280,7 +279,7 @@ func TestNodeAddress(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			// testCase setup
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -330,7 +329,7 @@ func TestNodeAddress(t *testing.T) {
 			)
 
 			// call setter on existing node
-			err := setter(ctx, existingNode)
+			err := setter(tCtx, existingNode)
 			if err != nil && !testCase.shouldError {
 				t.Fatalf("unexpected error: %v", err)
 			} else if err != nil && testCase.shouldError {
@@ -386,7 +385,7 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			// testCase setup
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
@@ -416,7 +415,7 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 				resolvedAddressesFunc)
 
 			// call setter on existing node
-			err := setter(ctx, existingNode)
+			err := setter(tCtx, existingNode)
 			if testCase.shouldError && err == nil {
 				t.Fatal("expected error but no error returned")
 			}
@@ -915,7 +914,7 @@ func TestMachineInfo(t *testing.T) {
 		}
 
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			machineInfoFunc := func() (*cadvisorapiv1.MachineInfo, error) {
 				return tc.machineInfo, tc.machineInfoError
 			}
@@ -942,7 +941,7 @@ func TestMachineInfo(t *testing.T) {
 			setter := MachineInfo(nodeName, tc.maxPods, tc.podsPerCore, machineInfoFunc, capacityFunc,
 				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc, tc.disableLocalStorageCapacityIsolation)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tCtx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected node
@@ -1076,7 +1075,7 @@ func TestVersionInfo(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			versionInfoFunc := func() (*cadvisorapiv1.VersionInfo, error) {
 				return tc.versionInfo, tc.versionInfoError
 			}
@@ -1089,7 +1088,7 @@ func TestVersionInfo(t *testing.T) {
 			// construct setter
 			setter := VersionInfo(versionInfoFunc, runtimeTypeFunc, runtimeVersionFunc)
 			// call setter on node
-			err := setter(ctx, tc.node)
+			err := setter(tCtx, tc.node)
 			require.Equal(t, tc.expectError, err)
 			// check expected node
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
@@ -1153,7 +1152,7 @@ func TestImages(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			imageListFunc := func() ([]kubecontainer.Image, error) {
 				// today, imageListFunc is expected to return a sorted list,
 				// but we may choose to sort in the setter at some future point
@@ -1165,7 +1164,7 @@ func TestImages(t *testing.T) {
 			setter := Images(tc.maxImages, imageListFunc)
 			// call setter on node
 			node := &v1.Node{}
-			err := setter(ctx, node)
+			err := setter(tCtx, node)
 			require.Equal(t, tc.expectError, err)
 			// check expected node, image list should be reset to empty when there is an error
 			expectNode := &v1.Node{}
@@ -1319,7 +1318,7 @@ func TestReadyCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			runtimeErrorsFunc := func() error {
 				return tc.runtimeErrors
 			}
@@ -1336,7 +1335,7 @@ func TestReadyCondition(t *testing.T) {
 				return tc.nodeShutdownManagerErrors
 			}
 			events := []testEvent{}
-			recordEventFunc := func(logger klog.Logger, eventType, event string) {
+			recordEventFunc := func(ctx context.Context, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1345,7 +1344,7 @@ func TestReadyCondition(t *testing.T) {
 			// construct setter
 			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, cmStatusFunc, nodeShutdownErrorsFunc, recordEventFunc, !tc.disableLocalStorageCapacityIsolation)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tCtx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
@@ -1453,9 +1452,9 @@ func TestMemoryPressureCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			events := []testEvent{}
-			recordEventFunc := func(logger klog.Logger, eventType, event string) {
+			recordEventFunc := func(ctx context.Context, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1467,7 +1466,7 @@ func TestMemoryPressureCondition(t *testing.T) {
 			// construct setter
 			setter := MemoryPressureCondition(nowFunc, pressureFunc, recordEventFunc)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tCtx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
@@ -1575,9 +1574,9 @@ func TestPIDPressureCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			events := []testEvent{}
-			recordEventFunc := func(logger klog.Logger, eventType, event string) {
+			recordEventFunc := func(ctx context.Context, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1589,7 +1588,7 @@ func TestPIDPressureCondition(t *testing.T) {
 			// construct setter
 			setter := PIDPressureCondition(nowFunc, pressureFunc, recordEventFunc)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tCtx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
@@ -1697,9 +1696,9 @@ func TestDiskPressureCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			events := []testEvent{}
-			recordEventFunc := func(logger klog.Logger, eventType, event string) {
+			recordEventFunc := func(ctx context.Context, eventType, event string) {
 				events = append(events, testEvent{
 					eventType: eventType,
 					event:     event,
@@ -1711,7 +1710,7 @@ func TestDiskPressureCondition(t *testing.T) {
 			// construct setter
 			setter := DiskPressureCondition(nowFunc, pressureFunc, recordEventFunc)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tCtx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
@@ -1758,7 +1757,7 @@ func TestVolumesInUse(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			syncedFunc := func() bool {
 				return tc.synced
 			}
@@ -1768,7 +1767,7 @@ func TestVolumesInUse(t *testing.T) {
 			// construct setter
 			setter := VolumesInUse(syncedFunc, volumesInUseFunc)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tCtx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected volumes
@@ -1796,7 +1795,7 @@ func TestDaemonEndpoints(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := ktesting.Init(t)
+			tCtx := ktesting.Init(t)
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: testKubeletHostname,
@@ -1808,7 +1807,7 @@ func TestDaemonEndpoints(t *testing.T) {
 			}
 
 			setter := DaemonEndpoints(test.endpoints)
-			if err := setter(ctx, existingNode); err != nil {
+			if err := setter(tCtx, existingNode); err != nil {
 				t.Fatal(err)
 			}
 

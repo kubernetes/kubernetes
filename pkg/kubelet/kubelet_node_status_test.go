@@ -189,7 +189,6 @@ func (l delegatingNodeLister) List(selector labels.Selector) (ret []*v1.Node, er
 }
 
 func TestUpdateNewNodeStatus(t *testing.T) {
-	tCtx := ktesting.Init(t)
 	cases := []struct {
 		desc                string
 		nodeStatusMaxImages int32
@@ -206,6 +205,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			// generate one more in inputImageList than we configure the Kubelet to report,
 			// or 5 images if unlimited
 			numTestImages := int(tc.nodeStatusMaxImages) + 1
@@ -1071,7 +1071,6 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 }
 
 func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
-	tCtx := ktesting.Init(t)
 	cases := []struct {
 		desc                  string
 		existingVolumes       []v1.UniqueVolumeName // volumes to initially populate volumeManager
@@ -1120,6 +1119,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			// Setup
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
@@ -1387,7 +1387,6 @@ func TestRegisterWithApiServer(t *testing.T) {
 }
 
 func TestTryRegisterWithApiServer(t *testing.T) {
-	tCtx := ktesting.Init(t)
 	alreadyExists := &apierrors.StatusError{
 		ErrStatus: metav1.Status{Reason: metav1.StatusReasonAlreadyExists},
 	}
@@ -1527,6 +1526,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			if tc.getOnForbiddenDisabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.32"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletRegistrationGetOnExistsOnly, true)
@@ -2171,7 +2171,6 @@ func TestUpdateDefaultResources(t *testing.T) {
 }
 
 func TestReconcileHugePageResource(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	hugePageResourceName64Ki := v1.ResourceName("hugepages-64Ki")
 	hugePageResourceName2Mi := v1.ResourceName("hugepages-2Mi")
@@ -2453,10 +2452,11 @@ func TestReconcileHugePageResource(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(T *testing.T) {
+			tCtx := ktesting.Init(T)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 
-			needsUpdate := kubelet.reconcileHugePageResource(logger, tc.initialNode, tc.existingNode)
+			needsUpdate := kubelet.reconcileHugePageResource(tCtx, tc.initialNode, tc.existingNode)
 			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
 		})
@@ -2464,7 +2464,6 @@ func TestReconcileHugePageResource(t *testing.T) {
 
 }
 func TestReconcileExtendedResource(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
@@ -2645,6 +2644,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 
+		logger, _ := ktesting.NewTestContext(t)
 		needsUpdate := kubelet.reconcileExtendedResource(logger, tc.initialNode, tc.existingNode)
 		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 		assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
@@ -2735,7 +2735,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 	for _, test := range tests {
 		err := validateNodeIP(netutils.ParseIPSloppy(test.nodeIP))
 		if test.success {
-			require.NoErrorf(t, err, "test %s", test.testName)
+			assert.NoErrorf(t, err, "test %s", test.testName)
 		} else {
 			assert.Errorf(t, err, "test %s", test.testName)
 		}
@@ -2945,7 +2945,6 @@ func TestNodeStatusHasChanged(t *testing.T) {
 }
 
 func TestUpdateNodeAddresses(t *testing.T) {
-	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -3060,6 +3059,7 @@ func TestUpdateNodeAddresses(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			oldNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 				Spec:       v1.NodeSpec{},
@@ -3076,14 +3076,14 @@ func TestUpdateNodeAddresses(t *testing.T) {
 			}
 
 			_, err := kubeClient.CoreV1().Nodes().Update(tCtx, oldNode, metav1.UpdateOptions{})
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			kubelet.setNodeStatusFuncs = []func(context.Context, *v1.Node) error{
 				func(_ context.Context, node *v1.Node) error {
 					node.Status.Addresses = expectedNode.Status.Addresses
 					return nil
 				},
 			}
-			require.NoError(t, kubelet.updateNodeStatus(tCtx))
+			assert.NoError(t, kubelet.updateNodeStatus(tCtx))
 
 			actions := kubeClient.Actions()
 			lastAction := actions[len(actions)-1]
@@ -3169,7 +3169,6 @@ func TestCalculateDelay(t *testing.T) {
 }
 
 func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
-	tCtx := ktesting.Init(t)
 	testCases := []struct {
 		name               string
 		featureGateEnabled bool
@@ -3198,6 +3197,7 @@ func TestSetNodeStatusDeclaredFeatures(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
 
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)

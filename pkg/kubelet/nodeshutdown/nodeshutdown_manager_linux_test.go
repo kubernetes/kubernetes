@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	testingktesting "k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -344,7 +345,7 @@ func TestManager(t *testing.T) {
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
 				KillPodFunc:                     killPodsFunc,
-				SyncNodeStatusFunc:              func(context context.Context) {},
+				SyncNodeStatusFunc:              func(context.Context) {},
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: tc.shutdownGracePeriodCriticalPods,
 				Clock:                           testingclock.NewFakeClock(time.Now()),
@@ -429,7 +430,7 @@ func TestFeatureEnabled(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
 			activePodsFunc := func() []*v1.Pod {
 				return nil
 			}
@@ -461,6 +462,8 @@ func TestFeatureEnabled(t *testing.T) {
 
 func TestRestart(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
@@ -511,7 +514,7 @@ func TestRestart(t *testing.T) {
 		StateDirectory:                  os.TempDir(),
 	})
 
-	err := manager.Start(tCtx)
+	err := manager.Start(ctx)
 	lock.Unlock()
 
 	if err != nil {
@@ -619,7 +622,8 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 					clock:                            tt.fields.clock,
 				},
 			}
-			if err := m.processShutdownEvent(); (err != nil) != tt.wantErr {
+			tCtx := testingktesting.Init(t)
+			if err := m.processShutdownEvent(tCtx); (err != nil) != tt.wantErr {
 				t.Errorf("managerImpl.processShutdownEvent() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -682,7 +686,8 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	}
 
 	start := fakeclock.Now()
-	err := m.processShutdownEvent()
+	tCtx := testingktesting.Init(t)
+	err := m.processShutdownEvent(tCtx)
 	end := fakeclock.Now()
 
 	require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")

@@ -37,6 +37,7 @@ import (
 // If neither container-level nor pod-level resources limits are specified, it defaults
 // to the node's allocatable resources.
 func (kl *Kubelet) defaultPodLimitsForDownwardAPI(ctx context.Context, pod *corev1.Pod, container *corev1.Container) (*corev1.Pod, *corev1.Container, error) {
+	logger := klog.FromContext(ctx)
 	if pod == nil {
 		return nil, nil, fmt.Errorf("invalid input, pod cannot be nil")
 	}
@@ -62,7 +63,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(ctx context.Context, pod *core
 		}
 	}
 
-	klog.InfoS("Allocatable", "allocatable", allocatable)
+	logger.Info("Allocatable", "allocatable", allocatable)
 	outputPod := pod.DeepCopy()
 	for idx := range outputPod.Spec.Containers {
 		resource.MergeContainerResourceLimits(&outputPod.Spec.Containers[idx], allocatable)

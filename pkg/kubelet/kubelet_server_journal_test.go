@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"bytes"
-	"context"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -31,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -258,7 +258,7 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 }
 
 func Test_heuristicsCopyFileLogs(t *testing.T) {
-	ctx := context.TODO()
+	tCtx := ktesting.Init(t)
 	buf := &bytes.Buffer{}
 
 	dir, err := os.MkdirTemp("", "logs")
@@ -268,14 +268,14 @@ func Test_heuristicsCopyFileLogs(t *testing.T) {
 	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Check missing logs
-	heuristicsCopyFileLogs(ctx, buf, dir, "service.log")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service.log")
 	if !strings.Contains(buf.String(), "log not found for service.log") {
 		t.Fail()
 	}
 	buf.Reset()
 
 	// Check missing service logs
-	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service")
 	if !strings.Contains(buf.String(), "log not found for service") {
 		t.Fail()
 	}
@@ -285,14 +285,14 @@ func Test_heuristicsCopyFileLogs(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "service.log"), []byte("valid logs"), 0o444); err != nil {
 		t.Fatal(err)
 	}
-	heuristicsCopyFileLogs(ctx, buf, dir, "service.log")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service.log")
 	if buf.String() != "valid logs" {
 		t.Fail()
 	}
 	buf.Reset()
 
 	// Check service logs
-	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service")
 	if buf.String() != "valid logs" {
 		t.Fail()
 	}
@@ -302,7 +302,7 @@ func Test_heuristicsCopyFileLogs(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, "service"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service")
 	if buf.String() != "valid logs" {
 		t.Fail()
 	}
@@ -312,7 +312,7 @@ func Test_heuristicsCopyFileLogs(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "service", "service.log"), []byte("error"), 0o444); err != nil {
 		t.Fatal(err)
 	}
-	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service")
 	if buf.String() != "valid logs" {
 		t.Fail()
 	}

@@ -19,7 +19,6 @@ limitations under the License.
 package stats
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -31,11 +30,12 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestSummaryProvider(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	var (
-		ctx            = context.Background()
 		podStats       = []statsapi.PodStats{*getPodStats()}
 		imageFsStats   = getFsStats()
 		rootFsStats    = getFsStats()
@@ -54,12 +54,12 @@ func TestSummaryProvider(t *testing.T) {
 	assert := assert.New(t)
 
 	mockStatsProvider := statstest.NewMockProvider(t)
-	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil).Maybe()
+	mockStatsProvider.EXPECT().GetNode(tCtx).Return(node, nil).Maybe()
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig).Maybe()
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot).Maybe()
-	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).Maybe()
-	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ListPodStats(tCtx).Return(podStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(tCtx).Return(podStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ImageFsStats(tCtx).Return(imageFsStats, imageFsStats, nil).Maybe()
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil).Maybe()
 	mockStatsProvider.EXPECT().RlimitStats().Return(nil, nil).Maybe()
 	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).Maybe()
@@ -67,7 +67,7 @@ func TestSummaryProvider(t *testing.T) {
 	kubeletCreationTime := metav1.Now()
 	systemBootTime := metav1.Now()
 	provider := summaryProviderImpl{kubeletCreationTime: kubeletCreationTime, systemBootTime: systemBootTime, provider: mockStatsProvider}
-	summary, err := provider.Get(ctx, true)
+	summary, err := provider.Get(tCtx, true)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")
