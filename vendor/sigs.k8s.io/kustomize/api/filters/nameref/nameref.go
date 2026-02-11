@@ -205,16 +205,14 @@ func getRoleRefGvk(n *resource.Resource) (*resid.Gvk, error) {
 		return nil, err
 	}
 	if apiGroup.IsNil() {
-		return nil, fmt.Errorf(
-			"apiGroup cannot be found in roleRef %s", roleRef.MustString())
+		return nil, fmt.Errorf("apiGroup cannot be found in roleRef %s", roleRef.MustString())
 	}
 	kind, err := roleRef.Pipe(yaml.Lookup("kind"))
 	if err != nil {
 		return nil, err
 	}
 	if kind.IsNil() {
-		return nil, fmt.Errorf(
-			"kind cannot be found in roleRef %s", roleRef.MustString())
+		return nil, fmt.Errorf("kind cannot be found in roleRef %s", roleRef.MustString())
 	}
 	return &resid.Gvk{
 		Group: apiGroup.YNode().Value,

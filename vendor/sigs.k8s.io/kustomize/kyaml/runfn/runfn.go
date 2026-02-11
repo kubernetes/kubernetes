@@ -230,7 +230,7 @@ func (r RunFns) runFunctions(
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf(strings.Join(errs, "\n---\n"))
+		return fmt.Errorf("%s", strings.Join(errs, "\n---\n"))
 	}
 	return nil
 }
