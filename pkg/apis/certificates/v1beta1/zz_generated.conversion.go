@@ -463,6 +463,7 @@ func autoConvert_v1beta1_PodCertificateRequestSpec_To_certificates_PodCertificat
 	out.MaxExpirationSeconds = (*int32)(unsafe.Pointer(in.MaxExpirationSeconds))
 	out.PKIXPublicKey = *(*[]byte)(unsafe.Pointer(&in.PKIXPublicKey))
 	out.ProofOfPossession = *(*[]byte)(unsafe.Pointer(&in.ProofOfPossession))
+	out.StubPKCS10Request = *(*[]byte)(unsafe.Pointer(&in.StubPKCS10Request))
 	out.UnverifiedUserAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UnverifiedUserAnnotations))
 	return nil
 }
@@ -483,6 +484,7 @@ func autoConvert_certificates_PodCertificateRequestSpec_To_v1beta1_PodCertificat
 	out.MaxExpirationSeconds = (*int32)(unsafe.Pointer(in.MaxExpirationSeconds))
 	out.PKIXPublicKey = *(*[]byte)(unsafe.Pointer(&in.PKIXPublicKey))
 	out.ProofOfPossession = *(*[]byte)(unsafe.Pointer(&in.ProofOfPossession))
+	out.StubPKCS10Request = *(*[]byte)(unsafe.Pointer(&in.StubPKCS10Request))
 	out.UnverifiedUserAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UnverifiedUserAnnotations))
 	return nil
 }

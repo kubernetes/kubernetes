@@ -43,6 +43,7 @@ spec:
   serviceAccountName: serviceAccountNameValue
   serviceAccountUID: serviceAccountUIDValue
   signerName: signerNameValue
+  stubPKCS10Request: DA==
   unverifiedUserAnnotations:
     unverifiedUserAnnotationsKey: unverifiedUserAnnotationsValue
 status:

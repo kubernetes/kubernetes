@@ -3983,6 +3983,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: stubPKCS10Request
+      type:
+        scalar: string
     - name: unverifiedUserAnnotations
       type:
         map:
