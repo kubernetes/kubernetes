@@ -18,17 +18,31 @@ package daemonset
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"math/big"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	admissionv1 "k8s.io/api/admission/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -53,6 +67,8 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	utilnet "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 var zero = int64(0)
@@ -1326,4 +1342,254 @@ func TestDaemonSetRollingUpdateWithTolerations(t *testing.T) {
 	validateDaemonSetPodsActive(podClient, podInformer, 0, t)
 	validateDaemonSetStatus(dsClient, ds.Name, 0, t)
 	validateUpdatedNumberScheduled(ctx, dsClient, ds.Name, 0, t)
+}
+
+// TestDaemonSetRecreatesPodAfterFirstWebhookTermination verifies that a DaemonSet can
+// successfully recreate a Pod after the first Pod creation is "interrupted" by a mutating
+// webhook that adds a deletionTimestamp (simulating an immediate termination scenario).
+func TestDaemonSetRecreatesPodAfterFirstWebhookTermination(t *testing.T) {
+	ctx, closeFn, dc, informers, clientset := setup(t)
+	defer closeFn()
+
+	ns := framework.CreateNamespaceOrDie(clientset, "ds-webhook-test", t)
+	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
+
+	dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+	podClient := clientset.CoreV1().Pods(ns.Name)
+
+	informers.Start(ctx.Done())
+	go dc.Run(ctx, 2)
+
+	// 1. Start a local mutating webhook server
+	ca := &x509.Certificate{
+		SerialNumber:          big.NewInt(2026),
+		Subject:               pkix.Name{Organization: []string{"Test CA"}},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+
+	caPrivKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate CA key: %v", err)
+	}
+
+	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
+	if err != nil {
+		t.Fatalf("failed to create CA cert: %v", err)
+	}
+	serverCert := &x509.Certificate{
+		SerialNumber: big.NewInt(2027),
+		Subject:      pkix.Name{CommonName: "localhost"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:  []net.IP{utilnet.ParseIPSloppy("127.0.0.1")},
+		DNSNames:     []string{"localhost"},
+	}
+
+	serverPrivKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate server key: %v", err)
+	}
+
+	serverBytes, err := x509.CreateCertificate(rand.Reader, serverCert, ca, &serverPrivKey.PublicKey, caPrivKey)
+	if err != nil {
+		t.Fatalf("failed to create server cert: %v", err)
+	}
+
+	privDER := x509.MarshalPKCS1PrivateKey(serverPrivKey)
+
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverBytes})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: privDER})
+	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caBytes})
+	serverCertPair, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		t.Fatalf("failed to parse server cert/key: %v", err)
+	}
+	caBundle := caPEM
+	var firstPodMutated = true
+	mux := http.NewServeMux()
+	mux.HandleFunc("/mutate", func(w http.ResponseWriter, r *http.Request) {
+		var review admissionv1.AdmissionReview
+		if err := json.NewDecoder(r.Body).Decode(&review); err != nil {
+			admResponse(t, w, admissionResponse(false, "failed to decode", review.Request.UID))
+			return
+		}
+
+		// Default: allow everything that is not a pod creation
+		if review.Request == nil || review.Request.Resource.Resource != "pods" || review.Request.Operation != admissionv1.Create {
+			admResponse(t, w, admissionResponse(true, "", review.Request.UID))
+			return
+		}
+
+		// Parse the Pod object from the admission request
+		var pod v1.Pod
+		if err := json.Unmarshal(review.Request.Object.Raw, &pod); err != nil {
+			admResponse(t, w, admissionResponse(true, "", review.Request.UID))
+			return
+		}
+
+		// Only apply mutation to Pods owned by a DaemonSet in this test namespace
+		isDaemonSetPod := false
+		for _, ref := range pod.OwnerReferences {
+			if ref.Kind == "DaemonSet" && ref.APIVersion == "apps/v1" {
+				isDaemonSetPod = true
+				break
+			}
+		}
+
+		if isDaemonSetPod && pod.Namespace == ns.Name && firstPodMutated {
+			// On the very first Pod creation attempt, inject deletionTimestamp
+			now := metav1.Now()
+			patch := []map[string]interface{}{
+				{
+					"op":    "add",
+					"path":  "/metadata/deletionTimestamp",
+					"value": now,
+				},
+			}
+
+			patchBytes, _ := json.Marshal(patch)
+			response := admissionv1.AdmissionResponse{
+				UID:     review.Request.UID,
+				Allowed: true,
+				Patch:   patchBytes,
+				PatchType: func() *admissionv1.PatchType {
+					pt := admissionv1.PatchTypeJSONPatch
+					return &pt
+				}(),
+			}
+			review.Response = &response
+			respBytes, _ := json.Marshal(review)
+			w.Header().Set("Content-Type", "application/json")
+			if _, err = w.Write(respBytes); err != nil {
+				t.Errorf("failed to write response: %v", err)
+			}
+			firstPodMutated = false
+			return
+		}
+
+		// All other requests (including retries) are allowed without modification
+		admResponse(t, w, admissionResponse(true, "", review.Request.UID))
+	})
+
+	// httptest 的 TLS server
+	server := httptest.NewUnstartedServer(mux)
+	server.TLS = &tls.Config{
+		Certificates: []tls.Certificate{serverCertPair},
+		NextProtos:   []string{"http/1.1"},
+	}
+	server.StartTLS()
+	defer server.Close()
+
+	webhookURL := server.URL + "/mutate"
+
+	// 2. Create a MutatingWebhookConfiguration that targets only this namespace
+	mwc := &admissionregistrationv1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "ds-first-pod-termination-webhook"},
+		Webhooks: []admissionregistrationv1.MutatingWebhook{
+			{
+				Name: "ds-first-termination.example.com",
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
+					URL:      ptr.To(webhookURL),
+					CABundle: []byte(caBundle),
+				},
+				Rules: []admissionregistrationv1.RuleWithOperations{
+					{
+						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
+						Rule: admissionregistrationv1.Rule{
+							APIGroups:   []string{""},
+							APIVersions: []string{"v1"},
+							Resources:   []string{"pods"},
+						},
+					},
+				},
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"kubernetes.io/metadata.name": ns.Name},
+				},
+				SideEffects:             ptr.To(admissionregistrationv1.SideEffectClassNone),
+				AdmissionReviewVersions: []string{"v1", "v1beta1"},
+			},
+		},
+	}
+	if _, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(ctx, mwc, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to create MutatingWebhookConfiguration: %v", err)
+	}
+	defer func() {
+		if err = clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, mwc.Name, metav1.DeleteOptions{}); err != nil {
+			t.Errorf("unexpect err: %v", err)
+		}
+	}()
+
+	// 3. Add one schedulable node (minimal setup for DaemonSet to schedule Pods)
+	addNodes(clientset.CoreV1().Nodes(), 0, 1, nil, t)
+
+	// 4. Create the DaemonSet under test
+	ds := newDaemonSet("webhook-test-ds", ns.Name)
+	_, err = dsClient.Create(ctx, ds, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create DaemonSet: %v", err)
+	}
+	defer cleanupDaemonSets(t, clientset, ds)
+
+	// 5. Wait until we see exactly one new Pod
+	// Since the ExpectationsTimeout is 5 minutes and the check interval is 1 minute
+	// we wait 6 minutes and 10 seconds to make sure there’s enough time for the new pod to be created.
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 6*time.Minute+10*time.Second, true, func(ctx context.Context) (bool, error) {
+		pods, err := podClient.List(ctx, metav1.ListOptions{LabelSelector: "name=test"})
+		if err != nil {
+			return false, nil
+		}
+		// Simulating delete pod
+		for _, p := range pods.Items {
+			if !p.DeletionTimestamp.IsZero() {
+				t.Logf("Delete pod with DeletionTimestamp is not zero: %s/%s", p.Namespace, p.Name)
+				if err = podClient.Delete(ctx, p.Name, metav1.DeleteOptions{}); err != nil {
+					t.Errorf("failed to delete pod: %v", err)
+				}
+			}
+		}
+		if len(pods.Items) != 1 {
+			return false, nil
+		}
+		return pods.Items[0].DeletionTimestamp.IsZero(), nil
+	})
+	if err != nil {
+		t.Fatalf("failed to observe one terminated pod and one running pod: %v", err)
+	}
+
+	t.Log("Test passed: DaemonSet successfully recreated pod after first creation was terminated by mutating webhook")
+}
+
+func admResponse(t *testing.T, w http.ResponseWriter, review *admissionv1.AdmissionReview) {
+	respBytes, err := json.Marshal(review)
+	if err != nil {
+		http.Error(w, "could not marshal response", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if _, err = w.Write(respBytes); err != nil {
+		t.Errorf("failed to write response: %v", err)
+	}
+}
+
+func admissionResponse(allowed bool, msg string, uid types.UID) *admissionv1.AdmissionReview {
+	return &admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: admissionv1.SchemeGroupVersion.String(),
+			Kind:       "AdmissionReview",
+		},
+		Response: &admissionv1.AdmissionResponse{
+			UID:     uid,
+			Allowed: allowed,
+			Result: &metav1.Status{
+				Message: msg,
+			},
+		},
+	}
 }

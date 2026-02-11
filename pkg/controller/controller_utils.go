@@ -154,6 +154,7 @@ var ExpKeyFunc = func(obj interface{}) (string, error) {
 // types of controllers, because the keys might conflict across types.
 type ControllerExpectationsInterface interface {
 	GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error)
+	ListExpectationKeys() []string
 	SatisfiedExpectations(logger klog.Logger, controllerKey string) bool
 	DeleteExpectations(logger klog.Logger, controllerKey string)
 	SetExpectations(logger klog.Logger, controllerKey string, add, del int) error
@@ -177,6 +178,12 @@ func (r *ControllerExpectations) GetExpectations(controllerKey string) (*Control
 		return exp.(*ControlleeExpectations), true, nil
 	}
 	return nil, false, err
+}
+
+// ListExpectationKeys returns the ControlleeExpectation keys.
+func (r *ControllerExpectations) ListExpectationKeys() []string {
+	expKeys := r.ListKeys()
+	return expKeys
 }
 
 // DeleteExpectations deletes the expectations of the given controller from the TTLStore.
@@ -217,6 +224,10 @@ func (r *ControllerExpectations) SatisfiedExpectations(logger klog.Logger, contr
 	// Trigger a sync if we either encountered and error (which shouldn't happen since we're
 	// getting from local store) or this controller hasn't established expectations.
 	return true
+}
+
+func (exp *ControlleeExpectations) IsExpired() bool {
+	return exp.isExpired()
 }
 
 // TODO: Extend ExpirationCache to support explicit expiration.
