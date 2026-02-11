@@ -68,12 +68,12 @@ func TestReflectorDataConsistencyDetector(t *testing.T) {
 }
 
 func runTestReflectorDataConsistencyDetector(t *testing.T, transformer TransformFunc) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	store := NewStore(MetaNamespaceKeyFunc)
-	fifo := newQueueFIFO(store, transformer, InformerNameAndResource{}, nil)
+	_, fifo := newQueueFIFO(logger, nil, store, transformer, InformerNameAndResource{}, nil)
 
 	lw := &ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {

@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,10 +47,7 @@ type controller[T runtime.Object] struct {
 
 	options ControllerOptions
 
-	// must hold a func() bool or nil
-	notificationsDelivered atomic.Value
-
-	hasProcessed synctrack.AsyncTracker[string]
+	hasProcessed *synctrack.AsyncTracker[string]
 }
 
 type ControllerOptions struct {
@@ -77,17 +73,11 @@ func NewController[T runtime.Object](
 	}
 
 	c := &controller[T]{
-		options:    options,
-		informer:   informer,
-		reconciler: reconciler,
-		queue:      nil,
-	}
-	c.hasProcessed.UpstreamHasSynced = func() bool {
-		f := c.notificationsDelivered.Load()
-		if f == nil {
-			return false
-		}
-		return f.(func() bool)()
+		options:      options,
+		informer:     informer,
+		reconciler:   reconciler,
+		queue:        nil,
+		hasProcessed: synctrack.NewAsyncTracker[string](options.Name),
 	}
 	return c
 }
@@ -159,12 +149,9 @@ func (c *controller[T]) Run(ctx context.Context) error {
 		return err
 	}
 
-	c.notificationsDelivered.Store(registration.HasSynced)
-
 	// Make sure event handler is removed from informer in case return early from
 	// an error
 	defer func() {
-		c.notificationsDelivered.Store(func() bool { return false })
 		// Remove event handler and Handle Error here. Error should only be raised
 		// for improper usage of event handler API.
 		if err := c.informer.RemoveEventHandler(registration); err != nil {
@@ -174,7 +161,12 @@ func (c *controller[T]) Run(ctx context.Context) error {
 
 	// Wait for initial cache list to complete before beginning to reconcile
 	// objects.
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.informer.HasSynced) {
+	if !cache.WaitFor(ctx, "caches", c.informer.HasSyncedChecker(), registration.HasSyncedChecker()) {
+		// TODO: should cache.WaitFor return an error?
+		// ctx.Err() or context.Cause(ctx)?
+		// Either of them would make dead code like the "if err == nil"
+		// below more obvious.
+
 		// ctx cancelled during cache sync. return early
 		err := ctx.Err()
 		if err == nil {
@@ -183,6 +175,10 @@ func (c *controller[T]) Run(ctx context.Context) error {
 		}
 		return err
 	}
+
+	// c.informer *and* our handler have synced, which implies that our AddFunc(= enqueue)
+	// and thus c.hasProcessed.Start have been called for the initial list => upstream is done.
+	c.hasProcessed.UpstreamHasSynced()
 
 	waitGroup := sync.WaitGroup{}
 

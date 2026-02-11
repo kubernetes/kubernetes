@@ -74,9 +74,15 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		gvNewFuncs[groupPkgName] = c.Universe.Function(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "New"})
 	}
 	m := map[string]interface{}{
+		"cacheDoneChecker":               c.Universe.Type(cacheDoneChecker),
 		"cacheInformerName":              c.Universe.Type(cacheInformerName),
 		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
+		"cacheSyncResult":                c.Universe.Type(cacheSyncResult),
 		"cacheTransformFunc":             c.Universe.Type(cacheTransformFunc),
+		"cacheWaitFor":                   c.Universe.Function(cacheWaitForFunc),
+		"contextContext":                 c.Universe.Type(contextContext),
+		"contextCause":                   c.Universe.Function(contextCauseFunc),
+		"fmtErrorf":                      c.Universe.Function(fmtErrorfFunc),
 		"groupVersions":                  g.groupVersions,
 		"gvInterfaces":                   gvInterfaces,
 		"gvNewFuncs":                     gvNewFuncs,
@@ -88,10 +94,12 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"reflectType":                    c.Universe.Type(reflectType),
 		"runtimeObject":                  c.Universe.Type(runtimeObject),
 		"schemaGroupVersionResource":     c.Universe.Type(schemaGroupVersionResource),
+		"stringsBuilder":                 c.Universe.Type(stringsBuilder),
 		"syncMutex":                      c.Universe.Type(syncMutex),
 		"timeDuration":                   c.Universe.Type(timeDuration),
 		"namespaceAll":                   c.Universe.Type(metav1NamespaceAll),
 		"object":                         c.Universe.Type(metav1Object),
+		"waitContextForChannel":          c.Universe.Function(waitContextForChannelFunc),
 	}
 
 	sw.Do(sharedInformerFactoryStruct, m)
@@ -208,6 +216,10 @@ func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, def
 }
 
 func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
+	f.StartWithContext({{.waitContextForChannel|raw}}(stopCh))
+}
+
+func (f *sharedInformerFactory) StartWithContext(ctx {{.contextContext|raw}}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -217,15 +229,9 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			f.wg.Add(1)
-			// We need a new variable in each loop iteration,
-			// otherwise the goroutine would use the loop variable
-			// and that keeps changing.
-			informer := informer
-			go func() {
-				defer f.wg.Done()
-				informer.Run(stopCh)
-			}()
+			f.wg.Go(func() {
+				informer.RunWithContext(ctx)
+			})
 			f.startedInformers[informerType] = true
 		}
 	}
@@ -243,24 +249,50 @@ func (f *sharedInformerFactory) Shutdown() {
 }
 
 func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
-	informers := func()map[reflect.Type]cache.SharedIndexInformer{
-               f.lock.Lock()
-               defer f.lock.Unlock()
+	result := f.WaitForCacheSyncWithContext(wait.ContextForChannel(stopCh))
+	return result.Synced
+}
 
-               informers := map[reflect.Type]cache.SharedIndexInformer{}
-               for informerType, informer := range f.informers {
-                       if f.startedInformers[informerType] {
-                               informers[informerType] = informer
-                       }
-               }
-               return informers
-       }()
+func (f *sharedInformerFactory) WaitForCacheSyncWithContext(ctx context.Context) {{.cacheSyncResult|raw}} {
+	informers := func() map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}} {
+		f.lock.Lock()
+		defer f.lock.Unlock()
 
-       res := map[reflect.Type]bool{}
-       for informType, informer := range informers {
-               res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
-       }
-       return res
+		informers := map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}{}
+		for informerType, informer := range f.informers {
+			if f.startedInformers[informerType] {
+				informers[informerType] = informer
+			}
+		}
+		return informers
+	}()
+
+	// Wait for informers to sync, without polling.
+	cacheSyncs := make([]{{.cacheDoneChecker|raw}}, 0, len(informers))
+	for _, informer := range informers {
+		cacheSyncs = append(cacheSyncs, informer.HasSyncedChecker())
+	}
+	{{.cacheWaitFor|raw}}(ctx, "" /* no logging */, cacheSyncs...)
+
+	res := {{.cacheSyncResult|raw}} {
+		Synced: make(map[{{.reflectType|raw}}]bool, len(informers)),
+	}
+	failed := false
+	for informType, informer := range informers {
+		hasSynced := informer.HasSynced()
+		if !hasSynced {
+			failed = true
+		}
+		res.Synced[informType] = hasSynced
+	}
+	if failed {
+		// context.Cause is more informative than ctx.Err().
+		// This must be non-nil, otherwise WaitFor wouldn't have stopped
+		// prematurely.
+		res.Err = {{.contextCause|raw}}(ctx)
+	}
+
+	return res
 }
 
 // InformerFor returns the SharedIndexInformer for obj using an internal
@@ -294,32 +326,51 @@ var sharedInformerFactoryInterface = `
 //
 // It is typically used like this:
 //
-//   ctx, cancel := context.WithCancel(context.Background())
-//   defer cancel()
-//   factory := NewSharedInformerFactory(client, resyncPeriod)
-//   defer factory.WaitForStop()    // Returns immediately if nothing was started.
-//   genericInformer := factory.ForResource(resource)
-//   typedInformer := factory.SomeAPIGroup().V1().SomeType()
-//   factory.Start(ctx.Done())          // Start processing these informers.
-//   synced := factory.WaitForCacheSync(ctx.Done())
-//   for v, ok := range synced {
-//       if !ok {
-//           fmt.Fprintf(os.Stderr, "caches failed to sync: %v", v)
-//           return
-//       }
-//   }
+//	ctx, cancel := context.WithCancel(context.Background())
+//	defer cancel()
+//	factory := NewSharedInformerFactory(client, resyncPeriod)
+//	defer factory.WaitForStop()    // Returns immediately if nothing was started.
+//	genericInformer := factory.ForResource(resource)
+//	typedInformer := factory.SomeAPIGroup().V1().SomeType()
+//	handle, err := typeInformer.Informer().AddEventHandler(...)
+//	if err != nil {
+//	    return fmt.Errorf("register event handler: %v", err)
+//	}
+//	defer typeInformer.Informer().RemoveEventHandler(handle) // Avoids leaking goroutines.
+//	factory.StartWithContext(ctx)                            // Start processing these informers.
+//	synced := factory.WaitForCacheSyncWithContext(ctx)
+//	if err := synced.AsError(); err != nil {
+//	    return err
+//	}
+//	for v := range synced {
+//	    // Only if desired log some information similar to this.
+//	    fmt.Fprintf(os.Stdout, "cache synced: %s", v)
+//	}
 //
-//   // Creating informers can also be created after Start, but then
-//   // Start must be called again:
-//   anotherGenericInformer := factory.ForResource(resource)
-//   factory.Start(ctx.Done())
+//	// Also make sure that all of the initial cache events have been delivered.
+//	if !WaitFor(ctx, "event handler sync", handle.HasSyncedChecker()) {
+//	    // Must have failed because of context.
+//	    return fmt.Errorf("sync event handler: %w", context.Cause(ctx))
+//	}
+//
+//	// Creating informers can also be created after Start, but then
+//	// Start must be called again:
+//	anotherGenericInformer := factory.ForResource(resource)
+//	factory.StartWithContext(ctx)
 type SharedInformerFactory interface {
 	{{.informerFactoryInterface|raw}}
 
 	// Start initializes all requested informers. They are handled in goroutines
 	// which run until the stop channel gets closed.
 	// Warning: Start does not block. When run in a go-routine, it will race with a later WaitForCacheSync.
+	//
+	// Contextual logging: StartWithContext should be used instead of Start in code which supports contextual logging.
 	Start(stopCh <-chan struct{})
+
+	// StartWithContext initializes all requested informers. They are handled in goroutines
+	// which run until the context gets canceled.
+	// Warning: StartWithContext does not block. When run in a go-routine, it will race with a later WaitForCacheSync.
+	StartWithContext(ctx context.Context)
 
 	// Shutdown marks a factory as shutting down. At that point no new
 	// informers can be started anymore and Start will return without
@@ -335,7 +386,13 @@ type SharedInformerFactory interface {
 
 	// WaitForCacheSync blocks until all started informers' caches were synced
 	// or the stop channel gets closed.
-	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
+	//
+	// Contextual logging: WaitForCacheSync should be used instead of WaitForCacheSync in code which supports contextual logging. It also returns a more useful result.
+	WaitForCacheSync(stopCh <-chan struct{}) map[{{.reflectType|raw}}]bool
+
+	// WaitForCacheSyncWithContext blocks until all started informers' caches were synced
+	// or the context gets canceled.
+	WaitForCacheSyncWithContext(ctx {{.contextContext|raw}}) {{.cacheSyncResult|raw}}
 
 	// ForResource gives generic access to a shared informer of the matching type.
 	ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error)

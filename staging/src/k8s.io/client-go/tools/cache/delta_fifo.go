@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/klog/v2"
@@ -31,6 +32,12 @@ import (
 // DeltaFIFOOptions is the configuration parameters for DeltaFIFO. All are
 // optional.
 type DeltaFIFOOptions struct {
+	// If set, log output will go to this logger instead of klog.Background().
+	// The name of the fifo gets added automatically.
+	Logger *klog.Logger
+
+	// Name can be used to override the default "DeltaFIFO" name for the new instance.
+	Name string
 
 	// KeyFunction is used to figure out what key an object should have. (It's
 	// exposed in the returned DeltaFIFO's KeyOf() method, with additional
@@ -55,9 +62,6 @@ type DeltaFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
-
-	// If set, log output will go to this logger instead of klog.Background().
-	Logger *klog.Logger
 }
 
 // DeltaFIFO is like FIFO, but differs in two ways.  One is that the
@@ -102,6 +106,13 @@ type DeltaFIFOOptions struct {
 // threads, you could end up with multiple threads processing slightly
 // different versions of the same object.
 type DeltaFIFO struct {
+	// logger is a per-instance logger. This gets chosen when constructing
+	// the instance, with klog.Background() as default.
+	logger klog.Logger
+
+	// name is the name of the fifo. It is included in the logger.
+	name string
+
 	// lock/cond protects access to 'items' and 'queue'.
 	lock sync.RWMutex
 	cond sync.Cond
@@ -114,6 +125,11 @@ type DeltaFIFO struct {
 	// There are no duplicates in `queue`.
 	// A key is in `queue` if and only if it is in `items`.
 	queue []string
+
+	// synced is initially an open channel. It gets closed (once!) by checkSynced_locked
+	// as soon as the initial sync is considered complete.
+	synced       chan struct{}
+	syncedClosed bool
 
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update/AddIfNotPresent was called first.
@@ -139,10 +155,6 @@ type DeltaFIFO struct {
 
 	// Called with every object if non-nil.
 	transformer TransformFunc
-
-	// logger is a per-instance logger. This gets chosen when constructing
-	// the instance, with klog.Background() as default.
-	logger klog.Logger
 }
 
 // TransformFunc allows for transforming an object before it will be processed.
@@ -263,6 +275,9 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 	}
 
 	f := &DeltaFIFO{
+		logger:       klog.Background(),
+		name:         "DeltaFIFO",
+		synced:       make(chan struct{}),
 		items:        map[string]Deltas{},
 		queue:        []string{},
 		keyFunc:      opts.KeyFunction,
@@ -270,11 +285,14 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 
 		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
 		transformer:           opts.Transformer,
-		logger:                klog.Background(),
 	}
 	if opts.Logger != nil {
 		f.logger = *opts.Logger
 	}
+	if name := opts.Name; name != "" {
+		f.name = name
+	}
+	f.logger = klog.LoggerWithName(f.logger, f.name)
 	f.cond.L = &f.lock
 	return f
 }
@@ -282,6 +300,7 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 var (
 	_ = Queue(&DeltaFIFO{})             // DeltaFIFO is a Queue
 	_ = TransformingStore(&DeltaFIFO{}) // DeltaFIFO implements TransformingStore to allow memory optimizations
+	_ = DoneChecker(&DeltaFIFO{})       // DeltaFIFO implements DoneChecker.
 )
 
 var (
@@ -327,8 +346,36 @@ func (f *DeltaFIFO) HasSynced() bool {
 	return f.hasSynced_locked()
 }
 
+// HasSyncedChecker is done if an Add/Update/Delete/AddIfNotPresent are called first,
+// or the first batch of items inserted by Replace() has been popped.
+func (f *DeltaFIFO) HasSyncedChecker() DoneChecker {
+	return f
+}
+
+// Name implements [DoneChecker.Name]
+func (f *DeltaFIFO) Name() string {
+	return f.name
+}
+
+// Done implements [DoneChecker.Done]
+func (f *DeltaFIFO) Done() <-chan struct{} {
+	return f.synced
+}
+
+// hasSynced_locked returns the result of a prior checkSynced_locked call.
 func (f *DeltaFIFO) hasSynced_locked() bool {
-	return f.populated && f.initialPopulationCount == 0
+	return f.syncedClosed
+}
+
+// checkSynced_locked checks whether the initial is completed.
+// It must be called whenever populated or initialPopulationCount change.
+func (f *DeltaFIFO) checkSynced_locked() {
+	synced := f.populated && f.initialPopulationCount == 0
+	if synced && !f.syncedClosed {
+		// Initial sync is complete.
+		f.syncedClosed = true
+		close(f.synced)
+	}
 }
 
 // Add inserts an item, and puts it in the queue. The item is only enqueued
@@ -337,6 +384,7 @@ func (f *DeltaFIFO) Add(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.checkSynced_locked()
 	return f.queueActionLocked(Added, obj)
 }
 
@@ -345,6 +393,7 @@ func (f *DeltaFIFO) Update(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.checkSynced_locked()
 	return f.queueActionLocked(Updated, obj)
 }
 
@@ -361,6 +410,7 @@ func (f *DeltaFIFO) Delete(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.checkSynced_locked()
 	if f.knownObjects == nil {
 		if _, exists := f.items[id]; !exists {
 			// Presumably, this was deleted when a relist happened.
@@ -477,10 +527,10 @@ func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType Del
 		// when given a non-empty list (as it is here).
 		// If somehow it happens anyway, deal with it but complain.
 		if oldDeltas == nil {
-			f.logger.Error(nil, "Impossible dedupDeltas, ignoring", "id", id, "oldDeltas", oldDeltas, "obj", obj)
+			utilruntime.HandleErrorWithLogger(f.logger, nil, "Impossible dedupDeltas, ignoring", "id", id, "oldDeltas", oldDeltas, "obj", obj)
 			return nil
 		}
-		f.logger.Error(nil, "Impossible dedupDeltas, breaking invariant by storing empty Deltas", "id", id, "oldDeltas", oldDeltas, "obj", obj)
+		utilruntime.HandleErrorWithLogger(f.logger, nil, "Impossible dedupDeltas, breaking invariant by storing empty Deltas", "id", id, "oldDeltas", oldDeltas, "obj", obj)
 		f.items[id] = newDeltas
 		return fmt.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; broke DeltaFIFO invariant by storing empty Deltas", id, oldDeltas, obj)
 	}
@@ -526,11 +576,12 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		depth := len(f.queue)
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
+			f.checkSynced_locked()
 		}
 		item, ok := f.items[id]
 		if !ok {
 			// This should never happen
-			f.logger.Error(nil, "Inconceivable! Item was in f.queue but not f.items; ignoring", "id", id)
+			utilruntime.HandleErrorWithLogger(f.logger, nil, "Inconceivable! Item was in f.queue but not f.items; ignoring", "id", id)
 			continue
 		}
 		delete(f.items, id)
@@ -623,7 +674,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 			deletedObj, exists, err := f.knownObjects.GetByKey(k)
 			if err != nil {
 				deletedObj = nil
-				f.logger.Error(err, "Unexpected error during lookup, placing DeleteFinalStateUnknown marker without object", "key", k)
+				utilruntime.HandleErrorWithLogger(f.logger, err, "Unexpected error during lookup, placing DeleteFinalStateUnknown marker without object", "key", k)
 			} else if !exists {
 				deletedObj = nil
 				f.logger.Info("Key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", "key", k)
@@ -638,6 +689,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = keys.Len() + queuedDeletions
+		f.checkSynced_locked()
 	}
 
 	return nil
@@ -666,7 +718,7 @@ func (f *DeltaFIFO) Resync() error {
 func (f *DeltaFIFO) syncKeyLocked(key string) error {
 	obj, exists, err := f.knownObjects.GetByKey(key)
 	if err != nil {
-		f.logger.Error(err, "Unexpected error during lookup, unable to queue object for sync", "key", key)
+		utilruntime.HandleErrorWithLogger(f.logger, err, "Unexpected error during lookup, unable to queue object for sync", "key", key)
 		return nil
 	} else if !exists {
 		f.logger.Info("Key does not exist in known objects store, unable to queue object for sync", "key", key)
