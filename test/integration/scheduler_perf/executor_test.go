@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha1"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -463,7 +464,7 @@ func (mc *mockDataCollector) init() error {
 func (mc *mockDataCollector) run(_ ktesting.TContext) {}
 
 // collect always returns DataItems defined in the collector.
-func (mc *mockDataCollector) collect() []DataItem {
+func (mc *mockDataCollector) collect(_ ktesting.TContext) []DataItem {
 	return mc.dataItems
 }
 
@@ -654,10 +655,9 @@ func TestMetricThreshold(t *testing.T) {
 			var capturedErr error
 			capturingCtx, finalize := tCtx.WithError(&capturedErr)
 			defer finalize()
-
 			originalGetTestDataCollectors := getTestDataCollectors
 			defer func() { getTestDataCollectors = originalGetTestDataCollectors }()
-			getTestDataCollectors = func(_ coreinformers.PodInformer, _ string, _ []string, _ map[string]string, _ *metricsCollectorConfig, _ float64, _ []string) []testDataCollector {
+			getTestDataCollectors = func(_ coreinformers.PodInformer, _ schedulinglisters.WorkloadLister, _ coreinformers.EventInformer, _ string, _ []string, _ map[string]string, _ *metricsCollectorConfig, _ float64, _ []string) []testDataCollector {
 				return []testDataCollector{&mockDataCollector{dataItems: tc.dataItems}}
 			}
 

@@ -1091,6 +1091,13 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName st
 	// need to start again.
 	podInformer := informerFactory.Core().V1().Pods()
 
+	eventInformer := informerFactory.Core().V1().Events()
+	// Trigger registration so Start() launches it
+	_ = eventInformer.Informer()
+	informerFactory.Start(tCtx.Done())
+	informerFactory.WaitForCacheSync(tCtx.Done())
+
+
 	// Everything else started by this function gets stopped before it returns.
 	tCtx = tCtx.WithCancel()
 
@@ -1099,6 +1106,8 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName st
 		scheduler:                    scheduler,
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
+		workloadLister:               informerFactory.Scheduling().V1alpha1().Workloads().Lister(),
+		eventInformer:                eventInformer,
 		throughputErrorMargin:        throughputErrorMargin,
 		testCase:                     tc,
 		workload:                     w,

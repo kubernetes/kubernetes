@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
@@ -359,7 +360,7 @@ func (*metricsCollector) run(tCtx ktesting.TContext) {
 	// metricCollector doesn't need to start before the tests, so nothing to do here.
 }
 
-func (mc *metricsCollector) collect() []DataItem {
+func (mc *metricsCollector) collect(_ ktesting.TContext) []DataItem {
 	var dataItems []DataItem
 	for metric, labelValsSlice := range mc.Metrics {
 		// no filter is specified, aggregate all the metrics within the same metricFamily.
@@ -531,7 +532,7 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(tc.podInformer.Informer().RemoveEventHandler(handle), "remove event handler")
 	}()
 
-	// Waiting for the initial sync didn't work, `handle.HasSynced` always returned
+	// Waiting for the initial sync dSidn't work, `handle.HasSynced` always returned
 	// false - perhaps because the event handlers get added to a running informer.
 	// That's okay(ish), throughput is typically measured within an empty namespace.
 	//
@@ -629,7 +630,7 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 	}
 }
 
-func (tc *throughputCollector) collect() []DataItem {
+func (tc *throughputCollector) collect(_ ktesting.TContext) []DataItem {
 	throughputSummary := DataItem{
 		Labels:   tc.resultLabels,
 		progress: tc.progress,
@@ -741,7 +742,7 @@ func (mc *memoryCollector) createMetricDataItem(values []float64, unit, metricNa
 	}
 }
 
-func (mc *memoryCollector) collect() []DataItem {
+func (mc *memoryCollector) collect(_ ktesting.TContext) []DataItem {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
@@ -803,7 +804,7 @@ func (sdc *schedulingDurationCollector) run(tCtx ktesting.TContext) {
 	sdc.duration = time.Since(start)
 }
 
-func (sdc *schedulingDurationCollector) collect() []DataItem {
+func (sdc *schedulingDurationCollector) collect(_ ktesting.TContext) []DataItem {
 	labels := maps.Clone(sdc.resultLabels)
 	labels["Metric"] = "SchedulingDuration"
 	return []DataItem{{
@@ -813,4 +814,160 @@ func (sdc *schedulingDurationCollector) collect() []DataItem {
 		},
 		Unit: "s",
 	}}
+}
+
+
+// PodGroupLatencyCollector tracks the scheduling latency of pod groups
+// For PodGroup with gang requirement it calculates the time from the first
+// pod creation to the schedule of the pod meeting minCount requirement.
+// For PodGroup with basic policy it calculates the time from the first
+// pod creation to the schedule of the last pod.
+type podGroupLatencyCollector struct {
+	podInformer       coreinformers.PodInformer
+	eventInformer     coreinformers.EventInformer
+	workloadLister    schedulinglisters.WorkloadLister
+	podGroupStats     map[string]*podGroupStat
+	podToScheduleTime map[string]time.Time
+	mu                sync.Mutex
+}
+
+type podGroupStat struct {
+	firstCreated time.Time
+	minCount     int32
+	pods         []string
+}
+
+func newPodGroupLatencyCollector(podInformer coreinformers.PodInformer, eventInformer coreinformers.EventInformer, workloadLister schedulinglisters.WorkloadLister) *podGroupLatencyCollector {
+	return &podGroupLatencyCollector{
+		podInformer:    podInformer,
+		eventInformer:  eventInformer,
+		workloadLister: workloadLister,
+		podGroupStats:  make(map[string]*podGroupStat),
+	}
+}
+
+func (c *podGroupLatencyCollector) init() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.podGroupStats = make(map[string]*podGroupStat)
+	c.podToScheduleTime = make(map[string]time.Time)
+	return nil
+}
+
+func (c *podGroupLatencyCollector) run(tCtx ktesting.TContext) {
+	podHandler := cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			pod := obj.(*v1.Pod)
+			c.onPodAdd(pod)
+		},
+	}
+	h, err := c.podInformer.Informer().AddEventHandler(podHandler)
+	if err != nil {
+		tCtx.Fatalf("register pod event handler: %v", err)
+	}
+
+	eventHandler := cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			event := obj.(*v1.Event)
+			c.onEventAdd(event)
+		},
+		UpdateFunc: func(oldObj, newObj any) {
+		},
+	}
+	eh, err := c.eventInformer.Informer().AddEventHandler(eventHandler)
+	if err != nil {
+		tCtx.Fatalf("register event event handler: %v", err)
+	}
+
+	tCtx.Logf("Started podGroupLatencyCollector")
+
+	tCtx.Cleanup(func() {
+		c.podInformer.Informer().RemoveEventHandler(h)
+		c.eventInformer.Informer().RemoveEventHandler(eh)
+	})
+}
+
+func (c *podGroupLatencyCollector) onPodAdd(pod *v1.Pod) {
+	if pod.Spec.WorkloadRef == nil {
+		return
+	}
+	podGroupKey := fmt.Sprintf("%s-%s-%s", pod.Spec.WorkloadRef.Name, pod.Spec.WorkloadRef.PodGroup, pod.Spec.WorkloadRef.PodGroupReplicaKey)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	stat, exists := c.podGroupStats[podGroupKey]
+	if !exists {
+		// Try to find minCount from workload
+		workload, err := c.workloadLister.Workloads(pod.Namespace).Get(pod.Spec.WorkloadRef.Name)
+		if err != nil {
+			klog.ErrorS(err, "Failed to get workload", "workload", pod.Spec.WorkloadRef.Name)
+			return
+		}
+		var minCount int32
+		for _, pg := range workload.Spec.PodGroups {
+			if pg.Name == pod.Spec.WorkloadRef.PodGroup {
+				if pg.Policy.Gang != nil {
+					minCount = pg.Policy.Gang.MinCount
+				}
+				break
+			}
+		}
+
+		stat = &podGroupStat{
+			firstCreated: pod.CreationTimestamp.Time,
+			minCount:     minCount,
+		}
+		c.podGroupStats[podGroupKey] = stat
+	}
+	c.podGroupStats[podGroupKey].pods = append(c.podGroupStats[podGroupKey].pods, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+	if pod.CreationTimestamp.Time.Before(stat.firstCreated) {
+		stat.firstCreated = pod.CreationTimestamp.Time
+	}
+}
+
+func (c *podGroupLatencyCollector) onEventAdd(event *v1.Event) {
+	if event.InvolvedObject.Kind != "Pod" || event.Reason != "Scheduled" {
+		return
+	}
+	podName := fmt.Sprintf("%s/%s", event.InvolvedObject.Namespace, event.InvolvedObject.Name)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.podToScheduleTime[podName] = event.EventTime.Time
+}
+
+func (c *podGroupLatencyCollector) collect(tCtx ktesting.TContext) []DataItem {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var items []DataItem
+	for key, stat := range c.podGroupStats {
+		times := []time.Time{}
+		for _, pod := range stat.pods {
+			if t, ok := c.podToScheduleTime[pod]; ok {
+				times = append(times, t)
+			} else {
+				tCtx.Errorf("No schedule time for pod %s", pod)
+			}
+		}
+		sort.Slice(times, func(i, j int) bool {
+			return times[i].Before(times[j])
+		})
+		var lastScheduledTime time.Time
+		if stat.minCount == 0 {
+			lastScheduledTime = times[len(times)-1]
+		} else if len(times) < int(stat.minCount) {
+			tCtx.Errorf("Scheduled less pods than expected for pod group key %s", key)
+		} else {
+			lastScheduledTime = times[stat.minCount-1]
+		}
+
+		latency := lastScheduledTime.Sub(stat.firstCreated).Milliseconds()
+		items = append(items, DataItem{
+			Labels: map[string]string{"Metric": "PodGroupSchedulingDuration", "PodGroupKey": key},
+			Data:   map[string]float64{"Duration": float64(latency)},
+			Unit:   "ms",
+		})
+	}
+	return items
 }
