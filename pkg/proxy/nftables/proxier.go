@@ -1109,24 +1109,20 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		ipvX_addr = "ipv6_addr"
 	}
 
+	var err error
+
 	var existingChains sets.Set[string]
-	existingChainsList, err := proxier.nftables.List(context.TODO(), "chain")
-	if err == nil {
-		existingChains = sets.New(existingChainsList...)
-	} else {
-		proxier.logger.Error(err, "Failed to list existing chains")
-	}
 	var existingAffinitySets sets.Set[string]
-	existingSets, err := proxier.nftables.List(context.TODO(), "sets")
-	if err == nil {
+	if allObjects, err := proxier.nftables.ListAll(context.TODO()); err == nil {
+		existingChains = sets.New(allObjects["chain"]...)
 		existingAffinitySets = sets.New[string]()
-		for _, set := range existingSets {
+		for _, set := range allObjects["set"] {
 			if isAffinitySetName(set) {
 				existingAffinitySets.Insert(set)
 			}
 		}
 	} else {
-		proxier.logger.Error(err, "Failed to list existing sets")
+		proxier.logger.Error(err, "Failed to list existing nftables objects")
 	}
 
 	// Accumulate service/endpoint chains and affinity sets to keep.
