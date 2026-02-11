@@ -9671,6 +9671,15 @@ func (m *PodSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.RestoreFrom != nil {
+		i -= len(*m.RestoreFrom)
+		copy(dAtA[i:], *m.RestoreFrom)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.RestoreFrom)))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xda
+	}
 	if m.WorkloadRef != nil {
 		{
 			size, err := m.WorkloadRef.MarshalToSizedBuffer(dAtA[:i])
@@ -18627,6 +18636,10 @@ func (m *PodSpec) Size() (n int) {
 		l = m.WorkloadRef.Size()
 		n += 2 + l + sovGenerated(uint64(l))
 	}
+	if m.RestoreFrom != nil {
+		l = len(*m.RestoreFrom)
+		n += 2 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -23072,6 +23085,7 @@ func (this *PodSpec) String() string {
 		`Resources:` + strings.Replace(this.Resources.String(), "ResourceRequirements", "ResourceRequirements", 1) + `,`,
 		`HostnameOverride:` + valueToStringGenerated(this.HostnameOverride) + `,`,
 		`WorkloadRef:` + strings.Replace(this.WorkloadRef.String(), "WorkloadReference", "WorkloadReference", 1) + `,`,
+		`RestoreFrom:` + valueToStringGenerated(this.RestoreFrom) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -55042,6 +55056,39 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 			if err := m.WorkloadRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 43:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RestoreFrom", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.RestoreFrom = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
