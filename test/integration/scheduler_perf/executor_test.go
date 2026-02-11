@@ -209,6 +209,37 @@ func TestRunOp(t *testing.T) {
 			},
 			expectedFailure: true,
 		},
+		{
+			name: "Create Nodes with Template Params",
+			op: &createNodesOp{
+				Opcode: createNodesOpcode,
+				Count:  1,
+				NodeTemplatePath: createObjTemplateFile(t,
+					&v1.Node{
+						ObjectMeta: metav1.ObjectMeta{
+							GenerateName: "param-node-",
+							Labels: map[string]string{
+								"test-param": "{{.ParamValue}}",
+							},
+						},
+						Status: v1.NodeStatus{
+							Capacity: v1.ResourceList{
+								v1.ResourcePods:   resource.MustParse("100"),
+								v1.ResourceCPU:    resource.MustParse("4"),
+								v1.ResourceMemory: resource.MustParse("8Gi"),
+							},
+						},
+					},
+				),
+				TemplateParams: map[string]any{
+					"ParamValue": "substituted-value",
+				},
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(1),
+				verifyLabelValuesAllowed("test-param", sets.New("substituted-value")),
+			},
+		},
 	}
 
 	for _, tt := range tests {

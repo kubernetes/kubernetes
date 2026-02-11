@@ -56,6 +56,9 @@ type createAny struct {
 	// Count determines how many objects get created. Defaults to 1 if unset.
 	Count      *int
 	CountParam string
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 var _ runnableOp = &createAny{}
@@ -81,6 +84,13 @@ func (c createAny) patchParams(w *workload) (realOp, error) {
 		}
 		c.Count = ptr.To(count)
 	}
+	if len(c.TemplateParams) > 0 {
+		var err error
+		c.TemplateParams, err = resolveTemplateParams(c.TemplateParams, w)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &c, c.isValid(false)
 }
 
@@ -97,7 +107,11 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 		count = *c.Count
 	}
 	for index := 0; index < count; index++ {
-		c.create(tCtx, map[string]any{"Index": index, "Count": count})
+		env := map[string]any{"Index": index, "Count": count}
+		for k, v := range c.TemplateParams {
+			env[k] = v
+		}
+		c.create(tCtx, env)
 	}
 }
 
@@ -204,6 +218,9 @@ type createNodesOp struct {
 	NodeAllocatableStrategy  *testutils.NodeAllocatableStrategy
 	LabelNodePrepareStrategy *testutils.LabelNodePrepareStrategy
 	UniqueNodeLabelStrategy  *testutils.UniqueNodeLabelStrategy
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 func (cno *createNodesOp) isValid(allowParameterization bool) error {
@@ -221,6 +238,13 @@ func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
 	if cno.CountParam != "" {
 		var err error
 		cno.Count, err = w.Params.get(cno.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(cno.TemplateParams) > 0 {
+		var err error
+		cno.TemplateParams, err = resolveTemplateParams(cno.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}
@@ -319,6 +343,9 @@ type createPodsOp struct {
 	// Optional
 	PersistentVolumeTemplatePath      *string
 	PersistentVolumeClaimTemplatePath *string
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
@@ -335,7 +362,7 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 		return errors.New("skipWaitToCompletion and steadyState cannot be true at the same time")
 	}
 	if cpo.SteadyState && !allowParameterization && cpo.Duration.Duration <= 0 {
-		return errors.New("when creating pods in a steady state, the test duration must be > 0")
+		return errors.New("whfen creating pods in a steady state, the test duration must be > 0")
 	}
 	return nil
 }
@@ -364,6 +391,13 @@ func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 	if cpo.SteadyStateParam != "" {
 		var err error
 		cpo.SteadyState, err = getParam[bool](w.Params, cpo.SteadyStateParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(cpo.TemplateParams) > 0 {
+		var err error
+		cpo.TemplateParams, err = resolveTemplateParams(cpo.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}

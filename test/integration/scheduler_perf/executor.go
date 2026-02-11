@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"runtime"
@@ -795,7 +796,7 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 
 	nodeTemplate := StaticNodeTemplate(makeBaseNode(prefix))
 	if cno.NodeTemplatePath != nil {
-		nodeTemplate = nodeTemplateFromFile(*cno.NodeTemplatePath)
+		nodeTemplate = nodeTemplateWithParams{path: *cno.NodeTemplatePath, params: cno.TemplateParams}
 	}
 
 	return NewIntegrationTestNodePreparer(
@@ -845,7 +846,7 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) {
 	podTemplate := testutils.StaticPodTemplate(makeBasePod())
 	if cpo.PodTemplatePath != nil {
-		podTemplate = podTemplateFromFile(*cpo.PodTemplatePath)
+		podTemplate = podTemplateWithParams{path: *cpo.PodTemplatePath, params: cpo.TemplateParams}
 	}
 	if cpo.PersistentVolumeClaimTemplatePath == nil {
 		return testutils.NewCustomCreatePodStrategy(podTemplate), nil
@@ -862,21 +863,35 @@ func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) 
 	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate), nil
 }
 
-type nodeTemplateFromFile string
+type nodeTemplateWithParams struct {
+	path   string
+	params map[string]any
+}
 
-func (f nodeTemplateFromFile) GetNodeTemplate(index, count int) (*v1.Node, error) {
+func (n nodeTemplateWithParams) GetNodeTemplate(index, count int) (*v1.Node, error) {
+	env := make(map[string]any)
+	maps.Copy(env, n.params)
+	env["Index"] = index
+	env["Count"] = count
 	nodeSpec := &v1.Node{}
-	if err := getSpecFromTextTemplateFile(string(f), map[string]any{"Index": index, "Count": count}, nodeSpec); err != nil {
+	if err := getSpecFromTextTemplateFile(n.path, env, nodeSpec); err != nil {
 		return nil, fmt.Errorf("parsing Node: %w", err)
 	}
 	return nodeSpec, nil
 }
 
-type podTemplateFromFile string
+type podTemplateWithParams struct {
+	path   string
+	params map[string]any
+}
 
-func (f podTemplateFromFile) GetPodTemplate(index, count int) (*v1.Pod, error) {
+func (p podTemplateWithParams) GetPodTemplate(index, count int) (*v1.Pod, error) {
+	env := make(map[string]any)
+	maps.Copy(env, p.params)
+	env["Index"] = index
+	env["Count"] = count
 	podSpec := &v1.Pod{}
-	if err := getSpecFromTextTemplateFile(string(f), map[string]any{"Index": index, "Count": count}, podSpec); err != nil {
+	if err := getSpecFromTextTemplateFile(p.path, env, podSpec); err != nil {
 		return nil, fmt.Errorf("parsing Pod: %w", err)
 	}
 	return podSpec, nil
