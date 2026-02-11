@@ -53,9 +53,6 @@ import (
 // draManagerStateFileName is the file name where dra manager stores its state
 const draManagerStateFileName = "dra_manager_state"
 
-// defaultReconcilePeriod is the default reconciliation period to keep all claim info state in sync.
-const defaultReconcilePeriod = 60 * time.Second
-
 // The time that DRA drivers have to come back after being unregistered
 // before the kubelet removes their ResourceSlices.
 //

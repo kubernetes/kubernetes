@@ -177,8 +177,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Second}
 	}
 	if obj.DRAManagerReconcilePeriod == zeroDuration {
-		// Keep the same as default NodeStatusUpdateFrequency
-		obj.DRAManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Second}
+		obj.DRAManagerReconcilePeriod = metav1.Duration{Duration: 60 * time.Second}
 	}
 	if obj.MemoryManagerPolicy == "" {
 		obj.MemoryManagerPolicy = kubeletconfigv1beta1.NoneMemoryManagerPolicy
