@@ -618,6 +618,10 @@ type startCollectingMetricsOp struct {
 	// If empty, it will collect the metric for all pods in the selected namespaces.
 	// Optional.
 	LabelSelector map[string]string
+	// List of collectors to use. If empty, defaults to:
+	// "Throughput", "Metrics", "Memory", "SchedulingDuration".
+	// Optional.
+	Collectors []string
 }
 
 func (scm *startCollectingMetricsOp) isValid(_ bool) error {

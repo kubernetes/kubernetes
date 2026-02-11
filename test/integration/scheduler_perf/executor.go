@@ -206,7 +206,7 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 			return fmt.Errorf("metrics collection is overlapping. Probably second collector was started before stopping a previous one")
 		}
 		var err error
-		e.collectorCtx, e.collectors, err = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, namespace, []string{namespace}, nil)
+		e.collectorCtx, e.collectors, err = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, namespace, []string{namespace}, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -420,14 +420,14 @@ func (e *WorkloadExecutor) runStartCollectingMetricsOp(opIndex int, op *startCol
 		return fmt.Errorf("metrics collection is overlapping. Probably second collector was started before stopping a previous one")
 	}
 	var err error
-	e.collectorCtx, e.collectors, err = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, op.Name, op.Namespaces, op.LabelSelector)
+	e.collectorCtx, e.collectors, err = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, op.Name, op.Namespaces, op.LabelSelector, op.Collectors)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string, labelSelector map[string]string) (ktesting.TContext, []testDataCollector, error) {
+func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string, labelSelector map[string]string, collectors []string) (ktesting.TContext, []testDataCollector, error) {
 	collectorCtx := tCtx.WithCancel()
 	workloadName := tCtx.Name()
 
@@ -436,7 +436,7 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 
 	// The first part is the same for each workload, therefore we can strip it.
 	workloadName = workloadName[strings.Index(name, "/")+1:]
-	collectorsList := getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", workloadName, name), namespaces, labelSelector, mcc, throughputErrorMargin)
+	collectorsList := getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", workloadName, name), namespaces, labelSelector, mcc, throughputErrorMargin, collectors)
 	for _, collector := range collectorsList {
 		// Need loop-local variable for function below.
 		err := collector.init()
@@ -488,7 +488,32 @@ type testDataCollector interface {
 }
 
 // var for mocking in tests.
-var getTestDataCollectors = func(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
+var getTestDataCollectors = func(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64, collectors []string) []testDataCollector {
+	if len(collectors) == 0 {
+		return getDefaultTestDataCollectors(podInformer, name, namespaces, labelSelector, mcc, throughputErrorMargin)
+	}
+	var testDataCollectors []testDataCollector
+	if mcc == nil {
+		mcc = &defaultMetricsCollectorConfig
+	}
+	for _, collector := range collectors {
+		switch collector {
+		case "Throughput":
+			testDataCollectors = append(testDataCollectors, newThroughputCollector(podInformer, map[string]string{"Name": name}, labelSelector, namespaces, throughputErrorMargin))
+		case "Metrics":
+			testDataCollectors = append(testDataCollectors, newMetricsCollector(mcc, map[string]string{"Name": name}))
+		case "Memory":
+			testDataCollectors = append(testDataCollectors, newMemoryCollector(map[string]string{"Name": name}, 500*time.Millisecond))
+		case "SchedulingDuration":
+			testDataCollectors = append(testDataCollectors, newSchedulingDurationCollector(map[string]string{"Name": name}))
+		default:
+			panic(fmt.Sprintf("unknown collector: %s", collector))
+		}
+	}
+	return testDataCollectors
+}
+
+func getDefaultTestDataCollectors(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}

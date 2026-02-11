@@ -657,7 +657,7 @@ func TestMetricThreshold(t *testing.T) {
 
 			originalGetTestDataCollectors := getTestDataCollectors
 			defer func() { getTestDataCollectors = originalGetTestDataCollectors }()
-			getTestDataCollectors = func(_ coreinformers.PodInformer, _ string, _ []string, _ map[string]string, _ *metricsCollectorConfig, _ float64) []testDataCollector {
+			getTestDataCollectors = func(_ coreinformers.PodInformer, _ string, _ []string, _ map[string]string, _ *metricsCollectorConfig, _ float64, _ []string) []testDataCollector {
 				return []testDataCollector{&mockDataCollector{dataItems: tc.dataItems}}
 			}
 
