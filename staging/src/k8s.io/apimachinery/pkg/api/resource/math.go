@@ -23,13 +23,12 @@ import (
 )
 
 const (
-	// maxInt64Factors defines the maximum number of base-10 digits that may be
-	// safely represented using int64Amount.
+	// maxInt64Factors is the highest power of 10 that will be checked when
+	// removing factors of 10 from an int64 (see int64Amount.AsScale()).
 	//
-	// This limit ensures all internal operations on int64Amount remain within
-	// int64 bounds, including scaling and canonicalization steps that may
-	// temporarily multiply the value. Values exceeding this limit must fall
-	// back to an arbitrary-precision representation.
+	// It also represents the maximum number of base-10 digits that can be
+	// safely represented in the int64 fast path without risking overflow
+	// during internal scaling or canonicalization.
 	maxInt64Factors = 18
 )
 
