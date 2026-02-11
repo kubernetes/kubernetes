@@ -105,6 +105,15 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 	podToStats := p.containerInfosToPodStats(logger, filteredInfos, rootFsInfo, imageFsInfo)
 	podTerminatedContainersToStats := p.containerInfosToPodStats(logger, terminatedInfos, rootFsInfo, imageFsInfo)
 
+	// Ensure pods that only have terminated containers are also included
+	for podRef, terminatedPodStats := range podTerminatedContainersToStats {
+		if _, found := podToStats[podRef]; !found {
+			podToStats[podRef] = &statsapi.PodStats{
+				PodRef: terminatedPodStats.PodRef,
+			}
+		}
+	}
+
 	// Add each PodStats to the result.
 	result := make([]statsapi.PodStats, 0, len(podToStats))
 	for podRef, podStats := range podToStats {
