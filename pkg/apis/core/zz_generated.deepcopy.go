@@ -4267,6 +4267,11 @@ func (in *PodResourceClaim) DeepCopyInto(out *PodResourceClaim) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.PodGroupResourceClaim != nil {
+		in, out := &in.PodGroupResourceClaim, &out.PodGroupResourceClaim
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

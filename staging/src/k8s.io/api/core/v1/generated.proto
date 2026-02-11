@@ -4170,8 +4170,8 @@ message PodResourceClaim {
   // ResourceClaimName is the name of a ResourceClaim object in the same
   // namespace as this pod.
   //
-  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
-  // be set.
+  // Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
+  // PodGroupResourceClaim must be set.
   optional string resourceClaimName = 3;
 
   // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -4187,9 +4187,18 @@ message PodResourceClaim {
   // corresponding ResourceClaim by the control plane after creating the
   // ResourceClaim.
   //
-  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
-  // be set.
+  // Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
+  // PodGroupResourceClaim must be set.
   optional string resourceClaimTemplateName = 4;
+
+  // PodGroupResourceClaim refers to the name of a claim associated with this
+  // pod's PodGroup.
+  //
+  // Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
+  // PodGroupResourceClaim must be set.
+  //
+  // +featureGate=WorkloadPodGroupResourceClaimTemplate
+  optional string podGroupResourceClaim = 5;
 }
 
 // PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim

@@ -34,8 +34,8 @@ type PodResourceClaimApplyConfiguration struct {
 	// ResourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this pod.
 	//
-	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
-	// be set.
+	// Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
+	// PodGroupResourceClaim must be set.
 	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
 	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
 	// object in the same namespace as this pod.
@@ -50,9 +50,15 @@ type PodResourceClaimApplyConfiguration struct {
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
 	//
-	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
-	// be set.
+	// Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
+	// PodGroupResourceClaim must be set.
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
+	// PodGroupResourceClaim refers to the name of a claim associated with this
+	// pod's PodGroup.
+	//
+	// Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
+	// PodGroupResourceClaim must be set.
+	PodGroupResourceClaim *string `json:"podGroupResourceClaim,omitempty"`
 }
 
 // PodResourceClaimApplyConfiguration constructs a declarative configuration of the PodResourceClaim type for use with
@@ -82,5 +88,13 @@ func (b *PodResourceClaimApplyConfiguration) WithResourceClaimName(value string)
 // If called multiple times, the ResourceClaimTemplateName field is set to the value of the last call.
 func (b *PodResourceClaimApplyConfiguration) WithResourceClaimTemplateName(value string) *PodResourceClaimApplyConfiguration {
 	b.ResourceClaimTemplateName = &value
+	return b
+}
+
+// WithPodGroupResourceClaim sets the PodGroupResourceClaim field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PodGroupResourceClaim field is set to the value of the last call.
+func (b *PodResourceClaimApplyConfiguration) WithPodGroupResourceClaim(value string) *PodResourceClaimApplyConfiguration {
+	b.PodGroupResourceClaim = &value
 	return b
 }
