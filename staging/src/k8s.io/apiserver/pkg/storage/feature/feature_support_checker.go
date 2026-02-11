@@ -62,11 +62,13 @@ type defaultFeatureSupportChecker struct {
 	lock                    sync.Mutex
 	progressNotifySupported *bool
 	checkingEndpoint        map[string]struct{}
+	checkClientTimeout      time.Duration
 }
 
 func newDefaultFeatureSupportChecker() *defaultFeatureSupportChecker {
 	return &defaultFeatureSupportChecker{
-		checkingEndpoint: make(map[string]struct{}),
+		checkingEndpoint:   make(map[string]struct{}),
+		checkClientTimeout: time.Minute,
 	}
 }
 
@@ -95,12 +97,6 @@ func (f *defaultFeatureSupportChecker) CheckClient(ctx context.Context, c client
 }
 
 func (f *defaultFeatureSupportChecker) checkClient(ctx context.Context, c client) {
-	// start with 10 ms, multiply by 2 each step, until 15 s and stays on 15 seconds.
-	delayFunc := wait.Backoff{
-		Duration: 10 * time.Millisecond,
-		Cap:      15 * time.Second,
-		Factor:   2.0,
-		Steps:    11}.DelayFunc()
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	for _, ep := range c.Endpoints() {
@@ -110,12 +106,24 @@ func (f *defaultFeatureSupportChecker) checkClient(ctx context.Context, c client
 		f.checkingEndpoint[ep] = struct{}{}
 		go func(ep string) {
 			defer runtime.HandleCrashWithContext(ctx)
-			err := delayFunc.Until(ctx, true, true, func(ctx context.Context) (done bool, err error) {
+			retryCtx, cancel := context.WithTimeout(ctx, f.checkClientTimeout)
+			defer cancel()
+			// start with 10 ms, multiply by 2 each step, until 15 s and stays on 15 seconds.
+			delayFunc := wait.Backoff{
+				Duration: 10 * time.Millisecond,
+				Cap:      15 * time.Second,
+				Factor:   2.0,
+				Steps:    11,
+			}.DelayFunc()
+			err := delayFunc.Until(retryCtx, true, true, func(ctx context.Context) (done bool, err error) {
 				internalErr := f.clientSupportsRequestWatchProgress(ctx, c, ep)
 				return internalErr == nil, nil
 			})
 			if err != nil {
-				klog.ErrorS(err, "Failed to check if RequestWatchProgress is supported by etcd after retrying")
+				klog.ErrorS(err, "Failed to check if etcd endpoint supports RequestWatchProgress; will retry on next storage creation", "endpoint", ep)
+				f.lock.Lock()
+				delete(f.checkingEndpoint, ep)
+				f.lock.Unlock()
 			}
 		}(ep)
 	}
