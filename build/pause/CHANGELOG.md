@@ -1,3 +1,7 @@
+# 3.10.2
+
+* Updating Windows pause image base to `mcr.microsoft.com/oss/v2/kubernetes/windows-pause-image-base:v0.4.1` to add Windows Server 2025 (ltsc2025) support.
+
 # 3.10.1
 
 * Updating base image for Windows pause container to `mcr.microsoft.com/oss/kubernetes/windows-pause-image-base:v0.4.1` to pick up security fixes in the nanoserver base image. ([#130102](https://github.com/kubernetes/kubernetes/pull/130102), [@marosset](https://github.com/marosset))
