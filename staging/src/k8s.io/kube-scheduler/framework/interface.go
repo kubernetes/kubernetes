@@ -708,7 +708,7 @@ type PlacementGeneratorPlugin interface {
 	// Each Placement represents a candidate set of resources (e.g., nodes matching a selector)
 	// and potential DRA allocations where the PodGroup might be scheduled.
 	// This runs in Phase 1 of the Workload Scheduling Cycle.
-	GeneratePlacements(ctx context.Context, state *CycleState, podGroup *PodGroupInfo, parentPlacements []*ParentPlacement) ([]*Placement, *Status)
+	GeneratePlacements(ctx context.Context, state PodGroupCycleState, podGroup *PodGroupInfo, parentPlacements []*PlacementInfo) ([]*Placement, *Status)
 }
 
 // PlacementStateData is the key for storing Placement options in the CycleState.
@@ -746,12 +746,12 @@ type PlacementStatePlugin interface {
 	Plugin
 	// AssumePlacement temporarily configures the scheduling context to evaluate the feasibility
 	// of the given Placement for the PodGroup.
-	AssumePlacement(ctx context.Context, state *CycleState, podGroup *PodGroupInfo, placement *Placement) *Status
+	AssumePlacement(ctx context.Context, state PodGroupCycleState, podGroup *PodGroupInfo, placement *PlacementInfo) *Status
 
 	// RevertPlacement reverts the temporary scheduling context changes made by AssumePlacement.
 	// This should be called after the evaluation of a Placement is complete to restore
 	// the scheduler's state and allow other Placements to be considered.
-	RevertPlacement(ctx context.Context, state *CycleState, podGroup *PodGroupInfo, placement *Placement) *Status
+	RevertPlacement(ctx context.Context, state PodGroupCycleState, podGroup *PodGroupInfo, placement *PlacementInfo) *Status
 }
 
 // PlacementScorerPlugin is an interface for plugins that score feasible Placements.
@@ -765,7 +765,7 @@ type PlacementScorerPlugin interface {
 	// with higher scores generally indicating more preferable Placements.
 	// Plugins can implement various scoring strategies, such as bin packing to minimize
 	// resource fragmentation.
-	ScorePlacement(ctx context.Context, state *CycleState, podGroup *PodGroupInfo, placement *Placement, podGroupAssignments *PodGroupAssignments) (float64, *Status)
+	ScorePlacement(ctx context.Context, state PodGroupCycleState, podGroup *PodGroupInfo, placement *PlacementInfo, podGroupAssignments *PodGroupAssignments) (float64, *Status)
 }
 
 // Handle provides data and some tools that plugins can use. It is
