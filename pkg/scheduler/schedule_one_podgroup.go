@@ -140,7 +140,7 @@ func (psc *podSchedulingContext) withNewState() *podSchedulingContext {
 	}
 }
 
-func initCycleState() *framework.CycleState {
+func initPodGroupCycleState() *framework.CycleState {
 	// Synchronously attempt to find a fit for the pod.
 	state := framework.NewCycleState()
 	// For the sake of performance, scheduler does not measure and export the scheduler_plugin_execution_duration metric
@@ -150,7 +150,7 @@ func initCycleState() *framework.CycleState {
 	return state
 }
 
-// initPodSchedulingContext initializes the scheduling context of a single pod for workload scheduling cycle.
+// initPodSchedulingContext initializes the scheduling context of a single pod for pod group scheduling cycle.
 func (sched *Scheduler) initPodSchedulingContext(ctx context.Context, pod *v1.Pod) (*podSchedulingContext, bool) {
 	logger := klog.FromContext(ctx)
 	// TODO(knelasevero): Remove duplicated keys from log entry calls
@@ -169,20 +169,11 @@ func (sched *Scheduler) initPodSchedulingContext(ctx context.Context, pod *v1.Po
 		return nil, false
 	}
 
-	state := initCycleState()
-
-	// Initialize an empty podsToActivate struct, which will be filled up by plugins or stay empty.
-	// During Workload Scheduling Cycle, no pods will be activated using this,
-	// as they will be eventually activated in the pod-by-pod phase.
-	// We however still need to provide this storage, not to break any existing plugin
-	// that may rely on this and run in the Workload Scheduling Cycle.
-	podsToActivate := framework.NewPodsToActivate()
-	state.Write(framework.PodsToActivateKey, podsToActivate)
-
-	return &podSchedulingContext{
+	podCtx := &podSchedulingContext{
 		logger: logger,
 		fwk:    podFwk,
 	}
+
 	return podCtx.withNewState(), true
 }
 
@@ -231,12 +222,13 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, podGroupInfo *framewo
 
 	// All pods in a pod group use the same scheduler profile
 	podGroupFwk := podCtxs[0].fwk
-	// CycleState for pod groups is separate from podbypod cycle state
-	podGroupCycleState := initCycleState()
+	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
+	if err != nil {
+		// TODO: do something about it, unexpected
+	}
+	podGroupCycleState := initPodGroupCycleState()
 
-	allNodes := make([]*v1.Node, 0)
-
-	placements, err := podGroupFwk.RunPlacementGeneratorPlugins(ctx, podGroupCycleState, podGroupInfo.PodGroupInfo, []*fwk.ParentPlacement{
+	placements, status := podGroupFwk.RunPlacementGeneratorPlugins(ctx, podGroupCycleState, nil, []*fwk.PlacementInfo{
 		{
 			Placement: fwk.Placement{
 				NodeSelector: &v1.NodeSelector{},
@@ -244,7 +236,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, podGroupInfo *framewo
 			PlacementNodes: allNodes,
 		},
 	})
-	if err != nil {
+	if !status.IsSuccess() {
 		// TODO: do something about it, pod group is unschedulable
 		return
 	}
@@ -275,9 +267,9 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, podGroupInfo *framewo
 
 	result := sched.selectPlacementResult(results)
 
-	sched.applyPodGroupAlgorithmResult(ctx, podGroupInfo, result, podCtxs)
+	sched.applyPodGroupAlgorithmResult(ctx, podGroupInfo, *result)
 
-	// TBD: Record PodGroup-level metrics, return podGroupInfo to the queue.
+	// TBD: Record PodGroup-level metrics and logs, return podGroupInfo to the queue.
 }
 
 func (s *Scheduler) selectPlacementResult(results []placementResult) *podGroupAlgorithmResult {
@@ -287,45 +279,7 @@ func (s *Scheduler) selectPlacementResult(results []placementResult) *podGroupAl
 
 type placementResult struct {
 	podGroupAlgorithmResult
-	placement *fwk.ParentPlacement
-}
-
-// applyPodGroupAlgorithmResult applies the result of the pod group scheduling algorithm.
-// If that algorithm succedeed, the schedulable pods are added as individuals to the scheduling queue.
-// Unschedulable pods are moved back to the scheduling queue and need to wait
-// for the next workload scheduling cycle.
-// If the preemption is required for this pod group, all pods are moved back to the scheduling queue
-// and require the next workload scheduling cycle to verify the preemption outcome.
-func (sched *Scheduler) applyPodGroupAlgorithmResult(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo, result *podGroupAlgorithmResult, podCtxs []*podSchedulingContext) {
-	for i, podResult := range result.podResults {
-		pInfo := podGroupInfo.QueuedPodInfos[i]
-		podCtx := podCtxs[i]
-		if podResult.status.IsSuccess() {
-			nominatingInfo := &fwk.NominatingInfo{
-				NominatingMode:    fwk.ModeOverride,
-				NominatedNodeName: podResult.scheduleResult.SuggestedHost,
-			}
-			switch result.status {
-			case podGroupFeasible:
-				// Pod is put into the activeQ and will be taken to the pod-by-pod scheduling.
-				sched.handlePodGroupSchedulingSuccess(ctx, podCtx.fwk, pInfo, nominatingInfo, time.Time{})
-			case podGroupUnschedulable:
-				// Pod group is unschedulable, so the pod has to be marked as unschedulable.
-				// Its rejection status is set to its permit status message.
-				status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, podResult.permitStatus.Message()).WithError(errPodGroupUnschedulable)
-				sched.FailureHandler(ctx, podCtx.fwk, pInfo, status, clearNominatedNode, time.Time{})
-			case podGroupRequiresPreemption:
-				// Pod has to come back to the scheduling queue as unschedulable, waiting for preemption to complete.
-				status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "preemption is required for other pods from a pod group").WithError(errPodGroupUnschedulable)
-				sched.FailureHandler(ctx, podCtx.fwk, pInfo, status, nominatingInfo, time.Time{})
-			}
-		} else {
-			// When an error occured or preemption is required for this pod, just call the FailureHandler.
-			// TBD: Add a message to status if the pod used features for which finding a placement cannot be guaranteed,
-			// such as heterogeneous pod group or using inter-pod dependencies.
-			sched.FailureHandler(ctx, podCtx.fwk, pInfo, podResult.status, podResult.scheduleResult.nominatingInfo, time.Time{})
-		}
-	}
+	placement *fwk.PlacementInfo
 }
 
 // algorithmResult stores the scheduling result and status for a scheduling attempt of a single pod.
