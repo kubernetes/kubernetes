@@ -476,6 +476,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
 		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
+		servermetrics.SetMetricsProvider(servermetrics.CRIMetricsProvider)
 	} else {
 		cadvisorOpts := cadvisorv2.RequestOptions{
 			IdType:    cadvisorv2.TypeName,
@@ -483,6 +484,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 			Recursive: true,
 		}
 		r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+		servermetrics.SetMetricsProvider(servermetrics.CAdvisorMetricsProvider)
 	}
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
