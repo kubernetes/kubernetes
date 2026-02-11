@@ -49,15 +49,12 @@ const (
 	// available on this server.
 	localDiscoveryRefreshInterval = 30 * time.Minute
 	// defaultExclusionGracePeriod is the default duration to wait before
-	// removing a group from the exclusion set after it is deleted from
+	// removing a groupversion from the exclusion set after it is deleted from
 	// CRDs and aggregated APIs.
 	// This is to allow time for all peer API servers to also observe
 	// the deleted CRD or aggregated API before this server stops excluding it
 	// in peer-aggregated discovery and while proxying requests to peers.
 	defaultExclusionGracePeriod = 5 * time.Minute
-	// defaultExclusionReaperInterval is the interval at which the we
-	// clean up deleted groups from the exclusion list.
-	defaultExclusionReaperInterval = 1 * time.Minute
 )
 
 // Interface defines how the Mixed Version Proxy filter interacts with the underlying system.
@@ -67,12 +64,49 @@ type Interface interface {
 	HasFinishedSync() bool
 	RunLocalDiscoveryCacheSync(stopCh <-chan struct{}) error
 	RunPeerDiscoveryCacheSync(ctx context.Context, workers int)
-	RunExcludedGVsReaper(stopCh <-chan struct{})
-	RunGVDeletionWorkers(ctx context.Context, workers int)
 	GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery
 	RegisterCacheInvalidationCallback(cb func())
+
+	// RegisterCRDInformerHandlers registers event handlers on the CRD informer to track
+	// which GroupVersions are served locally by CRDs. When a CRD is created or updated,
+	// its GV is added to the exclusion set. When deleted, the GV is marked for exclusion
+	// during a grace period to allow peers to observe the deletion. The extractor function
+	// extracts the GroupVersion from a CRD object.
+	//
+	// This exclusion is necessary because peer discovery is not refreshed when a local
+	// CRD is deleted. Without exclusion, the deleted GV might still appear in cached peer
+	// discovery data, causing requests to be incorrectly routed to a peer for a GV that
+	// no longer exists locally. Therefore, we intentionally exclude CRD GVs from peer
+	// discovery from the start and only rely on the local apiserver's view of the CRD
+	// to serve it in peer-aggregated discovery.
 	RegisterCRDInformerHandlers(crdInformer cache.SharedIndexInformer, extractor GVExtractor) error
+
+	// RegisterAPIServiceInformerHandlers registers event handlers on the APIService informer
+	// to track which GroupVersions are served locally by aggregated APIServices. When an
+	// APIService is created or updated, its GV is added to the exclusion set. When deleted,
+	// the GV is marked for exclusion during a grace period.
+	//
+	// This exclusion is necessary because peer discovery is not refreshed when a local
+	// aggregated APIService is deleted. Without exclusion, the deleted GV might still appear
+	// in cached peer discovery data, causing requests to be incorrectly routed to a peer.
+	// Therefore, we intentionally exclude aggregated APIService GVs from peer discovery
+	// from the start and only rely on the local apiserver's view to serve them in
+	// peer-aggregated discovery.
 	RegisterAPIServiceInformerHandlers(apiServiceInformer cache.SharedIndexInformer, extractor GVExtractor) error
+
+	// RunPeerDiscoveryActiveGVTracker starts a worker that processes CRD/APIService informer
+	// events to rebuild the set of actively served GroupVersions. This worker is triggered
+	// whenever a CRD or APIService is added or updated and updates the exclusion
+	// set accordingly. When a GV is deleted, a delayed sync is automatically scheduled
+	// after the grace period to reap expired GVs from the exclusion set.
+	RunPeerDiscoveryActiveGVTracker(ctx context.Context)
+
+	// RunPeerDiscoveryRefilter starts a worker that re-applies exclusion filtering to the
+	// cached peer discovery data whenever the exclusion set changes. This ensures that
+	// already-cached peer discovery responses are immediately updated to exclude newly added
+	// or updated local GVs, rather than waiting for the next peer lease event to trigger a
+	// cache refresh of peer discovery data.
+	RunPeerDiscoveryRefilter(ctx context.Context)
 }
 
 // New creates a new instance to implement unknown version proxy
@@ -95,22 +129,20 @@ func NewPeerProxyHandler(
 		localDiscoveryInfoCache:          atomic.Value{},
 		localDiscoveryCacheTicker:        time.NewTicker(localDiscoveryRefreshInterval),
 		localDiscoveryInfoCachePopulated: make(chan struct{}),
-		peerDiscoveryInfoCache:           atomic.Value{},
+		rawPeerDiscoveryCache:            atomic.Value{},
 		peerLeaseQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				Name: peerDiscoveryControllerName,
 			}),
 		apiserverIdentityInformer: leaseInformer,
-		excludedGVs:               make(map[schema.GroupVersion]*time.Time),
-		exclusionGracePeriod:      defaultExclusionGracePeriod,
-		reaperCheckInterval:       defaultExclusionReaperInterval,
-		gvDeletionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "gv-deletion",
-			}),
 	}
+
+	h.gvExclusionManager = NewGVExclusionManager(
+		defaultExclusionGracePeriod,
+		&h.rawPeerDiscoveryCache,
+		&h.cacheInvalidationCallback,
+	)
 
 	if parts := strings.Split(identityLeaseLabelSelector, "="); len(parts) != 2 {
 		return nil, fmt.Errorf("invalid identityLeaseLabelSelector provided, must be of the form key=value, received: %v", identityLeaseLabelSelector)
@@ -134,7 +166,7 @@ func NewPeerProxyHandler(
 	discoveryClient.NoPeerDiscovery = true
 	h.discoveryClient = discoveryClient
 	h.localDiscoveryInfoCache.Store(map[schema.GroupVersionResource]bool{})
-	h.peerDiscoveryInfoCache.Store(map[string]PeerDiscoveryCacheEntry{})
+	h.rawPeerDiscoveryCache.Store(map[string]PeerDiscoveryCacheEntry{})
 
 	proxyTransport, err := transport.New(proxyClientConfig)
 	if err != nil {
@@ -168,4 +200,34 @@ func NewPeerProxyHandler(
 
 	h.leaseRegistration = peerDiscoveryRegistration
 	return h, nil
+}
+
+// RegisterCRDInformerHandlers registers event handlers for CRD informer.
+func (h *peerProxyHandler) RegisterCRDInformerHandlers(crdInformer cache.SharedIndexInformer, extractor GVExtractor) error {
+	if h.gvExclusionManager != nil {
+		return h.gvExclusionManager.RegisterCRDInformerHandlers(crdInformer, extractor)
+	}
+	return nil
+}
+
+// RegisterAPIServiceInformerHandlers registers event handlers for APIService informer.
+func (h *peerProxyHandler) RegisterAPIServiceInformerHandlers(apiServiceInformer cache.SharedIndexInformer, extractor GVExtractor) error {
+	if h.gvExclusionManager != nil {
+		return h.gvExclusionManager.RegisterAPIServiceInformerHandlers(apiServiceInformer, extractor)
+	}
+	return nil
+}
+
+// RunPeerDiscoveryActiveGVTracker starts the worker that tracks active GVs from CRDs/APIServices.
+func (h *peerProxyHandler) RunPeerDiscoveryActiveGVTracker(ctx context.Context) {
+	if h.gvExclusionManager != nil {
+		h.gvExclusionManager.RunPeerDiscoveryActiveGVTracker(ctx)
+	}
+}
+
+// RunPeerDiscoveryRefilter starts the worker that refilters peer discovery cache.
+func (h *peerProxyHandler) RunPeerDiscoveryRefilter(ctx context.Context) {
+	if h.gvExclusionManager != nil {
+		h.gvExclusionManager.RunPeerDiscoveryRefilter(ctx)
+	}
 }

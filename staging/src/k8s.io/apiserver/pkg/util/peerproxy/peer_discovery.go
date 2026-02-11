@@ -115,23 +115,11 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 		}
 	}
 
-	// Apply exclusion filter to the cache.
-	if len(newCache) != 0 {
-		if filteredCache, peerDiscoveryChanged := h.filterPeerDiscoveryCache(newCache); peerDiscoveryChanged {
-			newCache = filteredCache
-		}
-	}
-
-	h.storePeerDiscoveryCacheAndInvalidate(newCache)
+	// Store unfiltered data to raw cache and trigger refilter.
+	// The refilter worker (single writer to filtered cache) will apply exclusions.
+	h.rawPeerDiscoveryCache.Store(newCache)
+	h.gvExclusionManager.TriggerRefilter()
 	return fetchDiscoveryErr
-}
-
-// storePeerDiscoveryCacheAndInvalidate stores the new peer discovery cache and always calls the invalidation callback if set.
-func (h *peerProxyHandler) storePeerDiscoveryCacheAndInvalidate(newCache map[string]PeerDiscoveryCacheEntry) {
-	h.peerDiscoveryInfoCache.Store(newCache)
-	if callback := h.cacheInvalidationCallback.Load(); callback != nil {
-		(*callback)()
-	}
 }
 
 func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID string) (PeerDiscoveryCacheEntry, error) {
@@ -287,14 +275,8 @@ func (h *peerProxyHandler) isValidPeerIdentityLease(obj interface{}) (*v1.Lease,
 
 func (h *peerProxyHandler) findServiceableByPeerFromPeerDiscoveryCache(gvr schema.GroupVersionResource) []string {
 	var serviceableByIDs []string
-	cache := h.peerDiscoveryInfoCache.Load()
-	if cache == nil {
-		return serviceableByIDs
-	}
-
-	cacheMap, ok := cache.(map[string]PeerDiscoveryCacheEntry)
-	if !ok {
-		klog.Warning("Invalid cache type in peerDiscoveryInfoCache")
+	cacheMap := h.gvExclusionManager.GetFilteredPeerDiscoveryCache()
+	if len(cacheMap) == 0 {
 		return serviceableByIDs
 	}
 

@@ -387,7 +387,7 @@ func newFakePeerProxyHandler(informerFinishedSync bool,
 		return nil, err
 	}
 	ppH.localDiscoveryInfoCache.Store(localCache)
-	ppH.peerDiscoveryInfoCache.Store(peerCache)
+	ppH.gvExclusionManager.filteredPeerDiscoveryCache.Store(peerCache)
 
 	ppH.finishedSync.Store(informerFinishedSync)
 	return ppH, nil
