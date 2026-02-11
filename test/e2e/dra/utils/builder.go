@@ -44,6 +44,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -52,15 +53,12 @@ import (
 
 // ExtendedResourceName returns hard coded extended resource name with a variable
 // suffix from the input integer when it's greater than or equal to 0.
-// "example.com/resource" is not special, any valid extended resource name can be used
-// instead, except when using example device plugin in the test, which hard coded it,
-// see test/e2e/dra/deploy_device_plugin.go.
 // i == -1 == SingletonIndex is special, the extended resource name has no extra suffix
 // and matches the one used by the example device plugin.
 func (b *Builder) ExtendedResourceName(i int) string {
 	switch i {
 	case SingletonIndex:
-		return "example.com/resource"
+		return e2enode.SampleDeviceResourceName
 	default:
 		return b.driver.Name + "/resource" + fmt.Sprintf("-%d", i)
 	}
