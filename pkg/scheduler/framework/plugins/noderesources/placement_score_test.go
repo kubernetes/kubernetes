@@ -239,16 +239,16 @@ func TestPlacementBinPackingScore(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			placementNodes := make([]*v1.Node, 0, len(tc.placementNodeNames))
+			placementNodes := make([]fwk.NodeInfo, 0, len(tc.placementNodeNames))
 			for _, name := range tc.placementNodeNames {
 				nodeInfo, err := snapshot.NodeInfos().Get(name)
 				if err != nil {
 					t.Fatal(err)
 				}
-				placementNodes = append(placementNodes, nodeInfo.Node())
+				placementNodes = append(placementNodes, nodeInfo)
 			}
 
-			score, status := plugin.ScorePlacement(tCtx, framework.NewCycleState(), &fwk.PodGroupInfo{UnscheduledPods: tc.podGroup}, &fwk.ParentPlacement{
+			score, status := plugin.ScorePlacement(tCtx, framework.NewCycleState(), &fwk.PodGroupInfo{UnscheduledPods: tc.podGroup}, &fwk.PlacementInfo{
 				PlacementNodes: placementNodes,
 			}, &fwk.PodGroupAssignments{
 				UnscheduledPodsToNodes: tc.podGroupAssignments,

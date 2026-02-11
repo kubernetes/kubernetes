@@ -44,7 +44,7 @@ func NewPlacementBinPacking(_ context.Context, plArgs runtime.Object, fh fwk.Han
 	}, nil
 }
 
-func (pl *PlacementBinPacking) ScorePlacement(ctx context.Context, state fwk.CycleState, podGroup *fwk.PodGroupInfo, placement *fwk.ParentPlacement, podGroupAssignments *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *PlacementBinPacking) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup *fwk.PodGroupInfo, placement *fwk.PlacementInfo, podGroupAssignments *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	requested := []int64{}
 	for _, pod := range podGroup.UnscheduledPods {
@@ -67,13 +67,7 @@ func (pl *PlacementBinPacking) ScorePlacement(ctx context.Context, state fwk.Cyc
 	allocatable := make([]int64, len(requested))
 	allocated := make([]int64, len(requested))
 	for _, node := range placement.PlacementNodes {
-		// DONOTMERGE: we could store NodeInfos instead of Nodes as PlacementNodes, then we wouldn't need this lookup
-		nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(node.Name)
-		if err != nil {
-			// Shouldn't happen, as placement nodes are supposed to be created from the snapshot
-			return 0, fwk.NewStatus(fwk.Error, "Placement node is not present in the snapshot", node.Name)
-		}
-		nodeAllocatable, nodeAllocated := pl.calculateNodeAllocatableRequest(ctx, nodeInfo, requested, nil)
+		nodeAllocatable, nodeAllocated := pl.calculateNodeAllocatableRequest(ctx, node, requested, nil)
 		for i := range requested {
 			allocatable[i] += nodeAllocatable[i]
 			allocated[i] += nodeAllocated[i]
@@ -81,4 +75,8 @@ func (pl *PlacementBinPacking) ScorePlacement(ctx context.Context, state fwk.Cyc
 		}
 	}
 	return pl.Score(allocatable, allocated, requested), nil
+}
+
+func (pl *PlacementBinPacking) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
+	return nil
 }
