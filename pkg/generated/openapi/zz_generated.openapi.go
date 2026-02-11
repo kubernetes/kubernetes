@@ -70373,6 +70373,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
+					"draManagerReconcilePeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "draManagerReconcilePeriod is the reconciliation period for the DRA Manager. Default: \"10s\"",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
 					"memoryManagerPolicy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "memoryManagerPolicy is the name of the policy to use by memory manager. Requires the MemoryManager feature gate to be enabled. Default: \"none\"",
