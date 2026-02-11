@@ -57,6 +57,7 @@ source "${KUBE_ROOT}/test/cmd/request-timeout.sh"
 source "${KUBE_ROOT}/test/cmd/results.sh"
 source "${KUBE_ROOT}/test/cmd/run.sh"
 source "${KUBE_ROOT}/test/cmd/save-config.sh"
+source "${KUBE_ROOT}/test/cmd/scale.sh"
 source "${KUBE_ROOT}/test/cmd/storage.sh"
 source "${KUBE_ROOT}/test/cmd/template-output.sh"
 source "${KUBE_ROOT}/test/cmd/version.sh"
@@ -1063,6 +1064,12 @@ runTests() {
   #######################
 
   record_command run_kuberc_tests
+
+  ###########
+  # Scale #
+  ###########
+
+  record_command run_kubectl_scale_tests
 
   cleanup_tests
 }
