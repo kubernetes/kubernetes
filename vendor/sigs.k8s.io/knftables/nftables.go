@@ -40,9 +40,14 @@ type Interface interface {
 	// result.
 	Check(ctx context.Context, tx *Transaction) error
 
+	// ListAll returns a map containing the names of all objects in the table,
+	// grouped by object type. If there are no objects, this will return an empty list
+	// and no error.
+	ListAll(ctx context.Context) (map[string][]string, error)
+
 	// List returns a list of the names of the objects of objectType ("chain", "set",
-	// or "map") in the table. If there are no such objects, this will return an empty
-	// list and no error.
+	// "map" or "counter") in the table. If there are no such objects, this will
+	// return an empty list and no error.
 	List(ctx context.Context, objectType string) ([]string, error)
 
 	// ListRules returns a list of the rules in a chain, in order. If no chain name is
@@ -58,7 +63,31 @@ type Interface interface {
 	// be "set" or "map".) If the set/map exists but contains no elements, this will
 	// return an empty list and no error.
 	ListElements(ctx context.Context, objectType, name string) ([]*Element, error)
+
+	// ListCounters returns a list of the counters in the table.
+	ListCounters(ctx context.Context) ([]*Counter, error)
 }
+
+// Option is an optional nftables feature that an Interface might or might not support
+type Option string
+
+const (
+	// NoObjectCommentEmulation turns off the default knftables.Interface behavior of
+	// ignoring comments on Table, Chain, Set, and Map objects if the underlying CLI
+	// or kernel does not support them. (The only real reason to specify this is if
+	// you want to avoid doing any "nft check" calls at construction time.)
+	NoObjectCommentEmulation Option = "NoObjectCommentEmulation"
+
+	// RequireDestroy tells knftables.New to fail if the `nft destroy` command is not
+	// available.
+	RequireDestroy Option = "RequireDestroy"
+
+	// EmulateDestroy tells the Interface to emulate the `nft destroy` command if it
+	// is not available. If you pass this option, then that will restrict the ways
+	// that you can use the `tx.Destroy()` method to be compatible with destroy
+	// emulation; see the docs for that method for more details.
+	EmulateDestroy Option = "EmulateDestroy"
+)
 
 type nftContext struct {
 	family Family
@@ -67,6 +96,14 @@ type nftContext struct {
 	// noObjectComments is true if comments on Table/Chain/Set/Map are not supported.
 	// (Comments on Rule and Element are always supported.)
 	noObjectComments bool
+
+	// emulateDestroy is true if tx.Destroy() should restrict itself to destroy
+	// actions that are compatible with an emulated version of "nft destroy"
+	emulateDestroy bool
+
+	// hasDestroy is true emulateDestroy is true but the nft binary actually supports
+	// "destroy" so we don't need to bother emulating it.
+	hasDestroy bool
 }
 
 // realNFTables is an implementation of Interface
@@ -80,10 +117,23 @@ type realNFTables struct {
 	path string
 }
 
+func optionSet(options []Option, option Option) bool {
+	for _, o := range options {
+		if o == option {
+			return true
+		}
+	}
+	return false
+}
+
 // newInternal creates a new nftables.Interface for interacting with the given table; this
 // is split out from New() so it can be used from unit tests with a fakeExec.
-func newInternal(family Family, table string, execer execer) (Interface, error) {
+func newInternal(family Family, table string, execer execer, options ...Option) (Interface, error) {
 	var err error
+
+	if (family == "") != (table == "") {
+		return nil, fmt.Errorf("family and table must either both be specified or both be empty")
+	}
 
 	nft := &realNFTables{
 		nftContext: nftContext{
@@ -108,30 +158,82 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 		return nil, fmt.Errorf("nft version must be v1.0.1 or later (got %s)", strings.TrimSpace(out))
 	}
 
+	testFamily := family
+	if testFamily == "" {
+		testFamily = InetFamily
+	}
+	testTable := table
+	if testTable == "" {
+		testTable = "test"
+	}
+
 	// Check that (a) nft works, (b) we have permission, (c) the kernel is new enough
 	// to support object comments.
 	tx := nft.NewTransaction()
 	tx.Add(&Table{
+		Family:  testFamily,
+		Name:    testTable,
 		Comment: PtrTo("test"),
 	})
 	if err := nft.Check(context.TODO(), tx); err != nil {
-		// Try again, checking just that (a) nft works, (b) we have permission.
-		tx := nft.NewTransaction()
-		tx.Add(&Table{})
-		if err := nft.Check(context.TODO(), tx); err != nil {
+		nft.noObjectComments = true
+		if !optionSet(options, NoObjectCommentEmulation) {
+			// Try again, checking just that (a) nft works, (b) we have permission.
+			tx := nft.NewTransaction()
+			tx.Add(&Table{
+				Family: testFamily,
+				Name:   testTable,
+			})
+			err = nft.Check(context.TODO(), tx)
+		}
+		if err != nil {
 			return nil, fmt.Errorf("could not run nftables command: %w", err)
 		}
+	}
 
-		nft.noObjectComments = true
+	requireDestroy := optionSet(options, RequireDestroy)
+	emulateDestroy := optionSet(options, EmulateDestroy)
+	if requireDestroy || emulateDestroy {
+		// Check if "nft destroy" is available.
+		tx = nft.NewTransaction()
+		tx.Destroy(&Table{})
+		if err := nft.Check(context.TODO(), tx); err != nil {
+			if requireDestroy {
+				return nil, fmt.Errorf("`nft destroy` is not available: %w", err)
+			}
+		} else {
+			nft.hasDestroy = true
+		}
+		// Can't set this until after doing the test above
+		nft.emulateDestroy = emulateDestroy
 	}
 
 	return nft, nil
 }
 
-// New creates a new nftables.Interface for interacting with the given table. If nftables
-// is not available/usable on the current host, it will return an error.
-func New(family Family, table string) (Interface, error) {
-	return newInternal(family, table, realExec{})
+// New creates a new nftables.Interface. If nftables is not available/usable on the
+// current host, it will return an error.
+//
+// Normally, family and table will specify the family and table to use for all operations
+// on the returned Interface. However, if you leave them empty (`""`), then the Interface
+// will have no associated family/table and (a) you must explicitly fill in those fields
+// in any objects you use in a Transaction, (b) you can't use any of the List* methods.
+//
+// In addition to the family and table, you can specify additional comma-separated options
+// to New(). The currently-supported options are:
+//
+//   - NoObjectCommentEmulation: disables the default knftables.Interface behavior of
+//     ignoring comments on Table, Chain, Set, and Map objects if the underlying CLI or
+//     kernel does not support them.
+//
+//   - RequireDestroy: require the system to support `nft destroy`; the New() call will
+//     fail with an error on older systems.
+//
+//   - EmulateDestroy: adjust the API of `tx.Destroy()` to make it possible to emulate via
+//     `nft add` and `nft delete` on systems that do not have `nft destroy`; see the docs
+//     for `tx.Destroy()` for more details.
+func New(family Family, table string, options ...Option) (Interface, error) {
+	return newInternal(family, table, realExec{}, options...)
 }
 
 // NewTransaction is part of Interface
@@ -149,14 +251,11 @@ func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 	}
 
 	nft.buffer.Reset()
-	err := tx.populateCommandBuf(nft.buffer)
-	if err != nil {
-		return err
-	}
+	tx.populateCommandBuf(nft.buffer)
 
 	cmd := exec.CommandContext(ctx, nft.path, "-f", "-")
 	cmd.Stdin = nft.buffer
-	_, err = nft.exec.Run(cmd)
+	_, err := nft.exec.Run(cmd)
 	return err
 }
 
@@ -170,14 +269,11 @@ func (nft *realNFTables) Check(ctx context.Context, tx *Transaction) error {
 	}
 
 	nft.buffer.Reset()
-	err := tx.populateCommandBuf(nft.buffer)
-	if err != nil {
-		return err
-	}
+	tx.populateCommandBuf(nft.buffer)
 
 	cmd := exec.CommandContext(ctx, nft.path, "--check", "-f", "-")
 	cmd.Stdin = nft.buffer
-	_, err = nft.exec.Run(cmd)
+	_, err := nft.exec.Run(cmd)
 	return err
 }
 
@@ -192,9 +288,9 @@ func jsonVal[T any](json map[string]interface{}, key string) (T, bool) {
 	return zero, false
 }
 
-// getJSONObjects takes the output of "nft -j list", validates it, and returns an array
-// of just the objects of objectType.
-func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, error) {
+// parseJSONResult takes the output of "nft -j list", validates it, and returns the array
+// of objects (including the "metainfo" object)
+func parseJSONObjects(listOutput string) ([]map[string]map[string]interface{}, error) {
 	// listOutput should contain JSON looking like:
 	//
 	// {
@@ -225,23 +321,7 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 	//   ]
 	// }
 	//
-	// In this case, given objectType "chain", we would return
-	//
-	// [
-	//   {
-	//     "family": "ip",
-	//     "table": "kube-proxy",
-	//     "name": "KUBE-SERVICES",
-	//     "handle": 3
-	//   },
-	//   {
-	//     "family": "ip",
-	//     "table": "kube-proxy",
-	//     "name": "KUBE-NODEPORTS",
-	//     "handle": 4
-	//   },
-	//   ...
-	// ]
+	// parseJSONResult returns the array of objects tagged "nftables".
 
 	jsonResult := map[string][]map[string]map[string]interface{}{}
 	if err := json.Unmarshal([]byte(listOutput), &jsonResult); err != nil {
@@ -261,6 +341,35 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 	if version, ok := jsonVal[float64](metainfo, "json_schema_version"); !ok || version != 1.0 {
 		return nil, fmt.Errorf("could not find supported json_schema_version in nft output %q", listOutput)
 	}
+	return nftablesResult, nil
+}
+
+// getJSONObjects takes the output of "nft -j list", validates it, and returns an array
+// of just the objects of objectType.
+func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, error) {
+	// Given the result from the parseJSONObjects example above, and objectType
+	// "chain", we would return
+	//
+	// [
+	//   {
+	//     "family": "ip",
+	//     "table": "kube-proxy",
+	//     "name": "KUBE-SERVICES",
+	//     "handle": 3
+	//   },
+	//   {
+	//     "family": "ip",
+	//     "table": "kube-proxy",
+	//     "name": "KUBE-NODEPORTS",
+	//     "handle": 4
+	//   },
+	//   ...
+	// ]
+
+	nftablesResult, err := parseJSONObjects(listOutput)
+	if err != nil {
+		return nil, err
+	}
 
 	var objects []map[string]interface{}
 	for _, objContainer := range nftablesResult {
@@ -272,37 +381,65 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 	return objects, nil
 }
 
-// List is part of Interface.
-func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string, error) {
-	// All currently-existing nftables object types have plural forms that are just
-	// the singular form plus 's'.
-	var typeSingular, typePlural string
-	if objectType[len(objectType)-1] == 's' {
-		typeSingular = objectType[:len(objectType)-1]
-		typePlural = objectType
-	} else {
-		typeSingular = objectType
-		typePlural = objectType + "s"
-	}
-
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", typePlural, string(nft.family))
+// ListAll is part of Interface.
+func (nft *realNFTables) ListAll(ctx context.Context) (map[string][]string, error) {
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
 	}
 
-	objects, err := getJSONObjects(out, typeSingular)
+	nftablesResult, err := parseJSONObjects(out)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string][]string)
+	for i, objContainer := range nftablesResult {
+		if i == 0 {
+			// Skip "metainfo"
+			continue
+		}
+		for objectType, obj := range objContainer {
+			if name, ok := jsonVal[string](obj, "name"); ok {
+				result[objectType] = append(result[objectType], name)
+			}
+			// Shouldn't be more than one field in objContainer, but ignore it
+			// if there is.
+			break
+		}
+	}
+	return result, nil
+}
+
+// List is part of Interface.
+func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string, error) {
+	if nft.table == "" {
+		return nil, fmt.Errorf("can't use List() on a knftables.Interface with no associated family/table")
+	}
+
+	// objectType is allowed to be either singular or plural. All currently-existing
+	// nftables object types have plural forms that are just the singular form plus 's',
+	// and none have singular forms ending in 's'.
+	if objectType[len(objectType)-1] == 's' {
+		objectType = objectType[:len(objectType)-1]
+	}
+
+	// We want to restrict nft to looking only at our table, so we have to do "list table"
+	// rather than any variant of "list <objectType>".
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+	out, err := nft.exec.Run(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run nft: %w", err)
+	}
+
+	objects, err := getJSONObjects(out, objectType)
 	if err != nil {
 		return nil, err
 	}
 
 	var result []string
 	for _, obj := range objects {
-		objTable, _ := jsonVal[string](obj, "table")
-		if objTable != nft.table {
-			continue
-		}
-
 		if name, ok := jsonVal[string](obj, "name"); ok {
 			result = append(result, name)
 		}
@@ -312,7 +449,10 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 
 // ListRules is part of Interface
 func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
-	// If no chain is given, return all rules from within the table.
+	if nft.table == "" {
+		return nil, fmt.Errorf("can't use ListRules() on a knftables.Interface with no associated family/table")
+	}
+
 	var cmd *exec.Cmd
 	if chain == "" {
 		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
@@ -358,6 +498,10 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 
 // ListElements is part of Interface
 func (nft *realNFTables) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
+	if nft.table == "" {
+		return nil, fmt.Errorf("can't use ListElements() on a knftables.Interface with no associated family/table")
+	}
+
 	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", objectType, string(nft.family), nft.table, name)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
@@ -390,12 +534,14 @@ func (nft *realNFTables) ListElements(ctx context.Context, objectType, name stri
 			key, value = tuple[0], tuple[1]
 		}
 
-		// If the element has a comment, then key will be a compound object like:
+		// If the element has a comment or a counter, then key will be a compound
+		// object like:
 		//
 		//   {
 		//     "elem": {
 		//       "val": "192.168.0.1",
-		//       "comment": "this is a comment"
+		//       "comment": "this is a comment",
+		//       "counter": { "packets": 0, "bytes": 0 }
 		//     }
 		//   }
 		//
@@ -473,15 +619,13 @@ func parseElementValue(json interface{}) ([]string, error) {
 		return []string{fmt.Sprintf("%d", int(val))}, nil
 	case map[string]interface{}:
 		if concat, _ := jsonVal[[]interface{}](val, "concat"); concat != nil {
-			vals := make([]string, len(concat))
+			vals := make([]string, 0, len(concat))
 			for i := range concat {
-				if str, ok := concat[i].(string); ok {
-					vals[i] = str
-				} else if num, ok := concat[i].(float64); ok {
-					vals[i] = fmt.Sprintf("%d", int(num))
-				} else {
-					return nil, fmt.Errorf("could not parse element value %q", concat[i])
+				newVals, err := parseElementValue(concat[i])
+				if err != nil {
+					return nil, err
 				}
+				vals = append(vals, newVals...)
 			}
 			return vals, nil
 		} else if prefix, _ := jsonVal[map[string]interface{}](val, "prefix"); prefix != nil {
@@ -511,4 +655,44 @@ func parseElementValue(json interface{}) ([]string, error) {
 	}
 
 	return nil, fmt.Errorf("could not parse element value %q", json)
+}
+
+// ListCounters is part of Interface
+func (nft *realNFTables) ListCounters(ctx context.Context) ([]*Counter, error) {
+	if nft.table == "" {
+		return nil, fmt.Errorf("can't use ListCounters() on a knftables.Interface with no associated family/table")
+	}
+
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "counters", "table", string(nft.family), nft.table)
+	out, err := nft.exec.Run(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run nft: %w", err)
+	}
+
+	objects, err := getJSONObjects(out, "counter")
+	if err != nil {
+		return nil, err
+	}
+
+	objectToCounter := func(object map[string]interface{}) *Counter {
+		counter := &Counter{
+			Name:    object["name"].(string),
+			Packets: PtrTo(uint64(object["packets"].(float64))),
+			Bytes:   PtrTo(uint64(object["bytes"].(float64))),
+		}
+		if handle, ok := jsonVal[string](object, "comment"); ok {
+			counter.Comment = PtrTo(handle)
+		}
+		if handle, ok := jsonVal[float64](object, "handle"); ok {
+			counter.Handle = PtrTo(int(handle))
+		}
+
+		return counter
+	}
+
+	counters := make([]*Counter, 0, len(objects))
+	for _, object := range objects {
+		counters = append(counters, objectToCounter(object))
+	}
+	return counters, nil
 }

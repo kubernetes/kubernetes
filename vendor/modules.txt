@@ -1207,7 +1207,7 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 ## explicit; go 1.23
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
-# sigs.k8s.io/knftables v0.0.17
+# sigs.k8s.io/knftables v0.0.20
 ## explicit; go 1.20
 sigs.k8s.io/knftables
 # sigs.k8s.io/kustomize/api v0.20.1
