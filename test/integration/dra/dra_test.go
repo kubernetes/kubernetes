@@ -158,7 +158,7 @@ func TestDRA(t *testing.T) {
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
 				tCtx.Run("PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
-				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
+				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
