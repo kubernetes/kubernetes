@@ -150,6 +150,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 	capabilities := map[storageframework.Capability]bool{
 		storageframework.CapPersistence:                    true,
 		storageframework.CapSnapshotDataSource:             true,
+		storageframework.CapSnapshotMetadata:               true,
 		storageframework.CapMultiPODs:                      true,
 		storageframework.CapBlock:                          true,
 		storageframework.CapPVCDataSource:                  true,
@@ -182,6 +183,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		},
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshot-metadata/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-health-monitor/external-health-monitor-controller/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
@@ -339,6 +341,12 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 
 	if err != nil {
 		framework.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
+	}
+
+	// SnapshotMetadata E2E resources creation
+	err = utils.CreateSnapshotMetadataResources(ctx, f, h.driverInfo.Name, driverNamespace.Name)
+	if err != nil {
+		framework.Failf("creating snapshot-metadata resources for %s driver: %v", h.driverInfo.Name, err)
 	}
 
 	cleanupFunc := generateDriverCleanupFunc(

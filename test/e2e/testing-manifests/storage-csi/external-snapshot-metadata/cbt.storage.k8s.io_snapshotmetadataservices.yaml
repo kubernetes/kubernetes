@@ -1,0 +1,76 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.15.0
+    api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshot-metadata/pull/2"
+  name: snapshotmetadataservices.cbt.storage.k8s.io
+spec:
+  group: cbt.storage.k8s.io
+  names:
+    kind: SnapshotMetadataService
+    listKind: SnapshotMetadataServiceList
+    plural: snapshotmetadataservices
+    shortNames:
+    - sms
+    singular: snapshotmetadataservice
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          SnapshotMetadataService is the Schema for the snapshotmetadataservices API
+          The presence of a SnapshotMetadataService CR advertises the existence of a CSI
+          driver's Kubernetes SnapshotMetadata gRPC service.
+          An audience scoped Kubernetes authentication bearer token must be passed in the
+          "security_token" field of each gRPC call made by a Kubernetes backup client.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Required.
+            properties:
+              address:
+                description: |-
+                  The TCP endpoint address of the gRPC service.
+                  Required.
+                type: string
+              audience:
+                description: |-
+                  The audience string value expected in a client's authentication token passed
+                  in the "security_token" field of each gRPC call.
+                  Required.
+                type: string
+              caCert:
+                description: |-
+                  Certificate authority bundle needed by the client to validate the service.
+                  Required.
+                format: byte
+                type: string
+            required:
+            - address
+            - audience
+            - caCert
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true

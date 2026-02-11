@@ -37,6 +37,7 @@ registry.k8s.io/sig-storage/csi-external-health-monitor-controller
 registry.k8s.io/sig-storage/csi-node-driver-registrar
 registry.k8s.io/sig-storage/csi-provisioner
 registry.k8s.io/sig-storage/csi-resizer
+registry.k8s.io/sig-storage/csi-snapshot-metadata
 registry.k8s.io/sig-storage/csi-snapshotter
 registry.k8s.io/sig-storage/hello-populator
 registry.k8s.io/sig-storage/hostpathplugin

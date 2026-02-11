@@ -130,6 +130,10 @@ type SnapshottableTestDriver interface {
 	GetSnapshotClass(ctx context.Context, config *PerTestConfig, parameters map[string]string) *unstructured.Unstructured
 }
 
+type SnapshotMetadataTestDriver interface {
+	TestDriver
+}
+
 // VolumeGroupSnapshottableTestDriver represents an interface for a TestDriver that supports DynamicGroupSnapshot
 type VolumeGroupSnapshottableTestDriver interface {
 	TestDriver
@@ -171,6 +175,7 @@ const (
 	CapVolumeMountGroup    Capability = "volumeMountGroup"   // Driver has the VolumeMountGroup CSI node capability. Because this is a FSGroup feature, the fsGroup capability must also be set to true.
 	CapExec                Capability = "exec"               // exec a file in the volume
 	CapSnapshotDataSource  Capability = "snapshotDataSource" // support populate data from snapshot
+	CapSnapshotMetadata    Capability = "snapshotMetadata"   // support group snapshot
 	CapVolumeGroupSnapshot Capability = "groupSnapshot"      // support group snapshot
 	CapPVCDataSource       Capability = "pvcDataSource"      // support populate data from pvc
 
