@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package workload
+package podgroup
 
 import (
 	"context"
@@ -48,7 +48,7 @@ func podInUnschedulablePods(t *testing.T, queue queue.SchedulingQueue, podName s
 	return false
 }
 
-func TestWorkloadScheduling(t *testing.T) {
+func TestPodGroupScheduling(t *testing.T) {
 	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 
 	gangWorkload := st.MakeWorkload().Name("workload").PodGroup(st.MakePodGroup().Name("pg").MinCount(3).Obj()).Obj()
