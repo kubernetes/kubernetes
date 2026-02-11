@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -38,6 +39,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -1380,3 +1382,121 @@ func getMemhogPodWithPodLevelResources(podName string, podLevelRes v1.ResourceRe
 
 	return pod
 }
+
+var _ = SIGDescribe("NodeAffinityEviction", framework.WithSerial(), framework.WithDisruptive(), framework.WithFeatureGate(features.NotEvictPodOnKubeletRestart), func() {
+	f := framework.NewDefaultFramework("node-affinity-eviction-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.Context("when a pod has node affinity with IgnoredDuringExecution", func() {
+		var nodeName string
+		var labelKey string
+		var labelValue string
+		var anotherLabelValue string
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			nodeName = framework.TestContext.NodeName
+			labelKey = "e2e-node-affinity-eviction-test"
+			labelValue = "true"
+			anotherLabelValue = "false"
+
+			ginkgo.By(fmt.Sprintf("Adding label %s=%s to node %s", labelKey, labelValue, nodeName))
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, labelKey, labelValue)
+			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+				if err != nil {
+					return "", err
+				}
+				if node.Labels == nil {
+					return "", nil
+				}
+				return node.Labels[labelKey], nil
+			}, time.Minute, time.Second).Should(gomega.Equal(labelValue))
+		})
+
+		ginkgo.AfterEach(func(ctx context.Context) {
+			ginkgo.By(fmt.Sprintf("Removing label %s from node %s", labelKey, nodeName))
+			e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, labelKey)
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+				if err != nil {
+					return true
+				}
+				if node.Labels == nil {
+					return true
+				}
+				_, hasLabel := node.Labels[labelKey]
+				return !hasLabel
+			}, time.Minute, time.Second).Should(gomega.BeTrueBecause("node should contain label"))
+		})
+
+		ginkgo.It("should not be evicted when node labels change and kubelet is restarted", func(ctx context.Context) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-with-node-affinity",
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      labelKey,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{labelValue},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  "pause",
+							Image: imageutils.GetPauseImageName(),
+						},
+					},
+				},
+			}
+
+			ginkgo.By("Creating a pod with node affinity")
+			podClient := e2epod.NewPodClient(f)
+			p := podClient.CreateSync(ctx, pod)
+
+			ginkgo.By("Waiting for the pod to be running")
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, p)
+			framework.ExpectNoError(err, "waiting for pod to be running")
+
+			ginkgo.By(fmt.Sprintf("Updating label on node %s to %s=%s", nodeName, labelKey, anotherLabelValue))
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, labelKey, anotherLabelValue)
+			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+				if err != nil {
+					return "", err
+				}
+				if node.Labels == nil {
+					return "", nil
+				}
+				return node.Labels[labelKey], nil
+			}, time.Minute, time.Second).Should(gomega.Equal(anotherLabelValue))
+
+			ginkgo.By("Restarting Kubelet")
+			restartKubelet(ctx, true)
+
+			ginkgo.By("Verifying the pod is not evicted and continues running")
+			gomega.Consistently(ctx, func() error {
+				p, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				if p.Status.Phase != v1.PodRunning {
+					return fmt.Errorf("pod is not running")
+				}
+				if p.Spec.NodeName != nodeName {
+					return fmt.Errorf("expected node name to be %s, got %s", nodeName, p.Spec.NodeName)
+				}
+				return nil
+			}, 20*time.Second, 1*time.Second).Should(gomega.Succeed())
+		})
+	})
+})

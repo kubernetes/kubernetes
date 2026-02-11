@@ -102,17 +102,19 @@ type predicateAdmitHandler struct {
 	getNodeAnyWayFunc        getNodeAnyWayFuncType
 	pluginResourceUpdateFunc pluginResourceUpdateFuncType
 	admissionFailureHandler  AdmissionFailureHandler
+	isPodAllocatedFunc       func(pod *v1.Pod) bool
 }
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
 
 // NewPredicateAdmitHandler returns a PodAdmitHandler which is used to evaluates
 // if a pod can be admitted from the perspective of predicates.
-func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) PodAdmitHandler {
+func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType, isPodAllocatedFunc func(pod *v1.Pod) bool) PodAdmitHandler {
 	return &predicateAdmitHandler{
 		getNodeAnyWayFunc,
 		pluginResourceUpdateFunc,
 		admissionFailureHandler,
+		isPodAllocatedFunc,
 	}
 }
 
@@ -184,7 +186,13 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	reasons := w.generalFilter(ctx, podWithoutMissingExtendedResources, nodeInfo)
+	var skipIgnorableChecks bool
+	if utilfeature.DefaultFeatureGate.Enabled(features.NotEvictPodOnKubeletRestart) &&
+		admitPod.Status.StartTime != nil && w.isPodAllocatedFunc(admitPod) {
+		skipIgnorableChecks = true
+	}
+
+	reasons := w.generalFilter(ctx, podWithoutMissingExtendedResources, nodeInfo, skipIgnorableChecks)
 	fit := len(reasons) == 0
 	if !fit {
 		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons)
@@ -203,12 +211,11 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var reason string
 		var message string
 		if len(reasons) == 0 {
-			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
 			logger.Info("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  UnknownReason,
-				Message: message,
+				Message: "GeneralPredicates failed due to unknown reason, which is unexpected.",
 			}
 		}
 		// If there are failed predicates, we only return the first one as a reason.
@@ -250,10 +257,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 }
 
 // generalFilter checks a group of filterings that the kubelet cares about.
-func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo, skipIgnorableChecks bool) []PredicateFailureReason {
 	logger := klog.FromContext(ctx)
 
-	reasons := generalFilter(logger, pod, nodeInfo)
+	reasons := generalFilter(logger, pod, nodeInfo, skipIgnorableChecks)
 	for _, r := range reasons {
 		if r.GetReason() != nodeaffinity.ErrReasonPod {
 			return reasons
@@ -269,7 +276,7 @@ func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, 
 			return reasons
 		}
 		nodeInfo.SetNode(node)
-		reasons = generalFilter(logger, pod, nodeInfo)
+		reasons = generalFilter(logger, pod, nodeInfo, skipIgnorableChecks)
 	}
 
 	return reasons
@@ -432,7 +439,7 @@ func (e *PredicateFailureError) GetReason() string {
 }
 
 // generalFilter checks a group of filterings that the kubelet cares about.
-func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo, skipIgnorableChecks bool) []PredicateFailureReason {
 	admissionResults := scheduler.AdmissionCheck(pod, nodeInfo, true)
 	var reasons []PredicateFailureReason
 	for _, r := range admissionResults {
@@ -444,12 +451,15 @@ func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework
 				Capacity:     r.InsufficientResource.Capacity,
 			})
 		} else {
+			if skipIgnorableChecks && r.Reason == nodeaffinity.ErrReasonPod {
+				continue
+			}
 			reasons = append(reasons, &PredicateFailureError{r.Name, r.Reason})
 		}
 	}
 
 	// Check taint/toleration except for static pods
-	if !types.IsStaticPod(pod) {
+	if !skipIgnorableChecks && !types.IsStaticPod(pod) {
 		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(logger, nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			// Kubelet is only interested in the NoExecute taint.
 			return t.Effect == v1.TaintEffectNoExecute
