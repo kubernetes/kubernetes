@@ -4590,6 +4590,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(WorkloadReference)
 		**out = **in
 	}
+	if in.RestoreFrom != nil {
+		in, out := &in.RestoreFrom, &out.RestoreFrom
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

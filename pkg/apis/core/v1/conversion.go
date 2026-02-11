@@ -313,6 +313,9 @@ func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s con
 		out.HostUsers = in.SecurityContext.HostUsers
 	}
 
+	// Handle RestoreFrom field (manually added until auto-conversion is regenerated)
+	out.RestoreFrom = in.RestoreFrom
+
 	return nil
 }
 
@@ -367,6 +370,9 @@ func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s con
 	out.SecurityContext.HostIPC = in.HostIPC
 	out.SecurityContext.ShareProcessNamespace = in.ShareProcessNamespace
 	out.SecurityContext.HostUsers = in.HostUsers
+
+	// Handle RestoreFrom field (manually added until auto-conversion is regenerated)
+	out.RestoreFrom = in.RestoreFrom
 
 	return nil
 }
