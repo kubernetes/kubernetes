@@ -442,12 +442,14 @@ message StorageClass {
   // create volumes of this storage class.
   // +optional
   // +k8s:immutable
+  // +k8s:optional
   map<string, string> parameters = 3;
 
   // reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
   // Defaults to Delete.
   // +optional
   // +k8s:immutable
+  // +k8s:optional
   optional string reclaimPolicy = 4;
 
   // mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -466,6 +468,7 @@ message StorageClass {
   // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
   // +k8s:immutable
+  // +k8s:optional
   optional string volumeBindingMode = 7;
 
   // allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.

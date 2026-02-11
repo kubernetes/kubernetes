@@ -116,6 +116,64 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("volumeBindingMode"), storage.VolumeBindingWaitForFirstConsumer, "field is immutable").WithOrigin("immutable"),
 			},
 		},
+		"invalid update provisioner unset to set": {
+			oldObj:    mkValidStorageClass(TweakProvisioner("")),
+			updateObj: mkValidStorageClass(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("provisioner"), "kubernetes.io/gce-pd", "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update provisioner set to unset": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakProvisioner("")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("provisioner"), "", "field is immutable").WithOrigin("immutable"),
+				field.Required(field.NewPath("provisioner"), ""),
+			},
+		},
+		"invalid update parameters unset to set": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakParameters(map[string]string{"foo": "bar"})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("parameters"), map[string]string{"foo": "bar"}, "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update parameters set to unset": {
+			oldObj:    mkValidStorageClass(TweakParameters(map[string]string{"foo": "bar"})),
+			updateObj: mkValidStorageClass(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("parameters"), nil, "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update reclaimPolicy unset to set": {
+			oldObj:    mkValidStorageClass(TweakReclaimPolicyNil()),
+			updateObj: mkValidStorageClass(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("reclaimPolicy"), api.PersistentVolumeReclaimDelete, "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update reclaimPolicy set to unset": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakReclaimPolicyNil()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("reclaimPolicy"), nil, "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update volumeBindingMode unset to set": {
+			oldObj:    mkValidStorageClass(TweakVolumeBindingModeNil()),
+			updateObj: mkValidStorageClass(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("volumeBindingMode"), storage.VolumeBindingImmediate, "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update volumeBindingMode set to unset": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakVolumeBindingModeNil()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("volumeBindingMode"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Required(field.NewPath("volumeBindingMode"), ""),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -170,8 +228,20 @@ func TweakReclaimPolicy(reclaimPolicy api.PersistentVolumeReclaimPolicy) func(ob
 	}
 }
 
+func TweakReclaimPolicyNil() func(obj *storage.StorageClass) {
+	return func(obj *storage.StorageClass) {
+		obj.ReclaimPolicy = nil
+	}
+}
+
 func TweakVolumeBindingMode(volumeBindingMode storage.VolumeBindingMode) func(obj *storage.StorageClass) {
 	return func(obj *storage.StorageClass) {
 		obj.VolumeBindingMode = &volumeBindingMode
+	}
+}
+
+func TweakVolumeBindingModeNil() func(obj *storage.StorageClass) {
+	return func(obj *storage.StorageClass) {
+		obj.VolumeBindingMode = nil
 	}
 }

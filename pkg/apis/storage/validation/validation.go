@@ -117,6 +117,9 @@ var supportedReclaimPolicy = sets.NewString(string(api.PersistentVolumeReclaimDe
 // provisioning for storage classes with impossible reclaim policies, e.g. EBS is not Recyclable
 func validateReclaimPolicy(reclaimPolicy *api.PersistentVolumeReclaimPolicy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if reclaimPolicy == nil {
+		return allErrs
+	}
 	if len(string(*reclaimPolicy)) > 0 {
 		if !supportedReclaimPolicy.Has(string(*reclaimPolicy)) {
 			allErrs = append(allErrs, field.NotSupported(fldPath, reclaimPolicy, supportedReclaimPolicy.List()))
