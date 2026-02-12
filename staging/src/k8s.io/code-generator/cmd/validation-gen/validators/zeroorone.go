@@ -26,31 +26,11 @@ import (
 var zeroOrOneOfUnionValidator = types.Name{Package: libValidationPkg, Name: "ZeroOrOneOfUnion"}
 var zeroOrOneOfVariablePrefix = "zeroOrOneOfMembershipFor"
 
-// zeroOrOneOfDefinitions stores all zero-or-one-of union definitions found by tag validators.
-// Key is the struct path.
-var zeroOrOneOfDefinitions = map[string]unions{}
-
-// MarkZeroOrOneOfDeclarative marks the zero-or-one-of union containing the given member as declarative.
-func MarkZeroOrOneOfDeclarative(parentPath string, member *types.Member) {
-	us, ok := zeroOrOneOfDefinitions[parentPath]
-	if !ok {
-		return
-	}
-	for _, u := range us {
-		// Check field members
-		for _, m := range u.fieldMembers {
-			if m == member {
-				u.isDeclarative = true
-			}
-		}
-	}
-}
-
 func init() {
 	// ZeroOrOneOf unions are comprised of multiple tags, which need to share information
 	// between them.  The tags are on struct fields, but the validation
 	// actually pertains to the struct itself.
-	shared := zeroOrOneOfDefinitions
+	shared := map[string]unions{}
 	RegisterTypeValidator(zeroOrOneOfTypeOrFieldValidator{shared})
 	RegisterFieldValidator(zeroOrOneOfTypeOrFieldValidator{shared})
 	RegisterTagValidator(zeroOrOneOfMemberTagValidator{shared})
