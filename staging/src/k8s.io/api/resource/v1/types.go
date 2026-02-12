@@ -79,6 +79,7 @@ type ResourceSlice struct {
 	// Contains the information published by the driver.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
+	// +required
 	Spec ResourceSliceSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 
@@ -746,6 +747,7 @@ type ResourceClaim struct {
 	// Spec describes what is being requested and how to configure it.
 	// The spec is immutable.
 	// +k8s:immutable
+	// +required
 	Spec ResourceClaimSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
 	// Status describes whether the claim is ready to use and what has been allocated.
@@ -1774,6 +1776,7 @@ type DeviceClass struct {
 	// the time of allocation.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
+	// +required
 	Spec DeviceClassSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 
@@ -1857,6 +1860,7 @@ type ResourceClaimTemplate struct {
 	// This field is immutable. A ResourceClaim will get created by the
 	// control plane for a Pod when needed and then not get updated
 	// anymore.
+	// +required
 	Spec ResourceClaimTemplateSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 
@@ -1871,6 +1875,7 @@ type ResourceClaimTemplateSpec struct {
 	// Spec for the ResourceClaim. The entire content is copied unchanged
 	// into the ResourceClaim that gets created from this template. The
 	// same fields as in a ResourceClaim are also valid here.
+	// +required
 	Spec ResourceClaimSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 

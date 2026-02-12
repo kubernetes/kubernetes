@@ -140,6 +140,7 @@ message DeviceTaintRule {
   // Spec specifies the selector and one taint.
   //
   // Changing the spec automatically increments the metadata.generation number.
+  // +required
   optional DeviceTaintRuleSpec spec = 2;
 
   // Status provides information about what was requested in the spec.
