@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	validationmetrics "k8s.io/apiserver/pkg/validation"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -254,12 +255,17 @@ func WithFuzzer(fuzzer *randfill.Filler) ValidationTestConfig {
 // hand-written imperative validation to declarative validation. It ensures that
 // the validation logic remains consistent before and after the feature is enabled.
 //
-// The function operates by running the provided validation function under two scenarios:
-//  1. With DeclarativeValidation and DeclarativeValidationTakeover feature gates disabled,
+// The function operates by running the provided validation function under four scenarios:
+//  1. With DeclarativeValidation and DeclarativeValidationBeta feature gates enabled,
+//     using the new declarative validation rules (Beta stage).
+//  2. With DeclarativeValidation enabled and DeclarativeValidationBeta disabled,
+//     using the new declarative validation rules (Standard stage).
+//  3. With DeclarativeValidation and DeclarativeValidationTakeover feature gates disabled,
 //     simulating the legacy hand-written validation.
-//  2. With both feature gates enabled, using the new declarative validation rules.
+//  4. With all declarative rules enforced (including Alpha), ensuring that the full set of
+//     declarative validations is correctly implemented (testing only).
 //
-// It then asserts that the validation errors produced in both scenarios are equivalent,
+// It then asserts that the validation errors produced in all scenarios are equivalent,
 // guaranteeing a safe migration. It also checks the errors against an expected set.
 // It compares errors by field, origin and type; all three should match to be called equivalent.
 // It also make sure all versions of the given API returns equivalent errors.
@@ -269,9 +275,10 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 	for _, testcfg := range testConfigs {
 		testcfg(opts)
 	}
-	verifyValidationEquivalence(t, expectedErrs, func() field.ErrorList {
-		return validateFn(ctx, obj)
-	}, opts)
+
+	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
+		return validateFn(c, obj)
+	}, ctx, opts)
 	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
 
@@ -279,12 +286,17 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 // hand-written imperative validation to declarative validation for update operations.
 // It ensures that the validation logic remains consistent before and after the feature is enabled.
 //
-// The function operates by running the provided validation function under two scenarios:
-//  1. With DeclarativeValidation and DeclarativeValidationTakeover feature gates disabled,
+// The function operates by running the provided validation function under four scenarios:
+//  1. With DeclarativeValidation and DeclarativeValidationBeta feature gates enabled,
+//     using the new declarative validation rules (Beta stage).
+//  2. With DeclarativeValidation enabled and DeclarativeValidationBeta disabled,
+//     using the new declarative validation rules (Standard stage).
+//  3. With DeclarativeValidation and DeclarativeValidationTakeover feature gates disabled,
 //     simulating the legacy hand-written validation.
-//  2. With both feature gates enabled, using the new declarative validation rules.
+//  4. With all declarative rules enforced (including Alpha), ensuring that the full set of
+//     declarative validations is correctly implemented (testing only).
 //
-// It then asserts that the validation errors produced in both scenarios are equivalent,
+// It then asserts that the validation errors produced in all scenarios are equivalent,
 // guaranteeing a safe migration. It also checks the errors against an expected set.
 // It compares errors by field, origin and type; all three should match to be called equivalent.
 // It also make sure all versions of the given API returns equivalent errors.
@@ -294,14 +306,15 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 	for _, testcfg := range testConfigs {
 		testcfg(opts)
 	}
-	verifyValidationEquivalence(t, expectedErrs, func() field.ErrorList {
-		return validateUpdateFn(ctx, obj, old)
-	}, opts)
+
+	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
+		return validateUpdateFn(c, obj, old)
+	}, ctx, opts)
 	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
 }
 
 // verifyValidationEquivalence is a generic helper that verifies validation equivalence with and without declarative validation.
-func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, runValidations func() field.ErrorList, opt *validationOption) {
+func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, runValidations func(context.Context) field.ErrorList, ctx context.Context, opt *validationOption) {
 	t.Helper()
 	var declarativeBetaEnabledErrs field.ErrorList
 	var declarativeBetaDisabledErrs field.ErrorList
@@ -312,10 +325,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	defer legacyregistry.Reset()
 
 	// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-	// TODO: Use ByValidationStabilityLevel once we want to explicitly verify the lifecycle stage of declarative
-	// validations (e.g. during promotion from Alpha to Beta), ensuring they are generated with the intended
-	// stability levels.
-	errOutputMatcher := field.ErrorMatcher{}.ByType().ByOrigin().ByFieldNormalized(opt.NormalizationRules).ByDeclarativeNative()
+	errOutputMatcher := field.ErrorMatcher{}.ByType().ByOrigin().ByFieldNormalized(opt.NormalizationRules)
 
 	// 1. Declarative Validation with Beta Gate Enabled
 	t.Run("with declarative validation (Beta enabled)", func(t *testing.T) {
@@ -324,7 +334,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: true,
 		})
-		declarativeBetaEnabledErrs = runValidations()
+		declarativeBetaEnabledErrs = runValidations(ctx)
 
 		if len(expectedErrs) > 0 {
 			errOutputMatcher.Test(t, expectedErrs, declarativeBetaEnabledErrs)
@@ -343,7 +353,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: false,
 		})
-		declarativeBetaDisabledErrs = runValidations()
+		declarativeBetaDisabledErrs = runValidations(ctx)
 
 		if len(expectedErrs) > 0 {
 			errOutputMatcher.Test(t, expectedErrs, declarativeBetaDisabledErrs)
@@ -365,13 +375,40 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			features.DeclarativeValidation: false,
 		})
-		imperativeErrs = runValidations()
+		imperativeErrs = runValidations(ctx)
 
 		if len(expectedErrs) > 0 {
 			errOutputMatcher.Test(t, expectedErrs, imperativeErrs)
 		} else if len(imperativeErrs) != 0 {
 			t.Errorf("expected no errors, but got: %v", imperativeErrs)
 		}
+	})
+
+	// 4. Declarative Validation with All Rules Enforced (Testing Only)
+	// This sub-test ensures that all declarative validation rules (including those marked as Alpha)
+	// are correctly implemented and match the expected errors. It uses a special context
+	// to force enforcement of all declarative rules and filter out their handwritten counterparts.
+	t.Run("with declarative validation (All Rules Enforced)", func(t *testing.T) {
+		validationmetrics.ResetValidationMetricsInstance()
+		// We don't strictly need to set feature gates here as the context override should force enforcement,
+		// but setting them ensures a consistent environment.
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.DeclarativeValidation:     true,
+			features.DeclarativeValidationBeta: true,
+		})
+		testCtx := rest.WithAllDeclarativeEnforcedForTest(ctx)
+		allDeclarativeErrs := runValidations(testCtx)
+
+		// The matcher here is more specific to ensure that errors from Alpha rules are included and matched correctly.
+		errOutputMatcherByStability := field.ErrorMatcher{}.ByType().ByOrigin().ByFieldNormalized(opt.NormalizationRules).ByValidationStabilityLevel()
+		if len(expectedErrs) > 0 {
+			errOutputMatcherByStability.Test(t, expectedErrs, allDeclarativeErrs)
+		} else if len(allDeclarativeErrs) != 0 {
+			t.Errorf("expected no errors, but got: %v", allDeclarativeErrs)
+		}
+
+		// Ensure no mismatches were logged/metrics incremented
+		testutil.AssertVectorCount(t, "apiserver_validation_declarative_validation_mismatch_total", nil, 0)
 	})
 
 	if t.Failed() {

@@ -87,6 +87,19 @@ func WithDeclarativeEnforcement() ValidationConfig {
 	}
 }
 
+type allDeclarativeEnforcedKeyType struct{}
+
+var allDeclarativeEnforcedKey = allDeclarativeEnforcedKeyType{}
+
+// WithAllDeclarativeEnforcedForTest returns a copy of parent context with allDeclarativeEnforcedKey set to true.
+// This is used for testing to expose all declarative validation errors and filter all handwritten validation errors
+// that are covered by declarative validation, regardless of the feature gate or maturity level.
+//
+// NOTE: This function is intended for testing purposes only and should not be used in production code.
+func WithAllDeclarativeEnforcedForTest(ctx context.Context) context.Context {
+	return context.WithValue(ctx, allDeclarativeEnforcedKey, true)
+}
+
 type validationConfigOption struct {
 	opType                 operation.Type
 	options                []string
@@ -371,9 +384,14 @@ func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.O
 //
 // Mismatches between HV and DV are logged if the DeclarativeValidation gate is enabled.
 // Mismatch checking is limited to Alpha and Beta stages when explicit enforcement is active.
+//
+// For testing purposes, WithAllDeclarativeEnforcedForTest can be used to enforce all declarative validations
+// regardless of feature gates and filter all covered handwritten validations.
 func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, configOpts ...ValidationConfig) field.ErrorList {
 	declarativeValidationEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation)
 	betaEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta)
+	// allDeclarativeEnforced indicates that we should check all declarative errors for testing purposes.
+	allDeclarativeEnforced := ctx.Value(allDeclarativeEnforcedKey) == true
 
 	validationIdentifier, err := metricIdentifier(ctx, scheme, obj, opType)
 	if err != nil {
@@ -391,7 +409,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	}
 
 	// Short-circuit if neither DeclarativeValidation is enabled nor the object is explicitly configured for declarative enforcement.
-	if !declarativeValidationEnabled && !cfg.declarativeEnforcement {
+	if !declarativeValidationEnabled && !cfg.declarativeEnforcement && !allDeclarativeEnforced {
 		return errs
 	}
 
@@ -418,7 +436,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mismatchCandidateErrs, cfg.declarativeEnforcement && betaEnabled, validationIdentifier, cfg.normalizationRules)
 	}
 
-	if !cfg.declarativeEnforcement {
+	if !cfg.declarativeEnforcement && !allDeclarativeEnforced {
 		// If enforcement is not enabled, we shadow declarative errors with hand-written ones, so we return early here.
 		return errs
 	}
@@ -429,6 +447,10 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		var fe *field.Error
 		if !errors.As(e, &fe) || !fe.CoveredByDeclarative {
 			return false
+		}
+
+		if allDeclarativeEnforced {
+			return true
 		}
 
 		// Explicit Strategy
@@ -443,6 +465,10 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 
 	// Append Enforced DV errors
 	for _, dvErr := range declarativeErrs {
+		if allDeclarativeEnforced {
+			errs = append(errs, dvErr)
+			continue
+		}
 		switch {
 		case dvErr.Type == field.ErrorTypeInternal:
 			errs = append(errs, dvErr)
