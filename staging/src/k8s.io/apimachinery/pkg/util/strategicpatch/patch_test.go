@@ -26,11 +26,11 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/sets"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
+	"k8s.io/utils/dump"
 )
 
 var (

@@ -22,10 +22,10 @@ import (
 	"hash/fnv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	"k8s.io/utils/dump"
 )
 
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV1{}
