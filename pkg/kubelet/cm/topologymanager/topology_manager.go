@@ -76,6 +76,10 @@ func (e *PodLevelTopologyAffinityError) Error() string {
 	return "Pod Scope Resources cannot be allocated with Topology locality"
 }
 
+func (e *PodLevelTopologyAffinityError) Type() string {
+	return ErrorTopologyAffinity
+}
+
 // Manager interface provides methods for Kubelet to manage pod topology hints
 type Manager interface {
 	// PodAdmitHandler is implemented by Manager
