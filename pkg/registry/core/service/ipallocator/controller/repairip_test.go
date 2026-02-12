@@ -477,10 +477,58 @@ func TestRepairIPAddress_syncIPAddress(t *testing.T) {
 	tests := []struct {
 		name     string
 		ip       *networkingv1.IPAddress
+		svc      *v1.Service
 		testTime time.Time
 		actions  [][]string // verb and resource
 		wantErr  bool
 	}{
+		{
+			name: "ExternalName Service with late IPAddress",
+			ip: &networkingv1.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "10.0.1.1",
+					Labels: map[string]string{
+						networkingv1.LabelIPAddressFamily: string(v1.IPv4Protocol),
+						networkingv1.LabelManagedBy:       ipallocator.ControllerName,
+					},
+					CreationTimestamp: metav1.Time{Time: testTimeNow.Add(10 * time.Second)},
+				},
+				Spec: networkingv1.IPAddressSpec{
+					ParentRef: &networkingv1.ParentReference{
+						Group:     "",
+						Resource:  "services",
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
+			},
+			svc:      newExternalNameService("foo", testTimeNow),
+			testTime: testTimeNow.Add(2 * time.Second),
+		},
+		{
+			name: "ExternalName Service with late IPAddress after threshold",
+			ip: &networkingv1.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "10.0.1.1",
+					Labels: map[string]string{
+						networkingv1.LabelIPAddressFamily: string(v1.IPv4Protocol),
+						networkingv1.LabelManagedBy:       ipallocator.ControllerName,
+					},
+					CreationTimestamp: metav1.Time{Time: testTimeNow.Add(10 * time.Second)},
+				},
+				Spec: networkingv1.IPAddressSpec{
+					ParentRef: &networkingv1.ParentReference{
+						Group:     "",
+						Resource:  "services",
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
+			},
+			svc:      newExternalNameService("foo", testTimeNow),
+			testTime: testTimeNow.Add(71 * time.Second),
+			actions:  [][]string{{"delete", "ipaddresses"}},
+		},
 		{
 			name: "correct ipv4 address",
 			ip: &networkingv1.IPAddress{
@@ -602,7 +650,11 @@ func TestRepairIPAddress_syncIPAddress(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = r.serviceStore.Add(newService("foo", []string{tt.ip.Name}))
+			svc := tt.svc
+			if svc == nil {
+				svc = newService("foo", []string{tt.ip.Name})
+			}
+			err = r.serviceStore.Add(svc)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -618,6 +670,20 @@ func TestRepairIPAddress_syncIPAddress(t *testing.T) {
 			expectAction(t, c.Actions(), tt.actions)
 
 		})
+	}
+}
+
+func newExternalNameService(name string, timestamp time.Time) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "bar",
+			Name:              name,
+			CreationTimestamp: metav1.Time{Time: timestamp},
+		},
+		Spec: v1.ServiceSpec{
+			Type:         v1.ServiceTypeExternalName,
+			ExternalName: "foo.bar.com",
+		},
 	}
 }
 
