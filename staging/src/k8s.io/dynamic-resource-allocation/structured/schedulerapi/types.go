@@ -59,7 +59,7 @@ func (d SharedDeviceID) String() string {
 }
 
 func (d SharedDeviceID) GetDeviceID() DeviceID {
-	return MakeDeviceID(d.Driver.String(), d.Pool.String(), d.Device.String())
+	return DeviceID{d.Driver, d.Pool, d.Device}
 }
 
 // MakeSharedDeviceID creates a new SharedDeviceID from a DeviceID and share ID.
