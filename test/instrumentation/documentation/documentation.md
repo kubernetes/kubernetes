@@ -3013,11 +3013,11 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
-	</div><div class="metric" data-stability="alpha">
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">kubernetes_build_info</div>
 	<div class="metric_help">A metric with a constant '1' value labeled by major, minor, git version, git commit, git tree state, build date, Go version, and compiler from which Kubernetes was built, and platform on which it is running.</div>
 	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">build_date</span><span class="metric_label">compiler</span><span class="metric_label">git_commit</span><span class="metric_label">git_tree_state</span><span class="metric_label">git_version</span><span class="metric_label">go_version</span><span class="metric_label">major</span><span class="metric_label">minor</span><span class="metric_label">platform</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
