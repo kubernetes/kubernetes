@@ -178,6 +178,12 @@ func EnableAllocators(names ...string) {
 	explicitlyEnabledAllocators = sets.New(names...)
 }
 
+// AllocatorEnabled returns true if the named allocator is currently enabled.
+// The name should be one of "stable", "incubating", or "experimental".
+func AllocatorEnabled(name string) bool {
+	return allocatorEnabled(name)
+}
+
 // explicitlyEnabledAllocators stores the result of EnableAllocators.
 // If empty (the default), all available allocators are enabled.
 var explicitlyEnabledAllocators sets.Set[string]

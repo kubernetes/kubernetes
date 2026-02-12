@@ -887,7 +887,7 @@ func (f *featureGate) SetEmulationVersionAndMinCompatibilityVersionWithLogger(lo
 		newVal := featureEnabled(feature, enabled, known, emulationVersion, minCompatibilityVersion)
 		oldVal := featureEnabled(feature, f.enabled.Load().(map[Feature]bool), known, f.EmulationVersion(), f.MinCompatibilityVersion())
 		if newVal != oldVal {
-			logger.Info("Warning: SetEmulationVersionAndMinCompatibilityVersion will change already queried feature", "featureGate", feature, "oldValue", oldVal, newVal)
+			logger.Info("Warning: SetEmulationVersionAndMinCompatibilityVersion will change already queried feature", "featureGate", feature, "oldValue", oldVal, "newValue", newVal)
 		}
 	}
 
