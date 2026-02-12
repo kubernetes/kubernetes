@@ -653,6 +653,12 @@ func processDeltas(
 				return err
 			}
 			handler.OnDelete(obj)
+		case Bookmark:
+			info, ok := obj.(BookmarkInfo)
+			if !ok {
+				return fmt.Errorf("bookmark delta did not contain BookmarkInfo: %T", obj)
+			}
+			clientState.Bookmark(info.ResourceVersion)
 		}
 	}
 	return nil
@@ -853,6 +859,7 @@ func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transfo
 		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO) {
 			options.AtomicEvents = true
 			options.UnlockWhileProcessing = clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.UnlockWhileProcessingFIFO)
+			options.EmitDeltaTypeBookmark = true
 		} else {
 			options.KnownObjects = clientState
 		}

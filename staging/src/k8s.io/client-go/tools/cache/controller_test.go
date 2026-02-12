@@ -921,7 +921,7 @@ func TestReplaceEvents(t *testing.T) {
 			fifoOptions.KnownObjects = store
 		}
 		fifo := NewRealFIFOWithOptions(fifoOptions)
-		recorder := newEventRecorder(store)
+		recorder := newEventRecorder(store, DeletionHandlingMetaNamespaceKeyFunc)
 
 		cfg := &Config{
 			Queue:            fifo,
@@ -1058,7 +1058,7 @@ func TestResetWatch(t *testing.T) {
 				fifoOptions.KnownObjects = store
 			}
 			fifo := NewRealFIFOWithOptions(fifoOptions)
-			recorder := newEventRecorder(store)
+			recorder := newEventRecorder(store, DeletionHandlingMetaNamespaceKeyFunc)
 
 			cfg := &Config{
 				Queue:            fifo,
@@ -1134,6 +1134,195 @@ func testResetWatch(t *testing.T, ctx context.Context, source *fcache.FakeContro
 	assert.False(t, addEvent.IsInInitialList)
 }
 
+func TestStoreResourceVersion(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1",
+			Namespace: "default",
+		},
+	})
+	t.Cleanup(func() {
+		source.Shutdown()
+	})
+
+	store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	fifo := NewRealFIFOWithOptions(RealFIFOOptions{
+		AtomicEvents: true,
+	})
+	recorder := newEventRecorder(store, DeletionHandlingMetaNamespaceKeyFunc)
+	logger, _ := ktesting.NewTestContext(t)
+
+	cfg := &Config{
+		Queue:            fifo,
+		ListerWatcher:    source,
+		ObjectType:       &v1.Pod{},
+		FullResyncPeriod: 0,
+		Process: func(obj interface{}, isInInitialList bool) error {
+			if deltas, ok := obj.(Deltas); ok {
+				return processDeltas(logger, recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+			}
+			return errors.New("object given as Process argument is not Deltas")
+		},
+		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
+			return processDeltasInBatch(logger, recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+		},
+	}
+	c := New(cfg)
+	go c.RunWithContext(ctx)
+	if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+		t.Fatal("Timed out waiting for cache sync")
+	}
+	testResourceVersion(t, ctx, source, recorder, store)
+}
+
+func testResourceVersion(t *testing.T, ctx context.Context, source *fcache.FakeControllerSource, recorder *eventRecorder, store Store) {
+	// The first event should be the initial add.
+	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
+	history := recorder.getHistory()
+	assert.Len(t, history, 1)
+	assert.Equal(t, "add", history[0].Action)
+	assert.Equal(t, "default/pod-1", history[0].Key)
+	assert.True(t, history[0].IsInInitialList)
+
+	recorder.clearHistory()
+	// Update the pod labels to increment the resource version.
+	source.Modify(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1",
+			Namespace: "default",
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+		},
+	})
+	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive update event, got: %v", recorder.getHistory())
+	history = recorder.getHistory()
+	// The stored resource version should have changed.
+	assert.Equal(t, history[0].EventRV, store.LastStoreSyncResourceVersion())
+
+	recorder.clearHistory()
+	// Delete the pod.
+	source.Delete(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1",
+			Namespace: "default",
+		},
+	})
+	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive delete event, got: %v", recorder.getHistory())
+	history = recorder.getHistory()
+	// The stored resource version should have changed.
+	assert.Equal(t, history[0].EventRV, store.LastStoreSyncResourceVersion())
+}
+
+func TestStoreResourceVersionWithNonMetaTransform(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1",
+			Namespace: "default",
+		},
+	})
+	t.Cleanup(func() {
+		source.Shutdown()
+	})
+
+	// Create a keyfunc that does not rely on object metadata.
+	keyFunc := func(obj interface{}) (string, error) {
+		return "pod-1", nil
+	}
+
+	store := NewStore(keyFunc)
+	fifo := NewRealFIFOWithOptions(RealFIFOOptions{
+		Transformer: func(obj interface{}) (interface{}, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return nil, fmt.Errorf("expected *v1.Pod, got %T", obj)
+			}
+			return pod.Name, nil
+		},
+		KeyFunction:  keyFunc,
+		AtomicEvents: true,
+	})
+	recorder := newEventRecorder(store, keyFunc)
+	logger, _ := ktesting.NewTestContext(t)
+
+	cfg := &Config{
+		Queue:            fifo,
+		ListerWatcher:    source,
+		ObjectType:       &v1.Pod{},
+		FullResyncPeriod: 0,
+
+		Process: func(obj interface{}, isInInitialList bool) error {
+			if deltas, ok := obj.(Deltas); ok {
+				return processDeltas(logger, recorder, store, deltas, isInInitialList, keyFunc)
+			}
+			return errors.New("object given as Process argument is not Deltas")
+		},
+		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
+			return processDeltasInBatch(logger, recorder, store, deltaList, isInInitialList, keyFunc)
+		},
+	}
+	c := New(cfg)
+	go c.RunWithContext(ctx)
+	if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+		t.Fatal("Timed out waiting for cache sync")
+	}
+	testResourceVersionWithNonMetaTransform(t, ctx, source, recorder, store)
+}
+
+func testResourceVersionWithNonMetaTransform(t *testing.T, ctx context.Context, source *fcache.FakeControllerSource, recorder *eventRecorder, store Store) {
+	// The first event should be the initial add.
+	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
+	history := recorder.getHistory()
+	assert.Len(t, history, 1)
+	assert.Equal(t, "add", history[0].Action)
+	assert.Equal(t, "pod-1", history[0].Key)
+	assert.True(t, history[0].IsInInitialList)
+
+	// The stored resource version should stay at the initial value given by the replace event since
+	// the update event does not have metadata.
+	replaceRV := store.LastStoreSyncResourceVersion()
+	recorder.clearHistory()
+	// Update the pod labels to increment the resource version.
+	source.Modify(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1",
+			Namespace: "default",
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+		},
+	})
+	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive update event, got: %v", recorder.getHistory())
+	// The stored resource version should not be changed due to the transform.
+	assert.Equal(t, replaceRV, store.LastStoreSyncResourceVersion())
+
+	recorder.clearHistory()
+	// Modify the pod but do not send the event.
+	source.ModifyDropWatch(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1",
+			Namespace: "default",
+			Labels: map[string]string{
+				"foo": "bar2",
+			},
+		},
+	})
+	// Trigger a replace by resetting the watch
+	source.ResetWatch()
+
+	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive replace event, got: %v", recorder.getHistory())
+	// The stored resource version should be updated to the replace events RV.
+	assert.Equal(t, "3", store.LastStoreSyncResourceVersion())
+}
+
 type eventRecord struct {
 	Action          string
 	Key             string
@@ -1146,14 +1335,16 @@ type eventRecorder struct {
 	historyLock sync.Mutex
 	history     []eventRecord
 	store       Store
+	keyFunc     KeyFunc
 
 	updateCh chan bool
 }
 
-func newEventRecorder(store Store) *eventRecorder {
+func newEventRecorder(store Store, keyFunc KeyFunc) *eventRecorder {
 	return &eventRecorder{
 		store:    store,
 		updateCh: make(chan bool, 1),
+		keyFunc:  keyFunc,
 	}
 }
 
@@ -1170,7 +1361,7 @@ func (m *eventRecorder) OnDelete(obj interface{}) {
 func (m *eventRecorder) record(action string, obj interface{}, isInInitialList bool) {
 	m.historyLock.Lock()
 	defer m.historyLock.Unlock()
-	key, _ := DeletionHandlingMetaNamespaceKeyFunc(obj)
+	key, _ := m.keyFunc(obj)
 
 	if deleted, ok := obj.(DeletedFinalStateUnknown); ok {
 		obj = deleted.Obj

@@ -73,6 +73,10 @@ type RealFIFOOptions struct {
 
 	// MetricsProvider is used to create metrics for the FIFO.
 	MetricsProvider FIFOMetricsProvider
+
+	// EmitDeltaTypeBookmark is used to specify whether the RealFIFO will emit
+	// bookmark deltas or not. This can only be set if AtomicEvents is true.
+	EmitDeltaTypeBookmark bool
 }
 
 const (
@@ -148,6 +152,11 @@ type RealFIFO struct {
 
 	// metrics holds all metrics for this FIFO.
 	metrics *fifoMetrics
+
+	// emitDeltaTypeBookmark defines whether bookmark deltas should be emitted.
+	// This may only be set if emitAtomicEvents is true, which avoids events
+	// propagating out of RV order during Replace and Resync.
+	emitDeltaTypeBookmark bool
 }
 
 // ReplacedAllInfo is the object associated with a Delta of type=ReplacedAll
@@ -157,6 +166,12 @@ type ReplacedAllInfo struct {
 	// Objects are the list of objects passed to the Replace() call that created this Delta,
 	// with any configured transformation already applied.
 	Objects []interface{}
+}
+
+// BookmarkInfo is the object associated with a Delta of type=Bookmark
+type BookmarkInfo struct {
+	// ResourceVersion is the resource version passed to the Bookmark() call that created this Delta
+	ResourceVersion string
 }
 
 // SyncAllInfo is the object associated with a Delta of type=SyncAll
@@ -564,6 +579,21 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProc
 	})
 }
 
+func (f *RealFIFO) Bookmark(resourceVersion string) error {
+	if !f.emitDeltaTypeBookmark {
+		return nil
+	}
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	f.items = append(f.items, Delta{
+		Type:   Bookmark,
+		Object: BookmarkInfo{ResourceVersion: resourceVersion},
+	})
+	f.cond.Broadcast()
+	return nil
+}
+
 // Replace
 // 1. finds those items in f.items that are not in newItems and creates synthetic deletes for them
 // 2. finds items in knownObjects that are not in newItems and creates synthetic deletes for them
@@ -790,6 +820,10 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		if opts.KnownObjects == nil {
 			panic("coding error: knownObjects must be provided when AtomicEvents is false")
 		}
+		// If we are not emitting atomic events, we must not emit bookmark deltas.
+		if opts.EmitDeltaTypeBookmark {
+			panic("coding error: EmitDeltaTypeBookmark must be false when AtomicEvents is false")
+		}
 	}
 
 	f := &RealFIFO{
@@ -802,6 +836,7 @@ func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
 		transformer:           opts.Transformer,
 		batchSize:             defaultBatchSize,
 		emitAtomicEvents:      opts.AtomicEvents,
+		emitDeltaTypeBookmark: opts.EmitDeltaTypeBookmark,
 		unlockWhileProcessing: opts.UnlockWhileProcessing,
 		identifier:            opts.Identifier,
 		metrics:               newFIFOMetrics(opts.Identifier, opts.MetricsProvider),
