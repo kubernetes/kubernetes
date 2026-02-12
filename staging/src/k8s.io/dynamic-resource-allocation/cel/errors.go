@@ -29,7 +29,7 @@ func EnhanceRuntimeError(err error) error {
 	}
 
 	if strings.HasPrefix(err.Error(), "no such key:") {
-		return fmt.Errorf("%s. Consider using CEL optional chaining (?), has() macro, or orValue() for optional fields", err)
+		return fmt.Errorf("%w. Consider using CEL optional chaining (?), has() macro, or orValue() for optional fields", err)
 	}
 
 	// Not a "no such key" error, return unchanged.

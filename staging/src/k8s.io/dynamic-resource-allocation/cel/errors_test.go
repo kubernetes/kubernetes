@@ -51,7 +51,7 @@ func TestEnhanceRuntimeError(t *testing.T) {
 		{
 			name: "no such key includes original message",
 			err:  errors.New("no such key: fieldX"),
-			want: "no such key: fieldX",
+			want: "no such key: fieldX. Consider using CEL optional chaining",
 		},
 		{
 			name: "non-no-such-key error is unchanged",
