@@ -1494,7 +1494,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 		logger.V(4).Info("Creating PodSandbox for pod", "pod", klog.KObj(pod))
 		metrics.StartedPodsTotal.Inc()
-		if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
 			metrics.StartedUserNamespacedPodsTotal.Inc()
 			// Failures in user namespace creation could happen at any point in the pod lifecycle,
 			// but usually will be caught in container creation.

@@ -1251,10 +1251,8 @@ func Register() {
 			legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
 			legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-			legacyregistry.MustRegister(StartedUserNamespacedPodsTotal)
-			legacyregistry.MustRegister(StartedUserNamespacedPodsErrorsTotal)
-		}
+		legacyregistry.MustRegister(StartedUserNamespacedPodsTotal)
+		legacyregistry.MustRegister(StartedUserNamespacedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
