@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/api/core/v1"
 )
 
 func TestParsePercentage(t *testing.T) {
@@ -88,5 +89,57 @@ func TestParsePercentage(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, testCase.expected, result)
 		})
+	}
+}
+
+func TestParseQOSReserved(t *testing.T) {
+	tests := []struct {
+		input    map[string]string
+		expected *map[v1.ResourceName]int64
+	}{
+		{
+			input:    map[string]string{"memory": ""},
+			expected: nil,
+		},
+		{
+			input:    map[string]string{"memory": "a"},
+			expected: nil,
+		},
+		{
+			input:    map[string]string{"memory": "a%"},
+			expected: nil,
+		},
+		{
+			input:    map[string]string{"memory": "200%"},
+			expected: nil,
+		},
+		{
+			input: map[string]string{"memory": "0%"},
+			expected: &map[v1.ResourceName]int64{
+				v1.ResourceMemory: 0,
+			},
+		},
+		{
+			input: map[string]string{"memory": "100%"},
+			expected: &map[v1.ResourceName]int64{
+				v1.ResourceMemory: 100,
+			},
+		},
+		{
+			// need to change this when CPU is added as a supported resource
+			input:    map[string]string{"memory": "100%", "cpu": "50%"},
+			expected: nil,
+		},
+	}
+	for _, test := range tests {
+		actual, err := ParseQOSReserved(test.input)
+		if test.expected == nil {
+			require.Error(t, err)
+			continue
+		}
+		
+		require.NoError(t, err)
+		require.NotNil(t, actual)
+		require.Equal(t, *test.expected, *actual)
 	}
 }
