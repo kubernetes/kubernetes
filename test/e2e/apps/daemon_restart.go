@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/onsi/gomega"
 	"strconv"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -125,6 +126,11 @@ func (r *RestartDaemonConfig) waitUp(ctx context.Context) {
 			if err != nil {
 				framework.Logf("Unable to parse healthz http return code: %v", err)
 			} else if httpCode == 200 {
+				// Now verify the daemon is actually ready by checking pod status
+				if verifyErr := r.verifyDaemonReadiness(ctx); verifyErr != nil {
+					framework.Logf("Healthz returned 200 but daemon not fully ready: %v", verifyErr)
+					return false, nil
+				}
 				return true, nil
 			}
 		}
@@ -133,6 +139,19 @@ func (r *RestartDaemonConfig) waitUp(ctx context.Context) {
 		return false, nil
 	})
 	framework.ExpectNoError(err, "%v did not respond with a 200 via %v within %v", r, healthzCheck, r.pollTimeout)
+}
+
+func (r *RestartDaemonConfig) verifyDaemonReadiness(ctx context.Context) error {
+	if r.daemonName == "kubelet" {
+		logCheckCmd := "sudo tail -20 /var/log/kubelet.log | grep -i error"
+		result, err := e2essh.NodeExec(ctx, r.nodeName, logCheckCmd, framework.TestContext.Provider)
+		if err != nil && result.Code != 1 {
+			framework.Logf("WARNING: Failed to check kubelet logs: %v", err)
+		} else if result.Code == 0 && strings.Contains(result.Stdout, "error") {
+			return fmt.Errorf("kubelet logs contain errors after restart: %v", result.Stdout)
+		}
+	}
+	return nil
 }
 
 // kill sends a SIGTERM to the daemon
@@ -240,7 +259,11 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithP
 		// The following code continues to run after the BeforeEach and thus
 		// must not use ctx.
 		backgroundCtx, cancel := context.WithCancel(context.Background())
-		ginkgo.DeferCleanup(cancel)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			controller.Run(make(chan struct{}))
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		})
 		tracker = newPodTracker()
 		newPods, controller = cache.NewInformer(
 			&cache.ListWatch{
@@ -268,12 +291,19 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithP
 				},
 			},
 		)
-		go controller.Run(backgroundCtx.Done())
+		stopCh := make(chan struct{})
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			close(stopCh)
+			// Give controller time to gracefully shut down
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		})
+		go controller.Run(stopCh)
 	})
 
 	f.It("Controller Manager should not create/delete replicas across restart", f.WithProvider("gce", "aws") /* Requires master ssh access. */, func(ctx context.Context) {
 
-		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
+		nodes := framework.WaitForControlPlaneNodes(ctx, f.ClientSet)
 
 		// checks if there is at least one control-plane node
 		gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist.", framework.ControlPlaneLabel)
@@ -312,7 +342,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithP
 	})
 
 	f.It("Scheduler should continue assigning pods to nodes across restart", f.WithProvider("gce", "aws") /* Requires master ssh access. */, func(ctx context.Context) {
-		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
+		nodes := framework.WaitForControlPlaneNodes(ctx, f.ClientSet)
 
 		// checks if there is at least one control-plane node
 		gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist.", framework.ControlPlaneLabel)

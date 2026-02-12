@@ -132,7 +132,11 @@ func allNodesReady(ctx context.Context, c clientset.Interface, timeout time.Dura
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 		if err != nil {
-			return false, err
+			if framework.IsRetryableAPIError(err) {
+				framework.Logf("retryable error listing nodes: %v", err)
+				return false, nil
+			}
+			return false, err // Fail fast
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]

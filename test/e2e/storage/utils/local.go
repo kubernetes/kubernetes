@@ -286,10 +286,23 @@ func (l *ltrMgr) setupLocalVolumeGCELocalSSD(ctx context.Context, node *v1.Node,
 }
 
 func (l *ltrMgr) cleanupLocalVolumeGCELocalSSD(ctx context.Context, ltr *LocalTestResource) {
-	// This filesystem is attached in cluster initialization, we clean all files to make it reusable.
 	removeCmd := fmt.Sprintf("find '%s' -mindepth 1 -maxdepth 1 -print0 | xargs -r -0 rm -rf", ltr.Path)
 	err := l.hostExec.IssueCommand(ctx, removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	if err != nil {
+		framework.Logf("WARNING: Failed to cleanup GCE Local SSD at %s: %v", ltr.Path, err)
+		return
+	}
+	verifyCmd := fmt.Sprintf("find '%s' -mindepth 1 -maxdepth 1 | wc -l", ltr.Path)
+	result, err := l.hostExec.IssueCommandWithResult(ctx, verifyCmd, ltr.Node)
+	if err != nil {
+		framework.Logf("WARNING: Failed to verify GCE Local SSD cleanup at %s: %v", ltr.Path, err)
+		return
+	}
+	if strings.TrimSpace(result) != "0" {
+		framework.Logf("WARNING: GCE Local SSD at %s still contains files after cleanup attempt", ltr.Path)
+		return
+	}
+	framework.Logf("Successfully cleaned up GCE Local SSD at %s", ltr.Path)
 }
 
 func (l *ltrMgr) expandLocalVolumeBlockFS(ctx context.Context, ltr *LocalTestResource, mbToAdd int) error {

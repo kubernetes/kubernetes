@@ -96,21 +96,35 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 		}
 	}
 
-	// pvs are global, so we need to wait for the exact ones bound to the statefulset pvcs.
 	pvNames := sets.NewString()
-	// TODO: Don't assume all pvcs in the ns belong to a statefulset
 	pvcPollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
 		}
+		if len(pvcList.Items) == 0 {
+			return true, nil
+		}
 		for _, pvc := range pvcList.Items {
 			pvNames.Insert(pvc.Spec.VolumeName)
-			// TODO: Double check that there are no pods referencing the pvc
-			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
-			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
+			podList, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				framework.Logf("WARNING: Failed to list pods when checking PVC references, retrying %v", err)
 				return false, nil
+			}
+			for _, pod := range podList.Items {
+				for _, volume := range pod.Spec.Volumes {
+					if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name {
+						framework.Logf("WARNING: Pod %v still referencing pvc %v, cannot delete yet", pod.Name, pvc.Name)
+						return false, nil
+					}
+				}
+			}
+			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
+			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvc.Name, metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]}); err != nil {
+				framework.Logf("ERROR: Failed to delete pvc %v: %v", pvc.Name, err)
+				return false, err
 			}
 		}
 		return true, nil
