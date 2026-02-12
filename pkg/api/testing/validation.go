@@ -400,7 +400,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		allDeclarativeErrs := runValidations(testCtx)
 
 		// The matcher here is more specific to ensure that errors from Alpha rules are included and matched correctly.
-		errOutputMatcherByStability := field.ErrorMatcher{}.ByType().ByOrigin().ByFieldNormalized(opt.NormalizationRules).ByValidationStabilityLevel()
+		errOutputMatcherByStability := errOutputMatcher.ByValidationStabilityLevel()
 		if len(expectedErrs) > 0 {
 			errOutputMatcherByStability.Test(t, expectedErrs, allDeclarativeErrs)
 		} else if len(allDeclarativeErrs) != 0 {

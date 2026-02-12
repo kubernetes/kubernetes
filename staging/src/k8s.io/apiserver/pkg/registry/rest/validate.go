@@ -442,26 +442,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	}
 
 	// Filter HV errors
-	// We remove HV errors that are covered by declarative validation AND are enforced.
-	errs = errs.Filter(func(e error) bool {
-		var fe *field.Error
-		if !errors.As(e, &fe) || !fe.CoveredByDeclarative {
-			return false
-		}
-
-		if allDeclarativeEnforced {
-			return true
-		}
-
-		// Explicit Strategy
-		if fe.IsBeta() {
-			// Beta validations are enforced only if the Beta feature gate is enabled.
-			return betaEnabled
-		}
-		// For Standard validations, we keep the handwritten error for now to avoid losing coverage
-		// before it is deleted from source. Alpha validations are always shadowed (kept).
-		return false
-	})
+	errs = filterHandwrittenErrors(errs, allDeclarativeEnforced, betaEnabled)
 
 	// Append Enforced DV errors
 	for _, dvErr := range declarativeErrs {
@@ -482,6 +463,29 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	}
 
 	return errs
+}
+
+func filterHandwrittenErrors(errs field.ErrorList, allDeclarativeEnforced, betaEnabled bool) field.ErrorList {
+	// We remove HV errors that are covered by declarative validation AND are enforced.
+	return errs.Filter(func(e error) bool {
+		var fe *field.Error
+		if !errors.As(e, &fe) || !fe.CoveredByDeclarative {
+			return false
+		}
+
+		if allDeclarativeEnforced {
+			return true
+		}
+
+		// Explicit Strategy
+		if fe.IsBeta() {
+			// Beta validations are enforced only if the Beta feature gate is enabled.
+			return betaEnabled
+		}
+		// For Standard validations, we keep the handwritten error for now to avoid losing coverage
+		// before it is deleted from source. Alpha validations are always shadowed (kept).
+		return false
+	})
 }
 
 // RecordDuplicateValidationErrors increments a metric and log the error when duplicate validation errors are found.
