@@ -36,6 +36,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -591,6 +593,22 @@ func GetNodeExternalIPs(node *v1.Node) (ips []string) {
 }
 
 // GetControlPlaneNodes returns a list of control plane nodes
+func IsRetryableAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.IsServerTimeout(err) || errors.IsTimeout(err) || errors.IsTooManyRequests(err) || errors.IsServiceUnavailable(err) || errors.IsInternalError(err) || errors.IsUnexpectedServerError(err) {
+		return true
+	}
+
+	if utilnet.IsConnectionRefused(err) || utilnet.IsConnectionReset(err) {
+		return true
+	}
+	return false
+}
+
+// GetControlPlaneNodes returns a list of control plane nodes synchronously
 func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeList {
 	allNodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	ExpectNoError(err, "error reading all nodes")
@@ -615,6 +633,41 @@ func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeLi
 	}
 
 	return &cpNodes
+}
+
+// WaitForControlPlaneNodes returns a list of control plane nodes, retrying retryable errors up to a structured timeout
+func WaitForControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeList {
+	var cpNodes *v1.NodeList
+	err := wait.PollUntilContextTimeout(ctx, Poll, TestContext.timeouts.SystemPodsStartup, true, func(ctx context.Context) (bool, error) {
+		var err error
+		allNodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			if IsRetryableAPIError(err) {
+				Logf("Retryable error reading all nodes: %v", err)
+				return false, nil
+			}
+			return false, err // fail fast on non-retryable errors
+		}
+
+		var nodes v1.NodeList
+		for _, node := range allNodes.Items {
+			if _, hasLabel := node.Labels[ControlPlaneLabel]; hasLabel {
+				nodes.Items = append(nodes.Items, node)
+				continue
+			}
+			for _, taint := range node.Spec.Taints {
+				if taint.Key == ControlPlaneLabel && taint.Effect == v1.TaintEffectNoSchedule {
+					nodes.Items = append(nodes.Items, node)
+					continue
+				}
+			}
+		}
+		cpNodes = &nodes
+		return true, nil
+	})
+	ExpectNoError(err, "error reading all nodes")
+
+	return cpNodes
 }
 
 // PrettyPrintJSON converts metrics to JSON format.

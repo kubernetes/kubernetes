@@ -298,12 +298,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(ctx, cs, nodeName, testTaint)
 		e2enode.ExpectNodeHasTaint(ctx, cs, nodeName, &testTaint)
-		taintRemoved := false
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			if !taintRemoved {
-				e2enode.RemoveTaintOffNode(ctx, cs, nodeName, testTaint)
-			}
-		})
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName, testTaint)
 
 		// 3. Wait some time
 		ginkgo.By("Waiting short time to make sure Pod is queued for deletion")
@@ -319,7 +314,6 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		// 4. Remove the taint
 		framework.Logf("Removing taint from Node")
 		e2enode.RemoveTaintOffNode(ctx, cs, nodeName, testTaint)
-		taintRemoved = true
 
 		// 5. See if Pod won't be evicted.
 		ginkgo.By("Waiting some time to make sure that toleration time passed.")

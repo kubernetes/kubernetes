@@ -54,10 +54,18 @@ var _ = SIGDescribe("ServerSideApply", func() {
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {
-		_ = client.AppsV1().Deployments(ns).Delete(ctx, "deployment", metav1.DeleteOptions{})
-		_ = client.AppsV1().Deployments(ns).Delete(ctx, "deployment-shared-unset", metav1.DeleteOptions{})
-		_ = client.AppsV1().Deployments(ns).Delete(ctx, "deployment-shared-map-item-removal", metav1.DeleteOptions{})
-		_ = client.CoreV1().Pods(ns).Delete(ctx, "test-pod", metav1.DeleteOptions{})
+		if err := client.AppsV1().Deployments(ns).Delete(ctx, "deployment", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			framework.Logf("WARNING: Failed to delete deployment in cleanup: %v", err)
+		}
+		if err := client.AppsV1().Deployments(ns).Delete(ctx, "deployment-shared-unset", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			framework.Logf("WARNING: Failed to delete deployment-shared-unset in cleanup: %v", err)
+		}
+		if err := client.AppsV1().Deployments(ns).Delete(ctx, "deployment-shared-map-item-removal", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			framework.Logf("WARNING: Failed to delete deployment-shared-map-item-removal in cleanup: %v", err)
+		}
+		if err := client.CoreV1().Pods(ns).Delete(ctx, "test-pod", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			framework.Logf("WARNING: Failed to delete test-pod in cleanup: %v", err)
+		}
 	})
 
 	/*

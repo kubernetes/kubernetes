@@ -415,7 +415,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 			}
 			return actualWatchEvents
 		}, func() (err error) {
-			_ = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
+			if delErr := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"}); delErr != nil && !apierrors.IsNotFound(delErr) {
+				framework.Logf("WARNING: Failed to delete ReplicationControllers: %v", delErr)
+			}
 			return err
 		})
 	})

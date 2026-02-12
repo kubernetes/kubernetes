@@ -86,3 +86,6 @@ order.
 
 `test/e2e/framework/internal/unittests/cleanup/cleanup.go` shows how these
 different callbacks can be used and in which order they are going to run.
+
+For detailed cleanup best practices and patterns that prevent cascading test
+failures, see [`CLEANUP_PATTERNS.md`](./CLEANUP_PATTERNS.md).

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -53,6 +54,12 @@ const (
 
 	// How long pods have to be "ready" after the reboot.
 	rebootPodReadyAgainTimeout = 5 * time.Minute
+
+	// Poll interval for daemon readiness checks
+	daemonReadinessPollInterval = 5 * time.Second
+
+	// Timeout for daemon readiness verification
+	daemonReadinessPollTimeout = 2 * time.Minute
 )
 
 var _ = SIGDescribe("Reboot", framework.WithDisruptive(), feature.Reboot, func() {
@@ -139,6 +146,42 @@ var _ = SIGDescribe("Reboot", framework.WithDisruptive(), feature.Reboot, func()
 		testReboot(ctx, f.ClientSet, dropPacketsScript("OUTPUT", tmpLogPath), catLogHook(ctx, tmpLogPath))
 	})
 })
+
+// verifyDaemonReadiness validates that the node and its critical daemons (kubelet, etc.) are truly operational
+// by proactively analyzing kubelet logs instead of relying solely on /healthz endpoint which may have false positives.
+func verifyDaemonReadiness(ctx context.Context, provider string, node *v1.Node) error {
+	nodeName := node.ObjectMeta.Name
+	// Check kubelet status through system logs
+	kubeletStatusCmd := "sudo journalctl -u kubelet -n 50 --no-pager | tail -20"
+
+	var lastOutput string
+	err := wait.PollUntilContextTimeout(ctx, daemonReadinessPollInterval, daemonReadinessPollTimeout, false, func(ctx context.Context) (bool, error) {
+		result, err := e2essh.IssueSSHCommandWithResult(ctx, kubeletStatusCmd, provider, node)
+		if err != nil {
+			framework.Logf("Failed to retrieve kubelet status on node %s: %v", nodeName, err)
+			return false, nil
+		}
+
+		// Check for signs of daemon being ready in logs
+		output := result.Stdout
+		lastOutput = output
+		if strings.Contains(output, "Started kubelet") ||
+			strings.Contains(output, "kubelet started") ||
+			(!strings.Contains(output, "error") && !strings.Contains(output, "panic")) {
+			framework.Logf("Node %s kubelet is operational based on logs", nodeName)
+			return true, nil
+		}
+
+		framework.Logf("Kubelet on node %s not yet fully operational. Waiting...", nodeName)
+		return false, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("node %s daemon readiness validation failed: %w. Last log excerpt:\n%s", nodeName, err, lastOutput)
+	}
+
+	return nil
+}
 
 func testReboot(ctx context.Context, c clientset.Interface, rebootCmd string, hook terminationHook) {
 	// Get all nodes, and kick off the test on each.
@@ -297,6 +340,12 @@ func rebootNode(ctx context.Context, c clientset.Interface, provider, name, rebo
 	if !e2epod.CheckPodsRunningReadyOrSucceeded(ctx, c, ns, podNames, rebootPodReadyAgainTimeout) {
 		newPods := ps.List()
 		printStatusAndLogsForNotReadyPods(ctx, c, ns, podNames, newPods)
+		return false
+	}
+
+	// Verify daemon readiness
+	if err := verifyDaemonReadiness(ctx, provider, node); err != nil {
+		framework.Logf("Daemon readiness check failed for node %s: %v", name, err)
 		return false
 	}
 
