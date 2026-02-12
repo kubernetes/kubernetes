@@ -59,6 +59,8 @@ import (
 
 var nevererrc chan error
 
+var testMetrics = newReflectorMetrics("reflector_test", "", "pods", nil)
+
 func TestCloseWatchChannelOnError(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	r := NewReflector(&ListWatch{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0)
@@ -782,6 +784,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 				}
 				r := &Reflector{
 					name:              "test-reflector",
+					metrics:           testMetrics,
 					listerWatcher:     lw,
 					store:             NewFIFO(MetaNamespaceKeyFunc),
 					backoffManager:    bm,
@@ -843,6 +846,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 
 	r := &Reflector{
 		name:              "test-reflector",
+		metrics:           testMetrics,
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
@@ -884,6 +888,7 @@ func TestNoRelistOnTooManyRequests(t *testing.T) {
 
 	r := &Reflector{
 		name:              "test-reflector",
+		metrics:           testMetrics,
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
@@ -959,6 +964,7 @@ func TestRetryInternalError(t *testing.T) {
 
 		r := &Reflector{
 			name:              "test-reflector",
+			metrics:           testMetrics,
 			listerWatcher:     lw,
 			store:             NewFIFO(MetaNamespaceKeyFunc),
 			backoffManager:    bm,
