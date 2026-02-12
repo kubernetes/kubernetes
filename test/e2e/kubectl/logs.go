@@ -296,6 +296,9 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				podOne := pods.Items[0].GetName()
 				podTwo := pods.Items[1].GetName()
 
+				ginkgo.By("sleep 1s to wait for log generator produce data after pods get ready")
+				time.Sleep(time.Second)
+
 				ginkgo.By("expecting logs from the default container from both pods in a deployment")
 				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("deploy/%s", deployName), "--all-pods")
 				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s/container-2]", podOne))).To(gomega.BeTrueBecause("pod 1 container 2 log should be present"))
@@ -314,6 +317,9 @@ var _ = SIGDescribe("Kubectl logs", func() {
 
 				podOne := pods.Items[0].GetName()
 				podTwo := pods.Items[1].GetName()
+
+				ginkgo.By("sleep 1s to wait for log generator produce data after pods get ready")
+				time.Sleep(time.Second)
 
 				ginkgo.By("expecting logs from all containers from both pods in a deployment")
 				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("deploy/%s", deployName), "--all-pods", "--all-containers")
