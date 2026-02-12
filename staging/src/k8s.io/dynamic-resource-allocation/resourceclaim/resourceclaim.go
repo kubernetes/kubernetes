@@ -32,6 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	schedulingv1alpha1 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1" // TODO: v1alpha2
 )
 
 var (
@@ -66,7 +67,9 @@ func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOw
 	switch {
 	case podClaim.ResourceClaimName != nil:
 		return podClaim.ResourceClaimName, false, nil
-	case podClaim.ResourceClaimTemplateName != nil:
+	// TODO: do we need to gate this on the feature if the API server will
+	// have already the Pod it if a PodGroup claim is defined?
+	case podClaim.ResourceClaimTemplateName != nil, podClaim.PodGroupResourceClaim != nil:
 		for _, status := range pod.Status.ResourceClaimStatuses {
 			if status.Name == podClaim.Name {
 				return status.ResourceClaimName, true, nil
@@ -89,6 +92,10 @@ func IsForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) error {
 	if claim.Namespace != pod.Namespace || !metav1.IsControlledBy(claim, pod) {
 		return fmt.Errorf("ResourceClaim %s/%s was not created for pod %s/%s (pod is not owner)", claim.Namespace, claim.Name, pod.Namespace, pod.Name)
 	}
+	// TODO: The claim is for the pod if it's controlled by the Pod's PodGroup.
+	// - How do we check that here only when PodGroup claims are enabled?
+	// - Is it safe to check the owner reference only by name/namespace instead
+	//   of UID? Pods don't know their PodGroup's UID.
 	return nil
 }
 
@@ -97,6 +104,12 @@ func IsForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) error {
 func IsReservedForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) bool {
 	for _, reserved := range claim.Status.ReservedFor {
 		if reserved.UID == pod.UID {
+			return true
+		}
+		// TODO: How do we gate this on the feature?
+		if reserved.APIGroup == schedulingv1alpha1.GroupName &&
+			reserved.Resource == "podgroups" &&
+			reserved.Name == pod.Spec.WorkloadRef.PodGroup { // TODO: pod.Spec.SchedulingGroup.PodGroupName
 			return true
 		}
 	}
