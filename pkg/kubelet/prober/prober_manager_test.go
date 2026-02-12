@@ -408,7 +408,7 @@ func testCleanupPods(tCtx ktesting.TContext) {
 
 	desiredPods := map[types.UID]sets.Empty{}
 	desiredPods[podToKeep.UID] = sets.Empty{}
-	m.CleanupPods(desiredPods)
+	m.CleanupPods(desiredPods, func(_ types.UID) bool { return true })
 
 	removedProbes := []probeKey{
 		{"pod_cleanup", "prober1", readiness},
@@ -455,7 +455,7 @@ func testCleanupRepeated(tCtx ktesting.TContext) {
 	}
 
 	for i := 0; i < 10; i++ {
-		m.CleanupPods(map[types.UID]sets.Empty{})
+		m.CleanupPods(map[types.UID]sets.Empty{}, func(_ types.UID) bool { return true })
 	}
 }
 
@@ -837,7 +837,7 @@ func waitForReadyStatus(t ktesting.TB, m *manager, ready bool) error {
 
 // cleanup running probes to avoid leaking goroutines.
 func cleanup(t ktesting.TB, m *manager) {
-	m.CleanupPods(nil)
+	m.CleanupPods(nil, func(_ types.UID) bool { return true })
 
 	condition := func() (bool, error) {
 		workerCount := m.workerCount()

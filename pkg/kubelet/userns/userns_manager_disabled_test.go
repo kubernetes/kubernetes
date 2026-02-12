@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -126,6 +127,6 @@ func TestCleanupOrphanedPodUsernsAllocationsDisabled(t *testing.T) {
 	m, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
 	require.NoError(t, err)
 
-	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil)
+	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil, func(_ types.UID) bool { return true })
 	assert.NoError(t, err)
 }

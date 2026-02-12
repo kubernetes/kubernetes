@@ -62,22 +62,33 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // * kubelet: kubelet binary is outside. (We plan to move main kubelet start logic out when we have
 // standard kubelet launcher)
 func (e *E2EServices) Start(ctx context.Context, featureGates map[string]bool) error {
-	var err error
+	if err := e.StartInternalServices(ctx, featureGates); err != nil {
+		return err
+	}
+	// running the kubelet depends on whether we are running conformance test-suite
+	if framework.TestContext.NodeConformance {
+		klog.Info("nothing to do in node-e2e-services, running conformance suite")
+	} else if err := e.StartKubelet(ctx, featureGates); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *E2EServices) StartKubelet(ctx context.Context, featureGates map[string]bool) (err error) {
+	// Start kubelet
+	e.kubelet, err = e.startKubelet(ctx, featureGates)
+	if err != nil {
+		return fmt.Errorf("failed to start kubelet: %w", err)
+	}
+	klog.Infof("Kubelet started.")
+	return nil
+}
+
+func (e *E2EServices) StartInternalServices(ctx context.Context, featureGates map[string]bool) (err error) {
 	if e.services, err = e.startInternalServices(); err != nil {
 		return fmt.Errorf("failed to start internal services: %w", err)
 	}
 	klog.Infof("Node services started.")
-	// running the kubelet depends on whether we are running conformance test-suite
-	if framework.TestContext.NodeConformance {
-		klog.Info("nothing to do in node-e2e-services, running conformance suite")
-	} else {
-		// Start kubelet
-		e.kubelet, err = e.startKubelet(ctx, featureGates)
-		if err != nil {
-			return fmt.Errorf("failed to start kubelet: %w", err)
-		}
-		klog.Infof("Kubelet started.")
-	}
 	return nil
 }
 
@@ -89,11 +100,24 @@ func (e *E2EServices) Stop() {
 			e.collectLogFiles()
 		}
 	}()
+	e.StopServices()
+	e.StopKubelet()
+	for _, d := range e.rmDirs {
+		err := os.RemoveAll(d)
+		if err != nil {
+			klog.Errorf("Failed to delete directory %s: %v", d, err)
+		}
+	}
+}
+
+func (e *E2EServices) StopServices() {
 	if e.services != nil {
 		if err := e.services.kill(); err != nil {
 			klog.Errorf("Failed to stop services: %v", err)
 		}
 	}
+}
+func (e *E2EServices) StopKubelet() {
 	if e.kubelet != nil {
 		if err := e.kubelet.kill(); err != nil {
 			klog.Errorf("Failed to kill kubelet: %v", err)
@@ -103,12 +127,22 @@ func (e *E2EServices) Stop() {
 			klog.Errorf("Failed to stop kubelet systemd unit: %v", err)
 		}
 	}
-	for _, d := range e.rmDirs {
-		err := os.RemoveAll(d)
-		if err != nil {
-			klog.Errorf("Failed to delete directory %s: %v", d, err)
-		}
+}
+
+// PauseServices pauses the services process (apiserver + etcd) using SIGSTOP.
+func (e *E2EServices) PauseServices() error {
+	if e.services != nil {
+		return e.services.pause()
 	}
+	return fmt.Errorf("services not started")
+}
+
+// ResumeServices resumes the services process (apiserver + etcd) using SIGCONT.
+func (e *E2EServices) ResumeServices() error {
+	if e.services != nil {
+		return e.services.resume()
+	}
+	return fmt.Errorf("services not started")
 }
 
 // RunE2EServices actually start the e2e services. This function is used to
