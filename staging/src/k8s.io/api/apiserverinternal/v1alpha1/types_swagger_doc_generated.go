@@ -29,10 +29,10 @@ package v1alpha1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_ServerStorageVersion = map[string]string{
 	"":                  "An API server instance reports the version it can decode and the version it encodes objects to when persisting objects in the backend.",
-	"apiServerID":       "The ID of the reporting API server.",
-	"encodingVersion":   "The API server encodes the object to this version when persisting it in the backend (e.g., etcd).",
-	"decodableVersions": "The API server can decode objects encoded in these versions. The encodingVersion must be included in the decodableVersions.",
-	"servedVersions":    "The API server can serve these versions. DecodableVersions must include all ServedVersions.",
+	"apiServerID":       "apiServerID is the ID of the reporting API server.",
+	"encodingVersion":   "encodingVersion is the version the API server encodes the object to when persisting it in the backend (e.g., etcd).",
+	"decodableVersions": "decodableVersions are the encoding versions the API server can handle to decode. The API server can decode objects encoded in these versions. The encodingVersion must be included in the decodableVersions.",
+	"servedVersions":    "servedVersions lists all versions the API server can serve. DecodableVersions must include all ServedVersions.",
 }
 
 func (ServerStorageVersion) SwaggerDoc() map[string]string {
@@ -41,9 +41,9 @@ func (ServerStorageVersion) SwaggerDoc() map[string]string {
 
 var map_StorageVersion = map[string]string{
 	"":         "Storage version of a specific resource.",
-	"metadata": "The name is <group>.<resource>.",
-	"spec":     "Spec is an empty spec. It is here to comply with Kubernetes API style.",
-	"status":   "API server instances report the version they can decode and the version they encode objects to when persisting objects in the backend.",
+	"metadata": "metadata is the standard object metadata. The name is <group>.<resource>.",
+	"spec":     "spec is an empty spec. It is here to comply with Kubernetes API style.",
+	"status":   "status hold the StorageVersionStatus, reporting the version an API server instance can decode and the version it encodes objects to when persisting objects in the backend.",
 }
 
 func (StorageVersion) SwaggerDoc() map[string]string {
@@ -52,12 +52,12 @@ func (StorageVersion) SwaggerDoc() map[string]string {
 
 var map_StorageVersionCondition = map[string]string{
 	"":                   "Describes the state of the storageVersion at a certain point.",
-	"type":               "Type of the condition.",
-	"status":             "Status of the condition, one of True, False, Unknown.",
-	"observedGeneration": "If set, this represents the .metadata.generation that the condition was set based upon.",
-	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
-	"reason":             "The reason for the condition's last transition.",
-	"message":            "A human readable message indicating details about the transition.",
+	"type":               "type of the condition.",
+	"status":             "status of the condition, one of True, False, Unknown.",
+	"observedGeneration": "observedGeneration represents the .metadata.generation that the condition was set based upon, if field is set.",
+	"lastTransitionTime": "lastTransitionTime is the last time the condition transitioned from one status to another.",
+	"reason":             "reason for the condition's last transition.",
+	"message":            "message is a human readable string indicating details about the transition.",
 }
 
 func (StorageVersionCondition) SwaggerDoc() map[string]string {
@@ -84,9 +84,9 @@ func (StorageVersionSpec) SwaggerDoc() map[string]string {
 
 var map_StorageVersionStatus = map[string]string{
 	"":                      "API server instances report the versions they can decode and the version they encode objects to when persisting objects in the backend.",
-	"storageVersions":       "The reported versions per API server instance.",
-	"commonEncodingVersion": "If all API server instances agree on the same encoding storage version, then this field is set to that version. Otherwise this field is left empty. API servers should finish updating its storageVersionStatus entry before serving write operations, so that this field will be in sync with the reality.",
-	"conditions":            "The latest available observations of the storageVersion's state.",
+	"storageVersions":       "storageVersions lists the reported versions per API server instance.",
+	"commonEncodingVersion": "commonEncodingVersion is set to an encoding storage version if all API server instances share that same version. If they don't share one storage version, this field is left empty. API servers should finish updating its storageVersionStatus entry before serving write operations, so that this field will be in sync with the reality.",
+	"conditions":            "conditions lists the latest available observations of the storageVersion's state.",
 }
 
 func (StorageVersionStatus) SwaggerDoc() map[string]string {
