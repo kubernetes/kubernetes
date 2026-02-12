@@ -42,6 +42,7 @@ message Event {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // eventTime is the time when this Event was first observed. It is required.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime eventTime = 2;
 
   // series is data about the Event series this event represents or nil if it's a singleton Event.
@@ -122,9 +123,11 @@ message EventList {
 // continuously for some time.
 message EventSeries {
   // count is the number of occurrences in this series up to the last heartbeat time.
+  // +required
   optional int32 count = 1;
 
   // lastObservedTime is the time when last Event from the series was seen before last heartbeat.
+  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 }
 

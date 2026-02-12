@@ -33884,7 +33884,7 @@ func schema_k8sio_api_events_v1_Event(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 				},
-				Required: []string{"eventTime"},
+				Required: []string{"eventTime", "reportingController", "reportingInstance", "action", "reason", "type"},
 			},
 		},
 		Dependencies: []string{
@@ -34095,7 +34095,6 @@ func schema_k8sio_api_events_v1beta1_Event(ref common.ReferenceCallback) common.
 						},
 					},
 				},
-				Required: []string{"eventTime"},
 			},
 		},
 		Dependencies: []string{
