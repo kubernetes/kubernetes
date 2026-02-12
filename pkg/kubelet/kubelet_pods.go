@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -208,7 +209,7 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 // https://github.com/kubernetes/kubernetes/issues/104824
 func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	allPods := kl.podManager.GetPods()
-	activePods := kl.filterOutInactivePods(allPods)
+	activePods := kl.filterOutInactivePods(allPods, kl.sourcesReady.SourceForPodReady)
 	return activePods
 }
 
@@ -1138,9 +1139,13 @@ func (kl *Kubelet) PodIsFinished(pod *v1.Pod) bool {
 // or are known to be fully terminated. This method should only be used
 // when the set of pods being filtered is upstream of the pod worker, i.e.
 // the pods the pod manager is aware of.
-func (kl *Kubelet) filterOutInactivePods(pods []*v1.Pod) []*v1.Pod {
+func (kl *Kubelet) filterOutInactivePods(pods []*v1.Pod, sourceForPodReady config.SourceForPodReadyFn) []*v1.Pod {
 	filteredPods := make([]*v1.Pod, 0, len(pods))
 	for _, p := range pods {
+		// Don't consider a pod active until we see its source
+		if !sourceForPodReady(p.UID) {
+			continue
+		}
 		if kl.isPodInactive(p) {
 			continue
 		}
@@ -1190,7 +1195,7 @@ func (kl *Kubelet) isAdmittedPodTerminal(pod *v1.Pod) bool {
 
 // removeOrphanedPodStatuses removes obsolete entries in podStatus where
 // the pod is no longer considered bound to this node.
-func (kl *Kubelet) removeOrphanedPodStatuses(logger klog.Logger, pods []*v1.Pod, mirrorPods []*v1.Pod) {
+func (kl *Kubelet) removeOrphanedPodStatuses(logger klog.Logger, pods []*v1.Pod, mirrorPods []*v1.Pod, sourceForPodReady config.SourceForPodReadyFn) {
 	podUIDs := make(map[types.UID]bool)
 	for _, pod := range pods {
 		podUIDs[pod.UID] = true
@@ -1198,7 +1203,7 @@ func (kl *Kubelet) removeOrphanedPodStatuses(logger klog.Logger, pods []*v1.Pod,
 	for _, pod := range mirrorPods {
 		podUIDs[pod.UID] = true
 	}
-	kl.statusManager.RemoveOrphanedStatuses(logger, podUIDs)
+	kl.statusManager.RemoveOrphanedStatuses(logger, podUIDs, sourceForPodReady)
 }
 
 // HandlePodCleanups performs a series of cleanup work, including terminating
@@ -1214,7 +1219,7 @@ func (kl *Kubelet) removeOrphanedPodStatuses(logger klog.Logger, pods []*v1.Pod,
 // of this call is the minimum latency for static pods to be restarted if they
 // are updated with a fixed UID (most should use a dynamic UID), and no config
 // updates are delivered to the pod workers while this method is running.
-func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
+func (kl *Kubelet) HandlePodCleanups(ctx context.Context, sourceForPodReady config.SourceForPodReadyFn) error {
 	logger := klog.FromContext(ctx)
 	// The kubelet lacks checkpointing, so we need to introspect the set of pods
 	// in the cgroup tree prior to inspecting the set of pods in our pod manager.
@@ -1297,16 +1302,16 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 	// Stop probing pods that are not running
 	logger.V(3).Info("Clean up probes for terminated pods")
-	kl.probeManager.CleanupPods(possiblyRunningPods)
+	kl.probeManager.CleanupPods(possiblyRunningPods, sourceForPodReady)
 
 	// Remove orphaned pod statuses not in the total list of known config pods
 	logger.V(3).Info("Clean up orphaned pod statuses")
-	kl.removeOrphanedPodStatuses(logger, allPods, mirrorPods)
-	kl.allocationManager.RemoveOrphanedPods(allPodsByUID)
+	kl.removeOrphanedPodStatuses(logger, allPods, mirrorPods, sourceForPodReady)
+	kl.allocationManager.RemoveOrphanedPods(allPodsByUID, sourceForPodReady)
 
 	// Remove orphaned pod user namespace allocations (if any).
 	logger.V(3).Info("Clean up orphaned pod user namespace allocations")
-	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(ctx, allPods, runningRuntimePods); err != nil {
+	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(ctx, allPods, runningRuntimePods, sourceForPodReady); err != nil {
 		logger.Error(err, "Failed cleaning up orphaned pod user namespaces allocations")
 	}
 
@@ -1318,7 +1323,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// in the future (volumes, mount dirs, logs, and containers could all be
 	// better separated)
 	logger.V(3).Info("Clean up orphaned pod directories")
-	err = kl.cleanupOrphanedPodDirs(logger, allPods, runningRuntimePods)
+	err = kl.cleanupOrphanedPodDirs(logger, allPods, runningRuntimePods, sourceForPodReady)
 	if err != nil {
 		// We want all cleanup tasks to be run even if one of them failed. So
 		// we just log an error here and continue other cleanup tasks.
@@ -1342,7 +1347,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 	// After pruning pod workers for terminated pods get the list of active pods for
 	// metrics and to determine restarts.
-	activePods := kl.filterOutInactivePods(allPods)
+	activePods := kl.filterOutInactivePods(allPods, sourceForPodReady)
 	allRegularPods, allStaticPods := splitPodsByStatic(allPods)
 	activeRegularPods, activeStaticPods := splitPodsByStatic(activePods)
 	metrics.DesiredPodCount.WithLabelValues("").Set(float64(len(allRegularPods)))
@@ -1399,7 +1404,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// Adding the pods with SyncPodKill to pod workers allows to proceed with
 	// force-deletion of such pods, yet preventing re-entry of the routine in the
 	// next invocation of HandlePodCleanups.
-	for _, pod := range kl.filterTerminalPodsToDelete(allPods, runningRuntimePods, workingPods) {
+	for _, pod := range kl.filterTerminalPodsToDelete(allPods, runningRuntimePods, workingPods, sourceForPodReady) {
 		logger.V(3).Info("Handling termination and deletion of the pod to pod workers", "pod", klog.KObj(pod), "podUID", pod.UID)
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 			UpdateType: kubetypes.SyncPodKill,
@@ -1489,9 +1494,12 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 // such pods is already handled by pod workers.
 // Finally, we skip runtime pods as their termination is handled separately in
 // the HandlePodCleanups routine.
-func (kl *Kubelet) filterTerminalPodsToDelete(allPods []*v1.Pod, runningRuntimePods []*kubecontainer.Pod, workingPods map[types.UID]PodWorkerSync) map[types.UID]*v1.Pod {
+func (kl *Kubelet) filterTerminalPodsToDelete(allPods []*v1.Pod, runningRuntimePods []*kubecontainer.Pod, workingPods map[types.UID]PodWorkerSync, sourceForPodReady config.SourceForPodReadyFn) map[types.UID]*v1.Pod {
 	terminalPodsToDelete := make(map[types.UID]*v1.Pod)
 	for _, pod := range allPods {
+		if !sourceForPodReady(pod.UID) {
+			continue
+		}
 		if pod.DeletionTimestamp == nil {
 			// skip pods which don't have a deletion timestamp
 			continue

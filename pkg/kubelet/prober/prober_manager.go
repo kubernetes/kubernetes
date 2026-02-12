@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -86,7 +87,7 @@ type Manager interface {
 
 	// CleanupPods handles cleaning up pods which should no longer be running.
 	// It takes a map of "desired pods" which should not be cleaned up.
-	CleanupPods(desiredPods map[types.UID]sets.Empty)
+	CleanupPods(desiredPods map[types.UID]sets.Empty, sourceForPodReady config.SourceForPodReadyFn)
 
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
@@ -261,11 +262,15 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 	}
 }
 
-func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
+func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty, sourceForPodReady config.SourceForPodReadyFn) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
 	for key, worker := range m.workers {
+		// Wait for relevant source to be ready before doing cleanup
+		if !sourceForPodReady(key.podUID) {
+			continue
+		}
 		if _, ok := desiredPods[key.podUID]; !ok {
 			worker.stop()
 		}

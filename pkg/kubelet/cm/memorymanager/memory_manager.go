@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -51,8 +52,9 @@ type runtimeService interface {
 
 type sourcesReadyStub struct{}
 
-func (s *sourcesReadyStub) AddSource(source string) {}
-func (s *sourcesReadyStub) AllReady() bool          { return true }
+func (s *sourcesReadyStub) AddSource(source string)          {}
+func (s *sourcesReadyStub) AllReady() bool                   { return true }
+func (s *sourcesReadyStub) SourceForPodReady(types.UID) bool { return true }
 
 // Manager interface provides methods for Kubelet to manage pod memory.
 type Manager interface {

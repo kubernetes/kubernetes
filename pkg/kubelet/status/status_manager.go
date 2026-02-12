@@ -40,6 +40,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -171,7 +172,7 @@ type Manager interface {
 
 	// RemoveOrphanedStatuses scans the status cache and removes any entries for pods not included in
 	// the provided podUIDs.
-	RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.UID]bool)
+	RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.UID]bool, sourceForPodReady config.SourceForPodReadyFn)
 
 	// GetPodResizeConditions returns cached PodStatus Resize conditions value
 	GetPodResizeConditions(podUID types.UID) []*v1.PodCondition
@@ -1052,10 +1053,14 @@ func (m *manager) deletePodStatus(uid types.UID) {
 }
 
 // TODO(filipg): It'd be cleaner if we can do this without signal from user.
-func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.UID]bool) {
+func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.UID]bool, sourceForPodReady config.SourceForPodReadyFn) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	for key := range m.podStatuses {
+		// Wait for relevant source to be ready before cleaning
+		if !sourceForPodReady(key) {
+			continue
+		}
 		if _, ok := podUIDs[key]; !ok {
 			logger.V(5).Info("Removing pod from status map", "podUID", key)
 			delete(m.podStatuses, key)

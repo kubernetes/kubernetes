@@ -421,3 +421,152 @@ func TestPodConfigRace(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestSourceForPodReadyBeforeAllSourcesReady(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(tCtx))
+	config := NewPodConfig(eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
+
+	fileSource := config.Channel(tCtx, kubetypes.FileSource)
+	_ = config.Channel(tCtx, kubetypes.ApiserverSource)
+
+	filePod := CreateValidPod("test-pod", "default")
+	fileSource <- createSourceUpdate(filePod)
+	time.Sleep(50 * time.Millisecond)
+
+	if !config.SourceForPodReady(filePod.UID) {
+		t.Error("Expected file pod source to be ready")
+	}
+	if config.SourceForPodReady("nonexistent-pod") {
+		t.Error("Expected nonexistent pod source to not be ready")
+	}
+
+	config.pods.podLock.RLock()
+	mapNil := config.pods.podSources == nil
+	config.pods.podLock.RUnlock()
+	if mapNil {
+		t.Error("Expected podSources map to exist before all sources ready")
+	}
+}
+
+func TestSourceForPodReadyAfterAllSourcesReady(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(tCtx))
+	config := NewPodConfig(eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
+
+	fileSource := config.Channel(tCtx, kubetypes.FileSource)
+	apiSource := config.Channel(tCtx, kubetypes.ApiserverSource)
+
+	filePod := CreateValidPod("file-pod", "default")
+	apiPod := CreateValidPod("api-pod", "default")
+
+	fileSource <- createSourceUpdate(filePod)
+	apiSource <- createSourceUpdate(apiPod)
+	time.Sleep(50 * time.Millisecond)
+
+	// Make a safe copy of sourcesSeen to avoid data race
+	config.pods.sourcesSeenLock.RLock()
+	sourcesSeen := config.pods.sourcesSeen.Clone()
+	config.pods.sourcesSeenLock.RUnlock()
+
+	if !config.SeenAllSources(tCtx.Logger(), sourcesSeen) {
+		t.Error("Expected all sources ready")
+	}
+
+	if !config.SourceForPodReady(filePod.UID) {
+		t.Error("Expected file pod to be ready after all sources ready")
+	}
+	if !config.SourceForPodReady(apiPod.UID) {
+		t.Error("Expected api pod to be ready after all sources ready")
+	}
+	if !config.SourceForPodReady("any-random-uid") {
+		t.Error("Expected any UID to be ready after all sources ready")
+	}
+
+	config.pods.podLock.RLock()
+	mapNil := config.pods.podSources == nil
+	config.pods.podLock.RUnlock()
+	if !mapNil {
+		t.Error("Expected podSources map to be cleared after all sources ready")
+	}
+}
+
+func TestSourceForPodReadyPodDeletion(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(tCtx))
+	config := NewPodConfig(eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
+
+	fileSource := config.Channel(tCtx, kubetypes.FileSource)
+
+	pod := CreateValidPod("test-pod", "default")
+	fileSource <- createSourceUpdate(pod)
+	time.Sleep(50 * time.Millisecond)
+
+	if !config.SourceForPodReady(pod.UID) {
+		t.Fatal("Expected pod source to be ready after adding")
+	}
+
+	fileSource <- createSourceUpdate()
+	time.Sleep(50 * time.Millisecond)
+
+	config.pods.podLock.RLock()
+	_, exists := config.pods.podSources[pod.UID]
+	config.pods.podLock.RUnlock()
+	if exists {
+		t.Error("Expected UID to be removed from podSources after deletion")
+	}
+
+	if config.SourceForPodReady(pod.UID) {
+		t.Error("Expected deleted pod to return false")
+	}
+}
+
+func TestSourceForPodReadyNoMapGrowthAfterAllReady(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(tCtx))
+	config := NewPodConfig(eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
+
+	fileSource := config.Channel(tCtx, kubetypes.FileSource)
+	apiSource := config.Channel(tCtx, kubetypes.ApiserverSource)
+
+	pod1 := CreateValidPod("file-1", "default")
+	pod2 := CreateValidPod("api-1", "default")
+	fileSource <- createSourceUpdate(pod1)
+	apiSource <- createSourceUpdate(pod2)
+	time.Sleep(50 * time.Millisecond)
+
+	// Make a safe copy of sourcesSeen to avoid data race
+	config.pods.sourcesSeenLock.RLock()
+	sourcesSeen := config.pods.sourcesSeen.Clone()
+	config.pods.sourcesSeenLock.RUnlock()
+
+	config.SeenAllSources(tCtx.Logger(), sourcesSeen)
+
+	pod3 := CreateValidPod("file-2", "default")
+	fileSource <- createSourceUpdate(pod1, pod3)
+	time.Sleep(50 * time.Millisecond)
+
+	config.pods.podLock.RLock()
+	mapNil := config.pods.podSources == nil
+	config.pods.podLock.RUnlock()
+	if !mapNil {
+		t.Error("Expected podSources map to stay nil after all sources ready")
+	}
+}
+
+func TestSourceForPodReadySourceNotReady(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(tCtx))
+	config := NewPodConfig(eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
+
+	config.Channel(tCtx, kubetypes.ApiserverSource)
+
+	pod := CreateValidPod("test-pod", "default")
+	config.pods.podLock.Lock()
+	config.pods.podSources[pod.UID] = kubetypes.ApiserverSource
+	config.pods.podLock.Unlock()
+
+	if config.SourceForPodReady(pod.UID) {
+		t.Error("Expected pod source to not be ready when source not seen")
+	}
+}

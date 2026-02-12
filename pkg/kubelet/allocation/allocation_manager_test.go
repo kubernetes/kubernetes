@@ -2459,7 +2459,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			}
 			return nil, false
 		},
-		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
+		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }, func(_ types.UID) bool { return true }),
 		record.NewFakeRecorder(20),
 	)
 

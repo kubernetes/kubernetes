@@ -32,6 +32,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -127,8 +128,9 @@ type sourcesReadyStub struct{}
 // PodReusableDevices is a map by pod name of devices to reuse.
 type PodReusableDevices map[string]map[string]sets.Set[string]
 
-func (s *sourcesReadyStub) AddSource(source string) {}
-func (s *sourcesReadyStub) AllReady() bool          { return true }
+func (s *sourcesReadyStub) AddSource(source string)          {}
+func (s *sourcesReadyStub) AllReady() bool                   { return true }
+func (s *sourcesReadyStub) SourceForPodReady(types.UID) bool { return true }
 
 // NewManagerImpl creates a new manager.
 func NewManagerImpl(logger klog.Logger, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {

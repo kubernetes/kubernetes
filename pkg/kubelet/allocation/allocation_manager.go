@@ -91,7 +91,7 @@ type Manager interface {
 	RemovePod(logger klog.Logger, uid types.UID)
 
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
-	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
+	RemoveOrphanedPods(remainingPods sets.Set[types.UID], sourceForPodReady config.SourceForPodReadyFn)
 
 	// Run starts the allocation manager. This is currently only used to handle periodic retry of
 	// pending resizes.
@@ -532,8 +532,8 @@ func (m *manager) RemovePod(logger klog.Logger, uid types.UID) {
 	}
 }
 
-func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
-	m.allocated.RemoveOrphanedPods(remainingPods)
+func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID], sourceForPodReady config.SourceForPodReadyFn) {
+	m.allocated.RemoveOrphanedPods(remainingPods, sourceForPodReady)
 }
 
 func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bool, error) {

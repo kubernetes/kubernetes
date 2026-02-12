@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 )
 
 type stateMemory struct {
@@ -142,11 +143,15 @@ func (s *stateMemory) RemovePod(logger klog.Logger, podUID types.UID) error {
 	return nil
 }
 
-func (s *stateMemory) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
+func (s *stateMemory) RemoveOrphanedPods(remainingPods sets.Set[types.UID], sourceForPodReady config.SourceForPodReadyFn) {
 	s.Lock()
 	defer s.Unlock()
 
 	for podUID := range s.podResources {
+		// Wait for relevant source to be ready before doing cleanup
+		if !sourceForPodReady(podUID) {
+			continue
+		}
 		if _, ok := remainingPods[types.UID(podUID)]; !ok {
 			delete(s.podResources, podUID)
 		}
