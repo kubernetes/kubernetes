@@ -234,6 +234,10 @@ linters:
       # jsontags: 'Port' must be capitalized for backward compatibility
       - text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
         path: "staging/src/k8s.io/api/core/v1/types.go"
+        
+      # nophase: Legacy 'Phase' fields retained for backward compatibility
+      - text: 'nophase: naming convention "nophase": field (PersistentVolumeStatus\.Phase|PersistentVolumeStatus\.LastPhaseTransitionTime): phase fields are deprecated and conditions should be preferred, avoid phase like enum fields'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
 
       - linters:
         - forbidigo
@@ -415,7 +419,7 @@ linters:
               # - "nofloats" # Ensure floats are not used.
               - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
               - "nonullable" # Ensure fields are not marked as nullable.
-              # - "nophase" # Ensure field names do not have the word "phase" in them.
+              - "nophase" # Ensure field names do not have the word "phase" in them.
               - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
               # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
               - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.

@@ -99,3 +99,7 @@
 # jsontags: 'Port' must be capitalized for backward compatibility
 - text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
   path: "staging/src/k8s.io/api/core/v1/types.go"
+  
+# nophase: Legacy 'Phase' fields retained for backward compatibility
+- text: 'nophase: naming convention "nophase": field (PersistentVolumeStatus\.Phase|PersistentVolumeStatus\.LastPhaseTransitionTime): phase fields are deprecated and conditions should be preferred, avoid phase like enum fields'
+  path: "staging/src/k8s.io/api/core/v1/types.go"
