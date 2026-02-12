@@ -76,6 +76,7 @@ var subTests = map[string]initialTestFunc{
 	"core DRA":                    coreDRA,
 	"ResourceClaim device status": resourceClaimDeviceStatus,
 	"DeviceTaints":                deviceTaints,
+	"DRA extended resources":      extendedResourcesUpgradeDowngrade,
 }
 
 type initialTestFunc func(tCtx ktesting.TContext, builder *drautils.Builder) upgradedTestFunc
@@ -213,7 +214,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		cluster = localupcluster.New(tCtx)
 		localUpClusterEnv := map[string]string{
 			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2,resource.k8s.io/v1alpha3",
-			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRADeviceTaintRules=true,DRADeviceTaints=true",
+			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRADeviceTaintRules=true,DRADeviceTaints=true,DRAExtendedResource=true",
 			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
 		}
 		cluster.Start(tCtx, binDir, localUpClusterEnv)
