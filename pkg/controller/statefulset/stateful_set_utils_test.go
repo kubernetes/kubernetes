@@ -1925,10 +1925,8 @@ func TestCompleteUpdate(t *testing.T) {
 				if status.CurrentReplicas != tc.updatedReplicas {
 					t.Errorf("expected CurrentReplicas to be %d, got %d", tc.updatedReplicas, status.CurrentReplicas)
 				}
-			} else {
-				if status.CurrentRevision != tc.currentRevision {
-					t.Errorf("expected CurrentRevision to remain %q, got %q", tc.currentRevision, status.CurrentRevision)
-				}
+			} else if status.CurrentRevision != tc.currentRevision {
+				t.Errorf("expected CurrentRevision to remain %q, got %q", tc.currentRevision, status.CurrentRevision)
 			}
 		})
 	}
