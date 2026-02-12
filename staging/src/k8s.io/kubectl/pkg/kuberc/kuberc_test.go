@@ -3170,3 +3170,117 @@ credentialPluginPolicy: ""
 		})
 	}
 }
+
+func TestGetAliasesForDisplay(t *testing.T) {
+	tests := map[string]struct {
+		kubercFile      string
+		kubercEnv       string
+		expectedAliases []config.AliasOverride
+		expectNil       bool
+	}{
+		"returns aliases from kuberc file": {
+			kubercFile: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+aliases:
+- name: getn
+  command: get
+  prependArgs:
+  - nodes
+  options:
+  - name: output
+    default: wide
+- name: runx
+  command: run
+  options:
+  - name: image
+    default: nginx
+  appendArgs:
+  - --
+  - custom-arg
+`,
+			expectedAliases: []config.AliasOverride{
+				{
+					Name:        "getn",
+					Command:     "get",
+					PrependArgs: []string{"nodes"},
+					Options: []config.CommandOptionDefault{
+						{Name: "output", Default: "wide"},
+					},
+				},
+				{
+					Name:    "runx",
+					Command: "run",
+					Options: []config.CommandOptionDefault{
+						{Name: "image", Default: "nginx"},
+					},
+					AppendArgs: []string{"--", "custom-arg"},
+				},
+			},
+		},
+		"returns nil when kuberc has no aliases": {
+			kubercFile: `
+kind: Preference
+apiVersion: kubectl.config.k8s.io/v1beta1
+defaults:
+- command: get
+  options:
+  - name: output
+    default: yaml
+`,
+			expectNil: true,
+		},
+		"returns nil when KUBERC is off": {
+			kubercEnv: "off",
+			expectNil: true,
+		},
+		"returns nil when no kuberc file exists": {
+			expectNil: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Save and restore default kuberc file path
+			defaultRecommendedKubeRCFile := RecommendedKubeRCFile
+			defer func() {
+				RecommendedKubeRCFile = defaultRecommendedKubeRCFile
+			}()
+			RecommendedKubeRCFile = ""
+
+			// Set up kuberc file if provided
+			if len(tc.kubercFile) != 0 {
+				tmpDir := t.TempDir()
+				kubercPath := filepath.Join(tmpDir, "kuberc")
+				require.NoError(t, os.WriteFile(kubercPath, []byte(tc.kubercFile), 0644))
+				t.Setenv("KUBERC", kubercPath)
+			} else if tc.kubercEnv != "" {
+				t.Setenv("KUBERC", tc.kubercEnv)
+			} else {
+				t.Setenv("KUBERC", "")
+			}
+
+			var errOut bytes.Buffer
+			aliases, err := GetAliasesForDisplay(&errOut)
+			require.NoError(t, err)
+
+			if tc.expectNil {
+				require.Nil(t, aliases)
+				return
+			}
+
+			require.Equal(t, len(tc.expectedAliases), len(aliases), "wrong number of aliases")
+			for i, expected := range tc.expectedAliases {
+				require.Equal(t, expected.Name, aliases[i].Name, "wrong alias name")
+				require.Equal(t, expected.Command, aliases[i].Command, "wrong alias command")
+				require.Equal(t, expected.PrependArgs, aliases[i].PrependArgs, "wrong prepend args")
+				require.Equal(t, expected.AppendArgs, aliases[i].AppendArgs, "wrong append args")
+				require.Equal(t, len(expected.Options), len(aliases[i].Options), "wrong number of options")
+				for j, opt := range expected.Options {
+					require.Equal(t, opt.Name, aliases[i].Options[j].Name, "wrong option name")
+					require.Equal(t, opt.Default, aliases[i].Options[j].Default, "wrong option default")
+				}
+			}
+		})
+	}
+}
