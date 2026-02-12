@@ -71,10 +71,10 @@ func (sc *stateCheckpoint) migrateV1CheckpointToV2Checkpoint(src *MemoryManagerC
 		dst.PolicyName = src.PolicyName
 	}
 	if src.MachineState != nil {
-		dst.MachineState = src.MachineState
+		dst.MachineState = src.MachineState.Clone()
 	}
 	if len(src.Entries) > 0 {
-		dst.Entries = src.Entries
+		dst.Entries = src.Entries.Clone()
 	}
 }
 
@@ -130,13 +130,19 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV2() (*MemoryManagerCheckpoin
 	if err == nil {
 		return checkpointV2, nil
 	}
-	if !errors.Is(err, cperrors.ErrCheckpointNotFound) {
-		sc.logger.Error(err, "Could not retrieve V2 checkpoint for memory manager, falling back to V1")
+	if errors.Is(err, cperrors.ErrCheckpointNotFound) {
+		return nil, err
+	}
+
+	// Log the V2 load error and fall back to V1.
+	if errors.Is(err, cperrors.CorruptCheckpointError{}) {
+		sc.logger.Error(err, "V2 checkpoint for memory manager is corrupt, falling back to V1")
+	} else {
+		sc.logger.Info("could not load V2 checkpoint for memory manager, falling back to V1", "err", err)
 	}
 
 	// Try to load as V1.
-	checkpointV1 := newMemoryManagerCheckpointV1()
-	err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV1)
+	checkpointV1, err := sc.loadCheckpointV1()
 	if err != nil {
 		// This will return ErrCheckpointNotFound if it's not found, or a corruption error.
 		return nil, err

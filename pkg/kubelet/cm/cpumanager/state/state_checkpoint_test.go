@@ -370,6 +370,30 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"Restore non-existing checkpoint with PodLevelResourceManagers enabled",
+			"",
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{},
+			true,
+		},
+		{
+			"Restore corrupt checkpoint with PodLevelResourceManagers enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {},
+				"podEntries": {},
+				"checksum": 12345
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"checkpoint is corrupted",
+			&stateMemory{},
+			true,
+		},
 	}
 
 	// create temp dir

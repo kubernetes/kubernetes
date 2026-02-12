@@ -105,7 +105,11 @@ func (sc *stateCheckpoint) migrateV2CheckpointToV3Checkpoint(src *CPUManagerChec
 		dst.DefaultCPUSet = src.DefaultCPUSet
 	}
 	if len(src.Entries) > 0 {
-		dst.Entries = src.Entries
+		dst.Entries = make(map[string]map[string]string, len(src.Entries))
+		for podUID, containerEntries := range src.Entries {
+			dst.Entries[podUID] = make(map[string]string, len(containerEntries))
+			maps.Copy(dst.Entries[podUID], containerEntries)
+		}
 	}
 }
 
@@ -190,8 +194,16 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV3() (*CPUManagerCheckpointV3
 	if err == nil {
 		return checkpointV3, nil
 	}
+	if errors.Is(err, cperrors.ErrCheckpointNotFound) {
+		return nil, err
+	}
+
 	// Log the V3 load error and fall back to V2.
-	sc.logger.Error(err, "could not load V3 checkpoint, falling back to V2")
+	if errors.Is(err, cperrors.CorruptCheckpointError{}) {
+		sc.logger.Error(err, "V3 checkpoint is corrupt, falling back to V2")
+	} else {
+		sc.logger.Info("could not load V3 checkpoint, falling back to V2", "err", err)
+	}
 
 	// Try to load as V2.
 	checkpointV2, err := sc.loadAndMigrateCheckpointV2()
@@ -213,15 +225,22 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV2() (*CPUManagerCheckpointV2
 	if err == nil {
 		return checkpointV2, nil
 	}
+	if errors.Is(err, cperrors.ErrCheckpointNotFound) {
+		return nil, err
+	}
+
 	// Log the V2 load error and fall back to V1.
-	sc.logger.Error(err, "could not load V2 checkpoint, falling back to V1")
+	if errors.Is(err, cperrors.CorruptCheckpointError{}) {
+		sc.logger.Error(err, "V2 checkpoint is corrupt, falling back to V1")
+	} else {
+		sc.logger.Info("could not load V2 checkpoint, falling back to V1", "err", err)
+	}
 
 	// Try to load as V1.
-	checkpointV1 := newCPUManagerCheckpointV1()
-	err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV1)
+	checkpointV1, err := sc.loadCheckpointV1()
 	if err == nil {
 		// Loaded V1, now migrate V1 -> V2.
-		sc.logger.Info("migrating cpu manager checkpoint from v1 to v3")
+		sc.logger.Info("migrating cpu manager checkpoint from v1 to v2")
 		tmpV2 := newCPUManagerCheckpointV2()
 		if migrationErr := sc.migrateV1CheckpointToV2Checkpoint(checkpointV1, tmpV2); migrationErr != nil {
 			return nil, fmt.Errorf("failed to migrate checkpoint from v1 to v2: %w", migrationErr)
@@ -231,6 +250,15 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV2() (*CPUManagerCheckpointV2
 
 	// All attempts failed. Return the last error we got (from the V1 read attempt).
 	return nil, err
+}
+
+func (sc *stateCheckpoint) loadCheckpointV1() (*CPUManagerCheckpointV1, error) {
+	checkpointV1 := newCPUManagerCheckpointV1()
+	err := sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV1)
+	if err != nil {
+		return nil, err
+	}
+	return checkpointV1, nil
 }
 
 // saves state to a checkpoint, caller is responsible for locking
