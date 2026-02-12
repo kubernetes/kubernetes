@@ -4399,7 +4399,6 @@ type PodSpec struct {
 	// When set to false, a new userns is created for the pod. Setting false is useful for
 	// mitigating container breakout vulnerabilities even allowing users to run their
 	// containers as root without actually having root privileges on the host.
-	// This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.
 	// +k8s:conversion-gen=false
 	// +optional
 	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
@@ -6606,7 +6605,6 @@ type NodeRuntimeHandlerFeatures struct {
 	// +optional
 	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty" protobuf:"varint,1,opt,name=recursiveReadOnlyMounts"`
 	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
-	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *bool `json:"userNamespaces,omitempty" protobuf:"varint,2,opt,name=userNamespaces"`
 }
@@ -6777,7 +6775,6 @@ type NodeStatus struct {
 	// +optional
 	Config *NodeConfigStatus `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
 	// The available runtime handlers.
-	// +featureGate=UserNamespacesSupport
 	// +optional
 	// +listType=atomic
 	RuntimeHandlers []NodeRuntimeHandler `json:"runtimeHandlers,omitempty" protobuf:"bytes,12,rep,name=runtimeHandlers"`
