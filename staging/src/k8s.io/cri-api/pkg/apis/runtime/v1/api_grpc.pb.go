@@ -58,11 +58,13 @@ const (
 	RuntimeService_RemovePodSandbox_FullMethodName          = "/runtime.v1.RuntimeService/RemovePodSandbox"
 	RuntimeService_PodSandboxStatus_FullMethodName          = "/runtime.v1.RuntimeService/PodSandboxStatus"
 	RuntimeService_ListPodSandbox_FullMethodName            = "/runtime.v1.RuntimeService/ListPodSandbox"
+	RuntimeService_StreamPodSandboxes_FullMethodName        = "/runtime.v1.RuntimeService/StreamPodSandboxes"
 	RuntimeService_CreateContainer_FullMethodName           = "/runtime.v1.RuntimeService/CreateContainer"
 	RuntimeService_StartContainer_FullMethodName            = "/runtime.v1.RuntimeService/StartContainer"
 	RuntimeService_StopContainer_FullMethodName             = "/runtime.v1.RuntimeService/StopContainer"
 	RuntimeService_RemoveContainer_FullMethodName           = "/runtime.v1.RuntimeService/RemoveContainer"
 	RuntimeService_ListContainers_FullMethodName            = "/runtime.v1.RuntimeService/ListContainers"
+	RuntimeService_StreamContainers_FullMethodName          = "/runtime.v1.RuntimeService/StreamContainers"
 	RuntimeService_ContainerStatus_FullMethodName           = "/runtime.v1.RuntimeService/ContainerStatus"
 	RuntimeService_UpdateContainerResources_FullMethodName  = "/runtime.v1.RuntimeService/UpdateContainerResources"
 	RuntimeService_ReopenContainerLog_FullMethodName        = "/runtime.v1.RuntimeService/ReopenContainerLog"
@@ -72,14 +74,17 @@ const (
 	RuntimeService_PortForward_FullMethodName               = "/runtime.v1.RuntimeService/PortForward"
 	RuntimeService_ContainerStats_FullMethodName            = "/runtime.v1.RuntimeService/ContainerStats"
 	RuntimeService_ListContainerStats_FullMethodName        = "/runtime.v1.RuntimeService/ListContainerStats"
+	RuntimeService_StreamContainerStats_FullMethodName      = "/runtime.v1.RuntimeService/StreamContainerStats"
 	RuntimeService_PodSandboxStats_FullMethodName           = "/runtime.v1.RuntimeService/PodSandboxStats"
 	RuntimeService_ListPodSandboxStats_FullMethodName       = "/runtime.v1.RuntimeService/ListPodSandboxStats"
+	RuntimeService_StreamPodSandboxStats_FullMethodName     = "/runtime.v1.RuntimeService/StreamPodSandboxStats"
 	RuntimeService_UpdateRuntimeConfig_FullMethodName       = "/runtime.v1.RuntimeService/UpdateRuntimeConfig"
 	RuntimeService_Status_FullMethodName                    = "/runtime.v1.RuntimeService/Status"
 	RuntimeService_CheckpointContainer_FullMethodName       = "/runtime.v1.RuntimeService/CheckpointContainer"
 	RuntimeService_GetContainerEvents_FullMethodName        = "/runtime.v1.RuntimeService/GetContainerEvents"
 	RuntimeService_ListMetricDescriptors_FullMethodName     = "/runtime.v1.RuntimeService/ListMetricDescriptors"
 	RuntimeService_ListPodSandboxMetrics_FullMethodName     = "/runtime.v1.RuntimeService/ListPodSandboxMetrics"
+	RuntimeService_StreamPodSandboxMetrics_FullMethodName   = "/runtime.v1.RuntimeService/StreamPodSandboxMetrics"
 	RuntimeService_RuntimeConfig_FullMethodName             = "/runtime.v1.RuntimeService/RuntimeConfig"
 	RuntimeService_UpdatePodSandboxResources_FullMethodName = "/runtime.v1.RuntimeService/UpdatePodSandboxResources"
 )
@@ -115,6 +120,12 @@ type RuntimeServiceClient interface {
 	PodSandboxStatus(ctx context.Context, in *PodSandboxStatusRequest, opts ...grpc.CallOption) (*PodSandboxStatusResponse, error)
 	// ListPodSandbox returns a list of PodSandboxes.
 	ListPodSandbox(ctx context.Context, in *ListPodSandboxRequest, opts ...grpc.CallOption) (*ListPodSandboxResponse, error)
+	// StreamPodSandboxes returns a stream of PodSandboxes.
+	// This is an alternative to ListPodSandbox that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many pods.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamPodSandboxes(ctx context.Context, in *StreamPodSandboxesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamPodSandboxesResponse], error)
 	// CreateContainer creates a new container in specified PodSandbox
 	CreateContainer(ctx context.Context, in *CreateContainerRequest, opts ...grpc.CallOption) (*CreateContainerResponse, error)
 	// StartContainer starts the container.
@@ -132,6 +143,12 @@ type RuntimeServiceClient interface {
 	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
 	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
+	// StreamContainers returns a stream of containers.
+	// This is an alternative to ListContainers that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many containers.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamContainers(ctx context.Context, in *StreamContainersRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamContainersResponse], error)
 	// ContainerStatus returns status of the container. If the container is not
 	// present, returns an error.
 	ContainerStatus(ctx context.Context, in *ContainerStatusRequest, opts ...grpc.CallOption) (*ContainerStatusResponse, error)
@@ -157,11 +174,23 @@ type RuntimeServiceClient interface {
 	ContainerStats(ctx context.Context, in *ContainerStatsRequest, opts ...grpc.CallOption) (*ContainerStatsResponse, error)
 	// ListContainerStats returns stats of all running containers.
 	ListContainerStats(ctx context.Context, in *ListContainerStatsRequest, opts ...grpc.CallOption) (*ListContainerStatsResponse, error)
+	// StreamContainerStats returns a stream of container stats.
+	// This is an alternative to ListContainerStats that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many containers.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamContainerStats(ctx context.Context, in *StreamContainerStatsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamContainerStatsResponse], error)
 	// PodSandboxStats returns stats of the pod sandbox. If the pod sandbox does not
 	// exist, the call returns an error.
 	PodSandboxStats(ctx context.Context, in *PodSandboxStatsRequest, opts ...grpc.CallOption) (*PodSandboxStatsResponse, error)
 	// ListPodSandboxStats returns stats of the pod sandboxes matching a filter.
 	ListPodSandboxStats(ctx context.Context, in *ListPodSandboxStatsRequest, opts ...grpc.CallOption) (*ListPodSandboxStatsResponse, error)
+	// StreamPodSandboxStats returns a stream of pod sandbox stats.
+	// This is an alternative to ListPodSandboxStats that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many pods.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamPodSandboxStats(ctx context.Context, in *StreamPodSandboxStatsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamPodSandboxStatsResponse], error)
 	// UpdateRuntimeConfig updates the runtime configuration based on the given request.
 	UpdateRuntimeConfig(ctx context.Context, in *UpdateRuntimeConfigRequest, opts ...grpc.CallOption) (*UpdateRuntimeConfigResponse, error)
 	// Status returns the status of the runtime.
@@ -178,6 +207,12 @@ type RuntimeServiceClient interface {
 	ListMetricDescriptors(ctx context.Context, in *ListMetricDescriptorsRequest, opts ...grpc.CallOption) (*ListMetricDescriptorsResponse, error)
 	// ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
 	ListPodSandboxMetrics(ctx context.Context, in *ListPodSandboxMetricsRequest, opts ...grpc.CallOption) (*ListPodSandboxMetricsResponse, error)
+	// StreamPodSandboxMetrics returns a stream of pod sandbox metrics.
+	// This is an alternative to ListPodSandboxMetrics that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many pods.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamPodSandboxMetrics(ctx context.Context, in *StreamPodSandboxMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamPodSandboxMetricsResponse], error)
 	// RuntimeConfig returns configuration information of the runtime.
 	// A couple of notes:
 	//   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
@@ -262,6 +297,25 @@ func (c *runtimeServiceClient) ListPodSandbox(ctx context.Context, in *ListPodSa
 	return out, nil
 }
 
+func (c *runtimeServiceClient) StreamPodSandboxes(ctx context.Context, in *StreamPodSandboxesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamPodSandboxesResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[0], RuntimeService_StreamPodSandboxes_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamPodSandboxesRequest, StreamPodSandboxesResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamPodSandboxesClient = grpc.ServerStreamingClient[StreamPodSandboxesResponse]
+
 func (c *runtimeServiceClient) CreateContainer(ctx context.Context, in *CreateContainerRequest, opts ...grpc.CallOption) (*CreateContainerResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateContainerResponse)
@@ -311,6 +365,25 @@ func (c *runtimeServiceClient) ListContainers(ctx context.Context, in *ListConta
 	}
 	return out, nil
 }
+
+func (c *runtimeServiceClient) StreamContainers(ctx context.Context, in *StreamContainersRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamContainersResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[1], RuntimeService_StreamContainers_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamContainersRequest, StreamContainersResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamContainersClient = grpc.ServerStreamingClient[StreamContainersResponse]
 
 func (c *runtimeServiceClient) ContainerStatus(ctx context.Context, in *ContainerStatusRequest, opts ...grpc.CallOption) (*ContainerStatusResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -402,6 +475,25 @@ func (c *runtimeServiceClient) ListContainerStats(ctx context.Context, in *ListC
 	return out, nil
 }
 
+func (c *runtimeServiceClient) StreamContainerStats(ctx context.Context, in *StreamContainerStatsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamContainerStatsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[2], RuntimeService_StreamContainerStats_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamContainerStatsRequest, StreamContainerStatsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamContainerStatsClient = grpc.ServerStreamingClient[StreamContainerStatsResponse]
+
 func (c *runtimeServiceClient) PodSandboxStats(ctx context.Context, in *PodSandboxStatsRequest, opts ...grpc.CallOption) (*PodSandboxStatsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PodSandboxStatsResponse)
@@ -421,6 +513,25 @@ func (c *runtimeServiceClient) ListPodSandboxStats(ctx context.Context, in *List
 	}
 	return out, nil
 }
+
+func (c *runtimeServiceClient) StreamPodSandboxStats(ctx context.Context, in *StreamPodSandboxStatsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamPodSandboxStatsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[3], RuntimeService_StreamPodSandboxStats_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamPodSandboxStatsRequest, StreamPodSandboxStatsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamPodSandboxStatsClient = grpc.ServerStreamingClient[StreamPodSandboxStatsResponse]
 
 func (c *runtimeServiceClient) UpdateRuntimeConfig(ctx context.Context, in *UpdateRuntimeConfigRequest, opts ...grpc.CallOption) (*UpdateRuntimeConfigResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -454,7 +565,7 @@ func (c *runtimeServiceClient) CheckpointContainer(ctx context.Context, in *Chec
 
 func (c *runtimeServiceClient) GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[0], RuntimeService_GetContainerEvents_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[4], RuntimeService_GetContainerEvents_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -490,6 +601,25 @@ func (c *runtimeServiceClient) ListPodSandboxMetrics(ctx context.Context, in *Li
 	}
 	return out, nil
 }
+
+func (c *runtimeServiceClient) StreamPodSandboxMetrics(ctx context.Context, in *StreamPodSandboxMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamPodSandboxMetricsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[5], RuntimeService_StreamPodSandboxMetrics_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamPodSandboxMetricsRequest, StreamPodSandboxMetricsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamPodSandboxMetricsClient = grpc.ServerStreamingClient[StreamPodSandboxMetricsResponse]
 
 func (c *runtimeServiceClient) RuntimeConfig(ctx context.Context, in *RuntimeConfigRequest, opts ...grpc.CallOption) (*RuntimeConfigResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -542,6 +672,12 @@ type RuntimeServiceServer interface {
 	PodSandboxStatus(context.Context, *PodSandboxStatusRequest) (*PodSandboxStatusResponse, error)
 	// ListPodSandbox returns a list of PodSandboxes.
 	ListPodSandbox(context.Context, *ListPodSandboxRequest) (*ListPodSandboxResponse, error)
+	// StreamPodSandboxes returns a stream of PodSandboxes.
+	// This is an alternative to ListPodSandbox that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many pods.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamPodSandboxes(*StreamPodSandboxesRequest, grpc.ServerStreamingServer[StreamPodSandboxesResponse]) error
 	// CreateContainer creates a new container in specified PodSandbox
 	CreateContainer(context.Context, *CreateContainerRequest) (*CreateContainerResponse, error)
 	// StartContainer starts the container.
@@ -559,6 +695,12 @@ type RuntimeServiceServer interface {
 	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
 	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
+	// StreamContainers returns a stream of containers.
+	// This is an alternative to ListContainers that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many containers.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamContainers(*StreamContainersRequest, grpc.ServerStreamingServer[StreamContainersResponse]) error
 	// ContainerStatus returns status of the container. If the container is not
 	// present, returns an error.
 	ContainerStatus(context.Context, *ContainerStatusRequest) (*ContainerStatusResponse, error)
@@ -584,11 +726,23 @@ type RuntimeServiceServer interface {
 	ContainerStats(context.Context, *ContainerStatsRequest) (*ContainerStatsResponse, error)
 	// ListContainerStats returns stats of all running containers.
 	ListContainerStats(context.Context, *ListContainerStatsRequest) (*ListContainerStatsResponse, error)
+	// StreamContainerStats returns a stream of container stats.
+	// This is an alternative to ListContainerStats that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many containers.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamContainerStats(*StreamContainerStatsRequest, grpc.ServerStreamingServer[StreamContainerStatsResponse]) error
 	// PodSandboxStats returns stats of the pod sandbox. If the pod sandbox does not
 	// exist, the call returns an error.
 	PodSandboxStats(context.Context, *PodSandboxStatsRequest) (*PodSandboxStatsResponse, error)
 	// ListPodSandboxStats returns stats of the pod sandboxes matching a filter.
 	ListPodSandboxStats(context.Context, *ListPodSandboxStatsRequest) (*ListPodSandboxStatsResponse, error)
+	// StreamPodSandboxStats returns a stream of pod sandbox stats.
+	// This is an alternative to ListPodSandboxStats that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many pods.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamPodSandboxStats(*StreamPodSandboxStatsRequest, grpc.ServerStreamingServer[StreamPodSandboxStatsResponse]) error
 	// UpdateRuntimeConfig updates the runtime configuration based on the given request.
 	UpdateRuntimeConfig(context.Context, *UpdateRuntimeConfigRequest) (*UpdateRuntimeConfigResponse, error)
 	// Status returns the status of the runtime.
@@ -605,6 +759,12 @@ type RuntimeServiceServer interface {
 	ListMetricDescriptors(context.Context, *ListMetricDescriptorsRequest) (*ListMetricDescriptorsResponse, error)
 	// ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
 	ListPodSandboxMetrics(context.Context, *ListPodSandboxMetricsRequest) (*ListPodSandboxMetricsResponse, error)
+	// StreamPodSandboxMetrics returns a stream of pod sandbox metrics.
+	// This is an alternative to ListPodSandboxMetrics that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many pods.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamPodSandboxMetrics(*StreamPodSandboxMetricsRequest, grpc.ServerStreamingServer[StreamPodSandboxMetricsResponse]) error
 	// RuntimeConfig returns configuration information of the runtime.
 	// A couple of notes:
 	//   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
@@ -647,6 +807,9 @@ func (UnimplementedRuntimeServiceServer) PodSandboxStatus(context.Context, *PodS
 func (UnimplementedRuntimeServiceServer) ListPodSandbox(context.Context, *ListPodSandboxRequest) (*ListPodSandboxResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListPodSandbox not implemented")
 }
+func (UnimplementedRuntimeServiceServer) StreamPodSandboxes(*StreamPodSandboxesRequest, grpc.ServerStreamingServer[StreamPodSandboxesResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamPodSandboxes not implemented")
+}
 func (UnimplementedRuntimeServiceServer) CreateContainer(context.Context, *CreateContainerRequest) (*CreateContainerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateContainer not implemented")
 }
@@ -661,6 +824,9 @@ func (UnimplementedRuntimeServiceServer) RemoveContainer(context.Context, *Remov
 }
 func (UnimplementedRuntimeServiceServer) ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListContainers not implemented")
+}
+func (UnimplementedRuntimeServiceServer) StreamContainers(*StreamContainersRequest, grpc.ServerStreamingServer[StreamContainersResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamContainers not implemented")
 }
 func (UnimplementedRuntimeServiceServer) ContainerStatus(context.Context, *ContainerStatusRequest) (*ContainerStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ContainerStatus not implemented")
@@ -689,11 +855,17 @@ func (UnimplementedRuntimeServiceServer) ContainerStats(context.Context, *Contai
 func (UnimplementedRuntimeServiceServer) ListContainerStats(context.Context, *ListContainerStatsRequest) (*ListContainerStatsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListContainerStats not implemented")
 }
+func (UnimplementedRuntimeServiceServer) StreamContainerStats(*StreamContainerStatsRequest, grpc.ServerStreamingServer[StreamContainerStatsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamContainerStats not implemented")
+}
 func (UnimplementedRuntimeServiceServer) PodSandboxStats(context.Context, *PodSandboxStatsRequest) (*PodSandboxStatsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PodSandboxStats not implemented")
 }
 func (UnimplementedRuntimeServiceServer) ListPodSandboxStats(context.Context, *ListPodSandboxStatsRequest) (*ListPodSandboxStatsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListPodSandboxStats not implemented")
+}
+func (UnimplementedRuntimeServiceServer) StreamPodSandboxStats(*StreamPodSandboxStatsRequest, grpc.ServerStreamingServer[StreamPodSandboxStatsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamPodSandboxStats not implemented")
 }
 func (UnimplementedRuntimeServiceServer) UpdateRuntimeConfig(context.Context, *UpdateRuntimeConfigRequest) (*UpdateRuntimeConfigResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateRuntimeConfig not implemented")
@@ -712,6 +884,9 @@ func (UnimplementedRuntimeServiceServer) ListMetricDescriptors(context.Context, 
 }
 func (UnimplementedRuntimeServiceServer) ListPodSandboxMetrics(context.Context, *ListPodSandboxMetricsRequest) (*ListPodSandboxMetricsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListPodSandboxMetrics not implemented")
+}
+func (UnimplementedRuntimeServiceServer) StreamPodSandboxMetrics(*StreamPodSandboxMetricsRequest, grpc.ServerStreamingServer[StreamPodSandboxMetricsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamPodSandboxMetrics not implemented")
 }
 func (UnimplementedRuntimeServiceServer) RuntimeConfig(context.Context, *RuntimeConfigRequest) (*RuntimeConfigResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RuntimeConfig not implemented")
@@ -848,6 +1023,17 @@ func _RuntimeService_ListPodSandbox_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RuntimeService_StreamPodSandboxes_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamPodSandboxesRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(RuntimeServiceServer).StreamPodSandboxes(m, &grpc.GenericServerStream[StreamPodSandboxesRequest, StreamPodSandboxesResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamPodSandboxesServer = grpc.ServerStreamingServer[StreamPodSandboxesResponse]
+
 func _RuntimeService_CreateContainer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateContainerRequest)
 	if err := dec(in); err != nil {
@@ -937,6 +1123,17 @@ func _RuntimeService_ListContainers_Handler(srv interface{}, ctx context.Context
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _RuntimeService_StreamContainers_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamContainersRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(RuntimeServiceServer).StreamContainers(m, &grpc.GenericServerStream[StreamContainersRequest, StreamContainersResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamContainersServer = grpc.ServerStreamingServer[StreamContainersResponse]
 
 func _RuntimeService_ContainerStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ContainerStatusRequest)
@@ -1100,6 +1297,17 @@ func _RuntimeService_ListContainerStats_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RuntimeService_StreamContainerStats_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamContainerStatsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(RuntimeServiceServer).StreamContainerStats(m, &grpc.GenericServerStream[StreamContainerStatsRequest, StreamContainerStatsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamContainerStatsServer = grpc.ServerStreamingServer[StreamContainerStatsResponse]
+
 func _RuntimeService_PodSandboxStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PodSandboxStatsRequest)
 	if err := dec(in); err != nil {
@@ -1135,6 +1343,17 @@ func _RuntimeService_ListPodSandboxStats_Handler(srv interface{}, ctx context.Co
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _RuntimeService_StreamPodSandboxStats_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamPodSandboxStatsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(RuntimeServiceServer).StreamPodSandboxStats(m, &grpc.GenericServerStream[StreamPodSandboxStatsRequest, StreamPodSandboxStatsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamPodSandboxStatsServer = grpc.ServerStreamingServer[StreamPodSandboxStatsResponse]
 
 func _RuntimeService_UpdateRuntimeConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateRuntimeConfigRequest)
@@ -1236,6 +1455,17 @@ func _RuntimeService_ListPodSandboxMetrics_Handler(srv interface{}, ctx context.
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _RuntimeService_StreamPodSandboxMetrics_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamPodSandboxMetricsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(RuntimeServiceServer).StreamPodSandboxMetrics(m, &grpc.GenericServerStream[StreamPodSandboxMetricsRequest, StreamPodSandboxMetricsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuntimeService_StreamPodSandboxMetricsServer = grpc.ServerStreamingServer[StreamPodSandboxMetricsResponse]
 
 func _RuntimeService_RuntimeConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RuntimeConfigRequest)
@@ -1399,8 +1629,33 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 	},
 	Streams: []grpc.StreamDesc{
 		{
+			StreamName:    "StreamPodSandboxes",
+			Handler:       _RuntimeService_StreamPodSandboxes_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamContainers",
+			Handler:       _RuntimeService_StreamContainers_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamContainerStats",
+			Handler:       _RuntimeService_StreamContainerStats_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamPodSandboxStats",
+			Handler:       _RuntimeService_StreamPodSandboxStats_Handler,
+			ServerStreams: true,
+		},
+		{
 			StreamName:    "GetContainerEvents",
 			Handler:       _RuntimeService_GetContainerEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamPodSandboxMetrics",
+			Handler:       _RuntimeService_StreamPodSandboxMetrics_Handler,
 			ServerStreams: true,
 		},
 	},
@@ -1408,11 +1663,12 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ImageService_ListImages_FullMethodName  = "/runtime.v1.ImageService/ListImages"
-	ImageService_ImageStatus_FullMethodName = "/runtime.v1.ImageService/ImageStatus"
-	ImageService_PullImage_FullMethodName   = "/runtime.v1.ImageService/PullImage"
-	ImageService_RemoveImage_FullMethodName = "/runtime.v1.ImageService/RemoveImage"
-	ImageService_ImageFsInfo_FullMethodName = "/runtime.v1.ImageService/ImageFsInfo"
+	ImageService_ListImages_FullMethodName   = "/runtime.v1.ImageService/ListImages"
+	ImageService_StreamImages_FullMethodName = "/runtime.v1.ImageService/StreamImages"
+	ImageService_ImageStatus_FullMethodName  = "/runtime.v1.ImageService/ImageStatus"
+	ImageService_PullImage_FullMethodName    = "/runtime.v1.ImageService/PullImage"
+	ImageService_RemoveImage_FullMethodName  = "/runtime.v1.ImageService/RemoveImage"
+	ImageService_ImageFsInfo_FullMethodName  = "/runtime.v1.ImageService/ImageFsInfo"
 )
 
 // ImageServiceClient is the client API for ImageService service.
@@ -1423,6 +1679,12 @@ const (
 type ImageServiceClient interface {
 	// ListImages lists existing images.
 	ListImages(ctx context.Context, in *ListImagesRequest, opts ...grpc.CallOption) (*ListImagesResponse, error)
+	// StreamImages returns a stream of images.
+	// This is an alternative to ListImages that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many images.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamImages(ctx context.Context, in *StreamImagesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamImagesResponse], error)
 	// ImageStatus returns the status of the image. If the image is not
 	// present, returns a response with ImageStatusResponse.Image set to
 	// nil.
@@ -1462,6 +1724,25 @@ func (c *imageServiceClient) ListImages(ctx context.Context, in *ListImagesReque
 	}
 	return out, nil
 }
+
+func (c *imageServiceClient) StreamImages(ctx context.Context, in *StreamImagesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamImagesResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ImageService_ServiceDesc.Streams[0], ImageService_StreamImages_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamImagesRequest, StreamImagesResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ImageService_StreamImagesClient = grpc.ServerStreamingClient[StreamImagesResponse]
 
 func (c *imageServiceClient) ImageStatus(ctx context.Context, in *ImageStatusRequest, opts ...grpc.CallOption) (*ImageStatusResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -1511,6 +1792,12 @@ func (c *imageServiceClient) ImageFsInfo(ctx context.Context, in *ImageFsInfoReq
 type ImageServiceServer interface {
 	// ListImages lists existing images.
 	ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error)
+	// StreamImages returns a stream of images.
+	// This is an alternative to ListImages that streams results one item at a time,
+	// avoiding the gRPC message size limit for nodes with many images.
+	// Feature gate: CRIListStreaming
+	// See https://kep.k8s.io/5825 for more details.
+	StreamImages(*StreamImagesRequest, grpc.ServerStreamingServer[StreamImagesResponse]) error
 	// ImageStatus returns the status of the image. If the image is not
 	// present, returns a response with ImageStatusResponse.Image set to
 	// nil.
@@ -1543,6 +1830,9 @@ type UnimplementedImageServiceServer struct{}
 
 func (UnimplementedImageServiceServer) ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListImages not implemented")
+}
+func (UnimplementedImageServiceServer) StreamImages(*StreamImagesRequest, grpc.ServerStreamingServer[StreamImagesResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamImages not implemented")
 }
 func (UnimplementedImageServiceServer) ImageStatus(context.Context, *ImageStatusRequest) (*ImageStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ImageStatus not implemented")
@@ -1594,6 +1884,17 @@ func _ImageService_ListImages_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _ImageService_StreamImages_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamImagesRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ImageServiceServer).StreamImages(m, &grpc.GenericServerStream[StreamImagesRequest, StreamImagesResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ImageService_StreamImagesServer = grpc.ServerStreamingServer[StreamImagesResponse]
 
 func _ImageService_ImageStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ImageStatusRequest)
@@ -1695,6 +1996,12 @@ var ImageService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ImageService_ImageFsInfo_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamImages",
+			Handler:       _ImageService_StreamImages_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto",
 }
