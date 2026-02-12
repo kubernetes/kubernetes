@@ -46,6 +46,14 @@ type StructuralOrBool struct {
 
 // +k8s:deepcopy-gen=true
 
+// ExternalDocumentation allows referencing an external resource for extended documentation.
+type ExternalDocumentation struct {
+	Description string
+	URL         string
+}
+
+// +k8s:deepcopy-gen=true
+
 // Generic contains the generic schema fields not allowed in value validation.
 type Generic struct {
 	Description string
@@ -53,10 +61,11 @@ type Generic struct {
 	// It can be object, array, number, integer, boolean, string.
 	// It is optional only if x-kubernetes-preserve-unknown-fields
 	// or x-kubernetes-int-or-string is true.
-	Type     string
-	Title    string
-	Default  JSON
-	Nullable bool
+	Type         string
+	Title        string
+	Default      JSON
+	Nullable     bool
+	ExternalDocs *ExternalDocumentation
 }
 
 // +k8s:deepcopy-gen=true
