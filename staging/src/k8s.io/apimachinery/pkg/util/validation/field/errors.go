@@ -100,7 +100,7 @@ var omitValue = OmitValueType{}
 func (e *Error) ErrorBody() string {
 	var s string
 	switch e.Type {
-	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeInternal:
+	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeTooShort, ErrorTypeInternal:
 		s = e.Type.String()
 	case ErrorTypeInvalid, ErrorTypeTypeInvalid, ErrorTypeNotSupported,
 		ErrorTypeNotFound, ErrorTypeDuplicate, ErrorTypeTooMany:
@@ -197,6 +197,10 @@ const (
 	ErrorTypeInternal ErrorType = "InternalError"
 	// ErrorTypeTypeInvalid is for the value did not match the schema type for that field
 	ErrorTypeTypeInvalid ErrorType = "FieldValueTypeInvalid"
+	// ErrorTypeTooShort is used to report that the given value is too short.
+	// This is similar to ErrorTypeInvalid, but the error will not include the
+	// too-short value. See TooShort().
+	ErrorTypeTooShort ErrorType = "FieldValueTooShort"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
@@ -222,6 +226,8 @@ func (t ErrorType) String() string {
 		return "Internal error"
 	case ErrorTypeTypeInvalid:
 		return "Invalid value"
+	case ErrorTypeTooShort:
+		return "Too short"
 	default:
 		return fmt.Sprintf("<unknown error %q>", string(t))
 	}
@@ -383,6 +389,29 @@ func InternalError(field *Path, err error) *Error {
 		Field:    field.String(),
 		BadValue: err,
 		Detail:   err.Error(),
+	}
+}
+
+// TooShort returns a *Error indicating "too short".  This is used to report that
+// the given value is too short. This is similar to Invalid, but the returned
+// error will not include the too-short value. If minLength is non-negative, it will
+// be included in the message. The value argument is not used.
+func TooShort(field *Path, _ interface{}, minLength int) *Error {
+	var msg string
+	if minLength >= 0 {
+		bs := "bytes"
+		if minLength == 1 {
+			bs = "byte"
+		}
+		msg = fmt.Sprintf("must be at least %d %s", minLength, bs)
+	} else {
+		msg = "value is too short"
+	}
+	return &Error{
+		Type:     ErrorTypeTooShort,
+		Field:    field.String(),
+		BadValue: "<value omitted>",
+		Detail:   msg,
 	}
 }
 
