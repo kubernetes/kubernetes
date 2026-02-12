@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onsi/gomega"
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
@@ -30,6 +29,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -2183,12 +2184,14 @@ func TestEnqueueIfNotBackingOffPreventsBackoffInflation(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(5, labelMap)
-	client := fake.NewSimpleClientset(rs)
+	client := fake.NewClientset(rs)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(t, client, stopCh, BurstReplicas)
 
-	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
+	if err := informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs); err != nil {
+		t.Fatalf("failed to add ReplicaSet to indexer: %v", err)
+	}
 
 	fakePodControl := controller.FakePodControl{Err: fmt.Errorf("quota exceeded")}
 	manager.podControl = &fakePodControl
@@ -2217,7 +2220,7 @@ func TestEnqueueIfNotBackingOffPreventsBackoffInflation(t *testing.T) {
 
 	// Simulate a burst of event-driven enqueue calls.
 	pod := newPod("event-pod", rs, v1.PodRunning, nil, true)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		manager.enqueueRS(rs)
 		manager.addPod(logger, pod)
 		manager.deletePod(logger, pod)
