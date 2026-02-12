@@ -465,6 +465,9 @@
           "description": "spec defines the desired behavior of the ValidatingAdmissionPolicyBinding."
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
