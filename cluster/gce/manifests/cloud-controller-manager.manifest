@@ -23,7 +23,7 @@
 "containers":[
     {
     "name": "cloud-controller-manager",
-    "image": "registry.k8s.io/cloud-provider-gcp/cloud-controller-manager:v35.0.0",
+    "image": "registry.k8s.io/cloud-provider-gcp/cloud-controller-manager:v35.0.2",
     "command": ["/go-runner"],
     "resources": {
       "requests": {
