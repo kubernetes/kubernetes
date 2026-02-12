@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 )
 
 // FakeManager simulates a prober.Manager for testing.
@@ -39,7 +40,7 @@ func (FakeManager) RemovePod(_ *v1.Pod) {}
 func (FakeManager) StopLivenessAndStartup(_ *v1.Pod) {}
 
 // CleanupPods simulates cleaning up Pods.
-func (FakeManager) CleanupPods(_ map[types.UID]sets.Empty) {}
+func (FakeManager) CleanupPods(_ map[types.UID]sets.Empty, _ config.SourceForPodReadyFn) {}
 
 // Start simulates start syncing the probe status
 func (FakeManager) Start() {}
