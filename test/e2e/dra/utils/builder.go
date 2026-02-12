@@ -515,7 +515,12 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 			continue
 		}
 		tCtx.Logf("Deleting %T %s", &pod, klog.KObj(&pod))
-		err := tCtx.Client().CoreV1().Pods(b.namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
+		options := metav1.DeleteOptions{}
+		if !b.driver.WithRealNodes {
+			// Force-delete, no kubelet.
+			options.GracePeriodSeconds = ptr.To(int64(0))
+		}
+		err := tCtx.Client().CoreV1().Pods(b.namespace).Delete(tCtx, pod.Name, options)
 		if !apierrors.IsNotFound(err) {
 			tCtx.ExpectNoError(err, "delete pod")
 		}
