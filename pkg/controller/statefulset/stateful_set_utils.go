@@ -685,7 +685,8 @@ func SetStatefulSetCondition(status *apps.StatefulSetStatus, condition apps.Stat
 		condition.LastTransitionTime = currentCond.LastTransitionTime
 	}
 	newConditions := filterOutStatefulSetCondition(status.Conditions, condition.Type)
-	status.Conditions = append(newConditions, condition)
+	newConditions = append(newConditions, condition)
+	status.Conditions = newConditions
 }
 
 // filterOutStatefulSetCondition returns a new slice of statefulset conditions without conditions with the provided type.

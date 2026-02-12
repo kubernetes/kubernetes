@@ -3990,8 +3990,12 @@ func TestStatefulSetAvailableCondition(t *testing.T) {
 				AvailableReplicas:  tc.availableReplicas,
 				ObservedGeneration: set.Generation,
 			}
-			ssc.UpdateStatefulSet(context.TODO(), set, []*v1.Pod{}, time.Now())
-			ssc.(*defaultStatefulSetControl).updateStatefulSetStatus(context.TODO(), set, &status)
+			if _, err := ssc.UpdateStatefulSet(context.TODO(), set, []*v1.Pod{}, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			if err := ssc.(*defaultStatefulSetControl).updateStatefulSetStatus(context.TODO(), set, &status); err != nil {
+				t.Fatal(err)
+			}
 
 			cond := GetStatefulSetCondition(status, apps.StatefulSetAvailable)
 			if cond == nil || cond.Status != tc.expectedStatus {
