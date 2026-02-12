@@ -27,7 +27,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -719,9 +718,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 			logger.V(2).Info("Pod of StatefulSet is terminating for update",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
 			if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
-				if !errors.IsNotFound(err) {
-					return &status, err
-				}
+				return &status, err
 			}
 			status.CurrentReplicas--
 			return &status, err
@@ -798,9 +795,7 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 				"statefulSet", klog.KObj(set),
 				"pod", klog.KObj(replicas[target]))
 			if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
-				if !errors.IsNotFound(err) {
-					return &status, err
-				}
+				return &status, err
 			}
 			deletedPods++
 			status.CurrentReplicas--
