@@ -301,7 +301,7 @@ func (c *claimTracker) GatherAllocatedState() (*structured.AllocatedState, error
 		// This ensures backward compatibility with the original DRA behavior where devices
 		// could only be allocated exclusively to a single claim.
 		for sharedDeviceID := range allocatedSharedDeviceIDs {
-			allocated.Insert(sharedDeviceID.GetBaseDeviceID())
+			allocated.Insert(sharedDeviceID.GetDeviceID())
 		}
 		// Reset allocatedSharedDeviceIDs and aggregatedCapacity
 		allocatedSharedDeviceIDs = sets.New[structured.SharedDeviceID]()
