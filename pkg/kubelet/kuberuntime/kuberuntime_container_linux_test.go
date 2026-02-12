@@ -342,6 +342,25 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 				MemoryLimitInBytes: 100 * 1024 * 1024,
 			},
 		},
+		{
+			name: "PodLevelResourceManagers disabled, Exclusive CPUs, Non Guaranteed container",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			containerResources: v1.ResourceRequirements{},
+			cpuSets:            map[string]cpuset.CPUSet{},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources:                true,
+				features.PodLevelResourceManagers:         false,
+				features.DisableCPUQuotaWithExclusiveCPUs: true,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 100000,
+				CpuQuota:  200000,
+				CpuShares: 2048,
+			},
+		},
 	}
 
 	for _, test := range tests {
