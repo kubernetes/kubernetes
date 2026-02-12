@@ -5,7 +5,6 @@
         "description": "An API server instance reports the version it can decode and the version it encodes objects to when persisting objects in the backend.",
         "properties": {
           "apiServerID": {
-            "default": "",
             "description": "The ID of the reporting API server.",
             "type": "string"
           },
@@ -19,7 +18,6 @@
             "x-kubernetes-list-type": "set"
           },
           "encodingVersion": {
-            "default": "",
             "description": "The API server encodes the object to this version when persisting it in the backend (e.g., etcd).",
             "type": "string"
           },

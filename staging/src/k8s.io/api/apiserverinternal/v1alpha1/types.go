@@ -71,18 +71,18 @@ type StorageVersionStatus struct {
 type ServerStorageVersion struct {
 	// The ID of the reporting API server.
 	// +required
-	APIServerID string `json:"apiServerID" protobuf:"bytes,1,opt,name=apiServerID"`
+	APIServerID string `json:"apiServerID,omitempty" protobuf:"bytes,1,opt,name=apiServerID"`
 
 	// The API server encodes the object to this version when persisting it in
 	// the backend (e.g., etcd).
 	// +required
-	EncodingVersion string `json:"encodingVersion" protobuf:"bytes,2,opt,name=encodingVersion"`
+	EncodingVersion string `json:"encodingVersion,omitempty" protobuf:"bytes,2,opt,name=encodingVersion"`
 
 	// The API server can decode objects encoded in these versions.
 	// The encodingVersion must be included in the decodableVersions.
 	// +listType=set
 	// +required
-	DecodableVersions []string `json:"decodableVersions" protobuf:"bytes,3,opt,name=decodableVersions"`
+	DecodableVersions []string `json:"decodableVersions,omitempty" protobuf:"bytes,3,opt,name=decodableVersions"`
 
 	// The API server can serve these versions.
 	// DecodableVersions must include all ServedVersions.
