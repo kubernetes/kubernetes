@@ -36,6 +36,7 @@ import (
 	resourcealpha "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -100,6 +101,9 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta2.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta1.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcealpha.SchemeGroupVersion))
+	}
+	if enabledFeatures[features.GenericWorkload] {
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", schedulingv1alpha1.SchemeGroupVersion))
 	}
 	customFlags := []string{
 		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
