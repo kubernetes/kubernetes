@@ -6085,7 +6085,7 @@ func TestGetPodCreationInfoForIndependentIndexes(t *testing.T) {
 }
 
 func TestJobPodLookup(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
@@ -6153,7 +6153,7 @@ func TestJobPodLookup(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job)
-		if jobs := manager.getPodJobs(tc.pod); len(jobs) > 0 {
+		if jobs := manager.getPodJobs(logger, tc.pod); len(jobs) > 0 {
 			if got, want := len(jobs), 1; got != want {
 				t.Errorf("len(jobs) = %v, want %v", got, want)
 			}

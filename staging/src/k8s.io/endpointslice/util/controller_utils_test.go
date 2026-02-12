@@ -29,58 +29,59 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 func TestDetermineNeededServiceUpdates(t *testing.T) {
 	testCases := []struct {
 		name  string
-		a     sets.String
-		b     sets.String
-		union sets.String
-		xor   sets.String
+		a     sets.Set[string]
+		b     sets.Set[string]
+		union sets.Set[string]
+		xor   sets.Set[string]
 	}{
 		{
 			name:  "no services changed",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString("a", "b", "c"),
-			xor:   sets.NewString(),
-			union: sets.NewString("a", "b", "c"),
+			a:     sets.New("a", "b", "c"),
+			b:     sets.New("a", "b", "c"),
+			xor:   nil,
+			union: sets.New("a", "b", "c"),
 		},
 		{
 			name:  "all old services removed, new services added",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString("d", "e", "f"),
-			xor:   sets.NewString("a", "b", "c", "d", "e", "f"),
-			union: sets.NewString("a", "b", "c", "d", "e", "f"),
+			a:     sets.New("a", "b", "c"),
+			b:     sets.New("d", "e", "f"),
+			xor:   sets.New("a", "b", "c", "d", "e", "f"),
+			union: sets.New("a", "b", "c", "d", "e", "f"),
 		},
 		{
 			name:  "all old services removed, no new services added",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString(),
-			xor:   sets.NewString("a", "b", "c"),
-			union: sets.NewString("a", "b", "c"),
+			a:     sets.New("a", "b", "c"),
+			b:     nil,
+			xor:   sets.New("a", "b", "c"),
+			union: sets.New("a", "b", "c"),
 		},
 		{
 			name:  "no old services, but new services added",
-			a:     sets.NewString(),
-			b:     sets.NewString("a", "b", "c"),
-			xor:   sets.NewString("a", "b", "c"),
-			union: sets.NewString("a", "b", "c"),
+			a:     nil,
+			b:     sets.New("a", "b", "c"),
+			xor:   sets.New("a", "b", "c"),
+			union: sets.New("a", "b", "c"),
 		},
 		{
 			name:  "one service removed, one service added, two unchanged",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString("b", "c", "d"),
-			xor:   sets.NewString("a", "d"),
-			union: sets.NewString("a", "b", "c", "d"),
+			a:     sets.New("a", "b", "c"),
+			b:     sets.New("b", "c", "d"),
+			xor:   sets.New("a", "d"),
+			union: sets.New("a", "b", "c", "d"),
 		},
 		{
 			name:  "no services",
-			a:     sets.NewString(),
-			b:     sets.NewString(),
-			xor:   sets.NewString(),
-			union: sets.NewString(),
+			a:     nil,
+			b:     nil,
+			xor:   nil,
+			union: nil,
 		},
 	}
 
@@ -88,12 +89,12 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
 			if !retval.Equal(testCase.xor) {
-				t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
+				t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, sets.List(testCase.xor), sets.List(retval))
 			}
 
 			retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
 			if !retval.Equal(testCase.union) {
-				t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
+				t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, sets.List(testCase.union), sets.List(retval))
 			}
 		})
 	}
@@ -364,37 +365,38 @@ func TestGetPodServicesToUpdate(t *testing.T) {
 	tests := []struct {
 		name   string
 		pod    *v1.Pod
-		expect sets.String
+		expect sets.Set[string]
 	}{
 		{
 			name:   "get servicesMemberships for pod-0",
 			pod:    pods[0],
-			expect: sets.NewString("test/service-0"),
+			expect: sets.New("test/service-0"),
 		},
 		{
 			name:   "get servicesMemberships for pod-1",
 			pod:    pods[1],
-			expect: sets.NewString("test/service-1"),
+			expect: sets.New("test/service-1"),
 		},
 		{
 			name:   "get servicesMemberships for pod-2",
 			pod:    pods[2],
-			expect: sets.NewString("test/service-2"),
+			expect: sets.New("test/service-2"),
 		},
 		{
 			name:   "get servicesMemberships for pod-3",
 			pod:    pods[3],
-			expect: sets.NewString(),
+			expect: nil,
 		},
 		{
 			name:   "get servicesMemberships for pod-4",
 			pod:    pods[4],
-			expect: sets.NewString(),
+			expect: nil,
 		},
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(test.pod, nil))
+			services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(logger, test.pod, nil))
 			if err != nil {
 				t.Errorf("Error from cache.GetServicesToUpdate: %v", err)
 			} else if !services.Equal(test.expect) {
@@ -434,8 +436,9 @@ func BenchmarkGetPodServicesToUpdate(b *testing.B) {
 
 	expect := sets.NewString("test/service-0")
 	b.ResetTimer()
+	logger, _ := ktesting.NewTestContext(b)
 	for i := 0; i < b.N; i++ {
-		services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(pod, nil))
+		services, err := GetServicesToUpdate(fakeInformerFactory.Core().V1().Services().Lister(), GetPodUpdateProjectionKey(logger, pod, nil))
 		if err != nil {
 			b.Fatalf("Error from GetServicesToUpdate(): %v", err)
 		}
