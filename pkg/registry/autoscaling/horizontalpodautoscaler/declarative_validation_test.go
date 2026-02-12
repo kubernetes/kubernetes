@@ -136,6 +136,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "minReplicas"), int32(0), "must be greater than or equal to 1").WithOrigin("minimum"),
 			},
 		},
+		"valid update: ratcheting minReplicas=0 when gate disabled": {
+			oldObj:            makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
+			updateObj:         makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...), tweakMaxReplicas(20)),
+			enableScaleToZero: false,
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
