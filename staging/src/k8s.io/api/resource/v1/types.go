@@ -1214,7 +1214,7 @@ type CELDeviceSelector struct {
 	//       has(device.attributes["gpu.example.com"].model) && device.attributes["gpu.example.com"].model == "A100"
 	//     The has() macro checks if a field exists before accessing it.
 	//
-	//   - Checking domain existence first:
+	//   - Checking domain existence first (still assumes that if the domain exists, it always has the field):
 	//       "gpu.example.com" in device.attributes && device.attributes["gpu.example.com"].model == "A100"
 	//
 	// For more details on CEL Optional Types, see:

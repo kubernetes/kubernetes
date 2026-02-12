@@ -990,9 +990,9 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, 
 			// TODO (future): more detailed errors which reference class resp. claim.
 			enhancedErr := cel.EnhanceRuntimeError(err)
 			if class != nil {
-				return false, fmt.Errorf("class %s: selector #%d: %w", class.Name, i, enhancedErr)
+				return false, fmt.Errorf("class %s: selector #%d: CEL runtime error: %w", class.Name, i, enhancedErr)
 			}
-			return false, fmt.Errorf("claim %s: selector #%d: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, enhancedErr)
+			return false, fmt.Errorf("claim %s: selector #%d: CEL runtime error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, enhancedErr)
 		}
 		if !matches {
 			return false, nil

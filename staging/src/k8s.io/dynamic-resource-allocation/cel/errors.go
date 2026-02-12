@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,25 +28,10 @@ func EnhanceRuntimeError(err error) error {
 		return nil
 	}
 
-	if isNoSuchKeyError(err) {
-		return fmt.Errorf("%s\n\nSee https://pkg.go.dev/k8s.io/api/resource/v1#CELDeviceSelector for documentation on CEL device selectors and how to handle optional fields.",
-			err)
+	if strings.HasPrefix(err.Error(), "no such key:") {
+		return fmt.Errorf("%s. Consider using CEL optional chaining (?), has() macro, or orValue() for optional fields", err)
 	}
 
 	// Not a "no such key" error, return unchanged.
 	return err
-}
-
-// isNoSuchKeyError checks if the error is a "no such key" error from cel-go.
-//
-// The error originates from cel-go's interpreter.resolutionError (an internal type),
-// so we cannot use errors.Is() for type checking. Instead, we check the error message format.
-//
-// The error format is "no such key: <key>" from:
-// https://github.com/google/cel-go/blob/v0.26.0/interpreter/attributes.go#L1422
-func isNoSuchKeyError(err error) bool {
-	if err == nil {
-		return false
-	}
-	return strings.HasPrefix(err.Error(), "no such key:")
 }

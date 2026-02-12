@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,9 +29,9 @@ func TestEnhanceRuntimeError(t *testing.T) {
 		want string
 	}{
 		{
-			name: "no such key error gets enhanced with documentation link",
+			name: "no such key error gets enhanced with usage hint",
 			err:  errors.New("no such key: sharingStrategy"),
-			want: "pkg.go.dev/k8s.io/api/resource/v1#CELDeviceSelector",
+			want: "Consider using CEL optional chaining",
 		},
 		{
 			name: "other error is returned unchanged",
@@ -46,7 +46,7 @@ func TestEnhanceRuntimeError(t *testing.T) {
 		{
 			name: "no such key with domain",
 			err:  errors.New("no such key: model"),
-			want: "pkg.go.dev/k8s.io/api/resource/v1#CELDeviceSelector",
+			want: "Consider using CEL optional chaining",
 		},
 		{
 			name: "no such key includes original message",
