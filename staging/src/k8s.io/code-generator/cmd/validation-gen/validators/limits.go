@@ -30,12 +30,14 @@ const (
 	maxItemsTagName  = "k8s:maxItems"
 	minimumTagName   = "k8s:minimum"
 	maxLengthTagName = "k8s:maxLength"
+	minLengthTagName = "k8s:minLength"
 )
 
 func init() {
 	RegisterTagValidator(maxItemsTagValidator{})
 	RegisterTagValidator(minimumTagValidator{})
 	RegisterTagValidator(maxLengthTagValidator{})
+	RegisterTagValidator(minLengthTagValidator{})
 }
 
 type maxLengthTagValidator struct{}
@@ -193,6 +195,63 @@ func (mtv minimumTagValidator) Docs() TagDoc {
 		Payloads: []TagPayloadDoc{{
 			Description: "<integer>",
 			Docs:        "This field must be greater than or equal to x.",
+		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
+	}
+}
+
+type minLengthTagValidator struct{}
+
+func (minLengthTagValidator) Init(_ Config) {}
+
+func (minLengthTagValidator) TagName() string {
+	return minLengthTagName
+}
+
+var minLengthTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
+
+func (minLengthTagValidator) ValidScopes() sets.Set[Scope] {
+	return minLengthTagValidScopes
+}
+
+var minLengthValidator = types.Name{Package: libValidationPkg, Name: "MinLength"}
+
+func (minLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	var result Validations
+
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
+		return result, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	}
+
+	intVal, err := strconv.Atoi(tag.Value)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	}
+	// The OpenAPI v3.0 spec allows for setting a `minLength: 0` which is equivalent to saying
+	// that the field is required and the empty string (`""`) is a valid value.
+	// Because we use the `+k8s:optional` and `+k8s:required` markers to denote required
+	// vs optional fields, it doesn't make sense to use the `+k8s:minLength` marker
+	// with a value of 0. If the empty string is a valid value for a field, omission of the
+	// `+k8s:minLength` marker on a string is sufficient to signal this.
+	if intVal < 1 {
+		return result, fmt.Errorf("must be greater than or equal to one")
+	}
+	result.AddFunction(Function(minLengthTagName, DefaultFlags, minLengthValidator, intVal))
+	return result, nil
+}
+
+func (mltv minLengthTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            mltv.TagName(),
+		StabilityLevel: TagStabilityLevelAlpha,
+		Scopes:         mltv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that a string field has a minimum length for its value.",
+		Payloads: []TagPayloadDoc{{
+			Description: "<integer>",
+			Docs:        "This field must have a length greater than or equal to x.",
 		}},
 		PayloadsType:     codetags.ValueTypeInt,
 		PayloadsRequired: true,
