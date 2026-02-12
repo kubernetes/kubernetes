@@ -517,7 +517,7 @@ func (o *DeleteOptions) PrintObj(info *resource.Info, response runtime.Object) {
 					finalizersList = append(finalizersList[:3], fmt.Sprintf("and %d more", len(finalizersList)-3))
 				}
 				finalizers := strings.Join(finalizersList, ", ")
-				msg := fmt.Sprintf("Warning: the resource %q has finalizers (%s) and will not be deleted until they are removed.\n", info.Name, finalizers)
+				msg := fmt.Sprintf("Warning: Resource %q has finalizers (%s) and will not be deleted until they are removed.\n", info.Name, finalizers)
 				o.WarningPrinter.Print(msg)
 			}
 		}
