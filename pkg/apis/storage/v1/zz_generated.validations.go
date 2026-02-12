@@ -39,6 +39,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type CSIDriver
+	scheme.AddValidationFunc((*storagev1.CSIDriver)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_CSIDriver(ctx, op, nil /* fldPath */, obj.(*storagev1.CSIDriver), safe.Cast[*storagev1.CSIDriver](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type StorageClass
 	scheme.AddValidationFunc((*storagev1.StorageClass)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -56,6 +64,61 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_CSIDriver validates an instance of CSIDriver according
+// to declarative validation rules in the API schema.
+func Validate_CSIDriver(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.CSIDriver) (errs field.ErrorList) {
+	// field storagev1.CSIDriver.TypeMeta has no validation
+	// field storagev1.CSIDriver.ObjectMeta has no validation
+
+	// field storagev1.CSIDriver.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *storagev1.CSIDriverSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CSIDriverSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *storagev1.CSIDriver) *storagev1.CSIDriverSpec { return &oldObj.Spec }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_CSIDriverSpec validates an instance of CSIDriverSpec according
+// to declarative validation rules in the API schema.
+func Validate_CSIDriverSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.CSIDriverSpec) (errs field.ErrorList) {
+	// field storagev1.CSIDriverSpec.AttachRequired
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *bool, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("attachRequired"), obj.AttachRequired, safe.Field(oldObj, func(oldObj *storagev1.CSIDriverSpec) *bool { return oldObj.AttachRequired }), oldObj != nil)...)
+
+	// field storagev1.CSIDriverSpec.PodInfoOnMount has no validation
+	// field storagev1.CSIDriverSpec.VolumeLifecycleModes has no validation
+	// field storagev1.CSIDriverSpec.StorageCapacity has no validation
+	// field storagev1.CSIDriverSpec.FSGroupPolicy has no validation
+	// field storagev1.CSIDriverSpec.TokenRequests has no validation
+	// field storagev1.CSIDriverSpec.RequiresRepublish has no validation
+	// field storagev1.CSIDriverSpec.SELinuxMount has no validation
+	// field storagev1.CSIDriverSpec.NodeAllocatableUpdatePeriodSeconds has no validation
+	// field storagev1.CSIDriverSpec.ServiceAccountTokenInSecrets has no validation
+	return errs
 }
 
 // Validate_StorageClass validates an instance of StorageClass according
