@@ -21,12 +21,15 @@ import (
 	"os"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/component-base/logs/json/register"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/features"
 	perf "k8s.io/kubernetes/test/integration/scheduler_perf"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMain(m *testing.M) {
@@ -57,14 +60,26 @@ func TestSchedulerPerf(t *testing.T) {
 			// with two sub tests:
 			// - "ga-only": keep disabling optional features
 			// - "default": don't change features
+			var options []perf.SchedulerPerfOption
 			if allocatorName == "stable" {
-				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.DRAAdminAccess:     false,
-					features.DRAPrioritizedList: false,
-				})
+				options = append(options, perf.WithPreRunFn(func(tCtx ktesting.TContext) error {
+					overrides := featuregatetesting.FeatureOverrides{
+						features.DRAAdminAccess:     false,
+						features.DRAPrioritizedList: false,
+					}
+					// If version emulation already caused features to be off,
+					// then we do not need and maybe even cannot turn them
+					// off (pre-alpha = feature doesn't event exist).
+					if utilfeature.DefaultFeatureGate.(featuregate.MutableVersionedFeatureGate).
+						EmulationVersion().AtLeast(version.MustParse("1.34")) {
+						overrides[features.DRAConsumableCapacity] = false
+					}
+					featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, overrides)
+					return nil
+				}))
 			}
 
-			perf.RunIntegrationPerfScheduling(t, "performance-config.yaml")
+			perf.RunIntegrationPerfScheduling(t, "performance-config.yaml", options...)
 		})
 	}
 }

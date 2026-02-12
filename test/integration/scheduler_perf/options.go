@@ -16,21 +16,38 @@ limitations under the License.
 
 package benchmark
 
-import "k8s.io/kubernetes/test/utils/ktesting"
+import (
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/test/utils/ktesting"
+)
 
 type SchedulerPerfOption func(options *schedulerPerfOptions)
 
-// PrepareFn is a function that is called before each workload is run.
-type PrepareFn func(tCtx ktesting.TContext) error
+// HookFn is a function that is called while going through the test execution.
+// The function may record test errors or abort the current test run through tCtx.
+// Alternatively, it may also return a non-nil error.
+type HookFn func(tCtx ktesting.TContext) error
 
 type schedulerPerfOptions struct {
-	prepareFn PrepareFn
+	outOfTreePluginRegistry frameworkruntime.Registry
+	preRunFn                HookFn
+	prepareFn               HookFn
 }
 
 // WithPrepareFn is the option to set a function that is called
 // before each workload is run. (e.g. applying CRDs for custom plugins)
-func WithPrepareFn(prepareFn PrepareFn) SchedulerPerfOption {
+// Scheduler and etcd are started at that point.
+func WithPrepareFn(prepareFn HookFn) SchedulerPerfOption {
 	return func(s *schedulerPerfOptions) {
 		s.prepareFn = prepareFn
+	}
+}
+
+// WithPreRunFn is the option to set a function that is called
+// after configuring the process (logging, feature gates) and
+// before running any code (etcd, scheduler).
+func WithPreRunFn(preRunFn HookFn) SchedulerPerfOption {
+	return func(s *schedulerPerfOptions) {
+		s.preRunFn = preRunFn
 	}
 }

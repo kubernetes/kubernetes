@@ -619,7 +619,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
-func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
+func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
 	tCtx := ktesting.Init(t, initoption.PerTestOutput(UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
 	if !UseTestingLog && doArtifacts {
@@ -687,15 +687,6 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// quit *before* restoring klog settings.
 	framework.GoleakCheck(t)
 
-	// Now that we are ready to run, start
-	// a brand new etcd.
-	logger := tCtx.Logger()
-	if !UseTestingLog {
-		// Associate output going to the global log with the current test.
-		logger = logger.WithName(tCtx.Name())
-	}
-	framework.StartEtcd(logger, t, true)
-
 	// We need to set emulation version for QueueingHints feature gate, which is locked at 1.34.
 	// Only emulate v1.33 when QueueingHints is explicitly disabled.
 	if qhEnabled, exists := featureGates[features.SchedulerQueueingHints]; exists && !qhEnabled {
@@ -708,6 +699,21 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)
 
+	if opts.preRunFn != nil {
+		if err := opts.preRunFn(tCtx); err != nil {
+			t.Fatalf("pre-run: %v", err)
+		}
+	}
+
+	// Now that we are ready to run, start
+	// a brand new etcd.
+	logger := tCtx.Logger()
+	if !UseTestingLog {
+		// Associate output going to the global log with the current test.
+		logger = logger.WithName(tCtx.Name())
+	}
+	framework.StartEtcd(logger, t, true)
+
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	timeout := 30 * time.Minute
 	tCtx = tCtx.WithTimeout(timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
@@ -719,7 +725,7 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 		})
 	}
 
-	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, outOfTreePluginRegistry)
+	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, opts)
 }
 
 func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featuregate.Feature]bool) map[featuregate.Feature]bool {
@@ -761,7 +767,9 @@ func fixJSONOutput(b *testing.B) {
 // Also, you may want to put your plugins in PluginNames variable in this package
 // to collect metrics for them.
 func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName string, outOfTreePluginRegistry frameworkruntime.Registry, options ...SchedulerPerfOption) {
-	opts := &schedulerPerfOptions{}
+	opts := &schedulerPerfOptions{
+		outOfTreePluginRegistry: outOfTreePluginRegistry,
+	}
 
 	for _, option := range options {
 		option(opts)
@@ -803,7 +811,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					fixJSONOutput(b)
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					scheduler, informerFactory, tCtx := setupTestCase(b, tc, featureGates, outOfTreePluginRegistry)
+					scheduler, informerFactory, tCtx := setupTestCase(b, tc, featureGates, opts)
 
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
@@ -898,7 +906,12 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 }
 
 // RunIntegrationPerfScheduling runs the scheduler performance integration tests.
-func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
+func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...SchedulerPerfOption) {
+	opts := &schedulerPerfOptions{}
+	for _, option := range options {
+		option(opts)
+	}
+
 	testCases, err := getTestCases(configFile)
 	if err != nil {
 		t.Fatal(err)
@@ -920,7 +933,7 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					scheduler, informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil)
+					scheduler, informerFactory, tCtx := setupTestCase(t, tc, featureGates, opts)
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						t.Fatalf("workload %s is not valid: %v", w.Name, err)
@@ -986,7 +999,7 @@ func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *workload) []op {
 	return unrolled
 }
 
-func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
+func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if configPath != "" {
@@ -998,7 +1011,7 @@ func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureG
 			tCtx.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	return mustSetupCluster(tCtx, cfg, featureGates, outOfTreePluginRegistry)
+	return mustSetupCluster(tCtx, cfg, featureGates, opts)
 }
 
 func labelsMatch(actualLabels, requiredLabels map[string]string) bool {
