@@ -51,7 +51,6 @@ func InitCustomSnapshotMetadataTestSuite(patterns []storageframework.TestPattern
 			Name:         "snapshotmetadata",
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
-				// Min: "1Gi",
 				Max: "1Gi",
 			},
 			TestTags: []interface{}{feature.SnapshotMetadata},
@@ -260,8 +259,9 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 		err            error
 
 		// backup client
+		backupClientPod  *v1.Pod
 		sourceDeviceName string
-		sourveDevicePath string
+		sourceDevicePath string
 		targetDevicePath string
 		targetDeviceName string
 	)
@@ -285,14 +285,14 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 		}
 		for _, device := range backupClientPod.Spec.Containers[0].VolumeDevices {
 			if device.Name == sourceDeviceName {
-				sourveDevicePath = device.DevicePath
+				sourceDevicePath = device.DevicePath
 			}
 			if device.Name == targetDeviceName {
 				targetDevicePath = device.DevicePath
 			}
 		}
 
-		err = framework.Gomega().Expect(sourveDevicePath).NotTo(gomega.BeEmpty())
+		err = framework.Gomega().Expect(sourceDevicePath).NotTo(gomega.BeEmpty())
 		framework.ExpectNoError(err, "Failed to get source device path")
 		err = framework.Gomega().Expect(targetDevicePath).NotTo(gomega.BeEmpty())
 		framework.ExpectNoError(err, "Failed to get target device path")
@@ -334,8 +334,25 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 	}
 
 	ginkgo.AfterEach(func(ctx context.Context) {
-		// framework.Logf("Don't cleanup")
-		// ginkgo.DeferCleanup(nil)
+		// Cleanup testPod
+		if testPod != nil {
+			framework.Logf("Deleting testPod %s/%s", testPod.Namespace, testPod.Name)
+			err := e2epod.DeletePodWithWait(ctx, clientSet, testPod)
+			if err != nil {
+				framework.Logf("Warning: failed to delete testPod: %v", err)
+			}
+			testPod = nil
+		}
+
+		// Cleanup backupClientPod
+		if backupClientPod != nil {
+			framework.Logf("Deleting backupClientPod %s/%s", backupClientPod.Namespace, backupClientPod.Name)
+			err := e2epod.DeletePodWithWait(ctx, clientSet, backupClientPod)
+			if err != nil {
+				framework.Logf("Warning: failed to delete backupClientPod: %v", err)
+			}
+			backupClientPod = nil
+		}
 	})
 
 	ginkgo.It("should verify GetMetadataDelta", func(ctx context.Context) {
@@ -369,13 +386,13 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 		targetDevicePvc := createPVCFromSnapshot(ctx, targetDevicePvcName, snapResource1.Vs.GetName())
 
 		// create backup client
-		backupClientPod := createBackupClientPod(ctx, sourceDevicePvc, targetDevicePvc)
+		backupClientPod = createBackupClientPod(ctx, sourceDevicePvc, targetDevicePvc)
 
 		// Run snapshot-metadata-verifier
 		ginkgo.By("run snapshot-metadata-verifier")
 		toolCommand := fmt.Sprintf("exec %s -c write-pod -- %s",
 			backupClientPod.Name,
-			constructVerifierCommand(f.Namespace.Name, snapResource2.Vs.GetName(), snapResource1.Vs.GetName(), sourveDevicePath, targetDevicePath))
+			constructVerifierCommand(f.Namespace.Name, snapResource2.Vs.GetName(), snapResource1.Vs.GetName(), sourceDevicePath, targetDevicePath))
 		runSnapshotMetadataVerifier(backupClientPod, toolCommand)
 	})
 
@@ -410,13 +427,13 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 		framework.ExpectNoError(err)
 
 		// create backup client
-		backupClientPod := createBackupClientPod(ctx, sourceDevicePvc, targetDevicePvc)
+		backupClientPod = createBackupClientPod(ctx, sourceDevicePvc, targetDevicePvc)
 
 		// Run snapshot-metadata-verifier
 		ginkgo.By("run snapshot-metadata-verifier")
 		toolCommand := fmt.Sprintf("exec %s -c write-pod -- %s",
 			backupClientPod.Name,
-			constructVerifierCommand(f.Namespace.Name, snapResource1.Vs.GetName(), "", sourveDevicePath, targetDevicePath))
+			constructVerifierCommand(f.Namespace.Name, snapResource1.Vs.GetName(), "", sourceDevicePath, targetDevicePath))
 		runSnapshotMetadataVerifier(backupClientPod, toolCommand)
 	})
 }

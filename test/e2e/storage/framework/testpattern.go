@@ -312,7 +312,7 @@ var (
 		AllowExpansion: true,
 	}
 
-	// Deginition for snapshot metadata
+	// Definition for snapshot metadata
 	SnapshotMetadata = TestPattern{
 		Name:                   "SnapshotMetadata",
 		VolType:                DynamicPV,
