@@ -58,7 +58,7 @@ func (d SharedDeviceID) String() string {
 	return deviceIDStr
 }
 
-func (d SharedDeviceID) GetBaseDeviceID() DeviceID {
+func (d SharedDeviceID) GetDeviceID() DeviceID {
 	return MakeDeviceID(d.Driver.String(), d.Pool.String(), d.Device.String())
 }
 
