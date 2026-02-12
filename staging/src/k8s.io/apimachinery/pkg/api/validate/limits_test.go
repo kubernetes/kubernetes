@@ -213,3 +213,55 @@ func doTestMinimum[T constraints.Integer](t *testing.T, cases []minimumTestCase[
 		}
 	}
 }
+
+func TestMinLength(t *testing.T) {
+	cases := []struct {
+		name     string
+		value    string
+		min      int
+		wantErrs field.ErrorList // regex
+	}{{
+		name:     "empty string allowed",
+		value:    "",
+		min:      0,
+		wantErrs: nil,
+	}, {
+		name:  "minimum length of one, empty string",
+		value: "",
+		min:   1,
+		wantErrs: field.ErrorList{
+			field.TooShort(field.NewPath("fldpath"), nil, 1).WithOrigin("minLength"),
+		},
+	}, {
+		name:     "minimum length of one, non-empty string",
+		value:    "test",
+		min:      1,
+		wantErrs: nil,
+	}, {
+		name:  "minimum length of 10, 9 character string",
+		value: "012345678",
+		min:   10,
+		wantErrs: field.ErrorList{
+			field.TooShort(field.NewPath("fldpath"), nil, 10).WithOrigin("minLength"),
+		},
+	}, {
+		name:     "minimum length of 10, 10 character string",
+		value:    "0123456789",
+		min:      10,
+		wantErrs: nil,
+	}, {
+		name:     "negative minimum value",
+		value:    "",
+		min:      -1,
+		wantErrs: nil,
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := tc.value
+			gotErrs := MinLength(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &v, nil, tc.min)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
