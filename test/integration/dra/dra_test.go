@@ -175,6 +175,34 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("UsesAllResources", testUsesAllResources)
 			},
 		},
+		// This scenario verifies that features which have graduated to GA can
+		// still be explicitly disabled via feature gates.
+		"GA-opt-out": {
+			apis: map[schema.GroupVersion]bool{},
+			features: map[featuregate.Feature]bool{
+				featuregate.Feature("AllBeta"): false,
+				features.DRAPrioritizedList:    false,
+			},
+			f: func(tCtx ktesting.TContext) {
+				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
+				tCtx.Run("PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
+				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
+				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
+					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
+				})
+				tCtx.Run("ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, false, true) })
+				tCtx.Run("ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, false, false) })
+				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
+				tCtx.Run("DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, false) })
+				tCtx.Run("ResourceSliceController", func(tCtx ktesting.TContext) {
+					namespace := createTestNamespace(tCtx, nil)
+					tCtx = tCtx.WithNamespace(namespace)
+					TestCreateResourceSlices(tCtx, 100)
+				})
+				tCtx.Run("UsesAllResources", testUsesAllResources)
+			},
+		},
 		"v1beta1": {
 			apis: map[schema.GroupVersion]bool{
 				resourceapi.SchemeGroupVersion:     false,
