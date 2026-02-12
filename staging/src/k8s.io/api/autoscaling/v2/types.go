@@ -60,6 +60,8 @@ type HorizontalPodAutoscalerSpec struct {
 	// available.
 	// +optional
 	// +k8s:optional
+	// +k8s:ifEnabled(HPAScaleToZero)=+k8s:minimum=0
+	// +k8s:ifDisabled(HPAScaleToZero)=+k8s:minimum=1
 	MinReplicas *int32 `json:"minReplicas,omitempty" protobuf:"varint,2,opt,name=minReplicas"`
 
 	// maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.

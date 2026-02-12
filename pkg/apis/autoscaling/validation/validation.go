@@ -57,7 +57,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 
 	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < opts.MinReplicasLowerBound {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("minReplicas"), *autoscaler.MinReplicas,
-			fmt.Sprintf("must be greater than or equal to %d", opts.MinReplicasLowerBound)))
+			fmt.Sprintf("must be greater than or equal to %d", opts.MinReplicasLowerBound)).WithOrigin("minimum").MarkCoveredByDeclarative())
 	}
 	if autoscaler.MaxReplicas == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("maxReplicas"), "must be set and greater than 0").MarkCoveredByDeclarative())

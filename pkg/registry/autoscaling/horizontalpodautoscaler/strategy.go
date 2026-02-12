@@ -77,7 +77,11 @@ func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 	autoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
 	opts := validationOptionsForHorizontalPodAutoscaler(autoscaler, nil)
 	allErrs := validation.ValidateHorizontalPodAutoscaler(autoscaler, opts)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, autoscaler, nil, allErrs, operation.Create)
+	var options []string
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
+		options = append(options, "HPAScaleToZero")
+	}
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, autoscaler, nil, allErrs, operation.Create, rest.WithOptions(options))
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -110,7 +114,11 @@ func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
 	opts := validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA)
 	errs := validation.ValidateHorizontalPodAutoscalerUpdate(newHPA, oldHPA, opts)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newHPA, oldHPA, errs, operation.Update)
+	var options []string
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
+		options = append(options, "HPAScaleToZero")
+	}
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newHPA, oldHPA, errs, operation.Update, rest.WithOptions(options))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

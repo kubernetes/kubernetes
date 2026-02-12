@@ -94,6 +94,12 @@ func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Oper
 			if earlyReturn {
 				return // do not proceed
 			}
+			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", false, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
+				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)
+			})...)
+			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", true, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
+				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
+			})...)
 			return
 		}(fldPath.Child("minReplicas"), obj.MinReplicas, safe.Field(oldObj, func(oldObj *autoscalingv2.HorizontalPodAutoscalerSpec) *int32 { return oldObj.MinReplicas }), oldObj != nil)...)
 
