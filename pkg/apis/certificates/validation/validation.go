@@ -512,7 +512,7 @@ func ValidateClusterTrustBundleUpdate(newBundle, oldBundle *certificates.Cluster
 	var allErrors field.ErrorList
 	allErrors = append(allErrors, ValidateClusterTrustBundle(newBundle, opts)...)
 	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newBundle.ObjectMeta, &oldBundle.ObjectMeta, field.NewPath("metadata"))...)
-	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newBundle.Spec.SignerName, oldBundle.Spec.SignerName, field.NewPath("spec", "signerName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newBundle.Spec.SignerName, oldBundle.Spec.SignerName, field.NewPath("spec", "signerName")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrors
 }
 

@@ -61,6 +61,7 @@ type CertificateSigningRequest struct {
 type CertificateSigningRequestSpec struct {
 	// request contains an x509 certificate signing request encoded in a "CERTIFICATE REQUEST" PEM block.
 	// When serialized as JSON or YAML, the data is additionally base64-encoded.
+	// +k8s:immutable
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// signerName indicates the requested signer, and is a qualified name.
@@ -84,6 +85,7 @@ type CertificateSigningRequestSpec struct {
 	//  4. Required, permitted, or forbidden key usages / extended key usages.
 	//  5. Expiration/certificate lifetime: whether it is fixed by the signer, configurable by the admin.
 	//  6. Whether or not requests for CA certificates are allowed.
+	// +k8s:immutable
 	SignerName string `json:"signerName" protobuf:"bytes,7,opt,name=signerName"`
 
 	// expirationSeconds is the requested duration of validity of the issued
@@ -106,6 +108,7 @@ type CertificateSigningRequestSpec struct {
 	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
 	//
 	// +optional
+	// +k8s:immutable
 	ExpirationSeconds *int32 `json:"expirationSeconds,omitempty" protobuf:"varint,8,opt,name=expirationSeconds"`
 
 	// usages specifies a set of key usages requested in the issued certificate.
@@ -123,6 +126,7 @@ type CertificateSigningRequestSpec struct {
 	//  "ipsec end system", "ipsec tunnel", "ipsec user",
 	//  "timestamping", "ocsp signing", "microsoft sgc", "netscape sgc"
 	// +listType=atomic
+	// +k8s:immutable
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// username contains the name of the user that created the CertificateSigningRequest.
