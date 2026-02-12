@@ -1099,9 +1099,9 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		if testCase.expectedContainerOptsLen == nil {
 			as.Nil(runContainerOpts)
 		} else {
-			as.Equal(len(runContainerOpts.Devices), testCase.expectedContainerOptsLen[0])
-			as.Equal(len(runContainerOpts.Mounts), testCase.expectedContainerOptsLen[1])
-			as.Equal(len(runContainerOpts.Envs), testCase.expectedContainerOptsLen[2])
+			as.Len(runContainerOpts.Devices, testCase.expectedContainerOptsLen[0])
+			as.Len(runContainerOpts.Mounts, testCase.expectedContainerOptsLen[1])
+			as.Len(runContainerOpts.Envs, testCase.expectedContainerOptsLen[2])
 		}
 		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
 		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
@@ -1275,7 +1275,7 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 
 	set, err := testManager.devicesToAllocate(tCtx, podToAllocate, containerToAllocate, resourceName, 1, sets.New[string]())
 	assert.NoError(t, err)
-	assert.Equal(t, set, sets.New[string](deviceID))
+	assert.Equal(t, sets.New[string](deviceID), set)
 }
 
 func TestGetDeviceRunContainerOptions(t *testing.T) {
@@ -1675,15 +1675,15 @@ func TestDevicePreStartContainer(t *testing.T) {
 
 	as.Contains(initializedDevs, "dev1")
 	as.Contains(initializedDevs, "dev2")
-	as.Equal(len(initializedDevs), res1.devs.Devices().Len())
+	as.Len(initializedDevs, res1.devs.Devices().Len())
 
 	expectedResps, err := allocateStubFunc()([]string{"dev1", "dev2"})
 	as.NoError(err)
 	as.Len(expectedResps.ContainerResponses, 1)
 	expectedResp := expectedResps.ContainerResponses[0]
-	as.Equal(len(runContainerOpts.Devices), len(expectedResp.Devices))
-	as.Equal(len(runContainerOpts.Mounts), len(expectedResp.Mounts))
-	as.Equal(len(runContainerOpts.Envs), len(expectedResp.Envs))
+	as.Len(runContainerOpts.Devices, len(expectedResp.Devices))
+	as.Len(runContainerOpts.Mounts, len(expectedResp.Mounts))
+	as.Len(runContainerOpts.Envs, len(expectedResp.Envs))
 
 	pod2 := makePod(v1.ResourceList{
 		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI)})
