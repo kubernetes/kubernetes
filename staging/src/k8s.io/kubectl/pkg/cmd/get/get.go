@@ -78,8 +78,9 @@ type GetOptions struct {
 
 	ServerPrint bool
 
-	NoHeaders      bool
-	IgnoreNotFound bool
+	NoHeaders       bool
+	IgnoreNotFound  bool
+	IgnoreForbidden bool
 
 	genericiooptions.IOStreams
 }
@@ -183,6 +184,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().BoolVar(&o.OutputWatchEvents, "output-watch-events", o.OutputWatchEvents, "Output watch event objects when --watch or --watch-only is used. Existing objects are output as initial ADDED events.")
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If set to true, suppresses NotFound error for specific objects that do not exist. Using this flag with commands that query for collections of resources has no effect when no resources are found.")
+	cmd.Flags().BoolVar(&o.IgnoreForbidden, "ignore-forbidden", o.IgnoreForbidden, "If set to true, suppresses Forbidden errors for resource types the current user is not authorized to access. Useful when querying resources by category across multiple resource types with varying permissions.")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	addServerPrintColumnFlags(cmd, o)
@@ -476,6 +478,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 
 	if o.IgnoreNotFound {
 		r.IgnoreErrors(apierrors.IsNotFound)
+	}
+	if o.IgnoreForbidden {
+		r.IgnoreErrors(apierrors.IsForbidden)
 	}
 	if err := r.Err(); err != nil {
 		return err
