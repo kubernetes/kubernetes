@@ -238,3 +238,30 @@ func TestSetupConntrack(t *testing.T) {
 		})
 	}
 }
+
+func TestGetConntrackMax_Capped(t *testing.T) {
+	// preserve original
+	originalDetectNumCPU := detectNumCPU
+	defer func() { detectNumCPU = originalDetectNumCPU }()
+
+	// Mock 512 cores
+	detectNumCPU = func() int { return 512 }
+
+	maxPerCore := int32(32768)
+	cfg := proxyconfigapi.KubeProxyConntrackConfiguration{
+		MaxPerCore: ptr.To(maxPerCore),
+		Min:        ptr.To(int32(0)),
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	val, err := getConntrackMax(ctx, &cfg)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// 512 * 32768 = 16,777,216. Cap is 1,048,576
+	expected := 1048576
+	if val != expected {
+		t.Errorf("Expected capped value %d, got %d", expected, val)
+	}
+}
