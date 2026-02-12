@@ -20,112 +20,57 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/cache"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 // PVAssumeCache is a AssumeCache for PersistentVolume objects
 type PVAssumeCache struct {
-	*assumecache.AssumeCache
-	logger klog.Logger
+	*passiveAssumeCache[*v1.PersistentVolume]
 }
 
 func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*v1.PersistentVolume); ok {
 		return []string{storagehelpers.GetPersistentVolumeClass(pv)}, nil
 	}
-	return []string{""}, fmt.Errorf("object is not a v1.PersistentVolume: %v", obj)
+	return nil, fmt.Errorf("object is not a v1.PersistentVolume: %v", obj)
 }
+
+const storageClassIndex = "storageclass"
 
 // NewPVAssumeCache creates a PV assume cache.
-func NewPVAssumeCache(logger klog.Logger, informer assumecache.Informer) *PVAssumeCache {
-	logger = klog.LoggerWithName(logger, "PV Cache")
-	return &PVAssumeCache{
-		AssumeCache: assumecache.NewAssumeCache(logger, informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc),
-		logger:      logger,
-	}
-}
-
-func (c *PVAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
-	obj, err := c.Get(pvName)
-	if err != nil {
-		return nil, err
-	}
-
-	pv, ok := obj.(*v1.PersistentVolume)
-	if !ok {
-		return nil, &assumecache.WrongTypeError{TypeName: "v1.PersistentVolume", Object: obj}
-	}
-	return pv, nil
-}
-
-func (c *PVAssumeCache) GetAPIPV(pvName string) (*v1.PersistentVolume, error) {
-	obj, err := c.GetAPIObj(pvName)
-	if err != nil {
-		return nil, err
-	}
-	pv, ok := obj.(*v1.PersistentVolume)
-	if !ok {
-		return nil, &assumecache.WrongTypeError{TypeName: "v1.PersistentVolume", Object: obj}
-	}
-	return pv, nil
-}
-
-func (c *PVAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume {
-	objs := c.List(&v1.PersistentVolume{
-		Spec: v1.PersistentVolumeSpec{
-			StorageClassName: storageClassName,
-		},
+func NewPVAssumeCache(logger klog.Logger, informer informer) (PVAssumeCache, error) {
+	logger = klog.LoggerWithName(logger, "pv-cache")
+	err := informer.GetIndexer().AddIndexers(map[string]cache.IndexFunc{
+		storageClassIndex: pvStorageClassIndexFunc,
 	})
-	pvs := []*v1.PersistentVolume{}
-	for _, obj := range objs {
-		pv, ok := obj.(*v1.PersistentVolume)
-		if !ok {
-			c.logger.Error(&assumecache.WrongTypeError{TypeName: "v1.PersistentVolume", Object: obj}, "ListPVs")
-			continue
+	if err != nil {
+		// Ignore the error if the index already exists. This can happen if
+		// the same informer is shared among multiple PVAssumeCache, maybe created from multiple profiles.
+		if informer.GetIndexer().GetIndexers()[storageClassIndex] == nil {
+			return PVAssumeCache{}, err
 		}
-		pvs = append(pvs, pv)
 	}
-	return pvs
+	cache, err := newAssumeCache[*v1.PersistentVolume](logger, informer, schema.GroupResource{Resource: "persistentvolumes"})
+	return PVAssumeCache{cache}, err
+}
+
+func (c PVAssumeCache) ListPVs(storageClassName string) ([]*v1.PersistentVolume, error) {
+	// This works because we will never change the storage class in scheduler
+	// Assumed PVs needs to be included here to ensure the same PVC will not be bound to another PV in the next scheduling cycle.
+	return c.ByIndex(storageClassIndex, storageClassName)
 }
 
 // PVCAssumeCache is a AssumeCache for PersistentVolumeClaim objects
 type PVCAssumeCache struct {
-	*assumecache.AssumeCache
-	logger klog.Logger
+	*passiveAssumeCache[*v1.PersistentVolumeClaim]
 }
 
 // NewPVCAssumeCache creates a PVC assume cache.
-func NewPVCAssumeCache(logger klog.Logger, informer assumecache.Informer) *PVCAssumeCache {
-	logger = klog.LoggerWithName(logger, "PVC Cache")
-	return &PVCAssumeCache{
-		AssumeCache: assumecache.NewAssumeCache(logger, informer, "v1.PersistentVolumeClaim", "", nil),
-		logger:      logger,
-	}
-}
-
-func (c *PVCAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
-	obj, err := c.Get(pvcKey)
-	if err != nil {
-		return nil, err
-	}
-
-	pvc, ok := obj.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, &assumecache.WrongTypeError{TypeName: "v1.PersistentVolumeClaim", Object: obj}
-	}
-	return pvc, nil
-}
-
-func (c *PVCAssumeCache) GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
-	obj, err := c.GetAPIObj(pvcKey)
-	if err != nil {
-		return nil, err
-	}
-	pvc, ok := obj.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, &assumecache.WrongTypeError{TypeName: "v1.PersistentVolumeClaim", Object: obj}
-	}
-	return pvc, nil
+func NewPVCAssumeCache(logger klog.Logger, informer informer) (PVCAssumeCache, error) {
+	logger = klog.LoggerWithName(logger, "pvc-cache")
+	cache, err := newAssumeCache[*v1.PersistentVolumeClaim](logger, informer, schema.GroupResource{Resource: "persistentvolumeclaims"})
+	return PVCAssumeCache{cache}, err
 }
