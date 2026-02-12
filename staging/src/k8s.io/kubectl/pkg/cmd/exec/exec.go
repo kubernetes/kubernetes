@@ -358,6 +358,11 @@ func (p *ExecOptions) Run() error {
 			return err
 		}
 		containerName = container.Name
+	} else {
+		container, _ := podcmd.FindContainerByName(pod, p.ContainerName)
+		if container == nil {
+			return fmt.Errorf("container %s is not valid for pod %s out of: %s", p.ContainerName, pod.Name, podcmd.AllContainerNames(pod))
+		}
 	}
 
 	// ensure we can recover the terminal while attached
