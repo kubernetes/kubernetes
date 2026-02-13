@@ -346,6 +346,7 @@ func TestNewManagerImpl(t *testing.T) {
 			require.NoError(t, err)
 			assert.NotNil(t, manager.cache)
 			assert.NotNil(t, manager.kubeClient)
+			assert.Equal(t, 10*time.Second, manager.reconcilePeriod)
 		})
 	}
 }
