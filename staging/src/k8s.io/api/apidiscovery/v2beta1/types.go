@@ -37,6 +37,7 @@ type APIGroupDiscoveryList struct {
 	// +optional
 	v1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// items is the list of groups for discovery. The groups are listed in priority order.
+	// +required
 	Items []APIGroupDiscovery `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -62,16 +63,19 @@ type APIGroupDiscovery struct {
 	// with the preferred version being the first entry.
 	// +listType=map
 	// +listMapKey=version
+	// +optional
 	Versions []APIVersionDiscovery `json:"versions,omitempty" protobuf:"bytes,2,rep,name=versions"`
 }
 
 // APIVersionDiscovery holds a list of APIResourceDiscovery types that are served for a particular version within an API Group.
 type APIVersionDiscovery struct {
 	// version is the name of the version within a group version.
+	// +required
 	Version string `json:"version" protobuf:"bytes,1,opt,name=version"`
 	// resources is a list of APIResourceDiscovery objects for the corresponding group version.
 	// +listType=map
 	// +listMapKey=resource
+	// +optional
 	Resources []APIResourceDiscovery `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 	// freshness marks whether a group version's discovery document is up to date.
 	// "Current" indicates the discovery document was recently
@@ -80,6 +84,7 @@ type APIVersionDiscovery struct {
 	// significantly out of date. Clients that require the latest
 	// version of the discovery information be retrieved before
 	// performing an operation should not use the aggregated document
+	// +optional
 	Freshness DiscoveryFreshness `json:"freshness,omitempty" protobuf:"bytes,3,opt,name=freshness"`
 }
 
@@ -89,33 +94,41 @@ type APIResourceDiscovery struct {
 	// for this resource across all versions in the API group.
 	// Resources with non-empty groups are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>
 	// Resources with empty groups are located at /api/v1/<APIResourceDiscovery.Resource>
+	// +required
 	Resource string `json:"resource" protobuf:"bytes,1,opt,name=resource"`
 	// responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
 	// APIs may return other objects types at their discretion, such as error conditions, requests for alternate representations, or other operation specific behavior.
 	// This value will be null or empty if an APIService reports subresources but supports no operations on the parent resource
+	// +optional
 	ResponseKind *v1.GroupVersionKind `json:"responseKind,omitempty" protobuf:"bytes,2,opt,name=responseKind"`
 	// scope indicates the scope of a resource, either Cluster or Namespaced
+	// +required
 	Scope ResourceScope `json:"scope" protobuf:"bytes,3,opt,name=scope"`
 	// singularResource is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
 	// For many clients the singular form of the resource will be more understandable to users reading messages and should be used when integrating the name of the resource into a sentence.
 	// The command line tool kubectl, for example, allows use of the singular resource name in place of plurals.
 	// The singular form of a resource should always be an optional element - when in doubt use the canonical resource name.
+	// +optional
 	SingularResource string `json:"singularResource" protobuf:"bytes,4,opt,name=singularResource"`
 	// verbs is a list of supported API operation types (this includes
 	// but is not limited to get, list, watch, create, update, patch,
 	// delete, deletecollection, and proxy).
 	// +listType=set
+	// +required
 	Verbs []string `json:"verbs" protobuf:"bytes,5,opt,name=verbs"`
 	// shortNames is a list of suggested short names of the resource.
 	// +listType=set
+	// +optional
 	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,6,rep,name=shortNames"`
 	// categories is a list of the grouped resources this resource belongs to (e.g. 'all').
 	// Clients may use this to simplify acting on multiple resource types at once.
 	// +listType=set
+	// +optional
 	Categories []string `json:"categories,omitempty" protobuf:"bytes,7,rep,name=categories"`
 	// subresources is a list of subresources provided by this resource. Subresources are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>/name-of-instance/<APIResourceDiscovery.subresources[i].subresource>
 	// +listType=map
 	// +listMapKey=subresource
+	// +optional
 	Subresources []APISubresourceDiscovery `json:"subresources,omitempty" protobuf:"bytes,8,rep,name=subresources"`
 }
 
@@ -139,9 +152,11 @@ const (
 type APISubresourceDiscovery struct {
 	// subresource is the name of the subresource.  This is used in the URL path and is the unique identifier
 	// for this resource across all versions.
+	// +required
 	Subresource string `json:"subresource" protobuf:"bytes,1,opt,name=subresource"`
 	// responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
 	// Some subresources do not return normal resources, these will have null or empty return types.
+	// +optional
 	ResponseKind *v1.GroupVersionKind `json:"responseKind,omitempty" protobuf:"bytes,2,opt,name=responseKind"`
 	// acceptedTypes describes the kinds that this endpoint accepts.
 	// Subresources may accept the standard content types or define
@@ -151,6 +166,7 @@ type APISubresourceDiscovery struct {
 	// +listMapKey=group
 	// +listMapKey=version
 	// +listMapKey=kind
+	// +optional
 	AcceptedTypes []v1.GroupVersionKind `json:"acceptedTypes,omitempty" protobuf:"bytes,3,rep,name=acceptedTypes"`
 	// verbs is a list of supported API operation types (this includes
 	// but is not limited to get, list, watch, create, update, patch,
@@ -159,5 +175,6 @@ type APISubresourceDiscovery struct {
 	// should expect the behavior of standard verbs to align with
 	// Kubernetes interaction conventions.
 	// +listType=set
+	// +required
 	Verbs []string `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
 }
