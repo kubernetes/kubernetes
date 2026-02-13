@@ -44,8 +44,8 @@ import (
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/backend/cache/debugger"
+	internalpodgroupmanager "k8s.io/kubernetes/pkg/scheduler/backend/podgroupmanager"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
-	internalworkloadmanager "k8s.io/kubernetes/pkg/scheduler/backend/workloadmanager"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
@@ -98,8 +98,8 @@ type Scheduler struct {
 	// framework.APICache should be used instead.
 	APIDispatcher *apidispatcher.APIDispatcher
 
-	// WorkloadManager can be used to provide workload-aware scheduling.
-	WorkloadManager internalworkloadmanager.WorkloadManager
+	// PodGroupManager can be used to provide workload-aware scheduling.
+	PodGroupManager internalpodgroupmanager.PodGroupManager
 
 	// Profiles are the scheduling profiles.
 	Profiles profile.Map
@@ -351,9 +351,9 @@ func New(ctx context.Context,
 	if feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {
 		apiDispatcher = apidispatcher.New(client, int(options.parallelism), apicalls.Relevances)
 	}
-	var workloadManager internalworkloadmanager.WorkloadManager
+	var podGroupManager internalpodgroupmanager.PodGroupManager
 	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		workloadManager = internalworkloadmanager.New(logger)
+		podGroupManager = internalpodgroupmanager.New(logger)
 	}
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
@@ -371,7 +371,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithPodsInPreBind(podsInPreBind),
 		frameworkruntime.WithAPIDispatcher(apiDispatcher),
 		frameworkruntime.WithSharedCSIManager(sharedCSIManager),
-		frameworkruntime.WithWorkloadManager(workloadManager),
+		frameworkruntime.WithPodGroupManager(podGroupManager),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
@@ -445,7 +445,7 @@ func New(ctx context.Context,
 		logger:                                 logger,
 		APIDispatcher:                          apiDispatcher,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
-		WorkloadManager:                        workloadManager,
+		PodGroupManager:                        podGroupManager,
 	}
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()
