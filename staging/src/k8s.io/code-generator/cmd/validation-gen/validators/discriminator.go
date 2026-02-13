@@ -160,23 +160,9 @@ func (mtv *memberTagValidator) ValidScopes() sets.Set[Scope] {
 	return sets.New(ScopeField)
 }
 
-var disallowedPayloadTags = sets.New(
-	listTypeTagName,
-	ListMapKeyTagName,
-	unionDiscriminatorTagName,
-	unionMemberTagName,
-	zeroOrOneOfMemberTagName,
-	discriminatorTagName,
-	memberTagName,
-)
-
 func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	if tag.ValueTag == nil {
 		return Validations{}, fmt.Errorf("missing required payload")
-	}
-
-	if disallowedPayloadTags.Has(tag.ValueTag.Name) {
-		return Validations{}, fmt.Errorf("unsupported payload tag: %q", tag.ValueTag.Name)
 	}
 
 	groupName := ""
