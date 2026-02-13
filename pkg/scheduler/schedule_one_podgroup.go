@@ -172,7 +172,7 @@ type podSchedulingContext struct {
 }
 
 // initPodSchedulingContext initializes the scheduling context of a single pod for pod group scheduling cycle.
-func (sched *Scheduler) initPodSchedulingContext(ctx context.Context, schedFwk framework.Framework, pod *v1.Pod) *podSchedulingContext {
+func (sched *Scheduler) initPodSchedulingContext(ctx context.Context, pod *v1.Pod) *podSchedulingContext {
 	logger := klog.FromContext(ctx)
 	// TODO(knelasevero): Remove duplicated keys from log entry calls
 	// When contextualized logging hits GA
@@ -309,7 +309,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 // It returns the algorithm result and, if successful or the preemption is required, the permit status together with the revert function.
 func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupInfo *framework.QueuedPodGroupInfo, podInfo *framework.QueuedPodInfo) (algorithmResult, func()) {
 	pod := podInfo.Pod
-	podCtx := sched.initPodSchedulingContext(ctx, schedFwk, pod)
+	podCtx := sched.initPodSchedulingContext(ctx, pod)
 	logger := podCtx.logger
 	ctx = klog.NewContext(ctx, logger)
 	start := time.Now()
@@ -425,7 +425,12 @@ func (sched *Scheduler) applyPodGroupAlgorithmResult(ctx context.Context, schedF
 			// When an error occurred or preemption is required for this pod, just call the FailureHandler.
 			// TBD: Add a message to status if the pod used features for which finding a placement cannot be guaranteed,
 			// such as heterogeneous pod group or using inter-pod dependencies.
-			sched.FailureHandler(ctx, schedFwk, pInfo, podResult.status, podResult.scheduleResult.nominatingInfo, time.Time{})
+			nominatingInfo := podResult.scheduleResult.nominatingInfo
+			if result.status == podGroupUnschedulable {
+				// In this case, preemption wasn't required. Just clear the nominated node.
+				nominatingInfo = clearNominatedNode
+			}
+			sched.FailureHandler(ctx, schedFwk, pInfo, podResult.status, nominatingInfo, time.Time{})
 		}
 	}
 }

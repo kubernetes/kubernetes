@@ -63,6 +63,11 @@ func RegisterFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Filter")
 }
 
+// RegisterPostFilterPlugin returns a function to register a PostFilter Plugin to a given registry.
+func RegisterPostFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PostFilter")
+}
+
 // RegisterReservePlugin returns a function to register a Reserve Plugin to a given registry.
 func RegisterReservePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Reserve")
@@ -127,6 +132,8 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return &plugins.QueueSort
 	case "Filter":
 		return &plugins.Filter
+	case "PostFilter":
+		return &plugins.PostFilter
 	case "PreFilter":
 		return &plugins.PreFilter
 	case "PreScore":

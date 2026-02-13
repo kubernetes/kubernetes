@@ -243,7 +243,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			wantPreEnqueueStatus: nil,
 			wantActivatedPods:    []*v1.Pod{p3},
 			// At Permit, p1 will be assumed, but the count (2) is less than the quorum (3), so it must wait.
-			wantPermitStatus: fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be waiting on permit"),
+			wantPermitStatus: fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be scheduled"),
 		},
 		{
 			name:                 "final gang pod arrives at Permit and allows all waiting pods from a gang",

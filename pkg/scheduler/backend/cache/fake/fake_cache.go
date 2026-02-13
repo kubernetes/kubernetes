@@ -25,10 +25,11 @@ import (
 // Cache is used for testing
 type Cache struct {
 	internalcache.Cache
-	AssumeFunc       func(*v1.Pod)
-	ForgetFunc       func(*v1.Pod)
-	IsAssumedPodFunc func(*v1.Pod) bool
-	GetPodFunc       func(*v1.Pod) *v1.Pod
+	AssumeFunc         func(*v1.Pod)
+	ForgetFunc         func(*v1.Pod)
+	IsAssumedPodFunc   func(*v1.Pod) bool
+	GetPodFunc         func(*v1.Pod) *v1.Pod
+	UpdateSnapshotFunc func(nodeSnapshot *internalcache.Snapshot) error
 }
 
 // AssumePod allows to mock this method for testing.
@@ -63,4 +64,12 @@ func (c *Cache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 		return c.GetPodFunc(pod), nil
 	}
 	return c.Cache.GetPod(pod)
+}
+
+// UpdateSnapshot allows to mock this method for testing.
+func (c *Cache) UpdateSnapshot(logger klog.Logger, nodeSnapshot *internalcache.Snapshot) error {
+	if c.UpdateSnapshotFunc != nil {
+		return c.UpdateSnapshotFunc(nodeSnapshot)
+	}
+	return c.Cache.UpdateSnapshot(logger, nodeSnapshot)
 }

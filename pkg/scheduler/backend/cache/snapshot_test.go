@@ -480,11 +480,10 @@ func TestSnapshot_AssumeForget(t *testing.T) {
 			},
 		},
 		{
-			name:            "assume a pod on a non-existing node",
-			initialPods:     []*v1.Pod{pod1},
-			initialNodes:    []*v1.Node{node1},
-			podsToAssume:    []*framework.PodInfo{podOnWrongNodeInfo},
-			expectAssumeErr: true,
+			name:         "assume a pod on a non-existing node",
+			initialPods:  []*v1.Pod{pod1},
+			initialNodes: []*v1.Node{node1},
+			podsToAssume: []*framework.PodInfo{podOnWrongNodeInfo},
 		},
 		{
 			name:         "forget a pod successfully",
