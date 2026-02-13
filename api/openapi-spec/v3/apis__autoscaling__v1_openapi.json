@@ -65,6 +65,9 @@
             "description": "status is the current information about the autoscaler."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {

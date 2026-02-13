@@ -89,8 +89,9 @@
   path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
 
 # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
-- text: "must be marked as optional or required"
-  path: "staging/src/k8s.io/api/(admission|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|networking|rbac|resource|storage|storagemigration)"
+# The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
+- text: "must be marked as optional or required|is a non-pointer struct with no required fields."
+  path: "staging/src/k8s.io/api/(admission|apidiscovery|apps|authentication|authorization|autoscaling|batch|certificates|core|discovery|events|extensions|flowcontrol|networking|rbac|resource|storage)"
 
 # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
 - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
@@ -99,3 +100,10 @@
 # jsontags: 'Port' must be capitalized for backward compatibility
 - text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
   path: "staging/src/k8s.io/api/core/v1/types.go"
+
+# NonPointerStructs - Existing fields that are non-pointer structs but where the current rules are incorrect.
+
+# The PodGroup.Policy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
+# Validation makes this require at least one of the fields within to be set.
+- text: "nonpointerstructs: field PodGroup.Policy is a non-pointer struct with no required fields."
+  path: "staging/src/k8s.io/api/scheduling/v1alpha1/types.go"

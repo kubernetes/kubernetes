@@ -627,6 +627,7 @@ message ValidatingAdmissionPolicyBinding {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines the desired behavior of the ValidatingAdmissionPolicyBinding.
+  // +required
   optional ValidatingAdmissionPolicyBindingSpec spec = 2;
 }
 

@@ -289,6 +289,7 @@ message PodCertificateRequest {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec contains the details about the certificate being requested.
+  // +required
   optional PodCertificateRequestSpec spec = 2;
 
   // status contains the issued certificate, and a standard set of conditions.

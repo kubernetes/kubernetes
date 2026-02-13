@@ -39,7 +39,7 @@ message CronJob {
 
   // Specification of the desired behavior of a cron job, including the schedule.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional CronJobSpec spec = 2;
 
   // Current status of a cron job.
