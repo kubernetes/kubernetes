@@ -115,7 +115,8 @@ func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	opts := validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA)
 	errs := validation.ValidateHorizontalPodAutoscalerUpdate(newHPA, oldHPA, opts)
 	var options []string
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
+	oldHasZeroMinReplicas := oldHPA.Spec.MinReplicas != nil && *oldHPA.Spec.MinReplicas == 0
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || oldHasZeroMinReplicas {
 		options = append(options, "HPAScaleToZero")
 	}
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newHPA, oldHPA, errs, operation.Update, rest.WithOptions(options))
