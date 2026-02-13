@@ -455,7 +455,9 @@ var (
 	// This feature can be removed once Containerd and CRI-O both added this support.
 	UserNamespacesHostNetworkSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesHostNetworkSupport"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// UserNamespacesSupport is in test-infra nodes that have runtimes with user-namespaces
+	// support. It will be dropped after containerd 1.7 support is removed from CI.
+	// Owner: sig-node
 	UserNamespacesSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesSupport"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
