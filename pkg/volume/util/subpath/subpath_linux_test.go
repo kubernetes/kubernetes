@@ -20,7 +20,6 @@ package subpath
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -195,7 +194,7 @@ func TestSafeMakeDir(t *testing.T) {
 		{
 			"non-directory",
 			func(base string) error {
-				return ioutil.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
 			},
 			"test/directory",
 			"",
@@ -205,7 +204,7 @@ func TestSafeMakeDir(t *testing.T) {
 		{
 			"non-directory-final",
 			func(base string) error {
-				return ioutil.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
 			},
 			"test",
 			"",
@@ -256,7 +255,7 @@ func TestSafeMakeDir(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			base, err := ioutil.TempDir("", "safe-make-dir-"+test.name+"-")
+			base, err := os.MkdirTemp("", "safe-make-dir-"+test.name+"-")
 			if err != nil {
 				t.Fatal(err.Error())
 			}
@@ -366,7 +365,7 @@ func TestRemoveEmptyDirs(t *testing.T) {
 				if err := os.MkdirAll(filepath.Join(base, "a/b"), defaultPerm); err != nil {
 					return err
 				}
-				return ioutil.WriteFile(filepath.Join(base, "a/b", "c"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "a/b", "c"), []byte{}, defaultPerm)
 			},
 			validate: func(base string) error {
 				if err := validateDirExists(filepath.Join(base, "a/b")); err != nil {
@@ -382,7 +381,7 @@ func TestRemoveEmptyDirs(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "remove-empty-dirs-"+test.name+"-")
+		base, err := os.MkdirTemp("", "remove-empty-dirs-"+test.name+"-")
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -448,7 +447,7 @@ func TestCleanSubPaths(t *testing.T) {
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return nil, err
 				}
-				return nil, ioutil.WriteFile(filepath.Join(path, "0"), []byte{}, defaultPerm)
+				return nil, os.WriteFile(filepath.Join(path, "0"), []byte{}, defaultPerm)
 			},
 			validate: func(base string) error {
 				return validateDirNotExists(filepath.Join(base, containerSubPathDirectoryName))
@@ -462,7 +461,7 @@ func TestCleanSubPaths(t *testing.T) {
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return nil, err
 				}
-				return nil, ioutil.WriteFile(filepath.Join(path, "container1"), []byte{}, defaultPerm)
+				return nil, os.WriteFile(filepath.Join(path, "container1"), []byte{}, defaultPerm)
 			},
 			validate: func(base string) error {
 				return validateDirExists(filepath.Join(base, containerSubPathDirectoryName, testVol))
@@ -476,7 +475,7 @@ func TestCleanSubPaths(t *testing.T) {
 				if err := os.MkdirAll(filepath.Join(path, "container1"), defaultPerm); err != nil {
 					return nil, err
 				}
-				return nil, ioutil.WriteFile(filepath.Join(path, "container2"), []byte{}, defaultPerm)
+				return nil, os.WriteFile(filepath.Join(path, "container2"), []byte{}, defaultPerm)
 			},
 			validate: func(base string) error {
 				path := filepath.Join(base, containerSubPathDirectoryName, testVol)
@@ -559,7 +558,7 @@ func TestCleanSubPaths(t *testing.T) {
 				}
 
 				file0 := filepath.Join(containerPath, "0")
-				if err := ioutil.WriteFile(file0, []byte{}, defaultPerm); err != nil {
+				if err := os.WriteFile(file0, []byte{}, defaultPerm); err != nil {
 					return nil, err
 				}
 
@@ -574,7 +573,7 @@ func TestCleanSubPaths(t *testing.T) {
 				}
 
 				file3 := filepath.Join(containerPath, "3")
-				if err := ioutil.WriteFile(file3, []byte{}, defaultPerm); err != nil {
+				if err := os.WriteFile(file3, []byte{}, defaultPerm); err != nil {
 					return nil, err
 				}
 
@@ -612,7 +611,7 @@ func TestCleanSubPaths(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "clean-subpaths-"+test.name+"-")
+		base, err := os.MkdirTemp("", "clean-subpaths-"+test.name+"-")
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -700,7 +699,7 @@ func TestBindSubPath(t *testing.T) {
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
 					return nil, "", "", err
 				}
-				return nil, volpath, subpath, ioutil.WriteFile(subpath, []byte{}, defaultPerm)
+				return nil, volpath, subpath, os.WriteFile(subpath, []byte{}, defaultPerm)
 			},
 			expectError: false,
 		},
@@ -749,7 +748,7 @@ func TestBindSubPath(t *testing.T) {
 					return nil, "", "", err
 				}
 				// touch file outside
-				if err := ioutil.WriteFile(child, []byte{}, defaultPerm); err != nil {
+				if err := os.WriteFile(child, []byte{}, defaultPerm); err != nil {
 					return nil, "", "", err
 				}
 
@@ -784,7 +783,7 @@ func TestBindSubPath(t *testing.T) {
 					return nil, "", "", err
 				}
 				// touch file outside
-				if err := ioutil.WriteFile(child, []byte{}, defaultPerm); err != nil {
+				if err := os.WriteFile(child, []byte{}, defaultPerm); err != nil {
 					return nil, "", "", err
 				}
 
@@ -869,7 +868,7 @@ func TestBindSubPath(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "bind-subpath-"+test.name+"-")
+		base, err := os.MkdirTemp("", "bind-subpath-"+test.name+"-")
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -983,7 +982,7 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 	}
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "bind-subpath-"+test.name+"-")
+		base, err := os.MkdirTemp("", "bind-subpath-"+test.name+"-")
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -1141,7 +1140,7 @@ func TestSafeOpen(t *testing.T) {
 		{
 			"non-directory",
 			func(base string) error {
-				return ioutil.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
 			},
 			"test/directory",
 			true,
@@ -1149,7 +1148,7 @@ func TestSafeOpen(t *testing.T) {
 		{
 			"non-directory-final",
 			func(base string) error {
-				return ioutil.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
 			},
 			"test",
 			false,
@@ -1217,7 +1216,7 @@ func TestSafeOpen(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "safe-open-"+test.name+"-")
+		base, err := os.MkdirTemp("", "safe-open-"+test.name+"-")
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -1364,7 +1363,7 @@ func TestFindExistingPrefix(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "find-prefix-"+test.name+"-")
+		base, err := os.MkdirTemp("", "find-prefix-"+test.name+"-")
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -1393,7 +1392,7 @@ func TestFindExistingPrefix(t *testing.T) {
 }
 
 func validateDirEmpty(dir string) error {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
@@ -1405,7 +1404,7 @@ func validateDirEmpty(dir string) error {
 }
 
 func validateDirExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
+	_, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
@@ -1413,7 +1412,7 @@ func validateDirExists(dir string) error {
 }
 
 func validateDirNotExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
+	_, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil
 	}
