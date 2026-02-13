@@ -70207,6 +70207,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "int32",
 						},
 					},
+					"eventSpamBurst": {
+						SchemaProps: spec.SchemaProps{
+							Description: "eventSpamBurst defines the maximum number of consecutive events of the same type generated for a single object. this helps control the long-tail of events for things that are always unhealthy",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"enableDebuggingHandlers": {
 						SchemaProps: spec.SchemaProps{
 							Description: "enableDebuggingHandlers enables server endpoints for log access and local running of containers and commands, including the exec, attach, logs, and portforward features. Default: true",
