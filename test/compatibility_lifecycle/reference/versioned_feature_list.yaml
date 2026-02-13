@@ -1623,6 +1623,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.33"
+  - default: false
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.36"
 - name: SeparateTaintEvictionController
   versionedSpecs:
   - default: true
