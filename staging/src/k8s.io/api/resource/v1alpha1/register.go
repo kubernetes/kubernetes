@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2026 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resource
+package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,12 +26,7 @@ import (
 const GroupName = "resource.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
-
-// Kind takes an unqualified kind and returns a Group qualified GroupKind
-func Kind(kind string) schema.GroupKind {
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) schema.GroupResource {
@@ -39,32 +34,21 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	// SchemeBuilder object to register various known types
+	// We only register manually written functions here. The registration of the
+	// generated functions takes place in the generated files. The separation
+	// makes the code compile even when the generated files are missing.
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-
-	// AddToScheme represents a func that can be used to apply all the registered
-	// funcs in a scheme
-	AddToScheme = SchemeBuilder.AddToScheme
+	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
+// Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
-	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
-		return err
-	}
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&DeviceClass{},
-		&DeviceClassList{},
-		&DeviceTaintRule{},
-		&DeviceTaintRuleList{},
-		&ResourceClaim{},
-		&ResourceClaimList{},
-		&ResourceClaimTemplate{},
-		&ResourceClaimTemplateList{},
-		&ResourceSlice{},
-		&ResourceSliceList{},
 		&ResourcePoolStatusRequest{},
 		&ResourcePoolStatusRequestList{},
 	)
 
+	// Add the watch version that applies
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

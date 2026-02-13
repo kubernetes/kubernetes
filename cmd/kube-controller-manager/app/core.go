@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim"
+	"k8s.io/kubernetes/pkg/controller/resourcepoolstatusrequest"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
@@ -493,6 +494,37 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 
 	return newControllerLoop(func(ctx context.Context) {
 		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
+	}, controllerName), nil
+}
+
+func newResourcePoolStatusRequestControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:        names.ResourcePoolStatusRequestController,
+		aliases:     []string{"resourcepool-status-request-controller"},
+		constructor: newResourcePoolStatusRequestController,
+		requiredFeatureGates: []featuregate.Feature{
+			features.DRAResourcePoolStatus,
+		},
+	}
+}
+
+func newResourcePoolStatusRequestController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.NewClient("resourcepoolstatusrequest-controller")
+	if err != nil {
+		return nil, err
+	}
+
+	controller, err := resourcepoolstatusrequest.NewController(
+		ctx,
+		client,
+		controllerContext.InformerFactory,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init resourcepoolstatusrequest controller: %w", err)
+	}
+
+	return newControllerLoop(func(ctx context.Context) {
+		controller.Run(ctx, 1) // Single worker is sufficient for this controller
 	}, controllerName), nil
 }
 
