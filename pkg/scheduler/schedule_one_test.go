@@ -64,8 +64,8 @@ import (
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/backend/cache/fake"
+	"k8s.io/kubernetes/pkg/scheduler/backend/podgroupmanager"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
-	"k8s.io/kubernetes/pkg/scheduler/backend/workloadmanager"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -1011,12 +1011,12 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		nominatedNodeNameForExpectationEnabled bool
 	}
 
-	withWorkloadRef := func(pod *v1.Pod, ref *v1.WorkloadReference) *v1.Pod {
+	withSchedulingGroup := func(pod *v1.Pod, group *v1.PodSchedulingGroup) *v1.Pod {
 		if pod == nil {
 			return nil
 		}
 		newPod := pod.DeepCopy()
-		newPod.Spec.WorkloadRef = ref
+		newPod.Spec.SchedulingGroup = group
 		return newPod
 	}
 
@@ -1029,19 +1029,18 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		var gotBinding *v1.Binding
 		var gotNominatingInfo *fwk.NominatingInfo
 
-		var wm workloadmanager.WorkloadManager
+		var pgm podgroupmanager.PodGroupManager
 		if scheduleAsPodGroup {
-			ref := &v1.WorkloadReference{
-				Name:     "workload",
-				PodGroup: "pg",
+			group := &v1.PodSchedulingGroup{
+				PodGroupName: ptr.To("pg"),
 			}
-			// When scheduling a pod as a pod group, set workloadRef to all relevant pods.
-			item.sendPod = withWorkloadRef(item.sendPod, ref)
-			item.expectErrorPod = withWorkloadRef(item.expectErrorPod, ref)
-			item.expectPodInBackoffQ = withWorkloadRef(item.expectPodInBackoffQ, ref)
-			item.expectPodInUnschedulable = withWorkloadRef(item.expectPodInUnschedulable, ref)
-			wm = workloadmanager.New(logger)
-			wm.AddPod(item.sendPod)
+			// When scheduling a pod as a pod group, set scheduling group to all relevant pods.
+			item.sendPod = withSchedulingGroup(item.sendPod, group)
+			item.expectErrorPod = withSchedulingGroup(item.expectErrorPod, group)
+			item.expectPodInBackoffQ = withSchedulingGroup(item.expectPodInBackoffQ, group)
+			item.expectPodInUnschedulable = withSchedulingGroup(item.expectPodInUnschedulable, group)
+			pgm = podgroupmanager.New(logger)
+			pgm.AddPod(item.sendPod)
 		}
 
 		client := clientsetfake.NewClientset(item.sendPod)
@@ -1119,7 +1118,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 			frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 			frameworkruntime.WithInformerFactory(informerFactory),
-			frameworkruntime.WithWorkloadManager(wm),
+			frameworkruntime.WithPodGroupManager(pgm),
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -1138,7 +1137,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			SchedulingQueue:                        queue,
 			Profiles:                               profile.Map{testSchedulerName: schedFramework},
 			APIDispatcher:                          apiDispatcher,
-			WorkloadManager:                        wm,
+			PodGroupManager:                        pgm,
 			nominatedNodeNameForExpectationEnabled: features.nominatedNodeNameForExpectationEnabled,
 		}
 		queue.Add(logger, item.sendPod)

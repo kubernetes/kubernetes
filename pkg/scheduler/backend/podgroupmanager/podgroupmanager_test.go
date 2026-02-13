@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package workloadmanager
+package podgroupmanager
 
 import (
 	"testing"
@@ -24,16 +24,13 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestWorkloadManager_AddPod(t *testing.T) {
-	p1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+func TestPodGroupManager_AddPod(t *testing.T) {
+	p1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").PodGroupName("pg1").Obj()
 	// Assigned
-	p2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").Node("node1").
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+	p2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").Node("node1").PodGroupName("pg1").Obj()
 	// Different ns
-	p3 := st.MakePod().Namespace("ns2").Name("p3").UID("p3").
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
-	nonWorkloadPod := st.MakePod().Namespace("ns1").Name("non-workload").Obj()
+	p3 := st.MakePod().Namespace("ns2").Name("p3").UID("p3").PodGroupName("pg1").Obj()
+	nonPodGroupPod := st.MakePod().Namespace("ns1").Name("non-podgroup").Obj()
 
 	tests := []struct {
 		name     string
@@ -69,8 +66,8 @@ func TestWorkloadManager_AddPod(t *testing.T) {
 			expectInUnscheduledPods: true,
 		},
 		{
-			name:              "adding a non-workload pod is a no-op",
-			podToAdd:          nonWorkloadPod,
+			name:              "adding a non-podgroup pod is a no-op",
+			podToAdd:          nonPodGroupPod,
 			expectedPodGroups: 0,
 		},
 	}
@@ -93,7 +90,7 @@ func TestWorkloadManager_AddPod(t *testing.T) {
 			if gotPodGroups == 0 {
 				return
 			}
-			state, err := manager.PodGroupState(tt.podToAdd.Namespace, tt.podToAdd.Spec.WorkloadRef)
+			state, err := manager.PodGroupState(tt.podToAdd.Namespace, tt.podToAdd.Spec.SchedulingGroup)
 			if err != nil {
 				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
@@ -110,19 +107,19 @@ func TestWorkloadManager_AddPod(t *testing.T) {
 	}
 }
 
-func TestWorkloadManager_UpdatePod(t *testing.T) {
+func TestPodGroupManager_UpdatePod(t *testing.T) {
 	pod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+		PodGroupName("pg1").Obj()
 	updatedPod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").Labels(map[string]string{"foo": "bar"}).
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+		PodGroupName("pg1").Obj()
 
 	assignedPod := st.MakePod().Namespace("ns1").Name("p2").UID("p2").Node("node1").
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+		PodGroupName("pg1").Obj()
 	updatedAssignedPod := st.MakePod().Namespace("ns1").Name("p2").UID("p2").Node("node1").Labels(map[string]string{"foo": "bar"}).
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+		PodGroupName("pg1").Obj()
 
-	nonWorkloadPod := st.MakePod().Namespace("ns1").Name("non-workload").Obj()
-	updatedNonWorkloadPod := st.MakePod().Namespace("ns1").Name("non-workload").Labels(map[string]string{"foo": "bar"}).Obj()
+	nonPodGroup := st.MakePod().Namespace("ns1").Name("non-podgroup").Obj()
+	updatedNonPodGroupPod := st.MakePod().Namespace("ns1").Name("non-podgroup").Labels(map[string]string{"foo": "bar"}).Obj()
 
 	tests := []struct {
 		name      string
@@ -173,9 +170,9 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 			expectInAssignedPods: true,
 		},
 		{
-			name:   "updating a non-workload pod is a no-op",
-			oldPod: nonWorkloadPod,
-			newPod: updatedNonWorkloadPod,
+			name:   "updating a non-podgroup pod is a no-op",
+			oldPod: nonPodGroup,
+			newPod: updatedNonPodGroupPod,
 		},
 	}
 
@@ -187,7 +184,7 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 
 			manager.AddPod(tt.oldPod)
 			if tt.assumePod {
-				state, err := manager.PodGroupState(tt.oldPod.Namespace, tt.oldPod.Spec.WorkloadRef)
+				state, err := manager.PodGroupState(tt.oldPod.Namespace, tt.oldPod.Spec.SchedulingGroup)
 				if err != nil {
 					t.Fatalf("Unexpected error getting pod group state: %v", err)
 				}
@@ -206,7 +203,7 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 			if !tt.expectInAllPods {
 				t.Fatalf("Expected no pod groups, but got %v", gotPodGroups)
 			}
-			state, err := manager.PodGroupState(tt.newPod.Namespace, tt.newPod.Spec.WorkloadRef)
+			state, err := manager.PodGroupState(tt.newPod.Namespace, tt.newPod.Spec.SchedulingGroup)
 			if err != nil {
 				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
@@ -223,11 +220,9 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 	}
 }
 
-func TestWorkloadManager_DeletePod(t *testing.T) {
-	p1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
-	p2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+func TestPodGroupManager_DeletePod(t *testing.T) {
+	p1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").PodGroupName("pg1").Obj()
+	p2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").PodGroupName("pg1").Obj()
 
 	tests := []struct {
 		name        string
@@ -270,7 +265,7 @@ func TestWorkloadManager_DeletePod(t *testing.T) {
 			if gotPodGroups == 0 {
 				return
 			}
-			state, err := manager.PodGroupState(tt.podToDelete.Namespace, tt.podToDelete.Spec.WorkloadRef)
+			state, err := manager.PodGroupState(tt.podToDelete.Namespace, tt.podToDelete.Spec.SchedulingGroup)
 			if err != nil {
 				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}

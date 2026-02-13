@@ -39,8 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/backend/cache/fake"
+	"k8s.io/kubernetes/pkg/scheduler/backend/podgroupmanager"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
-	"k8s.io/kubernetes/pkg/scheduler/backend/workloadmanager"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -87,11 +87,11 @@ func (mp *fakePodGroupPlugin) Permit(ctx context.Context, state fwk.CycleState, 
 }
 
 func TestPodGroupInfoForPod(t *testing.T) {
-	ref := &v1.WorkloadReference{Name: "workload", PodGroup: "pg"}
-	p1 := st.MakePod().Name("p1").Namespace("ns1").UID("p1").WorkloadRef(ref).Priority(100).Obj()
-	p2 := st.MakePod().Name("p2").Namespace("ns1").UID("p2").WorkloadRef(ref).Priority(200).Obj()
-	p3 := st.MakePod().Name("p3").Namespace("ns1").UID("p3").WorkloadRef(ref).Priority(150).Obj()
-	p4 := st.MakePod().Name("p4").Namespace("ns1").UID("p4").WorkloadRef(ref).Priority(150).Obj()
+	groupName := "pg"
+	p1 := st.MakePod().Name("p1").Namespace("ns1").UID("p1").PodGroupName(groupName).Priority(100).Obj()
+	p2 := st.MakePod().Name("p2").Namespace("ns1").UID("p2").PodGroupName(groupName).Priority(200).Obj()
+	p3 := st.MakePod().Name("p3").Namespace("ns1").UID("p3").PodGroupName(groupName).Priority(150).Obj()
+	p4 := st.MakePod().Name("p4").Namespace("ns1").UID("p4").PodGroupName(groupName).Priority(150).Obj()
 
 	pInfo1, _ := framework.NewPodInfo(p1)
 	pInfo2, _ := framework.NewPodInfo(p2)
@@ -146,11 +146,11 @@ func TestPodGroupInfoForPod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			wm := workloadmanager.New(logger)
+			manager := podgroupmanager.New(logger)
 
-			wm.AddPod(tt.pInfo.Pod)
+			manager.AddPod(tt.pInfo.Pod)
 			for _, pod := range tt.unscheduledPods {
-				wm.AddPod(pod)
+				manager.AddPod(pod)
 			}
 
 			q := internalqueue.NewTestQueue(ctx, nil)
@@ -161,7 +161,7 @@ func TestPodGroupInfoForPod(t *testing.T) {
 				}
 			}
 			sched := &Scheduler{
-				WorkloadManager: wm,
+				PodGroupManager: manager,
 				SchedulingQueue: q,
 			}
 
@@ -170,8 +170,8 @@ func TestPodGroupInfoForPod(t *testing.T) {
 				t.Fatalf("Failed to get pod group info: %v", err)
 			}
 
-			if diff := cmp.Diff(ref, result.WorkloadRef); diff != "" {
-				t.Errorf("Unexpected workload reference (-want,+got):\n%s", diff)
+			if diff := cmp.Diff(groupName, result.PodGroupInfo.Name); diff != "" {
+				t.Errorf("Unexpected pod group name (-want,+got):\n%s", diff)
 			}
 
 			var gotQueuedPods []string
@@ -388,10 +388,9 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 func TestPodGroupSchedulingDefaultAlgorithm(t *testing.T) {
 	testNode := st.MakeNode().Name("node1").UID("node1").Obj()
 
-	ref := &v1.WorkloadReference{Name: "workload", PodGroup: "pg"}
-	p1 := st.MakePod().Name("p1").UID("p1").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
-	p2 := st.MakePod().Name("p2").UID("p2").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
-	p3 := st.MakePod().Name("p3").UID("p3").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
+	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p3 := st.MakePod().Name("p3").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupScheduling: true}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupScheduling: true}
@@ -400,10 +399,7 @@ func TestPodGroupSchedulingDefaultAlgorithm(t *testing.T) {
 	pgInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2, qInfo3},
 		PodGroupInfo: &framework.PodGroupInfo{
-			WorkloadRef: &v1.WorkloadReference{
-				Name:     "workload",
-				PodGroup: "pg",
-			},
+			Name:            "pg",
 			UnscheduledPods: []*v1.Pod{p1, p2, p3},
 		},
 	}
@@ -767,10 +763,9 @@ func TestPodGroupSchedulingDefaultAlgorithm(t *testing.T) {
 func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 	testNode := st.MakeNode().Name("node1").UID("node1").Obj()
 
-	ref := &v1.WorkloadReference{Name: "workload", PodGroup: "pg"}
-	p1 := st.MakePod().Name("p1").UID("p1").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
-	p2 := st.MakePod().Name("p2").UID("p2").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
-	p3 := st.MakePod().Name("p3").UID("p3").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
+	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p3 := st.MakePod().Name("p3").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupScheduling: true}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupScheduling: true}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package workloadmanager
+package podgroupmanager
 
 import (
 	"fmt"
@@ -25,13 +25,13 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
-// WorkloadManager is the central source of truth for the state of pods belonging to Workload objects.
+// PodGroupManager is the central source of truth for the state of pods belonging to PodGroup objects.
 // It is designed to be driven explicitly by the scheduler's event handlers to ensure thread safety
 // and avoid race conditions with the main scheduling queue.
-// Note: The current implementation assumes that pod.Spec.Workload is immutable.
+// Note: The current implementation assumes that pod.Spec.SchedulingGroup is immutable.
 // Allowing mutability would require changes to the manager, e.g., by properly handling pod updates.
-type WorkloadManager interface {
-	fwk.WorkloadManager
+type PodGroupManager interface {
+	fwk.PodGroupManager
 
 	// AddPod is called by the scheduler when a Pod/Add event is observed.
 	AddPod(pod *v1.Pod)
@@ -41,8 +41,8 @@ type WorkloadManager interface {
 	DeletePod(pod *v1.Pod)
 }
 
-// workloadManager is the concrete implementation of the WorkloadManager.
-type workloadManager struct {
+// podGroupManager is the concrete implementation of the PodGroupManager.
+type podGroupManager struct {
 	lock sync.RWMutex
 
 	// podGroupStates stores the runtime state for each known pod group.
@@ -51,65 +51,65 @@ type workloadManager struct {
 	logger klog.Logger
 }
 
-// New initializes a new workload manager and returns it.
-func New(logger klog.Logger) *workloadManager {
-	return &workloadManager{
+// New initializes a new pod group manager and returns it.
+func New(logger klog.Logger) *podGroupManager {
+	return &podGroupManager{
 		podGroupStates: make(map[podGroupKey]*podGroupState),
 		logger:         logger,
 	}
 }
 
-// AddPod adds a pod to the workload manager if it has a workload reference.
+// AddPod adds a pod to the pod group manager if it has a scheduling group.
 // Pod is added to the available pods set for its corresponding pod group.
-func (wm *workloadManager) AddPod(pod *v1.Pod) {
-	if pod.Spec.WorkloadRef == nil {
+func (pgm *podGroupManager) AddPod(pod *v1.Pod) {
+	if pod.Spec.SchedulingGroup == nil {
 		return
 	}
-	wm.lock.Lock()
-	defer wm.lock.Unlock()
+	pgm.lock.Lock()
+	defer pgm.lock.Unlock()
 
-	key := newPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
-	state, ok := wm.podGroupStates[key]
+	key := newPodGroupKey(pod.Namespace, pod.Spec.SchedulingGroup)
+	state, ok := pgm.podGroupStates[key]
 	if !ok {
 		state = newPodGroupState()
-		wm.podGroupStates[key] = state
+		pgm.podGroupStates[key] = state
 	}
 	state.addPod(pod)
 }
 
-// UpdatePod updates a pod in the workload manager if it has a workload reference.
-// Note: The current implementation assumes that newPod.Spec.Workload is immutable.
-func (wm *workloadManager) UpdatePod(oldPod, newPod *v1.Pod) {
-	if newPod.Spec.WorkloadRef == nil {
+// UpdatePod updates a pod in the pod group manager if it has a scheduling group.
+// Note: The current implementation assumes that newPod.Spec.SchedulingGroup is immutable.
+func (pgm *podGroupManager) UpdatePod(oldPod, newPod *v1.Pod) {
+	if newPod.Spec.SchedulingGroup == nil {
 		return
 	}
-	wm.lock.Lock()
-	defer wm.lock.Unlock()
+	pgm.lock.Lock()
+	defer pgm.lock.Unlock()
 
-	key := newPodGroupKey(newPod.Namespace, newPod.Spec.WorkloadRef)
-	state, ok := wm.podGroupStates[key]
+	key := newPodGroupKey(newPod.Namespace, newPod.Spec.SchedulingGroup)
+	state, ok := pgm.podGroupStates[key]
 	if !ok {
 		// Shouldn't happen, but handling this case gracefully.
 		state = newPodGroupState()
-		wm.podGroupStates[key] = state
+		pgm.podGroupStates[key] = state
 		state.addPod(newPod)
-		wm.logger.Error(nil, "UpdatePod found no existing PodGroup for pod. Created new PodGroup for the pod", "pod", klog.KObj(newPod), "podGroupKey", klog.KObj(key))
+		pgm.logger.Error(nil, "UpdatePod found no existing PodGroup for pod. Created new PodGroup for the pod", "pod", klog.KObj(newPod), "podGroupKey", klog.KObj(key))
 		return
 	}
 	state.updatePod(oldPod, newPod)
 }
 
-// DeletePod removes a pod from the workload manager if it has a workload reference.
+// DeletePod removes a pod from the pod group manager if it has a scheduling group.
 // Pod is removed from the pods sets for its corresponding pod group.
-func (wm *workloadManager) DeletePod(pod *v1.Pod) {
-	if pod.Spec.WorkloadRef == nil {
+func (pgm *podGroupManager) DeletePod(pod *v1.Pod) {
+	if pod.Spec.SchedulingGroup == nil {
 		return
 	}
-	wm.lock.Lock()
-	defer wm.lock.Unlock()
+	pgm.lock.Lock()
+	defer pgm.lock.Unlock()
 
-	key := newPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
-	state, ok := wm.podGroupStates[key]
+	key := newPodGroupKey(pod.Namespace, pod.Spec.SchedulingGroup)
+	state, ok := pgm.podGroupStates[key]
 	if !ok {
 		// The pod group may have already been cleaned up, or the pod was never added.
 		return
@@ -117,18 +117,18 @@ func (wm *workloadManager) DeletePod(pod *v1.Pod) {
 	state.deletePod(pod.UID)
 	// Clean up the map entry if no pods are left in the group.
 	if state.empty() {
-		delete(wm.podGroupStates, key)
+		delete(pgm.podGroupStates, key)
 	}
 }
 
 // PodGroupState returns the runtime state of a pod group.
-func (wm *workloadManager) PodGroupState(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
-	wm.lock.RLock()
-	defer wm.lock.RUnlock()
+func (pgm *podGroupManager) PodGroupState(namespace string, schedulingGroup *v1.PodSchedulingGroup) (fwk.PodGroupState, error) {
+	pgm.lock.RLock()
+	defer pgm.lock.RUnlock()
 
-	state, ok := wm.podGroupStates[newPodGroupKey(namespace, workloadRef)]
+	state, ok := pgm.podGroupStates[newPodGroupKey(namespace, schedulingGroup)]
 	if !ok {
-		return nil, fmt.Errorf("internal pod group state doesn't exist for a pod's workload")
+		return nil, fmt.Errorf("internal pod group state doesn't exist for a pod's scheduling group")
 	}
 	return state, nil
 }
