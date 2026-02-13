@@ -14,21 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package workloadmanager
+package podgroupmanager
 
 import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/ptr"
 )
 
 func TestPodGroupState_AssumeForget(t *testing.T) {
 	pgs := newPodGroupState()
-	pod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+	pod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").PodGroupName("pg1").Obj()
 
 	pgs.addPod(pod)
 	if pgs.AssumedPods().Has(pod.UID) {
