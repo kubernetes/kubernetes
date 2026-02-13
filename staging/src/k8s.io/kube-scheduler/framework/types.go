@@ -170,7 +170,7 @@ const (
 	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
 	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
-	Workload              EventResource = "scheduling.k8s.io/Workload"
+	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
 
 	// WildCard is a special EventResource to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,

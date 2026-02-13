@@ -17,7 +17,6 @@ limitations under the License.
 package workloadmanager
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -35,17 +34,12 @@ var DefaultSchedulingTimeoutDuration = 5 * time.Minute
 
 // podGroupKey uniquely identifies a specific instance of a PodGroup.
 type podGroupKey struct {
-	namespace    string
-	workloadName string
-	podGroupName string
-	replicaKey   string
+	name      string
+	namespace string
 }
 
 func (pgk podGroupKey) GetName() string {
-	if pgk.replicaKey == "" {
-		return fmt.Sprintf("%s-%s", pgk.workloadName, pgk.podGroupName)
-	}
-	return fmt.Sprintf("%s-%s-%s", pgk.workloadName, pgk.podGroupName, pgk.replicaKey)
+	return pgk.name
 }
 
 func (pgk podGroupKey) GetNamespace() string {
@@ -54,12 +48,10 @@ func (pgk podGroupKey) GetNamespace() string {
 
 var _ klog.KMetadata = &podGroupKey{}
 
-func newPodGroupKey(namespace string, workloadRef *v1.WorkloadReference) podGroupKey {
+func newPodGroupKey(namespace string, schedulingGroup *v1.PodSchedulingGroup) podGroupKey {
 	return podGroupKey{
-		namespace:    namespace,
-		workloadName: workloadRef.Name,
-		podGroupName: workloadRef.PodGroup,
-		replicaKey:   workloadRef.PodGroupReplicaKey,
+		name:      *schedulingGroup.PodGroupName,
+		namespace: namespace,
 	}
 }
 

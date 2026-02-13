@@ -18,20 +18,9 @@ package helper
 
 import (
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
 )
 
-// MatchingWorkloadReference returns true if two pods belong to the same workload, including their pod group and replica key.
-func MatchingWorkloadReference(pod1, pod2 *v1.Pod) bool {
-	return pod1.Spec.WorkloadRef != nil && pod2.Spec.WorkloadRef != nil && pod1.Namespace == pod2.Namespace && *pod1.Spec.WorkloadRef == *pod2.Spec.WorkloadRef
-}
-
-// PodGroupPolicy is a helper to find the policy for a specific pod group name in a workload.
-func PodGroupPolicy(workload *schedulingapi.Workload, podGroupName string) (schedulingapi.PodGroupPolicy, bool) {
-	for _, podGroup := range workload.Spec.PodGroups {
-		if podGroup.Name == podGroupName {
-			return podGroup.Policy, true
-		}
-	}
-	return schedulingapi.PodGroupPolicy{}, false
+// MatchingSchedulingGroup returns true if two pods belong to the same scheduling group.
+func MatchingSchedulingGroup(pod1, pod2 *v1.Pod) bool {
+	return pod1.Namespace == pod2.Namespace && pod1.Spec.SchedulingGroup != nil && pod2.Spec.SchedulingGroup != nil && *pod1.Spec.SchedulingGroup.PodGroupName == *pod2.Spec.SchedulingGroup.PodGroupName
 }
