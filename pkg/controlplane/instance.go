@@ -54,7 +54,6 @@ import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
-	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
@@ -502,7 +501,6 @@ var (
 	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for additional API groups only provided in kube-apiserver. They are always disabled by default.
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		resourcev1alpha3.SchemeGroupVersion,
-		schedulingapiv1alpha1.SchemeGroupVersion,
 		schedulingapiv1alpha2.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 	}
