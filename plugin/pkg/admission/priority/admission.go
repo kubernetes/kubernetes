@@ -27,11 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializers "k8s.io/apiserver/pkg/admission/initializer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	schedulingv1listers "k8s.io/client-go/listers/scheduling/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -90,11 +92,12 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 
 var (
 	podResource           = core.Resource("pods")
+	workloadResource      = scheduling.Resource("workloads")
 	priorityClassResource = scheduling.Resource("priorityclasses")
 )
 
-// Admit checks Pods and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
-// Note that pod validation mechanism prevents update of a pod priority.
+// Admit checks Pods and Workloads and admits or rejects them. It also resolves the priority of pods/workloads based on their PriorityClass.
+// Note that pod/workload validation mechanism prevents update of a pod/workload priority.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
@@ -107,10 +110,60 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 			return p.admitPod(a)
 		}
 		return nil
-
+	case workloadResource:
+		if operation == admission.Create || operation == admission.Update {
+			return p.admitWorkload(a)
+		}
+		return nil
 	default:
 		return nil
 	}
+}
+
+// admitWorkload validates PriorityClassName and resolves Priority value for a workload.
+// This is only performed when workload-aware-preemption feature gate is enabled.
+//
+// PriorityClassName validation rules:
+// 1. If PriorityClassName is provided, it must refer to an existing PriorityClass.
+// 2. Otherwise, the PriorityClassName is set to the global default PriorityClass if it exists.
+//
+// Priority value resolution:
+// 1. If a valid PriorityClassName is provided, use the priority value of that PriorityClass.
+// 2. If a global default PriorityClass exists, use its priority value.
+// 3. Otherwise, use the default priority (0).
+func (p *Plugin) admitWorkload(a admission.Attributes) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		return nil
+	}
+
+	operation := a.GetOperation()
+	workload, ok := a.GetObject().(*scheduling.Workload)
+	if !ok {
+		return errors.NewBadRequest("resource was marked with kind Workload but was unable to be converted")
+	}
+
+	if operation == admission.Create {
+		var priority int32 = 0
+		if workload.Spec.PriorityClassName == nil || len(*workload.Spec.PriorityClassName) == 0 {
+			defaultPriorityClassName, defaultPriority, _, err := p.getDefaultPriority()
+			if err != nil {
+				return fmt.Errorf("failed to get default priority class: %w", err)
+			}
+			workload.Spec.PriorityClassName = &defaultPriorityClassName
+			priority = defaultPriority
+		} else {
+			priorityClass, err := p.lister.Get(*workload.Spec.PriorityClassName)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", *workload.Spec.PriorityClassName))
+				}
+				return fmt.Errorf("failed to resolve PriorityClass with name %s: %w", *workload.Spec.PriorityClassName, err)
+			}
+			priority = priorityClass.Value
+		}
+		workload.Spec.Priority = &priority
+	}
+	return nil
 }
 
 // Validate checks PriorityClasses and admits or rejects them.

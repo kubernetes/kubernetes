@@ -79,6 +79,7 @@ func validateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) fi
 		allErrs = append(allErrs, validateControllerRef(spec.ControllerRef, fldPath.Child("controllerRef"))...)
 	}
 	allErrs = append(allErrs, validatePodGroups(fldPath, spec, operation.Create)...)
+	allErrs = append(allErrs, validatePriorityClassName(spec.PriorityClassName, fldPath.Child("priorityClassName"))...)
 	return allErrs
 }
 
@@ -118,6 +119,16 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 	} else {
 		for _, msg := range content.IsPathSegmentName(ref.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg).WithOrigin("format=k8s-path-segment-name").MarkCoveredByDeclarative())
+		}
+	}
+	return allErrs
+}
+
+func validatePriorityClassName(priorityClassName *string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if priorityClassName != nil && len(*priorityClassName) > 0 {
+		for _, msg := range validation.IsDNS1123Subdomain(*priorityClassName) {
+			allErrs = append(allErrs, field.Invalid(fldPath, *priorityClassName, msg))
 		}
 	}
 	return allErrs
@@ -205,6 +216,7 @@ func validateWorkloadSpecUpdate(spec, oldSpec *scheduling.WorkloadSpec, fldPath 
 	} else if spec.ControllerRef != nil {
 		allErrs = append(allErrs, validateControllerRef(spec.ControllerRef, fldPath.Child("controllerRef"))...)
 	}
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PriorityClassName, oldSpec.PriorityClassName, fldPath.Child("priorityClassName")).WithOrigin("immutable")...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroups, oldSpec.PodGroups, fldPath.Child("podGroups")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validatePodGroups(fldPath, spec, operation.Update)...)
 	return allErrs

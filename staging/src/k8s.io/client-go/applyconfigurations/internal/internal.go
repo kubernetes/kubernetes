@@ -14443,6 +14443,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: priority
+      type:
+        scalar: numeric
+    - name: priorityClassName
+      type:
+        scalar: string
 - name: io.k8s.api.scheduling.v1beta1.PriorityClass
   map:
     fields:

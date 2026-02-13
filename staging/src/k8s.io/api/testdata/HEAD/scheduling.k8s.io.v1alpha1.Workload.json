@@ -59,6 +59,8 @@
           }
         }
       }
-    ]
+    ],
+    "priorityClassName": "priorityClassNameValue",
+    "priority": 4
   }
 }
