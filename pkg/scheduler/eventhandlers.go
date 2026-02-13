@@ -133,9 +133,9 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
-	if sched.WorkloadManager != nil {
-		// Register pod into workload manager before adding to the cache or scheduling queue.
-		sched.WorkloadManager.AddPod(pod)
+	if sched.PodGroupManager != nil {
+		// Register pod into pod group manager before adding to the cache or scheduling queue.
+		sched.PodGroupManager.AddPod(pod)
 	}
 	if assignedPod(pod) {
 		sched.addAssignedPodToCache(pod)
@@ -157,9 +157,9 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 		return
 	}
 
-	if sched.WorkloadManager != nil {
-		// Update pod in workload manager before updating it in the cache or scheduling queue.
-		sched.WorkloadManager.UpdatePod(oldPod, newPod)
+	if sched.PodGroupManager != nil {
+		// Update pod in pod group manager before updating it in the cache or scheduling queue.
+		sched.PodGroupManager.UpdatePod(oldPod, newPod)
 	}
 	if assignedPod(oldPod) {
 		sched.updateAssignedPodInCache(oldPod, newPod)
@@ -185,9 +185,9 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 	switch t := obj.(type) {
 	case *v1.Pod:
 		pod = t
-		if sched.WorkloadManager != nil {
-			// Delete pod from workload manager before deleting the pod from cache or scheduling queue.
-			sched.WorkloadManager.DeletePod(pod)
+		if sched.PodGroupManager != nil {
+			// Delete pod from pod group manager before deleting the pod from cache or scheduling queue.
+			sched.PodGroupManager.DeletePod(pod)
 		}
 		if assignedPod(pod) {
 			sched.deleteAssignedPodFromCache(pod)
@@ -204,9 +204,9 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 			return
 		}
-		if sched.WorkloadManager != nil {
-			// Delete pod from workload manager before deleting the pod from cache or scheduling queue.
-			sched.WorkloadManager.DeletePod(pod)
+		if sched.PodGroupManager != nil {
+			// Delete pod from pod group manager before deleting the pod from cache or scheduling queue.
+			sched.PodGroupManager.DeletePod(pod)
 		}
 		// The carried object may be stale, so we don't use it to check if
 		// it's assigned or not. Attempting to cleanup anyways.
@@ -676,10 +676,10 @@ func addAllEventHandlers(
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
-		case fwk.Workload:
+		case fwk.PodGroup:
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-				if handlerRegistration, err = informerFactory.Scheduling().V1alpha1().Workloads().Informer().AddEventHandler(
-					buildEvtResHandler(at, fwk.Workload),
+				if handlerRegistration, err = informerFactory.Scheduling().V1alpha2().PodGroups().Informer().AddEventHandler(
+					buildEvtResHandler(at, fwk.PodGroup),
 				); err != nil {
 					return err
 				}
