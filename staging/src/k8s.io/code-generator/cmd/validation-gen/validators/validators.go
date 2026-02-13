@@ -595,6 +595,14 @@ type WrapperFunction struct {
 	ObjType  *types.Type
 }
 
+// MultiWrapperFunction describes a function literal which has the fingerprint
+// of a regular validation function (op, fldPath, obj, oldObj) and calls
+// multiple other validation functions with the same signature.
+type MultiWrapperFunction struct {
+	Functions []FunctionGen
+	ObjType   *types.Type
+}
+
 // Literal is a literal value that, when used as an argument to a validator,
 // will be emitted without any further interpretation.  Use this with caution,
 // it will not be subject to Namers.
