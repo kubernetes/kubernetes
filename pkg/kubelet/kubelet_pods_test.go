@@ -4857,12 +4857,11 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	for _, test := range tests {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
 			t.Run(test.name, func(t *testing.T) {
-				tCtx := ktesting.Init(t)
+				logger, tCtx := ktesting.NewTestContext(t)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
 				kl := testKubelet.kubelet
-				logger, _ := ktesting.NewTestContext(t)
 				kl.statusManager.SetPodStatus(logger, test.pod, test.previousStatus)
 				for _, name := range test.unreadyContainer {
 					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
