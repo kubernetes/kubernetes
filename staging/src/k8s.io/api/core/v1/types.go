@@ -4458,17 +4458,27 @@ type PodSpec struct {
 	// +featureGate=HostnameOverride
 	// +optional
 	HostnameOverride *string `json:"hostnameOverride,omitempty" protobuf:"bytes,41,opt,name=hostnameOverride"`
-	// WorkloadRef provides a reference to the Workload object that this Pod belongs to.
-	// This field is used by the scheduler to identify the PodGroup and apply the
-	// correct group scheduling policies. The Workload object referenced
-	// by this field may not exist at the time the Pod is created.
-	// This field is immutable, but a Workload object with the same name
-	// may be recreated with different policies. Doing this during pod scheduling
+
+	// WorkloadRef is tombstoned to show why 42 is a reserved protobuf tag.
+	// This field got replaced with the SchedulingGroup field in Kubernetes 1.36.
+	// WorkloadRef *WorkloadReference `json:"workloadRef,omitempty" protobuf:"bytes,42,opt,name=workloadRef"`
+
+	// SchedulingGroup provides a reference to the immediate scheduling runtime
+	// grouping object that this Pod belongs to.
+	// This field is used by the scheduler to identify the group and apply the
+	// correct group scheduling policies. The association with a group also
+	// impacts other lifecycle aspects of a Pod that are relevant in a wider context
+	// of scheduling like preemption, resource attachment, etc. If not specified,
+	// the Pod is treated as a single unit in all of these aspects.
+	// The group object referenced by this field may not exist at the time the
+	// Pod is created.
+	// This field is immutable, but a group object with the same name may be
+	// recreated with different policies. Doing this during pod scheduling
 	// may result in the placement not conforming to the expected policies.
 	//
 	// +featureGate=GenericWorkload
 	// +optional
-	WorkloadRef *WorkloadReference `json:"workloadRef,omitempty" protobuf:"bytes,42,opt,name=workloadRef"`
+	SchedulingGroup *PodSchedulingGroup `json:"schedulingGroup,omitempty" protobuf:"bytes,43,opt,name=schedulingGroup"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
@@ -4580,34 +4590,16 @@ type PodSchedulingGate struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
-// WorkloadReference identifies the Workload object and PodGroup membership
-// that a Pod belongs to. The scheduler uses this information to apply
-// workload-aware scheduling semantics.
-type WorkloadReference struct {
-	// Name defines the name of the Workload object this Pod belongs to.
-	// Workload must be in the same namespace as the Pod.
-	// If it doesn't match any existing Workload, the Pod will remain unschedulable
-	// until a Workload object is created and observed by the kube-scheduler.
-	// It must be a DNS subdomain.
-	//
-	// +required
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-
-	// PodGroup is the name of the PodGroup within the Workload that this Pod
-	// belongs to. If it doesn't match any existing PodGroup within the Workload,
-	// the Pod will remain unschedulable until the Workload object is recreated
-	// and observed by the kube-scheduler. It must be a DNS label.
-	//
-	// +required
-	PodGroup string `json:"podGroup" protobuf:"bytes,2,opt,name=podGroup"`
-
-	// PodGroupReplicaKey specifies the replica key of the PodGroup to which this
-	// Pod belongs. It is used to distinguish pods belonging to different replicas
-	// of the same pod group. The pod group policy is applied separately to each replica.
-	// When set, it must be a DNS label.
+// PodSchedulingGroup identifies the runtime scheduling group instance that a Pod belongs to.
+// The scheduler uses this information to apply workload-aware scheduling semantics.
+type PodSchedulingGroup struct {
+	// PodGroupName specifies the name of the standalone PodGroup object
+	// that represents the runtime instance of this group.
+	// Must be a DNS subdomain.
 	//
 	// +optional
-	PodGroupReplicaKey string `json:"podGroupReplicaKey,omitempty" protobuf:"bytes,3,opt,name=podGroupReplicaKey"`
+	// +oneOf=GroupSelection
+	PodGroupName *string `json:"podGroupName,omitempty" protobuf:"bytes,1,opt,name=podGroupName"`
 }
 
 // +enum
