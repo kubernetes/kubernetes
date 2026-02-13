@@ -742,7 +742,7 @@ type Handle interface {
 	KubeConfig() *restclient.Config
 
 	// EventRecorder returns an event recorder.
-	EventRecorder() events.EventRecorder
+	EventRecorder() events.EventRecorderLogger
 
 	SharedInformerFactory() informers.SharedInformerFactory
 
