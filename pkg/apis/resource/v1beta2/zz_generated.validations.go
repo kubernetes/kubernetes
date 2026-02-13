@@ -1519,13 +1519,20 @@ func Validate_ResourceClaim(ctx context.Context, op operation.Operation, fldPath
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourceClaimSpec(ctx, op, fldPath, obj, oldObj)...)
@@ -1578,12 +1585,23 @@ func Validate_ResourceClaimStatus(ctx context.Context, op operation.Operation, f
 				return nil
 			}
 			// call field-attached validations
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
+			}
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				earlyReturn = true
-			}
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {

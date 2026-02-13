@@ -465,6 +465,20 @@ const (
 	NonError
 )
 
+const (
+	// UpdateCohort is the cohort for update-related validators (immutable, update).
+	// This cohort runs before the default cohort to fail fast on update violations.
+	// See https://github.com/kubernetes/kubernetes/issues/136262
+	//
+	// Do not add more cohorts. The update cohort is a special case needed to
+	// match the behavior of handwritten validation code, where immutability
+	// failures short-circuit all other checks. Adding additional cohorts
+	// increases complexity in the code generator and generated output with
+	// little benefit. If you think you need a new cohort, consider whether
+	// the ordering can be handled within the default cohort instead.
+	UpdateCohort = "update"
+)
+
 // Conditions defines what conditions must be true for a resource to be validated.
 // If any of the conditions are not true, the resource is not validated.
 type Conditions struct {
@@ -567,6 +581,12 @@ func (fg FunctionGen) WithComment(comment string) FunctionGen {
 // WithStabilityLevel returns a new FunctionGen with the given stability level.
 func (fg FunctionGen) WithStabilityLevel(level ValidationStabilityLevel) FunctionGen {
 	fg.StabilityLevel = level
+	return fg
+}
+
+// WithCohort returns a derived FunctionGen with the specified cohort.
+func (fg FunctionGen) WithCohort(cohort string) FunctionGen {
+	fg.Cohort = cohort
 	return fg
 }
 

@@ -1301,8 +1301,39 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 	// Group and sort the inputs.
 	cohorts := sortIntoCohorts(validations)
 
-	for _, validations := range cohorts {
+	// Check if we need cross-cohort early return (specifically for the "update" cohort
+	// when it has short-circuit validators that should prevent subsequent validation).
+	// This allows the update cohort to short-circuit all subsequent cohorts, and also
+	// to short-circuit caller-emitted code (type validation, list iteration) when the
+	// update cohort is the only cohort.
+	// See https://github.com/kubernetes/kubernetes/issues/136262
+	needsCrossCohortEarlyReturn := false
+	for _, cohort := range cohorts {
+		if cohort[0].Cohort == validators.UpdateCohort {
+			for _, v := range cohort {
+				if v.Flags.IsSet(validators.ShortCircuit) {
+					needsCrossCohortEarlyReturn = true
+					break
+				}
+			}
+			break
+		}
+	}
+
+	if needsCrossCohortEarlyReturn {
+		sw.Do("crossCohortEarlyReturn := false\n", nil)
+	}
+
+	for cohortIdx, validations := range cohorts {
 		cohortName := validations[0].Cohort
+
+		// Check cross-cohort early return before processing non-first cohorts
+		if needsCrossCohortEarlyReturn && cohortIdx > 0 {
+			sw.Do("if crossCohortEarlyReturn {\n", nil)
+			sw.Do("  return // short-circuit from previous cohort\n", nil)
+			sw.Do("}\n", nil)
+		}
+
 		if cohortName != "" {
 			sw.Do("func() { // cohort $.$\n", cohortName)
 		}
@@ -1398,6 +1429,10 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 
 				// Check for early return ONLY after the LAST short-circuit
 				if hasShortCircuits && i == lastShortCircuitIdx {
+					// For the update cohort, propagate early return BEFORE returning
+					if needsCrossCohortEarlyReturn && cohortName == validators.UpdateCohort {
+						sw.Do("crossCohortEarlyReturn = earlyReturn\n", nil)
+					}
 					sw.Do("if earlyReturn {\n", nil)
 					sw.Do("  return // do not proceed\n", nil)
 					sw.Do("}\n", nil)
@@ -1415,6 +1450,15 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 		if cohortName != "" {
 			sw.Do("}()\n", nil)
 		}
+	}
+
+	// When the update cohort is the last (or only) cohort, emit a final
+	// early-return check to protect caller-emitted code (type validation
+	// calls, list iterations) that follows.
+	if needsCrossCohortEarlyReturn && cohorts[len(cohorts)-1][0].Cohort == validators.UpdateCohort {
+		sw.Do("if crossCohortEarlyReturn {\n", nil)
+		sw.Do("  return // short-circuit from previous cohort\n", nil)
+		sw.Do("}\n", nil)
 	}
 }
 
@@ -1438,10 +1482,24 @@ func sortIntoCohorts(in []validators.FunctionGen) [][]validators.FunctionGen {
 			namedCohorts[key] = append(namedCohorts[key], fg)
 		}
 	}
-	if len(defaultCohort) > 0 {
-		idx = append([]string{""}, idx...)
+	// Build ordered index: update cohort first, then default, then others.
+	// This ensures update-related validators (immutable, update) run before
+	// other short-circuit validators (required, maxItems, etc.) and fail fast.
+	// See https://github.com/kubernetes/kubernetes/issues/136262
+	orderedIdx := make([]string, 0, len(idx)+2)
+	if _, hasUpdate := namedCohorts[validators.UpdateCohort]; hasUpdate {
+		orderedIdx = append(orderedIdx, validators.UpdateCohort)
 	}
-	// NOTE: we do not sort cohorts by name, because we want to preserve
+	if len(defaultCohort) > 0 {
+		orderedIdx = append(orderedIdx, "")
+	}
+	for _, k := range idx {
+		if k != validators.UpdateCohort {
+			orderedIdx = append(orderedIdx, k)
+		}
+	}
+	idx = orderedIdx
+	// NOTE: we do not sort other cohorts by name, because we want to preserve
 	// their definition order.
 
 	result := make([][]validators.FunctionGen, 0, len(in))

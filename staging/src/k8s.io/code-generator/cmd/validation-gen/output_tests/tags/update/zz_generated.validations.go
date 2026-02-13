@@ -62,13 +62,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("stringNoSet"), &obj.StringNoSet, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.StringNoSet }), oldObj != nil)...)
@@ -81,13 +88,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("stringNoUnset"), &obj.StringNoUnset, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.StringNoUnset }), oldObj != nil)...)
@@ -100,13 +114,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("stringNoModify"), &obj.StringNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.StringNoModify }), oldObj != nil)...)
@@ -119,13 +140,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("stringFullyRestricted"), &obj.StringFullyRestricted, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.StringFullyRestricted }), oldObj != nil)...)
@@ -138,13 +166,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("stringSetOnce"), &obj.StringSetOnce, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.StringSetOnce }), oldObj != nil)...)
@@ -157,13 +192,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("intNoModify"), &obj.IntNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *int { return &oldObj.IntNoModify }), oldObj != nil)...)
@@ -176,13 +218,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("int32NoModify"), &obj.Int32NoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *int32 { return &oldObj.Int32NoModify }), oldObj != nil)...)
@@ -195,13 +244,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("int64NoModify"), &obj.Int64NoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *int64 { return &oldObj.Int64NoModify }), oldObj != nil)...)
@@ -214,13 +270,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("uintNoModify"), &obj.UintNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *uint { return &oldObj.UintNoModify }), oldObj != nil)...)
@@ -233,13 +296,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("boolNoModify"), &obj.BoolNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *bool { return &oldObj.BoolNoModify }), oldObj != nil)...)
@@ -252,13 +322,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("float32NoModify"), &obj.Float32NoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *float32 { return &oldObj.Float32NoModify }), oldObj != nil)...)
@@ -271,13 +348,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("float64NoModify"), &obj.Float64NoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *float64 { return &oldObj.Float64NoModify }), oldObj != nil)...)
@@ -290,13 +374,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("byteNoModify"), &obj.ByteNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *byte { return &oldObj.ByteNoModify }), oldObj != nil)...)
@@ -309,13 +400,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("structNoModify"), &obj.StructNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *TestStruct { return &oldObj.StructNoModify }), oldObj != nil)...)
@@ -328,13 +426,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("nonComparableStructNoModify"), &obj.NonComparableStructNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *NonComparableStruct { return &oldObj.NonComparableStructNoModify }), oldObj != nil)...)
@@ -347,13 +452,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("pointerNoSet"), obj.PointerNoSet, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.PointerNoSet }), oldObj != nil)...)
@@ -366,13 +478,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("pointerNoUnset"), obj.PointerNoUnset, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.PointerNoUnset }), oldObj != nil)...)
@@ -385,13 +504,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("pointerNoModify"), obj.PointerNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.PointerNoModify }), oldObj != nil)...)
@@ -404,13 +530,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("pointerFullyRestricted"), obj.PointerFullyRestricted, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.PointerFullyRestricted }), oldObj != nil)...)
@@ -423,13 +556,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("intPointerNoModify"), obj.IntPointerNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *int { return oldObj.IntPointerNoModify }), oldObj != nil)...)
@@ -442,13 +582,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("boolPointerNoModify"), obj.BoolPointerNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *bool { return oldObj.BoolPointerNoModify }), oldObj != nil)...)
@@ -461,13 +608,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("structPointerNoModify"), obj.StructPointerNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *TestStruct { return oldObj.StructPointerNoModify }), oldObj != nil)...)
@@ -480,13 +634,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("customTypeNoModify"), &obj.CustomTypeNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *CustomString { return &oldObj.CustomTypeNoModify }), oldObj != nil)...)
@@ -499,13 +660,20 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				return nil
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			crossCohortEarlyReturn := false
+			func() { // cohort update
+				earlyReturn := false
+				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				crossCohortEarlyReturn = earlyReturn
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if crossCohortEarlyReturn {
+				return // short-circuit from previous cohort
 			}
 			return
 		}(fldPath.Child("customTypeNoSet"), &obj.CustomTypeNoSet, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *CustomInt { return &oldObj.CustomTypeNoSet }), oldObj != nil)...)

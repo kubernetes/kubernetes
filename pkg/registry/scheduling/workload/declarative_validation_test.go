@@ -169,7 +169,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setEmptyPodGroups()),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "podGroups"), "must have at least one item"),
 				field.Invalid(field.NewPath("spec", "podGroups"), []scheduling.PodGroup{}, "field is immutable").WithOrigin("immutable"),
 			},
 		},
@@ -177,7 +176,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setManyPodGroups(scheduling.WorkloadMaxPodGroups+1)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "podGroups"), scheduling.WorkloadMaxPodGroups+1, scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems"),
 				field.Invalid(field.NewPath("spec", "podGroups"), nil, "field is immutable").WithOrigin("immutable"),
 			},
 		},
