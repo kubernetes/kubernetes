@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -45,10 +46,17 @@ type remoteImageService struct {
 	imageClient runtimeapi.ImageServiceClient
 	logger      *klog.Logger
 	conn        *grpc.ClientConn
+	// useStreaming indicates whether to use streaming RPCs for list operations
+	// when the CRIListStreaming feature gate is enabled. It falls back to false
+	// if a streaming RPC returns Unimplemented. The fallback is racy but kept
+	// simple since the worst case is a few extra fallback attempts.
+	useStreaming bool
 }
 
 // NewRemoteImageService creates a new internalapi.ImageManagerService.
-func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider, logger *klog.Logger) (internalapi.ImageManagerService, error) {
+// If useStreaming is true, streaming RPCs will be used for list operations
+// instead of unary RPCs to avoid gRPC message size limits.
+func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider, logger *klog.Logger, useStreaming bool) (internalapi.ImageManagerService, error) {
 	internal.Log(logger, 3, "Connecting to image service", "endpoint", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
@@ -93,9 +101,10 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 	}
 
 	service := &remoteImageService{
-		timeout: connectionTimeout,
-		logger:  logger,
-		conn:    conn,
+		timeout:      connectionTimeout,
+		logger:       logger,
+		conn:         conn,
+		useStreaming: useStreaming,
 	}
 	if err := service.validateServiceConnection(ctx, conn, endpoint); err != nil {
 		return nil, fmt.Errorf("validate service connection: %w", err)
@@ -138,6 +147,9 @@ func (r *remoteImageService) ListImages(ctx context.Context, filter *runtimeapi.
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
+	if r.useStreaming {
+		return r.streamImagesV1(ctx, filter)
+	}
 	return r.listImagesV1(ctx, filter)
 }
 
@@ -151,6 +163,41 @@ func (r *remoteImageService) listImagesV1(ctx context.Context, filter *runtimeap
 	}
 
 	return resp.Images, nil
+}
+
+func (r *remoteImageService) streamImagesV1(ctx context.Context, filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+	stream, err := r.imageClient.StreamImages(ctx, &runtimeapi.StreamImagesRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		r.logErr(err, "StreamImages from image service failed", "filter", filter)
+		return nil, err
+	}
+
+	var images []*runtimeapi.Image
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			// If the RPC is unimplemented, disable streaming and fall back to the unary RPC.
+			// The Unimplemented status is not returned when creating the stream,
+			// but when calling Recv() on the stream.
+			if status.Code(err) == codes.Unimplemented {
+				r.log(5, "StreamImages not implemented, falling back to ListImages", "filter", filter)
+				r.useStreaming = false
+				return r.listImagesV1(ctx, filter)
+			}
+			r.logErr(err, "StreamImages recv failed", "filter", filter)
+			return nil, err
+		}
+		if resp.Image != nil {
+			images = append(images, resp.Image)
+		}
+	}
+
+	return images, nil
 }
 
 // ImageStatus returns the status of the image.
