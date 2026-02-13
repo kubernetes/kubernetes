@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -301,10 +302,13 @@ func TestGetMountSELinuxLabel(t *testing.T) {
 		},
 	}
 
+	// Unlock GA feature gates (SELinuxChangePolicy, SELinuxMount) so they can be disabled in tests
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			// Set feature gates for the test. *Disable* those that are not in tt.featureGates.
+			// Set feature gates for the test.
 			allGates := []featuregate.Feature{features.SELinuxChangePolicy, features.SELinuxMount}
 			enabledGates := sets.New(tt.featureGates...)
 			for _, fg := range allGates {
