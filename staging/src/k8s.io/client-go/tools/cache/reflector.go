@@ -104,7 +104,6 @@ type TransformingStore interface {
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
-	logger klog.Logger
 	// name identifies this reflector. By default, it will be a file:line if possible.
 	name string
 	// The name of the type we expect to place in the store. The name
@@ -250,10 +249,6 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 
 // ReflectorOptions configures a Reflector.
 type ReflectorOptions struct {
-	// Logger, if not nil, is used instead of klog.Background() for logging.
-	// The name of the reflector gets added automatically.
-	Logger *klog.Logger
-
 	// Name is the Reflector's name. If unset/unspecified, the name defaults to the closest source_file.go:line
 	// in the call stack that is outside this package.
 	Name string
@@ -343,13 +338,6 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		r.name = naming.GetNameFromCallsite(internalPackages...)
 	}
 
-	logger := klog.Background()
-	if options.Logger != nil {
-		logger = *options.Logger
-	}
-	logger = klog.LoggerWithName(logger, r.name)
-	r.logger = logger
-
 	if r.typeDescription == "" {
 		r.typeDescription = getTypeDescriptionFromObject(expectedType)
 	}
@@ -360,7 +348,9 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 
 	r.useWatchList = clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient)
 	if r.useWatchList && watchlist.DoesClientNotSupportWatchListSemantics(lw) {
-		r.logger.V(2).Info(
+		// Using klog.TODO() here because switching to a caller-provided contextual logger
+		// would require an API change and updating all existing call sites.
+		klog.TODO().V(2).Info(
 			"The client used to build this informer/reflector doesn't support WatchList semantics. The feature will be disabled. This is expected in unit tests but not in production. For details, see the documentation of watchlist.DoesClientNotSupportWatchListSemantics().",
 			"feature", clientfeatures.WatchListClient,
 		)

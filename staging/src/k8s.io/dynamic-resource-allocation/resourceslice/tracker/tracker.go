@@ -71,16 +71,8 @@ type Tracker struct {
 	// may be overridden in tests.
 	handleError func(context.Context, error, string, ...any)
 
-	// wg and cancel track resp. kill goroutines.
-	wg     sync.WaitGroup
-	cancel func(error)
-
 	// Synchronizes updates to these fields related to event handlers.
 	rwMutex sync.RWMutex
-
-	// synced gets closed once all the tracker's event handlers are synced.
-	synced chan struct{}
-
 	// All registered event handlers.
 	eventHandlers []cache.ResourceEventHandler
 	// The eventQueue contains functions which deliver an event to one
@@ -163,8 +155,6 @@ func newTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr er
 		deviceClasses:          opts.ClassInformer.Informer(),
 		patchedResourceSlices:  cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:            utilruntime.HandleErrorWithContext,
-		synced:                 make(chan struct{}),
-		cancel:                 func(error) {}, // Real function set in initInformers.
 		eventQueue:             *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),
 	}
 	defer func() {
@@ -222,22 +212,6 @@ func (t *Tracker) initInformers(ctx context.Context) error {
 		return fmt.Errorf("add event handler for DeviceClasses: %w", err)
 	}
 
-	// This usually short-lived goroutines monitors our upstream event handlers and
-	// closes our own synced channel when they are synced.
-	monitorCtx, cancel := context.WithCancelCause(ctx)
-	t.cancel = cancel
-	t.wg.Go(func() {
-		for _, handle := range []cache.ResourceEventHandlerRegistration{t.resourceSlicesHandle, t.deviceTaintsHandle, t.deviceClassesHandle} {
-			select {
-			case <-handle.HasSyncedChecker().Done():
-			case <-monitorCtx.Done():
-				// Abort without closing our synced channel.
-				return
-			}
-		}
-		close(t.synced)
-	})
-
 	return nil
 }
 
@@ -246,28 +220,21 @@ func (t *Tracker) initInformers(ctx context.Context) error {
 // point is possible and will emit events with up-to-date ResourceSlice
 // objects.
 func (t *Tracker) HasSynced() bool {
-	select {
-	case <-t.HasSyncedChecker().Done():
-		return true
-	default:
+	if !t.enableDeviceTaintRules {
+		return t.resourceSlices.HasSynced()
+	}
+
+	if t.resourceSlicesHandle != nil && !t.resourceSlicesHandle.HasSynced() {
 		return false
 	}
-}
-
-func (t *Tracker) HasSyncedChecker() cache.DoneChecker {
-	if !t.enableDeviceTaintRules {
-		return t.resourceSlices.HasSyncedChecker()
+	if t.deviceTaintsHandle != nil && !t.deviceTaintsHandle.HasSynced() {
+		return false
+	}
+	if t.deviceClassesHandle != nil && !t.deviceClassesHandle.HasSynced() {
+		return false
 	}
 
-	return trackerHasSynced{t}
-}
-
-type trackerHasSynced struct{ t *Tracker }
-
-func (s trackerHasSynced) Name() string { return "ResourceSlice tracker" }
-
-func (s trackerHasSynced) Done() <-chan struct{} {
-	return s.t.synced
+	return true
 }
 
 // Stop ends all background activity and blocks until that shutdown is complete.
@@ -276,16 +243,12 @@ func (t *Tracker) Stop() {
 		return
 	}
 
-	t.cancel(errors.New("stopped"))
-
 	if t.broadcaster != nil {
 		t.broadcaster.Shutdown()
 	}
 	_ = t.resourceSlices.RemoveEventHandler(t.resourceSlicesHandle)
 	_ = t.deviceTaints.RemoveEventHandler(t.deviceTaintsHandle)
 	_ = t.deviceClasses.RemoveEventHandler(t.deviceClassesHandle)
-
-	t.wg.Wait()
 }
 
 // ListPatchedResourceSlices returns all ResourceSlices in the cluster with

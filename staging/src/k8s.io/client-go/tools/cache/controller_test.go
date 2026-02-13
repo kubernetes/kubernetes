@@ -834,7 +834,6 @@ func TestProcessDeltasInBatch(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
 			mockStore := &mockTxnStore{
 				Store:       NewStore(MetaNamespaceKeyFunc),
 				failingObjs: tc.failingObjects,
@@ -852,7 +851,6 @@ func TestProcessDeltasInBatch(t *testing.T) {
 				},
 			}
 			err := processDeltasInBatch(
-				logger,
 				dummyListener,
 				mockStore,
 				tc.deltaList,
@@ -931,12 +929,12 @@ func TestReplaceEvents(t *testing.T) {
 
 			Process: func(obj interface{}, isInInitialList bool) error {
 				if deltas, ok := obj.(Deltas); ok {
-					return processDeltas(fifo.logger, recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+					return processDeltas(recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 				}
 				return errors.New("object given as Process argument is not Deltas")
 			},
 			ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-				return processDeltasInBatch(fifo.logger, recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+				return processDeltasInBatch(recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 			},
 		}
 		c := New(cfg)
@@ -1068,12 +1066,12 @@ func TestResetWatch(t *testing.T) {
 
 				Process: func(obj interface{}, isInInitialList bool) error {
 					if deltas, ok := obj.(Deltas); ok {
-						return processDeltas(fifo.logger, recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+						return processDeltas(recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 					}
 					return errors.New("object given as Process argument is not Deltas")
 				},
 				ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-					return processDeltasInBatch(fifo.logger, recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+					return processDeltasInBatch(recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 				},
 			}
 			c := New(cfg)
@@ -1154,7 +1152,6 @@ func TestStoreResourceVersion(t *testing.T) {
 		AtomicEvents: true,
 	})
 	recorder := newEventRecorder(store, DeletionHandlingMetaNamespaceKeyFunc)
-	logger, _ := ktesting.NewTestContext(t)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -1163,12 +1160,12 @@ func TestStoreResourceVersion(t *testing.T) {
 		FullResyncPeriod: 0,
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(logger, recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+				return processDeltas(recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
 		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(logger, recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+			return processDeltasInBatch(recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 		},
 	}
 	c := New(cfg)
@@ -1251,7 +1248,6 @@ func TestStoreResourceVersionWithNonMetaTransform(t *testing.T) {
 		AtomicEvents: true,
 	})
 	recorder := newEventRecorder(store, keyFunc)
-	logger, _ := ktesting.NewTestContext(t)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -1261,12 +1257,12 @@ func TestStoreResourceVersionWithNonMetaTransform(t *testing.T) {
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(logger, recorder, store, deltas, isInInitialList, keyFunc)
+				return processDeltas(recorder, store, deltas, isInInitialList, keyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
 		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(logger, recorder, store, deltaList, isInInitialList, keyFunc)
+			return processDeltasInBatch(recorder, store, deltaList, isInInitialList, keyFunc)
 		},
 	}
 	c := New(cfg)
