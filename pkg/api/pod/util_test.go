@@ -4379,6 +4379,10 @@ func TestDropSELinuxChangePolicy(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
+		// only if tc.gates include selinuxchangepolicy
+		if !sets.New(tc.gates...).Has(features.SELinuxChangePolicy) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		t.Run(tc.name, func(t *testing.T) {
 
 			// Set feature gates for the test. *Disable* those that are not in tc.gates.

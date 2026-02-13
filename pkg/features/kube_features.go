@@ -1690,6 +1690,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	SELinuxChangePolicy: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.39, locked to default in 1.36
 	},
 
 	SELinuxMount: {
@@ -1701,6 +1702,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.39, locked to default in 1.36
 	},
 
 	SchedulerAsyncAPICalls: {

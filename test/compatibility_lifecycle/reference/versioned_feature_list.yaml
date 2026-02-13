@@ -1567,6 +1567,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: SELinuxMount
   versionedSpecs:
   - default: false
@@ -1591,6 +1595,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.28"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.36"
 - name: SeparateCacheWatchRPC
   versionedSpecs:
   - default: true
