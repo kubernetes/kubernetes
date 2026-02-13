@@ -198,9 +198,9 @@ func TestFrameworkForPodGroup(t *testing.T) {
 	p2 := st.MakePod().Name("p2").SchedulerName("sched1").Obj()
 	p3 := st.MakePod().Name("p3").SchedulerName("sched2").Obj()
 
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupCycle: true}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupCycle: true}
-	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}, NeedsPodGroupCycle: true}
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupScheduling: true}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupScheduling: true}
+	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}, NeedsPodGroupScheduling: true}
 
 	tests := []struct {
 		name        string
@@ -258,9 +258,9 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 	p2 := st.MakePod().Name("p2").UID("p2").Terminating().Obj()
 	p3 := st.MakePod().Name("p3").UID("p3").Obj()
 
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupCycle: true}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupCycle: true}
-	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}, NeedsPodGroupCycle: true}
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupScheduling: true}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupScheduling: true}
+	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}, NeedsPodGroupScheduling: true}
 
 	pgInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2, qInfo3},
@@ -323,8 +323,8 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 	p1 := st.MakePod().Name("p1").UID("p1").SchedulerName("test-scheduler").Obj()
 	p2 := st.MakePod().Name("p2").UID("p2").SchedulerName("test-scheduler").Obj()
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupCycle: true}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupCycle: true}
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupScheduling: true}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupScheduling: true}
 
 	pgInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2},
@@ -393,9 +393,9 @@ func TestPodGroupSchedulingDefaultAlgorithm(t *testing.T) {
 	p2 := st.MakePod().Name("p2").UID("p2").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
 	p3 := st.MakePod().Name("p3").UID("p3").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
 
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupCycle: true}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupCycle: true}
-	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}, NeedsPodGroupCycle: true}
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupScheduling: true}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupScheduling: true}
+	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}, NeedsPodGroupScheduling: true}
 
 	pgInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2, qInfo3},
@@ -772,9 +772,9 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 	p2 := st.MakePod().Name("p2").UID("p2").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
 	p3 := st.MakePod().Name("p3").UID("p3").WorkloadRef(ref).SchedulerName("test-scheduler").Obj()
 
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupCycle: true}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupCycle: true}
-	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}, NeedsPodGroupCycle: true}
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}, NeedsPodGroupScheduling: true}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}, NeedsPodGroupScheduling: true}
+	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}, NeedsPodGroupScheduling: true}
 
 	pgInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2, qInfo3},

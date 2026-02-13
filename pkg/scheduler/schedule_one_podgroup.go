@@ -92,7 +92,9 @@ func (sched *Scheduler) frameworkForPodGroup(podGroupInfo *framework.QueuedPodGr
 	return fwk, nil
 }
 
-// skipPodGroupPodSchedule skips scheduling of particular pods from the group when they shouldn't be longer considered.
+// skipPodGroupPodSchedule skips the scheduling of particular pods from the group when they should no longer be considered.
+// This can happen when the pod is already being deleted (i.e., when its deletionTimestamp is set)
+// or when the pod has already been assumed.
 func (sched *Scheduler) skipPodGroupPodSchedule(ctx context.Context, schedFwk framework.Framework, podGroupInfo *framework.QueuedPodGroupInfo) {
 	filteredQueuedPodInfos := make([]*framework.QueuedPodInfo, 0, len(podGroupInfo.QueuedPodInfos))
 	for _, podInfo := range podGroupInfo.QueuedPodInfos {
@@ -399,7 +401,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			switch result.status {
 			case podGroupFeasible:
 				// Pod no longer needs a pod group scheduling cycle. Setting it to false to disable any checks in further functions.
-				pInfo.NeedsPodGroupCycle = false
+				pInfo.NeedsPodGroupScheduling = false
 				// Schedule result is applied for pod and its binding cycle executes.
 				assumedPodInfo, status := sched.prepareForBindingCycle(ctx, podCtx.state, schedFwk, pInfo, podCtx.podsToActivate, podResult.scheduleResult)
 				if !status.IsSuccess() {

@@ -908,7 +908,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
 	// Pod with Workload reference should always need the cycle after got unschedulable for some reason.
-	pInfo.NeedsPodGroupCycle = p.isGenericWorkloadEnabled && pod.Spec.WorkloadRef != nil
+	pInfo.NeedsPodGroupScheduling = p.isGenericWorkloadEnabled && pod.Spec.WorkloadRef != nil
 
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
@@ -1497,7 +1497,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 		Timestamp:               now,
 		InitialAttemptTimestamp: nil,
 		UnschedulablePlugins:    sets.New(plugins...),
-		NeedsPodGroupCycle:      p.isGenericWorkloadEnabled && pod.Spec.WorkloadRef != nil,
+		NeedsPodGroupScheduling: p.isGenericWorkloadEnabled && pod.Spec.WorkloadRef != nil,
 	}
 }
 

@@ -74,7 +74,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	if podInfo == nil || podInfo.Pod == nil {
 		return
 	}
-	if podInfo.NeedsPodGroupCycle {
+	if podInfo.NeedsPodGroupScheduling {
 		podGroupInfo, err := sched.podGroupInfoForPod(ctx, podInfo)
 		if err != nil {
 			podFwk, err := sched.frameworkForPod(podInfo.Pod)
@@ -352,7 +352,7 @@ func (sched *Scheduler) assumeAndReserve(
 }
 
 // unreserveAndForget unreserves and forgets the pod from scheduler's memory.
-// This function shouldn't be called during binding cycle with a pod that has the NeedsPodGroupCycle set to true,
+// This function shouldn't be called during binding cycle with a pod that has the NeedsPodGroupScheduling set to true,
 // but this shouldn't happen, because such pods cannot reach binding.
 func (sched *Scheduler) unreserveAndForget(
 	ctx context.Context,
@@ -364,7 +364,7 @@ func (sched *Scheduler) unreserveAndForget(
 	logger := klog.FromContext(ctx)
 
 	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
-	if assumedPodInfo.NeedsPodGroupCycle {
+	if assumedPodInfo.NeedsPodGroupScheduling {
 		err := sched.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod)
 		if err != nil {
 			return err
@@ -547,7 +547,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	pod := podInfo.Pod
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
-	if !podInfo.NeedsPodGroupCycle {
+	if !podInfo.NeedsPodGroupScheduling {
 		if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
 			return result, err
 		}
@@ -1087,7 +1087,7 @@ func (sched *Scheduler) assume(logger klog.Logger, assumedPodInfo *framework.Que
 	// immediately.
 	assumedPodInfo.Pod.Spec.NodeName = host
 
-	if assumedPodInfo.NeedsPodGroupCycle {
+	if assumedPodInfo.NeedsPodGroupScheduling {
 		err := sched.nodeInfoSnapshot.AssumePod(assumedPodInfo.PodInfo)
 		if err != nil {
 			logger.Error(err, "Scheduler snapshot AssumePod failed")
