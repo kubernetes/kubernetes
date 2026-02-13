@@ -95,27 +95,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("provisioner"), "kubernetes.io/aws-ebs", "field is immutable").WithOrigin("immutable"),
 			},
 		},
-		"invalid update parameters changed": {
-			oldObj:    mkValidStorageClass(),
-			updateObj: mkValidStorageClass(TweakParameters(map[string]string{"new": "value"})),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("parameters"), map[string]string{"new": "value"}, "field is immutable").WithOrigin("immutable"),
-			},
-		},
-		"invalid update reclaimPolicy changed": {
-			oldObj:    mkValidStorageClass(),
-			updateObj: mkValidStorageClass(TweakReclaimPolicy(api.PersistentVolumeReclaimRetain)),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("reclaimPolicy"), api.PersistentVolumeReclaimRetain, "field is immutable").WithOrigin("immutable"),
-			},
-		},
-		"invalid update volumeBindingMode changed": {
-			oldObj:    mkValidStorageClass(),
-			updateObj: mkValidStorageClass(TweakVolumeBindingMode(storage.VolumeBindingWaitForFirstConsumer)),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("volumeBindingMode"), storage.VolumeBindingWaitForFirstConsumer, "field is immutable").WithOrigin("immutable"),
-			},
-		},
 		"invalid update provisioner unset to set": {
 			oldObj:    mkValidStorageClass(TweakProvisioner("")),
 			updateObj: mkValidStorageClass(),
@@ -129,6 +108,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("provisioner"), "", "field is immutable").WithOrigin("immutable"),
 				field.Required(field.NewPath("provisioner"), ""),
+			},
+		},
+		"invalid update parameters changed": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakParameters(map[string]string{"new": "value"})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("parameters"), map[string]string{"new": "value"}, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 		"invalid update parameters unset to set": {
@@ -145,6 +131,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("parameters"), nil, "field is immutable").WithOrigin("immutable"),
 			},
 		},
+		"invalid update reclaimPolicy changed": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakReclaimPolicy(api.PersistentVolumeReclaimRetain)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("reclaimPolicy"), api.PersistentVolumeReclaimRetain, "field is immutable").WithOrigin("immutable"),
+			},
+		},
 		"invalid update reclaimPolicy unset to set": {
 			oldObj:    mkValidStorageClass(TweakReclaimPolicyNil()),
 			updateObj: mkValidStorageClass(),
@@ -157,6 +150,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidStorageClass(TweakReclaimPolicyNil()),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("reclaimPolicy"), nil, "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update volumeBindingMode changed": {
+			oldObj:    mkValidStorageClass(),
+			updateObj: mkValidStorageClass(TweakVolumeBindingMode(storage.VolumeBindingWaitForFirstConsumer)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("volumeBindingMode"), storage.VolumeBindingWaitForFirstConsumer, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 		"invalid update volumeBindingMode unset to set": {
