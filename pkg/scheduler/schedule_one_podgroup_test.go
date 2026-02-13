@@ -1070,7 +1070,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 				tt.algorithmResult.podResults[i].podCtx = podCtx
 			}
 
-			sched.submitPodGroupAlgorithmResult(ctx, schedFwk, pgInfo, tt.algorithmResult)
+			sched.submitPodGroupAlgorithmResult(ctx, schedFwk, pgInfo, tt.algorithmResult, time.Now())
 
 			if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 				lock.Lock()

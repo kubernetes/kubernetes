@@ -43,9 +43,23 @@ func PodScheduleError(profile string, duration float64) {
 }
 
 func observeScheduleAttemptAndLatency(result, profile string, duration float64) {
-	if duration >= 0 {
-		// Record the metric only for positive duration.
-		schedulingLatency.WithLabelValues(result, profile).Observe(duration)
-	}
+	schedulingLatency.WithLabelValues(result, profile).Observe(duration)
 	scheduleAttempts.WithLabelValues(result, profile).Inc()
+}
+
+// PodGroupScheduled can records a successful pod group scheduling attempt and the duration
+// since `start`.
+func PodGroupScheduled(profile string, duration float64) {
+	observePodGroupScheduleAttemptAndLatency(ScheduledResult, profile, duration)
+}
+
+// PodGroupUnschedulable can records a pod group scheduling attempt for an unschedulable pod
+// and the duration since `start`.
+func PodGroupUnschedulable(profile string, duration float64) {
+	observePodGroupScheduleAttemptAndLatency(UnschedulableResult, profile, duration)
+}
+
+func observePodGroupScheduleAttemptAndLatency(result, profile string, duration float64) {
+	podGroupSchedulingLatency.WithLabelValues(result, profile).Observe(duration)
+	podGroupScheduleAttempts.WithLabelValues(result, profile).Inc()
 }
