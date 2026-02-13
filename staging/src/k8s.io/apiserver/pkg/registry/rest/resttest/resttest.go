@@ -53,6 +53,7 @@ type Tester struct {
 	returnDeletedObject bool
 	namer               func(int) string
 	userInfo            user.Info
+	requestInfo         *genericapirequest.RequestInfo
 }
 
 func New(t *testing.T, storage rest.Storage) *Tester {
@@ -94,6 +95,12 @@ func (t *Tester) ReturnDeletedObject() *Tester {
 	return t
 }
 
+// SetRequestInfo sets the RequestInfo that should be present in the context when the
+// storage operation is called.
+func (t *Tester) SetRequestInfo(requestInfo *genericapirequest.RequestInfo) {
+	t.requestInfo = requestInfo
+}
+
 // TestNamespace returns the namespace that will be used when creating contexts.
 // Returns NamespaceNone for cluster-scoped objects.
 func (t *Tester) TestNamespace() string {
@@ -116,6 +123,9 @@ func (t *Tester) TestContext() context.Context {
 	ctx = genericapirequest.WithNamespace(ctx, t.TestNamespace())
 	if t.userInfo != nil {
 		ctx = genericapirequest.WithUser(ctx, t.userInfo)
+	}
+	if t.requestInfo != nil {
+		ctx = genericapirequest.WithRequestInfo(ctx, t.requestInfo)
 	}
 	return ctx
 }
@@ -415,6 +425,9 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object, opts metav1.CreateOptions) {
 	// Ignore non-empty namespace in context
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
+	if t.requestInfo != nil {
+		ctx = genericapirequest.WithRequestInfo(ctx, t.requestInfo)
+	}
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
 	created, err := t.storage.(rest.Creater).Create(ctx, valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
@@ -434,6 +447,9 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object, opts
 	// Ignore non-empty namespace in object meta
 	objectMeta.SetNamespace("not-default")
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
+	if t.requestInfo != nil {
+		ctx = genericapirequest.WithRequestInfo(ctx, t.requestInfo)
+	}
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
 	created, err := t.storage.(rest.Creater).Create(ctx, valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
@@ -1179,6 +1195,9 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 	objMeta.SetName(t.namer(5))
 
 	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar3")
+	if t.requestInfo != nil {
+		ctx1 = genericapirequest.WithRequestInfo(ctx1, t.requestInfo)
+	}
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
 	_, err := t.storage.(rest.Creater).Create(ctx1, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1186,6 +1205,9 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 	}
 
 	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar4")
+	if t.requestInfo != nil {
+		ctx2 = genericapirequest.WithRequestInfo(ctx2, t.requestInfo)
+	}
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx2))
 	_, err = t.storage.(rest.Creater).Create(ctx2, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1240,7 +1262,13 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 
 func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar1")
+	if t.requestInfo != nil {
+		ctx1 = genericapirequest.WithRequestInfo(ctx1, t.requestInfo)
+	}
 	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar2")
+	if t.requestInfo != nil {
+		ctx2 = genericapirequest.WithRequestInfo(ctx2, t.requestInfo)
+	}
 	objMeta := t.getObjectMetaOrFail(obj)
 	objMeta.SetName(t.namer(4))
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))

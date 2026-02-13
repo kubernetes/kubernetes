@@ -76,24 +76,37 @@ func WithNormalizationRules(rules []field.NormalizationRule) ValidationConfig {
 	}
 }
 
-// WithDeclarativeNative marks the validation configuration to indicate that it includes
-// declarative validations that are defined *only* declaratively, lacking corresponding imperative validation.
-// When set, declarative validation is always executed regardless of feature gates. Errors marked as
-// declarative-native are separated from the full set and returned alongside imperative errors.
-func WithDeclarativeNative() ValidationConfig {
+// WithDeclarativeEnforcement marks the validation configuration to indicate that it includes
+// declarative validations that should follow the fine-grained Validation Lifecycle.
+// When set, declarative validation is always executed regardless of feature gates.
+// Authority is determined by individual tag prefixes (+k8s:alpha, +k8s:beta) and the
+// DeclarativeValidationBeta safety switch.
+func WithDeclarativeEnforcement() ValidationConfig {
 	return func(config *validationConfigOption) {
-		config.containsDeclarativeNative = true
+		config.declarativeEnforcement = true
 	}
 }
 
+type allDeclarativeEnforcedKeyType struct{}
+
+var allDeclarativeEnforcedKey = allDeclarativeEnforcedKeyType{}
+
+// WithAllDeclarativeEnforcedForTest returns a copy of parent context with allDeclarativeEnforcedKey set to true.
+// This is used for testing to expose all declarative validation errors and filter all handwritten validation errors
+// that are covered by declarative validation, regardless of the feature gate or maturity level.
+//
+// NOTE: This function is intended for testing purposes only and should not be used in production code.
+func WithAllDeclarativeEnforcedForTest(ctx context.Context) context.Context {
+	return context.WithValue(ctx, allDeclarativeEnforcedKey, true)
+}
+
 type validationConfigOption struct {
-	opType                    operation.Type
-	options                   []string
-	takeover                  bool
-	subresourceGVKMapper      GroupVersionKindProvider
-	validationIdentifier      string
-	normalizationRules        []field.NormalizationRule
-	containsDeclarativeNative bool
+	opType                 operation.Type
+	options                []string
+	subresourceGVKMapper   GroupVersionKindProvider
+	validationIdentifier   string
+	normalizationRules     []field.NormalizationRule
+	declarativeEnforcement bool
 }
 
 // validateDeclaratively validates obj and oldObj against declarative
@@ -166,9 +179,9 @@ func parseSubresourcePath(subresourcePath string) ([]string, error) {
 
 // compareDeclarativeErrorsAndEmitMismatches checks for mismatches between imperative and declarative validation
 // and logs + emits metrics when inconsistencies are found
-func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool, validationIdentifier string, normalizationRules []field.NormalizationRule) {
+func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, enforced bool, validationIdentifier string, normalizationRules []field.NormalizationRule) {
 	logger := klog.FromContext(ctx)
-	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, takeover, normalizationRules)
+	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, enforced, normalizationRules)
 	for _, detail := range mismatchDetails {
 		// Log information about the mismatch using contextual logger
 		logger.Error(nil, detail)
@@ -180,29 +193,34 @@ func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeEr
 
 // gatherDeclarativeValidationMismatches compares imperative and declarative validation errors
 // and returns detailed information about any mismatches found. Errors are compared via type, field, and origin
-func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field.ErrorList, takeover bool, normalizationRules []field.NormalizationRule) []string {
+func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field.ErrorList, enforced bool, normalizationRules []field.NormalizationRule) []string {
 	var mismatchDetails []string
 	// short circuit here to minimize allocs for usual case of 0 validation errors
 	if len(imperativeErrs) == 0 && len(declarativeErrs) == 0 {
 		return mismatchDetails
 	}
-	// recommendation based on takeover status
-	recommendation := "This difference should not affect system operation since hand written validation is authoritative."
-	if takeover {
-		recommendation = "Consider disabling the DeclarativeValidationTakeover feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes."
-	}
-	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(normalizationRules)
-	exactMatcher := field.ErrorMatcher{}.Exactly()
+	// default recommendation based on enforcement status
+	const (
+		authoritativeMsg = "This difference should not affect system operation since hand written validation is authoritative."
+		disableBetaMsg   = "Consider disabling the DeclarativeValidationBeta feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes."
+	)
 
-	// Dedupe imperative errors of exact error matches as they are
-	// not intended and come from (buggy) duplicate validation calls
+	defaultRecommendation := authoritativeMsg
+	if enforced {
+		defaultRecommendation = disableBetaMsg
+	}
+
+	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(normalizationRules)
+
+	// Dedupe imperative errors using the fuzzy matcher (type, field, and origin) as they are
+	// not intended and come from (buggy) duplicate validation calls.
 	// This is necessary as without deduping we could get unmatched
-	// imperative errors for cases that are correct (matching)
+	// imperative errors for cases that are correct (matching).
 	dedupedImperativeErrs := field.ErrorList{}
 	for _, err := range imperativeErrs {
 		found := false
 		for _, existingErr := range dedupedImperativeErrs {
-			if exactMatcher.Matches(existingErr, err) {
+			if fuzzyMatcher.Matches(existingErr, err) {
 				found = true
 				break
 			}
@@ -244,12 +262,18 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 		}
 
 		if matchCount == 0 {
+			rec := defaultRecommendation
+			// If the imperative error is explicitly Alpha, it is never enforced, so HV is authoritative.
+			if iErr.IsAlpha() {
+				rec = authoritativeMsg
+			}
+
 			mismatchDetails = append(mismatchDetails,
 				fmt.Sprintf(
 					"Unexpected difference between hand written validation and declarative validation error results, unmatched error(s) found %s. "+
 						"This indicates an issue with declarative validation. %s",
 					fuzzyMatcher.Render(iErr),
-					recommendation,
+					rec,
 				),
 			)
 		}
@@ -259,12 +283,18 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 
 	// Any remaining unmatched declarative errors are considered "extra"
 	for _, dErr := range remaining {
+		rec := defaultRecommendation
+		// If the declarative error is Alpha, it is never enforced (shadowed), so HV is authoritative.
+		if dErr.IsAlpha() {
+			rec = authoritativeMsg
+		}
+
 		mismatchDetails = append(mismatchDetails,
 			fmt.Sprintf(
 				"Unexpected difference between hand written validation and declarative validation error results, extra error(s) found %s. "+
 					"This indicates an issue with declarative validation. %s",
 				fuzzyMatcher.Render(dErr),
-				recommendation,
+				rec,
 			),
 		)
 	}
@@ -345,12 +375,23 @@ func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.O
 	return identifier, errs
 }
 
-// ValidateDeclarativelyWithMigrationChecks runs declarative validation, and conditionally compares results
-// with imperative validation and merges errors based on the feature gate and `takeover` flag.
-// It proceeds if either the DeclarativeValidation feature gate is enabled or `containsDeclarativeNative` is set.
+// ValidateDeclarativelyWithMigrationChecks executes declarative validation and implements the Validation Lifecycle strategy.
+// It manages the transition from handwritten (HV) to declarative (DV) validation by controlling enforcement:
+//   - Standard: Enforced if declarativeEnforcement is set. HV counterparts are expected to be deleted from source.
+//   - Beta: Enforced if declarativeEnforcement is set AND DeclarativeValidationBeta feature gate is enabled.
+//     When enforced, corresponding HV errors are filtered out. Otherwise, DV is shadowed.
+//   - Alpha: Always shadowed; HV remains authoritative.
+//
+// Mismatches between HV and DV are logged if the DeclarativeValidation gate is enabled.
+// Mismatch checking is limited to Alpha and Beta stages when explicit enforcement is active.
+//
+// For testing purposes, WithAllDeclarativeEnforcedForTest can be used to enforce all declarative validations
+// regardless of feature gates and filter all covered handwritten validations.
 func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, configOpts ...ValidationConfig) field.ErrorList {
 	declarativeValidationEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation)
-	takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+	betaEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta)
+	// allDeclarativeEnforced indicates that we should check all declarative errors for testing purposes.
+	allDeclarativeEnforced := ctx.Value(allDeclarativeEnforcedKey) == true
 
 	validationIdentifier, err := metricIdentifier(ctx, scheme, obj, opType)
 	if err != nil {
@@ -361,51 +402,90 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	// Directly create the config and call the core validation logic.
 	cfg := &validationConfigOption{
 		opType:               opType,
-		takeover:             takeover,
 		validationIdentifier: validationIdentifier,
 	}
 	for _, opt := range configOpts {
 		opt(cfg)
 	}
 
-	// Short-circuit if neither DeclarativeValidation is enabled nor the object contains declarative native validation.
-	if !(declarativeValidationEnabled || cfg.containsDeclarativeNative) {
+	// Short-circuit if neither DeclarativeValidation is enabled nor the object is explicitly configured for declarative enforcement.
+	if !declarativeValidationEnabled && !cfg.declarativeEnforcement && !allDeclarativeEnforced {
 		return errs
 	}
 
 	// Call the panic-safe wrapper with the real validation function.
-	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.takeover || cfg.containsDeclarativeNative, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
-
-	mirroredDVErrors := field.ErrorList{}
-	dvNativeErrors := field.ErrorList{}
-
-	// When declarative native validation is present, we need to separate declarative native errors
-	// from mirrored declarative errors. This is to avoid comparing declarative native errors (which
-	// have no imperative equivalent) with handwritten imperative errors.
-	if cfg.containsDeclarativeNative {
-		for _, err := range declarativeErrs {
-			if err.DeclarativeNative {
-				dvNativeErrors = append(dvNativeErrors, err)
-			} else if err.Type == field.ErrorTypeInternal {
-				// Internal errors should fail both types of validation.
-				dvNativeErrors = append(dvNativeErrors, err)
-				mirroredDVErrors = append(mirroredDVErrors, err)
-			} else {
-				mirroredDVErrors = append(mirroredDVErrors, err)
-			}
-		}
-	} else {
-		mirroredDVErrors = declarativeErrs
-	}
+	// We should fail if validation is enforced.
+	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.declarativeEnforcement, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
 
 	if declarativeValidationEnabled {
-		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mirroredDVErrors, takeover, validationIdentifier, cfg.normalizationRules)
-		if takeover {
-			errs = append(errs.RemoveCoveredByDeclarative(), mirroredDVErrors...)
+		// Log mismatches.
+		// When explicit strategy is used (declarativeEnforcement), Standard errors are authoritative
+		// and may not have handwritten counterparts (e.g., in new APIs).
+		// We only mismatch check Alpha and Beta errors in this mode.
+		mismatchCandidateErrs := declarativeErrs
+		if cfg.declarativeEnforcement {
+			mismatchCandidateErrs = nil
+			for _, err := range declarativeErrs {
+				if err.IsAlpha() || err.IsBeta() {
+					mismatchCandidateErrs = append(mismatchCandidateErrs, err)
+				}
+			}
+		}
+
+		// We pass betaEnabled (and enforcement) as the takeover flag to avoid changing logic elsewhere for now.
+		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mismatchCandidateErrs, cfg.declarativeEnforcement && betaEnabled, validationIdentifier, cfg.normalizationRules)
+	}
+
+	if !cfg.declarativeEnforcement && !allDeclarativeEnforced {
+		// If enforcement is not enabled, we shadow declarative errors with hand-written ones, so we return early here.
+		return errs
+	}
+
+	// Filter HV errors
+	errs = filterHandwrittenErrors(errs, allDeclarativeEnforced, betaEnabled)
+
+	// Append Enforced DV errors
+	for _, dvErr := range declarativeErrs {
+		if allDeclarativeEnforced {
+			errs = append(errs, dvErr)
+			continue
+		}
+		switch {
+		case dvErr.Type == field.ErrorTypeInternal:
+			errs = append(errs, dvErr)
+		case dvErr.IsBeta():
+			if betaEnabled {
+				errs = append(errs, dvErr)
+			}
+		case !dvErr.IsAlpha():
+			errs = append(errs, dvErr) // Standard
 		}
 	}
-	errs = append(errs, dvNativeErrors...)
+
 	return errs
+}
+
+func filterHandwrittenErrors(errs field.ErrorList, allDeclarativeEnforced, betaEnabled bool) field.ErrorList {
+	// We remove HV errors that are covered by declarative validation AND are enforced.
+	return errs.Filter(func(e error) bool {
+		var fe *field.Error
+		if !errors.As(e, &fe) || !fe.CoveredByDeclarative {
+			return false
+		}
+
+		if allDeclarativeEnforced {
+			return true
+		}
+
+		// Explicit Strategy
+		if fe.IsBeta() {
+			// Beta validations are enforced only if the Beta feature gate is enabled.
+			return betaEnabled
+		}
+		// For Standard validations, we keep the handwritten error for now to avoid losing coverage
+		// before it is deleted from source. Alpha validations are always shadowed (kept).
+		return false
+	})
 }
 
 // RecordDuplicateValidationErrors increments a metric and log the error when duplicate validation errors are found.

@@ -62,14 +62,14 @@ func Validate_GangSchedulingPolicy(ctx context.Context, op operation.Operation, 
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha()...)
 			return
 		}(fldPath.Child("minCount"), &obj.MinCount, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.GangSchedulingPolicy) *int32 { return &oldObj.MinCount }), oldObj != nil)...)
 
@@ -88,14 +88,14 @@ func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *fie
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
 			return
 		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.PodGroup) *string { return &oldObj.Name }), oldObj != nil)...)
 
@@ -129,7 +129,7 @@ func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPat
 			return false
 		}
 		return obj.Gang != nil
-	})...)
+	}).MarkAlpha()...)
 
 	// field schedulingv1alpha1.PodGroupPolicy.Basic
 	errs = append(errs,
@@ -140,7 +140,7 @@ func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -160,7 +160,7 @@ func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -188,13 +188,13 @@ func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
 			return
 		}(fldPath.Child("apiGroup"), &obj.APIGroup, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.APIGroup }), oldObj != nil)...)
 
@@ -207,14 +207,14 @@ func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
 			return
 		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Kind }), oldObj != nil)...)
 
@@ -227,14 +227,14 @@ func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
 			return
 		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Name }), oldObj != nil)...)
 
@@ -274,10 +274,10 @@ func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath 
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -300,15 +300,15 @@ func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath 
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -316,7 +316,7 @@ func Validate_WorkloadSpec(ctx context.Context, op operation.Operation, fldPath 
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha1.PodGroup, b schedulingv1alpha1.PodGroup) bool { return a.Name == b.Name })...)
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha1.PodGroup, b schedulingv1alpha1.PodGroup) bool { return a.Name == b.Name }).MarkAlpha()...)
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha1.PodGroup, b schedulingv1alpha1.PodGroup) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_PodGroup)...)
 			return

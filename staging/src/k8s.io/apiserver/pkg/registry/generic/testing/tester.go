@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/registry/rest/resttest"
@@ -77,6 +78,11 @@ func (t *Tester) GeneratesName() *Tester {
 
 func (t *Tester) ReturnDeletedObject() *Tester {
 	t.tester = t.tester.ReturnDeletedObject()
+	return t
+}
+
+func (t *Tester) SetRequestInfo(requestInfo *genericapirequest.RequestInfo) *Tester {
+	t.tester.SetRequestInfo(requestInfo)
 	return t
 }
 
