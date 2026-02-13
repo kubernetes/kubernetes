@@ -760,7 +760,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 			GenerateName: "req-",
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: "core/v1",
+					APIVersion: "v1",
 					Kind:       "Pod",
 					Name:       podName,
 					UID:        podUID,
