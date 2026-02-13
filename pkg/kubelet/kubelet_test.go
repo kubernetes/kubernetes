@@ -3272,7 +3272,7 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 
 func createRemoteRuntimeService(endpoint string, t *testing.T, tp oteltrace.TracerProvider) internalapi.RuntimeService {
 	logger, _ := ktesting.NewTestContext(t)
-	runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, tp, &logger)
+	runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, tp, &logger, false)
 	require.NoError(t, err)
 	return runtimeService
 }
@@ -3436,7 +3436,7 @@ func TestSyncPodSpans(t *testing.T) {
 	fakeRuntime.ImageService.SetFakeImageSize(100)
 	fakeRuntime.ImageService.SetFakeImages([]string{"test:latest"})
 	logger := klog.FromContext(tCtx)
-	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp, &logger)
+	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp, &logger, false)
 	assert.NoError(t, err)
 
 	kubelet.containerRuntime, _, err = kuberuntime.NewKubeGenericRuntimeManager(

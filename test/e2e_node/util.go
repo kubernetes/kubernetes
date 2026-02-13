@@ -284,7 +284,12 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	logger := klog.Background()
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
+	// Streaming is disabled because the backend container runtime doesn't support the
+	// streaming APIs yet. The CRI proxy e2e tests verify streaming behavior by implementing
+	// the streaming APIs in the proxy layer. Once the runtime supports streaming, this can
+	// use the CRIListStreaming feature gate.
+	useStreaming := false
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger, useStreaming)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -294,7 +299,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger, useStreaming)
 	if err != nil {
 		return nil, nil, err
 	}
