@@ -56,10 +56,6 @@ type Error struct {
 	// that should also be caught by declarative validation.
 	CoveredByDeclarative bool
 
-	// DeclarativeNative is true when this error originates from a declarative-native validation.
-	// This field is used to distinguish errors that are exclusively declarative and lack an imperative counterpart.
-	DeclarativeNative bool
-
 	// ValidationStabilityLevel denotes the validation stability level of the declarative validation from this error is returned. This should be used in the declarative validations only.
 	ValidationStabilityLevel ValidationStabilityLevel
 }
@@ -482,20 +478,6 @@ func (list ErrorList) ExtractCoveredByDeclarative() ErrorList {
 		}
 	}
 	return newList
-}
-
-// MarkDeclarativeNative marks the error as originating from a declarative-native validation.
-func (e *Error) MarkDeclarativeNative() *Error {
-	e.DeclarativeNative = true
-	return e
-}
-
-// MarkDeclarativeNative marks all errors in the list as originating from declarative-native validations.
-func (list ErrorList) MarkDeclarativeNative() ErrorList {
-	for _, err := range list {
-		err.DeclarativeNative = true
-	}
-	return list
 }
 
 // MarkAlpha marks the error as an alpha validation error.
