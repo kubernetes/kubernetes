@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+)
+
 // GangSchedulingPolicyApplyConfiguration represents a declarative configuration of the GangSchedulingPolicy type for use
 // with apply.
 //
@@ -27,6 +31,10 @@ type GangSchedulingPolicyApplyConfiguration struct {
 	// at the same time for the scheduler to admit the entire group.
 	// It must be a positive integer.
 	MinCount *int32 `json:"minCount,omitempty"`
+	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+	// One of Pod, PodGroup.
+	// Defaults to Pod if unset.
+	DisruptionMode *schedulingv1alpha1.DisruptionMode `json:"disruptionMode,omitempty"`
 }
 
 // GangSchedulingPolicyApplyConfiguration constructs a declarative configuration of the GangSchedulingPolicy type for use with
@@ -40,5 +48,13 @@ func GangSchedulingPolicy() *GangSchedulingPolicyApplyConfiguration {
 // If called multiple times, the MinCount field is set to the value of the last call.
 func (b *GangSchedulingPolicyApplyConfiguration) WithMinCount(value int32) *GangSchedulingPolicyApplyConfiguration {
 	b.MinCount = &value
+	return b
+}
+
+// WithDisruptionMode sets the DisruptionMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DisruptionMode field is set to the value of the last call.
+func (b *GangSchedulingPolicyApplyConfiguration) WithDisruptionMode(value schedulingv1alpha1.DisruptionMode) *GangSchedulingPolicyApplyConfiguration {
+	b.DisruptionMode = &value
 	return b
 }

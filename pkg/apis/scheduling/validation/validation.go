@@ -176,6 +176,11 @@ func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldP
 	return nil
 }
 
+var allowedDisruptionModes = sets.New(
+	scheduling.DisruptionModePod,
+	scheduling.DisruptionModePodGroup,
+)
+
 func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPath *field.Path) field.ErrorList {
 	// To match the declarative validation behavior, we return Required for 0.
 	// Declarative validation treats 0 as "missing" via validate.RequiredValue()
@@ -187,6 +192,9 @@ func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPa
 		allErrs = append(allErrs, field.Required(fldPath.Child("minCount"), "").MarkCoveredByDeclarative())
 	} else if policy.MinCount < 0 {
 		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum").MarkCoveredByDeclarative()...)
+	}
+	if policy.DisruptionMode != nil && !allowedDisruptionModes.Has(*policy.DisruptionMode) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("disruptionMode"), policy.DisruptionMode, sets.List(allowedDisruptionModes)).WithOrigin("union"))
 	}
 	return allErrs
 }

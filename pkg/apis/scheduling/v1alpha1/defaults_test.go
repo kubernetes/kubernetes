@@ -23,7 +23,11 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/scheduling/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/features"
+	ptr "k8s.io/utils/ptr"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -56,5 +60,58 @@ func TestSetDefaultPreempting(t *testing.T) {
 	output := roundTrip(t, runtime.Object(priorityClass)).(*v1alpha1.PriorityClass)
 	if output.PreemptionPolicy == nil || *output.PreemptionPolicy != apiv1.PreemptLowerPriority {
 		t.Errorf("Expected PriorityClass.Preempting value: %+v\ngot: %+v\n", apiv1.PreemptLowerPriority, output.PreemptionPolicy)
+	}
+}
+
+func TestSetDefaultWorkload(t *testing.T) {
+	workload := &v1alpha1.Workload{
+		Spec: v1alpha1.WorkloadSpec{
+			PodGroups: []v1alpha1.PodGroup{
+				{
+					Name: "test-podgroup",
+					Policy: v1alpha1.PodGroupPolicy{
+						Gang: &v1alpha1.GangSchedulingPolicy{},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name                          string
+		enableWorkloadAwarePreemption bool
+		expectedDisruptionMode        *v1alpha1.DisruptionMode
+	}{
+		{
+			name:                          "workload-aware preemption disabled",
+			enableWorkloadAwarePreemption: false,
+			expectedDisruptionMode:        nil,
+		},
+		{
+			name:                          "workload-aware preemption enabled",
+			enableWorkloadAwarePreemption: true,
+			expectedDisruptionMode:        ptr.To(v1alpha1.DisruptionModePod),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+			if tc.enableWorkloadAwarePreemption {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GangScheduling, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadAwarePreemption, true)
+			}
+			workloadCopy := workload.DeepCopy()
+			output := roundTrip(t, runtime.Object(workloadCopy)).(*v1alpha1.Workload)
+			gang := output.Spec.PodGroups[0].Policy.Gang
+			if tc.expectedDisruptionMode == nil && gang.DisruptionMode != nil {
+				t.Fatalf("Expected Workload.Spec.PodGroups[0].Policy.Gang.DisruptionMode value: %+v\ngot: %+v\n", tc.expectedDisruptionMode, gang.DisruptionMode)
+			}
+			if tc.expectedDisruptionMode != nil {
+				if gang.DisruptionMode == nil || *gang.DisruptionMode != *tc.expectedDisruptionMode {
+					t.Fatalf("Expected Workload.Spec.PodGroups[0].Policy.Gang.DisruptionMode value: %+v\ngot: %+v\n", tc.expectedDisruptionMode, gang.DisruptionMode)
+				}
+			}
+		})
 	}
 }

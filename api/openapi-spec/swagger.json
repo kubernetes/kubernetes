@@ -19110,6 +19110,10 @@
     "io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy": {
       "description": "GangSchedulingPolicy defines the parameters for gang scheduling.",
       "properties": {
+        "disruptionMode": {
+          "description": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Pod, PodGroup. Defaults to Pod if unset.",
+          "type": "string"
+        },
         "minCount": {
           "description": "MinCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
           "format": "int32",
