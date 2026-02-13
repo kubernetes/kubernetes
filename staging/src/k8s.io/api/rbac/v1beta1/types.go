@@ -101,7 +101,7 @@ type Subject struct {
 // RoleRef contains information that points to the role being used
 type RoleRef struct {
 	// APIGroup is the group for the resource being referenced
-	// +required
+	// +optional
 	APIGroup string `json:"apiGroup" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced
 	// +required
