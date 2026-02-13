@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -263,7 +264,7 @@ func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
 	for _, pod := range s.assumedPods {
 		err := s.ForgetPod(logger, pod)
 		if err != nil {
-			logger.Error(err, "Failed to forget assumed pod")
+			utilruntime.HandleErrorWithLogger(logger, err, "Failed to forget assumed pod")
 		}
 	}
 }

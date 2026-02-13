@@ -214,7 +214,7 @@ func (sched *Scheduler) prepareForBindingCycle(
 		// trigger un-reserve plugins to clean up state associated with the reserved Pod
 		err := sched.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Unreserve and forget failed")
+			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
 
 		if runPermitStatus.IsRejected() {
@@ -331,7 +331,7 @@ func (sched *Scheduler) assumeAndReserve(
 		// trigger un-reserve to clean up state associated with the reserved Pod
 		err := sched.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Unreserve and forget failed")
+			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
 
 		if sts.IsRejected() {
@@ -492,7 +492,7 @@ func (sched *Scheduler) handleBindingCycleError(
 	assumedPod := podInfo.Pod
 	// trigger un-reserve plugins to clean up state associated with the reserved Pod
 	if forgetErr := sched.unreserveAndForget(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
-		utilruntime.HandleErrorWithContext(ctx, forgetErr, "Unreserve and forget failed")
+		utilruntime.HandleErrorWithContext(ctx, forgetErr, "ForgetPod failed")
 	} else {
 		// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
 		// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
@@ -558,7 +558,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 		return result, ErrNoNodesAvailable
 	}
 
-	feasibleNodes, diagnosis, nodeHint, signature, err := sched.findNodesThatFitPod(ctx, fwk, state, podInfo)
+	feasibleNodes, diagnosis, nodeHint, signature, err := sched.findNodesThatFitPod(ctx, fwk, state, podInfo.Pod)
 	if err != nil {
 		return result, err
 	}
@@ -607,13 +607,11 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
-func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) ([]fwk.NodeInfo, framework.Diagnosis, string, fwk.PodSignature, error) {
+func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, pod *v1.Pod) ([]fwk.NodeInfo, framework.Diagnosis, string, fwk.PodSignature, error) {
 	logger := klog.FromContext(ctx)
 	diagnosis := framework.Diagnosis{
 		NodeToStatus: framework.NewDefaultNodeToStatus(),
 	}
-	pod := podInfo.Pod
-
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
 		return nil, diagnosis, "", nil, err

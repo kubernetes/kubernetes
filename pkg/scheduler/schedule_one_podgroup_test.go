@@ -66,7 +66,6 @@ var _ fwk.PermitPlugin = &fakePodGroupPlugin{}
 func (mp *fakePodGroupPlugin) Name() string { return "FakePodGroupPlugin" }
 
 func (mp *fakePodGroupPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	klog.Info("MS1234: 15", "pod", klog.KObj(pod))
 	if status, ok := mp.filterStatus[pod.Name]; ok {
 		return status
 	}
@@ -156,7 +155,10 @@ func TestPodGroupInfoForPod(t *testing.T) {
 
 			q := internalqueue.NewTestQueue(ctx, nil)
 			for _, pInfo := range tt.queuePods {
-				q.AddUnschedulableIfNotPresent(logger, pInfo, 0)
+				err := q.AddUnschedulableIfNotPresent(logger, pInfo, 0)
+				if err != nil {
+					t.Fatalf("Failed to add unschedulable pod: %v", err)
+				}
 			}
 			sched := &Scheduler{
 				WorkloadManager: wm,
@@ -165,7 +167,7 @@ func TestPodGroupInfoForPod(t *testing.T) {
 
 			result, err := sched.podGroupInfoForPod(ctx, tt.pInfo)
 			if err != nil {
-				t.Errorf("Failed to get pod group info: %v", err)
+				t.Fatalf("Failed to get pod group info: %v", err)
 			}
 
 			if diff := cmp.Diff(ref, result.WorkloadRef); diff != "" {
@@ -762,7 +764,7 @@ func TestPodGroupSchedulingDefaultAlgorithm(t *testing.T) {
 	}
 }
 
-func TestApplyPodGroupAlgorithmResult(t *testing.T) {
+func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 	testNode := st.MakeNode().Name("node1").UID("node1").Obj()
 
 	ref := &v1.WorkloadReference{Name: "workload", PodGroup: "pg"}
@@ -1068,7 +1070,7 @@ func TestApplyPodGroupAlgorithmResult(t *testing.T) {
 				tt.algorithmResult.podResults[i].podCtx = podCtx
 			}
 
-			sched.applyPodGroupAlgorithmResult(ctx, schedFwk, pgInfo, tt.algorithmResult)
+			sched.submitPodGroupAlgorithmResult(ctx, schedFwk, pgInfo, tt.algorithmResult)
 
 			if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 				lock.Lock()

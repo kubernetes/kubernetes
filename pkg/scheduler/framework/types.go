@@ -636,7 +636,7 @@ func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
 	pqi.GatingPluginEvents = nil
 }
 
-// QueuedPodGroupInfo is a Pod wrapper with additional information related to
+// QueuedPodGroupInfo is a PodGroupInfo wrapper with additional information related to
 // the pod group's status in the scheduling queue and stores all queued pods from that pod group.
 type QueuedPodGroupInfo struct {
 	*PodGroupInfo

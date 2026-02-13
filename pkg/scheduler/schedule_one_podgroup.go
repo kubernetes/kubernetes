@@ -61,7 +61,8 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	}
 	sched.skipPodGroupPodSchedule(ctx, schedFwk, podGroupInfo)
 	// skipPodGroupPodSchedule could remove some pods from the pod group.
-	// Verify if it has any pods left.
+	// Pod group constraints will be re-evaluated on a Permit phase.
+	// Now, verify if it has any pods left.
 	if len(podGroupInfo.QueuedPodInfos) == 0 {
 		return
 	}
@@ -81,7 +82,7 @@ func (sched *Scheduler) frameworkForPodGroup(podGroupInfo *framework.QueuedPodGr
 		if schedulerName == "" {
 			schedulerName = pInfo.Pod.Spec.SchedulerName
 		} else if pInfo.Pod.Spec.SchedulerName != schedulerName {
-			return nil, fmt.Errorf("all pods in a single pod group should have the same .spec.schedulerName set")
+			return nil, fmt.Errorf("all pods in a single pod group should have the same .spec.schedulerName set, got: %q and %q", pInfo.Pod.Spec.SchedulerName, schedulerName)
 		}
 	}
 	fwk, ok := sched.Profiles[schedulerName]
@@ -187,10 +188,6 @@ func (sched *Scheduler) initPodSchedulingContext(ctx context.Context, pod *v1.Po
 	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
 
 	// Initialize an empty podsToActivate struct, which will be filled up by plugins or stay empty.
-	// During pod group scheduling cycle, no pods will be activated using this,
-	// as they will be eventually activated in the pod-by-pod phase.
-	// We however still need to provide this storage, not to break any existing plugin
-	// that may rely on this and run in the pod group scheduling cycle.
 	podsToActivate := framework.NewPodsToActivate()
 	state.Write(framework.PodsToActivateKey, podsToActivate)
 
@@ -217,8 +214,8 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 
 	result := sched.podGroupSchedulingDefaultAlgorithm(podGroupCycleCtx, schedFwk, podGroupInfo)
 
-	// applyPodGroupAlgorithmResult can dispatch binding goroutines, so should be called with the noncancelable ctx.
-	sched.applyPodGroupAlgorithmResult(ctx, schedFwk, podGroupInfo, result)
+	// submitPodGroupAlgorithmResult can dispatch binding goroutines, so should be called with the noncancelable ctx.
+	sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupInfo, result)
 
 	// TBD: Record PodGroup-level metrics and logs, return podGroupInfo to the queue.
 }
@@ -347,7 +344,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 	revertFn := func() {
 		err := sched.unreserveAndForget(ctx, podCtx.state, schedFwk, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Unreserve and forget failed")
+			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
 	}
 
@@ -382,13 +379,13 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 	}, revertFn
 }
 
-// applyPodGroupAlgorithmResult applies the result of the pod group scheduling algorithm.
+// submitPodGroupAlgorithmResult submits the result of the pod group scheduling algorithm.
 // If that algorithm succedeed, the schedulable pods proceed to the binding cycle.
 // Unschedulable pods are moved back to the scheduling queue and need to wait
 // for the next pod group scheduling cycle.
 // If the preemption is required for this pod group, all pods are moved back to the scheduling queue
 // and require the next pod group scheduling cycle to verify the preemption outcome.
-func (sched *Scheduler) applyPodGroupAlgorithmResult(ctx context.Context, schedFwk framework.Framework, podGroupInfo *framework.QueuedPodGroupInfo, result podGroupAlgorithmResult) {
+func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, schedFwk framework.Framework, podGroupInfo *framework.QueuedPodGroupInfo, result podGroupAlgorithmResult) {
 	for i, podResult := range result.podResults {
 		pInfo := podGroupInfo.QueuedPodInfos[i]
 		podCtx := podResult.podCtx
