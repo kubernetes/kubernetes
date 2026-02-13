@@ -409,7 +409,7 @@ func (mtfv *modeTypeOrFieldValidator) getForbiddenValidation(t *types.Type) (any
 	case types.Pointer:
 		forbidden = types.Name{Package: libValidationPkg, Name: "ForbiddenPointer"}
 	case types.Struct:
-		return nil, fmt.Errorf("can only be used on pointers to structs")
+		return nil, fmt.Errorf("modal member fields of struct type must be pointers")
 	default:
 		forbidden = types.Name{Package: libValidationPkg, Name: "ForbiddenValue"}
 	}
