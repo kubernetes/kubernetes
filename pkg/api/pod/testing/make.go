@@ -250,9 +250,9 @@ func SetObjectMeta(objectMeta metav1.ObjectMeta) Tweak {
 	}
 }
 
-func SetWorkloadRef(workloadRef *api.WorkloadReference) Tweak {
+func SetSchedulingGroup(schedulingGroup *api.PodSchedulingGroup) Tweak {
 	return func(pod *api.Pod) {
-		pod.Spec.WorkloadRef = workloadRef
+		pod.Spec.SchedulingGroup = schedulingGroup
 	}
 }
 
