@@ -974,6 +974,8 @@ spec:
           schedulerName: schedulerNameValue
           schedulingGates:
           - name: nameValue
+          schedulingGroup:
+            podGroupName: podGroupNameValue
           securityContext:
             appArmorProfile:
               localhostProfile: localhostProfileValue
@@ -1329,10 +1331,6 @@ spec:
               storagePolicyID: storagePolicyIDValue
               storagePolicyName: storagePolicyNameValue
               volumePath: volumePathValue
-          workloadRef:
-            name: nameValue
-            podGroup: podGroupValue
-            podGroupReplicaKey: podGroupReplicaKeyValue
       ttlSecondsAfterFinished: 8
   schedule: scheduleValue
   startingDeadlineSeconds: 2

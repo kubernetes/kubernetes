@@ -1,5 +1,5 @@
-apiVersion: scheduling.k8s.io/v1alpha1
-kind: Workload
+apiVersion: scheduling.k8s.io/v1alpha2
+kind: PodGroup
 metadata:
   annotations:
     annotationsKey: annotationsValue
@@ -33,13 +33,18 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  controllerRef:
-    apiGroup: apiGroupValue
-    kind: kindValue
-    name: nameValue
-  podGroups:
-  - name: nameValue
-    policy:
-      basic: {}
-      gang:
-        minCount: 1
+  podGroupTemplateRef:
+    podGroupTemplateName: podGroupTemplateNameValue
+    workloadName: workloadNameValue
+  schedulingPolicy:
+    basic: {}
+    gang:
+      minCount: 1
+status:
+  conditions:
+  - lastTransitionTime: "2004-01-01T01:01:01Z"
+    message: messageValue
+    observedGeneration: 3
+    reason: reasonValue
+    status: statusValue
+    type: typeValue
