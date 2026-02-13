@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clusterrole
+package role
 
 import (
 	"testing"
@@ -29,75 +29,88 @@ import (
 var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
 
 func TestDeclarativeValidateForDeclarative(t *testing.T) {
-	for _, apiVersion := range apiVersions {
-		testDeclarativeValidateForDeclarative(t, apiVersion)
+	for _, v := range apiVersions {
+		t.Run("version="+v, func(t *testing.T) {
+			testDeclarativeValidateForDeclarative(t, v)
+		})
 	}
 }
 
 func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "rbac.authorization.k8s.io",
-		APIVersion: apiVersion,
-	})
+	ctx := genericapirequest.WithRequestInfo(
+		genericapirequest.NewDefaultContext(),
+		&genericapirequest.RequestInfo{
+			APIGroup:   "rbac.authorization.k8s.io",
+			APIVersion: apiVersion,
+		},
+	)
+
 	testCases := map[string]struct {
-		input        rbac.ClusterRole
+		input        rbac.Role
 		expectedErrs field.ErrorList
 	}{
 		"valid": {
-			input: mkValidClusterRole(),
+			input: mkValidRole(),
 		},
-		"invalid ClusterRole missing verbs": {
-			input: mkValidClusterRole(tweakVerbs(nil)),
+		"invalid Role missing verbs": {
+			input: mkValidRole(tweakVerbs(nil)),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
 			},
 		},
-		"invalid ClusterRole empty verbs": {
-			input: mkValidClusterRole(tweakVerbs([]string{})),
+		"invalid Role empty verbs": {
+			input: mkValidRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
 			},
 		},
 		// TODO: Add more test cases
 	}
-	for k, tc := range testCases {
-		t.Run(k, func(t *testing.T) {
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
 }
 
 func TestValidateUpdateForDeclarative(t *testing.T) {
-	for _, apiVersion := range apiVersions {
-		testValidateUpdateForDeclarative(t, apiVersion)
+	for _, v := range apiVersions {
+		t.Run("version="+v, func(t *testing.T) {
+			testValidateUpdateForDeclarative(t, v)
+		})
 	}
 }
 
 func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "rbac.authorization.k8s.io",
-		APIVersion: apiVersion,
-	})
+	ctx := genericapirequest.WithRequestInfo(
+		genericapirequest.NewDefaultContext(),
+		&genericapirequest.RequestInfo{
+			APIGroup:   "rbac.authorization.k8s.io",
+			APIVersion: apiVersion,
+		},
+	)
+
 	testCases := map[string]struct {
-		old          rbac.ClusterRole
-		update       rbac.ClusterRole
+		old, update  rbac.Role
 		expectedErrs field.ErrorList
 	}{
 		"valid update": {
-			old:    mkValidClusterRole(),
-			update: mkValidClusterRole(),
+			old:    mkValidRole(),
+			update: mkValidRole(),
 		},
 		"invalid update clearing verbs": {
-			old:    mkValidClusterRole(),
-			update: mkValidClusterRole(tweakVerbs([]string{})),
+			old:    mkValidRole(),
+			update: mkValidRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
 			},
 		},
 		// TODO: Add more test cases
 	}
-	for k, tc := range testCases {
-		t.Run(k, func(t *testing.T) {
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
 			tc.old.ResourceVersion = "1"
 			tc.update.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
@@ -105,10 +118,11 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 	}
 }
 
-func mkValidClusterRole(tweaks ...func(*rbac.ClusterRole)) rbac.ClusterRole {
-	cr := rbac.ClusterRole{
+func mkValidRole(tweaks ...func(*rbac.Role)) rbac.Role {
+	r := rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "valid-cluster-role",
+			Name:      "valid-role",
+			Namespace: "default",
 		},
 		Rules: []rbac.PolicyRule{{
 			APIGroups: []string{"rbac.authorization.k8s.io"},
@@ -118,15 +132,15 @@ func mkValidClusterRole(tweaks ...func(*rbac.ClusterRole)) rbac.ClusterRole {
 	}
 
 	for _, tweak := range tweaks {
-		tweak(&cr)
+		tweak(&r)
 	}
-	return cr
+	return r
 }
 
-func tweakVerbs(verbs []string) func(*rbac.ClusterRole) {
-	return func(cr *rbac.ClusterRole) {
-		if len(cr.Rules) > 0 {
-			cr.Rules[0].Verbs = verbs
+func tweakVerbs(verbs []string) func(*rbac.Role) {
+	return func(r *rbac.Role) {
+		if len(r.Rules) > 0 {
+			r.Rules[0].Verbs = verbs
 		}
 	}
 }
