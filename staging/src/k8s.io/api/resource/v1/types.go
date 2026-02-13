@@ -1170,7 +1170,7 @@ type CELDeviceSelector struct {
 	//  - driver (string): the name of the driver which defines this device.
 	//  - attributes (map[string]object): the device's attributes, grouped by prefix
 	//    (e.g. device.attributes["dra.example.com"] evaluates to an object with all
-	//    of the attributes which were prefixed by "dra.example.com".
+	//    of the attributes which were prefixed by "dra.example.com").
 	//  - capacity (map[string]object): the device's capacities, grouped by prefix.
 	//  - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device
 	//    (v1.34+ with the DRAConsumableCapacity feature enabled).
@@ -1203,27 +1203,12 @@ type CELDeviceSelector struct {
 	// A robust expression should check for the existence of attributes
 	// before referencing them.
 	//
-	// Examples for handling optional attributes (CEL Optional Types, available since Kubernetes 1.29):
+	// For CEL expression syntax and examples, see:
+	// - CEL Optional Types: https://kubernetes.io/docs/reference/using-api/cel/#optional-types
+	// - DRA Device Selection: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/#cel-expressions
 	//
-	//   - Using optional chaining with orValue() (recommended):
-	//       device.attributes["gpu.example.com"].?model.orValue("") == "A100"
-	//     The ? operator makes field selection optional. If the field doesn't exist,
-	//     it returns optional.none(). orValue() then provides a default value.
-	//
-	//   - Using has() macro to check before accessing:
-	//       has(device.attributes["gpu.example.com"].model) && device.attributes["gpu.example.com"].model == "A100"
-	//     The has() macro checks if a field exists before accessing it.
-	//
-	//   - Checking domain existence first (still assumes that if the domain exists, it always has the field):
-	//       "gpu.example.com" in device.attributes && device.attributes["gpu.example.com"].model == "A100"
-	//
-	// For more details on CEL Optional Types, see:
-	// https://kubernetes.io/docs/reference/using-api/cel/#optional-types
-	// https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes
-	//
-	// Note: Accessing a non-existent key without these checks is a runtime error.
-	// This is intentional because silently skipping invalid expressions could lead
-	// to unexpected device selection.
+	// Common errors:
+	// - "no such key": Use has() macro, optional chaining (?), or orValue() for optional fields.
 	//
 	// For ease of use, the cel.bind() function is enabled, and can be used
 	// to simplify expressions that access multiple attributes with the
