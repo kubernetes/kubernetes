@@ -63,7 +63,6 @@ import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -417,10 +416,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithResource("priorityclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1().PriorityClasses().Informer()}, nil
-
-		// Group=scheduling.k8s.io, Version=v1alpha1
-	case schedulingv1alpha1.SchemeGroupVersion.WithResource("priorityclasses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha1().PriorityClasses().Informer()}, nil
 
 		// Group=scheduling.k8s.io, Version=v1alpha2
 	case schedulingv1alpha2.SchemeGroupVersion.WithResource("podgroups"):
