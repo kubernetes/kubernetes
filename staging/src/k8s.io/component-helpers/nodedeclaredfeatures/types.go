@@ -69,6 +69,12 @@ type StaticConfiguration struct {
 	CPUManagerPolicy string
 }
 
+// RuntimeFeatures provides information about CRI runtime-level capabilities.
+type RuntimeFeatures struct {
+	// UserNamespacesHostNetwork indicates if the runtime supports user namespaces with host network.
+	UserNamespacesHostNetwork bool
+}
+
 // NodeConfiguration provides a generic view of a node's static configuration.
 type NodeConfiguration struct {
 	// FeatureGates holds an implementation of the FeatureGate interface.
@@ -78,4 +84,6 @@ type NodeConfiguration struct {
 	// Version holds the current node version. This is used for full semantic version comparisons
 	// with Feature.MaxVersion() to determine if a feature needs to be reported.
 	Version *version.Version
+	// RuntimeFeatures holds runtime-level capabilities discovered from CRI.
+	RuntimeFeatures RuntimeFeatures
 }

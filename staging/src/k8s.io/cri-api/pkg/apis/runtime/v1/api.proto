@@ -1742,6 +1742,9 @@ message RuntimeHandler {
 message RuntimeFeatures {
     // supplemental_groups_policy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
     bool supplemental_groups_policy = 1;
+    // user_namespaces_host_network is set to true if the runtime supports containers using both
+    // host network and user namespace simultaneously.
+    bool user_namespaces_host_network = 2;
 }
 
 message StatusResponse {

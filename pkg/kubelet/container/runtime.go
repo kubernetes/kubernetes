@@ -652,7 +652,8 @@ func (c *RuntimeCondition) String() string {
 
 // RuntimeFeatures contains the set of features implemented by the runtime
 type RuntimeFeatures struct {
-	SupplementalGroupsPolicy bool
+	SupplementalGroupsPolicy  bool
+	UserNamespacesHostNetwork bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -660,7 +661,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v", f.SupplementalGroupsPolicy)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork)
 }
 
 // Pods represents the list of pods

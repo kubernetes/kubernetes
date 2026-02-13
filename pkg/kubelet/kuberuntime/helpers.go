@@ -255,7 +255,8 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 	var retFeatures *kubecontainer.RuntimeFeatures
 	if features != nil {
 		retFeatures = &kubecontainer.RuntimeFeatures{
-			SupplementalGroupsPolicy: features.SupplementalGroupsPolicy,
+			SupplementalGroupsPolicy:  features.SupplementalGroupsPolicy,
+			UserNamespacesHostNetwork: features.UserNamespacesHostNetwork,
 		}
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers, Features: retFeatures}
