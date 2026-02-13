@@ -18,47 +18,44 @@ package validate
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// ModalRule defines a validation to apply for a specific mode value.
-type ModalRule[T any] struct {
-	Value      string
-	Validation ValidateFunc[T]
+// DiscriminatedRule defines a validation to apply for a specific discriminator value.
+type DiscriminatedRule[Tfield any, Tdisc comparable] struct {
+	Value      Tdisc
+	Validation ValidateFunc[Tfield]
 }
 
-// Modal validates a value based on a discriminator value.
+// Discriminated validates a member field based on a discriminator value.
 // It iterates through the rules and applies the first one that matches the discriminator.
 // If no rule matches, it applies the defaultValidation if provided.
 //
 // It performs ratcheting: if the operation is an Update, and neither the discriminator
 // nor the value (checked via equiv) have changed, validation is skipped.
-func Modal[T any, D comparable, P any](ctx context.Context, op operation.Operation, structPath *field.Path,
-	obj, oldObj *P, fieldName string, getMemberValue func(*P) T, getDiscriminator func(*P) D,
-	equiv MatchFunc[T], defaultValidation ValidateFunc[T], rules []ModalRule[T],
+func Discriminated[Tfield any, Tdisc comparable, Tstruct any](ctx context.Context, op operation.Operation, structPath *field.Path,
+	obj, oldObj *Tstruct, fieldName string, getMemberValue func(*Tstruct) Tfield, getDiscriminator func(*Tstruct) Tdisc,
+	equiv MatchFunc[Tfield], defaultValidation ValidateFunc[Tfield], rules []DiscriminatedRule[Tfield, Tdisc],
 ) field.ErrorList {
 	value := getMemberValue(obj)
-	var oldValue T
-	var oldDiscriminator D
+	discriminator := getDiscriminator(obj)
+	var oldValue Tfield
+	var oldDiscriminator Tdisc
 
 	if oldObj != nil {
 		oldValue = getMemberValue(oldObj)
 		oldDiscriminator = getDiscriminator(oldObj)
 	}
 
-	discriminator := getDiscriminator(obj)
-
 	if op.Type == operation.Update && oldObj != nil && discriminator == oldDiscriminator && equiv(value, oldValue) {
 		return nil
 	}
 
 	fldPath := structPath.Child(fieldName)
-	dStr := fmt.Sprintf("%v", discriminator)
 	for _, rule := range rules {
-		if rule.Value == dStr {
+		if rule.Value == discriminator {
 			if rule.Validation == nil {
 				return nil
 			}
@@ -71,5 +68,4 @@ func Modal[T any, D comparable, P any](ctx context.Context, op operation.Operati
 	}
 
 	return nil
-
 }

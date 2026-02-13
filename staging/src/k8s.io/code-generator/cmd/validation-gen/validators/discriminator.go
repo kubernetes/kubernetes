@@ -18,7 +18,9 @@ package validators
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/util"
@@ -32,66 +34,70 @@ const (
 	memberTagName        = "k8s:member"
 )
 
+// validGroupNameRegex restricts discriminator group names to identifiers that
+// start with a letter and contain only alphanumeric characters and underscores.
+var validGroupNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
+
 func init() {
-	RegisterTagValidator(&modeTagValidator{modeDefinitions})
-	RegisterTagValidator(&memberTagValidator{modeDefinitions, nil})
-	RegisterTypeValidator(&modeTypeOrFieldValidator{modeDefinitions})
-	RegisterFieldValidator(&modeTypeOrFieldValidator{modeDefinitions})
+	RegisterTagValidator(&discriminatorTagValidator{discriminatorDefinitions})
+	RegisterTagValidator(&memberTagValidator{discriminatorDefinitions, nil})
+	RegisterTypeValidator(&discriminatorFieldValidator{discriminatorDefinitions})
+	RegisterFieldValidator(&discriminatorFieldValidator{discriminatorDefinitions})
 }
 
-// modeDefinitions stores all mode definitions found by tag validators.
+// discriminatorDefinitions stores all discriminator definitions found by tag validators.
 // Key is the struct path.
-var modeDefinitions = map[string]modeGroups{}
+var discriminatorDefinitions = map[string]discriminatorGroups{}
 
-type modeGroups map[string]*modeGroup
+type discriminatorGroups map[string]*discriminatorGroup
 
-type modeGroup struct {
+type discriminatorGroup struct {
 	name                string
 	discriminatorMember *types.Member
-	// members maps field names to their rules in this mode group.
-	members map[string]*fieldModeRules
+	// members maps field names to their rules in this discriminator group.
+	members map[string]*fieldMemberRules
 }
 
-type fieldModeRules struct {
+type fieldMemberRules struct {
 	member *types.Member
-	rules  []modeRule
+	rules  []memberRule
 }
 
-type modeRule struct {
+type memberRule struct {
 	value       string
 	validations Validations
 }
 
-func (mg modeGroups) getOrCreate(name string) *modeGroup {
+func (mg discriminatorGroups) getOrCreate(name string) *discriminatorGroup {
 	if name == "" {
 		name = "default"
 	}
 	g, ok := mg[name]
 	if !ok {
-		g = &modeGroup{
+		g = &discriminatorGroup{
 			name:    name,
-			members: make(map[string]*fieldModeRules),
+			members: make(map[string]*fieldMemberRules),
 		}
 		mg[name] = g
 	}
 	return g
 }
 
-type modeTagValidator struct {
-	shared map[string]modeGroups
+type discriminatorTagValidator struct {
+	shared map[string]discriminatorGroups
 }
 
-func (mtv *modeTagValidator) Init(_ Config) {}
+func (mtv *discriminatorTagValidator) Init(_ Config) {}
 
-func (mtv *modeTagValidator) TagName() string {
+func (mtv *discriminatorTagValidator) TagName() string {
 	return discriminatorTagName
 }
 
-func (mtv *modeTagValidator) ValidScopes() sets.Set[Scope] {
+func (mtv *discriminatorTagValidator) ValidScopes() sets.Set[Scope] {
 	return sets.New(ScopeField)
 }
 
-func (mtv *modeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (mtv *discriminatorTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	if util.NativeType(context.Type).Kind == types.Pointer {
 		return Validations{}, fmt.Errorf("can only be used on non-pointer types")
 	}
@@ -101,22 +107,28 @@ func (mtv *modeTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	}
 
 	if mtv.shared[context.ParentPath.String()] == nil {
-		mtv.shared[context.ParentPath.String()] = make(modeGroups)
+		mtv.shared[context.ParentPath.String()] = make(discriminatorGroups)
 	}
-	modeName := ""
+	groupName := ""
 	if nameArg, ok := tag.NamedArg("name"); ok {
-		modeName = nameArg.Value
+		groupName = nameArg.Value
 	}
-	group := mtv.shared[context.ParentPath.String()].getOrCreate(modeName)
+	if groupName != "" && !validGroupNameRegex.MatchString(groupName) {
+		return Validations{}, fmt.Errorf("discriminator group name must match %s, got %q", validGroupNameRegex.String(), groupName)
+	}
+	if groupName == "default" {
+		return Validations{}, fmt.Errorf("discriminator group name %q is reserved", groupName)
+	}
+	group := mtv.shared[context.ParentPath.String()].getOrCreate(groupName)
 	if group.discriminatorMember != nil && group.discriminatorMember != context.Member {
-		return Validations{}, fmt.Errorf("duplicate discriminator: %q", modeName)
+		return Validations{}, fmt.Errorf("duplicate discriminator: %q", groupName)
 	}
 	group.discriminatorMember = context.Member
 
 	return Validations{}, nil
 }
 
-func (mtv *modeTagValidator) Docs() TagDoc {
+func (mtv *discriminatorTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mtv.TagName(),
 		StabilityLevel: TagStabilityLevelAlpha,
@@ -132,7 +144,7 @@ func (mtv *modeTagValidator) Docs() TagDoc {
 }
 
 type memberTagValidator struct {
-	shared    map[string]modeGroups
+	shared    map[string]discriminatorGroups
 	validator TagValidationExtractor
 }
 
@@ -167,9 +179,12 @@ func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag)
 		return Validations{}, fmt.Errorf("unsupported payload tag: %q", tag.ValueTag.Name)
 	}
 
-	modeName := ""
+	groupName := ""
 	if modeArg, ok := tag.NamedArg("discriminator"); ok {
-		modeName = modeArg.Value
+		groupName = modeArg.Value
+	}
+	if groupName == "default" {
+		return Validations{}, fmt.Errorf("discriminator group name %q is reserved", groupName)
 	}
 
 	value := ""
@@ -183,9 +198,9 @@ func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag)
 	}
 
 	if mtv.shared[context.ParentPath.String()] == nil {
-		mtv.shared[context.ParentPath.String()] = make(modeGroups)
+		mtv.shared[context.ParentPath.String()] = make(discriminatorGroups)
 	}
-	group := mtv.shared[context.ParentPath.String()].getOrCreate(modeName)
+	group := mtv.shared[context.ParentPath.String()].getOrCreate(groupName)
 
 	fieldName := context.Member.Name
 	if rules, ok := group.members[fieldName]; ok {
@@ -193,7 +208,7 @@ func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag)
 			return Validations{}, fmt.Errorf("internal error: member mismatch for field %q", fieldName)
 		}
 	} else {
-		group.members[fieldName] = &fieldModeRules{
+		group.members[fieldName] = &fieldMemberRules{
 			member: context.Member,
 		}
 	}
@@ -203,7 +218,7 @@ func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag)
 		return Validations{}, err
 	}
 
-	group.members[fieldName].rules = append(group.members[fieldName].rules, modeRule{
+	group.members[fieldName].rules = append(group.members[fieldName].rules, memberRule{
 		value:       value,
 		validations: payloadValidations,
 	})
@@ -238,17 +253,17 @@ func (mtv *memberTagValidator) Docs() TagDoc {
 	}
 }
 
-type modeTypeOrFieldValidator struct {
-	shared map[string]modeGroups
+type discriminatorFieldValidator struct {
+	shared map[string]discriminatorGroups
 }
 
-func (modeTypeOrFieldValidator) Init(_ Config) {}
+func (discriminatorFieldValidator) Init(_ Config) {}
 
-func (modeTypeOrFieldValidator) Name() string {
-	return "modeTypeOrFieldValidator"
+func (discriminatorFieldValidator) Name() string {
+	return "discriminatorFieldValidator"
 }
 
-func (mtfv *modeTypeOrFieldValidator) GetValidations(context Context) (Validations, error) {
+func (mtfv *discriminatorFieldValidator) GetValidations(context Context) (Validations, error) {
 	// Extract the most concrete type possible.
 	if k := util.NonPointer(util.NativeType(context.Type)).Kind; k != types.Struct {
 		return Validations{}, nil
@@ -288,7 +303,7 @@ func (mtfv *modeTypeOrFieldValidator) GetValidations(context Context) (Validatio
 
 		for _, fn := range fieldNames {
 			rules := group.members[fn]
-			v, err := mtfv.generateModeFieldValidation(context, group, rules)
+			v, err := mtfv.generateMemberFieldValidation(context, group, rules)
 			if err != nil {
 				return Validations{}, err
 			}
@@ -299,7 +314,7 @@ func (mtfv *modeTypeOrFieldValidator) GetValidations(context Context) (Validatio
 	return result, nil
 }
 
-func (mtfv *modeTypeOrFieldValidator) generateModeFieldValidation(context Context, group *modeGroup, rules *fieldModeRules) (Validations, error) {
+func (mtfv *discriminatorFieldValidator) generateMemberFieldValidation(context Context, group *discriminatorGroup, rules *fieldMemberRules) (Validations, error) {
 	fieldType := rules.member.Type
 
 	// Use the nilable form to handle missing values.
@@ -322,7 +337,7 @@ func (mtfv *modeTypeOrFieldValidator) generateModeFieldValidation(context Contex
 		return Validations{}, err
 	}
 
-	// Prepare ModalRules
+	// Prepare DiscriminatedRules
 	// Aggregate rules by value
 	rulesByValue := make(map[string]Validations)
 	var values []string
@@ -336,7 +351,9 @@ func (mtfv *modeTypeOrFieldValidator) generateModeFieldValidation(context Contex
 	}
 	slices.Sort(values)
 
-	var modalRules []any
+	discriminatorType := group.discriminatorMember.Type
+
+	var discriminatedRules []any
 	for _, val := range values {
 		ruleValidations := rulesByValue[val]
 
@@ -345,22 +362,29 @@ func (mtfv *modeTypeOrFieldValidator) generateModeFieldValidation(context Contex
 			ObjType:   nilableFieldType,
 		}
 
-		modalRules = append(modalRules, StructLiteral{
-			Type:     types.Name{Package: libValidationPkg, Name: "ModalRule"},
-			TypeArgs: []*types.Type{nilableFieldType},
+		// Convert the string tag value to the appropriate typed Go literal
+		// for the discriminator type.
+		typedValue, err := convertDiscriminatorValue(val, discriminatorType)
+		if err != nil {
+			return Validations{}, fmt.Errorf("invalid discriminator value %q: %w", val, err)
+		}
+
+		discriminatedRules = append(discriminatedRules, StructLiteral{
+			Type:     types.Name{Package: libValidationPkg, Name: "DiscriminatedRule"},
+			TypeArgs: []*types.Type{nilableFieldType, discriminatorType},
 			Fields: []StructLiteralField{
-				{Name: "Value", Value: val},
+				{Name: "Value", Value: typedValue},
 				{Name: "Validation", Value: wrapper},
 			},
 		})
 	}
 
-	modalValidator := types.Name{Package: libValidationPkg, Name: "Modal"}
+	discriminatedValidator := types.Name{Package: libValidationPkg, Name: "Discriminated"}
 
 	rulesSlice := SliceLiteral{
-		ElementType:     types.Name{Package: libValidationPkg, Name: "ModalRule"},
-		ElementTypeArgs: []*types.Type{nilableFieldType},
-		Elements:        modalRules,
+		ElementType:     types.Name{Package: libValidationPkg, Name: "DiscriminatedRule"},
+		ElementTypeArgs: []*types.Type{nilableFieldType, discriminatorType},
+		Elements:        discriminatedRules,
 	}
 
 	// getValue extractor
@@ -371,14 +395,15 @@ func (mtfv *modeTypeOrFieldValidator) generateModeFieldValidation(context Contex
 	}
 
 	// getDiscriminator extractor
-	discriminatorType := group.discriminatorMember.Type
 	getDiscriminator := FunctionLiteral{
 		Parameters: []ParamResult{{Name: "obj", Type: types.PointerTo(context.Type)}},
 		Results:    []ParamResult{{Type: discriminatorType}},
 		Body:       fmt.Sprintf("return obj.%s", group.discriminatorMember.Name),
 	}
 
-	// Calculate equivArg for ratcheting the value
+	// directComparable is used to determine whether we can use the direct
+	// comparison operator "==" or need to use the semantic DeepEqual when
+	// looking up and comparing correlated list elements for validation ratcheting.
 	var equivArg any
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(fieldType))) {
 		equivArg = Identifier(validateDirectEqualPtr)
@@ -386,7 +411,7 @@ func (mtfv *modeTypeOrFieldValidator) generateModeFieldValidation(context Contex
 		equivArg = Identifier(validateSemanticDeepEqual)
 	}
 
-	fn := Function(discriminatorTagName, DefaultFlags, modalValidator,
+	fn := Function(discriminatorTagName, DefaultFlags, discriminatedValidator,
 		Literal(fmt.Sprintf("%q", jsonName)),
 		getValue,
 		getDiscriminator,
@@ -398,7 +423,7 @@ func (mtfv *modeTypeOrFieldValidator) generateModeFieldValidation(context Contex
 	return Validations{Functions: []FunctionGen{fn}}, nil
 }
 
-func (mtfv *modeTypeOrFieldValidator) getForbiddenValidation(t *types.Type) (any, error) {
+func (mtfv *discriminatorFieldValidator) getForbiddenValidation(t *types.Type) (any, error) {
 	var forbidden types.Name
 	nt := util.NativeType(t)
 	switch nt.Kind {
@@ -409,7 +434,7 @@ func (mtfv *modeTypeOrFieldValidator) getForbiddenValidation(t *types.Type) (any
 	case types.Pointer:
 		forbidden = types.Name{Package: libValidationPkg, Name: "ForbiddenPointer"}
 	case types.Struct:
-		return nil, fmt.Errorf("modal member fields of struct type must be pointers")
+		return nil, fmt.Errorf("discriminated member fields of struct type must be pointers")
 	default:
 		forbidden = types.Name{Package: libValidationPkg, Name: "ForbiddenValue"}
 	}
@@ -426,4 +451,33 @@ func (mtfv *modeTypeOrFieldValidator) getForbiddenValidation(t *types.Type) (any
 		Functions: []FunctionGen{fg},
 		ObjType:   wrapperObjType,
 	}, nil
+}
+
+// convertDiscriminatorValue converts a string tag value to the appropriate
+// typed Go literal for the given discriminator type.
+func convertDiscriminatorValue(val string, discType *types.Type) (any, error) {
+	nt := util.NonPointer(util.NativeType(discType))
+	if nt.Kind != types.Builtin {
+		return nil, fmt.Errorf("unsupported discriminator type: %s", nt.Name.Name)
+	}
+
+	switch nt.Name.Name {
+	case "string":
+		return val, nil
+	case "bool":
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse %q as bool: %w", val, err)
+		}
+		return b, nil
+	default:
+		if types.IsInteger(nt) {
+			i, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse %q as integer: %w", val, err)
+			}
+			return int(i), nil
+		}
+		return nil, fmt.Errorf("unsupported discriminator type: %s", nt.Name.Name)
+	}
 }
