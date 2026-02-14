@@ -129,6 +129,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.30"
+- name: AuditIDValidation
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.36"
 - name: AuthorizeNodeWithSelectors
   versionedSpecs:
   - default: false
