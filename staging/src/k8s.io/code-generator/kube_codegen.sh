@@ -408,6 +408,22 @@ function kube::codegen::gen_openapi() {
             -name zz_generated.openapi.go \
             | xargs -0 rm -f
 
+        local openapi_targets=()
+        for pkg in \
+            "k8s.io/apimachinery/pkg/apis/meta/v1" \
+            "k8s.io/apimachinery/pkg/runtime" \
+            "k8s.io/apimachinery/pkg/version" \
+            "k8s.io/apimachinery/pkg/api/resource" \
+        ; do
+            # If the package is not local (writable), we don't want to try to
+            # generate into it.  Openapi-gen will still see it as a dependency.
+            local dir
+            dir="$(GO111MODULE=on go list -find -f '{{.Dir}}' "${pkg}" 2>/dev/null || true)"
+            if [[ -n "${dir}" && -w "${dir}" ]]; then
+                openapi_targets+=("${pkg}")
+            fi
+        done
+
         "${GOBIN}/openapi-gen" \
             -v "${v}" \
             --output-file zz_generated.openapi.go \
@@ -416,10 +432,7 @@ function kube::codegen::gen_openapi() {
             --output-pkg "${out_pkg}" \
             --report-filename "${new_report}" \
             --output-model-name-file="${output_model_name_file}" \
-            "k8s.io/apimachinery/pkg/apis/meta/v1" \
-            "k8s.io/apimachinery/pkg/runtime" \
-            "k8s.io/apimachinery/pkg/version" \
-            "k8s.io/apimachinery/pkg/api/resource" \
+            "${openapi_targets[@]}" \
             "${input_pkgs[@]}"
     fi
 
