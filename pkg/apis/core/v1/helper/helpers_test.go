@@ -723,3 +723,160 @@ func TestHugePageUnitSizeFromByteSize(t *testing.T) {
 		}
 	}
 }
+
+func TestAddOrUpdateTolerationInPodSpecWorks(t *testing.T) {
+	testCases := []struct {
+		name                   string
+		podSpec                *v1.PodSpec
+		toleration             v1.Toleration
+		expectedUpdated        bool
+		expectedPodTolerations []v1.Toleration
+	}{
+		{
+			name: "add toleration to empty pod spec",
+			podSpec: &v1.PodSpec{
+				Tolerations: []v1.Toleration{},
+			},
+			toleration: v1.Toleration{
+				Key:      "key1",
+				Operator: v1.TolerationOpEqual,
+				Value:    "value1",
+				Effect:   v1.TaintEffectNoSchedule,
+			},
+			expectedPodTolerations: []v1.Toleration{{
+				Key:      "key1",
+				Operator: v1.TolerationOpEqual,
+				Value:    "value1",
+				Effect:   v1.TaintEffectNoSchedule,
+			}},
+			expectedUpdated: true,
+		},
+		{
+			name: "add toleration to pod spec with existing tolerations",
+			podSpec: &v1.PodSpec{
+				Tolerations: []v1.Toleration{
+					{
+						Key:      "key0",
+						Operator: v1.TolerationOpEqual,
+						Value:    "value0",
+						Effect:   v1.TaintEffectNoExecute,
+					},
+					{
+						Key:      "key1",
+						Operator: v1.TolerationOpEqual,
+						Value:    "value1",
+						Effect:   v1.TaintEffectNoExecute,
+					},
+					{
+						Key:      "key2",
+						Operator: v1.TolerationOpEqual,
+						Value:    "value2",
+						Effect:   v1.TaintEffectNoExecute,
+					},
+					{
+						Key:      "key3",
+						Operator: v1.TolerationOpEqual,
+						Value:    "value3",
+						Effect:   v1.TaintEffectNoExecute,
+					},
+					{
+						Key:      "key4",
+						Operator: v1.TolerationOpEqual,
+						Value:    "value4",
+						Effect:   v1.TaintEffectNoExecute,
+					},
+				},
+			},
+			toleration: v1.Toleration{
+				Key:      "key5",
+				Operator: v1.TolerationOpExists,
+				Effect:   v1.TaintEffectPreferNoSchedule,
+			},
+			expectedPodTolerations: []v1.Toleration{
+				{
+					Key:      "key0",
+					Operator: v1.TolerationOpEqual,
+					Value:    "value0",
+					Effect:   v1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "key1",
+					Operator: v1.TolerationOpEqual,
+					Value:    "value1",
+					Effect:   v1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "key2",
+					Operator: v1.TolerationOpEqual,
+					Value:    "value2",
+					Effect:   v1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "key3",
+					Operator: v1.TolerationOpEqual,
+					Value:    "value3",
+					Effect:   v1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "key4",
+					Operator: v1.TolerationOpEqual,
+					Value:    "value4",
+					Effect:   v1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "key5",
+					Operator: v1.TolerationOpExists,
+					Effect:   v1.TaintEffectPreferNoSchedule,
+				},
+			},
+			expectedUpdated: true,
+		},
+		{
+			name: "do not update existing toleration if at least one matches",
+			podSpec: &v1.PodSpec{
+				Tolerations: []v1.Toleration{
+					{
+						Key:      "key4",
+						Operator: v1.TolerationOpExists,
+						Effect:   v1.TaintEffectPreferNoSchedule,
+					},
+					{
+						Key:      "key5",
+						Operator: v1.TolerationOpExists,
+						Effect:   v1.TaintEffectPreferNoSchedule,
+					},
+				},
+			},
+			toleration: v1.Toleration{
+				Key:      "key5",
+				Operator: v1.TolerationOpExists,
+				Effect:   v1.TaintEffectPreferNoSchedule,
+			},
+			expectedPodTolerations: []v1.Toleration{},
+			expectedUpdated:        false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			updated := AddOrUpdateTolerationInPodSpec(tc.podSpec, &tc.toleration)
+			if updated != tc.expectedUpdated {
+				t.Errorf("AddOrUpdateTolerationInPodSpec() expectedUpdated %v", tc.expectedUpdated)
+			}
+			if tc.expectedUpdated == true {
+				if len(tc.podSpec.Tolerations) != len(tc.expectedPodTolerations) {
+					t.Errorf("Expected %d tolerations, got %d", len(tc.expectedPodTolerations), len(tc.podSpec.Tolerations))
+				}
+				for i, expectedToleration := range tc.expectedPodTolerations {
+					if tc.podSpec.Tolerations[i] != expectedToleration {
+						t.Errorf("Expected toleration %v at index %d, got %v", expectedToleration, i, tc.podSpec.Tolerations[i])
+					}
+				}
+			}
+			if !tc.expectedUpdated && len(tc.podSpec.Tolerations) == 0 {
+				t.Error("Expected tolerations to be added but got empty list")
+			}
+		})
+	}
+}
+
