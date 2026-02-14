@@ -124,7 +124,7 @@ type MetricAsyncRecorder struct {
 }
 
 func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-chan struct{}) *MetricAsyncRecorder {
-	recorder := &MetricAsyncRecorder{
+	return &MetricAsyncRecorder{
 		bufferCh:                      make(chan *histogramVecMetric, bufferSize),
 		bufferSize:                    bufferSize,
 		interval:                      interval,
@@ -134,8 +134,6 @@ func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-ch
 		aggregatedInflightEventMetricBufferCh:      make(chan *gaugeVecMetric, bufferSize),
 		IsStoppedCh:                                make(chan struct{}),
 	}
-	go recorder.run()
-	return recorder
 }
 
 // ObservePluginDurationAsync observes the plugin_execution_duration_seconds metric.
@@ -190,8 +188,8 @@ func (r *MetricAsyncRecorder) observeMetricAsync(m *metrics.HistogramVec, value 
 	}
 }
 
-// run flushes buffered metrics into Prometheus every second.
-func (r *MetricAsyncRecorder) run() {
+// Run flushes buffered metrics into Prometheus every second.
+func (r *MetricAsyncRecorder) Run() {
 	for {
 		select {
 		case <-r.stopCh:

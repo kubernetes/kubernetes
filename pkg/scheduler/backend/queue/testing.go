@@ -45,6 +45,7 @@ func NewTestQueueWithObjects(
 	// Because some major functions (e.g., Pop) requires the metric recorder to be set,
 	// we always set a metric recorder here.
 	recorder := metrics.NewMetricsAsyncRecorder(10, 20*time.Microsecond, ctx.Done())
+	go recorder.Run()
 	// We set it before the options that users provide, so that users can override it.
 	opts = append([]Option{WithMetricsRecorder(recorder)}, opts...)
 	return NewTestQueueWithInformerFactory(ctx, lessFn, informerFactory, opts...)
