@@ -17,9 +17,12 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
 )
 
 // MetricRecorder represents a metric recorder which takes action when the
@@ -108,6 +111,14 @@ type MetricAsyncRecorder struct {
 	// how often the recorder runs to flush the metrics.
 	interval time.Duration
 
+	// records how many events was dropped because buffer overflow
+	discardedEvents uint64
+
+	// logger *must* be initialized when creating a MetricAsyncRecorder,
+	// otherwise logging functions will access a nil sink and
+	// panic.
+	logger klog.Logger
+
 	// aggregatedInflightEventMetric is only to record InFlightEvents metric asynchronously.
 	// It's a map from gaugeVecMetricKey to the aggregated value
 	// and the aggregated value is flushed to Prometheus every time the interval is reached.
@@ -123,12 +134,13 @@ type MetricAsyncRecorder struct {
 	IsStoppedCh chan struct{}
 }
 
-func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-chan struct{}) *MetricAsyncRecorder {
+func NewMetricsAsyncRecorder(ctx context.Context, bufferSize int, interval time.Duration) *MetricAsyncRecorder {
 	recorder := &MetricAsyncRecorder{
 		bufferCh:                      make(chan *histogramVecMetric, bufferSize),
 		bufferSize:                    bufferSize,
 		interval:                      interval,
-		stopCh:                        stopCh,
+		stopCh:                        ctx.Done(),
+		logger:                        klog.FromContext(ctx),
 		aggregatedInflightEventMetric: make(map[gaugeVecMetricKey]int),
 		aggregatedInflightEventMetricLastFlushTime: time.Now(),
 		aggregatedInflightEventMetricBufferCh:      make(chan *gaugeVecMetric, bufferSize),
@@ -170,6 +182,7 @@ func (r *MetricAsyncRecorder) ObserveInFlightEventsAsync(eventLabel string, valu
 			select {
 			case r.aggregatedInflightEventMetricBufferCh <- newMetric:
 			default:
+				atomic.AddUint64(&r.discardedEvents, 1)
 			}
 		}
 		r.aggregatedInflightEventMetricLastFlushTime = time.Now()
@@ -187,6 +200,7 @@ func (r *MetricAsyncRecorder) observeMetricAsync(m *metrics.HistogramVec, value 
 	select {
 	case r.bufferCh <- newMetric:
 	default:
+		atomic.AddUint64(&r.discardedEvents, 1)
 	}
 }
 
@@ -206,6 +220,14 @@ func (r *MetricAsyncRecorder) run() {
 
 // FlushMetrics tries to clean up the bufferCh by reading at most bufferSize metrics.
 func (r *MetricAsyncRecorder) FlushMetrics() {
+	discardedEvents := atomic.SwapUint64(&r.discardedEvents, 0)
+	if discardedEvents > 0 {
+		r.logger.V(1).Info("dropping events due to buffer overflow, instrument results may be inaccurate. "+
+			"consider increasing the buffer size or decreasing the flush interval.",
+			"count", discardedEvents,
+		)
+	}
+
 	for i := 0; i < r.bufferSize; i++ {
 		select {
 		case m := <-r.bufferCh:

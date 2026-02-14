@@ -59,6 +59,7 @@ func SetObjectDefaults_InterPodAffinityArgs(in *configv1.InterPodAffinityArgs) {
 
 func SetObjectDefaults_KubeSchedulerConfiguration(in *configv1.KubeSchedulerConfiguration) {
 	SetDefaults_KubeSchedulerConfiguration(in)
+	SetDefaults_KubeSchedulerMetricConfiguration(&in.Metric)
 }
 
 func SetObjectDefaults_NodeResourcesBalancedAllocationArgs(in *configv1.NodeResourcesBalancedAllocationArgs) {

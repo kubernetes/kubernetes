@@ -461,6 +461,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 			// Profiles are processed during Framework instantiation to set default plugins and configurations. Capturing them for logging
 			completedProfiles = append(completedProfiles, profile)
 		}),
+		scheduler.WithMetricConfiguration(cc.ComponentConfig.Metric),
 	)
 	if err != nil {
 		return nil, nil, err

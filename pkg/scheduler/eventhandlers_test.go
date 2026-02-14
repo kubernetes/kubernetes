@@ -174,7 +174,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				apiDispatcher.Run(logger)
 				defer apiDispatcher.Close()
 
-				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+				recorder := metrics.NewMetricsAsyncRecorder(ctx, 3, 20*time.Microsecond)
 				queue := internalqueue.NewPriorityQueue(
 					newDefaultQueueSort(),
 					informerFactory,

@@ -293,9 +293,9 @@ func WithLogger(logger klog.Logger) Option {
 }
 
 // defaultFrameworkOptions are applied when no option corresponding to those fields exist.
-func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
+func defaultFrameworkOptions(ctx context.Context) frameworkOptions {
 	return frameworkOptions{
-		metricsRecorder: metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
+		metricsRecorder: metrics.NewMetricsAsyncRecorder(ctx, 1000, time.Second),
 		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
 	}
 }
@@ -308,7 +308,7 @@ var _ framework.Framework = &frameworkImpl{}
 // which continue running until the context gets canceled. WaitForShutdown can be used to block
 // until they have terminated.
 func NewFramework(ctx context.Context, r Registry, profile *config.KubeSchedulerProfile, opts ...Option) (framework.Framework, error) {
-	options := defaultFrameworkOptions(ctx.Done())
+	options := defaultFrameworkOptions(ctx)
 	for _, opt := range opts {
 		opt(&options)
 	}

@@ -18,6 +18,7 @@ package config
 
 import (
 	"math"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,6 +95,27 @@ type KubeSchedulerConfiguration struct {
 	// failover with the benefit of lower memory overhead while waiting to become leader.
 	// Defaults to false.
 	DelayCacheUntilActive bool
+
+	// Metric defines the configuration of metrics.
+	Metric KubeSchedulerMetricConfiguration
+}
+
+type KubeSchedulerMetricConfiguration struct {
+	// Percentage of plugin metrics to sample.
+	// A value of 100 means all metrics are recorded; lower values enable probabilistic sampling.
+	PluginMetricsSamplePercent int
+
+	// Buffer size for the MetricsAsyncRecorder.
+	// Incoming metrics are dropped when the buffer is full.
+	// Increasing the buffer size (with the trade-off of higher memory consumption) may be necessary
+	// to avoid metric events being dropped due to buffer overflow, particularly in large clusters.
+	MetricsAsyncRecorderBufferSize int
+
+	// Flush interval for the MetricsAsyncRecorder.
+	// Defines how frequently buffered metrics are pushed to the underlying sink.
+	// Reducing the buffer flush interval (with the trade-off of higher CPU consumption) may be necessary
+	// to avoid metric events being dropped due to buffer overflow, particularly in large clusters.
+	MetricsAsyncRecorderFlushInterval metav1.Duration
 }
 
 // KubeSchedulerProfile is a scheduling profile.
@@ -224,6 +246,18 @@ const (
 
 	// MaxWeight defines the max weight value allowed for custom PriorityPolicy
 	MaxWeight = MaxTotalScore / MaxCustomPriorityScore
+
+	// DefaultPluginMetricsSamplePercent specifies the default percentage of plugin
+	// metrics that will be sampled.
+	DefaultPluginMetricsSamplePercent = 10
+
+	// DefaultMetricsAsyncRecorderBufferSize specifies the default buffer size used
+	// by MetricsAsyncRecorder. Incoming metrics may be dropped when the buffer is full.
+	DefaultMetricsAsyncRecorderBufferSize = 1000
+
+	// DefaultMetricsAsyncRecorderFlushInterval specifies the default interval at
+	// which MetricsAsyncRecorder flushes its buffered metrics.
+	DefaultMetricsAsyncRecorderFlushInterval = time.Second
 )
 
 // Names returns the list of enabled plugin names.
