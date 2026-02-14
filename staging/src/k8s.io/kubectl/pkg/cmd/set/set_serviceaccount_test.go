@@ -59,7 +59,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 	}{
 		{yaml: "../../../testdata/set/replication.yaml", apiGroup: ""},
 		{yaml: "../../../testdata/set/daemon.yaml", apiGroup: "extensions"},
-		{yaml: "../../../testdata/set/redis-slave.yaml", apiGroup: "extensions"},
+		{yaml: "../../../testdata/set/test-slave.yaml", apiGroup: "extensions"},
 		{yaml: "../../../testdata/set/job.yaml", apiGroup: "batch"},
 		{yaml: "../../../testdata/set/deployment.yaml", apiGroup: "extensions"},
 	}

@@ -1,5 +1,5 @@
-apiVersion: v1
-kind: ReplicationController
+apiVersion: apps/v1
+kind: ReplicaSet
 metadata:
   name: redis-slave
   labels:
@@ -7,7 +7,14 @@ metadata:
     role: slave
     tier: backend
 spec:
+  # this replicas value is default
+  # modify it according to your case
   replicas: 2
+  selector:
+    matchLabels:
+      app: redis
+      role: slave
+      tier: backend
   template:
     metadata:
       labels:
@@ -17,10 +24,8 @@ spec:
     spec:
       containers:
       - name: slave
-        image: registry.k8s.io/e2e-test-images/redis:5.0.5-alpine
-        # We are only implementing the dns option of:
-        # https://github.com/kubernetes/examples/blob/97c7ed0eb6555a4b667d2877f965d392e00abc45/guestbook/redis-slave/run.sh
-        command: [ "redis-server", "--slaveof", "redis-master", "6379" ]
+        image: registry.k8s.io/e2e-test-images/agnhost:2.61
+        command: ["/agnhost", "pause"]
         resources:
           requests:
             cpu: 100m
@@ -31,7 +36,7 @@ spec:
           # If your cluster config does not include a dns service, then to
           # instead access an environment variable to find the master
           # service's host, comment out the 'value: dns' line above, and
-          # uncomment the line below:
+          # uncomment the line below.
           # value: env
         ports:
         - containerPort: 6379
