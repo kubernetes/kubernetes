@@ -87,7 +87,9 @@ type Allocator struct {
 	features       Features
 	allocatedState AllocatedState
 	classLister    DeviceClassLister
-	slices         []*resourceapi.ResourceSlice
+	slicesOnNode   map[string][]*resourceapi.ResourceSlice
+	slicesShared   []*resourceapi.ResourceSlice
+	allSlices      []*resourceapi.ResourceSlice
 	celCache       *cel.Cache
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
@@ -120,11 +122,23 @@ func NewAllocator(ctx context.Context,
 	slices []*resourceapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
+	slicesOnNode := make(map[string][]*resourceapi.ResourceSlice)
+	slicesShared := make([]*resourceapi.ResourceSlice, 0)
+	for _, slice := range slices {
+		nodeName := ptr.Deref(slice.Spec.NodeName, "")
+		if nodeName == "" || len(slice.Spec.SharedCounters) > 0 {
+			slicesShared = append(slicesShared, slice)
+		} else {
+			slicesOnNode[nodeName] = append(slicesOnNode[nodeName], slice)
+		}
+	}
 	return &Allocator{
 		features:          features,
 		allocatedState:    allocatedState,
 		classLister:       classLister,
-		slices:            slices,
+		slicesOnNode:      slicesOnNode,
+		slicesShared:      slicesShared,
+		allSlices:         slices,
 		celCache:          celCache,
 		availableCounters: make(map[draapi.UniqueString]counterSets),
 	}, nil
@@ -148,14 +162,14 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		result:               make([]internalAllocationResult, len(claims)),
 		allocatingCapacity:   NewConsumedCapacityCollection(),
 	}
-	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlices", len(alloc.slices))
+	slicesForNode := slices.Concat(alloc.slicesOnNode[node.Name], alloc.slicesShared)
+	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlicesForNode", len(slicesForNode))
 	defer func() {
 		alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
 	}()
 
-	alloc.logger.V(5).Info("Gathering pools", "slices", alloc.slices)
 	// First determine all eligible pools.
-	pools, err := GatherPools(ctx, alloc.slices, node, a.features)
+	pools, err := GatherPools(ctx, slicesForNode, node, a.features, alloc.allSlices)
 	if err != nil {
 		return nil, fmt.Errorf("gather pool information: %w", err)
 	}
