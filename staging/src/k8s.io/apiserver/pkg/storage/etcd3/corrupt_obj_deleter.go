@@ -63,11 +63,11 @@ func WithCorruptObjErrorHandlingTransformer(transformer value.Transformer) value
 // corrupt object error(s) that the list operation encounters while
 // retrieving objects from the storage.
 // maxCount: it is the maximum number of error that will be aggregated
-func corruptObjErrAggregatorFactory(maxCount int) func() ListErrorAggregator {
+func corruptObjErrAggregatorFactory(maxCount int) func() storage.ListItemErrors {
 	if maxCount <= 0 {
 		return defaultListErrorAggregatorFactory
 	}
-	return func() ListErrorAggregator {
+	return func() storage.ListItemErrors {
 		return &corruptObjErrAggregator{maxCount: maxCount}
 	}
 }
@@ -81,15 +81,19 @@ type corruptObjErrAggregator struct {
 	maxCount int
 }
 
-func (a *corruptObjErrAggregator) Aggregate(key string, err error) bool {
-	if len(a.errs) >= a.maxCount {
-		// add a sentinel error to indicate there are more
-		a.errs = append(a.errs, errTooMany)
+func (a *corruptObjErrAggregator) Append(key string, err error) bool {
+	if a.abortErr != nil || len(a.errs) >= a.maxCount {
 		return true
 	}
+
 	var corruptObjErr *corruptObjectError
 	if errors.As(err, &corruptObjErr) {
 		a.errs = append(a.errs, storage.NewCorruptObjError(key, corruptObjErr))
+		if len(a.errs) >= a.maxCount {
+			// add a sentinel error to indicate there are more
+			a.errs = append(a.errs, errTooMany)
+			return true
+		}
 		return false
 	}
 
@@ -98,7 +102,7 @@ func (a *corruptObjErrAggregator) Aggregate(key string, err error) bool {
 	return true
 }
 
-func (a *corruptObjErrAggregator) Err() error {
+func (a *corruptObjErrAggregator) Aggregate() error {
 	switch {
 	case len(a.errs) == 0 && a.abortErr != nil:
 		return a.abortErr
