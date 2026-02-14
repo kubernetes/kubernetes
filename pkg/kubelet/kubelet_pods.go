@@ -2664,6 +2664,18 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		containerSeen[cName] = containerSeen[cName] + 1
 	}
 
+	for _, container := range containers {
+		cs := statuses[container.Name]
+		if cs.State.Terminated == nil || cs.State.Terminated.Reason != "OOMKilled" {
+			continue
+		}
+		oldStatus, ok := oldStatuses[container.Name]
+		if ok && oldStatus.State.Running != nil {
+			klog.V(3).InfoS("ContainerOOMKilled", "containerStatus", cs)
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, "ContainerOOMKilled", "container %s was killed due to OOM", cs.Name)
+		}
+	}
+
 	// Handle the containers failed to be started, which should be in Waiting state.
 	for _, container := range containers {
 		if isInitContainer {
