@@ -40,7 +40,7 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -51,6 +51,11 @@ const (
 	// Specifies the maximum timeout a permit plugin can return.
 	maxTimeout = 15 * time.Minute
 )
+
+// MetricsRecorder defines the interface for recording plugin duration metrics.
+type MetricsRecorder interface {
+	ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64)
+}
 
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
@@ -87,7 +92,7 @@ type frameworkImpl struct {
 
 	sharedCSIManager fwk.CSIManager
 
-	metricsRecorder          *metrics.MetricAsyncRecorder
+	metricsRecorder          MetricsRecorder
 	profileName              string
 	percentageOfNodesToScore *int32
 
@@ -146,7 +151,7 @@ type frameworkOptions struct {
 	sharedDRAManager       fwk.SharedDRAManager
 	sharedCSIManager       fwk.CSIManager
 	snapshotSharedLister   fwk.SharedLister
-	metricsRecorder        *metrics.MetricAsyncRecorder
+	metricsRecorder        MetricsRecorder
 	podNominator           fwk.PodNominator
 	podActivator           fwk.PodActivator
 	extenders              []fwk.Extender

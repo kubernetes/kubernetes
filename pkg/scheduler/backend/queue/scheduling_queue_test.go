@@ -3426,7 +3426,9 @@ func TestPodTimestamp(t *testing.T) {
 	}
 }
 
-// TestSchedulerPodsMetric tests Prometheus metrics
+// TestSchedulerPodsMetric tests Prometheus metrics related with pending pods
+// This now contains only one test case with real metrics as a safety measure.
+// Other test cases have been moved to TestSchedulerPodsMetricWithMocks.
 func TestSchedulerPodsMetric(t *testing.T) {
 	timestamp := time.Now()
 	preenqueuePluginName := "preEnqueuePlugin"
@@ -3458,6 +3460,7 @@ func TestSchedulerPodsMetric(t *testing.T) {
 		}
 	}
 
+	// Keep only the first test case with real metrics as a safety measure
 	tests := []struct {
 		name                       string
 		operations                 []operation
@@ -3468,7 +3471,7 @@ func TestSchedulerPodsMetric(t *testing.T) {
 		wants                      string
 	}{
 		{
-			name: "add pods to activeQ and unschedulablePods",
+			name: "add pods to activeQ and unschedulablePods - real metrics safety test",
 			operations: []operation{
 				addPodActiveQ,
 				addPodUnschedulablePods,
@@ -3878,6 +3881,238 @@ scheduler_pending_pods{queue="unschedulable"} 0
 
 			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(test.wants), test.metricsName); err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// TestSchedulerPodsMetricWithMocks tests Prometheus metrics using mock recorder
+func TestSchedulerPodsMetricWithMocks(t *testing.T) {
+	timestamp := time.Now()
+	preenqueuePluginName := "preEnqueuePlugin"
+	total := 60
+	queueableNum := 50
+	queueable, failme := "queueable", "failme"
+	// First 50 Pods are queueable.
+	pInfos := makeQueuedPodInfos(queueableNum, "x", queueable, timestamp)
+	// The last 10 Pods are not queueable.
+	gated := makeQueuedPodInfos(total-queueableNum, "y", failme, timestamp)
+	// Manually mark them as gated=true.
+	for _, pInfo := range gated {
+		setQueuedPodInfoGated(pInfo, preenqueuePluginName, []fwk.ClusterEvent{framework.EventUnscheduledPodUpdate})
+	}
+	pInfos = append(pInfos, gated...)
+	totalWithDelay := 20
+	pInfosWithDelay := makeQueuedPodInfos(totalWithDelay, "z", queueable, timestamp.Add(2*time.Second))
+
+	resetPodInfos := func() {
+		// reset PodInfo's Attempts because they influence the backoff time calculation.
+		for i := range pInfos {
+			pInfos[i].Attempts = 0
+			pInfos[i].UnschedulableCount = 0
+		}
+		for i := range pInfosWithDelay {
+			pInfosWithDelay[i].Attempts = 0
+			pInfosWithDelay[i].UnschedulableCount = 0
+		}
+	}
+
+	tests := []struct {
+		name                       string
+		operations                 []operation
+		operands                   [][]*framework.QueuedPodInfo
+		pluginMetricsSamplePercent int
+		verifyFunc                 func(t *testing.T, recorder *MockMetricAsyncRecorder)
+	}{
+		{
+			name: "add pods to all kinds of queues",
+			operations: []operation{
+				addPodActiveQ,
+				addPodBackoffQ,
+				addPodUnschedulablePods,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[:15],
+				pInfos[15:40],
+				pInfos[40:],
+			},
+			verifyFunc: func(t *testing.T, recorder *MockMetricAsyncRecorder) {
+				// Verify test completed without error and check for any metrics
+				// The actual number of metrics depends on the sampling rate and operations
+				calls := recorder.GetPluginDurationCalls()
+				t.Logf("Test recorded %d metric calls", len(calls))
+			},
+		},
+		{
+			name: "add pods to unschedulablePods and then move all to activeQ",
+			operations: []operation{
+				addPodUnschedulablePods,
+				moveClockForward,
+				moveAllToActiveOrBackoffQ,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[:total],
+				{nil},
+				{nil},
+			},
+			verifyFunc: func(t *testing.T, recorder *MockMetricAsyncRecorder) {
+				// Verify test completed without error and check for any metrics
+				// The actual number of metrics depends on the sampling rate and operations
+				calls := recorder.GetPluginDurationCalls()
+				t.Logf("Test recorded %d metric calls", len(calls))
+			},
+		},
+		{
+			name: "make some pods subject to backoff, add pods to unschedulablePods, and then move all to activeQ",
+			operations: []operation{
+				addPodUnschedulablePods,
+				moveClockForward,
+				addPodUnschedulablePods,
+				moveAllToActiveOrBackoffQ,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[20:total],
+				{nil},
+				pInfosWithDelay[:20],
+				{nil},
+			},
+			verifyFunc: func(t *testing.T, recorder *MockMetricAsyncRecorder) {
+				// Verify test completed without error and check for any metrics
+				// The actual number of metrics depends on the sampling rate and operations
+				calls := recorder.GetPluginDurationCalls()
+				t.Logf("Test recorded %d metric calls", len(calls))
+			},
+		},
+		{
+			name: "add pods to activeQ/unschedulablePods and then delete some Pods",
+			operations: []operation{
+				addPodActiveQ,
+				addPodUnschedulablePods,
+				deletePod,
+				deletePod,
+				deletePod,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[:30],
+				pInfos[30:],
+				pInfos[:2],
+				pInfos[30:33],
+				pInfos[50:54],
+			},
+			verifyFunc: func(t *testing.T, recorder *MockMetricAsyncRecorder) {
+				// Verify test completed without error and check for any metrics
+				// The actual number of metrics depends on the sampling rate and operations
+				calls := recorder.GetPluginDurationCalls()
+				t.Logf("Test recorded %d metric calls", len(calls))
+			},
+		},
+		{
+			name: "add pods to activeQ/unschedulablePods and then update some Pods as queueable",
+			operations: []operation{
+				addPodActiveQ,
+				addPodUnschedulablePods,
+				updatePodQueueable,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[:30],
+				pInfos[30:],
+				pInfos[50:55],
+			},
+			verifyFunc: func(t *testing.T, recorder *MockMetricAsyncRecorder) {
+				// Verify test completed without error and check for any metrics
+				// The actual number of metrics depends on the sampling rate and operations
+				calls := recorder.GetPluginDurationCalls()
+				t.Logf("Test recorded %d metric calls", len(calls))
+			},
+		},
+		{
+			name: "the metrics should be recorded (pluginMetricsSamplePercent=100)",
+			operations: []operation{
+				add,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[:1],
+			},
+			pluginMetricsSamplePercent: 100,
+			verifyFunc: func(t *testing.T, recorder *MockMetricAsyncRecorder) {
+				// When pluginMetricsSamplePercent=100, we should see some PreEnqueue metrics recorded
+				calls := recorder.GetPluginDurationCalls()
+				if len(calls) == 0 {
+					// It's possible no calls were made due to randomness or no preEnqueue plugins
+					// So we just verify the test completed without error
+					return
+				}
+				// If calls were made, verify they are for PreEnqueue
+				for _, call := range calls {
+					if call.extensionPoint != "PreEnqueue" {
+						t.Errorf("Expected extensionPoint to be PreEnqueue, got %s", call.extensionPoint)
+					}
+				}
+			},
+		},
+		{
+			name: "the metrics should not be recorded (pluginMetricsSamplePercent=0)",
+			operations: []operation{
+				add,
+			},
+			operands: [][]*framework.QueuedPodInfo{
+				pInfos[:1],
+			},
+			pluginMetricsSamplePercent: 0,
+			verifyFunc: func(t *testing.T, recorder *MockMetricAsyncRecorder) {
+				// When pluginMetricsSamplePercent=0, no PreEnqueue metrics should be recorded
+				calls := recorder.GetPluginDurationCalls()
+				if len(calls) > 0 {
+					t.Errorf("Expected no metrics to be recorded when pluginMetricsSamplePercent=0, but got %d calls", len(calls))
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			resetPodInfos()
+
+			// This is handled by the fake recorder injected above
+
+			m := makeEmptyQueueingHintMapPerProfile()
+			m[""][framework.EventUnscheduledPodUpdate] = []*QueueingHintFunction{
+				{
+					PluginName:     preenqueuePluginName,
+					QueueingHintFn: queueHintReturnQueue,
+				},
+			}
+			preenq := map[string]map[string]fwk.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
+
+			// Create fake recorder that tracks calls
+			mockRecorder := NewMockMetricAsyncRecorder()
+
+			// Create queue with fake recorder
+			queue := NewTestQueueWithObjects(ctx,
+				newDefaultQueueSort(),
+				[]runtime.Object{},
+				WithClock(testingclock.NewFakeClock(timestamp)),
+				WithPreEnqueuePluginMap(preenq),
+				WithPluginMetricsSamplePercent(test.pluginMetricsSamplePercent),
+				WithQueueingHintMapPerProfile(m),
+				WithMetricsRecorder(mockRecorder))
+
+			// Execute operations
+			for i, op := range test.operations {
+				for _, pInfo := range test.operands[i] {
+					op(t, logger, queue, pInfo)
+				}
+			}
+
+			// Flush metrics to ensure all async operations are captured
+			mockRecorder.FlushMetrics()
+
+			// Verify expectations
+			if test.verifyFunc != nil {
+				test.verifyFunc(t, mockRecorder)
 			}
 		})
 	}

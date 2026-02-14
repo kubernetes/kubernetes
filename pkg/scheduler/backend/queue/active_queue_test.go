@@ -18,7 +18,6 @@ package queue
 
 import (
 	"testing"
-	"time"
 
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
@@ -28,9 +27,9 @@ import (
 )
 
 func TestClose(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	rr := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
-	aq := newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](convertLessFn(newDefaultQueueSort())), metrics.NewActivePodsRecorder()), true, rr, nil)
+	logger, _ := ktesting.NewTestContext(t)
+	mockRecorder := NewMockMetricAsyncRecorder()
+	aq := newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](convertLessFn(newDefaultQueueSort())), metrics.NewActivePodsRecorder()), true, mockRecorder, nil)
 
 	aq.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
 		unlockedActiveQ.add(logger, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("foo").Name("p1").UID("p1").Obj()}}, framework.EventUnscheduledPodAdd.Label())
