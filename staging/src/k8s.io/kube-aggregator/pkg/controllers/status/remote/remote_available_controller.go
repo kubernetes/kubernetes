@@ -19,6 +19,7 @@ package remote
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -276,9 +277,16 @@ func (c *AvailableConditionController) sync(key string) error {
 		}
 
 		attempts := 5
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		results := make(chan error, attempts)
 		for range attempts {
 			go func() {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(100 * time.Millisecond * time.Duration(i)): // Delay the second and following attempts slightly.
+				}
 				discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, *apiService.Spec.Service.Port)
 				if err != nil {
 					results <- err
@@ -303,16 +311,26 @@ func (c *AvailableConditionController) sync(key string) error {
 					// setting the system-masters identity ensures that we will always have access rights
 					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", "", []string{"system:masters"}, nil)
 					resp, err := discoveryClient.Do(newReq)
+					errToSend := err
 					if resp != nil {
-						resp.Body.Close()
-						// we should always been in the 200s or 300s
+						// We should always be in the 200s or 300s.
 						if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-							errCh <- fmt.Errorf("bad status from %v: %d", discoveryURL, resp.StatusCode)
-							return
+							errToSend = fmt.Errorf("bad status from %v: %d", discoveryURL, resp.StatusCode)
+						}
+						// Drain the response to avoid spammy errors in the aggregated server's logs.
+						if _, err := io.ReadAll(resp.Body); err != nil {
+							if errToSend == nil {
+								errToSend = fmt.Errorf("failed to read body: %w", err)
+							}
+						}
+						if err := resp.Body.Close(); err != nil {
+							if errToSend == nil {
+								errToSend = fmt.Errorf("failed to close body: %w", err)
+							}
 						}
 					}
 
-					errCh <- err
+					errCh <- errToSend
 				}()
 
 				select {
@@ -338,6 +356,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			lastError = <-results
 			// if we had at least one success, we are successful overall and we can return now
 			if lastError == nil {
+				cancel() // Cancel remaining requests.
 				break
 			}
 		}
