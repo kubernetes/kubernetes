@@ -336,6 +336,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 		podStatus.ContainerStatuses[i].Started = &started
 
 		if !started {
+			podStatus.ContainerStatuses[i].Ready = false
 			continue
 		}
 
@@ -391,6 +392,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 		}
 
 		if !started {
+			podStatus.InitContainerStatuses[i].Ready = false
 			continue
 		}
 
