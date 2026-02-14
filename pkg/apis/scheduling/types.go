@@ -199,10 +199,17 @@ type PodGroupPolicy struct {
 // BasicSchedulingPolicy indicates that standard Kubernetes
 // scheduling behavior should be used.
 type BasicSchedulingPolicy struct {
-	// This is intentionally empty. Its presence indicates that the basic
-	// scheduling policy should be applied. In the future, new fields may appear,
-	// describing such constraints on a pod group level without "all or nothing"
-	// (gang) scheduling.
+	// DesiredCount is the expected number of pods that will belong to this
+	// PodGroup. This field is a hint to the scheduler to help it make better
+	// placement decisions for the group as a whole.
+	//
+	// Unlike gang's minCount, this field does not block scheduling. If the number
+	// of available pods is less than desiredCount, the scheduler can still attempt
+	// to schedule the available pods, but will optimistically try to select a
+	// placement that can accommodate the future pods.
+	//
+	// +optional
+	DesiredCount *int32
 }
 
 // GangSchedulingPolicy defines the parameters for gang scheduling.
@@ -213,4 +220,18 @@ type GangSchedulingPolicy struct {
 	//
 	// +required
 	MinCount int32
+
+	// DesiredCount is the expected number of pods that will belong to this
+	// PodGroup. This field is a hint to the scheduler to help it make better
+	// placement decisions for the group as a whole.
+	//
+	// Unlike gang's minCount, this field does not block scheduling. If the number
+	// of available pods is less than desiredCount but at least minCount, the scheduler
+	// can still attempt to schedule the available pods, but will optimistically try
+	// to select a placement that can accommodate the future pods.
+	//
+	// When provided desiredCount must be greater or equal to minCount.
+	//
+	// +optional
+	DesiredCount *int32
 }

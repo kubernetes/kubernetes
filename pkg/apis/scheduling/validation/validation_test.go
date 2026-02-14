@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
+	ptr "k8s.io/utils/ptr"
 )
 
 func TestValidatePriorityClass(t *testing.T) {
@@ -191,6 +192,12 @@ func TestValidateWorkload(t *testing.T) {
 		}),
 		"no controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.ControllerRef.APIGroup = ""
+		}),
+		"no desired count for gang": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[1].Policy.Gang.DesiredCount = nil
+		}),
+		"no desired count for basic": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroups[0].Policy.Basic.DesiredCount = nil
 		}),
 	}
 	for name, workload := range successCases {
@@ -400,6 +407,31 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "podGroups").Index(1).Child("policy", "gang", "minCount"), int64(-1), "must be greater than zero").WithOrigin("minimum").MarkCoveredByDeclarative(),
 			},
 		},
+		"desired count is less than min count in gang": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[1].Policy.Gang.MinCount = int32(5)
+				w.Spec.PodGroups[1].Policy.Gang.DesiredCount = ptr.To(int32(4))
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroups").Index(1).Child("policy", "gang", "desiredCount"), int(4), "must be greater than or equal to minCount").WithOrigin("minimum").MarkCoveredByDeclarative(),
+			},
+		},
+		"zero desired count in basic": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[0].Policy.Basic.DesiredCount = ptr.To(int32(0))
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "basic", "desiredCount"), int(0), "must be greater than zero").WithOrigin("minimum").MarkCoveredByDeclarative(),
+			},
+		},
+		"negative desired count in basic": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[0].Policy.Basic.DesiredCount = ptr.To(int32(-1))
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "basic", "desiredCount"), int(-1), "must be greater than zero").WithOrigin("minimum").MarkCoveredByDeclarative(),
+			},
+		},
 	}
 
 	for name, tc := range failureCases {
@@ -497,6 +529,18 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 				w.Spec.PodGroups[1].Policy.Gang.MinCount = 5
 			}),
 		},
+		"change basic desired count": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[0].Policy.Basic.DesiredCount = ptr.To(int32(7))
+			}),
+		},
+		"change gang desired count": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroups[1].Policy.Gang.DesiredCount = ptr.To(int32(7))
+			}),
+		},
 		"change controllerRef": {
 			old: mkWorkload(),
 			update: mkWorkload(func(w *scheduling.Workload) {
@@ -533,13 +577,16 @@ func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
 			PodGroups: []scheduling.PodGroup{{
 				Name: "group1",
 				Policy: scheduling.PodGroupPolicy{
-					Basic: &scheduling.BasicSchedulingPolicy{},
+					Basic: &scheduling.BasicSchedulingPolicy{
+						DesiredCount: ptr.To(int32(5)),
+					},
 				},
 			}, {
 				Name: "group2",
 				Policy: scheduling.PodGroupPolicy{
 					Gang: &scheduling.GangSchedulingPolicy{
-						MinCount: 2,
+						MinCount:     2,
+						DesiredCount: ptr.To(int32(5)),
 					},
 				},
 			}},

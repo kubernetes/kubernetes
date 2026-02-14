@@ -163,7 +163,7 @@ func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Pa
 		allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")),
 			"exactly one of `basic`, `gang` is required, but multiple fields are set").WithOrigin("union").MarkCoveredByDeclarative())
 	case policy.Basic != nil:
-		allErrs = append(allErrs, validatBasicSchedulingPolicy(policy.Basic, fldPath.Child("basic"))...)
+		allErrs = append(allErrs, validateBasicSchedulingPolicy(policy.Basic, fldPath.Child("basic"))...)
 	case policy.Gang != nil:
 		allErrs = append(allErrs, validateGangSchedulingPolicy(policy.Gang, fldPath.Child("gang"))...)
 	}
@@ -171,9 +171,12 @@ func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Pa
 	return allErrs
 }
 
-func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldPath *field.Path) field.ErrorList {
-	// BasicSchedulingPolicy has no fields.
-	return nil
+func validateBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if policy.DesiredCount != nil {
+		allErrs = apivalidation.ValidatePositiveField(int64(*policy.DesiredCount), fldPath.Child("desiredCount")).WithOrigin("minimum").MarkCoveredByDeclarative()
+	}
+	return allErrs
 }
 
 func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPath *field.Path) field.ErrorList {
@@ -187,6 +190,9 @@ func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPa
 		allErrs = append(allErrs, field.Required(fldPath.Child("minCount"), "").MarkCoveredByDeclarative())
 	} else if policy.MinCount < 0 {
 		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum").MarkCoveredByDeclarative()...)
+	}
+	if policy.DesiredCount != nil && *policy.DesiredCount < policy.MinCount {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("desiredCount"), *policy.DesiredCount, "must be greater than or equal to minCount").WithOrigin("minimum").MarkCoveredByDeclarative())
 	}
 	return allErrs
 }
