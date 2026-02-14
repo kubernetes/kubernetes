@@ -95,16 +95,6 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
-	dbTotalSize = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Subsystem:         "apiserver",
-			Name:              "storage_db_total_size_in_bytes",
-			Help:              "Total size of the storage database file physically allocated in bytes.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.28.0",
-		},
-		[]string{"endpoint"},
-	)
 	storageSizeDescription   = compbasemetrics.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"storage_cluster_id"}, nil, compbasemetrics.STABLE, "")
 	storageMonitor           = &monitorCollector{monitorGetter: func() ([]Monitor, error) { return nil, nil }}
 	etcdEventsReceivedCounts = compbasemetrics.NewCounterVec(
@@ -188,7 +178,6 @@ func Register() {
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(resourceSizeEstimate)
 		legacyregistry.MustRegister(newObjectCounts)
-		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.CustomMustRegister(storageMonitor)
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
@@ -266,12 +255,6 @@ func Reset() {
 // This is a variable to facilitate testing.
 var sinceInSeconds = func(start time.Time) float64 {
 	return time.Since(start).Seconds()
-}
-
-// UpdateEtcdDbSize sets the etcd_db_total_size_in_bytes metric.
-// Deprecated: Metric etcd_db_total_size_in_bytes will be replaced with apiserver_storage_size_bytes
-func UpdateEtcdDbSize(ep string, size int64) {
-	dbTotalSize.WithLabelValues(ep).Set(float64(size))
 }
 
 // SetStorageMonitorGetter sets monitor getter to allow monitoring etcd stats.
