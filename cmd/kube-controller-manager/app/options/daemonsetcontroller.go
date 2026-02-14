@@ -36,6 +36,7 @@ func (o *DaemonSetControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.Int32Var(&o.ConcurrentDaemonSetSyncs, "concurrent-daemonset-syncs", o.ConcurrentDaemonSetSyncs, "The number of daemonset objects that are allowed to sync concurrently. Larger number = more responsive daemonsets, but more CPU (and network) load")
+	fs.Int32Var(&o.BurstReplicas, "daemonset-burst-replicas", o.BurstReplicas, "The maximum number of pods the daemonset controller will create/delete in a single sync. Larger number = faster rollouts, but risks registry/API DoS")
 }
 
 // ApplyTo fills up DaemonSetController config with options.
@@ -45,6 +46,7 @@ func (o *DaemonSetControllerOptions) ApplyTo(cfg *daemonconfig.DaemonSetControll
 	}
 
 	cfg.ConcurrentDaemonSetSyncs = o.ConcurrentDaemonSetSyncs
+	cfg.BurstReplicas = o.BurstReplicas
 
 	return nil
 }
@@ -58,6 +60,9 @@ func (o *DaemonSetControllerOptions) Validate() []error {
 	errs := []error{}
 	if o.ConcurrentDaemonSetSyncs < 1 {
 		errs = append(errs, fmt.Errorf("concurrent-daemonset-syncs must be greater than 0, but got %d", o.ConcurrentDaemonSetSyncs))
+	}
+	if o.BurstReplicas < 1 {
+		errs = append(errs, fmt.Errorf("daemonset-burst-replicas must be greater than 0, but got %d", o.BurstReplicas))
 	}
 	return errs
 }

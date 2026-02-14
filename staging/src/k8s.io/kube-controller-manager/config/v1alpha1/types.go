@@ -228,6 +228,10 @@ type DaemonSetControllerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive daemonset,
 	// but more CPU (and network) load.
 	ConcurrentDaemonSetSyncs int32
+	// burstReplicas is the maximum number of pods the daemonset controller will
+	// create/delete in a single sync. Larger number = faster rollouts but risks
+	// registry/API DoS.
+	BurstReplicas int32
 }
 
 // DeploymentControllerConfiguration contains elements describing DeploymentController.

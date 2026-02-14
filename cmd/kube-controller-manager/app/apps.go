@@ -54,6 +54,7 @@ func newDaemonSetController(ctx context.Context, controllerContext ControllerCon
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		client,
 		flowcontrol.NewBackOff(1*time.Second, 15*time.Minute),
+		int(controllerContext.ComponentConfig.DaemonSetController.BurstReplicas),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating DaemonSets controller: %w", err)

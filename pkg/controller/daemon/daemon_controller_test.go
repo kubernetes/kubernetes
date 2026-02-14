@@ -323,6 +323,7 @@ func newTestController(ctx context.Context, initialObjects ...runtime.Object) (*
 		informerFactory.Core().V1().Nodes(),
 		clientset,
 		flowcontrol.NewFakeBackOff(50*time.Millisecond, 500*time.Millisecond, testingclock.NewFakeClock(time.Now())),
+		DefaultBurstReplicas,
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -496,6 +497,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		f.Core().V1().Nodes(),
 		client,
 		flowcontrol.NewFakeBackOff(50*time.Millisecond, 500*time.Millisecond, testingclock.NewFakeClock(time.Now())),
+		DefaultBurstReplicas,
 	)
 	if err != nil {
 		t.Fatal(err)
