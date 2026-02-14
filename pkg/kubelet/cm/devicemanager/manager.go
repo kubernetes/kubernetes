@@ -28,14 +28,14 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -337,7 +337,8 @@ func (m *ManagerImpl) checkpointFile() string {
 // Start starts the Device Plugin Manager and start initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
-func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string]) error {
+func (m *ManagerImpl) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string]) error {
+	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Starting Device Plugin manager")
 
 	m.activePods = activePods
@@ -351,6 +352,26 @@ func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourc
 		logger.Error(err, "Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date")
 	}
 
+	go wait.Until(func() {
+		if !m.sourcesReady.AllReady() {
+			return
+		}
+		pods := m.activePods()
+		pendingPodUIDs := sets.NewString()
+		for _, pod := range pods {
+			// only pending status pods need devicesToReuse
+			if pod.Status.Phase == v1.PodPending {
+				pendingPodUIDs.Insert(string(pod.UID))
+			}
+		}
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
+		for uid := range m.devicesToReuse {
+			if !pendingPodUIDs.Has(uid) {
+				delete(m.devicesToReuse, uid)
+			}
+		}
+	}, 10*time.Second, ctx.Done())
 	return m.server.Start(logger)
 }
 
@@ -367,39 +388,41 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// Use context.TODO() because we currently do not have a proper context to pass in.
 	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
 	ctx := context.TODO()
+	m.mutex.Lock()
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set[string])
 	}
-	// If pod entries to m.devicesToReuse other than the current pod exist, delete them.
-	for podUID := range m.devicesToReuse {
-		if podUID != string(pod.UID) {
-			delete(m.devicesToReuse, podUID)
-		}
-	}
+	devicesToReuse := m.devicesToReuse[string(pod.UID)]
+	m.mutex.Unlock()
+
+	defer func() {
+		m.mutex.Lock()
+		m.devicesToReuse[string(pod.UID)] = devicesToReuse
+		m.mutex.Unlock()
+	}()
 	// Allocate resources for init containers first as we know the caller always loops
 	// through init containers before looping through app containers. Should the caller
 	// ever change those semantics, this logic will need to be amended.
 	for _, initContainer := range pod.Spec.InitContainers {
 		if container.Name == initContainer.Name {
-
-			if err := m.allocateContainerResources(ctx, pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+			if err := m.allocateContainerResources(ctx, pod, container, devicesToReuse); err != nil {
 				return err
 			}
 			if !podutil.IsRestartableInitContainer(&initContainer) {
-				m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
+				m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
 			} else {
 				// If the init container is restartable, we need to keep the
 				// devices allocated. In other words, we should remove them
 				// from the devicesToReuse.
-				m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
+				m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
 			}
 			return nil
 		}
 	}
-	if err := m.allocateContainerResources(ctx, pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+	if err := m.allocateContainerResources(ctx, pod, container, devicesToReuse); err != nil {
 		return err
 	}
-	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
+	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
 	return nil
 }
 

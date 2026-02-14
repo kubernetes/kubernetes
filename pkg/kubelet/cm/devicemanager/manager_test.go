@@ -286,7 +286,8 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 }
 
 func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string,
-	topology []cadvisorapi.Node, logger klog.Logger) (Manager, <-chan interface{}) {
+	topology []cadvisorapi.Node, ctx context.Context) (Manager, <-chan interface{}) {
+	logger := klog.FromContext(ctx)
 	topologyStore := topologymanager.NewFakeManager()
 	m, err := newManagerImpl(logger, socketName, topology, topologyStore)
 	require.NoError(t, err)
@@ -308,7 +309,7 @@ func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitor
 
 	// test steady state, initialization where sourcesReady, containerMap and containerRunningSet
 	// are relevant will be tested with a different flow
-	err = w.Start(logger, activePods, &sourcesReadyStub{}, containermap.NewContainerMap(), sets.New[string]())
+	err = w.Start(ctx, activePods, &sourcesReadyStub{}, containermap.NewContainerMap(), sets.New[string]())
 	require.NoError(t, err)
 
 	return w, updateChan
@@ -340,15 +341,13 @@ func runPluginManager(ctx context.Context, pluginManager pluginmanager.PluginMan
 }
 
 func setup(ctx context.Context, t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub) {
-	logger := klog.FromContext(ctx)
-	m, updateChan := setupDeviceManager(t, devs, callback, socketName, nil, logger)
+	m, updateChan := setupDeviceManager(t, devs, callback, socketName, nil, ctx)
 	p := setupDevicePlugin(ctx, t, devs, pluginSocketName)
 	return m, updateChan, p
 }
 
 func setupInProbeMode(ctx context.Context, t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub, pluginmanager.PluginManager) {
-	logger := klog.FromContext(ctx)
-	m, updateChan := setupDeviceManager(t, devs, callback, socketName, nil, logger)
+	m, updateChan := setupDeviceManager(t, devs, callback, socketName, nil, ctx)
 	p := setupDevicePlugin(ctx, t, devs, pluginSocketName)
 	pm := setupPluginManager(t, pluginSocketName, m)
 	return m, updateChan, p, pm
@@ -1809,7 +1808,7 @@ func makeDevice(devOnNUMA checkpoint.DevicesPerNUMA, topology bool) map[string]*
 }
 
 func TestGetTopologyHintsWithUpdates(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	socketDir, socketName, _, err := tmpSocketDir()
 	defer os.RemoveAll(socketDir)
 	require.NoError(t, err)
@@ -1857,7 +1856,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.description, func(t *testing.T) {
-			m, _ := setupDeviceManager(t, nil, nil, socketName, topology, logger)
+			m, _ := setupDeviceManager(t, nil, nil, socketName, topology, ctx)
 			defer func() {
 				err := m.Stop(logger)
 				require.NoError(t, err)
@@ -2190,4 +2189,77 @@ func TestEndpointSyncOnDisconnect(t *testing.T) {
 	require.Empty(t, manager.endpoints)
 	require.Empty(t, manager.healthyDevices)
 	require.Empty(t, manager.unhealthyDevices)
+}
+
+func TestDeviceAllocateParallel(t *testing.T) {
+	res1 := TestResource{
+		resourceName:     "domain3.com/resource3",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev5", "dev6"}},
+		topology:         false,
+	}
+	res2 := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		topology:         false,
+	}
+
+	as := require.New(t)
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	tmpDir := t.TempDir()
+
+	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, []TestResource{res1, res2})
+	as.NoError(err)
+	testManager.endpoints[res1.resourceName] = endpointInfo{
+		e: &MockEndpoint{
+			allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+				resp := new(pluginapi.ContainerAllocateResponse)
+				resp.Envs = make(map[string]string)
+				for _, dev := range devs {
+					switch dev {
+					case "dev5":
+						resp.Envs["key2"] = "val2"
+
+					case "dev6":
+						resp.Envs["key2"] = "val3"
+					}
+				}
+				resps := new(pluginapi.AllocateResponse)
+				resps.ContainerResponses = append(resps.ContainerResponses, resp)
+				time.Sleep(2 * time.Second)
+				return resps, nil
+			},
+		},
+		opts: nil,
+	}
+
+	pod1 := makePod(v1.ResourceList{
+		v1.ResourceName(res1.resourceName): res1.resourceQuantity})
+	pod2 := makePod(v1.ResourceList{
+		v1.ResourceName(res2.resourceName): res2.resourceQuantity})
+	activePods := []*v1.Pod{}
+	activePods = append(activePods, pod1, pod2)
+	podsStub.updateActivePods(activePods)
+
+	var err1, err2 error
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err1 = testManager.Allocate(pod1, &pod1.Spec.Containers[0])
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(500 * time.Millisecond)
+		err2 = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	}()
+
+	wg.Wait()
+	as.NoError(err1)
+	as.NoError(err2)
 }
