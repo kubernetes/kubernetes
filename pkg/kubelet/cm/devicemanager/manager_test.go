@@ -18,6 +18,7 @@ package devicemanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1441,6 +1442,306 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	as.True(initCont2Devices.IsSuperset(normalCont1Devices))
 	as.True(initCont2Devices.IsSuperset(normalCont2Devices))
 	as.Equal(0, normalCont1Devices.Intersection(normalCont2Devices).Len())
+}
+
+func TestPodPartialDeviceAllocationFailed(t *testing.T) {
+	// This test case constructs a scenario where partial resource allocation fails
+	// The node has three healthy devices: dev1, dev2, dev3
+	// Pod1 first attempts to allocate all three devices:
+	// - dev1 and dev2 are successfully allocated and recorded
+	// - Allocation of dev3 fails due to m.callGetPreferredAllocationIfAvailable failure
+	// After the first failure, Pod2 attempts to allocate dev1 and dev2 again:
+	// - Fails initially due to dirty data
+	// - Succeeds after data cleanup/repair
+
+	resourceName := "domain1.com/resource3"
+
+	res1 := TestResource{
+		resourceName:     resourceName,
+		resourceQuantity: *resource.NewQuantity(int64(3), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2", "dev3"}},
+	}
+	res2 := TestResource{
+		resourceName:     resourceName,
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+	}
+
+	testResources := []TestResource{res2, res1}
+	as := require.New(t)
+	tmpDir := t.TempDir()
+
+	allDevices := ResourceDeviceInstances{
+		resourceName: map[string]*pluginapi.Device{
+			"dev1": {
+				ID: "dev1",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{{ID: 1}},
+				},
+			},
+			"dev2": {
+				ID: "dev2",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{ID: 1},
+						{ID: 2},
+					},
+				},
+			},
+			"dev3": {
+				ID: "dev3",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{{ID: 2}},
+				},
+			},
+		},
+	}
+
+	fakeAffinity, _ := bitmask.NewBitMask(2)
+	fakeHint := topologymanager.TopologyHint{
+		NUMANodeAffinity: fakeAffinity,
+		Preferred:        true,
+	}
+
+	testManager, err := getTestManager(tmpDir, func() []*v1.Pod { return []*v1.Pod{} }, testResources)
+	as.NoError(err)
+	testManager.topologyAffinityStore = topologymanager.NewFakeManagerWithHint(&fakeHint)
+	testManager.allDevices = allDevices
+	testManager.endpoints[resourceName] = endpointInfo{
+		e: &MockEndpoint{
+			allocateFunc: allocateStubFunc(),
+			getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+				// Inject fault only when pod1 allocates dev3
+				if size == 3 {
+					return nil, errors.New("fake error")
+				}
+				return nil, nil
+			},
+		},
+		opts: &pluginapi.DevicePluginOptions{
+			GetPreferredAllocationAvailable: true,
+		},
+	}
+
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(resourceName): res1.resourceQuantity,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(resourceName): res2.resourceQuantity,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Attempt allocation for pod1 (should fail on dev3)
+	err = testManager.Allocate(pod1, &pod1.Spec.Containers[0])
+	as.Error(err)
+	t.Logf("allocate failed for podid %s, error %s", pod1.UID, err)
+
+	// Verify allocatedDevices cache is cleaned after failure
+	allocatedDevices := testManager.GetAllocatedDevices()
+	allocatedCount := len(allocatedDevices[resourceName])
+	as.Zero(allocatedCount, "Allocated devices cache should be empty after failure")
+
+	// Verify no traces left in podDevices for failed pod
+	pod1Devices := testManager.GetDevices(string(pod1.UID), pod1.Spec.Containers[0].Name)
+	as.Nil(pod1Devices[resourceName], "Failed pod should not have entries in podDevices")
+
+	// Attempt allocation for pod2 (should succeed after cleanup)
+	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	as.NoError(err)
+
+	podUID := string(pod2.UID)
+	normalCont1 := pod2.Spec.Containers[0].Name
+	normalCont1Devices := testManager.GetDevices(podUID, normalCont1)
+	normalCont1DeviceIDs := sets.KeySet(normalCont1Devices[res1.resourceName])
+	as.Equal(2, normalCont1DeviceIDs.Len())
+	as.True(normalCont1DeviceIDs.Has("dev2"))
+	as.True(normalCont1DeviceIDs.Has("dev3"))
+}
+
+// TestPodAllocationFailureCleanup verifies that when device allocation fails,
+// the allocatedDevices cache is properly cleaned up to avoid stale data that
+// could cause subsequent pod allocations to incorrectly report UnexpectedAdmissionError.
+func TestPodAllocationFailureCleanup(t *testing.T) {
+	tests := []struct {
+		name                       string
+		allocateFunc               func([]string) (*pluginapi.AllocateResponse, error)
+		setupDevices               func() ResourceDeviceInstances
+		expectAllocate             bool
+		getPreferredAllocationFunc func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error)
+	}{
+		{
+			name: "Success case - normal allocation",
+			allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+				return &pluginapi.AllocateResponse{
+					ContainerResponses: []*pluginapi.ContainerAllocateResponse{{}},
+				}, nil
+			},
+			setupDevices: func() ResourceDeviceInstances {
+				return ResourceDeviceInstances{
+					"domain1.com/resource": map[string]*pluginapi.Device{
+						"dev1": {ID: "dev1", Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}}},
+						"dev2": {ID: "dev2", Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 2}}}},
+					},
+				}
+			},
+			expectAllocate: true,
+		},
+		{
+			name: "GetPreferredAllocation failure",
+			allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+				return nil, errors.New("device plugin GetPreferredAllocation rpc failed")
+			},
+			setupDevices: func() ResourceDeviceInstances {
+				return ResourceDeviceInstances{
+					"domain1.com/resource": map[string]*pluginapi.Device{
+						"dev1": {ID: "dev1", Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}}},
+						"dev2": {ID: "dev2", Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 2}}}},
+						"dev3": {ID: "dev3", Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 2}}}},
+					},
+				}
+			},
+			expectAllocate: false,
+			getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+				if size == 2 {
+					return nil, errors.New("fake error")
+				}
+				return nil, nil
+			},
+		},
+		{
+			name: "Empty ContainerResponses",
+			allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+				return &pluginapi.AllocateResponse{}, nil
+			},
+			setupDevices: func() ResourceDeviceInstances {
+				return ResourceDeviceInstances{
+					"domain1.com/resource": map[string]*pluginapi.Device{
+						"dev1": {ID: "dev1", Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}}},
+					},
+				}
+			},
+			expectAllocate: false,
+		},
+		{
+			name: "GetPreferredAllocation failure - devices without NUMA topology",
+			allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+				return nil, errors.New("device plugin GetPreferredAllocation rpc failed")
+			},
+			setupDevices: func() ResourceDeviceInstances {
+				return ResourceDeviceInstances{
+					"domain1.com/resource": map[string]*pluginapi.Device{
+						"dev1": {ID: "dev1", Topology: nil},
+						"dev2": {ID: "dev2", Topology: nil},
+						"dev3": {ID: "dev3", Topology: nil},
+					},
+				}
+			},
+			expectAllocate: false,
+			getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+				if size == 2 {
+					return nil, errors.New("fake error")
+				}
+				return nil, nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resourceName := "domain1.com/resource"
+			res := TestResource{
+				resourceName:     resourceName,
+				resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+				devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+			}
+
+			testResources := []TestResource{res}
+			as := require.New(t)
+			tmpDir := t.TempDir()
+
+			testManager, err := getTestManager(tmpDir, func() []*v1.Pod { return []*v1.Pod{} }, testResources)
+			as.NoError(err)
+
+			testManager.allDevices = tt.setupDevices()
+
+			endpoint := &MockEndpoint{
+				allocateFunc: tt.allocateFunc,
+			}
+			if tt.getPreferredAllocationFunc != nil {
+				endpoint.getPreferredAllocationFunc = tt.getPreferredAllocationFunc
+				testManager.endpoints[resourceName] = endpointInfo{
+					e: endpoint,
+					opts: &pluginapi.DevicePluginOptions{
+						GetPreferredAllocationAvailable: true,
+					},
+				}
+			} else {
+				testManager.endpoints[resourceName] = endpointInfo{e: endpoint, opts: nil}
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: uuid.NewUUID(),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: string(uuid.NewUUID()),
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(resourceName): res.resourceQuantity,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			err = testManager.Allocate(pod, &pod.Spec.Containers[0])
+
+			if tt.expectAllocate {
+				as.NoError(err)
+				return
+			}
+			as.Error(err)
+			t.Logf("allocate failed for podid %s, error %v", pod.UID, err)
+
+			allocatedDevices := testManager.GetAllocatedDevices()
+			allocatedCount := len(allocatedDevices[resourceName])
+			as.Zero(allocatedCount, "Allocated devices cache should be empty after failure")
+
+			podDevices := testManager.GetDevices(string(pod.UID), pod.Spec.Containers[0].Name)
+			as.Nil(podDevices[resourceName], "Failed pod should not have entries in podDevices")
+		})
+	}
 }
 
 func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
