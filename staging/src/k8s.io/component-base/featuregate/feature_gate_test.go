@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/metrics/legacyregistry"
 	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
@@ -2576,5 +2577,31 @@ func TestValidateDependencies(t *testing.T) {
 				assert.EqualError(t, err, tc.expectedErr)
 			}
 		})
+	}
+}
+
+func TestResetFeatureQueriedForTest(t *testing.T) {
+	gate := NewFeatureGate()
+	featureA := Feature("FeatureA")
+	featureB := Feature("FeatureB")
+	if err := gate.Add(map[Feature]FeatureSpec{
+		featureA: {Default: false, PreRelease: Alpha},
+		featureB: {Default: false, PreRelease: Alpha},
+	}); err != nil {
+		t.Fatalf("failed to add features for test: %v", err)
+	}
+
+	gate.Enabled(featureA)
+	gate.Enabled(featureB)
+
+	gate.ResetFeatureQueriedForTest(featureA)
+
+	actual := gate.queriedFeatures.Load().(sets.Set[Feature])
+	if actual.Has(featureA) {
+		t.Errorf("expected featureA to be removed from queried set, but it was present")
+	}
+
+	if !actual.Has(featureB) {
+		t.Errorf("expected featureB to remain in queried set, but it was removed")
 	}
 }
