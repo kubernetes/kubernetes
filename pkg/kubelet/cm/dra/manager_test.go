@@ -49,6 +49,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/utils/ptr"
 
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
@@ -1702,7 +1703,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		}
 
 		// Check cache state
-		cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
+		cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health
 		assert.Equal(t, state.DeviceHealthStatus("Unhealthy"), cachedHealth, "Cache update check failed")
 
 		t.Log("HealthChangeForAllocatedDevice: Closing responses channel to signal EOF")
@@ -1760,7 +1761,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		}
 
 		// Check health cache for the "other-device"
-		cachedHealthOther := manager.healthInfoCache.getHealthInfo(driverName, poolName, "other-device")
+		cachedHealthOther := manager.healthInfoCache.getHealthInfo(driverName, poolName, "other-device").Health
 		assert.Equal(t, state.DeviceHealthStatus("Unhealthy"), cachedHealthOther, "Cache update for other-device failed")
 
 		close(responses)
@@ -1954,7 +1955,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 				{
 					Name: "claim:claim1",
 					Resources: []v1.ResourceHealth{
-						{ResourceID: "test-driver/pool/dev-a", Health: v1.ResourceHealthStatusHealthy},
+						{ResourceID: "test-driver/pool/dev-a", Health: v1.ResourceHealthStatusHealthy, Message: ptr.To("Device is operating normally")},
 					},
 				},
 			},
@@ -1989,7 +1990,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 				{
 					Name: "claim:renamed-pod-claim",
 					Resources: []v1.ResourceHealth{
-						{ResourceID: "test-driver/pool/dev-b", Health: v1.ResourceHealthStatusHealthy},
+						{ResourceID: "test-driver/pool/dev-b", Health: v1.ResourceHealthStatusHealthy, Message: ptr.To("Device is operating normally")},
 					},
 				},
 			},
@@ -2024,7 +2025,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 				{
 					Name: "claim:templated-claim",
 					Resources: []v1.ResourceHealth{
-						{ResourceID: "test-driver/pool/dev-c", Health: v1.ResourceHealthStatusHealthy},
+						{ResourceID: "test-driver/pool/dev-c", Health: v1.ResourceHealthStatusHealthy, Message: ptr.To("Device is operating normally")},
 					},
 				},
 			},
@@ -2033,6 +2034,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceHealthStatusMessage, true)
 			tCtx := ktesting.Init(t)
 			logger := tCtx.Logger()
 			manager, err := NewManager(logger, nil, t.TempDir())
@@ -2047,7 +2049,12 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 			for _, ci := range tc.claimInfos {
 				for driverName, ds := range ci.DriverState {
 					for _, dev := range ds.Devices {
-						devices = append(devices, state.DeviceHealth{PoolName: dev.PoolName, DeviceName: dev.DeviceName, Health: state.DeviceHealthStatusHealthy})
+						devices = append(devices, state.DeviceHealth{
+							PoolName:   dev.PoolName,
+							DeviceName: dev.DeviceName,
+							Health:     state.DeviceHealthStatusHealthy,
+							Message:    "Device is operating normally",
+						})
 					}
 					_, err := manager.healthInfoCache.updateHealthInfo(logger, driverName, devices)
 					require.NoError(t, err)
@@ -2059,6 +2066,197 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 
 			require.Len(t, status.ContainerStatuses, 1)
 			assert.Equal(t, tc.expectedAllocatedResourcesStatus, status.ContainerStatuses[0].AllocatedResourcesStatus)
+		})
+	}
+}
+
+func TestUpdateAllocatedResourcesStatus_Subrequest(t *testing.T) {
+	directClaimName := "test-claim"
+
+	testCases := []struct {
+		name                  string
+		claimRequest          string
+		deviceRequestNames    []string
+		expectHealthReported  bool
+		expectedHealthMessage string
+		expectedHealthStatus  v1.ResourceHealthStatus
+	}{
+		{
+			name:                  "Subrequest matches base name",
+			claimRequest:          "req-base/sub",
+			deviceRequestNames:    []string{"req-base"},
+			expectHealthReported:  true,
+			expectedHealthMessage: "Device healthy",
+			expectedHealthStatus:  v1.ResourceHealthStatusHealthy,
+		},
+		{
+			name:                 "Subrequest does not match different base name",
+			claimRequest:         "req-other/sub",
+			deviceRequestNames:   []string{"req-base"},
+			expectHealthReported: false,
+		},
+		{
+			name:                  "Base request matches base name",
+			claimRequest:          "req-base",
+			deviceRequestNames:    []string{"req-base"},
+			expectHealthReported:  true,
+			expectedHealthMessage: "Device healthy",
+			expectedHealthStatus:  v1.ResourceHealthStatusHealthy,
+		},
+		{
+			name:                  "Empty request matches any device",
+			claimRequest:          "",
+			deviceRequestNames:    []string{"req-base"},
+			expectHealthReported:  true,
+			expectedHealthMessage: "Device healthy",
+			expectedHealthStatus:  v1.ResourceHealthStatusHealthy,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceHealthStatusMessage, true)
+			tCtx := ktesting.Init(t)
+			manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
+			require.NoError(t, err)
+
+			// Setup claim info with device
+			claimInfo := &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					ClaimName: directClaimName,
+					PodUIDs:   sets.New("test-pod-uid"),
+					DriverState: map[string]state.DriverState{
+						"test-driver": {
+							Devices: []state.Device{
+								{
+									PoolName:     "test-pool",
+									DeviceName:   "test-device",
+									RequestNames: tc.deviceRequestNames,
+								},
+							},
+						},
+					},
+				},
+			}
+			manager.cache.add(claimInfo)
+
+			// Setup health cache
+			devices := []state.DeviceHealth{
+				{
+					PoolName:   "test-pool",
+					DeviceName: "test-device",
+					Health:     state.DeviceHealthStatusHealthy,
+					Message:    "Device healthy",
+				},
+			}
+			_, err = manager.healthInfoCache.updateHealthInfo(tCtx.Logger(), "test-driver", devices)
+			require.NoError(t, err)
+
+			// Create pod and status
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", UID: "test-pod-uid"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Claims: []v1.ResourceClaim{
+									{Name: "claim1", Request: tc.claimRequest},
+								},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{Name: "claim1", ResourceClaimName: &directClaimName},
+					},
+				},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{Name: "claim1", ResourceClaimName: &directClaimName},
+					},
+				},
+			}
+
+			status := &v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{Name: "container1"},
+				},
+			}
+
+			// Call UpdateAllocatedResourcesStatus
+			manager.UpdateAllocatedResourcesStatus(pod, status)
+
+			// Assert results
+			require.Len(t, status.ContainerStatuses, 1)
+
+			if tc.expectHealthReported {
+				// Should have one ResourceStatus entry
+				require.Len(t, status.ContainerStatuses[0].AllocatedResourcesStatus, 1)
+				resStatus := status.ContainerStatuses[0].AllocatedResourcesStatus[0]
+
+				// Should have one ResourceHealth entry
+				require.Len(t, resStatus.Resources, 1, "Expected exactly one ResourceHealth entry")
+				healthEntry := resStatus.Resources[0]
+
+				// Verify health matches what we put in the cache
+				assert.Equal(t, tc.expectedHealthStatus, healthEntry.Health)
+				assert.Equal(t, tc.expectedHealthMessage, ptr.Deref(healthEntry.Message, ""))
+				assert.Equal(t, v1.ResourceID("test-driver/test-pool/test-device"), healthEntry.ResourceID)
+			} else {
+				// Should have no ResourceStatus entries at all (empty statuses are pruned)
+				assert.Empty(t, status.ContainerStatuses[0].AllocatedResourcesStatus,
+					"Expected AllocatedResourcesStatus to be empty when device is filtered out")
+			}
+		})
+	}
+}
+
+func TestTruncateHealthMessage(t *testing.T) {
+	testCases := map[string]struct {
+		input    string
+		expected string
+	}{
+		"empty message": {
+			input:    "",
+			expected: "",
+		},
+		"short message": {
+			input:    "Device is healthy",
+			expected: "Device is healthy",
+		},
+		"message at exactly max length": {
+			input:    string(make([]byte, v1.ResourceHealthMessageMaxLength)),
+			expected: string(make([]byte, v1.ResourceHealthMessageMaxLength)),
+		},
+		"message one character over max length": {
+			input:    string(make([]byte, v1.ResourceHealthMessageMaxLength+1)),
+			expected: string(make([]byte, v1.ResourceHealthMessageMaxLength-3)) + "...",
+		},
+		"very long message": {
+			input:    string(make([]byte, v1.ResourceHealthMessageMaxLength*2)),
+			expected: string(make([]byte, v1.ResourceHealthMessageMaxLength-3)) + "...",
+		},
+		"message with meaningful content": {
+			input:    "ECC error count exceeded threshold on device GPU-0",
+			expected: "ECC error count exceeded threshold on device GPU-0",
+		},
+		"long message with meaningful content": {
+			input:    string(make([]byte, v1.ResourceHealthMessageMaxLength)) + " extra content",
+			expected: string(make([]byte, v1.ResourceHealthMessageMaxLength-3)) + "...",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			result := truncateHealthMessage(tc.input)
+			assert.Equal(t, tc.expected, result)
+			// Verify the result is never longer than max length
+			assert.LessOrEqual(t, len(result), v1.ResourceHealthMessageMaxLength)
+			// Verify that if truncation occurred, it ends with "..."
+			if len(tc.input) > v1.ResourceHealthMessageMaxLength {
+				assert.Len(t, result, v1.ResourceHealthMessageMaxLength)
+				assert.Equal(t, "...", result[len(result)-3:])
+			}
 		})
 	}
 }

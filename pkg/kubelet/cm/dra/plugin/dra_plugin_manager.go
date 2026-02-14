@@ -384,7 +384,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 	}
 	p.conn = conn
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) && pm.streamHandler != nil {
 		pm.wg.Add(1)
 		go func() {
 			defer pm.wg.Done()
