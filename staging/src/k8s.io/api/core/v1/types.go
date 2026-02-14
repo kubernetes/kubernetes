@@ -216,7 +216,6 @@ type VolumeSource struct {
 	// The volume will be mounted read-only (ro) and non-executable files (noexec).
 	// Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.
 	// The field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.
-	// +featureGate=ImageVolume
 	// +optional
 	Image *ImageVolumeSource `json:"image,omitempty" protobuf:"bytes,30,opt,name=image"`
 }
