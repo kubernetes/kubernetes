@@ -119,7 +119,7 @@ func (e errorNotServeServerMock) Watch(_ *grpchealth.HealthCheckRequest, stream 
 }
 
 func TestGrpcProber_Probe(t *testing.T) {
-	t.Run("Should: failed but return nil error because cant find host", func(t *testing.T) {
+	t.Run("Should: failed but return nil error because can't find host", func(t *testing.T) {
 		s := New()
 		p, o, err := s.Probe("", "", 32, time.Second)
 		assert.Equal(t, probe.Failure, p)
