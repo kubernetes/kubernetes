@@ -895,6 +895,33 @@ func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, d
 	}
 }
 
+type AllocatorTestCase struct {
+	features                 Features
+	claimsToAllocate         []wrapResourceClaim
+	allocatedDevices         []DeviceID
+	allocatedSharedDeviceIDs sets.Set[SharedDeviceID]
+	allocatedCapacityDevices ConsumedCapacityCollection
+	classes                  []*resourceapi.DeviceClass
+	slices                   []*resourceapi.ResourceSlice
+	node                     *v1.Node
+
+	expectResults []any
+	expectError   types.GomegaMatcher // can be used to check for no error or match specific error
+
+	// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
+	// which doesn't provide the stats and also falls over with excessive runtime for them.
+	expectNumAllocateOneInvocations int64
+
+	// expectNumAllocateOneInvocationsByChannel overrides expectNumAllocateOneInvocations with
+	// different values for specific implementations (e.g. "experimental").
+	//
+	// Ignored unless expectNumAllocateOneInvocations is also set.
+	// expectNumAllocateOneInvocations should contain the "best" result, so
+	// expectNumAllocateOneInvocationsByChannel is only needed as long as we have "worse"
+	// implementations.
+	expectNumAllocateOneInvocationsByChannel map[internal.AllocatorChannel]int64
+}
+
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
 // Test cases which depend on features that are not supported by the implementation are silently skipped.
 func TestAllocator(t *testing.T,
@@ -947,33 +974,7 @@ func TestAllocator(t *testing.T,
 		Effect:   resourceapi.DeviceTaintEffectNoSchedule,
 	}
 
-	testcases := map[string]struct {
-		features                 Features
-		claimsToAllocate         []wrapResourceClaim
-		allocatedDevices         []DeviceID
-		allocatedSharedDeviceIDs sets.Set[SharedDeviceID]
-		allocatedCapacityDevices ConsumedCapacityCollection
-		classes                  []*resourceapi.DeviceClass
-		slices                   []*resourceapi.ResourceSlice
-		node                     *v1.Node
-
-		expectResults []any
-		expectError   types.GomegaMatcher // can be used to check for no error or match specific error
-
-		// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
-		// which doesn't provide the stats and also falls over with excessive runtime for them.
-		expectNumAllocateOneInvocations int64
-
-		// expectNumAllocateOneInvocationsByChannel overrides expectNumAllocateOneInvocations with
-		// different values for specific implementations (e.g. "experimental").
-		//
-		// Ignored unless expectNumAllocateOneInvocations is also set.
-		// expectNumAllocateOneInvocations should contain the "best" result, so
-		// expectNumAllocateOneInvocationsByChannel is only needed as long as we have "worse"
-		// implementations.
-		expectNumAllocateOneInvocationsByChannel map[internal.AllocatorChannel]int64
-	}{
-
+	testcases := map[string]AllocatorTestCase{
 		"empty": {},
 		"simple": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
@@ -6271,6 +6272,20 @@ func TestAllocator(t *testing.T,
 		},
 	}
 
+	RunTestAllocator(t, supportedFeatures, newAllocator, testcases)
+}
+
+func RunTestAllocator(t *testing.T,
+	supportedFeatures Features,
+	newAllocator func(
+		ctx context.Context,
+		features Features,
+		allocateState AllocatedState,
+		classLister DeviceClassLister,
+		slices []*resourceapi.ResourceSlice,
+		celCache *cel.Cache,
+	) (Allocator, error),
+	testcases map[string]AllocatorTestCase) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
@@ -6327,6 +6342,7 @@ func TestAllocator(t *testing.T,
 					t.Logf("allocated capacity: %v", allocation.ConsumedCapacity)
 				}
 			}
+			t.Logf("results: %+v", results)
 			g.Expect(results).To(gomega.ConsistOf(tc.expectResults...))
 
 			// Objects that the allocator had access to should not have been modified.

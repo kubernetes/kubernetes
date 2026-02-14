@@ -17,6 +17,7 @@ limitations under the License.
 package experimental
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -57,37 +58,26 @@ func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Both is recorded in the result.
 func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice, node *v1.Node, features Features, allSlices []*resourceapi.ResourceSlice) ([]*Pool, error) {
 	pools := make(map[PoolID][]*draapi.ResourceSlice)
-	var slicesWithBindingConditions []*resourceapi.ResourceSlice
+	var normalSlices, slicesWithBindingConditions []*resourceapi.ResourceSlice
 
 	for _, slice := range slicesForNode {
 		if !features.PartitionableDevices && (slice.Spec.PerDeviceNodeSelection != nil || len(slice.Spec.SharedCounters) > 0) {
 			continue
 		}
 
+		// Determine if the slice should be considered for the node.
+		shouldConsiderSlice := false
+
 		// Always include slices with SharedCounters since they are needed to use a pool
 		// regardless of their node selector.
 		if len(slice.Spec.SharedCounters) > 0 {
-			if err := addSlice(pools, slice); err != nil {
-				return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
-			}
+			shouldConsiderSlice = true
 		} else if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false); nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
 			match, err := NodeMatches(node, nodeName, allNodes, slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
 			}
-			if match {
-				if hasBindingConditions(slice) {
-					// If there is a Device in the ResourceSlice that contains BindingConditions,
-					// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions
-					// because then the allocation is going to prefer the simpler devices without
-					// binding conditions.
-					slicesWithBindingConditions = append(slicesWithBindingConditions, slice)
-					continue
-				}
-				if err := addSlice(pools, slice); err != nil {
-					return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
-				}
-			}
+			shouldConsiderSlice = match
 		} else if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
 			for _, device := range slice.Spec.Devices {
 				match, err := NodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
@@ -96,15 +86,7 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 						device.String(), slice.Name, err)
 				}
 				if match {
-					if hasBindingConditions(slice) {
-						// If there is a Device in the ResourceSlice that contains BindingConditions,
-						// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions.
-						slicesWithBindingConditions = append(slicesWithBindingConditions, slice)
-						break
-					}
-					if err := addSlice(pools, slice); err != nil {
-						return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
-					}
+					shouldConsiderSlice = true
 					break
 				}
 			}
@@ -119,8 +101,29 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 			continue
 		}
 
+		if shouldConsiderSlice {
+			if hasBindingConditions(slice) {
+				slicesWithBindingConditions = append(slicesWithBindingConditions, slice)
+			} else {
+				normalSlices = append(normalSlices, slice)
+			}
+		}
 	}
 
+	// Sort slices by name to ensure a deterministic allocation order.
+	// Because the allocator uses a first-fit search, this allows driver authors
+	// to influence prioritization through their naming conventions.
+	sortSlicesByName(normalSlices)
+	sortSlicesByName(slicesWithBindingConditions)
+	// If there is a Device in the ResourceSlice that contains BindingConditions,
+	// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions
+	// because then the allocation is going to prefer the simpler devices without
+	// binding conditions.
+	for _, s := range normalSlices {
+		if err := addSlice(pools, s); err != nil {
+			return nil, fmt.Errorf("failed to add node slice %s: %w", s.Name, err)
+		}
+	}
 	for _, slice := range slicesWithBindingConditions {
 		if err := addSlice(pools, slice); err != nil {
 			return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
@@ -192,11 +195,30 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 		}
 		result = append(result, pool)
 	}
+
+	// Sort pools by name to ensure a deterministic allocation order.
+	// Because the allocator uses a first-fit search, this allows driver authors
+	// to influence prioritization through their naming conventions.
+	sortPoolsByID(result)
+	sortPoolsByID(resultWithBindingConditions)
+
 	if len(resultWithBindingConditions) != 0 {
 		result = append(result, resultWithBindingConditions...)
 	}
 
 	return result, nil
+}
+
+func sortSlicesByName(slicesToSort []*resourceapi.ResourceSlice) {
+	slices.SortFunc(slicesToSort, func(a, b *resourceapi.ResourceSlice) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+}
+
+func sortPoolsByID(pools []*Pool) {
+	slices.SortFunc(pools, func(a, b *Pool) int {
+		return cmp.Compare(a.PoolID.String(), b.PoolID.String())
+	})
 }
 
 func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceSlice) error {
