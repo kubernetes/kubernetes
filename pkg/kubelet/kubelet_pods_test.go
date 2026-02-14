@@ -2205,6 +2205,10 @@ func withRestartCount(status v1.ContainerStatus, restartCount int32) v1.Containe
 	status.RestartCount = restartCount
 	return status
 }
+func withLastTerminationState(status v1.ContainerStatus, lastState v1.ContainerState) v1.ContainerStatus {
+	status.LastTerminationState = lastState
+	return status
+}
 
 func TestPodPhaseWithRestartAlways(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
@@ -3915,7 +3919,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			},
 		},
 		{
-			name: "currently running with lower reset restartCount; should keeping previous restartCount",
+			name: "currently running with lower restartCount; should keeping previous restartCount",
 			pod: &v1.Pod{
 				Spec: desiredState,
 			},
@@ -3940,8 +3944,16 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			// no init containers
 			// is not an init container
 			expected: []v1.ContainerStatus{
-				withRestartCount(runningState("containerA"), 6),
-				withRestartCount(runningState("containerB"), 6),
+				withRestartCount(withLastTerminationState(runningState("containerA"), v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						ExitCode: -1,
+					},
+				}), 6),
+				withRestartCount(withLastTerminationState(runningState("containerB"), v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						ExitCode: -1,
+					},
+				}), 6),
 			},
 		},
 		{
@@ -4039,13 +4051,19 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				}},
 			},
 			previousStatus: []v1.ContainerStatus{
-				withRestartCount(waitingState("containerA"), 1),
+				withRestartCount(waitingStateWithRestartingAllContainers("containerA"), 1),
 				failedStateWithExitCode("containerB", 42),
 			},
 			containers:    desiredState.Containers,
 			podRestarting: true,
 			expected: []v1.ContainerStatus{
-				withRestartCount(runningState("containerA"), 1),
+				withRestartCount(withLastTerminationState(runningState("containerA"), v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						Reason:   RestartingAllContainers,
+						Message:  "The container is removed because RestartAllContainers in place",
+						ExitCode: 137,
+					},
+				}), 1),
 				withRestartCount(waitingStateWithRestartingAllContainers("containerB"), 1),
 			},
 		},
