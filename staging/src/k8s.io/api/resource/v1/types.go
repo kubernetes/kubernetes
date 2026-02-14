@@ -1359,6 +1359,7 @@ type OpaqueDeviceConfiguration struct {
 	// +required
 	// +k8s:required
 	// +k8s:format=k8s-long-name-caseless
+	// +k8s:maxLength=63
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
 
 	// Parameters can contain arbitrary data. It is the responsibility of
@@ -1603,6 +1604,7 @@ type DeviceRequestAllocationResult struct {
 	// +required
 	// +k8s:format=k8s-long-name-caseless
 	// +k8s:required
+	// +k8s:maxLength=63
 	Driver string `json:"driver" protobuf:"bytes,2,name=driver"`
 
 	// This name together with the driver name and the device name field

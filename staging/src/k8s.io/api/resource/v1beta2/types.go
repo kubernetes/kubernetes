@@ -1364,6 +1364,7 @@ type OpaqueDeviceConfiguration struct {
 	//
 	// +required
 	// +k8s:required
+	// +k8s:maxLength=63
 	// +k8s:format=k8s-long-name-caseless
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
 
@@ -1608,6 +1609,7 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +required
 	// +k8s:format=k8s-long-name-caseless
+	// +k8s:maxLength=63
 	// +k8s:required
 	Driver string `json:"driver" protobuf:"bytes,2,name=driver"`
 

@@ -49,7 +49,7 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.Name = ""
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("metadata.name"), ""),
+				field.Required(field.NewPath("metadata.name"), "").MarkFromImperative(),
 			},
 		},
 		"name: label format": {
@@ -127,8 +127,8 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				rc.GenerateName = "name"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("metadata.name"), ""),
-				field.InternalError(field.NewPath("metadata.name"), fmt.Errorf("")),
+				field.Required(field.NewPath("metadata.name"), "").MarkFromImperative(),
+				field.InternalError(field.NewPath("metadata.name"), fmt.Errorf("")).MarkFromImperative(),
 			},
 		},
 
@@ -216,7 +216,7 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				rc.Name += "x"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, ""),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").MarkFromImperative(),
 			},
 		},
 		// metadata.generateName

@@ -335,6 +335,26 @@ func TestErrorMatcher_Matches(t *testing.T) {
 		wantedErr: baseErr,
 		actualErr: &Error{Type: ErrorTypeInvalid},
 		matches:   false,
+	}, {
+		name:    "BySource: match",
+		matcher: ErrorMatcher{}.BySource(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.FromImperative = true
+			return e
+		},
+		actualErr: &Error{FromImperative: true},
+		matches:   true,
+	}, {
+		name:    "BySource: no match",
+		matcher: ErrorMatcher{}.BySource(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.FromImperative = true
+			return e
+		},
+		actualErr: &Error{FromImperative: false},
+		matches:   false,
 	}}
 
 	for _, tc := range testCases {
@@ -447,6 +467,17 @@ func TestErrorMatcher_Test(t *testing.T) {
 		matcher:        ErrorMatcher{}.ByValidationStabilityLevel(),
 		want:           ErrorList{{}}.MarkAlpha(),
 		got:            ErrorList{{}}.MarkBeta(),
+		expectedErrors: []string{"expected an error matching:", "unmatched error:"},
+	}, {
+		name:    "by source: match",
+		matcher: ErrorMatcher{}.BySource(),
+		want:    ErrorList{{FromImperative: true}},
+		got:     ErrorList{{FromImperative: true}},
+	}, {
+		name:           "by source: no match",
+		matcher:        ErrorMatcher{}.BySource(),
+		want:           ErrorList{{FromImperative: true}},
+		got:            ErrorList{{FromImperative: false}},
 		expectedErrors: []string{"expected an error matching:", "unmatched error:"},
 	}, {
 		name:    "with origin: single match",
@@ -604,6 +635,27 @@ func TestErrorMatcher_Render(t *testing.T) {
 			matcher:  ErrorMatcher{}.ByType().ByValue(),
 			err:      Required(NewPath("field"), "detail"),
 			expected: `{Type="Required value", Value=""}`,
+		},
+		{
+			name:    "with from imperative",
+			matcher: ErrorMatcher{}.BySource(),
+			err: func() *Error {
+				e := Invalid(NewPath("field"), "value", "detail")
+				e.FromImperative = true
+				return e
+			}(),
+			expected: `{FromImperative=true}`,
+		},
+		{
+			name:    "all fields with from imperative",
+			matcher: ErrorMatcher{}.ByType().ByField().ByValue().ByOrigin().ByDetailExact().ByDeclarativeNative().BySource(),
+			err: func() *Error {
+				e := Invalid(NewPath("field"), "value", "detail").WithOrigin("origin")
+				e.DeclarativeNative = true
+				e.FromImperative = true
+				return e
+			}(),
+			expected: `{Type="Invalid value", Field="field", Value="value", Origin="origin", Detail="detail", DeclarativeNative=true, FromImperative=true}`,
 		},
 	}
 
