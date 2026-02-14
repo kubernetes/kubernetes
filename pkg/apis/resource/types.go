@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -409,6 +410,38 @@ type Device struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	AllowMultipleAllocations *bool
+
+	// NativeResourceMappings defines the native resource (CPU, Memory, Hugepages)
+	// footprint of this device. This includes resources provided by the device
+	// acting as a source (e.g., a CPU DRA driver exposing CPUs on a NUMA node
+	// as a device) or native resources required as a dependency (e.g., a GPU
+	// requiring host memory or CPU to function). The map's key is the native
+	// resource name (e.g., "cpu", "memory", "hugepages-1Gi").
+	// +optional
+	// +featureGate=DRANativeResources
+	NativeResourceMappings map[v1.ResourceName]NativeResourceMapping
+}
+
+type NativeResourceMapping struct {
+	// QuantityFrom defines how the quantity of the native resource is determined.
+	QuantityFrom NativeResourceQuantity
+}
+
+// NativeResourceQuantity defines the method to identify how we obtain native resource quantity from the Claim.
+// Only one of PerInstanceQuantity or Capacity must be specified.
+type NativeResourceQuantity struct {
+	// PerInstanceQuantity specifies a fixed amount of the native resource
+	// for each allocated instance of this device. This is used when the
+	// quantity is constant per device, such as a CPU core providing 1 CPU
+	// or a GPU requiring 2Gi of host memory.
+	// +optional
+	PerInstanceQuantity *resource.Quantity
+
+	// Capacity indicates that the native resource quantity is tied to a
+	// capacity defined in the device's capacity map. The native resource quantity is
+	// derived from the ResourceClaim based on the key defined here.
+	// +optional
+	Capacity QualifiedName
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -1703,6 +1736,11 @@ type DeviceClassSpec struct {
 	// +optional
 	// +featureGate=DRAExtendedResource
 	ExtendedResourceName *string
+
+	// ManagesNativeResources indicates if devices of this class manages native resources like cpu, memory and/or hugepages.
+	// +optional
+	// +featureGate=DRANativeResources
+	ManagesNativeResources bool
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

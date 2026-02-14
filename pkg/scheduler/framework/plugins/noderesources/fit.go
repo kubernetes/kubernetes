@@ -232,6 +232,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 type ResourceRequestsOptions struct {
 	EnablePodLevelResources   bool
 	EnableDRAExtendedResource bool
+	EnableDRANativeResources  bool
 }
 
 // shouldDelegateResourceToDRA checks if the given resource should be delegated to the DRA plugin.
@@ -287,7 +288,8 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !opts.EnablePodLevelResources,
+		SkipPodLevelResources:           !opts.EnablePodLevelResources,
+		UseDRANativeResourceClaimStatus: opts.EnableDRANativeResources,
 	})
 	result := &preFilterState{}
 	result.SetMaxResource(reqs)

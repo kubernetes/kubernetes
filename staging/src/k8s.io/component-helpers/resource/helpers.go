@@ -20,6 +20,8 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -60,6 +62,8 @@ type PodResourcesOptions struct {
 	SkipPodLevelResources bool
 	// SkipContainerLevelResources
 	SkipContainerLevelResources bool
+	// Use native resource claim information from pod status to compute the effective pod resource request.
+	UseDRANativeResourceClaimStatus bool
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
@@ -153,7 +157,6 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	}
 
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
-
 		var effectiveReqs v1.ResourceList
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
 			if pod.Status.Resources != nil {
@@ -184,6 +187,51 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	return reqs
 }
 
+// NativeDRAAllocationInfo holds the details of a single native resource allocation from a DRA claim.
+type NativeDRAAllocationInfo struct {
+	Quantity   resource.Quantity
+	ClaimUID   types.UID
+	ClaimName  string
+	DriverName string
+}
+
+// ContainerNativeDRAInfo maps a resource name to a list of DRAAllocationInfos for a container.
+type ContainerNativeDRAInfo map[v1.ResourceName][]NativeDRAAllocationInfo
+
+// perContainerClaimInfo is a helper function to parse pod.Status.NativeResourceClaimStatus
+func perContainerClaimInfo(pod *v1.Pod, podNativeResourceClaimStatus []v1.PodNativeResourceClaimStatus) map[string]ContainerNativeDRAInfo {
+	perContainerDRA := make(map[string]ContainerNativeDRAInfo)
+	allContainers := make(map[string]bool)
+	for _, c := range pod.Spec.InitContainers {
+		allContainers[c.Name] = true
+	}
+	for _, c := range pod.Spec.Containers {
+		allContainers[c.Name] = true
+	}
+
+	for _, claimStatus := range podNativeResourceClaimStatus {
+		for _, containerName := range claimStatus.Containers {
+			if !allContainers[containerName] {
+				continue // Should not happen if status is valid
+			}
+
+			if _, exists := perContainerDRA[containerName]; !exists {
+				perContainerDRA[containerName] = make(ContainerNativeDRAInfo)
+			}
+
+			for _, resAlloc := range claimStatus.Resources {
+				draInfo := NativeDRAAllocationInfo{
+					Quantity:  resAlloc.Quantity,
+					ClaimUID:  claimStatus.ClaimInfo.UID,
+					ClaimName: claimStatus.ClaimInfo.Name,
+				}
+				perContainerDRA[containerName][resAlloc.ResourceName] = append(perContainerDRA[containerName][resAlloc.ResourceName], draInfo)
+			}
+		}
+	}
+	return perContainerDRA
+}
+
 // AggregateContainerRequests computes the total resource requests of all the containers
 // in a pod. This computation folows the formula defined in the KEP for sidecar
 // containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
@@ -201,7 +249,6 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 			containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
 		}
 	}
-
 	for _, container := range pod.Spec.Containers {
 		containerReqs := container.Resources.Requests
 		if opts.UseStatusResources {
@@ -221,6 +268,28 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 
 		if opts.ContainerFn != nil {
 			opts.ContainerFn(containerReqs, Containers)
+		}
+
+		if opts.UseDRANativeResourceClaimStatus && len(pod.Status.NativeResourceClaimStatus) > 0 {
+			accountedClaimRes := sets.New[string]()
+			perContainerDRA := perContainerClaimInfo(pod, pod.Status.NativeResourceClaimStatus)
+
+			for containerName, cInfo := range perContainerDRA {
+				if len(cInfo) == 0 || containerName != container.Name {
+					continue
+				}
+				for resName, allocs := range cInfo {
+					for _, info := range allocs {
+						key := string(info.ClaimUID)
+						if !accountedClaimRes.Has(key) {
+							singleResList := v1.ResourceList{resName: info.Quantity}
+							addResourceList(containerReqs, singleResList)
+							accountedClaimRes.Insert(key)
+						}
+					}
+				}
+			}
+
 		}
 
 		addResourceList(reqs, containerReqs)

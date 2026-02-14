@@ -430,6 +430,38 @@ type Device struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty" protobuf:"bytes,12,opt,name=allowMultipleAllocations"`
+
+	// NativeResourceMappings defines the native resource (CPU, Memory, Hugepages)
+	// footprint of this device. This includes resources provided by the device
+	// acting as a source (e.g., a CPU DRA driver exposing CPUs on a NUMA node
+	// as a device) or native resources required as a dependency (e.g., a GPU
+	// requiring host memory or CPU to function). The map's key is the native
+	// resource name (e.g., "cpu", "memory", "hugepages-1Gi").
+	// +optional
+	// +featureGate=DRANativeResources
+	NativeResourceMappings map[v1.ResourceName]NativeResourceMapping `json:"nativeResourceMappings,omitempty" protobuf:"bytes,13,opt,name=nativeResourceMappings"`
+}
+
+type NativeResourceMapping struct {
+	// QuantityFrom defines how the quantity of the native resource is determined.
+	QuantityFrom NativeResourceQuantity `json:"quantityFrom" protobuf:"bytes,2,name=quantityFrom"`
+}
+
+// NativeResourceQuantity defines the method to identify how we obtain native resource quantity from the Claim.
+// Only one of PerInstanceQuantity or Capacity must be specified.
+type NativeResourceQuantity struct {
+	// PerInstanceQuantity specifies a fixed amount of the native resource
+	// for each allocated instance of this device. This is used when the
+	// quantity is constant per device, such as a CPU core providing 1 CPU
+	// or a GPU requiring 2Gi of host memory.
+	// +optional
+	PerInstanceQuantity *resource.Quantity `json:"perInstanceQuantity,omitempty" protobuf:"bytes,1,opt,name=perInstanceQuantity"`
+
+	// Capacity indicates that the native resource quantity is tied to a
+	// capacity defined in the device's capacity map. The native resource quantity is
+	// derived from the ResourceClaim based on the key defined here.
+	// +optional
+	Capacity QualifiedName `json:"capacity,omitempty" protobuf:"bytes,2,opt,name=capacity"`
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -1821,6 +1853,11 @@ type DeviceClassSpec struct {
 	// +k8s:optional
 	// +k8s:format=k8s-extended-resource-name
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty" protobuf:"bytes,4,opt,name=extendedResourceName"`
+
+	// ManagesNativeResources indicates if devices of this class manages native resources like cpu, memory and/or hugepages.
+	// +optional
+	// +featureGate=DRANativeResources
+	ManagesNativeResources bool `json:"managesNativeResources,omitempty" protobuf:"bytes,5,opt,name=managesNativeResources"`
 }
 
 // DeviceClassConfiguration is used in DeviceClass.
