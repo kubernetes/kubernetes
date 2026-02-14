@@ -203,6 +203,8 @@ message HorizontalPodAutoscalerSpec {
   // available.
   // +optional
   // +k8s:optional
+  // +k8s:ifEnabled(HPAScaleToZero)=+k8s:minimum=0
+  // +k8s:ifDisabled(HPAScaleToZero)=+k8s:minimum=1
   optional int32 minReplicas = 2;
 
   // maxReplicas is the upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
