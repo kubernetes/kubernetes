@@ -278,8 +278,9 @@ func (sched *Scheduler) bindingCycle(
 
 	assumedPod := assumedPodInfo.Pod
 
+	var preFlightStatus *fwk.Status
 	if sched.nominatedNodeNameForExpectationEnabled {
-		preFlightStatus := schedFramework.RunPreBindPreFlights(ctx, state, assumedPod, scheduleResult.SuggestedHost)
+		preFlightStatus = schedFramework.RunPreBindPreFlights(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if preFlightStatus.Code() == fwk.Error ||
 			// Unschedulable status is not supported in PreBindPreFlight and hence we regard it as an error.
 			preFlightStatus.IsRejected() {
@@ -323,9 +324,24 @@ func (sched *Scheduler) bindingCycle(
 	// we can free the cluster events stored in the scheduling queue sooner, which is worth for busy clusters memory consumption wise.
 	sched.SchedulingQueue.Done(assumedPod.UID)
 
+	// If we are going to run prebind plugins we put the pod in binding map to optimize preemption.
+	if preFlightStatus.IsSuccess() {
+		var podInPreBindCancel context.CancelCauseFunc
+		ctx, podInPreBindCancel = context.WithCancelCause(ctx)
+		defer podInPreBindCancel(nil)
+		defer schedFramework.RemovePodInPreBind(assumedPod.UID)
+		schedFramework.AddPodInPreBind(assumedPod.UID, podInPreBindCancel)
+	}
 	// Run "prebind" plugins.
 	if status := schedFramework.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost); !status.IsSuccess() {
 		return status
+	}
+
+	// Verify that pod was not preempted during prebinding.
+	bindingPod := schedFramework.GetPodInPreBind(assumedPod.UID)
+	if bindingPod != nil && !bindingPod.MarkPrebound() {
+		err := context.Cause(ctx)
+		return fwk.AsStatus(err)
 	}
 
 	// Run "bind" plugins.

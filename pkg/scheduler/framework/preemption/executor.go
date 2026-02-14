@@ -77,12 +77,21 @@ func newExecutor(fh fwk.Handle) *Executor {
 		logger := klog.FromContext(ctx)
 
 		skipAPICall := false
+		eventMessage := fmt.Sprintf("Preempted by pod %v on node %v", preemptor.UID, c.Name())
 		// If the victim is a WaitingPod, try to preempt it without a delete call (victim will go back to backoff queue).
 		// Otherwise we should delete the victim.
 		if waitingPod := e.fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			if waitingPod.Preempt(pluginName, "preempted") {
 				logger.V(2).Info("Preemptor pod preempted a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
 				skipAPICall = true
+			}
+		} else if podInPreBind := e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
+			// If the victim is in the preBind cancel the binding process.
+			if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
+				logger.V(2).Info("Preemptor pod rejected a pod in preBind", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+				skipAPICall = true
+			} else {
+				logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
 			}
 		}
 		if !skipAPICall {
@@ -114,9 +123,11 @@ func newExecutor(fh fwk.Handle) *Executor {
 				return nil
 			}
 			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
+		} else {
+			eventMessage += " (in kube-scheduler memory)."
 		}
 
-		fh.EventRecorder().Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by pod %v on node %v", preemptor.UID, c.Name())
+		fh.EventRecorder().Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", eventMessage)
 
 		return nil
 	}
