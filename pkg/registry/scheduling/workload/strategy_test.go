@@ -31,10 +31,10 @@ var workload = &scheduling.Workload{
 		Namespace: metav1.NamespaceDefault,
 	},
 	Spec: scheduling.WorkloadSpec{
-		PodGroups: []scheduling.PodGroup{
+		PodGroupTemplates: []scheduling.PodGroupTemplate{
 			{
 				Name: "bar",
-				Policy: scheduling.PodGroupPolicy{
+				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 					Gang: &scheduling.GangSchedulingPolicy{
 						MinCount: 5,
 					},
@@ -56,7 +56,7 @@ func TestWorkloadStrategy(t *testing.T) {
 func ctxWithRequestInfo() context.Context {
 	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "scheduling.k8s.io",
-		APIVersion:        "v1alpha1",
+		APIVersion:        "v1alpha2",
 		Resource:          "workloads",
 		IsResourceRequest: true,
 	})
@@ -77,7 +77,7 @@ func TestPodSchedulingStrategyCreate(t *testing.T) {
 	t.Run("failed validation", func(t *testing.T) {
 		ctx := ctxWithRequestInfo()
 		workload := workload.DeepCopy()
-		workload.Spec.PodGroups[0].Policy.Gang.MinCount = -1
+		workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = -1
 
 		Strategy.PrepareForCreate(ctx, workload)
 		errs := Strategy.Validate(ctx, workload)
@@ -136,7 +136,7 @@ func TestPodSchedulingStrategyUpdate(t *testing.T) {
 		ctx := ctxWithRequestInfo()
 		workload := workload.DeepCopy()
 		newWorkload := workload.DeepCopy()
-		newWorkload.Spec.PodGroups[0].Policy.Gang.MinCount = 4
+		newWorkload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = 4
 		newWorkload.ResourceVersion = "4"
 
 		Strategy.PrepareForUpdate(ctx, newWorkload, workload)

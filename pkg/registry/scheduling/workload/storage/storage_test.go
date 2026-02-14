@@ -54,10 +54,10 @@ func validNewWorkload() *scheduling.Workload {
 			Name: "foo",
 		},
 		Spec: scheduling.WorkloadSpec{
-			PodGroups: []scheduling.PodGroup{
+			PodGroupTemplates: []scheduling.PodGroupTemplate{
 				{
 					Name: "bar",
-					Policy: scheduling.PodGroupPolicy{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 						Gang: &scheduling.GangSchedulingPolicy{
 							MinCount: 5,
 						},
@@ -71,7 +71,7 @@ func validNewWorkload() *scheduling.Workload {
 func newTester(t *testing.T, storage *genericregistry.Store) *genericregistrytest.Tester {
 	return genericregistrytest.New(t, storage).SetRequestInfo(&genericapirequest.RequestInfo{
 		APIGroup:   "scheduling.k8s.io",
-		APIVersion: "v1alpha1",
+		APIVersion: "v1alpha2",
 		Resource:   "workloads",
 	})
 }
@@ -114,7 +114,7 @@ func TestUpdate(t *testing.T) {
 		// Update MinCount
 		func(obj runtime.Object) runtime.Object {
 			w := obj.(*scheduling.Workload)
-			w.Spec.PodGroups[0].Policy.Gang.MinCount = 4
+			w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = 4
 			return w
 		},
 	)
