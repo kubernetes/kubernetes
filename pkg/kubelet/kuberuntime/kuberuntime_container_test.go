@@ -89,7 +89,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS.Create(expectedContainerLogPath)
 	fakeOS.Create(expectedContainerLogPathRotated)
 
-	err = m.removeContainer(tCtx, containerID)
+	err = m.removeContainer(tCtx, containerID, false)
 	assert.NoError(t, err)
 
 	// Verify container log is removed.
@@ -102,6 +102,60 @@ func TestRemoveContainer(t *testing.T) {
 	containers, err := fakeRuntime.ListContainers(tCtx, &runtimeapi.ContainerFilter{Id: containerID})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
+}
+
+func TestRemoveContainer_keepLogs(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Create fake sandbox and container
+	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	assert.Len(t, fakeContainers, 1)
+
+	containerID := fakeContainers[0].Id
+	fakeOS := m.osInterface.(*containertest.FakeOS)
+	fakeOS.GlobFn = func(pattern, path string) bool {
+		pattern = strings.ReplaceAll(pattern, "*", ".*")
+		pattern = strings.ReplaceAll(pattern, "\\", "\\\\")
+		return regexp.MustCompile(pattern).MatchString(path)
+	}
+	podLogsDirectory := "/var/log/pods"
+	expectedContainerLogPath := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log")
+	expectedContainerLogPathRotated := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
+
+	_, err = fakeOS.Create(expectedContainerLogPath)
+	require.NoError(t, err)
+	_, err = fakeOS.Create(expectedContainerLogPathRotated)
+	require.NoError(t, err)
+
+	err = m.removeContainer(tCtx, containerID, true)
+	require.NoError(t, err)
+
+	// Verify container logs are kept.
+	// We could not predict the order of `fakeOS.Removes`, so we use `assert.ElementsMatch` here.
+	require.Empty(t, fakeOS.Removes)
+	// Verify container is removed
+	require.Contains(t, fakeRuntime.Called, "RemoveContainer")
+	containers, err := fakeRuntime.ListContainers(tCtx, &runtimeapi.ContainerFilter{Id: containerID})
+	require.NoError(t, err)
+	require.Empty(t, containers)
 }
 
 // TestKillContainer tests killing the container in a Pod.
