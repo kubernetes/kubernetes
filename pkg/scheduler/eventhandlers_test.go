@@ -188,7 +188,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 
 				// Put test pods into unschedulable queue
 				for _, pod := range unschedulablePods {
-					queue.Add(logger, pod)
+					queue.Add(ctx, logger, pod)
 					poppedPod, err := queue.Pop(logger)
 					if err != nil {
 						t.Fatalf("Pop failed: %v", err)

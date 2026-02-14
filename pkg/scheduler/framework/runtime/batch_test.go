@@ -180,12 +180,6 @@ func newTestNodes(n []string) *testSortedScoredNodes {
 	return &testSortedScoredNodes{Nodes: n}
 }
 
-func newTestSigFunc(sig *fwk.PodSignature) SignatureFunc {
-	return func(h fwk.Handle, ctx context.Context, p *v1.Pod, shouldRecordStats bool) fwk.PodSignature {
-		return *sig
-	}
-}
-
 func TestBatchBasic(t *testing.T) {
 	// This test first let OpportunisticBatch handle the first pod, and then see how it behaves with the second pod.
 	tests := []struct {
@@ -327,11 +321,11 @@ func TestBatchBasic(t *testing.T) {
 			}
 
 			signature := fwk.PodSignature(tt.firstSig)
-			batch := newOpportunisticBatch(testFwk, newTestSigFunc(&signature))
+			batch := newOpportunisticBatch(testFwk)
 			state := framework.NewCycleState()
 
 			// Run the first "pod" through
-			hint, _ := batch.GetNodeHint(ctx, pod, state, 1)
+			hint := batch.GetNodeHint(ctx, pod, signature, state, 1)
 			if hint != "" {
 				t.Fatalf("Got unexpected hint %s", hint)
 			}
@@ -360,7 +354,7 @@ func TestBatchBasic(t *testing.T) {
 			lister.nodes = nodeInfoLister{lastChosenNode}
 
 			signature = fwk.PodSignature(tt.secondSig)
-			hint, _ = batch.GetNodeHint(ctx, pod2, state, cycleCount)
+			hint = batch.GetNodeHint(ctx, pod2, signature, state, cycleCount)
 
 			if hint != tt.expectedHint {
 				t.Fatalf("Got hint '%s' expected '%s' for test '%s'", hint, tt.expectedHint, tt.name)
