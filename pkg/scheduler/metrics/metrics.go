@@ -135,10 +135,12 @@ var (
 	FrameworkExtensionPointDuration *metrics.HistogramVec
 	PluginExecutionDuration         *metrics.HistogramVec
 
-	PermitWaitDuration    *metrics.HistogramVec
-	CacheSize             *metrics.GaugeVec
-	unschedulableReasons  *metrics.GaugeVec
-	PluginEvaluationTotal *metrics.CounterVec
+	PermitWaitDuration          *metrics.HistogramVec
+	CacheSize                   *metrics.GaugeVec
+	unschedulableReasons        *metrics.GaugeVec
+	PluginEvaluationTotal       *metrics.CounterVec
+	PluginInfluenceWinnerChange *metrics.CounterVec
+	PluginInfluenceTopKOverlap  *metrics.HistogramVec
 
 	// The below two are only available when the QHint feature gate is enabled.
 	queueingHintExecutionDuration *metrics.HistogramVec
@@ -383,6 +385,23 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"plugin", "extension_point", "profile"})
 
+	PluginInfluenceWinnerChange = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "plugin_influence_winner_change_total",
+			Help:           "Number of scheduling cycles where removing a scoring plugin changes the winning node.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile", "plugin", "changed"})
+
+	PluginInfluenceTopKOverlap = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "plugin_influence_topk_overlap_ratio",
+			Help:           "Top-K overlap ratio between baseline scoring and scoring without a given plugin.",
+			Buckets:        metrics.LinearBuckets(0, 0.1, 11),
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile", "plugin"})
+
 	PreemptionGoroutinesDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -481,6 +500,8 @@ func InitMetrics() {
 		CacheSize,
 		unschedulableReasons,
 		PluginEvaluationTotal,
+		PluginInfluenceWinnerChange,
+		PluginInfluenceTopKOverlap,
 		BatchAttemptStats,
 		BatchCacheFlushed,
 		GetNodeHintDuration,

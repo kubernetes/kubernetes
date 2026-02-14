@@ -39,6 +39,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -462,7 +463,8 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 		}, nil
 	}
 
-	priorityList, err := prioritizeNodes(ctx, sched.Extenders, fwk, state, pod, feasibleNodes)
+	influenceCfg := sched.pluginInfluenceConfigs[fwk.ProfileName()]
+	priorityList, err := prioritizeNodes(ctx, sched.Extenders, fwk, state, pod, feasibleNodes, influenceCfg)
 	if err != nil {
 		return result, err
 	}
@@ -800,6 +802,7 @@ func prioritizeNodes(
 	state fwk.CycleState,
 	pod *v1.Pod,
 	nodes []fwk.NodeInfo,
+	pluginInfluenceCfg *schedulerapi.PluginInfluence,
 ) ([]fwk.NodePluginScores, error) {
 	logger := klog.FromContext(ctx)
 	// If no priority configs are provided, then all nodes will have a score of one.
@@ -898,12 +901,126 @@ func prioritizeNodes(
 		}
 	}
 
+	if pluginInfluenceCfg != nil && pluginInfluenceCfg.Enabled {
+		if pluginInfluenceCfg.SamplePercent > 0 {
+			if pluginInfluenceCfg.SamplePercent >= 100 || rand.Intn(100) < int(pluginInfluenceCfg.SamplePercent) {
+				analyzePluginInfluence(logger, schedFramework.ProfileName(), pluginInfluenceCfg, nodesScores, extenders)
+			}
+		}
+	}
+
 	if loggerVTen.Enabled() {
 		for i := range nodesScores {
 			loggerVTen.Info("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", nodesScores[i].Name, "score", nodesScores[i].TotalScore)
 		}
 	}
 	return nodesScores, nil
+}
+
+func analyzePluginInfluence(logger klog.Logger, profileName string, cfg *schedulerapi.PluginInfluence, nodesScores []fwk.NodePluginScores, extenders []fwk.Extender) {
+	if cfg == nil || !cfg.Enabled || len(nodesScores) == 0 {
+		return
+	}
+	topK := int(cfg.TopK)
+	if topK <= 0 {
+		return
+	}
+	if topK > len(nodesScores) {
+		topK = len(nodesScores)
+	}
+
+	baselineTopK, baselineWinner := topKNodesByScore(nodesScores, topK)
+	baselineSet := sets.New[string](baselineTopK...)
+
+	extenderNames := sets.New[string]()
+	for _, ext := range extenders {
+		extenderNames.Insert(ext.Name())
+	}
+
+	pluginSet := sets.New[string]()
+	for _, nodeScore := range nodesScores {
+		for _, ps := range nodeScore.Scores {
+			if extenderNames.Has(ps.Name) {
+				continue
+			}
+			pluginSet.Insert(ps.Name)
+		}
+	}
+	if pluginSet.Len() == 0 {
+		return
+	}
+
+	plugins := sets.List(pluginSet)
+	pluginScores := make(map[string][]int64, len(plugins))
+	for _, name := range plugins {
+		pluginScores[name] = make([]int64, len(nodesScores))
+	}
+	for i, nodeScore := range nodesScores {
+		for _, ps := range nodeScore.Scores {
+			if extenderNames.Has(ps.Name) {
+				continue
+			}
+			if scores, ok := pluginScores[ps.Name]; ok {
+				scores[i] = ps.Score
+			}
+		}
+	}
+
+	for _, pluginName := range plugins {
+		adjustedScores := make([]fwk.NodePluginScores, len(nodesScores))
+		for i, nodeScore := range nodesScores {
+			adjustedScores[i] = fwk.NodePluginScores{
+				Name:       nodeScore.Name,
+				TotalScore: nodeScore.TotalScore - pluginScores[pluginName][i],
+				Randomizer: nodeScore.Randomizer,
+			}
+		}
+
+		topKNodes, newWinner := topKNodesByScore(adjustedScores, topK)
+		overlapCount := 0
+		for _, nodeName := range topKNodes {
+			if baselineSet.Has(nodeName) {
+				overlapCount++
+			}
+		}
+		overlapRatio := float64(overlapCount) / float64(topK)
+		winnerChanged := newWinner != baselineWinner
+
+		logger.V(4).Info("Plugin influence analysis",
+			"profile", profileName,
+			"plugin", pluginName,
+			"baselineWinner", baselineWinner,
+			"winner", newWinner,
+			"winnerChanged", winnerChanged,
+			"topK", topK,
+			"topKOverlap", overlapCount,
+			"topKOverlapRatio", overlapRatio,
+		)
+
+		metrics.PluginInfluenceWinnerChange.WithLabelValues(profileName, pluginName, strconv.FormatBool(winnerChanged)).Inc()
+		metrics.PluginInfluenceTopKOverlap.WithLabelValues(profileName, pluginName).Observe(overlapRatio)
+	}
+}
+
+func topKNodesByScore(nodeScores []fwk.NodePluginScores, k int) ([]string, string) {
+	if k <= 0 || len(nodeScores) == 0 {
+		return nil, ""
+	}
+	working := make([]fwk.NodePluginScores, len(nodeScores))
+	copy(working, nodeScores)
+	h := nodeScoreHeap(working)
+	heap.Init(&h)
+
+	topKNodes := make([]string, 0, k)
+	winner := ""
+	for i := 0; i < k && h.Len() > 0; i++ {
+		entry := heap.Pop(&h).(fwk.NodePluginScores)
+		if i == 0 {
+			winner = entry.Name
+		}
+		topKNodes = append(topKNodes, entry.Name)
+	}
+	return topKNodes, winner
 }
 
 type sortedNodeScores struct {

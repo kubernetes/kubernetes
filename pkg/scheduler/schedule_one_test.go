@@ -4135,7 +4135,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to list node from snapshot: %v", err)
 			}
-			nodesscores, err := prioritizeNodes(ctx, extenders, schedFramework, state, test.pod, nodeInfos)
+			nodesscores, err := prioritizeNodes(ctx, extenders, schedFramework, state, test.pod, nodeInfos, nil)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
