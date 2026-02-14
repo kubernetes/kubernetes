@@ -28,17 +28,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
-	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	podresourcetest "k8s.io/kubernetes/pkg/kubelet/apis/podresources/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestListPodResourcesV1(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
-
 	tCtx := ktesting.Init(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
@@ -294,8 +289,6 @@ func collectNamespacedNamesFromPodResources(prs []*podresourcesapi.PodResources)
 }
 
 func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
-
 	tCtx := ktesting.Init(t)
 	numaID := int64(1)
 
@@ -411,7 +404,6 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 }
 
 func TestListPodResourcesWithInitContainersV1(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
 	tCtx := ktesting.Init(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
@@ -899,11 +891,6 @@ func TestAllocatableResources(t *testing.T) {
 }
 
 func TestGetPodResourcesV1(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		pkgfeatures.KubeletPodResourcesGet:              true,
-		pkgfeatures.KubeletPodResourcesDynamicResources: true,
-	})
-
 	tCtx := ktesting.Init(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
@@ -1079,11 +1066,6 @@ func TestGetPodResourcesV1(t *testing.T) {
 }
 
 func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		pkgfeatures.KubeletPodResourcesGet:              true,
-		pkgfeatures.KubeletPodResourcesDynamicResources: true,
-	})
-
 	tCtx := ktesting.Init(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
