@@ -19,8 +19,10 @@ package priorityclass
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -53,7 +55,8 @@ func (priorityClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // Validate validates a new PriorityClass.
 func (priorityClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pc := obj.(*scheduling.PriorityClass)
-	return validation.ValidatePriorityClass(pc)
+	allErrs := validation.ValidatePriorityClass(pc)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, pc, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -71,7 +74,10 @@ func (priorityClassStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (priorityClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePriorityClassUpdate(obj.(*scheduling.PriorityClass), old.(*scheduling.PriorityClass))
+	newPc := obj.(*scheduling.PriorityClass)
+	oldPc := old.(*scheduling.PriorityClass)
+	allErrs := validation.ValidatePriorityClassUpdate(newPc, oldPc)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newPc, oldPc, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
