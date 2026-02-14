@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1748,10 +1749,5 @@ func MetricsEqualIgnoreTimestamp(a *volume.Metrics, b *volume.Metrics) bool {
 }
 
 func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(modes, mode)
 }

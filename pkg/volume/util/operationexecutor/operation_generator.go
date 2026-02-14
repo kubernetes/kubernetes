@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -1500,12 +1501,10 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 		return volumeToDetach.GenerateErrorDetailed("DetachVolume failed fetching node from API server", fetchErr)
 	}
 
-	for _, inUseVolume := range node.Status.VolumesInUse {
-		if inUseVolume == volumeToDetach.VolumeName {
-			return volumeToDetach.GenerateErrorDetailed(
-				"DetachVolume failed",
-				fmt.Errorf("volume is still in use by node, according to Node status"))
-		}
+	if slices.Contains(node.Status.VolumesInUse, volumeToDetach.VolumeName) {
+		return volumeToDetach.GenerateErrorDetailed(
+			"DetachVolume failed",
+			fmt.Errorf("volume is still in use by node, according to Node status"))
 	}
 
 	// Volume is not marked as in use by node
