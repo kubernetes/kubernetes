@@ -74,6 +74,28 @@ var (
 			ResourceRequest: true,
 			Path:            "/api/v1/namespaces/default/pods/busybox",
 		},
+		"customResource": &authorizer.AttributesRecord{
+			User:            tim,
+			Verb:            "get",
+			Namespace:       "default",
+			APIGroup:        "example.com",
+			APIVersion:      "v1",
+			Resource:        "examples",
+			Name:            "my-example",
+			ResourceRequest: true,
+			Path:            "/apis/example.com/v1/namespaces/default/examples/my-example",
+		},
+		"customResourceSubgroup": &authorizer.AttributesRecord{
+			User:            tim,
+			Verb:            "get",
+			Namespace:       "default",
+			APIGroup:        "foo.example.com",
+			APIVersion:      "v1",
+			Resource:        "widgets",
+			Name:            "my-widget",
+			ResourceRequest: true,
+			Path:            "/apis/foo.example.com/v1/namespaces/default/widgets/my-widget",
+		},
 		"Unauthorized": &authorizer.AttributesRecord{
 			Verb:            "get",
 			Namespace:       "default",
@@ -181,6 +203,18 @@ var (
 				ResourceNames: []string{"edit"},
 			}},
 		},
+		"customAPIGroup": {
+			Level: audit.LevelMetadata,
+			Resources: []audit.GroupResources{{
+				Group: "example.com",
+			}},
+		},
+		"wildcardCustomAPIGroup": {
+			Level: audit.LevelRequestResponse,
+			Resources: []audit.GroupResources{{
+				Group: "*.example.com",
+			}},
+		},
 		"omit RequestReceived": {
 			Level: audit.LevelRequest,
 			OmitStages: []audit.Stage{
@@ -256,6 +290,9 @@ func testAuditLevel(t *testing.T, stages []audit.Stage) {
 	test(t, "subresource", audit.LevelRequest, stages, stages, "getPodWildcardMatching")
 	test(t, "subresource", audit.LevelRequest, stages, stages, "getPodResourceWildcardMatching")
 	test(t, "subresource", audit.LevelRequest, stages, stages, "getPodSubResourceWildcardMatching")
+
+	test(t, "customResource", audit.LevelMetadata, stages, stages, "customAPIGroup")
+	test(t, "customResourceSubgroup", audit.LevelRequestResponse, stages, stages, "wildcardCustomAPIGroup")
 
 	test(t, "Unauthorized", audit.LevelNone, stages, stages, "tims")
 	test(t, "Unauthorized", audit.LevelMetadata, stages, stages, "tims", "default")
@@ -443,6 +480,53 @@ func TestOmitManagedFields(t *testing.T) {
 			got := evaluator.EvaluatePolicyRule(attributes)
 			if test.want != got.OmitManagedFields {
 				t.Errorf("Expected OmitManagedFields to match, want: %t, got: %t", test.want, got.OmitManagedFields)
+			}
+		})
+	}
+}
+
+func Test_apiGroupMatches(t *testing.T) {
+	tests := []struct {
+		name     string
+		apiGroup string
+		gr       audit.GroupResources
+		want     bool
+	}{
+		{
+			name:     "exact match",
+			apiGroup: "example.com",
+			gr:       audit.GroupResources{Group: "example.com"},
+			want:     true,
+		},
+		{
+			name:     "no match",
+			apiGroup: "example.com",
+			gr:       audit.GroupResources{Group: "other.com"},
+			want:     false,
+		},
+		{
+			name:     "wildcard match",
+			apiGroup: "foo.example.com",
+			gr:       audit.GroupResources{Group: "*.example.com"},
+			want:     true,
+		},
+		{
+			name:     "wildcard no match",
+			apiGroup: "example.org",
+			gr:       audit.GroupResources{Group: "*.example.com"},
+			want:     false,
+		},
+		{
+			name:     "wildcard match subdomain",
+			apiGroup: "bar.foo.example.com",
+			gr:       audit.GroupResources{Group: "*.example.com"},
+			want:     true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := apiGroupMatches(tt.apiGroup, tt.gr); got != tt.want {
+				t.Errorf("apiGroupMatches() = %v, want %v", got, tt.want)
 			}
 		})
 	}
