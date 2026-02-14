@@ -745,7 +745,187 @@ func TestCorrelation(t *testing.T) {
 			KeyPath:  []interface{}{"foo", 0, "key"},
 			NewValue: nil,
 		},
+		// KEP-5073 Granular Ratcheting Tests for Atomic Data Types
+
+		// Test 1: Atomic list with map keys should now support granular correlation
+		{
+			Name: "Atomic list with map keys should correlate granularly (KEP-5073)",
+			RootObject: mustUnstructured(`
+                foo:
+                - key: keyValue
+                  bar: newValue
+            `),
+			RootOldObject: mustUnstructured(`
+                foo:
+                - key: otherKeyValue
+                  bar: otherOldValue
+                - key: altKeyValue
+                  bar: altOldValue
+                - key: keyValue
+                  bar: oldValue
+            `),
+			Schema: mustSchema(`
+                properties:
+                  foo:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        bar:
+                          type: string
+                    x-kubernetes-list-type: atomic
+                    x-kubernetes-list-map-keys:
+                    - key
+            `),
+			KeyPath:  []interface{}{"foo", 0, "bar"},
+			NewValue: "newValue",
+			OldValue: "oldValue",
+		},
+
+		// Test 2: Atomic list without map keys should still not correlate by index
+		{
+			Name: "Atomic list without map keys should not correlate by index",
+			RootObject: mustUnstructured(`
+                foo:
+                - bar: baz
+                  val: newValue
+            `),
+			RootOldObject: mustUnstructured(`
+                foo:
+                - bar: fizz
+                  val: fizzValue
+                - bar: baz
+                  val: barValue
+            `),
+			Schema: mustSchema(`
+                properties:
+                  foo:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bar:
+                          type: string
+                        val:
+                          type: string
+                    x-kubernetes-list-type: atomic
+            `),
+			KeyPath: []interface{}{"foo", 0, "val"},
+			// Should fail to correlate - expecting nil values
+		},
+
+		// Test 3: Atomic map should support granular correlation (per-key)
+		{
+			Name: "Atomic map should support granular correlation",
+			RootObject: mustUnstructured(`
+                config:
+                  changedKey: newValue
+                  unchangedKey: sameValue
+            `),
+			RootOldObject: mustUnstructured(`
+                config:
+                  changedKey: oldValue
+                  unchangedKey: sameValue
+                  removedKey: removedValue
+            `),
+			Schema: mustSchema(`
+                properties:
+                  config:
+                    type: object
+                    x-kubernetes-map-type: atomic
+                    additionalProperties:
+                      type: string
+            `),
+			KeyPath:  []interface{}{"config", "changedKey"},
+			NewValue: "newValue",
+			OldValue: "oldValue",
+		},
+
+		// Test 4: Unchanged key in atomic map should correlate properly
+		{
+			Name: "Unchanged key in atomic map should correlate",
+			RootObject: mustUnstructured(`
+                config:
+                  changedKey: newValue
+                  unchangedKey: sameValue
+            `),
+			RootOldObject: mustUnstructured(`
+                config:
+                  changedKey: oldValue
+                  unchangedKey: sameValue
+            `),
+			Schema: mustSchema(`
+                properties:
+                  config:
+                    type: object
+                    x-kubernetes-map-type: atomic
+                    additionalProperties:
+                      type: string
+            `),
+			KeyPath:     []interface{}{"config", "unchangedKey"},
+			NewValue:    "sameValue",
+			OldValue:    "sameValue",
+			ExpectEqual: true,
+		},
+
+		// Test 5: Complex atomic list with nested map keys
+		{
+			Name: "Complex atomic list with nested objects should correlate",
+			RootObject: mustUnstructured(`
+                items:
+                - metadata:
+                    name: item1
+                  spec:
+                    value: newValue1
+                - metadata:
+                    name: item2
+                  spec:
+                    value: newValue2
+            `),
+			RootOldObject: mustUnstructured(`
+                items:
+                - metadata:
+                    name: item2
+                  spec:
+                    value: oldValue2
+                - metadata:
+                    name: item1
+                  spec:
+                    value: oldValue1
+                - metadata:
+                    name: item3
+                  spec:
+                    value: oldValue3
+            `),
+			Schema: mustSchema(`
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        metadata:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                        spec:
+                          type: object
+                          properties:
+                            value:
+                              type: string
+                    x-kubernetes-list-type: atomic
+                    x-kubernetes-list-map-keys:
+                    - metadata.name
+            `),
+			KeyPath:  []interface{}{"items", 0, "spec", "value"},
+			NewValue: "newValue1",
+			OldValue: "oldValue1",
+		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			if err := c.Run(); err != nil {

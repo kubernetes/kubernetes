@@ -87,7 +87,11 @@ func NewCorrelatedObject(new, old interface{}, schema Schema) *CorrelatedObject 
 // map-keys, caches it for future calls, and returns the map value, or nil if
 // the correlated key is not in the old map
 //
-// Otherwise, if the list type is not correlatable this funcion returns nil.
+// If listType is atomic but the list has map keys (KEP-5073), enables granular
+// ratcheting by treating it like a map-type list for correlation purposes while
+// preserving atomic semantics for other operations.
+//
+// Otherwise, if the list type is not correlatable this function returns nil.
 func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) interface{} {
 	oldAsList, ok := r.OldValue.([]interface{})
 	if !ok {
@@ -124,7 +128,28 @@ func (r *CorrelatedObject) correlateOldValueForChildAtNewIndex(index int) interf
 	case "":
 		fallthrough
 	case "atomic":
-		// Atomic lists are the default are not correlatable by item
+		// KEP-5073 alignment: Enable granular ratcheting for atomic lists with map keys.
+		// This allows per-item correlation even within atomic collections, improving
+		// user experience by only re-validating changed items rather than the entire
+		// atomic collection when any part is modified.
+		if r.Schema.XListMapKeys() != nil && len(r.Schema.XListMapKeys()) > 0 {
+			// For atomic lists with map keys, treat them like map-type lists for correlation
+			// while preserving their atomic semantics for other operations
+			currentElement := asList[index]
+
+			oldList := r.mapList
+			if oldList == nil {
+				// Create a map list using a temporary schema
+				// This allows to use map list correlation logic for atomic lists with map keys
+				tmpSchema := &atomicMapListSchema{
+					originalSchema: r.Schema,
+				}
+				oldList = MakeMapList(tmpSchema, oldAsList)
+				r.mapList = oldList
+			}
+			return oldList.Get(currentElement)
+		}
+		// Atomic lists without map keys are not correlatable by item
 		// Ratcheting is not available on a per-index basis
 		return nil
 	default:
@@ -331,4 +356,153 @@ func (r *CorrelatedObject) Index(i int) *CorrelatedObject {
 	}
 	r.children[i] = res
 	return res
+}
+
+// atomicMapListSchema is a schema wrapper that allows atomic lists with map keys
+// to be used with MakeMapList for correlation purposes while preserving the
+// original atomic schema for other operations.
+type atomicMapListSchema struct {
+	originalSchema Schema
+}
+
+func (a *atomicMapListSchema) Type() string {
+	return "array"
+}
+
+func (a *atomicMapListSchema) XListType() string {
+	// Return "map" instead of "atomic" to enable map list correlation
+	return "map"
+}
+
+func (a *atomicMapListSchema) XListMapKeys() []string {
+	return a.originalSchema.XListMapKeys()
+}
+
+func (a *atomicMapListSchema) Items() Schema {
+	return a.originalSchema.Items()
+}
+
+// Format Implement minimal Schema interface methods needed for MakeMapList
+func (a *atomicMapListSchema) Format() string {
+	return a.originalSchema.Format()
+}
+
+func (a *atomicMapListSchema) Properties() map[string]Schema {
+	return a.originalSchema.Properties()
+}
+
+func (a *atomicMapListSchema) AdditionalProperties() SchemaOrBool {
+	return a.originalSchema.AdditionalProperties()
+}
+
+func (a *atomicMapListSchema) Default() interface{} {
+	return a.originalSchema.Default()
+}
+
+func (a *atomicMapListSchema) WithTypeAndObjectMeta() Schema {
+	return &atomicMapListSchema{
+		originalSchema: a.originalSchema.WithTypeAndObjectMeta(),
+	}
+}
+
+// Pattern Implement Validations interface (embedded in Schema)
+func (a *atomicMapListSchema) Pattern() string {
+	return a.originalSchema.Pattern()
+}
+
+func (a *atomicMapListSchema) Minimum() *float64 {
+	return a.originalSchema.Minimum()
+}
+
+func (a *atomicMapListSchema) IsExclusiveMinimum() bool {
+	return a.originalSchema.IsExclusiveMinimum()
+}
+
+func (a *atomicMapListSchema) Maximum() *float64 {
+	return a.originalSchema.Maximum()
+}
+
+func (a *atomicMapListSchema) IsExclusiveMaximum() bool {
+	return a.originalSchema.IsExclusiveMaximum()
+}
+
+func (a *atomicMapListSchema) MultipleOf() *float64 {
+	return a.originalSchema.MultipleOf()
+}
+
+func (a *atomicMapListSchema) MinItems() *int64 {
+	return a.originalSchema.MinItems()
+}
+
+func (a *atomicMapListSchema) MaxItems() *int64 {
+	return a.originalSchema.MaxItems()
+}
+
+func (a *atomicMapListSchema) MinLength() *int64 {
+	return a.originalSchema.MinLength()
+}
+
+func (a *atomicMapListSchema) MaxLength() *int64 {
+	return a.originalSchema.MaxLength()
+}
+
+func (a *atomicMapListSchema) MinProperties() *int64 {
+	return a.originalSchema.MinProperties()
+}
+
+func (a *atomicMapListSchema) MaxProperties() *int64 {
+	return a.originalSchema.MaxProperties()
+}
+
+func (a *atomicMapListSchema) Required() []string {
+	return a.originalSchema.Required()
+}
+
+func (a *atomicMapListSchema) Enum() []interface{} {
+	return a.originalSchema.Enum()
+}
+
+func (a *atomicMapListSchema) Nullable() bool {
+	return a.originalSchema.Nullable()
+}
+
+func (a *atomicMapListSchema) UniqueItems() bool {
+	return a.originalSchema.UniqueItems()
+}
+
+func (a *atomicMapListSchema) AllOf() []Schema {
+	return a.originalSchema.AllOf()
+}
+
+func (a *atomicMapListSchema) OneOf() []Schema {
+	return a.originalSchema.OneOf()
+}
+
+func (a *atomicMapListSchema) AnyOf() []Schema {
+	return a.originalSchema.AnyOf()
+}
+
+func (a *atomicMapListSchema) Not() Schema {
+	return a.originalSchema.Not()
+}
+
+// IsXIntOrString Implement KubeExtensions interface (embedded in Schema)
+func (a *atomicMapListSchema) IsXIntOrString() bool {
+	return a.originalSchema.IsXIntOrString()
+}
+
+func (a *atomicMapListSchema) IsXEmbeddedResource() bool {
+	return a.originalSchema.IsXEmbeddedResource()
+}
+
+func (a *atomicMapListSchema) IsXPreserveUnknownFields() bool {
+	return a.originalSchema.IsXPreserveUnknownFields()
+}
+
+func (a *atomicMapListSchema) XMapType() string {
+	return a.originalSchema.XMapType()
+}
+
+func (a *atomicMapListSchema) XValidations() []ValidationRule {
+	return a.originalSchema.XValidations()
 }
