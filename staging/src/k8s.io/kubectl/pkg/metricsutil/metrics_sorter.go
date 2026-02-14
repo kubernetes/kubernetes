@@ -128,3 +128,69 @@ func NewContainerMetricsSorter(metrics []metricsapi.ContainerMetrics, sortBy str
 		sortBy:  sortBy,
 	}
 }
+
+// PodUtilizationSorter implements sort.Interface for utilization-based sorting
+type PodUtilizationSorter struct {
+	utilizations  []*PodUtilization
+	sortBy        string
+	withNamespace bool
+}
+
+func NewPodUtilizationSorter(utilizations []*PodUtilization, withNamespace bool, sortBy string) *PodUtilizationSorter {
+	return &PodUtilizationSorter{
+		utilizations:  utilizations,
+		sortBy:        sortBy,
+		withNamespace: withNamespace,
+	}
+}
+
+func (s *PodUtilizationSorter) Len() int {
+	return len(s.utilizations)
+}
+
+func (s *PodUtilizationSorter) Swap(i, j int) {
+	s.utilizations[i], s.utilizations[j] = s.utilizations[j], s.utilizations[i]
+}
+
+func (s *PodUtilizationSorter) Less(i, j int) bool {
+	switch s.sortBy {
+	case "cpu":
+		return s.utilizations[i].CPUUsage.MilliValue() > s.utilizations[j].CPUUsage.MilliValue()
+	case "memory":
+		return s.utilizations[i].MemoryUsage.Value() > s.utilizations[j].MemoryUsage.Value()
+	case "cpu-util":
+		// Sort by CPU request percentage (descending)
+		// Pods without requests sort last
+		pi := s.utilizations[i].CPURequestPercent
+		pj := s.utilizations[j].CPURequestPercent
+		if pi < 0 && pj < 0 {
+			return s.utilizations[i].Name < s.utilizations[j].Name
+		}
+		if pi < 0 {
+			return false // i goes last
+		}
+		if pj < 0 {
+			return true // j goes last
+		}
+		return pi > pj
+	case "mem-util":
+		// Sort by memory request percentage (descending)
+		pi := s.utilizations[i].MemoryRequestPercent
+		pj := s.utilizations[j].MemoryRequestPercent
+		if pi < 0 && pj < 0 {
+			return s.utilizations[i].Name < s.utilizations[j].Name
+		}
+		if pi < 0 {
+			return false
+		}
+		if pj < 0 {
+			return true
+		}
+		return pi > pj
+	default:
+		if s.withNamespace && s.utilizations[i].Namespace != s.utilizations[j].Namespace {
+			return s.utilizations[i].Namespace < s.utilizations[j].Namespace
+		}
+		return s.utilizations[i].Name < s.utilizations[j].Name
+	}
+}

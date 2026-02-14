@@ -46,6 +46,7 @@ type TopCmdPrinter struct {
 	measuredResources []v1.ResourceName
 	nodeColumns       []string
 	podColumns        []string
+	podUtilColumns    []string
 	// a map from a node name to its missing resources
 	nodesMissingResources map[string][]string
 }
@@ -59,6 +60,7 @@ func NewTopCmdPrinter(out io.Writer, showSwap bool) *TopCmdPrinter {
 		},
 		nodeColumns:           []string{"NAME", "CPU(cores)", "CPU(%)", "MEMORY(bytes)", "MEMORY(%)"},
 		podColumns:            []string{"NAME", "CPU(cores)", "MEMORY(bytes)"},
+		podUtilColumns:        []string{"NAME", "CPU(cores)", "CPU:REQ", "CPU:LIM", "MEMORY(bytes)", "MEM:REQ", "MEM:LIM", "STATUS"},
 		nodesMissingResources: make(map[string][]string),
 	}
 
@@ -66,6 +68,9 @@ func NewTopCmdPrinter(out io.Writer, showSwap bool) *TopCmdPrinter {
 		printer.measuredResources = append(printer.measuredResources, ResourceSwap)
 		printer.nodeColumns = append(printer.nodeColumns, "SWAP(bytes)", "SWAP(%)")
 		printer.podColumns = append(printer.podColumns, "SWAP(bytes)")
+		// Insert SWAP columns before STATUS in utilization mode
+		printer.podUtilColumns = []string{"NAME", "CPU(cores)", "CPU:REQ", "CPU:LIM",
+			"MEMORY(bytes)", "MEM:REQ", "MEM:LIM", "SWAP(bytes)", "STATUS"}
 	}
 
 	return printer
@@ -102,14 +107,20 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	return nil
 }
 
-func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, sum bool) error {
+func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, sum bool, showUtilization bool, podSpecs map[string]*v1.Pod) error {
 	if len(metrics) == 0 {
 		return nil
 	}
 	w := printers.GetNewTabWriter(printer.out)
 	defer w.Flush()
 
-	columnWidth := len(printer.podColumns)
+	// Select columns based on mode
+	columns := printer.podColumns
+	if showUtilization {
+		columns = printer.podUtilColumns
+	}
+
+	columnWidth := len(columns)
 	if !noHeaders {
 		if withNamespace {
 			printValue(w, NamespaceColumn)
@@ -119,27 +130,49 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 			printValue(w, PodColumn)
 			columnWidth++
 		}
-		printColumnNames(w, printer.podColumns)
+		printColumnNames(w, columns)
 	}
 
-	sort.Sort(NewPodMetricsSorter(metrics, withNamespace, sortBy, printer.measuredResources))
-
-	for _, m := range metrics {
-		if printContainers {
-			sort.Sort(NewContainerMetricsSorter(m.Containers, sortBy))
-			printer.printSinglePodContainerMetrics(w, &m, withNamespace, printer.measuredResources)
-		} else {
-			printer.printSinglePodMetrics(w, &m, withNamespace, printer.measuredResources)
+	if showUtilization {
+		// Build utilization list first
+		utilizations := make([]*PodUtilization, 0, len(metrics))
+		for i := range metrics {
+			m := &metrics[i]
+			var podSpec *v1.Pod
+			if podSpecs != nil {
+				key := m.Namespace + "/" + m.Name
+				podSpec = podSpecs[key]
+			}
+			util := CalculatePodUtilization(m, podSpec, printer.measuredResources)
+			utilizations = append(utilizations, util)
 		}
 
-	}
+		// Sort utilizations
+		sort.Sort(NewPodUtilizationSorter(utilizations, withNamespace, sortBy))
 
-	if sum {
-		adder := NewResourceAdder(printer.measuredResources)
+		// Print utilizations
+		for _, util := range utilizations {
+			printer.printPodUtilizationLine(w, util, withNamespace, printer.measuredResources)
+		}
+	} else {
+		sort.Sort(NewPodMetricsSorter(metrics, withNamespace, sortBy, printer.measuredResources))
+
 		for _, m := range metrics {
-			adder.AddPodMetrics(&m)
+			if printContainers {
+				sort.Sort(NewContainerMetricsSorter(m.Containers, sortBy))
+				printer.printSinglePodContainerMetrics(w, &m, withNamespace, printer.measuredResources)
+			} else {
+				printer.printSinglePodMetrics(w, &m, withNamespace, printer.measuredResources)
+			}
 		}
-		printer.printPodResourcesSum(w, adder.total, columnWidth, printer.measuredResources)
+
+		if sum {
+			adder := NewResourceAdder(printer.measuredResources)
+			for _, m := range metrics {
+				adder.AddPodMetrics(&m)
+			}
+			printer.printPodResourcesSum(w, adder.total, columnWidth, printer.measuredResources)
+		}
 	}
 
 	return nil
@@ -273,4 +306,55 @@ func (printer *TopCmdPrinter) printPodResourcesSum(out io.Writer, total v1.Resou
 		Available: v1.ResourceList{},
 	}, measuredResources)
 
+}
+
+// printPodUtilizationLine prints a single line of utilization output
+func (printer *TopCmdPrinter) printPodUtilizationLine(out io.Writer, util *PodUtilization, withNamespace bool, measuredResources []v1.ResourceName) {
+	if withNamespace {
+		printValue(out, util.Namespace)
+	}
+
+	// Name
+	printValue(out, util.Name)
+
+	// CPU usage
+	printSingleResourceUsage(out, v1.ResourceCPU, util.CPUUsage)
+	fmt.Fprint(out, "\t")
+
+	// CPU:REQ percentage
+	printPercentOrDash(out, util.CPURequestPercent)
+
+	// CPU:LIM percentage
+	printPercentOrDash(out, util.CPULimitPercent)
+
+	// Memory usage
+	printSingleResourceUsage(out, v1.ResourceMemory, util.MemoryUsage)
+	fmt.Fprint(out, "\t")
+
+	// MEM:REQ percentage
+	printPercentOrDash(out, util.MemoryRequestPercent)
+
+	// MEM:LIM percentage
+	printPercentOrDash(out, util.MemoryLimitPercent)
+
+	// SWAP if enabled
+	for _, res := range measuredResources {
+		if res == ResourceSwap {
+			fmt.Fprint(out, "-\t") // Placeholder for swap utilization
+		}
+	}
+
+	// Status
+	printValue(out, string(util.Status))
+
+	fmt.Fprint(out, "\n")
+}
+
+// printPercentOrDash prints percentage or dash if not available
+func printPercentOrDash(out io.Writer, percent int64) {
+	if percent < 0 {
+		fmt.Fprint(out, "-\t")
+	} else {
+		fmt.Fprintf(out, "%d%%\t", percent)
+	}
 }
