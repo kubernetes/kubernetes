@@ -122,7 +122,24 @@ func Validate_IngressClassParametersReference(ctx context.Context, op operation.
 // Validate_IngressClassSpec validates an instance of IngressClassSpec according
 // to declarative validation rules in the API schema.
 func Validate_IngressClassSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *networkingv1.IngressClassSpec) (errs field.ErrorList) {
-	// field networkingv1.IngressClassSpec.Controller has no validation
+	// field networkingv1.IngressClassSpec.Controller
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("controller"), &obj.Controller, safe.Field(oldObj, func(oldObj *networkingv1.IngressClassSpec) *string { return &oldObj.Controller }), oldObj != nil)...)
 
 	// field networkingv1.IngressClassSpec.Parameters
 	errs = append(errs,
