@@ -4216,3 +4216,232 @@ func Test_isAffinityViolatingNUMAAllocations(t *testing.T) {
 		})
 	}
 }
+
+// mockHugepagesReader is a mock implementation of HugepagesReader for testing
+type mockHugepagesReader struct {
+	// freePages maps (numaNodeID, pageSizeBytes) to free pages count
+	freePages map[int]map[uint64]uint64
+	// errors maps (numaNodeID, pageSizeBytes) to errors
+	errors map[int]map[uint64]error
+}
+
+func newMockHugepagesReader() *mockHugepagesReader {
+	return &mockHugepagesReader{
+		freePages: make(map[int]map[uint64]uint64),
+		errors:    make(map[int]map[uint64]error),
+	}
+}
+
+func (m *mockHugepagesReader) SetFreePages(numaNodeID int, pageSizeBytes uint64, freePages uint64) {
+	if m.freePages[numaNodeID] == nil {
+		m.freePages[numaNodeID] = make(map[uint64]uint64)
+	}
+	m.freePages[numaNodeID][pageSizeBytes] = freePages
+}
+
+func (m *mockHugepagesReader) SetError(numaNodeID int, pageSizeBytes uint64, err error) {
+	if m.errors[numaNodeID] == nil {
+		m.errors[numaNodeID] = make(map[uint64]error)
+	}
+	m.errors[numaNodeID][pageSizeBytes] = err
+}
+
+func (m *mockHugepagesReader) GetFreeHugepages(numaNodeID int, pageSizeBytes uint64) (uint64, error) {
+	if m.errors[numaNodeID] != nil {
+		if err, ok := m.errors[numaNodeID][pageSizeBytes]; ok {
+			return 0, err
+		}
+	}
+	if m.freePages[numaNodeID] != nil {
+		if pages, ok := m.freePages[numaNodeID][pageSizeBytes]; ok {
+			return pages, nil
+		}
+	}
+	return 0, fmt.Errorf("no data for NUMA node %d, page size %d", numaNodeID, pageSizeBytes)
+}
+
+// TestVerifyOSHugepagesAvailability tests the OS hugepages verification during pod admission
+// This addresses: https://github.com/kubernetes/kubernetes/issues/134395
+func TestVerifyOSHugepagesAvailability(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	testCases := []struct {
+		description        string
+		numaAffinity       []int
+		requestedResources map[v1.ResourceName]uint64
+		mockSetup          func(*mockHugepagesReader)
+		expectError        bool
+		errorContains      string
+	}{
+		{
+			description:  "should pass when OS has enough free hugepages",
+			numaAffinity: []int{0},
+			requestedResources: map[v1.ResourceName]uint64{
+				v1.ResourceMemory: 1 * gb,
+				hugepages1Gi:      2 * gb,
+			},
+			mockSetup: func(m *mockHugepagesReader) {
+				// 1Gi hugepages: 2 pages available, 2 requested = OK
+				m.SetFreePages(0, 1*gb, 2)
+			},
+			expectError: false,
+		},
+		{
+			description:  "should fail when OS has insufficient free hugepages",
+			numaAffinity: []int{0},
+			requestedResources: map[v1.ResourceName]uint64{
+				v1.ResourceMemory: 1 * gb,
+				hugepages1Gi:      4 * gb, // Request 4Gi
+			},
+			mockSetup: func(m *mockHugepagesReader) {
+				// Only 2 pages (2Gi) available, but 4Gi requested
+				m.SetFreePages(0, 1*gb, 2)
+			},
+			expectError:   true,
+			errorContains: "insufficient OS-reported free hugepages",
+		},
+		{
+			description:  "should aggregate free hugepages across multiple NUMA nodes",
+			numaAffinity: []int{0, 1},
+			requestedResources: map[v1.ResourceName]uint64{
+				hugepages1Gi: 3 * gb, // Request 3Gi total
+			},
+			mockSetup: func(m *mockHugepagesReader) {
+				// Node 0 has 2 pages, Node 1 has 2 pages = 4Gi total
+				m.SetFreePages(0, 1*gb, 2)
+				m.SetFreePages(1, 1*gb, 2)
+			},
+			expectError: false,
+		},
+		{
+			description:  "should fail when aggregate across NUMA nodes is insufficient",
+			numaAffinity: []int{0, 1},
+			requestedResources: map[v1.ResourceName]uint64{
+				hugepages1Gi: 5 * gb, // Request 5Gi total
+			},
+			mockSetup: func(m *mockHugepagesReader) {
+				// Node 0 has 2 pages, Node 1 has 2 pages = 4Gi total (insufficient)
+				m.SetFreePages(0, 1*gb, 2)
+				m.SetFreePages(1, 1*gb, 2)
+			},
+			expectError:   true,
+			errorContains: "insufficient OS-reported free hugepages",
+		},
+		{
+			description:  "should skip verification when sysfs read fails",
+			numaAffinity: []int{0},
+			requestedResources: map[v1.ResourceName]uint64{
+				hugepages1Gi: 10 * gb,
+			},
+			mockSetup: func(m *mockHugepagesReader) {
+				// Simulate sysfs read error
+				m.SetError(0, 1*gb, fmt.Errorf("sysfs not available"))
+			},
+			expectError: false, // Should gracefully skip verification
+		},
+		{
+			description:  "should skip regular memory (not hugepages)",
+			numaAffinity: []int{0},
+			requestedResources: map[v1.ResourceName]uint64{
+				v1.ResourceMemory: 100 * gb, // Large memory request
+			},
+			mockSetup: func(m *mockHugepagesReader) {
+				// No hugepages configured - verification should be skipped
+			},
+			expectError: false,
+		},
+		{
+			description:  "should verify with nil hugepagesReader",
+			numaAffinity: []int{0},
+			requestedResources: map[v1.ResourceName]uint64{
+				hugepages1Gi: 10 * gb,
+			},
+			mockSetup:   nil, // No mock setup - will use nil reader
+			expectError: false,
+		},
+		{
+			description:  "should fail when OS reports zero free hugepages (exhausted)",
+			numaAffinity: []int{0},
+			requestedResources: map[v1.ResourceName]uint64{
+				hugepages1Gi: 1 * gb, // Request 1Gi
+			},
+			mockSetup: func(m *mockHugepagesReader) {
+				// OS reports 0 free pages - hugepages are exhausted
+				// This should FAIL verification, not skip it
+				m.SetFreePages(0, 1*gb, 0)
+			},
+			expectError:   true,
+			errorContains: "insufficient OS-reported free hugepages",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			// Create policy with minimal valid config
+			machineInfo := &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 10 * gb,
+						HugePages: []cadvisorapi.HugePagesInfo{
+							{PageSize: pageSize1Gb, NumPages: 10},
+						},
+					},
+				},
+			}
+			systemReserved := systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+			}
+
+			manager := topologymanager.NewFakeManager()
+			p, err := NewPolicyStatic(logger, machineInfo, systemReserved, manager)
+			if err != nil {
+				t.Fatalf("Failed to create policy: %v", err)
+			}
+
+			policy := p.(*staticPolicy)
+
+			// Set up mock
+			if tc.mockSetup != nil {
+				mock := newMockHugepagesReader()
+				tc.mockSetup(mock)
+				policy.SetHugepagesReader(mock)
+			} else {
+				policy.SetHugepagesReader(nil)
+			}
+
+			// Run verification
+			err = policy.verifyOSHugepagesAvailability(logger, tc.numaAffinity, tc.requestedResources)
+
+			// Check result
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				} else if tc.errorContains != "" && !containsString(err.Error(), tc.errorContains) {
+					t.Errorf("Error message should contain '%s', got: %v", tc.errorContains, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// containsString checks if s contains substr
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
