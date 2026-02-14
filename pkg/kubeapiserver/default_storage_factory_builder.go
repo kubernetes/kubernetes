@@ -87,6 +87,7 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		certificates.Resource("podcertificaterequests").WithVersion("v1beta1"),
 		storagemigration.Resource("storagemigrations").WithVersion("v1beta1"),
 		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
+		resource.Resource("resourcepoolstatusrequests").WithVersion("v1alpha1"),
 		scheduling.Resource("workloads").WithVersion("v1alpha1"),
 	}
 
