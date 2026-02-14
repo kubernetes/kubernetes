@@ -26,7 +26,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -70,6 +72,32 @@ func DeletePodsWithWait(ctx context.Context, c clientset.Interface, pods []*v1.P
 	for _, testPod := range pods {
 		framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c, testPod.Name, testPod.Namespace, PodDeleteTimeout))
 	}
+}
+
+// DeletePodCollectionWithWait deletes a collection of pods matching the label selector and waits for them to be terminated.
+// This function uses DeleteCollection API and polls until all pods matching the selector are deleted.
+func DeletePodCollectionWithWait(ctx context.Context, c clientset.Interface, namespace string, labelSelector labels.Selector, timeout time.Duration) {
+	labelSelectorString := labelSelector.String()
+	framework.Logf("Deleting pod collection in namespace %q with label selector %q", namespace, labelSelectorString)
+
+	err := c.CoreV1().Pods(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelectorString})
+	framework.ExpectNoError(err, "failed to delete pod collection")
+
+	framework.Logf("Waiting up to %v for all pods matching selector %q to be deleted", timeout, labelSelectorString)
+	err = wait.PollUntilContextTimeout(ctx, 2*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+		list, err := c.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelectorString})
+		if err != nil {
+			return false, err
+		}
+
+		if len(list.Items) != 0 {
+			framework.Logf("Expecting 0 pods but found %d", len(list.Items))
+			return false, nil
+		}
+		framework.Logf("All pods matching %q label selector deleted", labelSelectorString)
+		return true, nil
+	})
+	framework.ExpectNoError(err, "failed waiting for pods to be deleted")
 }
 
 // DeletePodWithWaitByName deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod

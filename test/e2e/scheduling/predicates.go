@@ -29,6 +29,7 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -377,12 +378,18 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 
 		ginkgo.By("Starting Pods to consume most of the cluster CPU.")
 		// Create one pod per node that requires 70% of the node remaining CPU.
+		var testingPodLabel = map[string]string{"podname": "predicates-validate-resource-limits-node"}
+
+		labelSelector := labels.SelectorFromSet(labels.Set(testingPodLabel))
+		ginkgo.DeferCleanup(e2epod.DeletePodCollectionWithWait, f.ClientSet, f.Namespace.Name, labelSelector, f.Timeouts.PodDelete)
+
 		fillerPods := []*v1.Pod{}
 		for nodeName, cpu := range nodeToAllocatableMap {
 			requestedCPU := cpu * 7 / 10
 			framework.Logf("Creating a pod which consumes cpu=%vm on Node %v", requestedCPU, nodeName)
 			fillerPods = append(fillerPods, createPausePod(ctx, f, pausePodConfig{
-				Name: "filler-pod-" + string(uuid.NewUUID()),
+				Name:   "filler-pod-" + string(uuid.NewUUID()),
+				Labels: testingPodLabel,
 				Resources: &v1.ResourceRequirements{
 					Limits: v1.ResourceList{
 						v1.ResourceCPU: *resource.NewMilliQuantity(requestedCPU, "DecimalSI"),
@@ -421,7 +428,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		podName := "additional-pod"
 		conf := pausePodConfig{
 			Name:   podName,
-			Labels: map[string]string{"name": "additional"},
+			Labels: testingPodLabel,
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
 					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
