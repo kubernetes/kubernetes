@@ -6557,6 +6557,13 @@ func ValidatePodBinding(binding *core.Binding) field.ErrorList {
 	if len(binding.Target.Name) == 0 {
 		// TODO: When validation becomes versioned, this gets more complicated.
 		allErrs = append(allErrs, field.Required(field.NewPath("target", "name"), ""))
+	} else {
+		// Validate node name format when binding to a Node (or when Kind is empty, which defaults to Node)
+		if len(binding.Target.Kind) == 0 || binding.Target.Kind == "Node" {
+			for _, msg := range ValidateNodeName(binding.Target.Name, false) {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("target", "name"), binding.Target.Name, msg))
+			}
+		}
 	}
 
 	return allErrs
