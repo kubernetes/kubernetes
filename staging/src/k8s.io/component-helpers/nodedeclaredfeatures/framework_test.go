@@ -78,9 +78,9 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 			maxVersion: featureMaxVersion,
 		},
 		&mockFeature{
-			name: "FeatureBWithStaticConfig",
+			name: "FeatureB",
 			discover: func(cfg *NodeConfiguration) bool {
-				return cfg.FeatureGates.Enabled("feature-b") && cfg.StaticConfig.CPUManagerPolicy == "static"
+				return cfg.FeatureGates.Enabled("feature-b")
 			},
 			maxVersion: featureMaxVersion,
 		},
@@ -108,18 +108,16 @@ func TestDiscoverNodeFeatures(t *testing.T) {
 					string("feature-a"): true,
 					string("feature-b"): true,
 				}),
-				StaticConfig: StaticConfiguration{CPUManagerPolicy: "static"},
 			},
-			expected: []string{"FeatureA", "FeatureBWithStaticConfig"}, // Should be sorted
+			expected: []string{"FeatureA", "FeatureB"}, // Should be sorted
 		},
 		{
 			name: "no features enabled",
 			config: &NodeConfiguration{
 				FeatureGates: newMockFeatureGate(map[string]bool{
 					string("feature-a"): false,
-					string("feature-b"): true,
+					string("feature-b"): false,
 				}),
-				StaticConfig: StaticConfiguration{CPUManagerPolicy: "none"},
 			},
 			expected: []string{},
 		},

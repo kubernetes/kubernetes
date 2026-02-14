@@ -63,10 +63,9 @@ type FeatureGate interface {
 	Enabled(key string) bool
 }
 
-// StaticConfiguration provides a view of a node's static configuration.
+// StaticConfiguration provides a view of a node's static configuration required for feature discovery.
 type StaticConfiguration struct {
-	// Kubelet's CPU Manager policy
-	CPUManagerPolicy string
+	// Add configuration fields here as required by registered features.
 }
 
 // NodeConfiguration provides a generic view of a node's static configuration.

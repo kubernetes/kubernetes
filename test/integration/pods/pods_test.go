@@ -1503,8 +1503,9 @@ func TestRelaxedDNSSearchValidation(t *testing.T) {
 
 func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.NodeDeclaredFeatures:      true,
-		features.InPlacePodVerticalScaling: true,
+		features.NodeDeclaredFeatures:                    true,
+		features.PodLevelResources:                       true,
+		features.InPlacePodLevelResourcesVerticalScaling: true,
 	})
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -1519,30 +1520,20 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 		},
 		Spec: v1.PodSpec{
 			NodeName: nodeName,
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+			},
 			Containers: []v1.Container{
 				{
 					Name:  "test-container",
 					Image: "fakeimage",
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
-						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
-					},
 				},
 			},
 			RestartPolicy: v1.RestartPolicyAlways,
 		},
 		Status: v1.PodStatus{
 			Phase: v1.PodRunning,
-			ContainerStatuses: []v1.ContainerStatus{
-				{
-					Name:  "test-container",
-					Ready: true,
-					AllocatedResources: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("1"),
-						v1.ResourceMemory: resource.MustParse("1Gi"),
-					},
-				},
-			},
 		},
 	}
 
@@ -1558,19 +1549,19 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
 			nodeVersion:          "1.35.0",
 			podUpdateFn: func(pod *v1.Pod) {
-				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
-				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
 			},
-			expectError: "pod update requires features GuaranteedQoSPodCPUResize which are not available on node",
+			expectError: "pod update requires features InPlacePodLevelResourcesVerticalScaling which are not available on node",
 		},
 
 		{
 			name:                 "admission succeeds when required feature is declared on node",
-			nodeDeclaredFeatures: []string{ipprfeature.GuaranteedQoSPodCPUResize},
+			nodeDeclaredFeatures: []string{ipprfeature.PodLevelResourcesResizeFeature.Name()},
 			nodeVersion:          "1.35.0",
 			podUpdateFn: func(pod *v1.Pod) {
-				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
-				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
 			},
 			expectError: "",
 		},
