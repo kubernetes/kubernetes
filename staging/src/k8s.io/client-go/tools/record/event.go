@@ -493,6 +493,7 @@ func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, annotations map
 			Namespace:   namespace,
 			Annotations: annotations,
 		},
+		EventTime:      metav1.MicroTime{Time: time.Now()},
 		InvolvedObject: *ref,
 		Reason:         reason,
 		Message:        message,
