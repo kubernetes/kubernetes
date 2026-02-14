@@ -1,0 +1,10 @@
+apiVersion: scheduling.k8s.io/v1alpha1
+kind: Workload
+metadata:
+  name: test-workload
+spec:
+  podGroups:
+  - name: group-default
+    policy: 
+      gang: 
+        minCount: 10

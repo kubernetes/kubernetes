@@ -1,0 +1,41 @@
+# Benchmarking TAS
+# TODO: Adjust this to PodGroup as a top level object and inject TAS requirements into the PodGroup
+- name: WorkloadPodGroupScheduling
+  workloadTemplate:
+  # Nodes are assigned to racks based on the index // rackCount
+  - opcode: createNodes
+    countParam: $nodes
+    nodeTemplatePath: templates/node-with-rack.yaml
+    templateParams:
+      rackCount: $rackCount
+  - opcode: createNamespaces
+    count: 1
+    prefix: default
+  - opcode: createAny
+    namespace: default-0
+    templatePath: templates/workload.yaml
+  - opcode: startCollectingMetrics
+    namespaces: ["default-0"]
+    collectors:
+    - PodGroupLatency
+  # Pods are assigned to a PodGroup based on the index // podGroupCount
+  - opcode: createPods
+    countParam: $pods
+    namespace: default-0
+    podTemplatePath: templates/pod-with-workload.yaml
+    skipWaitToCompletion: true
+    templateParams:
+      podGroupCount: $podGroupCount
+  - opcode: barrier
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: default
+    featureGates: 
+      GenericWorkload: true
+      GangScheduling: true
+    labels: [performance, tas]
+    params:
+      nodes: 100
+      pods: 10
+      podGroupCount: 1
+      rackCount: 10

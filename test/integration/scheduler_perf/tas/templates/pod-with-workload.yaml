@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-
+spec:
+  workloadRef:
+    name: test-workload
+    podGroup: group-default
+    podGroupReplicaKey: replica-{{ Mod .Index .podGroupCount }}
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    resources:
+      limits:
+        cpu: 100m
+        memory: 500Mi
+      requests:
+        cpu: 100m
+        memory: 500Mi
