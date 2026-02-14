@@ -52,6 +52,23 @@ const (
 	maxTimeout = 15 * time.Minute
 )
 
+// MetricsRecorder is an interface for recording metrics asynchronously.
+// This interface abstracts the metrics recording functionality, allowing
+// for dependency injection and easier testing with mocks.
+type MetricsRecorder interface {
+	// ObservePluginDurationAsync observes the scheduler_plugin_execution_duration_seconds metric.
+	// The metric will be flushed asynchronously.
+	ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64)
+
+	// ObserveQueueingHintDurationAsync observes the scheduler_queueing_hint_execution_duration_seconds metric.
+	// The metric will be flushed asynchronously.
+	ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64)
+
+	// ObserveInFlightEventsAsync observes the scheduler_in_flight_events metric.
+	// The metric will be flushed asynchronously. Setting forceFlush to true forces immediate flushing and should be used rarely.
+	ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool)
+}
+
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
 type frameworkImpl struct {
@@ -87,7 +104,7 @@ type frameworkImpl struct {
 
 	sharedCSIManager fwk.CSIManager
 
-	metricsRecorder          *metrics.MetricAsyncRecorder
+	metricsRecorder          MetricsRecorder
 	profileName              string
 	percentageOfNodesToScore *int32
 
@@ -146,7 +163,7 @@ type frameworkOptions struct {
 	sharedDRAManager       fwk.SharedDRAManager
 	sharedCSIManager       fwk.CSIManager
 	snapshotSharedLister   fwk.SharedLister
-	metricsRecorder        *metrics.MetricAsyncRecorder
+	metricsRecorder        MetricsRecorder
 	podNominator           fwk.PodNominator
 	podActivator           fwk.PodActivator
 	extenders              []fwk.Extender
@@ -272,7 +289,7 @@ func WithCaptureProfile(c CaptureProfile) Option {
 }
 
 // WithMetricsRecorder sets metrics recorder for the scheduling frameworkImpl.
-func WithMetricsRecorder(r *metrics.MetricAsyncRecorder) Option {
+func WithMetricsRecorder(r MetricsRecorder) Option {
 	return func(o *frameworkOptions) {
 		o.metricsRecorder = r
 	}
