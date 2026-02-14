@@ -93,166 +93,218 @@
   },
   "status": {
     "unwantedReferences": {
-      "github.com/davecgh/go-spew": [
-        "github.com/cyphar/filepath-securejoin",
-        "github.com/go-logr/zapr",
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
-        "github.com/go-task/slim-sprig/v3",
-        "github.com/google/cadvisor",
-        "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
-        "github.com/grpc-ecosystem/go-grpc-middleware/v2",
-        "github.com/json-iterator/go",
-        "github.com/prometheus/common",
-        "github.com/sirupsen/logrus",
-        "github.com/stretchr/objx",
-        "github.com/stretchr/testify",
-        "go.etcd.io/bbolt",
-        "go.etcd.io/etcd/api/v3",
-        "go.etcd.io/etcd/client/pkg/v3",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/pkg/v3",
-        "go.etcd.io/etcd/server/v3",
-        "go.etcd.io/raft/v3",
-        "go.opentelemetry.io/auto/sdk",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
-        "go.opentelemetry.io/otel",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
-        "go.opentelemetry.io/otel/metric",
-        "go.opentelemetry.io/otel/sdk",
-        "go.opentelemetry.io/otel/trace",
-        "go.uber.org/goleak",
-        "go.uber.org/multierr",
-        "go.uber.org/zap",
-        "k8s.io/kube-openapi",
-        "k8s.io/utils",
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
-      ],
-      "github.com/flynn/go-shlex": [
-        "github.com/coredns/caddy"
-      ],
-      "github.com/gogo/protobuf": [
-        "github.com/containerd/containerd/api",
-        "github.com/containerd/errdefs/pkg",
-        "github.com/containerd/ttrpc",
-        "github.com/containerd/typeurl/v2",
-        "github.com/google/cadvisor",
-        "go.etcd.io/etcd/api/v3",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/server/v3",
-        "go.etcd.io/raft/v3",
-        "k8s.io/code-generator"
-      ],
-      "github.com/golang/groupcache": [
-        "go.etcd.io/etcd/server/v3"
-      ],
-      "github.com/golang/protobuf": [
-        "github.com/container-storage-interface/spec",
-        "github.com/containerd/containerd/api",
-        "github.com/containerd/ttrpc",
-        "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
-        "go.etcd.io/etcd/api/v3",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/server/v3",
-        "go.etcd.io/raft/v3",
-        "google.golang.org/grpc",
-        "google.golang.org/protobuf",
-        "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
-      ],
-      "github.com/google/btree": [
-        "go.etcd.io/etcd/server/v3"
-      ],
-      "github.com/google/gofuzz": [
-        "github.com/json-iterator/go"
-      ],
-      "github.com/json-iterator/go": [
-        "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v6"
-      ],
-      "github.com/klauspost/compress": [
-        "github.com/prometheus/client_golang",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/server/v3"
-      ],
-      "github.com/mailru/easyjson": [
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
-        "k8s.io/kube-openapi",
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
-      ],
-      "github.com/modern-go/concurrent": [
-        "github.com/json-iterator/go",
-        "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v6"
-      ],
-      "github.com/modern-go/reflect2": [
-        "github.com/json-iterator/go",
-        "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v6"
-      ],
-      "github.com/pkg/errors": [
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5"
-      ],
-      "github.com/planetscale/vtprotobuf": [
-        "google.golang.org/grpc"
-      ],
-      "golang.org/x/exp": [
-        "github.com/antlr4-go/antlr/v4",
-        "github.com/google/cel-go",
-        "github.com/grpc-ecosystem/go-grpc-middleware/v2"
-      ],
-      "gopkg.in/yaml.v3": [
-        "github.com/containerd/containerd/api",
-        "github.com/coreos/go-semver",
-        "github.com/cyphar/filepath-securejoin",
-        "github.com/go-logr/zapr",
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
-        "github.com/go-task/slim-sprig/v3",
-        "github.com/google/cadvisor",
-        "github.com/google/cel-go",
-        "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
-        "github.com/grpc-ecosystem/go-grpc-middleware/v2",
-        "github.com/prometheus/common",
-        "github.com/spf13/cobra",
-        "github.com/stretchr/objx",
-        "github.com/stretchr/testify",
-        "go.etcd.io/bbolt",
-        "go.etcd.io/etcd/api/v3",
-        "go.etcd.io/etcd/client/pkg/v3",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/pkg/v3",
-        "go.etcd.io/etcd/server/v3",
-        "go.etcd.io/raft/v3",
-        "go.opentelemetry.io/auto/sdk",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
-        "go.opentelemetry.io/otel",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
-        "go.opentelemetry.io/otel/metric",
-        "go.opentelemetry.io/otel/sdk",
-        "go.opentelemetry.io/otel/trace",
-        "go.uber.org/goleak",
-        "go.uber.org/multierr",
-        "go.uber.org/zap",
-        "k8s.io/kube-openapi",
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
-      ]
+      "github.com/davecgh/go-spew": {
+        "direct": [
+          "github.com/json-iterator/go",
+          "github.com/stretchr/testify",
+          "k8s.io/utils",
+          "sigs.k8s.io/kustomize/kyaml"
+        ],
+        "transitive": [
+          "github.com/cyphar/filepath-securejoin",
+          "github.com/go-logr/zapr",
+          "github.com/go-openapi/jsonpointer",
+          "github.com/go-openapi/swag",
+          "github.com/go-task/slim-sprig/v3",
+          "github.com/google/cadvisor",
+          "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
+          "github.com/grpc-ecosystem/go-grpc-middleware/v2",
+          "github.com/prometheus/common",
+          "github.com/sirupsen/logrus",
+          "github.com/stretchr/objx",
+          "go.etcd.io/bbolt",
+          "go.etcd.io/etcd/api/v3",
+          "go.etcd.io/etcd/client/pkg/v3",
+          "go.etcd.io/etcd/client/v3",
+          "go.etcd.io/etcd/pkg/v3",
+          "go.etcd.io/etcd/server/v3",
+          "go.etcd.io/raft/v3",
+          "go.opentelemetry.io/auto/sdk",
+          "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
+          "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+          "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+          "go.opentelemetry.io/otel",
+          "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+          "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+          "go.opentelemetry.io/otel/metric",
+          "go.opentelemetry.io/otel/sdk",
+          "go.opentelemetry.io/otel/trace",
+          "go.uber.org/goleak",
+          "go.uber.org/multierr",
+          "go.uber.org/zap",
+          "k8s.io/kube-openapi",
+          "sigs.k8s.io/kustomize/api",
+          "sigs.k8s.io/kustomize/kustomize/v5"
+        ]
+      },
+      "github.com/flynn/go-shlex": {
+        "direct": [
+          "github.com/coredns/caddy"
+        ]
+      },
+      "github.com/gogo/protobuf": {
+        "direct": [
+          "github.com/containerd/ttrpc",
+          "github.com/containerd/typeurl/v2",
+          "go.etcd.io/etcd/api/v3",
+          "go.etcd.io/etcd/server/v3",
+          "go.etcd.io/raft/v3",
+          "k8s.io/code-generator"
+        ],
+        "transitive": [
+          "github.com/containerd/containerd/api",
+          "github.com/containerd/errdefs/pkg",
+          "github.com/google/cadvisor",
+          "go.etcd.io/etcd/client/v3"
+        ]
+      },
+      "github.com/golang/groupcache": {
+        "direct": [
+          "go.etcd.io/etcd/server/v3"
+        ]
+      },
+      "github.com/golang/protobuf": {
+        "direct": [
+          "github.com/container-storage-interface/spec",
+          "github.com/containerd/ttrpc",
+          "go.etcd.io/etcd/api/v3",
+          "go.etcd.io/etcd/server/v3",
+          "go.etcd.io/raft/v3",
+          "google.golang.org/protobuf"
+        ],
+        "transitive": [
+          "github.com/containerd/containerd/api",
+          "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
+          "go.etcd.io/etcd/client/v3",
+          "google.golang.org/grpc",
+          "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
+        ]
+      },
+      "github.com/google/btree": {
+        "direct": [
+          "go.etcd.io/etcd/server/v3"
+        ]
+      },
+      "github.com/google/gofuzz": {
+        "direct": [
+          "github.com/json-iterator/go"
+        ]
+      },
+      "github.com/json-iterator/go": {
+        "direct": [
+          "github.com/prometheus/client_golang",
+          "sigs.k8s.io/structured-merge-diff/v6"
+        ],
+        "transitive": [
+          "k8s.io/kube-openapi"
+        ]
+      },
+      "github.com/klauspost/compress": {
+        "direct": [
+          "github.com/prometheus/client_golang"
+        ],
+        "transitive": [
+          "go.etcd.io/etcd/client/v3",
+          "go.etcd.io/etcd/server/v3"
+        ]
+      },
+      "github.com/mailru/easyjson": {
+        "direct": [
+          "github.com/go-openapi/swag"
+        ],
+        "transitive": [
+          "github.com/go-openapi/jsonpointer",
+          "k8s.io/kube-openapi",
+          "sigs.k8s.io/kustomize/api",
+          "sigs.k8s.io/kustomize/kustomize/v5",
+          "sigs.k8s.io/kustomize/kyaml"
+        ]
+      },
+      "github.com/modern-go/concurrent": {
+        "direct": [
+          "github.com/json-iterator/go"
+        ],
+        "transitive": [
+          "github.com/prometheus/client_golang",
+          "k8s.io/kube-openapi",
+          "sigs.k8s.io/structured-merge-diff/v6"
+        ]
+      },
+      "github.com/modern-go/reflect2": {
+        "direct": [
+          "github.com/json-iterator/go"
+        ],
+        "transitive": [
+          "github.com/prometheus/client_golang",
+          "k8s.io/kube-openapi",
+          "sigs.k8s.io/structured-merge-diff/v6"
+        ]
+      },
+      "github.com/pkg/errors": {
+        "transitive": [
+          "sigs.k8s.io/kustomize/api",
+          "sigs.k8s.io/kustomize/kustomize/v5"
+        ]
+      },
+      "github.com/planetscale/vtprotobuf": {
+        "transitive": [
+          "google.golang.org/grpc"
+        ]
+      },
+      "golang.org/x/exp": {
+        "direct": [
+          "github.com/antlr4-go/antlr/v4"
+        ],
+        "transitive": [
+          "github.com/google/cel-go",
+          "github.com/grpc-ecosystem/go-grpc-middleware/v2"
+        ]
+      },
+      "gopkg.in/yaml.v3": {
+        "direct": [
+          "github.com/coreos/go-semver",
+          "github.com/go-openapi/swag",
+          "github.com/google/cel-go",
+          "github.com/spf13/cobra",
+          "github.com/stretchr/testify",
+          "go.uber.org/zap"
+        ],
+        "transitive": [
+          "github.com/containerd/containerd/api",
+          "github.com/cyphar/filepath-securejoin",
+          "github.com/go-logr/zapr",
+          "github.com/go-openapi/jsonpointer",
+          "github.com/go-task/slim-sprig/v3",
+          "github.com/google/cadvisor",
+          "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
+          "github.com/grpc-ecosystem/go-grpc-middleware/v2",
+          "github.com/prometheus/common",
+          "github.com/stretchr/objx",
+          "go.etcd.io/bbolt",
+          "go.etcd.io/etcd/api/v3",
+          "go.etcd.io/etcd/client/pkg/v3",
+          "go.etcd.io/etcd/client/v3",
+          "go.etcd.io/etcd/pkg/v3",
+          "go.etcd.io/etcd/server/v3",
+          "go.etcd.io/raft/v3",
+          "go.opentelemetry.io/auto/sdk",
+          "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
+          "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+          "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+          "go.opentelemetry.io/otel",
+          "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+          "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+          "go.opentelemetry.io/otel/metric",
+          "go.opentelemetry.io/otel/sdk",
+          "go.opentelemetry.io/otel/trace",
+          "go.uber.org/goleak",
+          "go.uber.org/multierr",
+          "k8s.io/kube-openapi",
+          "sigs.k8s.io/kustomize/api",
+          "sigs.k8s.io/kustomize/kustomize/v5",
+          "sigs.k8s.io/kustomize/kyaml"
+        ]
+      }
     },
     "unwantedVendored": [
       "github.com/davecgh/go-spew",
