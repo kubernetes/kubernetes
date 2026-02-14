@@ -104,6 +104,7 @@ func ShouldRetry(err error) (retry bool, retryAfter time.Duration) {
 	if apierrors.IsTimeout(err) ||
 		apierrors.IsTooManyRequests(err) ||
 		apierrors.IsServiceUnavailable(err) ||
+		apierrors.IsConflict(err) ||
 		errors.Is(err, io.EOF) ||
 		errors.As(err, &transientError{}) {
 		return true, 0
