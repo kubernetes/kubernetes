@@ -585,7 +585,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"too-many-taints": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("taints"), resourceapi.DeviceTaintsMaxLength+1, resourceapi.DeviceTaintsMaxLength),
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("taints"), resourceapi.DeviceTaintsMaxLength+1, resourceapi.DeviceTaintsMaxLength).MarkCoveredByDeclarative(),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)

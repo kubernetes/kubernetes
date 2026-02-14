@@ -391,6 +391,7 @@ type BasicDevice struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
+	// +k8s:maxItems=16
 	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,7,rep,name=taints"`
 
 	// BindsToNode indicates if the usage of an allocation involving this device
@@ -1980,6 +1981,10 @@ type AllocatedDeviceStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=type
+	// +k8s:maxItems=8
 	Conditions []metav1.Condition `json:"conditions" protobuf:"bytes,4,opt,name=conditions"`
 
 	// Data contains arbitrary driver-specific data.

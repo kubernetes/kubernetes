@@ -103,7 +103,30 @@ func Validate_AllocatedDeviceStatus(ctx context.Context, op operation.Operation,
 			return
 		}(fldPath.Child("shareID"), obj.ShareID, safe.Field(oldObj, func(oldObj *resourcev1beta1.AllocatedDeviceStatus) *string { return oldObj.ShareID }), oldObj != nil)...)
 
-	// field resourcev1beta1.AllocatedDeviceStatus.Conditions has no validation
+	// field resourcev1beta1.AllocatedDeviceStatus.Conditions
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []v1.Condition, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type })...)
+			return
+		}(fldPath.Child("conditions"), obj.Conditions, safe.Field(oldObj, func(oldObj *resourcev1beta1.AllocatedDeviceStatus) []v1.Condition { return oldObj.Conditions }), oldObj != nil)...)
+
 	// field resourcev1beta1.AllocatedDeviceStatus.Data has no validation
 
 	// field resourcev1beta1.AllocatedDeviceStatus.NetworkData
@@ -224,6 +247,15 @@ func Validate_BasicDevice(ctx context.Context, op operation.Operation, fldPath *
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 16); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceTaint)...)
