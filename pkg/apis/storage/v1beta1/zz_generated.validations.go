@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -73,6 +74,10 @@ func Validate_StorageClass(ctx context.Context, op operation.Operation, fldPath 
 			}
 			// call field-attached validations
 			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
 			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
@@ -83,11 +88,79 @@ func Validate_StorageClass(ctx context.Context, op operation.Operation, fldPath 
 			return
 		}(fldPath.Child("provisioner"), &obj.Provisioner, safe.Field(oldObj, func(oldObj *storagev1beta1.StorageClass) *string { return &oldObj.Provisioner }), oldObj != nil)...)
 
-	// field storagev1beta1.StorageClass.Parameters has no validation
-	// field storagev1beta1.StorageClass.ReclaimPolicy has no validation
+	// field storagev1beta1.StorageClass.Parameters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("parameters"), obj.Parameters, safe.Field(oldObj, func(oldObj *storagev1beta1.StorageClass) map[string]string { return oldObj.Parameters }), oldObj != nil)...)
+
+	// field storagev1beta1.StorageClass.ReclaimPolicy
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *v1.PersistentVolumeReclaimPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("reclaimPolicy"), obj.ReclaimPolicy, safe.Field(oldObj, func(oldObj *storagev1beta1.StorageClass) *v1.PersistentVolumeReclaimPolicy {
+			return oldObj.ReclaimPolicy
+		}), oldObj != nil)...)
+
 	// field storagev1beta1.StorageClass.MountOptions has no validation
 	// field storagev1beta1.StorageClass.AllowVolumeExpansion has no validation
-	// field storagev1beta1.StorageClass.VolumeBindingMode has no validation
+
+	// field storagev1beta1.StorageClass.VolumeBindingMode
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *storagev1beta1.VolumeBindingMode, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("volumeBindingMode"), obj.VolumeBindingMode, safe.Field(oldObj, func(oldObj *storagev1beta1.StorageClass) *storagev1beta1.VolumeBindingMode {
+			return oldObj.VolumeBindingMode
+		}), oldObj != nil)...)
+
 	// field storagev1beta1.StorageClass.AllowedTopologies has no validation
 	return errs
 }
