@@ -4,3 +4,4 @@ linux/ppc64le=REGISTRY/agnhost:2.63.0-linux-ppc64le
 linux/s390x=REGISTRY/agnhost:2.63.0-linux-s390x
 windows/amd64/1809=REGISTRY/agnhost:2.63.0-windows-amd64-1809
 windows/amd64/ltsc2022=REGISTRY/agnhost:2.63.0-windows-amd64-ltsc2022
+windows/amd64/ltsc2025=REGISTRY/agnhost:2.63.0-windows-amd64-ltsc2025
