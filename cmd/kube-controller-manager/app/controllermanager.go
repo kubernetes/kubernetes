@@ -157,6 +157,9 @@ controller, and serviceaccounts controller.`,
 		},
 	}
 
+	// Format controllers list so that it contains the associated feature gates.
+	s.Generic.ControllerListFormatter = newControllerListFormatter(NewControllerDescriptors())
+
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
 	s.ParsedFlags = &namedFlagSets
