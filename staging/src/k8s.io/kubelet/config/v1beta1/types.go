@@ -31,19 +31,47 @@ type HairpinMode string
 const (
 	// Set the hairpin flag on the veth of containers in the respective
 	// container runtime.
-	HairpinVeth = "hairpin-veth"
+	HairpinVeth HairpinMode = "hairpin-veth"
 	// Make the container bridge promiscuous. This will force it to accept
 	// hairpin packets, even if the flag isn't set on ports of the bridge.
-	PromiscuousBridge = "promiscuous-bridge"
+	PromiscuousBridge HairpinMode = "promiscuous-bridge"
 	// Neither of the above. If the kubelet is started in this hairpin mode
 	// and kube-proxy is running in iptables mode, hairpin packets will be
 	// dropped by the container bridge.
-	HairpinNone = "none"
+	HairpinNone HairpinMode = "none"
+)
+
+type CgroupDriver string
+
+const (
+	CgroupFSDriver CgroupDriver = "cgroupfs"
+	SystemdDriver  CgroupDriver = "systemd"
+)
+
+type CPUManagerPolicy string
+
+const (
+	NoneCPUManagerPolicy   CPUManagerPolicy = "none"
+	StaticCPUManagerPolicy CPUManagerPolicy = "static"
+)
+
+type EnforceNodeAllocatable string
+
+const (
+	NoneEnforceNodeAllocatable                       EnforceNodeAllocatable = "none"
+	PodsEnforceNodeAllocatable                       EnforceNodeAllocatable = "pods"
+	SystemReservedEnforceNodeAllocatable             EnforceNodeAllocatable = "system-reserved"
+	SystemReservedCompressibleEnforceNodeAllocatable EnforceNodeAllocatable = "system-reserved-compressible"
+	KubeReservedEnforceNodeAllocatable               EnforceNodeAllocatable = "kube-reserved"
+	KubeReservedCompressibleEnforceNodeAllocatable   EnforceNodeAllocatable = "kube-reserved-compressible"
 )
 
 // ResourceChangeDetectionStrategy denotes a mode in which internal
 // managers (secret, configmap) are discovering object changes.
 type ResourceChangeDetectionStrategy string
+type TopologyManagerPolicy string
+type TopologyManagerScope string
+type MemoryManagerPolicy string
 
 // Enum settings for different strategies of kubelet managers.
 const (
@@ -58,29 +86,32 @@ const (
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
 	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
 	// pods with optimal NUMA node alignment for requested resources
-	RestrictedTopologyManagerPolicy = "restricted"
+	RestrictedTopologyManagerPolicy TopologyManagerPolicy = "restricted"
 	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
 	// pods with NUMA alignment of CPU and device resources.
-	BestEffortTopologyManagerPolicy = "best-effort"
+	BestEffortTopologyManagerPolicy TopologyManagerPolicy = "best-effort"
 	// NoneTopologyManagerPolicy is a mode in which kubelet has no knowledge
 	// of NUMA alignment of a pod's CPU and device resources.
-	NoneTopologyManagerPolicy = "none"
+	NoneTopologyManagerPolicy TopologyManagerPolicy = "none"
 	// SingleNumaNodeTopologyManagerPolicy is a mode in which kubelet only allows
 	// pods with a single NUMA alignment of CPU and device resources.
-	SingleNumaNodeTopologyManagerPolicy = "single-numa-node"
+	SingleNumaNodeTopologyManagerPolicy TopologyManagerPolicy = "single-numa-node"
 	// ContainerTopologyManagerScope represents that
 	// topology policy is applied on a per-container basis.
-	ContainerTopologyManagerScope = "container"
+	ContainerTopologyManagerScope TopologyManagerScope = "container"
 	// PodTopologyManagerScope represents that
 	// topology policy is applied on a per-pod basis.
-	PodTopologyManagerScope = "pod"
+	PodTopologyManagerScope TopologyManagerScope = "pod"
 	// NoneMemoryManagerPolicy is a memory manager none policy, under the none policy
 	// the memory manager will not pin containers memory of guaranteed pods
-	NoneMemoryManagerPolicy = "None"
+	NoneMemoryManagerPolicy MemoryManagerPolicy = "none"
 	// StaticMemoryManagerPolicy is a memory manager static policy, under the static policy
 	// the memory manager will try to pin containers memory of guaranteed pods to the smallest
 	// possible sub-set of NUMA nodes
-	StaticMemoryManagerPolicy = "Static"
+	StaticMemoryManagerPolicy MemoryManagerPolicy = "static"
+	// BestEffortMemoryManagerPolicy is the best-effort memory manager policy (Windows only).
+	// It attempts to allocate memory on the most optimal NUMA node based on CPU assignment.
+	BestEffortMemoryManagerPolicy MemoryManagerPolicy = "best-effort"
 )
 
 // ImagePullCredentialsVerificationPolicy is an enum for the policy that is enforced
@@ -388,15 +419,24 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	CgroupsPerQOS *bool `json:"cgroupsPerQOS,omitempty"`
-	// cgroupDriver is the driver kubelet uses to manipulate CGroups on the host (cgroupfs
-	// or systemd).
+	// cgroupDriver is the driver kubelet uses to manipulate CGroups on the host
+	// Valid values include:
+	//
+	// - `cgroupfs`: Directly manages cgroups via the cgroup filesystem.
+	// - `systemd`: Integrates with systemd to manage cgroups.
+	//
 	// Default: "cgroupfs"
 	// +optional
-	CgroupDriver string `json:"cgroupDriver,omitempty"`
+	CgroupDriver CgroupDriver `json:"cgroupDriver,omitempty"`
 	// cpuManagerPolicy is the name of the policy to use.
-	// Default: "None"
+	// Valid values include:
+	//
+	// - `none`: Does not modify CPU affinity or exclusivity.
+	// - `static`: Grants exclusive CPU assignments to eligible Guaranteed pods.
+	//
+	// Default: "none"
 	// +optional
-	CPUManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
+	CPUManagerPolicy CPUManagerPolicy `json:"cpuManagerPolicy,omitempty"`
 	// singleProcessOOMKill, if true, will prevent the `memory.oom.group` flag from being set for container
 	// cgroups in cgroups v2. This causes processes in the container to be OOM killed individually instead of as
 	// a group. It means that if true, the behavior aligns with the behavior of cgroups v1.
@@ -416,10 +456,16 @@ type KubeletConfiguration struct {
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
 	// memoryManagerPolicy is the name of the policy to use by memory manager.
+	// Valid values include:
+	//
+	// - `none`: No effect on memory allocation.
+	// - `static`: Guarantees memory on specific NUMA nodes for Guaranteed pods.
+	// - `best-effort`: Tries to allocate memory on an optimal NUMA node (Windows only).
+	//
 	// Requires the MemoryManager feature gate to be enabled.
 	// Default: "none"
 	// +optional
-	MemoryManagerPolicy string `json:"memoryManagerPolicy,omitempty"`
+	MemoryManagerPolicy MemoryManagerPolicy `json:"memoryManagerPolicy,omitempty"`
 	// topologyManagerPolicy is the name of the topology manager policy to use.
 	// Valid values include:
 	//
@@ -433,7 +479,7 @@ type KubeletConfiguration struct {
 	//
 	// Default: "none"
 	// +optional
-	TopologyManagerPolicy string `json:"topologyManagerPolicy,omitempty"`
+	TopologyManagerPolicy TopologyManagerPolicy `json:"topologyManagerPolicy,omitempty"`
 	// topologyManagerScope represents the scope of topology hint generation
 	// that topology manager requests and hint providers generate. Valid values include:
 	//
@@ -442,7 +488,7 @@ type KubeletConfiguration struct {
 	//
 	// Default: "container"
 	// +optional
-	TopologyManagerScope string `json:"topologyManagerScope,omitempty"`
+	TopologyManagerScope TopologyManagerScope `json:"topologyManagerScope,omitempty"`
 	// TopologyManagerPolicyOptions is a set of key=value which allows to set extra options
 	// to fine tune the behaviour of the topology manager policies.
 	// Requires  both the "TopologyManager" and "TopologyManagerPolicyOptions" feature gates to be enabled.
@@ -475,7 +521,7 @@ type KubeletConfiguration struct {
 	// because promiscuous-bridge assumes the existence of a container bridge named cbr0.
 	// Default: "promiscuous-bridge"
 	// +optional
-	HairpinMode string `json:"hairpinMode,omitempty"`
+	HairpinMode HairpinMode `json:"hairpinMode,omitempty"`
 	// maxPods is the maximum number of Pods that can run on this Kubelet.
 	// The value must be a non-negative integer.
 	// Default: 110
@@ -743,7 +789,7 @@ type KubeletConfiguration struct {
 	// for more information.
 	// Default: ["pods"]
 	// +optional
-	EnforceNodeAllocatable []string `json:"enforceNodeAllocatable,omitempty"`
+	EnforceNodeAllocatable []EnforceNodeAllocatable `json:"enforceNodeAllocatable,omitempty"`
 	// A comma separated whitelist of unsafe sysctls or sysctl patterns (ending in `*`).
 	// Unsafe sysctl groups are `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`,
 	// and `net.*`. For example: "`kernel.msg*,net.ipv4.route.min_pmtu`"

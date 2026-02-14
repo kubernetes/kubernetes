@@ -70351,14 +70351,14 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"cgroupDriver": {
 						SchemaProps: spec.SchemaProps{
-							Description: "cgroupDriver is the driver kubelet uses to manipulate CGroups on the host (cgroupfs or systemd). Default: \"cgroupfs\"",
+							Description: "cgroupDriver is the driver kubelet uses to manipulate CGroups on the host Valid values include:\n\n- `cgroupfs`: Directly manages cgroups via the cgroup filesystem. - `systemd`: Integrates with systemd to manage cgroups.\n\nDefault: \"cgroupfs\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"cpuManagerPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "cpuManagerPolicy is the name of the policy to use. Default: \"None\"",
+							Description: "cpuManagerPolicy is the name of the policy to use. Valid values include:\n\n- `none`: Does not modify CPU affinity or exclusivity. - `static`: Grants exclusive CPU assignments to eligible Guaranteed pods.\n\nDefault: \"none\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -70394,7 +70394,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"memoryManagerPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "memoryManagerPolicy is the name of the policy to use by memory manager. Requires the MemoryManager feature gate to be enabled. Default: \"none\"",
+							Description: "memoryManagerPolicy is the name of the policy to use by memory manager. Valid values include:\n\n- `none`: No effect on memory allocation. - `static`: Guarantees memory on specific NUMA nodes for Guaranteed pods. - `best-effort`: Tries to allocate memory on an optimal NUMA node (Windows only).\n\nRequires the MemoryManager feature gate to be enabled. Default: \"none\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
