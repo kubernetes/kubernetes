@@ -184,6 +184,10 @@ func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	if !nodeStatusConfigInUse(oldNode) {
 		newNode.Status.Config = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) && oldNode.Status.NodeInfo.RunningInUserNamespace == nil {
+		newNode.Status.NodeInfo.RunningInUserNamespace = nil
+	}
 }
 
 // nodeStatusConfigInUse returns true if node's Status Config is set(used)

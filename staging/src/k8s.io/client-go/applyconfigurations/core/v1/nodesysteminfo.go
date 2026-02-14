@@ -49,6 +49,8 @@ type NodeSystemInfoApplyConfiguration struct {
 	Architecture *string `json:"architecture,omitempty"`
 	// Swap Info reported by the node.
 	Swap *NodeSwapStatusApplyConfiguration `json:"swap,omitempty"`
+	// Whether the node is running in a user namespace.
+	RunningInUserNamespace *bool `json:"runningInUserNamespace,omitempty"`
 }
 
 // NodeSystemInfoApplyConfiguration constructs a declarative configuration of the NodeSystemInfo type for use with
@@ -142,5 +144,13 @@ func (b *NodeSystemInfoApplyConfiguration) WithArchitecture(value string) *NodeS
 // If called multiple times, the Swap field is set to the value of the last call.
 func (b *NodeSystemInfoApplyConfiguration) WithSwap(value *NodeSwapStatusApplyConfiguration) *NodeSystemInfoApplyConfiguration {
 	b.Swap = value
+	return b
+}
+
+// WithRunningInUserNamespace sets the RunningInUserNamespace field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RunningInUserNamespace field is set to the value of the last call.
+func (b *NodeSystemInfoApplyConfiguration) WithRunningInUserNamespace(value bool) *NodeSystemInfoApplyConfiguration {
+	b.RunningInUserNamespace = &value
 	return b
 }

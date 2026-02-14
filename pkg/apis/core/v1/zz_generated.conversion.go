@@ -5677,6 +5677,7 @@ func autoConvert_v1_NodeSystemInfo_To_core_NodeSystemInfo(in *corev1.NodeSystemI
 	out.OperatingSystem = in.OperatingSystem
 	out.Architecture = in.Architecture
 	out.Swap = (*core.NodeSwapStatus)(unsafe.Pointer(in.Swap))
+	out.RunningInUserNamespace = (*bool)(unsafe.Pointer(in.RunningInUserNamespace))
 	return nil
 }
 
@@ -5697,6 +5698,7 @@ func autoConvert_core_NodeSystemInfo_To_v1_NodeSystemInfo(in *core.NodeSystemInf
 	out.OperatingSystem = in.OperatingSystem
 	out.Architecture = in.Architecture
 	out.Swap = (*corev1.NodeSwapStatus)(unsafe.Pointer(in.Swap))
+	out.RunningInUserNamespace = (*bool)(unsafe.Pointer(in.RunningInUserNamespace))
 	return nil
 }
 

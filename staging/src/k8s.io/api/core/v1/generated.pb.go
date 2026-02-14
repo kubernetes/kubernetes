@@ -7186,6 +7186,16 @@ func (m *NodeSystemInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.RunningInUserNamespace != nil {
+		i--
+		if *m.RunningInUserNamespace {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x60
+	}
 	if m.Swap != nil {
 		{
 			size, err := m.Swap.MarshalToSizedBuffer(dAtA[:i])
@@ -17561,6 +17571,9 @@ func (m *NodeSystemInfo) Size() (n int) {
 		l = m.Swap.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.RunningInUserNamespace != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -22333,6 +22346,7 @@ func (this *NodeSystemInfo) String() string {
 		`OperatingSystem:` + fmt.Sprintf("%v", this.OperatingSystem) + `,`,
 		`Architecture:` + fmt.Sprintf("%v", this.Architecture) + `,`,
 		`Swap:` + strings.Replace(this.Swap.String(), "NodeSwapStatus", "NodeSwapStatus", 1) + `,`,
+		`RunningInUserNamespace:` + valueToStringGenerated(this.RunningInUserNamespace) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -45814,6 +45828,27 @@ func (m *NodeSystemInfo) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 12:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RunningInUserNamespace", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.RunningInUserNamespace = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
