@@ -4217,3 +4217,62 @@ func TestWarningsOnUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestWarningsOnCreate(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      *api.Pod
+		warnings []string
+	}{
+		{
+			name: "valid pod name",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-pod",
+				},
+			},
+			warnings: nil,
+		},
+		{
+			name: "invalid pod name with no hostname",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invald-pod.1",
+				},
+			},
+			warnings: []string{
+				"this is used in the Pod's hostname",
+			},
+		},
+		{
+			name: "invalid pod name with hostname",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-pod.1",
+				},
+				Spec: api.PodSpec{
+					Hostname: "valid-pod",
+				},
+			},
+			warnings: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			warnings := Strategy.WarningsOnCreate(context.Background(), test.pod)
+			ok := len(warnings) == len(test.warnings)
+			if ok {
+				for i := range warnings {
+					if !strings.Contains(warnings[i], test.warnings[i]) {
+						ok = false
+						break
+					}
+				}
+			}
+			if !ok {
+				t.Errorf("Expected warnings for %v, got %v", test.warnings, warnings)
+			}
+		})
+	}
+}

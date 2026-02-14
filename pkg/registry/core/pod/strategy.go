@@ -121,7 +121,7 @@ func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 func (podStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	newPod := obj.(*api.Pod)
 	var warnings []string
-	if msgs := utilvalidation.IsDNS1123Label(newPod.Name); len(msgs) != 0 {
+	if msgs := utilvalidation.IsDNS1123Label(newPod.Name); len(msgs) != 0 && newPod.Spec.Hostname == "" {
 		warnings = append(warnings, fmt.Sprintf("metadata.name: this is used in the Pod's hostname, which can result in surprising behavior; a DNS label is recommended: %v", msgs))
 	}
 	warnings = append(warnings, podutil.GetWarningsForPod(ctx, newPod, nil)...)
