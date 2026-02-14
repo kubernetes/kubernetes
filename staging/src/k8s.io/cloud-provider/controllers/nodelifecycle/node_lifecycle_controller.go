@@ -44,6 +44,9 @@ import (
 const (
 	deleteNodeEvent       = "DeletingNode"
 	deleteNodeFailedEvent = "DeletingNodeFailed"
+
+	// LabelNodeLifecycleExclude is the label used to exclude a node from lifecycle management
+	LabelNodeLifecycleExclude = "node.kubernetes.io/exclude-from-lifecycle-management"
 )
 
 var ShutdownTaint = &v1.Taint{
@@ -134,6 +137,12 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 	}
 
 	for _, node := range nodes {
+		// Skip nodes with the lifecycle exclusion label
+		if _, excluded := node.Labels[LabelNodeLifecycleExclude]; excluded {
+			klog.V(4).Infof("Skipping node %s due to exclusion label %s", node.Name, LabelNodeLifecycleExclude)
+			continue
+		}
+		
 		// Default NodeReady status to v1.ConditionUnknown
 		status := v1.ConditionUnknown
 		if _, c := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
