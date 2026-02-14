@@ -344,11 +344,11 @@ func TestPreferNominatedNode(t *testing.T) {
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+		v1.ResourceMemory: *resource.NewQuantity(100*1024, resource.DecimalSI)},
 	}
 	tests := []struct {
 		name         string
@@ -373,7 +373,7 @@ func TestPreferNominatedNode(t *testing.T) {
 				Priority: &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 			runningNode: "node-1",
@@ -394,7 +394,7 @@ func TestPreferNominatedNode(t *testing.T) {
 				Priority: &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 			runningNode: "node-2",
