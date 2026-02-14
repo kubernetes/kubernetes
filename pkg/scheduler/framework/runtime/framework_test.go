@@ -179,6 +179,29 @@ func newTestPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk
 	return &TestPlugin{name: testPlugin}, nil
 }
 
+const testPluginToWriteState = "test-plugin-to-write-state"
+
+type testCycleState struct {
+	message string
+}
+
+func (t *testCycleState) Clone() fwk.StateData {
+	return &testCycleState{t.message}
+}
+
+type TestPluginToWriteState struct {
+	name string
+}
+
+func (pl *TestPluginToWriteState) Name() string {
+	return pl.name
+}
+
+func (pl *TestPluginToWriteState) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	state.Write(testPluginToWriteState, &testCycleState{"Filter has been called!"})
+	return nil
+}
+
 // TestPlugin implements all Plugin interfaces.
 type TestPlugin struct {
 	name string
@@ -2446,6 +2469,107 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, state, tt.pod, tt.nodeInfo)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("Unexpected status: (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFilterPluginsWriteStateWithNominatedPods(t *testing.T) {
+	tests := []struct {
+		name            string
+		preFilterPlugin *TestPlugin
+		filterPlugin    *TestPluginToWriteState
+		pod             *v1.Pod
+		nominatedPod    *v1.Pod
+		node            *v1.Node
+		nodeInfo        *framework.NodeInfo
+		wantStatus      *fwk.Status
+	}{
+		{
+			name: "node has a low-priority nominated pod and pre filters return unschedulable",
+			preFilterPlugin: &TestPlugin{
+				name: "TestPlugin1",
+				inj: injectedResult{
+					PreFilterAddPodStatus: int(fwk.Unschedulable),
+				},
+			},
+			filterPlugin: &TestPluginToWriteState{
+				name: "TestPlugin2",
+			},
+			pod:          highPriorityPod,
+			nominatedPod: lowPriorityPod,
+			node:         node,
+			nodeInfo:     framework.NewNodeInfo(pod),
+			wantStatus:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			registry := Registry{}
+			cfgPls := &config.Plugins{}
+
+			if tt.preFilterPlugin != nil {
+				if err := registry.Register(tt.preFilterPlugin.name,
+					func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return tt.preFilterPlugin, nil
+					}); err != nil {
+					t.Fatalf("fail to register preFilter plugin (%s)", tt.preFilterPlugin.name)
+				}
+				cfgPls.PreFilter.Enabled = append(
+					cfgPls.PreFilter.Enabled,
+					config.Plugin{Name: tt.preFilterPlugin.name},
+				)
+			}
+			if tt.filterPlugin != nil {
+				if err := registry.Register(tt.filterPlugin.name,
+					func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return tt.filterPlugin, nil
+					}); err != nil {
+					t.Fatalf("fail to register filter plugin (%s)", tt.filterPlugin.name)
+				}
+				cfgPls.Filter.Enabled = append(
+					cfgPls.Filter.Enabled,
+					config.Plugin{Name: tt.filterPlugin.name},
+				)
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+			podInformer := informerFactory.Core().V1().Pods().Informer()
+			err := podInformer.GetStore().Add(tt.pod)
+			if err != nil {
+				t.Fatalf("Error adding pod to podInformer: %s", err)
+			}
+			if tt.nominatedPod != nil {
+				err = podInformer.GetStore().Add(tt.nominatedPod)
+				if err != nil {
+					t.Fatalf("Error adding nominated pod to podInformer: %s", err)
+				}
+			}
+
+			podNominator := internalqueue.NewSchedulingQueue(nil, informerFactory)
+			if tt.nominatedPod != nil {
+				podNominator.AddNominatedPod(
+					logger,
+					mustNewPodInfo(t, tt.nominatedPod),
+					&fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: nodeName})
+			}
+			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile, WithPodNominator(podNominator))
+			if err != nil {
+				t.Fatalf("fail to create framework: %s", err)
+			}
+			defer func() {
+				_ = f.Close()
+			}()
+			tt.nodeInfo.SetNode(tt.node)
+			f.RunFilterPluginsWithNominatedPods(ctx, state, tt.pod, tt.nodeInfo)
+			_, err = state.Read(testPluginToWriteState)
+			if err != nil {
+				t.Fatalf("Error reading state: %s", err)
 			}
 		})
 	}
