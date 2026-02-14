@@ -174,6 +174,7 @@ var (
 		"CPUManagerPolicy",
 		"CPUManagerPolicyOptions[*]",
 		"CPUManagerReconcilePeriod.Duration",
+		"DRAManagerReconcilePeriod.Duration",
 		"TopologyManagerPolicy",
 		"TopologyManagerScope",
 		"TopologyManagerPolicyOptions[*]",
