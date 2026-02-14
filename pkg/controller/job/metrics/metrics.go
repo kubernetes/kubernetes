@@ -116,6 +116,7 @@ var (
 			rule. Possible values of the action label correspond to the
 			possible values for the failure policy rule action, which are:
 			"FailJob", "Ignore" and "Count".`,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"action"})
 
@@ -129,6 +130,7 @@ var (
 			Help: `The number of terminated pods (phase=Failed|Succeeded)
 that have the finalizer batch.kubernetes.io/job-tracking
 The event label can be "add" or "delete".`,
+			StabilityLevel: metrics.BETA,
 		}, []string{"event"})
 
 	// JobFinishedIndexesTotal records the number of finished indexes.
