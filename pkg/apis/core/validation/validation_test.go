@@ -14588,6 +14588,33 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "updated workloadRef",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyNever),
+					podtest.SetContainerRestartPolicyRules(core.ContainerRestartRule{
+						Action: core.ContainerRestartRuleActionRestartAllContainers,
+						ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+							Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{42},
+						},
+					}),
+				)),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyNever),
+					podtest.SetContainerRestartPolicyRules(core.ContainerRestartRule{
+						Action: core.ContainerRestartRuleActionRestartAllContainers,
+						ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+							Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{43},
+						},
+					}),
+				)),
+			),
+			err:  "pod updates may not change fields other than",
+			test: "updated restartPolicyRules",
 		},
 	}
 

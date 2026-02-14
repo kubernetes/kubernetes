@@ -1185,6 +1185,89 @@ var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeature
 			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "source-container", 3*time.Minute))
 			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
 		})
+
+		ginkgo.It("should preserve CPU affinity after restarting all containers", func(ctx context.Context) {
+			podName := "restart-all-preserve-affinity-" + string(uuid.NewUUID())
+			// We use a Guaranteed pod to ensure managers (like CPU Manager) are engaged.
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:  "affinity-checker",
+							Image: imageutils.GetE2EImage(imageutils.BusyBox),
+							// Script logic:
+							// 1. Check if 'affinity.txt' exists in shared volume.
+							// 2. If not: record current affinity, touch 'affinity.txt', and exit 42 to trigger RestartAll.
+							// 3. If yes: compare current affinity with 'affinity.txt'. If match, sleep forever (success).
+							Command: []string{"/bin/sh", "-c", `
+								AFFINITY_FILE="/mnt/affinity.txt"
+								CURRENT_AFFINITY=$(taskset -cp 1)
+								if [ ! -f $AFFINITY_FILE ]; then
+									echo "First run. Recording affinity: $CURRENT_AFFINITY"
+									echo "$CURRENT_AFFINITY" > $AFFINITY_FILE
+									exit 42
+								else
+									OLD_AFFINITY=$(cat $AFFINITY_FILE)
+									echo "Restarted. Old: $OLD_AFFINITY, New: $CURRENT_AFFINITY"
+									if [ "$OLD_AFFINITY" != "$CURRENT_AFFINITY" ]; then
+										echo "ERROR: Affinity not preserved!"
+										exit 1
+									fi
+									echo "Affinity preserved. Success."
+									sleep 10000
+								fi
+							`},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1000m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1000m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+						{
+							Name:    "sidecar",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			// All containers should be restarted once
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+			validateAllContainersRestarted(ctx, f, pod, []string{"affinity-checker", "sidecar"})
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "affinity-checker", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "sidecar", 3*time.Minute))
+		})
 	})
 })
 
