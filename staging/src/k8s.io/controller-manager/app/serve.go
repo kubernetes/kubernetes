@@ -24,6 +24,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apiserver "k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -55,9 +56,11 @@ func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.Aut
 }
 
 // NewBaseHandler takes in CompletedConfig and returns a handler.
-func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, healthzHandler http.Handler) *mux.PathRecorderMux {
+func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, checks, readyzChecks []healthz.HealthChecker) *mux.PathRecorderMux {
 	mux := mux.NewPathRecorderMux("controller-manager")
-	mux.Handle("/healthz", healthzHandler)
+	healthz.InstallHandler(mux, checks...)
+	healthz.InstallLivezHandler(mux)
+	healthz.InstallReadyzHandler(mux, readyzChecks...)
 	if c.EnableProfiling {
 		routes.Profiling{}.Install(mux)
 		if c.EnableContentionProfiling {
