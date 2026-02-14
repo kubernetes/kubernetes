@@ -78,10 +78,10 @@ var _ = common.SIGDescribe("HostPort", func() {
 		randomNode := &nodes.Items[rand.Intn(len(nodes.Items))]
 
 		ips := e2enode.GetAddressesByTypeAndFamily(randomNode, v1.NodeInternalIP, family)
-		if len(ips) == 0 {
-			framework.Failf("Failed to get NodeIP")
-		}
-		hostIP := ips[0]
+			if len(ips) == 0 {
+				ginkgo.Skip("node has no InternalIP; skipping HostPort conformance test")
+			}
+			hostIP := ips[0]
 		port := int32(54323)
 
 		// Create pods with the same HostPort

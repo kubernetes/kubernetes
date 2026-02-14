@@ -129,7 +129,8 @@ func RedirectChecker(followNonLocalRedirects bool) func(*http.Request, []*http.R
 	}
 
 	return func(req *http.Request, via []*http.Request) error {
-		if req.URL.Hostname() != via[0].URL.Hostname() {
+		orig := via[0].URL
+		if req.URL.Hostname() != orig.Hostname() || req.URL.Scheme != orig.Scheme {
 			return http.ErrUseLastResponse
 		}
 		// Default behavior: stop after 10 redirects.
