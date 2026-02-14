@@ -1,0 +1,23 @@
+name: atomicwriter validatePath (windows)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - name: Run unit test
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./pkg/volume/util -run TestValidatePathRejectsWindowsAbsoluteAndUNC -count=1 -v | tee test_windows.log
+      - name: Upload log
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-log
+          path: test_windows.log

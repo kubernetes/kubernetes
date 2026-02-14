@@ -1,0 +1,22 @@
+name: atomicwriter windows repro
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run volume util tests
+        shell: pwsh
+        run: |
+          go version
+          go test ./pkg/volume/util -count=1 -v
