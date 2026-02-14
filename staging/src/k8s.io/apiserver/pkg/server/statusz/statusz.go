@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/statusz/negotiate"
 
@@ -94,7 +95,17 @@ func Install(m mux, componentName string, reg statuszRegistry) {
 	if err != nil {
 		utilruntime.HandleError(err)
 	}
-	m.Handle(DefaultStatuszPath, handleStatusz(componentName, reg, filteredCodecFactory, negotiate.StatuszEndpointRestrictions{}))
+	m.Handle(DefaultStatuszPath,
+		metrics.InstrumentHandlerFunc("GET",
+			/* group = */ "",
+			/* version = */ "",
+			/* resource = */ "",
+			/* subresource = */ DefaultStatuszPath,
+			/* scope = */ "",
+			/* component = */ "",
+			/* deprecated */ false,
+			/* removedRelease */ "",
+			handleStatusz(componentName, reg, filteredCodecFactory, negotiate.StatuszEndpointRestrictions{})))
 }
 
 // newStatuszCodecFactory creates a codec factory with the standard serializers for statusz,

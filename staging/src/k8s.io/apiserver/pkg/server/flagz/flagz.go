@@ -29,6 +29,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
 	v1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
 	"k8s.io/apiserver/pkg/server/flagz/negotiate"
@@ -69,7 +70,17 @@ func Install(m mux, componentName string, flagReader Reader, opts ...Option) {
 	if err != nil {
 		utilruntime.HandleError(err)
 	}
-	m.Handle(DefaultFlagzPath, handleFlagz(componentName, reg, filteredCodecFactory, negotiate.FlagzEndpointRestrictions{}))
+	m.Handle(DefaultFlagzPath,
+		metrics.InstrumentHandlerFunc("GET",
+			/* group = */ "",
+			/* version = */ "",
+			/* resource = */ "",
+			/* subresource = */ DefaultFlagzPath,
+			/* scope = */ "",
+			/* component = */ "",
+			/* deprecated */ false,
+			/* removedRelease */ "",
+			handleFlagz(componentName, reg, filteredCodecFactory, negotiate.FlagzEndpointRestrictions{})))
 }
 
 // newFlagzCodecFactory creates a codec factory with the standard serializers for flagz,
