@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -257,6 +258,13 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 			return
 		}
 	}
+
+	// Remove redundant logs before rotation.
+	if err := c.rmRedundantLogs(ctx, id, path); err != nil {
+		// Print the error and continue log rotation, not block the original log rotation
+		klog.ErrorS(err, "Failed to remove redundant logs for container", "path", path, "containerID", id)
+	}
+
 	if info.Size() < c.policy.MaxSize {
 		logger.V(7).Info("log file doesn't need to be rotated", "worker", worker, "containerID", id, "path", path, "currentSize", info.Size(), "maxSize", c.policy.MaxSize)
 		return
@@ -268,6 +276,69 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 	}
 	return
 }
+
+func (c *containerLogManager) rmRedundantLogs(ctx context.Context, id, log string) error {
+	klog.V(4).InfoS("Removing redundant logs for container", "containerID", id, "log", log)
+	// get the log dir and name of log file
+	logDir := filepath.Dir(log)
+	logPattern := filepath.Join(logDir, "*.log*")
+	currenLogsByDir, err := filepath.Glob(logPattern)
+	if err != nil {
+		return fmt.Errorf("failed to get current logs by dir %q: %v", logDir, err)
+	}
+
+	// c.policy.MaxFiles is the number which the one container shoudld keep before rotation by default, we just make this redundant log truncate work
+	// when there are more than c.policy.MaxFiles logs in the log dir.
+	if len(currenLogsByDir) <= c.policy.MaxFiles {
+		klog.V(4).InfoS("No more than redundant logs found in log dir, skipping redundant log truncation", "MaxFiles", c.policy.MaxFiles, "logDir", logDir)
+		return nil
+	}
+
+	logFile := filepath.Base(log)
+	logFileNum := 0
+	parts := strings.Split(logFile, ".")
+	if len(parts) >= 2 {
+		// if log file has an extension, e.g. 5.log.*, we only keep the
+		// first part as the log file prefix
+		logFileNum, err = strconv.Atoi(parts[0])
+		if err != nil {
+			klog.ErrorS(err, "Log file name has unexpected format, cannot extract log file number", "log", log)
+			return err
+		}
+	}
+
+	logs, err := getLogsLessThanN(logDir, logFileNum - 1)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get logs less than N", "logDir", logDir, "N", logFileNum - 1)
+		return err
+	}
+
+	for i := 0; i < len(logs); i++ {
+		if err := c.osInterface.Remove(logs[i]); err != nil {
+			klog.ErrorS(err, "Failed to remove old log", "log", logs[i])
+		}
+	}
+
+	return nil
+}
+
+func getLogsLessThanN(dir string, n int) ([]string, error) {
+	var logs []string
+	
+	for i := 0; i < n; i++ {
+		basePattern := fmt.Sprintf("%d.log", i)
+		pattern := filepath.Join(dir, fmt.Sprintf("%s*", basePattern))		
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("Pattern match failed %q: %v", pattern, err)
+		}
+		
+		logs = append(logs, matches...)
+	}
+	
+	return logs, nil
+}
+
 
 func (c *containerLogManager) rotateLog(ctx context.Context, id, log string) error {
 	// pattern is used to match all rotated files.
