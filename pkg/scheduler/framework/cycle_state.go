@@ -41,9 +41,42 @@ type CycleState struct {
 	parallelPreBindPlugins sets.Set[string]
 }
 
+// cycleStatePool is a sync.Pool for CycleState objects to reduce GC pressure.
+var cycleStatePool = sync.Pool{
+	New: func() interface{} {
+		return &CycleState{}
+	},
+}
+
 // NewCycleState initializes a new CycleState and returns its pointer.
+// It uses a sync.Pool to reduce GC pressure from frequent allocations.
 func NewCycleState() *CycleState {
-	return &CycleState{}
+	cs := cycleStatePool.Get().(*CycleState)
+	// Ensure the state is clean
+	// Note: storage is already cleared by Recycle(), no need to reinitialize
+	cs.recordPluginMetrics = false
+	cs.skipFilterPlugins = nil
+	cs.skipScorePlugins = nil
+	cs.skipPreBindPlugins = nil
+	return cs
+}
+
+// Recycle returns the CycleState to the pool for reuse.
+// This should be called after the scheduling cycle is complete.
+func (c *CycleState) Recycle() {
+	if c == nil {
+		return
+	}
+	// Clear the storage
+	c.storage.Range(func(key, value interface{}) bool {
+		c.storage.Delete(key)
+		return true
+	})
+	c.recordPluginMetrics = false
+	c.skipFilterPlugins = nil
+	c.skipScorePlugins = nil
+	c.skipPreBindPlugins = nil
+	cycleStatePool.Put(c)
 }
 
 // ShouldRecordPluginMetrics returns whether metrics.PluginExecutionDuration metrics should be recorded.
