@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -833,7 +834,7 @@ func Test_Discover(t *testing.T) {
 				}
 				return
 			}
-			if diff := cmp.Diff(got, tt.want); diff != "" {
+			if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreUnexported(cpuset.CPUSet{})); diff != "" {
 				t.Errorf("Discover() = %v, want %v diff=%s", got, tt.want, diff)
 			}
 		})

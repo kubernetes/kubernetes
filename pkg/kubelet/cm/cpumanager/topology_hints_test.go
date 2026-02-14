@@ -262,6 +262,62 @@ func TestGetTopologyHints(t *testing.T) {
 	}
 }
 
+func TestGetTopologyHintsSkipsNUMANodesWithoutMemory(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	pod := makePod("fakePod", "fakeContainer", "2", "2")
+	container := &pod.Spec.Containers[0]
+
+	machineInfo := cadvisorapi.MachineInfo{
+		NumCores:   4,
+		NumSockets: 2,
+		Topology: []cadvisorapi.Node{
+			{
+				Id:     0,
+				Memory: 1024,
+				Cores: []cadvisorapi.Core{
+					{SocketID: 0, Id: 0, Threads: []int{0, 1}},
+				},
+			},
+			{
+				Id:     1,
+				Memory: 0,
+				Cores: []cadvisorapi.Core{
+					{SocketID: 1, Id: 0, Threads: []int{2, 3}},
+				},
+			},
+		},
+	}
+
+	topology, _ := topology.Discover(logger, &machineInfo)
+	m := manager{
+		policy: &staticPolicy{
+			topology: topology,
+		},
+		state: &mockState{
+			assignments:   state.ContainerCPUAssignments{},
+			defaultCPUSet: cpuset.New(0, 1, 2, 3),
+		},
+		topology:          topology,
+		activePods:        func() []*v1.Pod { return nil },
+		podStatusProvider: mockPodStatusProvider{},
+		sourcesReady:      &sourcesReadyStub{},
+	}
+
+	hints := m.GetTopologyHints(pod, container)[string(v1.ResourceCPU)]
+	expectedMask, _ := bitmask.NewBitMask(0)
+	expectedHints := []topologymanager.TopologyHint{
+		{
+			NUMANodeAffinity: expectedMask,
+			Preferred:        true,
+		},
+	}
+
+	if !reflect.DeepEqual(expectedHints, hints) {
+		t.Fatalf("Expected hints to be %v, got %v", expectedHints, hints)
+	}
+}
+
 func TestGetPodTopologyHints(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()

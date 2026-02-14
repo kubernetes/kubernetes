@@ -669,6 +669,21 @@ func (p *staticPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, po
 	}
 }
 
+// candidateNUMANodesForHints returns the NUMA IDs that should be considered for hint generation.
+// If memory information is unavailable, it falls back to all NUMA nodes that host CPUs.
+func (p *staticPolicy) candidateNUMANodesForHints() cpuset.CPUSet {
+	numaNodes := p.topology.CPUDetails.NUMANodes()
+	if p.topology.NUMANodesWithMemory.Size() == 0 {
+		return numaNodes
+	}
+
+	numaNodesWithMemory := numaNodes.Intersection(p.topology.NUMANodesWithMemory)
+	if numaNodesWithMemory.Size() == 0 {
+		return numaNodes
+	}
+	return numaNodesWithMemory
+}
+
 // generateCPUTopologyHints generates a set of TopologyHints given the set of
 // available CPUs and the number of CPUs being requested.
 //
@@ -677,11 +692,12 @@ func (p *staticPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, po
 // marking all others with 'Preferred: false'.
 func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
 	// Initialize minAffinitySize to include all NUMA Nodes.
-	minAffinitySize := p.topology.CPUDetails.NUMANodes().Size()
+	numaNodes := p.candidateNUMANodesForHints()
+	minAffinitySize := numaNodes.Size()
 
 	// Iterate through all combinations of numa nodes bitmask and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().List(), func(mask bitmask.BitMask) {
+	bitmask.IterateBitMasks(numaNodes.List(), func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
 		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
