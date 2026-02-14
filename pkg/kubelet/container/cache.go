@@ -22,7 +22,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
 )
 
 // Cache stores the PodStatus for the pods. It represents *all* the visible
@@ -47,6 +49,26 @@ type Cache interface {
 	GetNewerThan(types.UID, time.Time) (*PodStatus, error)
 	Delete(types.UID)
 	UpdateTime(time.Time)
+}
+
+// CacheConfig holds configuration options for the cache
+type CacheConfig struct {
+	// TimeShiftThreshold is the threshold for detecting time shifts.
+	// When the current time is significantly earlier than expected (more than
+	// this threshold), the cache treats existing data as "newer" to avoid
+	// blocking indefinitely and prevent container name reservation conflicts.
+	// Default: 30 seconds
+	TimeShiftThreshold time.Duration
+	// Clock provides time functionality for the cache. If nil, uses time.Now()
+	Clock clock.Clock
+}
+
+// DefaultCacheConfig returns the default cache configuration
+func DefaultCacheConfig() *CacheConfig {
+	return &CacheConfig{
+		TimeShiftThreshold: 30 * time.Second,
+		Clock:              clock.RealClock{},
+	}
 }
 
 type data struct {
@@ -76,11 +98,25 @@ type cache struct {
 	timestamp *time.Time
 	// Map that stores the subscriber records.
 	subscribers map[types.UID][]*subRecord
+	// Configuration for the cache
+	config *CacheConfig
 }
 
-// NewCache creates a pod cache.
+// NewCache creates a pod cache with default configuration.
 func NewCache() Cache {
-	return &cache{pods: map[types.UID]*data{}, subscribers: map[types.UID][]*subRecord{}}
+	return NewCacheWithConfig(DefaultCacheConfig())
+}
+
+// NewCacheWithConfig creates a pod cache with the provided configuration.
+func NewCacheWithConfig(config *CacheConfig) Cache {
+	if config == nil {
+		config = DefaultCacheConfig()
+	}
+	return &cache{
+		pods:        map[types.UID]*data{},
+		subscribers: map[types.UID][]*subRecord{},
+		config:      config,
+	}
 }
 
 // Get returns the PodStatus for the pod; callers are expected not to
@@ -158,15 +194,35 @@ func (c *cache) get(id types.UID) *data {
 func (c *cache) getIfNewerThan(id types.UID, minTime time.Time) *data {
 	d, ok := c.pods[id]
 	globalTimestampIsNewer := (c.timestamp != nil && c.timestamp.After(minTime))
-	if !ok && globalTimestampIsNewer {
-		// Status is not cached, but the global timestamp is newer than
-		// minTime, return the default status.
+	
+	// Handle time shift scenarios: if the current time is significantly earlier than minTime,
+	// it indicates a clock step backwards. In such cases, we should treat cached data as "newer"
+	// to avoid blocking indefinitely and prevent container name reservation conflicts.
+	currentTime := c.config.Clock.Now()
+	timeShiftDetected := currentTime.Before(minTime.Add(-c.config.TimeShiftThreshold))
+	
+	if timeShiftDetected {
+		// Log time shift detection for monitoring and debugging
+		klog.V(2).InfoS("Time shift detected in pod cache",
+			"podUID", id,
+			"currentTime", currentTime,
+			"minTime", minTime,
+			"timeDifference", minTime.Sub(currentTime),
+			"threshold", c.config.TimeShiftThreshold)
+	}
+	
+	if !ok && (globalTimestampIsNewer || timeShiftDetected) {
+		// Status is not cached, but either:
+		//   * the global timestamp is newer than minTime, or
+		//   * a time shift was detected (clock went backwards)
+		// Return the default status.
 		return makeDefaultData(id)
 	}
-	if ok && (d.modified.After(minTime) || globalTimestampIsNewer) {
-		// Status is cached, return status if either of the following is true.
+	if ok && (d.modified.After(minTime) || globalTimestampIsNewer || timeShiftDetected) {
+		// Status is cached, return status if any of the following is true:
 		//   * status was modified after minTime
-		//   * the global timestamp of the cache is newer than minTime.
+		//   * the global timestamp of the cache is newer than minTime
+		//   * a time shift was detected (clock went backwards)
 		return d
 	}
 	// The pod status is not ready.
@@ -182,9 +238,26 @@ func (c *cache) notify(id types.UID, timestamp time.Time) {
 		return
 	}
 	newList := []*subRecord{}
+	currentTime := c.config.Clock.Now()
+	
 	for i, r := range list {
-		if timestamp.Before(r.time) {
-			// Doesn't meet the time requirement; keep the record.
+		// Handle time shift scenarios: if the current time is significantly earlier than the
+		// subscriber's time, it indicates a clock step backwards. In such cases, we should
+		// notify the subscriber to avoid blocking indefinitely.
+		timeShiftDetected := currentTime.Before(r.time.Add(-c.config.TimeShiftThreshold))
+		
+		if timeShiftDetected {
+			// Log time shift detection in notification for monitoring
+			klog.V(3).InfoS("Time shift detected in pod cache notification",
+				"podUID", id,
+				"currentTime", currentTime,
+				"subscriberTime", r.time,
+				"timeDifference", r.time.Sub(currentTime),
+				"threshold", c.config.TimeShiftThreshold)
+		}
+		
+		if timestamp.Before(r.time) && !timeShiftDetected {
+			// Doesn't meet the time requirement and no time shift detected; keep the record.
 			newList = append(newList, list[i])
 			continue
 		}
