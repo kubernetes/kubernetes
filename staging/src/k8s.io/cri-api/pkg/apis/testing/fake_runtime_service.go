@@ -717,6 +717,36 @@ func (r *FakeRuntimeService) CheckpointContainer(_ context.Context, options *run
 	return nil
 }
 
+// CheckpointPod emulates call to checkpoint a pod sandbox in the FakeRuntimeService.
+func (r *FakeRuntimeService) CheckpointPod(_ context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "CheckpointPod")
+
+	if err := r.popError("CheckpointPod"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RestorePod emulates call to restore a pod sandbox in the FakeRuntimeService.
+func (r *FakeRuntimeService) RestorePod(_ context.Context, options *runtimeapi.RestorePodRequest) (string, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "RestorePod")
+
+	if err := r.popError("RestorePod"); err != nil {
+		return "", err
+	}
+
+	// Return a fake pod sandbox ID
+	return "fake-restored-pod-id", nil
+}
+
+
 func (f *FakeRuntimeService) GetContainerEvents(ctx context.Context, containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	return nil
 }

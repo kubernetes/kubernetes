@@ -90,6 +90,12 @@ func (kl *Kubelet) getCheckpointsDir() string {
 	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletCheckpointsDirName)
 }
 
+// getPodCheckpointsDir returns a data directory name for pod checkpoints.
+// Checkpoints can be stored in this directory for further use.
+func (kl *Kubelet) getPodCheckpointsDir() string {
+	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletPodCheckpointsDirName)
+}
+
 // getVolumeDevicePluginsDir returns the full path to the directory under which plugin
 // directories are created.  Plugins can use these directories for data that
 // they need to persist.  Plugins should create subdirectories under this named

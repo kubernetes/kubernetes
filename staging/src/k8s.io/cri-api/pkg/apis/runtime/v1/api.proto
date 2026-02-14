@@ -109,6 +109,13 @@ service RuntimeService {
     // CheckpointContainer checkpoints a container
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
 
+    // CheckpointPod creates a Pod-level checkpoint. If the pod sandbox does not
+    // exist or the checkpoint operation fails, the call returns an error.
+    rpc CheckpointPod(CheckpointPodRequest) returns (CheckpointPodResponse) {}
+
+    // RestorePod restores a pod sandbox from a checkpoint
+    rpc RestorePod(RestorePodRequest) returns (RestorePodResponse) {}
+
     // GetContainerEvents gets container events from the CRI runtime
     rpc GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
 
@@ -2002,6 +2009,42 @@ message CheckpointContainerRequest {
 }
 
 message CheckpointContainerResponse {}
+
+message CheckpointPodRequest {
+    // ID of the pod sandbox to be checkpointed.
+    string pod_sandbox_id = 1;
+    // Location path where the checkpoint will be saved
+    string path = 2;
+    // Timeout in seconds for the checkpoint to complete.
+    // Timeout of zero means to use the CRI default.
+    // Timeout > 0 means to use the user specified timeout.
+    int64 timeout = 3;
+    // Checkpoint options passed to the container runtime.
+    map<string, string> options = 4;
+}
+
+message CheckpointPodResponse {}
+
+message RestorePodRequest {
+    // Location path where the checkpoint will be restored from.
+    string path = 1;
+    // Optional pod sandbox configuration to override checkpoint metadata.
+    // If not specified, the pod will be restored with its original configuration.
+    PodSandboxConfig config = 2;
+    // Restore options passed to the container runtime.
+    map<string, string> options = 3;
+    // Container configurations for all containers in the pod.
+    // This includes mount configurations that tell the runtime where to mount
+    // host paths (e.g., /etc/hosts, termination logs, volumes) into the containers.
+    // The runtime should match containers from the checkpoint with these configs
+    // by container name and apply the mount configurations.
+    repeated ContainerConfig container_configs = 4;
+}
+
+message RestorePodResponse {
+    // ID of the restored pod sandbox
+    string pod_sandbox_id = 1;
+}
 
 message GetEventsRequest {}
 
