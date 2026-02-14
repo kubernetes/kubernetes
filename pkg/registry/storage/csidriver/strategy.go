@@ -20,8 +20,10 @@ import (
 	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -64,8 +66,8 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiDriver := obj.(*storage.CSIDriver)
-
-	return validation.ValidateCSIDriver(csiDriver)
+	allErrs := validation.ValidateCSIDriver(csiDriver)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, csiDriver, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -122,7 +124,8 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 func (csiDriverStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSIDriverObj := obj.(*storage.CSIDriver)
 	oldCSIDriverObj := old.(*storage.CSIDriver)
-	return validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)
+	allErrs := validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newCSIDriverObj, oldCSIDriverObj, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
