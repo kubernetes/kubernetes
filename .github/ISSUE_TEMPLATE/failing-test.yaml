@@ -2,6 +2,26 @@ name: Failing Test
 description: Report continuously failing tests or jobs in Kubernetes CI
 labels: kind/failing-test
 body:
+  - type: input
+    id: testgridname
+    attributes:
+      label: Testgrid test name
+    description: |
+      Please provide the exact name of the test as it appears on Testgrid.
+      Example: ClusterLoaderV2.access-tokens: [step: 02] Creating ServiceAccounts
+    validations:
+      required: true
+
+  - type: input
+    id: testgrid
+    attributes:
+      label: Testgrid link
+    description: |
+      Please provide a direct link to the Testgrid page for the failing test.
+      Example: https://testgrid.k8s.io/sig-release-master-informing#ec2-master-scale-performance
+    validations:
+      required: true
+
   - type: textarea
     id: jobs
     attributes:
@@ -25,11 +45,6 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: testgrid
-    attributes:
-      label: Testgrid link
-
   - type: textarea
     id: reason
     attributes:
@@ -45,4 +60,4 @@ body:
     attributes:
       label: Relevant SIG(s)
       description: You can identify the SIG from the "prowjob_config_url" on the testgrid dashboard for a test.
-      value: /sig 
+      value: /sig
