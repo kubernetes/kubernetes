@@ -1,0 +1,248 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Test kubectl diff command
+
+####################
+# Basic Diff Tests
+####################
+
+# Test that it works when the live object doesn't exist
+! kubectl diff -f hack/testdata/pod.yaml
+stdout 'test-pod'
+
+# Ensure diff only dry-runs and doesn't persist change
+! kubectl get pod test-pod
+stderr 'not found'
+
+# Apply the pod
+kubectl apply -f hack/testdata/pod.yaml
+stdout 'pod/test-pod'
+
+# Verify pod exists
+kubectl get pod test-pod -o jsonpath='{.metadata.name}'
+stdout 'test-pod'
+
+# Make sure that diffing the resource right after returns nothing (0 exit code)
+kubectl diff -f hack/testdata/pod.yaml
+
+# Test that diff returns exit code 1 when there's a difference
+# and the difference contains the changed image
+! kubectl diff -f hack/testdata/pod-changed.yaml
+stdout 'registry.k8s.io/pause:3.4'
+
+# Verify diff didn't modify the pod (image should still be 3.10.1, not 3.4)
+kubectl get pod test-pod -o jsonpath='{.spec.containers[0].image}'
+stdout 'registry.k8s.io/pause:3.10.1'
+
+# Test found diff with server-side apply
+! kubectl diff -f hack/testdata/pod-changed.yaml --server-side
+stdout 'registry.k8s.io/pause:3.4'
+
+# Test that we have a return code bigger than 1 if there is an error when diffing
+# Note: In testscript, we can't directly test exit codes > 1, but we can verify it fails
+! kubectl diff -f hack/testdata/invalid-pod.yaml
+stderr 'invalid'
+
+# Cleanup
+kubectl delete -f hack/testdata/pod.yaml
+stdout 'deleted'
+
+####################
+# Server-Side Diff Tests
+####################
+
+# Test that kubectl diff --server-side works when the live object doesn't exist
+! kubectl diff --server-side -f hack/testdata/pod.yaml
+stdout 'test-pod'
+
+# Ensure diff --server-side only dry-runs and doesn't persist change
+! kubectl get pod test-pod
+stderr 'not found'
+
+# Server-side apply the Pod
+kubectl apply --server-side -f hack/testdata/pod.yaml
+stdout 'pod/test-pod'
+
+# Verify pod exists
+kubectl get pod test-pod -o jsonpath='{.metadata.name}'
+stdout 'test-pod'
+
+# Make sure that --server-side diffing the resource right after returns nothing (0 exit code)
+kubectl diff --server-side -f hack/testdata/pod.yaml
+
+# Make sure that kubectl diff --server-side returns exit code 1 for changes
+! kubectl diff --server-side -f hack/testdata/pod-changed.yaml
+stdout 'registry.k8s.io/pause:3.4'
+
+####################
+# Diff with Prune Tests
+####################
+
+# Create namespace for prune tests
+kubectl create ns nsb
+stdout 'namespace/nsb created'
+
+# Create default service account (required for pods in test environment)
+kubectl create serviceaccount default -n nsb
+stdout 'serviceaccount/default created'
+
+# Apply pod 'a' with prune label
+kubectl apply --namespace nsb -l prune-group=true -f hack/testdata/prune/a.yaml
+stdout 'pod/a'
+
+# Verify pod 'a' exists
+kubectl get pod a -n nsb -o jsonpath='{.metadata.name}'
+stdout 'a'
+
+# Make sure that kubectl diff does not return pod 'a' without prune flag
+# Diff will show exit code 1 because 'b' doesn't exist, but shouldn't mention 'a'
+! kubectl diff --namespace nsb -l prune-group=true -f hack/testdata/prune/b.yaml
+! stdout 'name: a'
+
+# Make sure that kubectl diff --prune shows pod 'a' will be pruned
+! kubectl diff --prune --namespace nsb -l prune-group=true -f hack/testdata/prune/b.yaml
+stdout 'name: a'
+
+# Apply b with prune
+kubectl apply --prune --namespace nsb -l prune-group=true -f hack/testdata/prune/b.yaml
+stdout 'pod/b'
+
+# Wait for pod b to exist and pod a to be deleted
+kube-retry 'pod b -n nsb' '{.metadata.name}' b
+! kubectl get pod a -n nsb
+stderr 'not found'
+
+# Make sure that diff --prune returns nothing (0 exit code) for 'b'
+kubectl diff --prune --namespace nsb -l prune-group=true -f hack/testdata/prune/b.yaml
+
+# Cleanup
+kubectl delete --namespace nsb -f hack/testdata/prune/b.yaml
+kubectl delete namespace nsb
+####################
+# Diff with Prune and Label Selector Tests
+####################
+
+# Create namespace for prune label selector tests
+kubectl create ns nsbprune
+stdout 'namespace/nsbprune created'
+
+# Create default service account (required for pods in test environment)
+kubectl create serviceaccount default -n nsbprune
+stdout 'serviceaccount/default created'
+
+# Apply three pods: a and b with prune-group=true, c with prune-group=false
+kubectl apply --namespace nsbprune -f $WORK/prune-three-pods.yaml
+stdout 'pod/a'
+stdout 'pod/b'
+stdout 'pod/c'
+
+# Verify all three pods exist
+kubectl get pod a -n nsbprune -o jsonpath='{.metadata.name}'
+stdout 'a'
+kubectl get pod b -n nsbprune -o jsonpath='{.metadata.name}'
+stdout 'b'
+kubectl get pod c -n nsbprune -o jsonpath='{.metadata.name}'
+stdout 'c'
+
+# Make sure that kubectl diff does not return either pod 'b' or pod 'c' without prune flag
+# We're diffing with a file that has pods a and c (no b)
+kubectl diff --namespace nsbprune -l prune-group=true -f $WORK/prune-subset-ac.yaml
+! stdout 'name: b'
+! stdout 'name: c'
+
+# The exit code for diff --prune is 1 because pod 'b' is found in the given label selector but not in file
+# Pod 'c' should not appear because its label doesn't match prune-group=true
+! kubectl diff --prune --namespace nsbprune -l prune-group=true -f $WORK/prune-subset-ac.yaml
+stdout 'name: b'
+! stdout 'name: c'
+
+# Cleanup
+kubectl delete namespace nsbprune
+
+####################
+# Diff with Multiple Resources with Same Name (KUBECTL_EXTERNAL_DIFF)
+####################
+
+# Test kubectl diff with multiple resources with the same name
+# Using KUBECTL_EXTERNAL_DIFF to see the filenames
+# Exit code will be 1 because resources don't exist yet
+env KUBECTL_EXTERNAL_DIFF=find
+! kubectl diff -Rf hack/testdata/diff/
+stdout 'v1\.Pod\..*\.test'
+stdout 'apps\.v1\.Deployment\..*\.test'
+stdout 'v1\.ConfigMap\..*\.test'
+stdout 'v1\.Secret\..*\.test'
+
+-- prune-three-pods.yaml --
+apiVersion: v1
+kind: Pod
+metadata:
+  name: a
+  namespace: nsbprune
+  labels:
+    prune-group: "true"
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.10.1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: b
+  namespace: nsbprune
+  labels:
+    prune-group: "true"
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.10.1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: c
+  namespace: nsbprune
+  labels:
+    prune-group: "false"
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.10.1
+
+-- prune-subset-ac.yaml --
+apiVersion: v1
+kind: Pod
+metadata:
+  name: a
+  namespace: nsbprune
+  labels:
+    prune-group: "true"
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.10.1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: c
+  namespace: nsbprune
+  labels:
+    prune-group: "false"
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.10.1

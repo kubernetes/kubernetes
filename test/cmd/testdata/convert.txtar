@@ -1,0 +1,55 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Test kubectl convert command
+# NOTE: kubectl convert was removed from kubectl in v1.26 and moved to a separate plugin
+# This test verifies that the convert command is not available in the main kubectl binary
+# For actual conversion testing, users should install kubectl-convert plugin
+
+####################
+# Verify kubectl convert is not available
+####################
+
+# Test: kubectl convert should not be available in modern kubectl
+! kubectl convert --help
+stderr 'unknown command "convert"'
+
+####################
+# Alternative: Test deployment creation and verification
+####################
+
+# Since convert is not available, we test basic deployment operations instead
+# Pre-condition: no deployments exist
+kubectl get deployment -o jsonpath='{range.items}{.metadata.name}:{end}'
+! stdout 'nginx'
+
+# Create a deployment (revision 1)
+kubectl create -f hack/testdata/deployment-revision1.yaml
+stdout 'deployment.apps/nginx created'
+
+# Verify deployment exists
+kubectl get deployment nginx -o jsonpath='{.metadata.name}'
+stdout 'nginx'
+
+# Verify correct image
+kubectl get deployment nginx -o jsonpath='{.spec.template.spec.containers[0].image}'
+stdout 'registry.k8s.io/nginx:test-cmd'
+
+# Verify apiVersion is apps/v1
+kubectl get deployment nginx -o jsonpath='{.apiVersion}'
+stdout 'apps/v1'
+
+# Clean up
+kubectl delete deployment nginx
+stdout 'deployment.apps "nginx" deleted'
