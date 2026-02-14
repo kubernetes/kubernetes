@@ -263,6 +263,10 @@ type KubeletConfiguration struct {
 	// Default: 100
 	// +optional
 	EventBurst int32 `json:"eventBurst,omitempty"`
+	// eventSpamBurst defines the maximum number of consecutive events
+	// of the same type generated for a single object.
+	// this helps control the long-tail of events for things that are always unhealthy
+	EventSpamBurst int `json:"eventSpamBurst,omitempty"`
 	// enableDebuggingHandlers enables server endpoints for log access
 	// and local running of containers and commands, including the exec,
 	// attach, logs, and portforward features.

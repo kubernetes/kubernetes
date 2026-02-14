@@ -181,6 +181,10 @@ type KubeletConfiguration struct {
 	// allows event creations to burst to this number, while still not exceeding
 	// eventRecordQPS. Only used if eventRecordQPS > 0.
 	EventBurst int32
+	// eventSpamBurst defines the maximum number of consecutive events
+	// of the same type generated for a single object.
+	// this helps control the long-tail of events for things that are always unhealthy
+	EventSpamBurst int
 	// enableDebuggingHandlers enables server endpoints for log collection
 	// and local running of containers and commands
 	EnableDebuggingHandlers bool
