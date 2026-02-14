@@ -27,6 +27,7 @@ import (
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -51,6 +52,17 @@ const (
 	// failed or returned an internal server error.
 	ValidatingAuditAnnotationFailedOpenKeyPrefix = "failed-open." + ValidatingAuditAnnotationPrefix
 )
+
+// statusReasonsToPriority maps known statuses to priority, ranging from 0 to len(statusReasonsToPriority)-1,
+// where 0 is the most preferred error type to return
+var statusReasonsToPriority = map[metav1.StatusReason]int{
+	metav1.StatusReasonBadRequest:         0,
+	metav1.StatusReasonInvalid:            1,
+	metav1.StatusReasonForbidden:          2,
+	metav1.StatusReasonUnauthorized:       3,
+	metav1.StatusReasonServiceUnavailable: 4,
+	metav1.StatusReasonInternalError:      5,
+}
 
 type validatingDispatcher struct {
 	cm     *webhookutil.ClientManager
@@ -236,13 +248,134 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	if len(errs) == 0 {
 		return nil
 	}
-	if len(errs) > 1 {
-		for i := 1; i < len(errs); i++ {
-			// TODO: merge status errors; until then, just return the first one.
-			utilruntime.HandleError(errs[i])
+	mergedErr, unmergedErrs := aggregateWebhookErrors(errs)
+	for _, unmergedErr := range unmergedErrs {
+		// log errors that couldn't be merged, since they won't be returned to the user
+		utilruntime.HandleError(unmergedErr)
+	}
+	return mergedErr
+}
+
+func aggregateWebhookErrors(errs []error) (mergedErr error, unmergedErrs []error) { //nolint:staticcheck
+	if len(errs) == 1 {
+		return errs[0], nil
+	}
+
+	// When there are multiple groups of errors, we can only return one group.
+	// We use priorities to decide the group to return. The items are ordered from highest to lowest priority.
+	// We prioritize "actionable" errors, i.e. errors that can be resolved by some user action, like changing the resource.
+	priorityIndex := getHighestPriorityStatusErrorIndex(errs)
+	if priorityIndex == -1 {
+		return errs[0], errs[1:]
+	}
+
+	mergedErr, unmergedErrs = collectMergeableErrorsForPriority(errs, priorityIndex)
+	return mergedErr, unmergedErrs
+}
+
+func getHighestPriorityStatusErrorIndex(errs []error) int {
+	minPriority := len(statusReasonsToPriority)
+	resultIndex := -1
+
+	for i, err := range errs {
+		statusErr, ok := err.(apierrors.APIStatus)
+		if !ok {
+			continue
+		}
+		priority, ok := statusReasonsToPriority[statusErr.Status().Reason]
+		if !ok {
+			continue
+		}
+		if priority < minPriority {
+			resultIndex = i
+			minPriority = priority
+			if minPriority == 0 {
+				// we won't find a lower priority
+				break
+			}
 		}
 	}
-	return errs[0]
+	return resultIndex
+}
+
+// collectMergeableErrorsForPriority merges all compatible errors with the priority error
+// and returns the merged error and non-mergeable errors separately
+func collectMergeableErrorsForPriority(errs []error, priorityIndex int) (mergedErr error, unmergedErrs []error) { //nolint:staticcheck
+	// mergedStatus holds the merged status.
+	// This is nil until we encounter the error we're merging into,
+	// and is only set if that error is an *apierrors.StatusError.
+	var mergedStatus *metav1.Status
+
+	for i, err := range errs {
+		// errStatus holds the status for the current error, if it is an *apierrors.StatusError.
+		var errStatus *metav1.Status
+		if statusErr, ok := err.(*apierrors.StatusError); ok { //nolint:errorlint
+			errStatus = &statusErr.ErrStatus
+		}
+
+		switch {
+		case i == priorityIndex:
+			mergedErr = err
+			mergedStatus = errStatus
+
+		case i > priorityIndex && canMergeStatus(mergedStatus, errStatus):
+			mergeStatus(mergedStatus, errStatus)
+
+		default:
+			unmergedErrs = append(unmergedErrs, err)
+		}
+	}
+
+	return mergedErr, unmergedErrs
+}
+
+func canMergeStatus(status1, status2 *metav1.Status) bool {
+	if status1 == nil || status2 == nil {
+		return false
+	}
+
+	if status1.Code != status2.Code || status1.Reason != status2.Reason {
+		return false
+	}
+
+	details1, details2 := status1.Details, status2.Details
+
+	if (details1 == nil) != (details2 == nil) {
+		return false
+	}
+
+	if details1 == nil && details2 == nil {
+		return true
+	}
+
+	return details1.Name == details2.Name && details1.Group == details2.Group &&
+		details1.Kind == details2.Kind && details1.UID == details2.UID
+}
+
+func mergeStatus(dest, status *metav1.Status) {
+	if dest == nil || status == nil {
+		return
+	}
+
+	if status.Message != "" {
+		if dest.Message != "" {
+			dest.Message += "; " + status.Message
+		} else {
+			dest.Message = status.Message
+		}
+	}
+
+	if status.Details != nil {
+		if dest.Details == nil {
+			newDetails := *status.Details
+			dest.Details = &newDetails
+		} else {
+			dest.Details.Causes = append(dest.Details.Causes, status.Details.Causes...)
+			if status.Details.RetryAfterSeconds > dest.Details.RetryAfterSeconds {
+				dest.Details.RetryAfterSeconds = status.Details.RetryAfterSeconds
+			}
+		}
+	}
 }
 
 func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes) error {
