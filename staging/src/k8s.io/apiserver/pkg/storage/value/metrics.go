@@ -51,7 +51,7 @@ var (
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
 			// external KMS is involved latencies may climb into hundreds of milliseconds.
 			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 25),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"transformation_type", "transformer_prefix"},
 	)
@@ -62,7 +62,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "transformation_operations_total",
 			Help:           "Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. The status, resource, and transformation_type fields can be used for alerting purposes. For example, you can monitor for encryption/decryption failures using the transformation_type (e.g., from_storage for decryption and to_storage for encryption). Additionally, these fields can be used to ensure that the correct transformers are applied to each resource.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"resource", "transformation_type", "transformer_prefix", "status"},
 	)
