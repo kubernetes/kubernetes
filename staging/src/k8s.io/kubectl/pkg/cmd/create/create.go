@@ -130,6 +130,8 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-create")
 
+	cmd.Flags().MarkDeprecated("edit", "use kubectl apply instead")
+
 	o.PrintFlags.AddFlags(cmd)
 
 	// create subcommands
