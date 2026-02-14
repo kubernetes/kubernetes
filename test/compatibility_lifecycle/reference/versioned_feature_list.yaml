@@ -55,6 +55,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: AllowServiceExternalIPs
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
 - name: AllowUnsafeMalformedObjectDeletion
   versionedSpecs:
   - default: false

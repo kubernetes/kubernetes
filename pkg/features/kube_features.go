@@ -56,6 +56,14 @@ const (
 	// Allow spec.terminationGracePeriodSeconds to be overridden by MaxPodGracePeriodSeconds in soft evictions.
 	AllowOverwriteTerminationGracePeriodSeconds featuregate.Feature = "AllowOverwriteTerminationGracePeriodSeconds"
 
+	// owner: @adrianmoisey
+	// kep: https://kep.k8s.io/5707
+	//
+	// When enabled, kube-proxy will program iptables/nftables/ipvs rules for Service.spec.externalIPs.
+	// When disabled, kube-proxy will not program rules for externalIPs, effectively disabling this
+	// deprecated feature.
+	AllowServiceExternalIPs featuregate.Feature = "AllowServiceExternalIPs"
+
 	// owner: @bswartz
 	//
 	// Enables usage of any object for volume data source in PVCs
@@ -1142,6 +1150,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.38
 	},
 
+	AllowServiceExternalIPs: {
+		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
+	},
+
 	AnyVolumeDataSource: {
 		{Version: version.MustParse("1.18"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
@@ -2173,6 +2185,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	AllowInsecureKubeletCertificateSigningRequests: {},
 
 	AllowOverwriteTerminationGracePeriodSeconds: {},
+
+	AllowServiceExternalIPs: {},
 
 	AnyVolumeDataSource: {},
 
