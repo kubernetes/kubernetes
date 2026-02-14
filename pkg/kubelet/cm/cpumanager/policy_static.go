@@ -401,7 +401,7 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 		return err
 	}
 
-	s.SetCPUSet(string(pod.UID), container.Name, cpuAllocation.CPUs)
+	s.Allocate(string(pod.UID), container.Name, cpuAllocation.CPUs)
 	p.updateCPUsToReuse(pod, container, cpuAllocation.CPUs)
 	p.updateMetricsOnAllocate(logger, s, cpuAllocation)
 
@@ -431,11 +431,10 @@ func (p *staticPolicy) RemoveContainer(logger logr.Logger, s state.State, podUID
 	if !ok {
 		return nil
 	}
-	s.Delete(podUID, containerName)
-	// Mutate the shared pool, adding released cpus.
+
 	toRelease = toRelease.Difference(cpusInUse)
 	updatedCPUs := s.GetDefaultCPUSet().Union(toRelease)
-	s.SetDefaultCPUSet(updatedCPUs)
+	s.Reclaim(podUID, containerName, updatedCPUs)
 	p.updateMetricsOnRelease(logger, s, toRelease)
 	logger.Info(" RemoveContainer end", "defaultCPUSet", updatedCPUs)
 	return nil
@@ -471,9 +470,6 @@ func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs i
 	}
 	result.CPUs = result.CPUs.Union(remainingCPUs)
 	result.Aligned = p.topology.CheckAlignment(result.CPUs)
-
-	// Remove allocated CPUs from the shared CPUSet.
-	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result.CPUs))
 
 	logger.Info("AllocateCPUs", "result", result.String())
 	return result, nil
