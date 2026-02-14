@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,54 +23,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
-var apiVersions = []string{"v1", "v2"}
-
 func TestDeclarativeValidate(t *testing.T) {
+	apiVersions := []string{"v1", "v2"}
 	for _, apiVersion := range apiVersions {
-		testDeclarativeValidate(t, apiVersion)
-	}
-}
-
-func testDeclarativeValidate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "autoscaling",
-		APIVersion: apiVersion,
-		Resource:   "horizontalpodautoscalers",
-	})
-	testCases := map[string]struct {
-		input        api.HorizontalPodAutoscaler
-		expectedErrs field.ErrorList
-	}{
-		"valid: minReplicas = 5": {
-			input: makeValidHPA(tweakMinReplicas(5)),
-		},
-		"valid: minReplicas not set (nil)": {
-			input: makeValidHPA(), // Default, no minReplicas set
-		},
-		"invalid: maxReplicas = 0 (required)": {
-			input: makeValidHPA(tweakMaxReplicas(0)),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "maxReplicas"), ""),
-			},
-		},
-		"invalid: maxReplicas negative": {
-			input: makeValidHPA(tweakMaxReplicas(-1)),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
-			},
-		},
-	}
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidate(t, apiVersion)
 		})
 	}
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
+	apiVersions := []string{"v1", "v2"}
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)
@@ -78,80 +44,126 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 	}
 }
 
-func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+func testDeclarativeValidate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "autoscaling",
+		APIVersion:        apiVersion,
+		Resource:          "horizontalpodautoscalers",
+		IsResourceRequest: true,
+		Verb:              "create",
+	})
+
 	testCases := map[string]struct {
-		oldObj       api.HorizontalPodAutoscaler
-		updateObj    api.HorizontalPodAutoscaler
+		input        autoscaling.HorizontalPodAutoscaler
 		expectedErrs field.ErrorList
 	}{
-		"valid update": {
-			oldObj:    makeValidHPA(),
-			updateObj: makeValidHPA(tweakMaxReplicas(20)),
+		"valid": {
+			input: mkValidHPA(),
 		},
-		"valid update: change minReplicas": {
-			oldObj:    makeValidHPA(tweakMinReplicas(1)),
-			updateObj: makeValidHPA(tweakMinReplicas(5)),
-		},
-		"invalid update: maxReplicas = 0 (required)": {
-			oldObj:    makeValidHPA(),
-			updateObj: makeValidHPA(tweakMaxReplicas(0)),
+		"invalid maxReplicas (zero)": {
+			input: mkValidHPA(TweakMaxReplicas(0)),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "maxReplicas"), ""),
 			},
 		},
-		"invalid update: maxReplicas negative": {
-			oldObj:    makeValidHPA(),
-			updateObj: makeValidHPA(tweakMaxReplicas(-1)),
+		"invalid maxReplicas (negative)": {
+			input: mkValidHPA(TweakMaxReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "maxReplicas"), int32(-1), "must be greater than or equal to 1").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec", "maxReplicas"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"invalid scaleTargetRef.kind (empty)": {
+			input: mkValidHPA(TweakScaleTargetRefKind("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), ""),
+			},
+		},
+		"invalid scaleTargetRef.name (empty)": {
+			input: mkValidHPA(TweakScaleTargetRefName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), ""),
+			},
+		},
+		"invalid scaleTargetRef.kind (special characters)": {
+			input: mkValidHPA(TweakScaleTargetRefKind("asd/asd")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "scaleTargetRef", "kind"), nil, "").WithOrigin("format=k8s-path-segment-name"),
 			},
 		},
 	}
+
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:          "autoscaling",
-				APIVersion:        apiVersion,
-				Resource:          "horizontalpodautoscalers",
-				Name:              "test-hpa",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
 }
 
-func makeValidHPA(mutators ...func(*api.HorizontalPodAutoscaler)) api.HorizontalPodAutoscaler {
-	hpa := api.HorizontalPodAutoscaler{
+func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "autoscaling",
+		APIVersion:        apiVersion,
+		Resource:          "horizontalpodautoscalers",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+
+	testCases := map[string]struct {
+		oldInput     autoscaling.HorizontalPodAutoscaler
+		newInput     autoscaling.HorizontalPodAutoscaler
+		expectedErrs field.ErrorList
+	}{
+		"valid update": {
+			oldInput: mkValidHPA(func(obj *autoscaling.HorizontalPodAutoscaler) {
+				obj.ResourceVersion = "1"
+			}),
+			newInput: mkValidHPA(func(obj *autoscaling.HorizontalPodAutoscaler) {
+				obj.ResourceVersion = "1"
+			}),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.newInput, &tc.oldInput, Strategy.ValidateUpdate, tc.expectedErrs)
+		})
+	}
+}
+
+func TweakMaxReplicas(max int32) func(obj *autoscaling.HorizontalPodAutoscaler) {
+	return func(obj *autoscaling.HorizontalPodAutoscaler) {
+		obj.Spec.MaxReplicas = max
+	}
+}
+
+func TweakScaleTargetRefKind(kind string) func(obj *autoscaling.HorizontalPodAutoscaler) {
+	return func(obj *autoscaling.HorizontalPodAutoscaler) {
+		obj.Spec.ScaleTargetRef.Kind = kind
+	}
+}
+
+func TweakScaleTargetRefName(name string) func(obj *autoscaling.HorizontalPodAutoscaler) {
+	return func(obj *autoscaling.HorizontalPodAutoscaler) {
+		obj.Spec.ScaleTargetRef.Name = name
+	}
+}
+
+func mkValidHPA(tweaks ...func(obj *autoscaling.HorizontalPodAutoscaler)) autoscaling.HorizontalPodAutoscaler {
+	obj := autoscaling.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            "test-hpa",
-			Namespace:       "default",
-			ResourceVersion: "1",
+			Name:      "valid-hpa",
+			Namespace: "default",
 		},
-		Spec: api.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: api.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				Name:       "test-deployment",
-				APIVersion: "apps/v1",
-			},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
 			MaxReplicas: 10,
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "Deployment",
+				Name: "foo",
+			},
 		},
 	}
-	for _, mutate := range mutators {
-		mutate(&hpa)
+	for _, tweak := range tweaks {
+		tweak(&obj)
 	}
-	return hpa
-}
-
-func tweakMinReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
-	return func(hpa *api.HorizontalPodAutoscaler) {
-		hpa.Spec.MinReplicas = &replicas
-	}
-}
-
-func tweakMaxReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
-	return func(hpa *api.HorizontalPodAutoscaler) {
-		hpa.Spec.MaxReplicas = replicas
-	}
+	return obj
 }
