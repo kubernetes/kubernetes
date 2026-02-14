@@ -73,10 +73,7 @@ type jsonResponse struct {
 var _ = common.SIGDescribe("Proxy", func() {
 	version := "v1"
 	ginkgo.Context("version "+version, func() {
-		options := framework.Options{
-			ClientQPS: -1.0,
-		}
-		f := framework.NewFramework("proxy", options, nil)
+		f := framework.NewDefaultFramework("proxy")
 		f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 		prefix := "/api/" + version
 

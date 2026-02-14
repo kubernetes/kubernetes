@@ -280,8 +280,8 @@ func NewFrameworkWithCustomTimeouts(baseName string, timeouts *TimeoutContext) *
 // instance.
 func NewDefaultFramework(baseName string) *Framework {
 	options := Options{
-		ClientQPS:   20,
-		ClientBurst: 50,
+		ClientQPS:   10,
+		ClientBurst: 30,
 	}
 	return NewFramework(baseName, options, nil)
 }
