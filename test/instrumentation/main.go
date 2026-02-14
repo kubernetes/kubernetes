@@ -32,6 +32,8 @@ import (
 	"strings"
 
 	yaml "go.yaml.in/yaml/v2"
+
+	"k8s.io/kubernetes/test/instrumentation/internal/metric"
 )
 
 const (
@@ -44,6 +46,7 @@ var (
 	// env configs
 	GOOS                  string = findGOOS()
 	ALL_STABILITY_CLASSES bool
+	EndpointMappings      string
 )
 
 func findGOOS() string {
@@ -61,13 +64,26 @@ func findGOOS() string {
 func main() {
 
 	flag.BoolVar(&ALL_STABILITY_CLASSES, "allstabilityclasses", false, "use this flag to enable all stability classes")
+	flag.StringVar(&EndpointMappings, "endpoint-mappings", "", "path to endpoint mappings configuration file")
 	flag.Parse()
 	if len(flag.Args()) < 1 {
 		fmt.Fprintf(os.Stderr, "USAGE: %s <DIR or FILE or '-'> [...]\n", os.Args[0])
 		os.Exit(64)
 	}
+
+	// Load endpoint mappings configuration if provided
+	var endpointConfig *endpointMappingConfig
+	if EndpointMappings != "" {
+		var err error
+		endpointConfig, err = loadEndpointMappingConfig(EndpointMappings)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to load endpoint mappings: %s\n", err)
+			os.Exit(1)
+		}
+	}
+
 	stableMetricNames := map[string]struct{}{}
-	stableMetrics := []metric{}
+	stableMetrics := []metric.Metric{}
 	errors := []error{}
 
 	addStdin := false
@@ -76,9 +92,9 @@ func main() {
 			addStdin = true
 			continue
 		}
-		ms, es := searchPathForStableMetrics(arg)
+		ms, es := searchPathForStableMetrics(arg, endpointConfig)
 		for _, m := range ms {
-			fqName := m.buildFQName()
+			fqName := m.BuildFQName()
 			if _, ok := stableMetricNames[fqName]; !ok {
 				stableMetrics = append(stableMetrics, m)
 			}
@@ -91,7 +107,7 @@ func main() {
 		scanner.Split(bufio.ScanLines)
 		for scanner.Scan() {
 			arg := scanner.Text()
-			ms, es := searchPathForStableMetrics(arg)
+			ms, es := searchPathForStableMetrics(arg, endpointConfig)
 			stableMetrics = append(stableMetrics, ms...)
 			errors = append(errors, es...)
 		}
@@ -112,7 +128,7 @@ func main() {
 		}
 		stableMetrics[i] = m
 	}
-	sort.Sort(byFQName(stableMetrics))
+	sort.Sort(metric.ByFQName(stableMetrics))
 	data, err := yaml.Marshal(stableMetrics)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
@@ -122,8 +138,8 @@ func main() {
 	fmt.Print(string(data))
 }
 
-func searchPathForStableMetrics(path string) ([]metric, []error) {
-	metrics := []metric{}
+func searchPathForStableMetrics(path string, endpointConfig *endpointMappingConfig) ([]metric.Metric, []error) {
+	metrics := []metric.Metric{}
 	errors := []error{}
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if strings.HasPrefix(path, "vendor") {
@@ -132,7 +148,7 @@ func searchPathForStableMetrics(path string) ([]metric, []error) {
 		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
-		ms, es := searchFileForStableMetrics(path, nil)
+		ms, es := searchFileForStableMetrics(path, nil, endpointConfig)
 		errors = append(errors, es...)
 		metrics = append(metrics, ms...)
 		return nil
@@ -144,29 +160,43 @@ func searchPathForStableMetrics(path string) ([]metric, []error) {
 }
 
 // Pass either only filename of existing file or src including source code in any format and a filename that it comes from
-func searchFileForStableMetrics(filename string, src interface{}) ([]metric, []error) {
+func searchFileForStableMetrics(filename string, src interface{}, endpointConfig *endpointMappingConfig) ([]metric.Metric, []error) {
 	fileset := token.NewFileSet()
 	tree, err := parser.ParseFile(fileset, filename, src, parser.AllErrors)
 	if err != nil {
-		return []metric{}, []error{err}
+		return []metric.Metric{}, []error{err}
 	}
 	metricsImportName, err := getLocalNameOfImportedPackage(tree, kubeMetricImportPath, kubeMetricsDefaultImportName)
 	if err != nil {
-		return []metric{}, addFileInformationToErrors([]error{err}, fileset)
+		return []metric.Metric{}, addFileInformationToErrors([]error{err}, fileset)
 	}
 	if metricsImportName == "" {
-		return []metric{}, []error{}
+		return []metric.Metric{}, []error{}
 	}
 	variables := globalVariableDeclarations(tree)
 
 	variables, err = importedGlobalVariableDeclaration(variables, tree.Imports)
 	if err != nil {
-		return []metric{}, addFileInformationToErrors([]error{err}, fileset)
+		return []metric.Metric{}, addFileInformationToErrors([]error{err}, fileset)
 	}
 
 	stableMetricsFunctionCalls, errors := findStableMetricDeclaration(tree, metricsImportName)
 	metrics, es := decodeMetricCalls(stableMetricsFunctionCalls, metricsImportName, variables)
 	errors = append(errors, es...)
+
+	// Attach component/endpoint information if config is provided
+	if endpointConfig != nil {
+		ces := endpointConfig.inferComponentEndpoints(filename)
+		if len(ces) > 0 {
+			for i := range metrics {
+				metrics[i].ComponentEndpoints = ces
+			}
+		} else if len(metrics) > 0 {
+			fmt.Fprintf(os.Stderr, "WARNING: found %d metric(s) in %q but could not infer component endpoints. "+
+				"Consider updating endpoint-mappings.yaml.\n", len(metrics), filename)
+		}
+	}
+
 	return metrics, addFileInformationToErrors(errors, fileset)
 }
 

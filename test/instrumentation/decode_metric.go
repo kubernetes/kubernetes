@@ -26,14 +26,15 @@ import (
 	"time"
 
 	"k8s.io/component-base/metrics"
+	"k8s.io/kubernetes/test/instrumentation/internal/metric"
 )
 
-func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName string, variables map[string]ast.Expr) ([]metric, []error) {
+func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName string, variables map[string]ast.Expr) ([]metric.Metric, []error) {
 	finder := metricDecoder{
 		kubeMetricsImportName: metricsImportName,
 		variables:             variables,
 	}
-	ms := make([]metric, 0, len(fs))
+	ms := make([]metric.Metric, 0, len(fs))
 	errors := []error{}
 	for _, f := range fs {
 		m, err := finder.decodeNewMetricCall(f)
@@ -53,8 +54,8 @@ type metricDecoder struct {
 	variables             map[string]ast.Expr
 }
 
-func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
-	var m metric
+func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric.Metric, error) {
+	var m metric.Metric
 	var err error
 	se, ok := fc.Fun.(*ast.SelectorExpr)
 	if !ok {
@@ -63,7 +64,7 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 		case *ast.Ident:
 			if v.Name == "NewTimingRatioHistogramVec" {
 				m, err = c.decodeMetricVecForTimingRatioHistogram(fc)
-				m.Type = timingRatioHistogram
+				m.Type = metric.TypeTimingRatioHistogram
 				return &m, err
 			}
 		}
@@ -99,31 +100,31 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 func getMetricType(functionName string) string {
 	switch functionName {
 	case "NewDesc":
-		return customType
+		return metric.TypeCustom
 	case "NewCounter", "NewCounterVec":
-		return counterMetricType
+		return metric.TypeCounter
 	case "NewGauge", "NewGaugeVec", "NewGaugeFunc":
-		return gaugeMetricType
+		return metric.TypeGauge
 	case "NewHistogram", "NewHistogramVec":
-		return histogramMetricType
+		return metric.TypeHistogram
 	case "NewSummary", "NewSummaryVec":
-		return summaryMetricType
+		return metric.TypeSummary
 	case "NewTimingHistogram", "NewTimingHistogramVec", "NewTimingRatioHistogramVec":
-		return timingRatioHistogram
+		return metric.TypeTimingRatioHistogram
 	default:
 		panic("getMetricType expects correct function name")
 	}
 }
 
-func (c *metricDecoder) decodeMetric(call *ast.CallExpr) (metric, error) {
+func (c *metricDecoder) decodeMetric(call *ast.CallExpr) (metric.Metric, error) {
 	if len(call.Args) > 2 {
-		return metric{}, newDecodeErrorf(call, errInvalidNewMetricCall)
+		return metric.Metric{}, newDecodeErrorf(call, errInvalidNewMetricCall)
 	}
 	return c.decodeOpts(call.Args[0])
 }
 
-func (c *metricDecoder) decodeDesc(ce *ast.CallExpr) (metric, error) {
-	m := &metric{}
+func (c *metricDecoder) decodeDesc(ce *ast.CallExpr) (metric.Metric, error) {
+	m := &metric.Metric{}
 	name, err := c.decodeString(ce.Args[0])
 	if err != nil {
 		return *m, newDecodeErrorf(ce, errorDecodingString)
@@ -253,9 +254,9 @@ func (c *metricDecoder) decodeString(expr ast.Expr) (*string, error) {
 	return nil, newDecodeErrorf(expr, errorDecodingString)
 }
 
-func (c *metricDecoder) decodeMetricVec(call *ast.CallExpr) (metric, error) {
+func (c *metricDecoder) decodeMetricVec(call *ast.CallExpr) (metric.Metric, error) {
 	if len(call.Args) != 2 {
-		return metric{}, newDecodeErrorf(call, errInvalidNewMetricCall)
+		return metric.Metric{}, newDecodeErrorf(call, errInvalidNewMetricCall)
 	}
 	m, err := c.decodeOpts(call.Args[0])
 	if err != nil {
@@ -270,7 +271,7 @@ func (c *metricDecoder) decodeMetricVec(call *ast.CallExpr) (metric, error) {
 	return m, nil
 }
 
-func (c *metricDecoder) decodeMetricVecForTimingRatioHistogram(call *ast.CallExpr) (metric, error) {
+func (c *metricDecoder) decodeMetricVecForTimingRatioHistogram(call *ast.CallExpr) (metric.Metric, error) {
 	m, err := c.decodeOpts(call.Args[0])
 	if err != nil {
 		return m, err
@@ -319,8 +320,8 @@ func (c *metricDecoder) decodeLabels(expr ast.Expr) ([]string, error) {
 	return c.decodeLabelsFromArray(cl.Elts)
 }
 
-func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
-	m := metric{
+func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric.Metric, error) {
+	m := metric.Metric{
 		Labels: []string{},
 	}
 	ue, ok := expr.(*ast.UnaryExpr)
