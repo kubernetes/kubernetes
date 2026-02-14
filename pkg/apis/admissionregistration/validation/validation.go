@@ -1371,8 +1371,14 @@ func validateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionP
 
 func validateMutatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissionregistration.MutatingAdmissionPolicySpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
-
-	compiler := createCompiler(true)
+	var compiler plugincel.Compiler // composition compiler is stateful, create one lazily per policy
+	getCompiler := func() plugincel.Compiler {
+		if compiler == nil {
+			needsComposition := len(spec.Variables) > 0
+			compiler = createCompiler(needsComposition)
+		}
+		return compiler
+	}
 
 	if spec.FailurePolicy == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("failurePolicy"), ""))
@@ -1405,13 +1411,13 @@ func validateMutatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admission
 		allErrors = append(allErrors, validateMatchConditions(spec.MatchConditions, opts, fldPath.Child("matchConditions"))...)
 	}
 	for i, variable := range spec.Variables {
-		allErrors = append(allErrors, validateVariable(compiler, &variable, spec.ParamKind, opts, fldPath.Child("variables").Index(i))...)
+		allErrors = append(allErrors, validateVariable(getCompiler(), &variable, spec.ParamKind, opts, fldPath.Child("variables").Index(i))...)
 	}
 	if len(spec.Mutations) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("mutations"), "mutations must contain at least one item"))
 	} else {
 		for i, mutation := range spec.Mutations {
-			allErrors = append(allErrors, validateMutation(compiler, &mutation, spec.ParamKind, opts, fldPath.Child("mutations").Index(i))...)
+			allErrors = append(allErrors, validateMutation(getCompiler(), &mutation, spec.ParamKind, opts, fldPath.Child("mutations").Index(i))...)
 		}
 	}
 	if len(spec.ReinvocationPolicy) == 0 {
