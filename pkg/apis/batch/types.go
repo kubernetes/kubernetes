@@ -481,10 +481,18 @@ type JobStatus struct {
 	// become false. When a Job is completed, one of the conditions will have
 	// type "Complete" and status true.
 	//
-	// A job is considered finished when it is in a terminal condition, either
-	// "Complete" or "Failed". A Job cannot have both the "Complete" and "Failed" conditions.
+	// The Job controller evaluates terminal conditions in a defined order.
+	// Failure conditions (for example, exceeding backoffLimit,
+	// activeDeadlineSeconds, or PodFailurePolicy actions) are evaluated
+	// before success conditions (such as completions or successPolicy).
+	//
+	// If both failure and success criteria are met during the same
+	// evaluation, the Job is marked as Failed.
+	// This behavior is intentional and part of the Job API contract.
+	//
+	// A Job cannot have both the "Complete" and "Failed" conditions.
 	// Additionally, it cannot be in the "Complete" and "FailureTarget" conditions.
-	// The "Complete", "Failed" and "FailureTarget" conditions cannot be disabled.
+	// The "Complete", "Failed", and "FailureTarget" conditions cannot be disabled.
 	//
 	// +optional
 	Conditions []JobCondition
@@ -503,7 +511,12 @@ type JobStatus struct {
 	// Represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
-	// The completion time is set when the job finishes successfully, and only then.
+	//
+	// The presence of completionTime indicates that the Job has reached a 
+	// successful terminal state ("Complete").
+	// Fields such as .status.succeeded are not terminal signals and may be
+	// updated before the Job reaches a final state.
+	//
 	// The value cannot be updated or removed. The value indicates the same or
 	// later point in time as the startTime field.
 	// +optional
@@ -531,6 +544,10 @@ type JobStatus struct {
 	// The number of pods which reached phase Succeeded.
 	// The value increases monotonically for a given spec. However, it may
 	// decrease in reaction to scale down of elastic indexed jobs.
+	//
+	// This field does not indicate that the Job has completed successfully.
+	// A Job is only considered successfully completed when the "Complete"
+	// condition is set and completionTime is populated.
 	// +optional
 	Succeeded int32
 
