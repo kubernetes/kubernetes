@@ -293,7 +293,7 @@ func TestCheckEvictionSupport(t *testing.T) {
 	for _, evictionVersion := range []string{"", "v1", "v1beta1"} {
 		t.Run(fmt.Sprintf("evictionVersion=%v", evictionVersion),
 			func(t *testing.T) {
-				k := fake.NewSimpleClientset()
+				k := fake.NewClientset()
 				if len(evictionVersion) > 0 {
 					addEvictionSupport(t, k, evictionVersion)
 				} else {
@@ -411,7 +411,7 @@ func TestDeleteOrEvict(t *testing.T) {
 			}
 
 			// Build the fake client
-			k := fake.NewSimpleClientset(create...)
+			k := fake.NewClientset(create...)
 			if tc.evictionSupported {
 				addEvictionSupport(t, k, "v1")
 			} else {
