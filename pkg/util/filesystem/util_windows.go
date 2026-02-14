@@ -19,6 +19,7 @@ limitations under the License.
 package filesystem
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -259,4 +260,71 @@ func Chmod(path string, filemode os.FileMode) error {
 // that get validated on Unix, persisted, then consumed by Windows, etc).
 func IsAbs(path string) bool {
 	return filepath.IsAbs(path) || strings.HasPrefix(path, `\`) || strings.HasPrefix(path, `/`)
+}
+
+// IsPathValidForMount checks if the given `path` is a valid mount point.
+// Return whether the path is valid and error encountered if any
+func IsPathValidForMount(path string) (bool, error) {
+	path = strings.TrimSuffix(path, string(filepath.Separator))
+	dir, err := os.Lstat(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return false, err
+		}
+
+		return false, nil
+	}
+
+	if dir.IsDir() {
+		// the path may not be mounted yet
+		return true, nil
+	}
+
+	// for windows NTFS, check if the path is symlink instead of directory.
+	isSymlink := dir.Mode()&os.ModeSymlink != 0 || dir.Mode()&os.ModeIrregular != 0
+
+	// mounted folder created by SetVolumeMountPoint may still report ModeSymlink == 0
+	mountedFolder, err := IsMountedFolder(path)
+	if err != nil {
+		return false, err
+	}
+
+	if isSymlink && mountedFolder {
+		return true, nil
+	}
+
+	return false, fmt.Errorf("path %v exists but is not a mounted path", path)
+}
+
+// IsMountedFolder checks whether the `path` is a mounted folder.
+func IsMountedFolder(path string) (bool, error) {
+	// https://learn.microsoft.com/en-us/windows/win32/fileio/determining-whether-a-directory-is-a-volume-mount-point
+	utf16Path, _ := windows.UTF16PtrFromString(path)
+	attrs, err := windows.GetFileAttributes(utf16Path)
+	if err != nil {
+		return false, err
+	}
+
+	if (attrs & windows.FILE_ATTRIBUTE_REPARSE_POINT) == 0 {
+		return false, nil
+	}
+
+	var findData windows.Win32finddata
+	findHandle, err := windows.FindFirstFile(utf16Path, &findData)
+	if err != nil && !errors.Is(err, windows.ERROR_NO_MORE_FILES) {
+		return false, err
+	}
+
+	for err == nil {
+		if findData.Reserved0&windows.IO_REPARSE_TAG_MOUNT_POINT != 0 {
+			return true, nil
+		}
+
+		err = windows.FindNextFile(findHandle, &findData)
+		if err != nil && !errors.Is(err, windows.ERROR_NO_MORE_FILES) {
+			return false, err
+		}
+	}
+
+	return false, nil
 }
