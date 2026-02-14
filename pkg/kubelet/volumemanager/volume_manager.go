@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -204,6 +205,7 @@ func NewVolumeManager(
 			volumePluginMgr,
 			recorder,
 			blockVolumePathHandler)),
+		volumeStateCh: make(chan struct{}),
 	}
 
 	intreeToCSITranslator := csitrans.New()
@@ -235,6 +237,15 @@ func NewVolumeManager(
 		hostutil,
 		volumePluginMgr,
 		kubeletPodsDir)
+
+	// When a new volume is added to the desired state, immediately wake the
+	// reconciler so it can start the mount without waiting for the next tick.
+	vm.desiredStateOfWorld.SetVolumeAddedNotify(vm.reconciler.Poke)
+
+	// When a volume mount/unmount completes, broadcast to all goroutines
+	// waiting in WaitForAttachAndMount / WaitForUnmount so they can return
+	// immediately instead of waiting for the next poll tick.
+	vm.actualStateOfWorld.SetVolumeStateChangedNotify(vm.notifyVolumeStateChange)
 
 	return vm
 }
@@ -281,6 +292,14 @@ type volumeManager struct {
 
 	// intreeToCSITranslator translates in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
+
+	// volumeStateMu protects volumeStateCh.
+	volumeStateMu sync.Mutex
+	// volumeStateCh is closed and recreated whenever the actual state of
+	// world changes (volume mounted/unmounted). Closing the channel acts
+	// as a broadcast to all goroutines waiting in WaitForAttachAndMount
+	// or WaitForUnmount.
+	volumeStateCh chan struct{}
 }
 
 type VolumeAttachLimitExceededError struct {
@@ -394,6 +413,62 @@ func (vm *volumeManager) MarkVolumesAsReportedInUse(
 	vm.desiredStateOfWorld.MarkVolumesReportedInUse(volumesReportedAsInUse)
 }
 
+// waitForVolumeStateChange returns a channel that will be closed the next
+// time the actual state of world changes (volume mounted/unmounted). Callers
+// should get this channel BEFORE checking any condition to avoid missing
+// changes that occur between the check and the wait.
+func (vm *volumeManager) waitForVolumeStateChange() <-chan struct{} {
+	vm.volumeStateMu.Lock()
+	defer vm.volumeStateMu.Unlock()
+	return vm.volumeStateCh
+}
+
+// notifyVolumeStateChange broadcasts to all goroutines waiting on a volume
+// state change by closing the current channel and creating a new one.
+func (vm *volumeManager) notifyVolumeStateChange() {
+	vm.volumeStateMu.Lock()
+	defer vm.volumeStateMu.Unlock()
+	close(vm.volumeStateCh)
+	vm.volumeStateCh = make(chan struct{})
+}
+
+// waitForConditionWithNotification is like wait.PollUntilContextTimeout but
+// also wakes immediately when the actual state of world changes. This avoids
+// a fixed polling delay between a volume mount/unmount completing and the
+// caller noticing.
+func (vm *volumeManager) waitForConditionWithNotification(
+	ctx context.Context,
+	interval time.Duration,
+	timeout time.Duration,
+	condition wait.ConditionWithContextFunc,
+) error {
+	deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	for {
+		// Get notification channel BEFORE checking condition to avoid
+		// missing state changes between check and wait.
+		ch := vm.waitForVolumeStateChange()
+
+		done, err := condition(deadlineCtx)
+		if err != nil {
+			return err
+		}
+		if done {
+			return nil
+		}
+
+		select {
+		case <-deadlineCtx.Done():
+			return deadlineCtx.Err()
+		case <-ch:
+			// Volume state changed, re-check immediately.
+		case <-time.After(interval):
+			// Fallback poll for non-ASW state changes (e.g. DSW errors).
+		}
+	}
+}
+
 func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error {
 	logger := klog.FromContext(ctx)
 	if pod == nil {
@@ -414,11 +489,10 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 	// like Downward API, depend on this to update the contents of the volume).
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
 
-	err := wait.PollUntilContextTimeout(
+	err := vm.waitForConditionWithNotification(
 		ctx,
 		podAttachAndMountRetryInterval,
 		podAttachAndMountTimeout,
-		true,
 		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
 
 	if err != nil {
@@ -482,11 +556,10 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
 
-	err := wait.PollUntilContextTimeout(
+	err := vm.waitForConditionWithNotification(
 		ctx,
 		podAttachAndMountRetryInterval,
 		podAttachAndMountTimeout,
-		true,
 		vm.verifyVolumesUnmountedFunc(uniquePodName))
 
 	if err != nil {
