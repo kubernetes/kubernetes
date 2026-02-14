@@ -98,6 +98,7 @@ func (lw *listerWatcher) List(options metav1.ListOptions) (runtime.Object, error
 	if lw.contextMetadata != nil {
 		ctx = metadata.NewOutgoingContext(ctx, lw.contextMetadata)
 	}
+	ctx = storage.WithPrefetch(ctx)
 	if err := lw.storage.GetList(ctx, lw.resourcePrefix, storageOpts, list); err != nil {
 		return nil, err
 	}

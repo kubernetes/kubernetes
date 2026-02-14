@@ -17,6 +17,12 @@ limitations under the License.
 package etcd3
 
 import (
+	"sync/atomic"
+
+	"google.golang.org/grpc/metadata"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apiserver/pkg/storage/cacher"
+
 	"context"
 	"crypto/rand"
 	"fmt"
@@ -1149,6 +1155,389 @@ func TestPrefixStats(t *testing.T) {
 				t.Errorf("Stats diff:\n%s", diff)
 			}
 
+		})
+	}
+}
+
+type countingKV struct {
+	clientv3.KV
+	getCalls int32
+}
+
+func (c *countingKV) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+	atomic.AddInt32(&c.getCalls, 1)
+	return c.KV.Get(ctx, key, opts...)
+}
+
+func TestPrefetching_NoContext(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	defer store.Close()
+	store.UsePrefetch = true
+
+	// 1. Wrap KV with counter
+	realKV := store.client.KV
+	wrapper := &countingKV{KV: realKV}
+	store.client.KV = wrapper
+
+	// 2. Create 20 items (2 pages of 10)
+	for i := 0; i < 20; i++ {
+		key := fmt.Sprintf("/pods/item-%03d", i) // Sorted keys
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("item-%03d", i)}}
+		if err := store.Create(ctx, key, obj, nil, 0); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	// 3. List Page 1 (Limit 10)
+	listObj := newPodList()
+	opts := storage.ListOptions{
+		Predicate: storage.SelectionPredicate{
+			Limit: 10,
+			Label: labels.Everything(),
+			Field: fields.Everything(),
+		},
+		ResourceVersion: "", // Recent
+		Recursive:       true,
+	}
+
+	err := store.GetList(ctx, "/pods/", opts, listObj)
+	if err != nil {
+		t.Fatalf("GetList Page 1 failed: %v", err)
+	}
+
+	// Wait for background prefetch (should NOT happen)
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify only 1 call
+	calls := atomic.LoadInt32(&wrapper.getCalls)
+	if calls != 1 {
+		t.Errorf("Expected only 1 KV.Get call (prefetch should be blocked by context check), got %d", calls)
+	}
+}
+
+func TestPrefetching_ParameterMismatch(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	// Enable explicit prefetch context
+	ctx = storage.WithPrefetch(ctx)
+	defer store.Close()
+	store.UsePrefetch = true
+
+	// 1. Wrap KV with counter
+	realKV := store.client.KV
+	wrapper := &countingKV{KV: realKV}
+	store.client.KV = wrapper
+
+	// 2. Create 20 items (2 pages of 10)
+	for i := 0; i < 20; i++ {
+		key := fmt.Sprintf("/pods/item-%03d", i)
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("item-%03d", i)}}
+		if err := store.Create(ctx, key, obj, nil, 0); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	// 3. List Page 1 (Limit 10) - This triggers prefetch for Page 2 with Limit 10
+	listObj := newPodList()
+	opts := storage.ListOptions{
+		Predicate: storage.SelectionPredicate{
+			Limit: 10,
+			Label: labels.Everything(),
+			Field: fields.Everything(),
+		},
+		ResourceVersion: "",
+		Recursive:       true,
+	}
+
+	err := store.GetList(ctx, "/pods/", opts, listObj)
+	if err != nil {
+		t.Fatalf("GetList Page 1 failed: %v", err)
+	}
+
+	// Verify Page 1
+	listAccessor, _ := meta.ListAccessor(listObj)
+	cont := listAccessor.GetContinue()
+	if cont == "" {
+		t.Fatalf("Expected continue token")
+	}
+
+	// Wait for background prefetch
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify 2 calls (1 sync + 1 background)
+	calls := atomic.LoadInt32(&wrapper.getCalls)
+	if calls != 2 {
+		t.Errorf("Expected 2 KV.Get calls, got %d", calls)
+	}
+
+	// 4. List Page 2 BUT with DIFFERENT Limit (e.g., 100)
+	// This should CAUSE A MISS because prefetch validation fails (Limit 10 vs 100)
+	// AND it should consume the rest of the list so no new prefetch is triggered.
+	opts.Predicate.Limit = 100
+	opts.Predicate.Continue = cont
+	opts.ResourceVersion = ""
+	
+	listObj2 := newPodList()
+	err = store.GetList(ctx, "/pods/", opts, listObj2)
+	if err != nil {
+		t.Fatalf("GetList Page 2 failed: %v", err)
+	}
+
+	// Verify Page 2 items (should be 10 items - the rest)
+	objs, _ := meta.ExtractList(listObj2)
+	if len(objs) != 10 {
+		t.Errorf("Expected 10 items (rest of list), got %d", len(objs))
+	}
+
+	// Verify WE HAD ANOTHER CALL (Total 3)
+	// 1 (Page 1) + 1 (Prefetch Limit 10) + 1 (Miss -> Page 2 Limit 100) = 3
+	callsAfter := atomic.LoadInt32(&wrapper.getCalls)
+	if callsAfter != 3 {
+		t.Errorf("Expected 3 KV.Get calls (cache miss mismatch + no new prefetch), got %d", callsAfter)
+	}
+
+	// Verify Cache was consumed (cleared) and NOT re-populated (no more items)
+	hasKeyAfter := store.prefetch.Load() != nil
+	if hasKeyAfter {
+		t.Errorf("Expected prefetchKey to be empty after consumption and exhaustion")
+	}
+}
+
+func TestPrefetching(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	// Enable specific prefetch context
+	ctx = storage.WithPrefetch(ctx)
+	defer store.Close()
+	store.UsePrefetch = true
+
+	// 1. Wrap KV with counter
+	realKV := store.client.KV
+	wrapper := &countingKV{KV: realKV}
+	store.client.KV = wrapper
+
+	// 2. Create 20 items (2 pages of 10)
+	for i := 0; i < 20; i++ {
+		key := fmt.Sprintf("/pods/item-%03d", i) // Sorted keys
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("item-%03d", i)}}
+		if err := store.Create(ctx, key, obj, nil, 0); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	// 3. List Page 1 (Limit 10)
+	listObj := newPodList()
+	opts := storage.ListOptions{
+		Predicate: storage.SelectionPredicate{
+			Limit: 10,
+			Label: labels.Everything(),
+			Field: fields.Everything(),
+		},
+		ResourceVersion: "", // Recent
+		Recursive:       true,
+	}
+
+	err := store.GetList(ctx, "/pods/", opts, listObj)
+	if err != nil {
+		t.Fatalf("GetList Page 1 failed: %v", err)
+	}
+
+	// Verify Page 1
+	listAccessor, _ := meta.ListAccessor(listObj)
+	cont := listAccessor.GetContinue()
+	if cont == "" {
+		t.Fatalf("Expected continue token")
+	}
+
+	// Wait for background prefetch to complete
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify prefetch started (1 initial list + 1 background fetch = 2 calls)
+	// Note: Create calls above don't count towards wrapper.getCalls as they use OptimisticPut/Get which might bypass or we handled GetList specifically?
+	// store.GetList calls s.client.KV.Get.
+	// store.Create calls s.client.Kubernetes.OptimisticPut. Wrapper only wraps KV.Get.
+	// The Create calls are clean.
+	calls := atomic.LoadInt32(&wrapper.getCalls)
+	if calls != 2 {
+		t.Errorf("Expected 2 KV.Get calls (1 sync + 1 prefetch), got %d", calls)
+	}
+
+	// Verify Cache entry exists
+	// We check if prefetchKey is set (non-empty)
+	// We check if prefetchKey is set (non-empty)
+	hasKey := store.prefetch.Load() != nil
+
+	if !hasKey {
+		t.Errorf("Expected prefetchKey to be set")
+	}
+
+	// 4. List Page 2
+	opts.Predicate.Continue = cont
+	opts.ResourceVersion = "" // Clear RV for continue
+	listObj2 := newPodList()
+
+	err = store.GetList(ctx, "/pods/", opts, listObj2)
+	if err != nil {
+		t.Fatalf("GetList Page 2 failed: %v", err)
+	}
+
+	// Verify Page 2 items
+	objs, _ := meta.ExtractList(listObj2)
+	if len(objs) != 10 {
+		t.Errorf("Expected 10 items in Page 2, got %d", len(objs))
+	}
+
+	// Verify NO NEW CALLS (Hit cache)
+	callsAfter := atomic.LoadInt32(&wrapper.getCalls)
+	if callsAfter != 2 {
+		t.Errorf("Expected valid cache hit (still 2 calls), got %d", callsAfter)
+
+		// Verify Cache was consumed
+		// Verify Cache was consumed (cleared)
+		hasKeyAfter := store.prefetch.Load() != nil
+		if hasKeyAfter {
+			t.Errorf("Expected prefetchKey to be empty after consumption")
+		}
+
+	}
+}
+
+func BenchmarkPrefetch(b *testing.B) {
+	// Setup
+
+	ctx, store, _ := testSetup(b)
+	defer store.Close()
+
+	// 1. Create 500 items
+	totalItems := 10000
+	pageSize := 500
+
+	// Pre-create items
+	for i := 0; i < totalItems; i++ {
+		key := fmt.Sprintf("/pods/bench-%03d", i)
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("bench-%03d", i)}}
+		store.Create(ctx, key, obj, nil, 0)
+	}
+
+	benchCases := []struct {
+		name     string
+		prefetch bool
+	}{
+		{"Sequential", false},
+		{"Prefetch", true},
+	}
+
+	for _, bc := range benchCases {
+		b.Run(bc.name, func(b *testing.B) {
+			store.UsePrefetch = bc.prefetch
+			// Clear cache before run
+			store.UsePrefetch = bc.prefetch
+			store.prefetch.Store(nil)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				// Create a per-iteration context that might have prefetch enabled
+				runCtx := ctx
+				if bc.prefetch {
+					runCtx = storage.WithPrefetch(ctx)
+				}
+				
+				listObj := newPodList()
+				opts := storage.ListOptions{
+					Predicate: storage.SelectionPredicate{
+						Limit: int64(pageSize),
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+					},
+					Recursive:       true,
+					ResourceVersion: "",
+				}
+
+				// Page 1
+				err := store.GetList(runCtx, "/pods/", opts, listObj)
+				if err != nil {
+					b.Fatalf("GetList failed: %v", err)
+				}
+
+				// Follow pages
+				listAccessor, _ := meta.ListAccessor(listObj)
+				for {
+					cont := listAccessor.GetContinue()
+					if cont == "" {
+						break
+					}
+					opts.Predicate.Continue = cont
+					opts.ResourceVersion = ""
+
+					listObj = newPodList()
+					err := store.GetList(runCtx, "/pods/", opts, listObj)
+					if err != nil {
+						b.Fatalf("GetList page failed: %v", err)
+					}
+					listAccessor, _ = meta.ListAccessor(listObj)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkPrefetch_WithCacher(b *testing.B) {
+	// Setup
+	ctx, store, _ := testSetup(b)
+	defer store.Close()
+
+	// 1. Create 500 items
+	totalItems := 10000
+	pageSize := 500
+
+	for i := 0; i < totalItems; i++ {
+		key := fmt.Sprintf("/pods/bench-%03d", i)
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("bench-%03d", i)}}
+		store.Create(ctx, key, obj, nil, 0)
+	}
+
+	// 2. Setup ListerWatcher
+	lw := cacher.NewListerWatcher(store, "/pods/", newPodList, metadata.MD{})
+
+	benchCases := []struct {
+		name     string
+		prefetch bool
+	}{
+		{"Sequential", false},
+		{"Prefetch", true},
+	}
+
+	for _, bc := range benchCases {
+		b.Run(bc.name, func(b *testing.B) {
+			store.UsePrefetch = bc.prefetch
+			// Clear cache
+			store.UsePrefetch = bc.prefetch
+			store.prefetch.Store(nil)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				opts := metav1.ListOptions{Limit: int64(pageSize)}
+
+				// Page 1
+				listObj, err := lw.List(opts)
+				if err != nil {
+					b.Fatalf("List failed: %v", err)
+				}
+
+				// Follow pages
+				listAccessor, _ := meta.ListAccessor(listObj)
+				for {
+					cont := listAccessor.GetContinue()
+					if cont == "" {
+						break
+					}
+					opts.Continue = cont
+
+					listObj, err = lw.List(opts)
+					if err != nil {
+						b.Fatalf("List page failed: %v", err)
+					}
+					listAccessor, _ = meta.ListAccessor(listObj)
+				}
+			}
 		})
 	}
 }
