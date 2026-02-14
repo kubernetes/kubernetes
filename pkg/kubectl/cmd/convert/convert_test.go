@@ -18,14 +18,20 @@ package convert
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	scheme "k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 type testcase struct {
@@ -109,4 +115,66 @@ func TestConvertObject(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestAsVersionedObjectsSetsUnknownMetadata(t *testing.T) {
+	unregistered := &fakeUnregisteredObject{
+		TypeMeta: runtime.TypeMeta{
+			APIVersion: "example.com/v1",
+			Kind:       "Example",
+		},
+		Data: "value",
+	}
+	if _, _, err := scheme.Scheme.ObjectKinds(unregistered); !runtime.IsNotRegisteredError(err) {
+		t.Fatalf("expected not registered error, got %v", err)
+	}
+	info := &resource.Info{Object: unregistered}
+	encoder := &stubJSONEncoder{identifier: runtime.Identifier("test-encoder")}
+	streams := genericiooptions.NewTestIOStreamsDiscard()
+	objs, err := asVersionedObjects([]*resource.Info{info}, schema.GroupVersion{Group: "example.com", Version: "v1"}, encoder, streams)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(objs) != 1 {
+		t.Fatalf("expected 1 object, got %d", len(objs))
+	}
+	unknown, ok := objs[0].(*runtime.Unknown)
+	if !ok {
+		t.Fatalf("expected runtime.Unknown, got %T", objs[0])
+	}
+	if unknown.ContentType != runtime.ContentTypeJSON {
+		t.Errorf("expected ContentType %q, got %q", runtime.ContentTypeJSON, unknown.ContentType)
+	}
+	if unknown.ContentEncoding != "" {
+		t.Errorf("expected ContentEncoding %q, got %q", "", unknown.ContentEncoding)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(unknown.Raw, &decoded); err != nil {
+		t.Fatalf("unable to decode raw payload: %v", err)
+	}
+	if decoded["kind"] != "Example" {
+		t.Errorf("expected kind %q, got %v", "Example", decoded["kind"])
+	}
+}
+
+type fakeUnregisteredObject struct {
+	runtime.TypeMeta
+	Data string `json:"data"`
+}
+
+func (f *fakeUnregisteredObject) DeepCopyObject() runtime.Object {
+	copy := *f
+	return &copy
+}
+
+type stubJSONEncoder struct {
+	identifier runtime.Identifier
+}
+
+func (s *stubJSONEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	return json.NewEncoder(w).Encode(obj)
+}
+
+func (s *stubJSONEncoder) Identifier() runtime.Identifier {
+	return s.identifier
 }
