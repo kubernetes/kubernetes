@@ -1877,7 +1877,12 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	}
 
 	// Let the pod worker sets the status to fail after this sync.
-	kubelet.HandlePodUpdates(ctx, pods)
+	// Use HandlePodSyncs to test active deadline behavior.
+	// This bypasses admission and sends pods directly to the pod worker.
+	// HandlePodUpdates requires the pod to already be known to the worker,
+	// and HandlePodAdditions would reject the pod due to test node capacity.
+	kubelet.podManager.SetPods(pods)
+	kubelet.HandlePodSyncs(ctx, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.Equal(t, v1.PodFailed, status.Phase)
@@ -1927,8 +1932,11 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 		}},
 	}
 
+	// Use HandlePodSyncs to test active deadline behavior.
+	// This bypasses admission and sends pods directly to the pod worker.
+	// HandlePodUpdates requires the pod to already be known to the worker.
 	kubelet.podManager.SetPods(pods)
-	kubelet.HandlePodUpdates(ctx, pods)
+	kubelet.HandlePodSyncs(ctx, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.NotEqual(t, v1.PodFailed, status.Phase)
@@ -3533,7 +3541,7 @@ func TestSyncPodSpans(t *testing.T) {
 	}
 }
 
-func TestRecordAdmissionRejection(t *testing.T) {
+func TestObserveAdmissionRejection(t *testing.T) {
 	metrics.Register()
 
 	testCases := []struct {
@@ -3748,7 +3756,7 @@ func TestRecordAdmissionRejection(t *testing.T) {
 			metrics.AdmissionRejectionsTotal.Reset()
 
 			// Call the function.
-			recordAdmissionRejection(tc.reason)
+			observeAdmissionRejection(tc.reason)
 
 			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), "kubelet_admission_rejections_total"); err != nil {
 				t.Error(err)
@@ -4895,4 +4903,245 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsPodRejected(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	// Helper to create a unique pod for each test case.
+	podCounter := 0
+	newUniquePod := func() *v1.Pod {
+		podCounter++
+		pod := newTestPods(1)[0]
+		pod.UID = types.UID(fmt.Sprintf("test-pod-uid-%d", podCounter))
+		pod.Name = fmt.Sprintf("test-pod-%d", podCounter)
+		return pod
+	}
+
+	testCases := []struct {
+		name             string
+		setupPod         func() *v1.Pod
+		setupLocalStatus func(*v1.Pod)
+		expectedRejected bool
+		description      string
+	}{
+		{
+			name: "no local status",
+			setupPod: func() *v1.Pod {
+				return newUniquePod()
+			},
+			setupLocalStatus: func(pod *v1.Pod) {},
+			expectedRejected: false,
+			description:      "pod with no local status should not be considered rejected",
+		},
+		{
+			name: "local status set via SetPodStatus",
+			setupPod: func() *v1.Pod {
+				return newUniquePod()
+			},
+			setupLocalStatus: func(pod *v1.Pod) {
+				kubelet.statusManager.SetPodStatus(klog.TODO(), pod, v1.PodStatus{
+					Phase:   v1.PodFailed,
+					Reason:  "ImagePullBackOff",
+					Message: "Failed to pull image",
+				})
+			},
+			expectedRejected: false,
+			description:      "pod with status set via SetPodStatus should not be considered rejected",
+		},
+		{
+			name: "rejected pod via SetPodRejected",
+			setupPod: func() *v1.Pod {
+				return newUniquePod()
+			},
+			setupLocalStatus: func(pod *v1.Pod) {
+				kubelet.statusManager.SetPodRejected(klog.TODO(), pod, v1.PodStatus{
+					Phase:   v1.PodFailed,
+					Reason:  "OutOfcpu",
+					Message: PodRejectionMessagePrefix + "insufficient CPU",
+				})
+			},
+			expectedRejected: true,
+			description:      "pod rejected via SetPodRejected should be considered rejected",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := tc.setupPod()
+			tc.setupLocalStatus(pod)
+
+			result := kubelet.statusManager.IsPodRejected(pod.UID)
+			assert.Equal(t, tc.expectedRejected, result, tc.description)
+		})
+	}
+}
+
+func TestRejectPodUsesConstant(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	ctx := ktesting.Init(t)
+
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	pod := newTestPods(1)[0]
+	reason := "OutOfcpu"
+	message := "insufficient CPU resources"
+
+	kubelet.rejectPod(ctx, pod, reason, message)
+
+	status, found := kubelet.statusManager.GetPodStatus(pod.UID)
+	assert.True(t, found, "expected to find status for rejected pod")
+	assert.Equal(t, v1.PodFailed, status.Phase)
+	assert.Equal(t, reason, status.Reason)
+
+	expectedMessage := PodRejectionMessagePrefix + message
+	assert.Equal(t, expectedMessage, status.Message, "rejectPod should use PodRejectionMessagePrefix constant")
+	assert.True(t, strings.HasPrefix(status.Message, PodRejectionMessagePrefix), "rejection message should start with prefix")
+}
+
+func TestRejectedPodNeverEntersPodWorkers(t *testing.T) {
+	ctx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	// Set up node with limited CPU and memory so pods get rejected during admission
+	kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{{
+		ObjectMeta: metav1.ObjectMeta{Name: string(kubelet.nodeName)},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+				v1.ResourceCPU:    resource.MustParse("100m"),  // Only 100 millicores available
+				v1.ResourceMemory: resource.MustParse("100Mi"), // Only 100Mi available
+			},
+		},
+	}}}
+
+	// Use real podWorkers for proper state tracking
+	kubelet.workQueue = queue.NewBasicWorkQueue(clock.RealClock{})
+	kubelet.podWorkers = newPodWorkers(
+		kubelet, kubelet.recorder, kubelet.workQueue,
+		kubelet.resyncInterval, backOffPeriod,
+		kubelet.podCache, kubelet.allocationManager,
+	)
+
+	// Initialize pod_workers by calling SyncKnownPods with empty list
+	// This sets podsSynced=true so CouldHaveRunningContainers works correctly
+	kubelet.podWorkers.SyncKnownPods(nil)
+
+	// Simulate force scheduling a pod into a node where it doesnt fit.
+	t.Run("rejected pod not added to podWorkers after ADD", func(t *testing.T) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "rejected-add-pod",
+				Name:      "rejected-add-pod",
+				Namespace: "default",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name: "container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("10Mi"),
+						},
+					},
+				}},
+			},
+			Status: v1.PodStatus{
+				Phase: v1.PodPending,
+			},
+		}
+
+		// Call HandlePodAdditions simulating a forced schedule followed by ADD operation.
+		kubelet.HandlePodAdditions(ctx, []*v1.Pod{pod})
+		assert.True(t, kubelet.statusManager.IsPodRejected(pod.UID),
+			"pod should be rejected")
+
+		// Verify pod is NOT in podWorkers by checking the known pods map
+		knownPods := kubelet.podWorkers.SyncKnownPods(nil)
+		_, isKnown := knownPods[pod.UID]
+		assert.False(t, isKnown,
+			"rejected pod should not be in pod_workers after ADD")
+	})
+
+	// Simulate a re-sync for a rejected pod that was force-scheduled.
+	t.Run("rejected pod not added to podWorkers after UPDATE sync", func(t *testing.T) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "rejected-update-pod",
+				Name:      "rejected-update-pod",
+				Namespace: "default",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name: "container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("10Mi"),
+						},
+					},
+				}},
+			},
+			Status: v1.PodStatus{
+				Phase: v1.PodPending,
+			},
+		}
+
+		kubelet.HandlePodAdditions(ctx, []*v1.Pod{pod})
+		assert.True(t, kubelet.statusManager.IsPodRejected(pod.UID),
+			"pod should be rejected")
+
+		// Now simulate an UPDATE from a re-sync for the rejected pod. Note
+		// the status in apiserver is still Pending as it was previously rejected
+		// but has not re-synced
+		kubelet.HandlePodUpdates(ctx, []*v1.Pod{pod})
+
+		// Verify pod is still NOT in pod_workers after UPDATE
+		knownPods := kubelet.podWorkers.SyncKnownPods(nil)
+		_, isKnown := knownPods[pod.UID]
+		assert.False(t, isKnown,
+			"rejected pod should not be in pod_workers after UPDATE")
+	})
+
+	// Simulate a pod that was rejected and synced to apiserver, then kubelet restarted
+	// and its getting the pod again, this time with Failed phase.
+	t.Run("pod with Failed status triggers termination in podWorkers", func(t *testing.T) {
+		// Create a pod with small resource requests that will be admitted
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "failed-pod",
+				Name:      "failed-pod",
+				Namespace: "default",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name: "container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("10Mi"),
+						},
+					},
+				}},
+			},
+			Status: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		}
+
+		kubelet.HandlePodAdditions(ctx, []*v1.Pod{pod})
+		assert.False(t, kubelet.statusManager.IsPodRejected(pod.UID),
+			"pod can not be rejected because it was already terminal")
+
+		// HandlePodUpdates with Failed phase should trigger termination
+		kubelet.HandlePodUpdates(ctx, []*v1.Pod{pod})
+		// Verify pod has termination requested (terminatingAt is set)
+		assert.True(t, kubelet.podWorkers.IsPodTerminationRequested(pod.UID),
+			"pod with Failed status should have termination requested after UPDATE")
+	})
 }
