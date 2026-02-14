@@ -120,6 +120,7 @@ func TestCause(t *testing.T) {
 					}
 				}
 				time.Sleep(tt.sleep)
+				synctest.Wait()
 				actualErr := ctx.Err()
 				actualCause := context.Cause(ctx)
 				assert.Equal(t, tt.expectErr, actualErr, "ctx.Err()")
