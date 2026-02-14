@@ -618,7 +618,7 @@ func (jm *ControllerV2) syncCronJob(
 		// but failed to update the active list in the status, in which case we should reattempt to add the job
 		// into the active list and update the status.
 		jobAlreadyExists = true
-		job, err := jm.jobControl.GetJob(jobReq.GetNamespace(), jobReq.GetName())
+		job, err := jm.jobControl.GetJob(cronJob.Namespace, jobReq.GetName())
 		if err != nil {
 			return nil, updateStatus, err
 		}
