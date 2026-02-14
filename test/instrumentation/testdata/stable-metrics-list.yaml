@@ -132,6 +132,14 @@
   - 10
   - 15
   - 30
+- name: storage_events_received_total
+  subsystem: apiserver
+  help: Number of etcd events received split by kind.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
 - name: check_duration_seconds
   subsystem: validating_admission_policy
   namespace: apiserver

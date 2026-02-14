@@ -112,7 +112,7 @@ var (
 			Subsystem:      "apiserver",
 			Name:           "storage_events_received_total",
 			Help:           "Number of etcd events received split by kind.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
