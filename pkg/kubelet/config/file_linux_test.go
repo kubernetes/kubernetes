@@ -174,6 +174,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 					UID:         "12345",
 					Namespace:   "mynamespace",
 					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
+					Generation:  1,
 				},
 				Spec: v1.PodSpec{
 					NodeName:                      string(hostname),
