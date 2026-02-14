@@ -738,6 +738,7 @@ type createPodsOp struct {
 	// Optional
 	PersistentVolumeTemplatePath      *string
 	PersistentVolumeClaimTemplatePath *string
+	PersistentVolumeBound             *bool
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
@@ -755,6 +756,9 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 	}
 	if cpo.SteadyState && !allowParameterization && cpo.Duration.Duration <= 0 {
 		return errors.New("when creating pods in a steady state, the test duration must be > 0")
+	}
+	if (cpo.PersistentVolumeTemplatePath != nil) != (cpo.PersistentVolumeClaimTemplatePath != nil) {
+		return errors.New("persistentVolumeClaimTemplatePath and persistentVolumeTemplatePath must be specified together")
 	}
 	return nil
 }
@@ -2466,7 +2470,8 @@ func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) 
 	if err != nil {
 		return nil, err
 	}
-	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate), nil
+	bindVolume := ptr.Deref(cpo.PersistentVolumeBound, true)
+	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate, bindVolume), nil
 }
 
 type nodeTemplateFromFile string
@@ -2505,10 +2510,10 @@ func getPersistentVolumeClaimSpecFromFile(path *string) (*v1.PersistentVolumeCla
 	return persistentVolumeClaimSpec, nil
 }
 
-func getCustomVolumeFactory(pvTemplate *v1.PersistentVolume) func(id int) *v1.PersistentVolume {
-	return func(id int) *v1.PersistentVolume {
+func getCustomVolumeFactory(pvTemplate *v1.PersistentVolume) func(namePrefix string, id int) *v1.PersistentVolume {
+	return func(namePrefix string, id int) *v1.PersistentVolume {
 		pv := pvTemplate.DeepCopy()
-		volumeID := fmt.Sprintf("vol-%d", id)
+		volumeID := fmt.Sprintf("%s-%d", namePrefix, id)
 		pv.ObjectMeta.Name = volumeID
 		pvs := pv.Spec.PersistentVolumeSource
 		if pvs.CSI != nil {

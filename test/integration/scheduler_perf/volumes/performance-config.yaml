@@ -269,6 +269,46 @@
       initPods: 5000
       measurePods: 5000
 
+- name: StaticDelayedBindingPVs
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    nodeAllocatableStrategy:
+      nodeAllocatable:
+        attachable-volumes-csi-ebs.csi.aws.com: "39"
+      csiNodeAllocatable:
+        ebs.csi.aws.com:
+          count: 39
+  - opcode: createPods
+    countParam: $initPods
+    persistentVolumeTemplatePath: ../templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    persistentVolumeTemplatePath: ../templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+    persistentVolumeBound: false
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 100Nodes_500Pods
+    params:
+      initNodes: 100
+      initPods: 500
+      measurePods: 500
+  - name: 1000Nodes_5000Pods
+    labels: [performance]
+    params:
+      initNodes: 1000
+      initPods: 5000
+      measurePods: 5000
+
 - name: PreemptionPVs
   workloadTemplate:
   - opcode: createNodes

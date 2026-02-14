@@ -147,8 +147,12 @@ func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSe
 // TODO(mborsz): Use a real PV controller here.
 func StartFakePVController(ctx context.Context, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) {
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
+	queue := make(chan *v1.PersistentVolume, 30)
+	logger := klog.FromContext(ctx).WithName("fakePVController")
+	logger.V(1).Info("Using fake PV controller")
 
 	syncPV := func(obj *v1.PersistentVolume) {
+		logger.V(4).Info("Sync PV", "pv", obj.Name)
 		if obj.Spec.ClaimRef != nil {
 			claimRef := obj.Spec.ClaimRef
 			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
@@ -158,7 +162,7 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 				// check is conservative and only ignores the "context canceled"
 				// error while shutting down.
 				if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
-					klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+					logger.Error(err, "error while getting PVC", "pvc", klog.KRef(claimRef.Namespace, claimRef.Name))
 				}
 				return
 			}
@@ -170,22 +174,35 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 				if err != nil {
 					if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
 						// Shutting down, no need to record this.
-						klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+						logger.Error(err, "error while updating pvc", "pvc", klog.KObj(pvc))
 					}
 					return
 				}
+				logger.V(2).Info("pretend PV bound", "pvc", klog.KObj(pvc), "pv", klog.KObj(obj))
 			}
 		}
 	}
 
 	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			syncPV(obj.(*v1.PersistentVolume))
+			queue <- obj.(*v1.PersistentVolume)
 		},
 		UpdateFunc: func(_, obj interface{}) {
-			syncPV(obj.(*v1.PersistentVolume))
+			queue <- obj.(*v1.PersistentVolume)
 		},
 	})
+	for range 30 {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case pv := <-queue:
+					syncPV(pv)
+				}
+			}
+		}()
+	}
 }
 
 // CreateGCController creates a garbage controller and returns a run function
