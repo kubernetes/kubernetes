@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +32,11 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 
 	"k8s.io/klog/v2"
+)
+
+var (
+	// Track if we've already logged the initial event type mismatch to avoid spam
+	initialEventTypeMismatchLogged atomic.Bool
 )
 
 // possible states of the cache watcher
@@ -371,6 +377,27 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 		return e
 	}
 
+	// For initial events (sent as part of sendInitialEvents requests), we must
+	// always return them as ADDED events to maintain the API contract that only
+	// ADDED events precede the initial BOOKMARK, regardless of any PrevObject
+	// data or filtering logic.
+	if event.IsInitialEvent {
+		// Defensive detection for issue #134831: initial events with wrong type.
+		// This should not happen (initial events are created as ADDED), but has been
+		// observed in production at scale. Log once for diagnostics and validation.
+		if event.Type != watch.Added && initialEventTypeMismatchLogged.CompareAndSwap(false, true) {
+			klog.Warningf("Initial event type corrected (issue #134831): type=%v→ADDED, key=%s, hasPrevObject=%v, rv=%d. Further corrections will be silent.",
+				event.Type, event.Key, event.PrevObject != nil, event.ResourceVersion)
+		}
+
+		// Even for initial events, we must respect the filter - if the object
+		// doesn't match the watcher's filter, it should not be sent at all.
+		if !c.filter(event.Key, event.ObjLabels, event.ObjFields) {
+			return nil
+		}
+		return &watch.Event{Type: watch.Added, Object: getMutableObject(event.Object)}
+	}
+
 	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields)
 	oldObjPasses := false
 	if event.PrevObject != nil {
@@ -454,6 +481,9 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
 
+	// Capture original deadline before processing initial events
+	originalDeadline, hasDeadline := ctx.Deadline()
+
 	// cacheInterval may be created from a version being more fresh than requested
 	// (e.g. for NotOlderThan semantic). In such a case, we need to prevent watch event
 	// with lower resourceVersion from being delivered to ensure watch contract.
@@ -513,6 +543,37 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	// send bookmark after sending all events in cacheInterval for watchlist request
 	if cacheInterval.initialEventsEndBookmark != nil {
 		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+
+		// For sendInitialEvents requests, extend the deadline to ensure the watch
+		// continues for the full timeout duration AFTER sending initial events.
+		// This prevents premature watch termination when initial event processing
+		// takes a long time in large clusters (issue #134837).
+		if hasDeadline {
+			// Calculate time spent sending initial events
+			timeSpentOnInitialEvents := time.Since(startTime)
+			// Extend deadline by the time spent so the ongoing watch gets the full timeout
+			newDeadline := originalDeadline.Add(timeSpentOnInitialEvents)
+
+			// Create a context that respects both parent cancellation and the new deadline.
+			// We use context.Background() to bypass the parent's deadline (context package
+			// doesn't support extending deadlines, only shortening them). This means we lose
+			// context values like APF initialization signal and tracing, but this is necessary
+			// to fix the critical bug where watches close prematurely. We still monitor parent
+			// cancellation to handle client disconnects and server shutdown.
+			parentCtx := ctx
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithDeadline(context.Background(), newDeadline)
+			go func() {
+				select {
+				case <-parentCtx.Done():
+					// Parent cancelled (client disconnect, server shutdown, etc)
+					cancel()
+				case <-ctx.Done():
+					// Our extended deadline reached or cancel() was called
+				}
+			}()
+			defer cancel()
+		}
 	}
 	c.process(ctx, resourceVersion)
 }
