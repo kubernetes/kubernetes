@@ -36,6 +36,7 @@ const (
 	bestEffort            = "bestEffort"
 	burstable             = "burstable"
 	highRequestBurstable  = "high-request-burstable"
+	highPriorityBurstable = "high-priority-burstable"
 	guaranteed            = "guaranteed"
 	highRequestGuaranteed = "high-request-guaranteed"
 	tinyBurstable         = "tiny"
@@ -317,6 +318,14 @@ func TestGetPodsToPreempt(t *testing.T) {
 			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable], allPods[highRequestGuaranteed]},
 		},
 		{
+			testName:              "evict guaranteed when we have to, and dont evict the high request guaranteed pod",
+			preemptor:             allPods[clusterCritical],
+			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
+			insufficientResources: getAdmissionRequirementList(0, 350, 0),
+			expectErr:             false,
+			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable], allPods[guaranteed]},
+		},
+		{
 			testName:              "evict cluster critical pod for node critical pod",
 			preemptor:             allPods[nodeCritical],
 			inputPods:             []*v1.Pod{allPods[clusterCritical]},
@@ -331,6 +340,22 @@ func TestGetPodsToPreempt(t *testing.T) {
 			insufficientResources: getAdmissionRequirementList(100, 0, 0),
 			expectErr:             true,
 			expectedOutput:        nil,
+		},
+		{
+			testName:              "can not evict high priority burstable pod for guaranteed pod",
+			preemptor:             allPods[clusterCritical],
+			inputPods:             []*v1.Pod{allPods[guaranteed], allPods[highPriorityBurstable]},
+			insufficientResources: getAdmissionRequirementList(100, 0, 0),
+			expectErr:             false,
+			expectedOutput:        []*v1.Pod{allPods[guaranteed]},
+		},
+		{
+			testName:              "evict the high priority pod when we have to, and dont evict the extra guaranteed",
+			preemptor:             allPods[clusterCritical],
+			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[guaranteed], allPods[highRequestBurstable], allPods[highPriorityBurstable]},
+			insufficientResources: getAdmissionRequirementList(0, 500, 0),
+			expectErr:             false,
+			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable], allPods[highPriorityBurstable]},
 		},
 	}
 
@@ -573,6 +598,12 @@ func getTestPods() map[string]*v1.Pod {
 				v1.ResourceMemory: resource.MustParse("300Mi"),
 			},
 		}),
+		highPriorityBurstable: getPodWithResources(highPriorityBurstable, v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("200Mi"),
+			},
+		}),
 	}
 	allPods[clusterCritical].Namespace = kubeapi.NamespaceSystem
 	allPods[clusterCritical].Spec.PriorityClassName = scheduling.SystemClusterCritical
@@ -583,6 +614,9 @@ func getTestPods() map[string]*v1.Pod {
 	allPods[nodeCritical].Spec.PriorityClassName = scheduling.SystemNodeCritical
 	nodePriority := scheduling.SystemCriticalPriority + 100
 	allPods[nodeCritical].Spec.Priority = &nodePriority
+
+	priorityBurstable := int32(100)
+	allPods[highPriorityBurstable].Spec.Priority = &priorityBurstable
 
 	return allPods
 }
