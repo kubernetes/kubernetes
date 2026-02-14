@@ -1,0 +1,100 @@
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+### Testing kubectl exec POD COMMAND
+### Test execute non-existing POD
+! exec kubectl exec abc --namespace ${NAMESPACE} -- date
+# POD abc should error since it doesn't exist
+stderr 'pods "abc" not found'
+
+### Test execute multiple resources
+! exec kubectl exec -f pods.yaml --namespace ${NAMESPACE} -- echo test
+stderr 'cannot exec into multiple objects at a time'
+
+### Test execute existing POD
+# Create test-pod
+exec kubectl create -f ${K8S_ROOT}/hack/testdata/pod.yaml --namespace ${NAMESPACE}
+# Execute existing POD
+! exec kubectl exec test-pod date --namespace ${NAMESPACE}
+# POD test-pod is exists this is shouldn't have output not found
+! stderr 'pods "test-pod" not found'
+# These must be pass the validate
+! stderr 'pod or type/name must be specified'
+
+# Clean up
+exec kubectl delete pods test-pod --namespace ${NAMESPACE}
+
+### Testing kubectl exec TYPE/NAME COMMAND
+
+### Test execute invalid resource type
+! exec kubectl exec foo/bar --namespace ${NAMESPACE} -- date
+stderr 'error:'
+
+### Test execute non-existing resources
+! exec kubectl exec deployments/bar --namespace ${NAMESPACE} -- date
+# resource type foo should error since it doesn't exist
+stderr '"bar" not found'
+
+exec kubectl create -f ${K8S_ROOT}/hack/testdata/pod.yaml --namespace ${NAMESPACE}
+exec kubectl create -f ${K8S_ROOT}/hack/testdata/frontend-replicaset.yaml --namespace ${NAMESPACE}
+exec kubectl create -f ${K8S_ROOT}/hack/testdata/configmap.yaml --namespace ${NAMESPACE}
+
+### Test execute non-implemented resources
+! exec kubectl exec configmap/test-set-env-config --namespace ${NAMESPACE} -- date 2>&1)
+# resource type configmap should error since configmap not implemented to be attached
+stderr 'not implemented'
+
+### Test execute exists and valid resource type.
+# Just check the output, since test-cmd not run kubelet, pod never be assigned.
+# and not really can run `kubectl exec` command
+
+! exec kubectl exec pods/test-pod --namespace ${NAMESPACE} -- date
+# POD test-pod is exists this is shouldn't have output not found
+! stderr 'not found'
+# These must be pass the validate
+! stderr 'pod, type/name or --filename must be specified'
+
+exec kubectl get --namespace ${NAMESPACE} replicaset/frontend
+exec kubectl get --namespace ${NAMESPACE} pods
+! exec kubectl exec replicaset/frontend --namespace ${NAMESPACE} -- date
+# Replicaset frontend is valid and exists will select the first pod.
+# and Shouldn't have output not found
+! stderr 'not found'
+# These must be pass the validate
+! stderr 'pod, type/name or --filename must be specified'
+
+# Clean up
+exec kubectl delete pods/test-pod --namespace ${NAMESPACE}
+exec kubectl delete replicaset/frontend --namespace ${NAMESPACE}
+exec kubectl delete configmap/test-set-env-config --namespace ${NAMESPACE}
+
+
+-- pods.yaml --
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test2
+spec:
+  containers:
+  - name: nginx
+    image: nginx
