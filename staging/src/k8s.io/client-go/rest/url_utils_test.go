@@ -18,6 +18,7 @@ package rest
 
 import (
 	"path"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -39,6 +40,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		{"http://host", "/", "http://host/" + v1.SchemeGroupVersion.Version, false},
 		{"http://host", "/other", "http://host/other/" + v1.SchemeGroupVersion.Version, false},
 		{"host/server", "", "", true},
+		{"host:abc:def", "", "", true},
 	}
 	for i, testCase := range testCases {
 		u, versionedAPIPath, err := DefaultServerURL(testCase.Host, testCase.APIPath, v1.SchemeGroupVersion, false)
@@ -57,5 +59,15 @@ func TestValidatesHostParameter(t *testing.T) {
 			t.Errorf("%d: expected host %s, got %s", i, e, a)
 			continue
 		}
+	}
+}
+
+func TestDefaultServerURLErrorMessageIncludesHost(t *testing.T) {
+	_, _, err := DefaultServerURL("host:abc:def", "", v1.SchemeGroupVersion, false)
+	if err == nil {
+		t.Fatal("expected error for invalid host")
+	}
+	if !strings.Contains(err.Error(), "host:abc:def") {
+		t.Errorf("error message should contain the host value, got: %v", err)
 	}
 }
