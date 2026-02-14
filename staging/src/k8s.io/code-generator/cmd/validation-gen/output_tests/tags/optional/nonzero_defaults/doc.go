@@ -50,4 +50,17 @@ type Struct struct {
 	// +k8s:optional
 	// +default=true
 	BoolPtrField *bool `json:"boolPtrField"`
+
+	// +k8s:optional
+	// +default=ref(DefaultString)
+	RefStringField string `json:"refStringField"`
+
+	// +k8s:optional
+	// +default=ref(k8s.io/code-generator/cmd/validation-gen/output_tests/tags/optional/nonzero_defaults.DefaultInt)
+	RefIntField int `json:"refIntField"`
 }
+
+const (
+	DefaultString = "foobar"
+	DefaultInt    = 123
+)
