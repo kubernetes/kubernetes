@@ -57,6 +57,8 @@ func pluginsNames(p *configv1.Plugins) []string {
 		p.Permit,
 		p.PreEnqueue,
 		p.QueueSort,
+		p.PlacementGenerate,
+		p.PlacementScore,
 	}
 	n := sets.New[string]()
 	for _, e := range extensions {
@@ -240,6 +242,15 @@ func SetDefaults_NodeResourcesFitArgs(obj *configv1.NodeResourcesFitArgs) {
 	for i := range obj.ScoringStrategy.Resources {
 		if obj.ScoringStrategy.Resources[i].Weight == 0 {
 			obj.ScoringStrategy.Resources[i].Weight = 1
+		}
+	}
+}
+
+func SetDefaults_PlacementBinPackingArgs(obj *configv1.PlacementBinPackingArgs) {
+	if obj.ScoringStrategy == nil {
+		obj.ScoringStrategy = &configv1.ScoringStrategy{
+			Type:      configv1.ScoringStrategyType(config.LeastAllocated),
+			Resources: defaultResourceSpec,
 		}
 	}
 }

@@ -313,29 +313,50 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 		}
 	}
 
-	strategyPath := path.Child("scoringStrategy")
-	if args.ScoringStrategy != nil {
-		if !supportedScoringStrategyTypes.Has(string(args.ScoringStrategy.Type)) {
-			allErrs = append(allErrs, field.NotSupported(strategyPath.Child("type"), args.ScoringStrategy.Type, sets.List(supportedScoringStrategyTypes)))
-		}
-		allErrs = append(allErrs, validateResources(args.ScoringStrategy.Resources, strategyPath.Child("resources"))...)
-		if args.ScoringStrategy.Type == config.RequestedToCapacityRatio {
-			if args.ScoringStrategy.RequestedToCapacityRatio == nil {
-				allErrs = append(allErrs, field.Required(strategyPath.Child("requestedToCapacityRatio"), "must be specified when type is RequestedToCapacityRatio"))
-			} else {
-				allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, strategyPath.Child("requestedToCapacityRatio").Child("shape"))...)
-			}
-		} else if args.ScoringStrategy.RequestedToCapacityRatio != nil {
-			allErrs = append(allErrs, field.Forbidden(strategyPath.Child("requestedToCapacityRatio"), "must be nil when type is not RequestedToCapacityRatio"))
-		}
-	} else {
-		allErrs = append(allErrs, field.Required(strategyPath, "ScoringStrategy field is required"))
-	}
+	allErrs = append(allErrs, validateScoringStrategy(args.ScoringStrategy, path.Child("scoringStrategy"))...)
 
 	if len(allErrs) == 0 {
 		return nil
 	}
 	return allErrs.ToAggregate()
+}
+
+func ValidatePlacementBinPackingArgs(path *field.Path, args *config.PlacementBinPackingArgs, fts feature.Features) error {
+	var allErrs field.ErrorList
+
+	if fts.EnableWorkloadSchedulingCycle {
+		allErrs = append(allErrs, validateScoringStrategy(args.ScoringStrategy, path.Child("ScoringStrategy"))...)
+	} else {
+		allErrs = append(allErrs, field.Forbidden(path.Child("ScoringStrategy"), "WorkloadSchedulingCycle feature gate is disabled"))
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+
+	return allErrs.ToAggregate()
+}
+
+func validateScoringStrategy(strategy *config.ScoringStrategy, path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if strategy != nil {
+		if !supportedScoringStrategyTypes.Has(string(strategy.Type)) {
+			allErrs = append(allErrs, field.NotSupported(path.Child("type"), strategy.Type, sets.List(supportedScoringStrategyTypes)))
+		}
+		allErrs = append(allErrs, validateResources(strategy.Resources, path.Child("resources"))...)
+		if strategy.Type == config.RequestedToCapacityRatio {
+			if strategy.RequestedToCapacityRatio == nil {
+				allErrs = append(allErrs, field.Required(path.Child("requestedToCapacityRatio"), "must be specified when type is RequestedToCapacityRatio"))
+			} else {
+				allErrs = append(allErrs, validateFunctionShape(strategy.RequestedToCapacityRatio.Shape, path.Child("requestedToCapacityRatio").Child("shape"))...)
+			}
+		} else if strategy.RequestedToCapacityRatio != nil {
+			allErrs = append(allErrs, field.Forbidden(path.Child("requestedToCapacityRatio"), "must be nil when type is not RequestedToCapacityRatio"))
+		}
+	} else {
+		allErrs = append(allErrs, field.Required(path, "ScoringStrategy field is required"))
+	}
+	return allErrs
 }
 
 // ValidateDynamicResourcesArgs validates that DynamicResourcesArgs are correct.
