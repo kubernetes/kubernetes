@@ -632,13 +632,11 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 		status.UpdateRevision != set.Status.UpdateRevision
 }
 
-// completeRollingUpdate completes a rolling update when all of set's replica Pods have been updated
-// to the updateRevision. status's currentRevision is set to updateRevision and its' updateRevision
-// is set to the empty string. status's currentReplicas is set to updateReplicas and its updateReplicas
-// are set to 0.
-func completeRollingUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
-	if set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
-		status.UpdatedReplicas == *set.Spec.Replicas &&
+// completeUpdate completes an update when all of set's replica Pods have been updated
+// to the updateRevision. status's currentRevision is set to updateRevision and status's
+// currentReplicas is set to updateReplicas.
+func completeUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
+	if status.UpdatedReplicas == *set.Spec.Replicas &&
 		status.ReadyReplicas == *set.Spec.Replicas &&
 		status.Replicas == *set.Spec.Replicas {
 		status.CurrentReplicas = status.UpdatedReplicas

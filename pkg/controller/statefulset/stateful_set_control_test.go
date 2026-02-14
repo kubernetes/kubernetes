@@ -1543,6 +1543,10 @@ func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 		if err := test.validateRestart(set, pods); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
+		if set.Status.CurrentRevision != set.Status.UpdateRevision {
+			t.Fatalf("%s: after OnDelete update completes, CurrentRevision %s should equal UpdateRevision %s",
+				test.name, set.Status.CurrentRevision, set.Status.UpdateRevision)
+		}
 	}
 
 	tests := []testcase{
