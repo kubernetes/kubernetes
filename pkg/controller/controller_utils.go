@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -331,12 +332,58 @@ type UIDSet struct {
 	key string
 }
 
+// GeneratePodCreationKey generates a predictable key for tracking pod creation before
+// the pod is actually created and has a UID. The key is based on namespace, generateName
+// prefix, and an index to make it unique per creation attempt.
+// Format: "namespace/generateName-index"
+func GeneratePodCreationKey(namespace, generateName string, index int) string {
+	return fmt.Sprintf("%s/%s-%d", namespace, generateName, index)
+}
+
+// MatchPodToCreationKey attempts to match a created pod to an expected creation key
+// from the provided set of expected keys. It matches by checking if the pod's name
+// starts with the pattern from the expected key (namespace/namePrefix).
+// Returns the matched key if found, empty string otherwise.
+func MatchPodToCreationKey(pod *v1.Pod, expectedKeys sets.String) string {
+	if pod == nil || expectedKeys == nil || expectedKeys.Len() == 0 {
+		return ""
+	}
+
+	// Try to find a key that matches this pod's namespace and name prefix
+	for _, key := range expectedKeys.List() {
+		// Expected key format: "namespace/generateName-index"
+		// Pod name format: "generateName-<generated-suffix>"
+		// We need to check if pod is in the right namespace and name starts with generateName
+		parts := strings.SplitN(key, "/", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		keyNamespace := parts[0]
+		keyNamePattern := parts[1]
+
+		// Extract the generateName prefix from the key (remove the -index suffix)
+		lastDash := strings.LastIndex(keyNamePattern, "-")
+		if lastDash == -1 {
+			continue
+		}
+		generateNamePrefix := keyNamePattern[:lastDash]
+
+		// Check if pod matches: same namespace and name starts with generateName prefix
+		if pod.Namespace == keyNamespace && strings.HasPrefix(pod.Name, generateNamePrefix) {
+			return key
+		}
+	}
+
+	return ""
+}
+
 // UIDTrackingControllerExpectations tracks the UID of the pods it deletes.
 // This cache is needed over plain old expectations to safely handle graceful
 // deletion. The desired behavior is to treat an update that sets the
 // DeletionTimestamp on an object as a delete. To do so consistently, one needs
 // to remember the expected deletes so they aren't double counted.
-// TODO: Track creates as well (#22599)
+// It also tracks pod creations using predictable keys to prevent double-counting
+// during race conditions and handle controller restarts gracefully.
 type UIDTrackingControllerExpectations struct {
 	ControllerExpectationsInterface
 	// TODO: There is a much nicer way to do this that involves a single store,
@@ -345,6 +392,12 @@ type UIDTrackingControllerExpectations struct {
 	// Store used for the UIDs associated with any expectation tracked via the
 	// ControllerExpectationsInterface.
 	uidStore cache.Store
+	// creationUIDStoreLock protects the creationUIDStore
+	creationUIDStoreLock sync.Mutex
+	// Store used for the creation keys associated with any expectation tracked
+	// via the ControllerExpectationsInterface. Since pod UIDs aren't known before
+	// creation, we use predictable keys (namespace/generateName pattern) instead.
+	creationUIDStore cache.Store
 }
 
 // GetUIDs is a convenience method to avoid exposing the set of expected uids.
@@ -355,6 +408,37 @@ func (u *UIDTrackingControllerExpectations) GetUIDs(controllerKey string) sets.S
 		return uid.(*UIDSet).String
 	}
 	return nil
+}
+
+// GetCreationUIDs is a convenience method to get the set of expected creation keys.
+// The returned set is not thread safe, all modifications must be made holding
+// the creationUIDStoreLock.
+func (u *UIDTrackingControllerExpectations) GetCreationUIDs(controllerKey string) sets.String {
+	if uid, exists, err := u.creationUIDStore.GetByKey(controllerKey); err == nil && exists {
+		return uid.(*UIDSet).String
+	}
+	return nil
+}
+
+// ExpectCreations records expectations for the given creation keys, against the given controller.
+// Unlike ExpectDeletions, this takes predictable keys (namespace/generateName-index) since pod UIDs
+// aren't known before creation.
+func (u *UIDTrackingControllerExpectations) ExpectCreations(logger klog.Logger, rcKey string, creationKeys []string) error {
+	expectedKeys := sets.NewString()
+	for _, k := range creationKeys {
+		expectedKeys.Insert(k)
+	}
+	logger.V(4).Info("Controller waiting on creations", "controller", rcKey, "keys", creationKeys)
+	u.creationUIDStoreLock.Lock()
+	defer u.creationUIDStoreLock.Unlock()
+
+	if existing := u.GetCreationUIDs(rcKey); existing != nil && existing.Len() != 0 {
+		logger.Error(nil, "Clobbering existing creation keys", "keys", existing)
+	}
+	if err := u.creationUIDStore.Add(&UIDSet{expectedKeys, rcKey}); err != nil {
+		return err
+	}
+	return u.ControllerExpectationsInterface.ExpectCreations(logger, rcKey, expectedKeys.Len())
 }
 
 // ExpectDeletions records expectations for the given deleteKeys, against the given controller.
@@ -376,6 +460,39 @@ func (u *UIDTrackingControllerExpectations) ExpectDeletions(logger klog.Logger, 
 	return u.ControllerExpectationsInterface.ExpectDeletions(logger, rcKey, expectedUIDs.Len())
 }
 
+// CreationObserved records the given creationKey as a creation, for the given rc.
+// If the creationKey matches an expected key, it decrements the creation expectation counter.
+// If creationKey is empty or doesn't match any expected key, it still decrements for backward compatibility
+// with tests and scenarios where keys aren't being tracked.
+func (u *UIDTrackingControllerExpectations) CreationObserved(logger klog.Logger, rcKey, creationKey string) {
+	u.creationUIDStoreLock.Lock()
+	defer u.creationUIDStoreLock.Unlock()
+
+	keys := u.GetCreationUIDs(rcKey)
+
+	// If we have creation keys being tracked
+	if keys != nil && keys.Len() > 0 {
+		if creationKey != "" && keys.Has(creationKey) {
+			// Matched key - decrement and remove from set
+			logger.V(4).Info("Controller received create for pod", "controller", rcKey, "key", creationKey)
+			u.ControllerExpectationsInterface.CreationObserved(logger, rcKey)
+			keys.Delete(creationKey)
+		} else if creationKey == "" {
+			// Backward compatibility: no key provided but we have keys tracked
+			// This can happen in tests - still decrement to maintain test compatibility
+			logger.V(4).Info("Controller received create for pod without key (backward compat)", "controller", rcKey)
+			u.ControllerExpectationsInterface.CreationObserved(logger, rcKey)
+		} else {
+			// Key provided but doesn't match - likely an adopted pod, don't decrement
+			logger.V(4).Info("Controller received create for pod without matching expected key", "controller", rcKey, "key", creationKey)
+		}
+	} else {
+		// No creation keys being tracked - always decrement (pure counter mode)
+		logger.V(4).Info("Controller received create for pod (no keys tracked)", "controller", rcKey, "key", creationKey)
+		u.ControllerExpectationsInterface.CreationObserved(logger, rcKey)
+	}
+}
+
 // DeletionObserved records the given deleteKey as a deletion, for the given rc.
 func (u *UIDTrackingControllerExpectations) DeletionObserved(logger klog.Logger, rcKey, deleteKey string) {
 	u.uidStoreLock.Lock()
@@ -389,24 +506,40 @@ func (u *UIDTrackingControllerExpectations) DeletionObserved(logger klog.Logger,
 	}
 }
 
-// DeleteExpectations deletes the UID set and invokes DeleteExpectations on the
+// DeleteExpectations deletes the UID set and creation key set and invokes DeleteExpectations on the
 // underlying ControllerExpectationsInterface.
 func (u *UIDTrackingControllerExpectations) DeleteExpectations(logger klog.Logger, rcKey string) {
 	u.uidStoreLock.Lock()
 	defer u.uidStoreLock.Unlock()
 
+	u.creationUIDStoreLock.Lock()
+	defer u.creationUIDStoreLock.Unlock()
+
 	u.ControllerExpectationsInterface.DeleteExpectations(logger, rcKey)
+
+	// Clean up deletion UIDs
 	if uidExp, exists, err := u.uidStore.GetByKey(rcKey); err == nil && exists {
 		if err := u.uidStore.Delete(uidExp); err != nil {
 			logger.V(2).Info("Error deleting uid expectations", "controller", rcKey, "err", err)
 		}
 	}
+
+	// Clean up creation keys
+	if creationExp, exists, err := u.creationUIDStore.GetByKey(rcKey); err == nil && exists {
+		if err := u.creationUIDStore.Delete(creationExp); err != nil {
+			logger.V(2).Info("Error deleting creation key expectations", "controller", rcKey, "err", err)
+		}
+	}
 }
 
 // NewUIDTrackingControllerExpectations returns a wrapper around
-// ControllerExpectations that is aware of deleteKeys.
+// ControllerExpectations that is aware of deleteKeys and creation keys.
 func NewUIDTrackingControllerExpectations(ce ControllerExpectationsInterface) *UIDTrackingControllerExpectations {
-	return &UIDTrackingControllerExpectations{ControllerExpectationsInterface: ce, uidStore: cache.NewStore(UIDSetKeyFunc)}
+	return &UIDTrackingControllerExpectations{
+		ControllerExpectationsInterface: ce,
+		uidStore:                        cache.NewStore(UIDSetKeyFunc),
+		creationUIDStore:                cache.NewStore(UIDSetKeyFunc),
+	}
 }
 
 // Reasons for pod events
@@ -508,7 +641,9 @@ func getPodsAnnotationSet(template *v1.PodTemplateSpec) labels.Set {
 	return desiredAnnotations
 }
 
-func getPodsPrefix(controllerName string) string {
+// GetPodsPrefix returns the prefix used for pod names created by a controller.
+// Exported for use by controllers that need to generate creation tracking keys.
+func GetPodsPrefix(controllerName string) string {
 	// use the dash (if the name isn't too long) to make the pod name a bit prettier
 	prefix := fmt.Sprintf("%s-", controllerName)
 	if len(validation.ValidatePodName(prefix, true)) != 0 {
@@ -567,7 +702,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	if err != nil {
 		return nil, fmt.Errorf("parentObject does not have ObjectMeta, %v", err)
 	}
-	prefix := getPodsPrefix(accessor.GetName())
+	prefix := GetPodsPrefix(accessor.GetName())
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
