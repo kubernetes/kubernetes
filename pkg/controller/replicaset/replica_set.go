@@ -30,6 +30,7 @@ package replicaset
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -56,6 +57,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metrics2 "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -70,6 +72,10 @@ const (
 	// Realistic value of the burstReplica field for the replica set manager based off
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
+
+	// BurstFailedPodWindow timeframe will be used to observe failed pods. If any are detected, the number of
+	// BurstReplicas will be halved.
+	BurstFailedPodWindow = 20 * time.Minute
 
 	// The number of times we retry updating a ReplicaSet's status.
 	statusUpdateRetries = 1
@@ -597,13 +603,15 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 // Does NOT modify <activePods>.
-// It will requeue the replica set in case of an error while creating/deleting pods.
-func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods []*v1.Pod, rs *apps.ReplicaSet) error {
+// It returns:
+// - A duration in seconds that the ReplicaSet should be synced again to handle failed pods.
+// - An error that will requeue the replica set in case of an error while creating/deleting pods.
+func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods []*v1.Pod, rs *apps.ReplicaSet) (*time.Duration, error) {
 	diff := len(activePods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
-		return nil
+		return nil, nil
 	}
 	logger := klog.FromContext(ctx)
 	if diff < 0 {
@@ -618,6 +626,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		// beforehand and store it via ExpectCreations.
 		rsc.expectations.ExpectCreations(logger, rsKey, diff)
 		logger.V(2).Info("Too few replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "creating", diff)
+		var nextResync *time.Duration
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 		// and double with each successful iteration in a kind of "slow start".
 		// This handles attempts to start large numbers of pods that would
@@ -626,7 +635,42 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		// prevented from spamming the API service with the pod create requests
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
-		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
+		// We can further limit the number of pods to create in batchPrecondition.
+		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func(podsCreated int) (int, error) {
+			maxPodsToCreate := diff
+			rsPods, err := controller.FilterPodsByOwner(rsc.podIndexer, &rs.ObjectMeta, rsc.Kind, false)
+			if err != nil {
+				return 0, err
+			}
+			now := rsc.clock.Now()
+			var rsFailedPods []*v1.Pod
+			for _, rsPod := range rsPods {
+				if v1.PodFailed == rsPod.Status.Phase {
+					rsFailedPods = append(rsFailedPods, rsPod)
+					// If we see any failed replicas in the last 20 minutes, decrease the max burst.
+					if maxPodsToCreate > rsc.burstReplicas/2 && rsPod.Status.StartTime != nil && now.Sub(rsPod.Status.StartTime.Time) < BurstFailedPodWindow {
+						maxPodsToCreate = rsc.burstReplicas / 2
+					}
+				}
+			}
+			if len(rsFailedPods) == 0 {
+				return maxPodsToCreate, nil
+			}
+
+			// Slow down the creation of new pods if there are recently failed pods,
+			// to make sure we do not get into a hot feedback loop with kubelet and not overwhelm the apiserver/etcd.
+			weightedFailedPodCount, nextBucketPromotion := calculateTimeWeightedFailedPodsCount(rsc.clock, maxPodsToCreate, rsFailedPods)
+			if weightedFailedPodCount > 0 {
+				logger.V(4).Info("Recently failed pods found", "replicaSet", klog.KObj(rs), "failedPodCount", len(rsFailedPods), "weightedFailedPodCount", weightedFailedPodCount, "nextSync", nextBucketPromotion)
+				// Schedule the next sync, because we might be able to decrease weightedFailedPodCount and create new pod(s).
+				nextResync = nextBucketPromotion
+			}
+			// Subtract pods from already executed batches and weighted failed pods
+			// If a pod fails quickly it can be counted twice (i.e. have double the weight)
+			// in a single slowStartBatch execution -> fail this sync faster.
+			maxPodsToCreate -= podsCreated + weightedFailedPodCount
+			return maxPodsToCreate, nil
+		}, func() error {
 			err := rsc.podControl.CreatePods(ctx, rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
 			if err != nil {
 				if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
@@ -648,7 +692,9 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 				rsc.expectations.CreationObserved(logger, rsKey)
 			}
 		}
-		return err
+
+		// Can exit early due to our precondition so we might have to retry later.
+		return nextResync, err
 	} else if diff > 0 {
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
@@ -692,13 +738,13 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		case err := <-errCh:
 			// all errors have been reported before and they're likely to be the same, so we'll only return the first one we hit.
 			if err != nil {
-				return err
+				return nil, err
 			}
 		default:
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 // syncReplicaSet will sync the ReplicaSet with the given key if it has had its expectations fulfilled,
@@ -755,7 +801,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	var manageReplicasErr error
 	var nextSyncDuration *time.Duration
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
-		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
+		nextSyncDuration, manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
 	}
 	rs = rs.DeepCopy()
 	// Use the same time for calculating status and nextSyncDuration.
@@ -774,15 +820,20 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 	// Plan the next availability check as a last line of defense against queue preemption (we have one queue key for checking availability of all the pods)
 	// or early sync (see https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info).
+	var nextAvailabilityCheckSyncDuration *time.Duration
 	if updatedRS.Spec.MinReadySeconds > 0 &&
 		updatedRS.Status.ReadyReplicas != updatedRS.Status.AvailableReplicas {
 		// Safeguard fallback to the .spec.minReadySeconds to ensure that we always end up with .status.availableReplicas updated.
-		nextSyncDuration = ptr.To(time.Duration(updatedRS.Spec.MinReadySeconds) * time.Second)
+		nextAvailabilityCheckSyncDuration = ptr.To(time.Duration(updatedRS.Spec.MinReadySeconds) * time.Second)
 		// Use the same point in time (now) for calculating status and nextSyncDuration to get matching availability for the pods.
 		if nextCheck := controller.FindMinNextPodAvailabilityCheck(activePods, updatedRS.Spec.MinReadySeconds, now, rsc.clock); nextCheck != nil {
-			nextSyncDuration = nextCheck
+			nextAvailabilityCheckSyncDuration = nextCheck
 		}
 	}
+	if nextAvailabilityCheckSyncDuration != nil && (nextSyncDuration == nil || *nextAvailabilityCheckSyncDuration < *nextSyncDuration) {
+		nextSyncDuration = nextAvailabilityCheckSyncDuration
+	}
+
 	if nextSyncDuration != nil {
 		rsc.queue.AddAfter(key, *nextSyncDuration)
 	}
@@ -806,6 +857,12 @@ func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.Replica
 	return cm.ClaimPods(ctx, filteredPods)
 }
 
+// batchPrecondition is used in the slowStartBatch to check if each batch should run.
+// successes is the number of past successful fn invocations
+// maxBatchSize limits the numbers of fn invocations in the next batch
+// err any error will stop the batch execution
+type batchPrecondition func(successes int) (maxBatchSize int, err error)
+
 // slowStartBatch tries to call the provided function a total of 'count' times,
 // starting slow to check for errors, then speeding up if calls succeed.
 //
@@ -816,11 +873,24 @@ func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.Replica
 // If there are any failures in a batch, all remaining batches are skipped
 // after waiting for the current batch to complete.
 //
+// batchPrecondition function can be specified to limit the number of pods to
+// be created in each batch and exit the scale up prematurely if there are none.
+//
 // It returns the number of successful calls to the function.
-func slowStartBatch(count int, initialBatchSize int, fn func() error) (int, error) {
+func slowStartBatch(count int, initialBatchSize int, batchPrecondition batchPrecondition, fn func() error) (int, error) {
 	remaining := count
 	successes := 0
-	for batchSize := min(remaining, initialBatchSize); batchSize > 0; batchSize = min(2*batchSize, remaining) {
+	for batchSizeLimit := min(remaining, initialBatchSize); batchSizeLimit > 0; batchSizeLimit = min(2*batchSizeLimit, remaining) {
+		batchSize := batchSizeLimit
+		if batchPrecondition != nil {
+			maxBatchSize, err := batchPrecondition(successes)
+			if maxBatchSize <= 0 || err != nil {
+				return successes, err
+			}
+			if maxBatchSize < batchSize {
+				batchSize = maxBatchSize
+			}
+		}
 		errCh := make(chan error, batchSize)
 		var wg sync.WaitGroup
 		wg.Add(batchSize)
@@ -835,10 +905,10 @@ func slowStartBatch(count int, initialBatchSize int, fn func() error) (int, erro
 		wg.Wait()
 		curSuccesses := batchSize - len(errCh)
 		successes += curSuccesses
+		remaining -= batchSize
 		if len(errCh) > 0 {
 			return successes, <-errCh
 		}
-		remaining -= batchSize
 	}
 	return successes, nil
 }
@@ -918,6 +988,113 @@ func getPodsRankedByRelatedPodsOnSameNode(podsToRank, relatedPods []*v1.Pod) con
 		ranks[i] = podsOnNode[pod.Spec.NodeName]
 	}
 	return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: ranks, Now: metav1.Now()}
+}
+
+// calculateTimeWeightedFailedPodsCount calculates the weighted pod count for failed pods according to the number of
+// replicasToCreate and the age of the failed pods.
+// Older pods have a lower weight to allow the ReplicaSet to recover gradually in case its pods start to be suddenly
+// scheduled on nodes where the kubelet will not reject the pods.
+//
+// For example replicasToCreate == 50 will create 50, 70, 90, 110, 130, 150 buckets.
+// 1 failed pod in the 50s bucket corresponds to 1 weighted failed pod.
+// 1 failed pod in the 70s bucket corresponds to 5/6 weighted failed pod.
+// 1 failed pod in the 90s bucket corresponds to 4/6 weighted failed pod.
+// ...
+// 1 failed pod in the 150s bucket corresponds to 1/6 weighted failed pod.
+// Failed pods older than 150s are not included in the count.
+//
+// For a ReplicaSet with .spec.replicas >= 10, the generation rate should be slightly higher than .spec.replicas over
+// the period of 2 * .spec.replicas seconds == 0.5 pods/s == 30 pods / minute.
+//
+// The following measurements were obtained experimentally:
+// ReplicaSet with .spec.replicas == 1 generates approx 4 failed pods / minute.
+// ReplicaSet with .spec.replicas == 5 generates approx 15 failed pods / minute.
+// ReplicaSet with .spec.replicas == 10 generates approx 30 failed pods / minute.
+// ReplicaSet with .spec.replicas >= 25 generates approx 36 failed pods / minute.
+//
+// This function/feature does not fully solve the ReplicaSet controller - kubelet feedback loop, but it slows it down
+// considerably. Now it will usually take 12500/36 == 379m == 6h19m until there are 12500 (default) failed pods. Then
+// the pod garbage collector will kick in and clean up the extra pods after the replica set controller.
+//
+// Returns the time-weighted failed pod count
+// and the next time duration a pod should be promoted from one bucket to the next.
+func calculateTimeWeightedFailedPodsCount(clock clock.PassiveClock, replicasToCreate int, failedPods []*v1.Pod) (int, *time.Duration) {
+	if replicasToCreate <= 0 {
+		return 0, nil
+	}
+	now := clock.Now()
+	// Our ability to detect that the ReplicaSet controller is creating too many failed replicas, depends on how fast
+	// the controller can generate them. The controller can usually generate anywhere from 1 to 30+ replicas per second,
+	// depending on the machine, active utilization and total number of pods.
+	//
+	// Let's consider the scenario of congested ReplicaSet controller that can generate 1 replica per second or less.
+	// Also, let's consider a worst-case scenario, where a kubelet(s) reject all ReplicaSet pods:
+	//
+	// We have to first wait for a first set of pods (usually .spec.replicas count) to be generated to observe pod
+	// failures. We can then use these failures as data for our timeWeightedFailedPodCount calculation to slow down pod
+	// generation. We will do this by assigning weights to these pods according to their age.
+	// So let's wait for at least replicasToCreate seconds (aka firstUpperBound and usually .spec.replicas). The
+	// ReplicaSet controller should generate at least replicasToCreate number of pods, before we can limit the creation
+	// of additional pods. Let's assign these pods a weight of 1. The first bucket should be at least replicasToCreate
+	// and the second bucket should be equal to 0, until we can promote pods from the first bucket.
+	//
+	// To ensure that we do not burst create replicas periodically in these intervals, we should also consider old pods,
+	// but with a lower weight. We can consider pods that are younger than the 3 * firstUpperBound seconds. This should
+	// give us some buffer in case the controller is slower than 1 replica per second.
+	//
+	// Let's consider 6 buckets and decrease the weight in each bucket by 1/6. This means that when the firstUpperBound
+	// time is reached for the first time, 1/6 of the replicasToCreate can be retried.
+	//
+	// The manageReplicas function limits this value to burstReplicas, which is usually 500 (further limited to 250 by a
+	// precondition), so this is our maximum for the firstUpperBound.
+	firstUpperBound := replicasToCreate
+	// The minimum is 10s, which means our first retry is in 10s, and the failed pods blocking window is only 30s.
+	// Smaller ReplicaSets will reconcile faster because they are not limited by the time ot takes the controller to
+	// create all the pods.
+	if firstUpperBound < 10 {
+		firstUpperBound = 10
+	}
+	lastUpperBound := firstUpperBound * 3
+	bucketsCount := 6
+	bucketsWidth := float64(lastUpperBound-firstUpperBound) / float64(bucketsCount-1)
+	bucketUpperBounds := metrics2.LinearBuckets(float64(firstUpperBound), bucketsWidth, bucketsCount)
+	timeBuckets := make([]int, bucketsCount)
+	var nextTimeToPromoteBucket *int
+
+	// Create a histogram of failed pods.
+	for _, failedPod := range failedPods {
+		if failedPod.Status.Phase == v1.PodFailed && failedPod.Status.StartTime != nil {
+			podStartedBeforeSeconds := now.Sub(failedPod.Status.StartTime.Time).Seconds()
+			bucketIdx := sort.SearchFloat64s(bucketUpperBounds, podStartedBeforeSeconds)
+			// Ignore pods older than the last bucket.
+			if bucketIdx != len(bucketUpperBounds) {
+				timeBuckets[bucketIdx]++
+				bucketUpperBound := bucketUpperBounds[bucketIdx]
+				timeToPromoteBucket := int(math.Ceil(bucketUpperBound - podStartedBeforeSeconds))
+				if nextTimeToPromoteBucket == nil || timeToPromoteBucket < *nextTimeToPromoteBucket {
+					nextTimeToPromoteBucket = &timeToPromoteBucket
+				}
+			}
+		}
+	}
+	// Compute the count with decreasing significance.
+	var timeWeightedFailedPodCount float64
+	for i, failedPodCount := range timeBuckets {
+		weight := float64(bucketsCount-i) / float64(bucketsCount)
+		timeWeightedFailedPodCount += float64(failedPodCount) * weight
+	}
+	if nextTimeToPromoteBucket != nil && *nextTimeToPromoteBucket < 5 {
+		// nextTimeToPromoteBucket can equal to 0, but we need a positive time period to move it to the next bucket.
+		// Large ReplicaSets can result in repeated 1s periods which is too often.
+		nextTimeToPromoteBucket = ptr.To[int](5)
+	}
+
+	var nextTimeToPromoteBucketDuration *time.Duration
+	if nextTimeToPromoteBucket != nil {
+		nextTimeToPromoteBucketDuration = ptr.To(time.Duration(*nextTimeToPromoteBucket) * time.Second)
+	}
+	// Ignore decimals to speed up the pod replacement in small ReplicaSets.
+	return int(timeWeightedFailedPodCount), nextTimeToPromoteBucketDuration
 }
 
 func getPodKeys(pods []*v1.Pod) []string {

@@ -181,6 +181,15 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	})
 })
 
+var _ = SIGDescribe("Privileged ReplicaSet", func() {
+	f := framework.NewDefaultFramework("replicaset-privileged")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.It("should not cause a hot loop that creates pods immediately after being rejected by kubelet", func(ctx context.Context) {
+		testHotLoopCausedByPodsRejectedByKubelet(ctx, f)
+	})
+})
+
 // A basic test to check the deployment of an image using a ReplicaSet. The
 // image serves its hostname which is checked for each replica.
 func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework, test string, image string) {
@@ -737,4 +746,65 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 	})
 	framework.ExpectNoError(err, "failed to locate replicaset %v in namespace %v", testReplicaSet.ObjectMeta.Name, ns)
 	framework.Logf("Replicaset %s has a patched status", rsName)
+}
+
+func testHotLoopCausedByPodsRejectedByKubelet(ctx context.Context, f *framework.Framework) {
+	// windows does not support sysctls
+	e2eskipper.SkipIfNodeOSDistroIs("windows")
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	// Create webserver pods.
+	podName := "sysctl-pod-rejected-by-kubelet"
+	rsPodLabels := map[string]string{
+		"name": podName,
+		"pod":  AgnhostImageName,
+	}
+	labelSelector := labels.SelectorFromSet(rsPodLabels).String()
+
+	rsName := "test-rs"
+	replicas := int32(10)
+	// Create a ReplicaSet
+	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
+	rs.Spec.Template.Spec.SecurityContext = &v1.PodSecurityContext{
+		Sysctls: []v1.Sysctl{
+			{
+				Name:  "test.sysctl.apps.k8s",
+				Value: "10",
+			},
+		},
+	}
+	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	// Initial burst of 10 pods in the first 10s plus calculateTimeWeightedFailedPodsCount function specifies that
+	// approximately 30 pods per minute should be created for RS of size 10.
+	expectedPodsCreated := 35 // 10 + (30 * 5/6)
+	// Consider 10 pods as a deviation.
+	expectedMaxPodsCreated := expectedPodsCreated + 10 // 45
+	expectedMinPodsCreated := expectedPodsCreated - 10 // 25
+
+	// ReplicaSet controller would usually create 60-1800 pods per minute, before the fix implemented by
+	// calculateTimeWeightedFailedPodsCount function.
+	var lastFailedPods []v1.Pod
+	gomega.Consistently(ctx, func(ctx context.Context) (int, error) {
+		pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			return 0, err
+		}
+		var failedPods []v1.Pod
+		for _, p := range pods.Items {
+			// Some pods may not have been scheduled yet.
+			if p.Status.Phase == v1.PodFailed {
+				failedPods = append(failedPods, p)
+			}
+		}
+		lastFailedPods = failedPods
+		return len(failedPods), nil
+	}).
+		WithPolling(2 * time.Second).WithTimeout(time.Minute).
+		Should(gomega.BeNumerically("<=", expectedMaxPodsCreated))
+
+	// Due to the delay of the KCM/scheduler/kubelet we do not exactly know how many pods there will be.
+	gomega.Expect(len(lastFailedPods)).Should(gomega.BeNumerically(">=", expectedMinPodsCreated))
 }
