@@ -35,6 +35,30 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+type staticPolicyStateChange int
+
+const (
+	StateChangeNotCalled staticPolicyStateChange = iota
+	StateChangeNotChanged
+	StateChangeRemoval
+	StateChangeAllocation
+)
+
+func (sc staticPolicyStateChange) String() string {
+	switch sc {
+	case StateChangeNotCalled:
+		return "NotCalled"
+	case StateChangeNotChanged:
+		return "NotChanged"
+	case StateChangeRemoval:
+		return "Removal"
+	case StateChangeAllocation:
+		return "Allocation"
+	default:
+		return "Unknown"
+	}
+}
+
 type staticPolicyTest struct {
 	description     string
 	topo            *topology.CPUTopology
@@ -50,6 +74,7 @@ type staticPolicyTest struct {
 	expErr          error
 	expCPUAlloc     bool
 	expCSet         cpuset.CPUSet
+	stateChange     staticPolicyStateChange
 }
 
 // this is not a real Clone() - hence Pseudo- - because we don't clone some
@@ -68,6 +93,7 @@ func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
 		expErr:          spt.expErr,
 		expCPUAlloc:     spt.expCPUAlloc,
 		expCSet:         spt.expCSet.Clone(),
+		stateChange:     spt.stateChange,
 	}
 }
 
@@ -244,6 +270,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 5),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			description:     "GuPodMultipleCores, DualSocketHT, ExpectAllocOneSocket",
@@ -259,6 +286,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 3, 5, 7, 9, 11),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			description:     "GuPodMultipleCores, DualSocketHT, ExpectAllocThreeCores",
@@ -274,6 +302,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(2, 3, 4, 8, 9, 10),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			description:     "GuPodMultipleCores, DualSocketNoHT, ExpectAllocOneSocket",
@@ -289,6 +318,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(4, 5, 6, 7),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			description:     "GuPodMultipleCores, DualSocketNoHT, ExpectAllocFourCores",
@@ -304,6 +334,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 3, 6, 7),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			description:     "GuPodMultipleCores, DualSocketHT, ExpectAllocOneSocketOneCore",
@@ -319,6 +350,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 3, 4, 5, 7, 9, 10, 11),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			description:     "NonGuPod, SingleSocketHT, NoAlloc",
@@ -330,6 +362,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
+			stateChange:     StateChangeNotCalled,
 		},
 		{
 			description:     "GuPodNonIntegerCore, SingleSocketHT, NoAlloc",
@@ -341,6 +374,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
+			stateChange:     StateChangeNotCalled,
 		},
 		{
 			// All the CPUs from Socket 0 are available. Some CPUs from each
@@ -358,6 +392,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         largeTopoSock0CPUSet,
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			// Only 2 full cores from three Sockets and some partial cores are available.
@@ -375,6 +410,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 25, 13, 38, 11, 35, 23, 48, 53, 173, 113, 233),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			// All CPUs from Socket 1, 1 full core and some partial cores are available.
@@ -393,6 +429,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:      nil,
 			expCPUAlloc: true,
 			expCSet:     largeTopoSock1CPUSet.Union(cpuset.New(10, 34, 22, 47)),
+			stateChange: StateChangeAllocation,
 		},
 	}
 
@@ -408,6 +445,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(4), // expect sibling of partial core
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			// Only partial cores are available in the entire system.
@@ -424,6 +462,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(10, 11, 53, 67, 52),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
@@ -435,6 +474,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=8, available=7"),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
+			stateChange:     StateChangeNotChanged,
 		},
 		{
 			description:     "GuPodMultipleCores, SingleSocketHT, ExpectSameAllocation",
@@ -450,6 +490,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(2, 3, 6, 7),
+			stateChange:     StateChangeNotCalled,
 		},
 		{
 			description:     "GuPodMultipleCores, DualSocketHT, NoAllocExpectError",
@@ -465,6 +506,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=10, available=8"),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
+			stateChange:     StateChangeNotChanged,
 		},
 		{
 			description:     "GuPodMultipleCores, SingleSocketHT, NoAllocExpectError",
@@ -480,6 +522,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=2, available=1"),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
+			stateChange:     StateChangeNotChanged,
 		},
 		{
 			// Only 7 CPUs are available.
@@ -497,6 +540,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=76, available=7"),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
+			stateChange:     StateChangeNotChanged,
 		},
 	}
 
@@ -515,6 +559,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          SMTAlignmentError{RequestedCPUs: 1, CpusPerCore: 2},
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(), // reject allocation of sibling of partial core
+			stateChange:     StateChangeNotCalled,
 		},
 		{
 			// test SMT-level != 2 - which is the default on x86_64
@@ -530,6 +575,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          SMTAlignmentError{RequestedCPUs: 15, CpusPerCore: 4},
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
+			stateChange:     StateChangeNotCalled,
 		},
 		{
 			description: "GuPodManyCores, topoDualSocketHT, ExpectDoNotAllocPartialCPU",
@@ -545,6 +591,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          SMTAlignmentError{RequestedCPUs: 10, CpusPerCore: 2, AvailablePhysicalCPUs: 8, CausedByPhysicalCPUs: true},
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
+			stateChange:     StateChangeNotCalled,
 		},
 		{
 			description: "GuPodManyCores, topoDualSocketHT, AutoReserve, ExpectAllocAllCPUs",
@@ -559,6 +606,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			description: "GuPodManyCores, topoDualSocketHT, ExpectAllocAllCPUs",
@@ -574,6 +622,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			stateChange:     StateChangeAllocation,
 		},
 	}
 	newNUMAAffinity := func(bits ...int) bitmask.BitMask {
@@ -595,6 +644,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(2, 11),
+			stateChange:     StateChangeAllocation,
 		},
 		{
 			description: "Align by socket: false, cpu's are taken strictly from NUMA nodes in hint",
@@ -610,6 +660,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(2, 21),
+			stateChange:     StateChangeAllocation,
 		},
 	}
 
@@ -690,11 +741,32 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 				testCase.description, container.Name, st.assignments)
 		}
 	}
+
+	testStateChangeStats(t, st, testCase)
 }
 
 func runStaticPolicyTestCaseWithFeatureGate(t *testing.T, testCase staticPolicyTest) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 	runStaticPolicyTestCase(t, testCase)
+}
+
+var expectedStateCallStats = map[staticPolicyStateChange][2]mockStateStats{
+	StateChangeNotCalled:  {{}, {}},
+	StateChangeNotChanged: {{HoldStore: 1}, {Store: 1}},
+	StateChangeRemoval:    {{HoldStore: 1}, {SetDefaultCPUSet: 1, Delete: 1, Store: 1}},
+	StateChangeAllocation: {{HoldStore: 1}, {SetCPUSet: 1, SetDefaultCPUSet: 1, Store: 1}},
+}
+
+func testStateChangeStats(t *testing.T, st *mockState, testCase staticPolicyTest) {
+	if st.hold != 0 {
+		t.Errorf("StaticPolicy error (%v). Expected state hold to be disabled: hold %v",
+			testCase.description, st.hold)
+	}
+
+	if !reflect.DeepEqual(st.callStats, expectedStateCallStats[testCase.stateChange]) {
+		t.Errorf("StaticPolicy error (%v). Expected call stats: %v for stateChange %v, collected call stats %v",
+			testCase.description, expectedStateCallStats[testCase.stateChange], testCase.stateChange, st.callStats)
+	}
 }
 
 func TestStaticPolicyReuseCPUs(t *testing.T) {
@@ -820,6 +892,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.New(4, 5, 6, 7),
 			expCSet:         cpuset.New(1, 2, 3, 4, 5, 6, 7),
+			stateChange:     StateChangeRemoval,
 		},
 		{
 			description:   "SingleSocketHT, DeAllocOneContainer, BeginEmpty",
@@ -834,6 +907,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.New(),
 			expCSet:         cpuset.New(1, 2, 3),
+			stateChange:     StateChangeRemoval,
 		},
 		{
 			description:   "SingleSocketHT, DeAllocTwoContainer",
@@ -848,6 +922,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.New(6, 7),
 			expCSet:         cpuset.New(1, 3, 5, 6, 7),
+			stateChange:     StateChangeRemoval,
 		},
 		{
 			description:   "SingleSocketHT, NoDeAlloc",
@@ -861,6 +936,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.New(2, 4, 6, 7),
 			expCSet:         cpuset.New(2, 4, 6, 7),
+			stateChange:     StateChangeNotCalled,
 		},
 	}
 
@@ -887,6 +963,8 @@ func TestStaticPolicyRemove(t *testing.T) {
 			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected (pod %v, container %v) not be in assignments %v",
 				testCase.description, testCase.podUID, testCase.containerName, st.assignments)
 		}
+
+		testStateChangeStats(t, st, testCase)
 	}
 }
 

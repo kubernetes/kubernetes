@@ -395,6 +395,8 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 	logger.Info("Topology Affinity", "affinity", hint)
 
 	// Allocate CPUs according to the NUMA affinity contained in the hint.
+	s.HoldStore()
+	defer s.Store()
 	cpuAllocation, err := p.allocateCPUs(logger, s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
 	if err != nil {
 		logger.Error(err, "Unable to allocate CPUs", "numCPUs", numCPUs)
@@ -431,6 +433,8 @@ func (p *staticPolicy) RemoveContainer(logger logr.Logger, s state.State, podUID
 	if !ok {
 		return nil
 	}
+	s.HoldStore()
+	defer s.Store()
 	s.Delete(podUID, containerName)
 	// Mutate the shared pool, adding released cpus.
 	toRelease = toRelease.Difference(cpusInUse)

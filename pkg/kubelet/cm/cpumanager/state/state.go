@@ -49,6 +49,8 @@ type writer interface {
 	SetCPUAssignments(ContainerCPUAssignments)
 	Delete(podUID string, containerName string)
 	ClearState()
+	HoldStore()
+	Store()
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment
