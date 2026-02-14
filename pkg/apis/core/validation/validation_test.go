@@ -25774,7 +25774,7 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 	}
 }
 
-func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
+func TestValidatePodTemplateSpec(t *testing.T) {
 	rootFld := field.NewPath("template")
 	tests := []struct {
 		description string
@@ -25855,7 +25855,7 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		err := ValidatePodTemplateSpec(test.spec, rootFld, PodValidationOptions{})
+		err := ValidatePodTemplateSpec(test.spec, test.fldPath, PodValidationOptions{})
 		assert.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
 	}
 }
