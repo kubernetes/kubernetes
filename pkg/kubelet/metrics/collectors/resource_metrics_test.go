@@ -42,14 +42,17 @@ func TestCollectResourceMetrics(t *testing.T) {
 		"node_cpu_usage_seconds_total",
 		"node_memory_working_set_bytes",
 		"node_swap_usage_bytes",
+		"node_memory_usage_bytes",
 		"container_cpu_usage_seconds_total",
 		"container_memory_working_set_bytes",
 		"container_swap_usage_bytes",
 		"container_swap_limit_bytes",
+		"container_memory_usage_bytes",
 		"container_start_time_seconds",
 		"pod_cpu_usage_seconds_total",
 		"pod_memory_working_set_bytes",
 		"pod_swap_usage_bytes",
+		"pod_memory_usage_bytes",
 	}
 
 	tests := []struct {
@@ -137,6 +140,33 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP node_swap_usage_bytes [ALPHA] Current swap usage of the node in bytes. Reported only on non-windows systems
 				# TYPE node_swap_usage_bytes gauge
 				node_swap_usage_bytes 500 1624396288302
+				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE scrape_error gauge
+				scrape_error 0
+				# HELP resource_scrape_error [STABLE] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE resource_scrape_error gauge
+				resource_scrape_error 0
+			`,
+		},
+		{
+			name: "node memory usage metrics",
+			summary: &statsapi.Summary{
+				Node: statsapi.NodeStats{
+					Memory: &statsapi.MemoryStats{
+						Time:            testTime,
+						WorkingSetBytes: ptr.To[uint64](1000),
+						UsageBytes:      ptr.To[uint64](2000),
+					},
+				},
+			},
+			summaryErr: nil,
+			expectedMetrics: `
+				# HELP node_memory_usage_bytes [ALPHA] Total memory in use in bytes. This includes all memory regardless of when it was accessed. On Windows, this will be populated once PR #132047 merges to report committed memory.
+				# TYPE node_memory_usage_bytes gauge
+				node_memory_usage_bytes 2000 1624396278302
+				# HELP node_memory_working_set_bytes [STABLE] Current working set of the node in bytes
+				# TYPE node_memory_working_set_bytes gauge
+				node_memory_working_set_bytes 1000 1624396278302
 				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
 				# TYPE scrape_error gauge
 				scrape_error 0
@@ -261,6 +291,59 @@ func TestCollectResourceMetrics(t *testing.T) {
         		# HELP container_swap_usage_bytes [ALPHA] Current amount of the container swap usage in bytes. Reported only on non-windows systems
         		# TYPE container_swap_usage_bytes gauge
         		container_swap_usage_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 1624396278302
+			`,
+		},
+		{
+			name: "container and pod memory usage metrics",
+			summary: &statsapi.Summary{
+				Pods: []statsapi.PodStats{
+					{
+						PodRef: statsapi.PodReference{
+							Name:      "pod_a",
+							Namespace: "namespace_a",
+						},
+						Memory: &statsapi.MemoryStats{
+							Time:            testTime,
+							WorkingSetBytes: ptr.To[uint64](2000),
+							UsageBytes:      ptr.To[uint64](3000),
+						},
+						Containers: []statsapi.ContainerStats{
+							{
+								Name:      "container_a",
+								StartTime: metav1.NewTime(staticTimestamp.Add(-30 * time.Second)),
+								Memory: &statsapi.MemoryStats{
+									Time:            testTime,
+									WorkingSetBytes: ptr.To[uint64](1000),
+									UsageBytes:      ptr.To[uint64](1500),
+								},
+							},
+						},
+					},
+				},
+			},
+			summaryErr: nil,
+			expectedMetrics: `
+				# HELP container_memory_usage_bytes [ALPHA] Total memory in use by the container in bytes. This includes all memory regardless of when it was accessed. On Windows, this will be populated once PR #132047 merges to report committed memory.
+				# TYPE container_memory_usage_bytes gauge
+				container_memory_usage_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1500 1624396278302
+				# HELP container_memory_working_set_bytes [STABLE] Current working set of the container in bytes
+				# TYPE container_memory_working_set_bytes gauge
+				container_memory_working_set_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 1624396278302
+				# HELP container_start_time_seconds [STABLE] Start time of the container since unix epoch in seconds
+				# TYPE container_start_time_seconds gauge
+				container_start_time_seconds{container="container_a",namespace="namespace_a",pod="pod_a"} 1.6243962483020916e+09
+				# HELP pod_memory_usage_bytes [ALPHA] Total memory in use by the pod in bytes. This includes all memory regardless of when it was accessed. On Windows, this will be populated once PR #132047 merges to report committed memory.
+				# TYPE pod_memory_usage_bytes gauge
+				pod_memory_usage_bytes{namespace="namespace_a",pod="pod_a"} 3000 1624396278302
+				# HELP pod_memory_working_set_bytes [STABLE] Current working set of the pod in bytes
+				# TYPE pod_memory_working_set_bytes gauge
+				pod_memory_working_set_bytes{namespace="namespace_a",pod="pod_a"} 2000 1624396278302
+				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE scrape_error gauge
+				scrape_error 0
+				# HELP resource_scrape_error [STABLE] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE resource_scrape_error gauge
+				resource_scrape_error 0
 			`,
 		},
 		{
@@ -436,6 +519,30 @@ func TestCollectResourceMetrics(t *testing.T) {
 			},
 			summaryErr: nil,
 			expectedMetrics: `
+				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE scrape_error gauge
+				scrape_error 0
+				# HELP resource_scrape_error [STABLE] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE resource_scrape_error gauge
+				resource_scrape_error 0
+			`,
+		},
+		{
+			name: "nil memory usage metrics",
+			summary: &statsapi.Summary{
+				Node: statsapi.NodeStats{
+					Memory: &statsapi.MemoryStats{
+						Time:            testTime,
+						WorkingSetBytes: ptr.To[uint64](1000),
+						UsageBytes:      nil,
+					},
+				},
+			},
+			summaryErr: nil,
+			expectedMetrics: `
+				# HELP node_memory_working_set_bytes [STABLE] Current working set of the node in bytes
+				# TYPE node_memory_working_set_bytes gauge
+				node_memory_working_set_bytes 1000 1624396278302
 				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
 				# TYPE scrape_error gauge
 				scrape_error 0

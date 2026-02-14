@@ -48,6 +48,14 @@ var (
 		metrics.ALPHA,
 		"")
 
+	nodeMemoryTotalUsageDesc = metrics.NewDesc("node_memory_usage_bytes",
+		"Total memory in use in bytes. This includes all memory regardless of when it was accessed. "+
+			"On Windows, this will be populated once PR #132047 merges to report committed memory.",
+		nil,
+		nil,
+		metrics.ALPHA,
+		"")
+
 	containerCPUUsageDesc = metrics.NewDesc("container_cpu_usage_seconds_total",
 		"Cumulative cpu time consumed by the container in core-seconds",
 		[]string{"container", "pod", "namespace"},
@@ -76,6 +84,14 @@ var (
 		metrics.ALPHA,
 		"")
 
+	containerMemoryTotalUsageDesc = metrics.NewDesc("container_memory_usage_bytes",
+		"Total memory in use by the container in bytes. This includes all memory regardless of when it was accessed. "+
+			"On Windows, this will be populated once PR #132047 merges to report committed memory.",
+		[]string{"container", "pod", "namespace"},
+		nil,
+		metrics.ALPHA,
+		"")
+
 	podCPUUsageDesc = metrics.NewDesc("pod_cpu_usage_seconds_total",
 		"Cumulative cpu time consumed by the pod in core-seconds",
 		[]string{"pod", "namespace"},
@@ -92,6 +108,14 @@ var (
 
 	podSwapUsageDesc = metrics.NewDesc("pod_swap_usage_bytes",
 		"Current amount of the pod swap usage in bytes. Reported only on non-windows systems",
+		[]string{"pod", "namespace"},
+		nil,
+		metrics.ALPHA,
+		"")
+
+	podMemoryTotalUsageDesc = metrics.NewDesc("pod_memory_usage_bytes",
+		"Total memory in use by the pod in bytes. This includes all memory regardless of when it was accessed. "+
+			"On Windows, this will be populated once PR #132047 merges to report committed memory.",
 		[]string{"pod", "namespace"},
 		nil,
 		metrics.ALPHA,
@@ -140,14 +164,17 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 	ch <- nodeCPUUsageDesc
 	ch <- nodeMemoryUsageDesc
 	ch <- nodeSwapUsageDesc
+	ch <- nodeMemoryTotalUsageDesc
 	ch <- containerStartTimeDesc
 	ch <- containerCPUUsageDesc
 	ch <- containerMemoryUsageDesc
 	ch <- containerSwapUsageDesc
 	ch <- containerSwapLimitDesc
+	ch <- containerMemoryTotalUsageDesc
 	ch <- podCPUUsageDesc
 	ch <- podMemoryUsageDesc
 	ch <- podSwapUsageDesc
+	ch <- podMemoryTotalUsageDesc
 	ch <- resourceScrapeResultDesc
 	ch <- resourceScrapeErrorResultDesc
 }
@@ -176,6 +203,7 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 	rc.collectNodeCPUMetrics(ch, statsSummary.Node)
 	rc.collectNodeMemoryMetrics(ch, statsSummary.Node)
 	rc.collectNodeSwapMetrics(ch, statsSummary.Node)
+	rc.collectNodeMemoryTotalUsageMetrics(ch, statsSummary.Node)
 
 	for _, pod := range statsSummary.Pods {
 		for _, container := range pod.Containers {
@@ -183,10 +211,12 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 			rc.collectContainerCPUMetrics(ch, pod, container)
 			rc.collectContainerMemoryMetrics(ch, pod, container)
 			rc.collectContainerSwapMetrics(ch, pod, container)
+			rc.collectContainerMemoryTotalUsageMetrics(ch, pod, container)
 		}
 		rc.collectPodCPUMetrics(ch, pod)
 		rc.collectPodMemoryMetrics(ch, pod)
 		rc.collectPodSwapMetrics(ch, pod)
+		rc.collectPodMemoryTotalUsageMetrics(ch, pod)
 	}
 }
 
@@ -215,6 +245,18 @@ func (rc *resourceMetricsCollector) collectNodeSwapMetrics(ch chan<- metrics.Met
 
 	ch <- metrics.NewLazyMetricWithTimestamp(s.Swap.Time.Time,
 		metrics.NewLazyConstMetric(nodeSwapUsageDesc, metrics.GaugeValue, float64(*s.Swap.SwapUsageBytes)))
+}
+
+// collectNodeMemoryTotalUsageMetrics collects total memory usage metrics for the node.
+// UsageBytes includes all memory regardless of when it was accessed.
+// Related: https://github.com/kubernetes/kubernetes/pull/132047 for Windows support
+func (rc *resourceMetricsCollector) collectNodeMemoryTotalUsageMetrics(ch chan<- metrics.Metric, s summary.NodeStats) {
+	if s.Memory == nil || s.Memory.UsageBytes == nil {
+		return
+	}
+
+	ch <- metrics.NewLazyMetricWithTimestamp(s.Memory.Time.Time,
+		metrics.NewLazyConstMetric(nodeMemoryTotalUsageDesc, metrics.GaugeValue, float64(*s.Memory.UsageBytes)))
 }
 
 func (rc *resourceMetricsCollector) collectContainerStartTime(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
@@ -265,6 +307,19 @@ func (rc *resourceMetricsCollector) collectContainerSwapMetrics(ch chan<- metric
 	}
 }
 
+// collectContainerMemoryTotalUsageMetrics collects total memory usage metrics for containers.
+// UsageBytes includes all memory regardless of when it was accessed.
+// Related: https://github.com/kubernetes/kubernetes/pull/132047 for Windows support
+func (rc *resourceMetricsCollector) collectContainerMemoryTotalUsageMetrics(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
+	if s.Memory == nil || s.Memory.UsageBytes == nil {
+		return
+	}
+
+	ch <- metrics.NewLazyMetricWithTimestamp(s.Memory.Time.Time,
+		metrics.NewLazyConstMetric(containerMemoryTotalUsageDesc, metrics.GaugeValue,
+			float64(*s.Memory.UsageBytes), s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
+}
+
 func (rc *resourceMetricsCollector) collectPodCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
 	if pod.CPU == nil || pod.CPU.UsageCoreNanoSeconds == nil {
 		return
@@ -293,4 +348,17 @@ func (rc *resourceMetricsCollector) collectPodSwapMetrics(ch chan<- metrics.Metr
 	ch <- metrics.NewLazyMetricWithTimestamp(pod.Swap.Time.Time,
 		metrics.NewLazyConstMetric(podSwapUsageDesc, metrics.GaugeValue,
 			float64(*pod.Swap.SwapUsageBytes), pod.PodRef.Name, pod.PodRef.Namespace))
+}
+
+// collectPodMemoryTotalUsageMetrics collects total memory usage metrics for pods.
+// UsageBytes includes all memory regardless of when it was accessed.
+// Related: https://github.com/kubernetes/kubernetes/pull/132047 for Windows support
+func (rc *resourceMetricsCollector) collectPodMemoryTotalUsageMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
+	if pod.Memory == nil || pod.Memory.UsageBytes == nil {
+		return
+	}
+
+	ch <- metrics.NewLazyMetricWithTimestamp(pod.Memory.Time.Time,
+		metrics.NewLazyConstMetric(podMemoryTotalUsageDesc, metrics.GaugeValue,
+			float64(*pod.Memory.UsageBytes), pod.PodRef.Name, pod.PodRef.Namespace))
 }
