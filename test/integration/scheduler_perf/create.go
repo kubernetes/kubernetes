@@ -68,7 +68,7 @@ func (c *createAny) collectsMetrics() bool {
 	return false
 }
 
-func (c createAny) patchParams(w *workload) (realOp, error) {
+func (c createAny) patchParams(w *Workload) (realOp, error) {
 	if c.CountParam != "" {
 		count, err := w.Params.get(c.CountParam[1:])
 		if err != nil {
