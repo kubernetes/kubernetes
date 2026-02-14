@@ -41,6 +41,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -6597,6 +6598,158 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 		}
 	}
 }
+
+func TestDescribeNodeWithResourceSlice(t *testing.T) {
+	nodeCapacity := mergeResourceLists(
+		getHugePageResourceList("2Mi", "4Gi"),
+		getResourceList("8", "24Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+	nodeAllocatable := mergeResourceLists(
+		getHugePageResourceList("2Mi", "2Gi"),
+		getResourceList("4", "12Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+
+	fake := fake.NewClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: true,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:    nodeCapacity,
+				Allocatable: nodeAllocatable,
+			},
+		},
+		&resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "slice-1",
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				NodeName: ptr.To("bar"),
+				Driver:   "nvidia.com/gpu",
+				Pool: resourcev1.ResourcePool{
+					Name: "gpu-pool",
+				},
+				Devices: []resourcev1.Device{
+					{Name: "gpu-0"},
+					{Name: "gpu-1"},
+				},
+			},
+		},
+		&resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "slice-2",
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				NodeName: ptr.To("bar"),
+				Driver:   "nvidia.com/gpu",
+				Pool: resourcev1.ResourcePool{
+					Name: "gpu-pool",
+				},
+				Devices: []resourcev1.Device{
+					{Name: "gpu-2"},
+					{Name: "gpu-3"},
+				},
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify node-exclusive resource slices are shown aggregated by pool
+	expectedOut := []string{
+		"Unschedulable",
+		"true",
+		"Node-Local ResourceSlices:",
+		"Driver",
+		"Pool",
+		"Slices",
+		"Devices",
+		"nvidia.com/gpu",
+		"gpu-pool",
+	}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
+	}
+}
+
+func TestDescribeNodeWithResourceSliceCapping(t *testing.T) {
+	// Create a node with more than 10 pools to test capping
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
+		},
+	}
+
+	objects := []runtime.Object{node}
+
+	// Create 12 different driver/pool combinations
+	for i := range 12 {
+		objects = append(objects, &resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("slice-%d", i),
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				NodeName: ptr.To("bar"),
+				Driver:   fmt.Sprintf("driver-%d.example.com", i),
+				Pool: resourcev1.ResourcePool{
+					Name: fmt.Sprintf("pool-%d", i),
+				},
+				Devices: []resourcev1.Device{
+					{Name: "device-0"},
+				},
+			},
+		})
+	}
+
+	fake := fake.NewClientset(objects...)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Should show capping message
+	if !strings.Contains(out, "...and 2 more pools") {
+		t.Errorf("expected capping message in output: %q", out)
+	}
+}
+
+func TestDescribeNodeWithNoResourceSlices(t *testing.T) {
+	fake := fake.NewClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Should NOT show ResourceSlices section when there are none
+	if strings.Contains(out, "Node-Local ResourceSlices") {
+		t.Errorf("did not expect ResourceSlices section when there are no slices: %q", out)
+	}
+}
+
 func TestDescribeStatefulSet(t *testing.T) {
 	var partition int32 = 2672
 	var replicas int32 = 1
