@@ -248,13 +248,12 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to run since it's
-	// first time seen by kubelet.
+	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to go from pending to running.
 	PodStartDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartDurationKey,
-			Help:           "Duration in seconds from kubelet seeing a pod for the first time to the pod starting to run",
+			Help:           "Duration in seconds for a single pod to go from pending to running.",
 			Buckets:        podStartupDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},

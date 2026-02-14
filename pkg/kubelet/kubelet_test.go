@@ -1532,6 +1532,105 @@ func TestCreateMirrorPod(t *testing.T) {
 	}
 }
 
+func TestPodStartDurationCountMetric(t *testing.T) {
+	metrics.Register()
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	logger, _ := ktesting.NewTestContext(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				kubetypes.ConfigFirstSeenAnnotationKey: kubetypes.NewTimestamp().GetString(),
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "container"},
+			},
+		},
+	}
+
+	histogramCount := 0
+
+	tests := []struct {
+		name                  string
+		podUID                types.UID
+		podStatus             v1.PodStatus
+		containerState        kubecontainer.State
+		populateStatusManager bool
+		expectedHistogramBump bool
+	}{
+		{
+			name:                  "statusManager is not populated and apiPodStatus is pending",
+			podUID:                "uid1",
+			populateStatusManager: false,
+			expectedHistogramBump: false,
+		},
+		{
+			name:                  "statusManager is not populated and apiPodStatus is running",
+			podUID:                "uid2",
+			containerState:        kubecontainer.ContainerStateRunning,
+			populateStatusManager: false,
+			expectedHistogramBump: false,
+		},
+		{
+			name:                  "statusManager is populated, existingStatus is pending, and apiPodStatus is pending",
+			podUID:                "uid3",
+			podStatus:             v1.PodStatus{Phase: v1.PodPending},
+			populateStatusManager: true,
+			expectedHistogramBump: false,
+		},
+		{
+			name:                  "statusManager is populated, existingStatus is pending, and apiPodStatus is running",
+			podUID:                "uid4",
+			containerState:        kubecontainer.ContainerStateRunning,
+			podStatus:             v1.PodStatus{Phase: v1.PodPending},
+			populateStatusManager: true,
+			expectedHistogramBump: true,
+		},
+		{
+			name:                  "statusManager is populated, existingStatus is running, and apiPodStatus is running",
+			podUID:                "uid5",
+			containerState:        kubecontainer.ContainerStateRunning,
+			podStatus:             v1.PodStatus{Phase: v1.PodRunning},
+			populateStatusManager: true,
+			expectedHistogramBump: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pod.UID = test.podUID
+
+			if test.populateStatusManager {
+				kubelet.statusManager.SetPodStatus(logger, pod, test.podStatus)
+			}
+
+			_, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodSync, pod, nil, &kubecontainer.PodStatus{
+				ID: pod.UID,
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						Name:  pod.Spec.Containers[0].Name,
+						State: test.containerState,
+					},
+				},
+			})
+			if err != nil {
+				t.Errorf("Unexpected err: %v", err)
+			}
+
+			if test.expectedHistogramBump {
+				histogramCount++
+			}
+
+			testutil.AssertHistogramTotalCount(t, "kubelet_pod_start_duration_seconds", map[string]string{}, histogramCount)
+		})
+	}
+}
+
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
