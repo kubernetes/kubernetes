@@ -124,6 +124,11 @@ const (
 
 	// owner: @HirazawaUi
 	//
+	// Allow kubelet to cancel pulling images after pod deletion.
+	CancelPullImage featuregate.Feature = "CancelPullImage"
+
+	// owner: @HirazawaUi
+	//
 	// Enabling this feature gate will cause the pod's status to change due to a kubelet restart.
 	ChangeContainerStatusOnKubeletRestart featuregate.Feature = "ChangeContainerStatusOnKubeletRestart"
 
@@ -1153,6 +1158,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	CancelPullImage: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	ChangeContainerStatusOnKubeletRestart: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Deprecated},
@@ -2133,6 +2142,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CSIServiceAccountTokenSecrets: {},
 
 	CSIVolumeHealth: {},
+
+	CancelPullImage: {},
 
 	ChangeContainerStatusOnKubeletRestart: {},
 
