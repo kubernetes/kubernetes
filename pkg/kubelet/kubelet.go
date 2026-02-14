@@ -1035,7 +1035,11 @@ func NewMainKubelet(ctx context.Context,
 		}
 		klet.version = v
 		klet.nodeDeclaredFeaturesFramework = framework
-		klet.nodeDeclaredFeatures = klet.discoverNodeDeclaredFeatures()
+		var discoverErr error
+		klet.nodeDeclaredFeatures, discoverErr = klet.discoverNodeDeclaredFeatures()
+		if discoverErr != nil {
+			klog.ErrorS(discoverErr, "Failed to discover node declared features")
+		}
 		klet.nodeDeclaredFeaturesSet = ndf.NewFeatureSet(klet.nodeDeclaredFeatures...)
 	}
 

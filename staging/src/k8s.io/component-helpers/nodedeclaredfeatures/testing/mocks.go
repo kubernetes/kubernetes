@@ -54,7 +54,7 @@ func (_m *MockFeature) EXPECT() *MockFeature_Expecter {
 }
 
 // Discover provides a mock function for the type MockFeature
-func (_mock *MockFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) bool {
+func (_mock *MockFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) (bool, error) {
 	ret := _mock.Called(cfg)
 
 	if len(ret) == 0 {
@@ -62,12 +62,21 @@ func (_mock *MockFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) 
 	}
 
 	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*nodedeclaredfeatures.NodeConfiguration) (bool, error)); ok {
+		return returnFunc(cfg)
+	}
 	if returnFunc, ok := ret.Get(0).(func(*nodedeclaredfeatures.NodeConfiguration) bool); ok {
 		r0 = returnFunc(cfg)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(*nodedeclaredfeatures.NodeConfiguration) error); ok {
+		r1 = returnFunc(cfg)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // MockFeature_Discover_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Discover'
@@ -94,12 +103,12 @@ func (_c *MockFeature_Discover_Call) Run(run func(cfg *nodedeclaredfeatures.Node
 	return _c
 }
 
-func (_c *MockFeature_Discover_Call) Return(b bool) *MockFeature_Discover_Call {
-	_c.Call.Return(b)
+func (_c *MockFeature_Discover_Call) Return(b bool, err error) *MockFeature_Discover_Call {
+	_c.Call.Return(b, err)
 	return _c
 }
 
-func (_c *MockFeature_Discover_Call) RunAndReturn(run func(cfg *nodedeclaredfeatures.NodeConfiguration) bool) *MockFeature_Discover_Call {
+func (_c *MockFeature_Discover_Call) RunAndReturn(run func(cfg *nodedeclaredfeatures.NodeConfiguration) (bool, error)) *MockFeature_Discover_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -302,6 +311,52 @@ func (_c *MockFeature_Name_Call) RunAndReturn(run func() string) *MockFeature_Na
 	return _c
 }
 
+// Requirements provides a mock function for the type MockFeature
+func (_mock *MockFeature) Requirements() *nodedeclaredfeatures.FeatureRequirements {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Requirements")
+	}
+
+	var r0 *nodedeclaredfeatures.FeatureRequirements
+	if returnFunc, ok := ret.Get(0).(func() *nodedeclaredfeatures.FeatureRequirements); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*nodedeclaredfeatures.FeatureRequirements)
+		}
+	}
+	return r0
+}
+
+// MockFeature_Requirements_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Requirements'
+type MockFeature_Requirements_Call struct {
+	*mock.Call
+}
+
+// Requirements is a helper method to define mock.On call
+func (_e *MockFeature_Expecter) Requirements() *MockFeature_Requirements_Call {
+	return &MockFeature_Requirements_Call{Call: _e.mock.On("Requirements")}
+}
+
+func (_c *MockFeature_Requirements_Call) Run(run func()) *MockFeature_Requirements_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockFeature_Requirements_Call) Return(featureRequirements *nodedeclaredfeatures.FeatureRequirements) *MockFeature_Requirements_Call {
+	_c.Call.Return(featureRequirements)
+	return _c
+}
+
+func (_c *MockFeature_Requirements_Call) RunAndReturn(run func() *nodedeclaredfeatures.FeatureRequirements) *MockFeature_Requirements_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockFeatureGate creates a new instance of MockFeatureGate. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockFeatureGate(t interface {
@@ -329,35 +384,44 @@ func (_m *MockFeatureGate) EXPECT() *MockFeatureGate_Expecter {
 	return &MockFeatureGate_Expecter{mock: &_m.Mock}
 }
 
-// Enabled provides a mock function for the type MockFeatureGate
-func (_mock *MockFeatureGate) Enabled(key string) bool {
+// CheckEnabled provides a mock function for the type MockFeatureGate
+func (_mock *MockFeatureGate) CheckEnabled(key string) (bool, error) {
 	ret := _mock.Called(key)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Enabled")
+		panic("no return value specified for CheckEnabled")
 	}
 
 	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (bool, error)); ok {
+		return returnFunc(key)
+	}
 	if returnFunc, ok := ret.Get(0).(func(string) bool); ok {
 		r0 = returnFunc(key)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(key)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
-// MockFeatureGate_Enabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Enabled'
-type MockFeatureGate_Enabled_Call struct {
+// MockFeatureGate_CheckEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckEnabled'
+type MockFeatureGate_CheckEnabled_Call struct {
 	*mock.Call
 }
 
-// Enabled is a helper method to define mock.On call
+// CheckEnabled is a helper method to define mock.On call
 //   - key string
-func (_e *MockFeatureGate_Expecter) Enabled(key interface{}) *MockFeatureGate_Enabled_Call {
-	return &MockFeatureGate_Enabled_Call{Call: _e.mock.On("Enabled", key)}
+func (_e *MockFeatureGate_Expecter) CheckEnabled(key interface{}) *MockFeatureGate_CheckEnabled_Call {
+	return &MockFeatureGate_CheckEnabled_Call{Call: _e.mock.On("CheckEnabled", key)}
 }
 
-func (_c *MockFeatureGate_Enabled_Call) Run(run func(key string)) *MockFeatureGate_Enabled_Call {
+func (_c *MockFeatureGate_CheckEnabled_Call) Run(run func(key string)) *MockFeatureGate_CheckEnabled_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -370,12 +434,12 @@ func (_c *MockFeatureGate_Enabled_Call) Run(run func(key string)) *MockFeatureGa
 	return _c
 }
 
-func (_c *MockFeatureGate_Enabled_Call) Return(b bool) *MockFeatureGate_Enabled_Call {
-	_c.Call.Return(b)
+func (_c *MockFeatureGate_CheckEnabled_Call) Return(b bool, err error) *MockFeatureGate_CheckEnabled_Call {
+	_c.Call.Return(b, err)
 	return _c
 }
 
-func (_c *MockFeatureGate_Enabled_Call) RunAndReturn(run func(key string) bool) *MockFeatureGate_Enabled_Call {
+func (_c *MockFeatureGate_CheckEnabled_Call) RunAndReturn(run func(key string) (bool, error)) *MockFeatureGate_CheckEnabled_Call {
 	_c.Call.Return(run)
 	return _c
 }

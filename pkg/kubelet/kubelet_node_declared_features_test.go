@@ -31,41 +31,37 @@ import (
 
 func TestGuaranteedPodExclusiveCPUsFeatureDiscovery(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	const guaranteedCPUResizeDeclaredFeature = "GuaranteedQoSPodCPUResize"
 
 	testcases := []struct {
 		name                                string
 		cpuManagerPolicy                    string
 		inplacePodResizeExclusiveCPUsEnable bool
-		expectedFeature                     string
-		expectFeature                       bool
+		expectFeaturePresent                bool
 	}{
 		{
 			name:                                "feature enabled with static cpu manager policy",
 			cpuManagerPolicy:                    "static",
 			inplacePodResizeExclusiveCPUsEnable: true,
-			expectedFeature:                     "GuaranteedQoSPodCPUResize",
-			expectFeature:                       true,
+			expectFeaturePresent:                true,
 		},
 		{
 			name:                                "feature enabled with none cpu manager policy",
 			cpuManagerPolicy:                    "none",
 			inplacePodResizeExclusiveCPUsEnable: true,
-			expectedFeature:                     "GuaranteedQoSPodCPUResize",
-			expectFeature:                       true,
+			expectFeaturePresent:                true,
 		},
 		{
 			name:                                "feature disabled with static cpu manager policy",
 			cpuManagerPolicy:                    "static",
 			inplacePodResizeExclusiveCPUsEnable: false,
-			expectedFeature:                     "GuaranteedQoSPodCPUResize",
-			expectFeature:                       false,
+			expectFeaturePresent:                false,
 		},
 		{
 			name:                                "feature disabled with none cpu manager policy",
 			cpuManagerPolicy:                    "none",
 			inplacePodResizeExclusiveCPUsEnable: false,
-			expectedFeature:                     "GuaranteedQoSPodCPUResize",
-			expectFeature:                       true,
+			expectFeaturePresent:                true,
 		},
 	}
 	for _, tc := range testcases {
@@ -83,11 +79,12 @@ func TestGuaranteedPodExclusiveCPUsFeatureDiscovery(t *testing.T) {
 			require.NoError(t, err)
 			kubelet.nodeDeclaredFeaturesFramework = framework
 
-			features := kubelet.discoverNodeDeclaredFeatures()
-			if tc.expectFeature {
-				assert.Contains(t, features, tc.expectedFeature)
+			features, err := kubelet.discoverNodeDeclaredFeatures()
+			require.NoError(t, err)
+			if tc.expectFeaturePresent {
+				assert.Contains(t, features, guaranteedCPUResizeDeclaredFeature)
 			} else {
-				assert.NotContains(t, features, tc.expectedFeature)
+				assert.NotContains(t, features, guaranteedCPUResizeDeclaredFeature)
 			}
 		})
 	}

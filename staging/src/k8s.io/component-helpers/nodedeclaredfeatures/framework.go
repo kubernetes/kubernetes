@@ -17,6 +17,7 @@ limitations under the License.
 package nodedeclaredfeatures
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -28,7 +29,7 @@ import (
 // Framework provides functions for discovering node features and inferring pod feature requirements.
 // It is stateful and holds the feature registry.
 type Framework struct {
-	registry []Feature
+	featureMap map[string]Feature
 }
 
 // FeatureSet is a set of node features.
@@ -59,25 +60,35 @@ func New(registry []Feature) (*Framework, error) {
 	if registry == nil {
 		return nil, fmt.Errorf("registry must not be nil")
 	}
+	featureMap := make(map[string]Feature, len(registry))
+	for _, f := range registry {
+		featureMap[f.Name()] = f
+	}
 	return &Framework{
-		registry: registry,
+		featureMap: featureMap,
 	}, nil
 }
 
 // DiscoverNodeFeatures determines which features from the registry are enabled
 // for a specific node configuration. It returns a sorted, unique list of feature names.
-func (f *Framework) DiscoverNodeFeatures(cfg *NodeConfiguration) []string {
+func (f *Framework) DiscoverNodeFeatures(cfg *NodeConfiguration) ([]string, error) {
 	var enabledFeatures []string
-	for _, f := range f.registry {
-		if f.Discover(cfg) {
-			if cfg.Version != nil && f.MaxVersion() != nil && cfg.Version.GreaterThan(f.MaxVersion()) {
+	var errs error
+	for _, fr := range f.featureMap {
+		enabled, err := fr.Discover(cfg)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("feature %s: %w", fr.Name(), err))
+			continue
+		}
+		if enabled {
+			if cfg.Version != nil && fr.MaxVersion() != nil && cfg.Version.GreaterThan(fr.MaxVersion()) {
 				continue
 			}
-			enabledFeatures = append(enabledFeatures, f.Name())
+			enabledFeatures = append(enabledFeatures, fr.Name())
 		}
 	}
 	slices.Sort(enabledFeatures)
-	return enabledFeatures
+	return enabledFeatures, errs
 }
 
 // InferForPodScheduling determines which features from the registry are required by a pod scheduling for a given target version.
@@ -86,7 +97,7 @@ func (f *Framework) InferForPodScheduling(podInfo *PodInfo, targetVersion *versi
 		return FeatureSet{}, fmt.Errorf("target version cannot be nil")
 	}
 	reqs := NewFeatureSet()
-	for _, f := range f.registry {
+	for _, f := range f.featureMap {
 		if f.MaxVersion() != nil && targetVersion.GreaterThan(f.MaxVersion()) {
 			// If target version is greater than the feature's max version, no need to require the feature
 			continue
@@ -104,7 +115,7 @@ func (f *Framework) InferForPodUpdate(oldPodInfo, newPodInfo *PodInfo, targetVer
 		return FeatureSet{}, fmt.Errorf("target version cannot be nil")
 	}
 	reqs := NewFeatureSet()
-	for _, f := range f.registry {
+	for _, f := range f.featureMap {
 		if f.MaxVersion() != nil && targetVersion.GreaterThan(f.MaxVersion()) {
 			// If target version is greater than the feature's max version, no need to require the feature
 			continue
@@ -155,4 +166,14 @@ func MatchNodeFeatureSet(requiredFeatures FeatureSet, nodeFeatures FeatureSet) (
 		return &MatchResult{IsMatch: false, UnsatisfiedRequirements: mismatched}, nil
 	}
 	return &MatchResult{IsMatch: true}, nil
+}
+
+// GetFeatureRequirements returns the feature gates that a feature depends on.
+func (f *Framework) GetFeatureRequirements(name string) (*FeatureRequirements, error) {
+	feature, exists := f.featureMap[name]
+	if !exists {
+		return nil, fmt.Errorf("feature '%s' not found in registry", name)
+	}
+
+	return feature.Requirements(), nil
 }

@@ -144,6 +144,8 @@ const (
 type FeatureGate interface {
 	// Enabled returns true if the key is enabled.
 	Enabled(key Feature) bool
+	// CheckEnabled returns true if the key is enabled and an error if the key is unknown.
+	CheckEnabled(key Feature) (bool, error)
 	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
 	KnownFeatures() []string
 	// Dependencies returns a copy of the known feature dependencies.
@@ -949,6 +951,15 @@ func (f *featureGate) Enabled(key Feature) bool {
 	v := featureEnabled(key, f.enabled.Load().(map[Feature]bool), f.known.Load().(map[Feature]VersionedSpecs), f.EmulationVersion(), f.MinCompatibilityVersion())
 	f.unsafeRecordQueried(key)
 	return v
+}
+
+// CheckEnabled returns true if the key is enabled. If the key is not known, an error is returned.
+func (f *featureGate) CheckEnabled(key Feature) (bool, error) {
+	knownMap := f.known.Load().(map[Feature]VersionedSpecs)
+	if _, ok := knownMap[key]; !ok {
+		return false, fmt.Errorf("feature gate %q is not registered", key)
+	}
+	return featureEnabled(key, f.enabled.Load().(map[Feature]bool), knownMap, f.EmulationVersion(), f.MinCompatibilityVersion()), nil
 }
 
 func (f *featureGate) featureSpecAtEmulationAndMinCompatVersion(v VersionedSpecs) *FeatureSpec {

@@ -371,6 +371,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 									{Name: names.DefaultBinder},
+									{Name: names.NodeDeclaredFeatures},
 								},
 							},
 							Bind: configv1.PluginSet{

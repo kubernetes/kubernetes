@@ -3196,7 +3196,7 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 	})
 	mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
 	mockFeature.EXPECT().InferForUpdate(mock.Anything, mock.Anything).Return(false).Maybe()
-	mockFeature.EXPECT().Discover(mock.Anything).Return(false).Maybe()
+	mockFeature.EXPECT().Discover(mock.Anything).Return(false, nil).Maybe()
 
 	tests := []struct {
 		name           string

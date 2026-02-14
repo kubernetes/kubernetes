@@ -1035,8 +1035,8 @@ func Test_UnionedGVKs(t *testing.T) {
 			enableSchedulerQueueingHints:    true,
 		},
 		{
-			name:    "plugins with default profile and NodeDeclaredFeatures",
-			plugins: schedulerapi.PluginSet{Enabled: append(defaults.PluginsV1.MultiPoint.Enabled, schedulerapi.Plugin{Name: names.NodeDeclaredFeatures})},
+			name:    "plugins with default profile (NodeDeclaredFeatures: enabled)",
+			plugins: defaults.PluginsV1.MultiPoint,
 			want: map[fwk.EventResource]fwk.ActionType{
 				// NodeDeclaredFeatures adds fwk.Update
 				fwk.Pod: fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Delete | fwk.Update,
