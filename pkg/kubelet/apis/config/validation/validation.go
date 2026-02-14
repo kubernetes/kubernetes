@@ -395,5 +395,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		}
 	}
 
+	if kc.GoTraceback != "" {
+		validValues := sets.NewString("none", "single", "all", "system", "crash")
+		if !validValues.Has(kc.GoTraceback) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: goTraceback %q must be one of: %v", kc.GoTraceback, validValues.List()))
+		}
+	}
+
 	return utilerrors.NewAggregate(allErrors)
 }

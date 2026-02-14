@@ -660,6 +660,12 @@ type KubeletConfiguration struct {
 	// +optional
 	ContainerLogMaxFiles *int32 `json:"containerLogMaxFiles,omitempty"`
 
+	// goTraceback is the value to set the GOTRACEBACK environment variable to.
+	// Valid values are "none", "single", "all", "system", "crash".
+	// If not specified, the environment variable or default behavior is used.
+	// +optional
+	GoTraceback string `json:"goTraceback,omitempty"`
+
 	// ContainerLogMaxWorkers specifies the maximum number of concurrent workers to spawn
 	// for performing the log rotate operations. Set this count to 1 for disabling the
 	// concurrent log rotation workflows
