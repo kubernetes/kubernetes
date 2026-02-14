@@ -1043,10 +1043,19 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 		return true
 	}
 
-	// If any of the main containers have status and are Running, then all init containers must
-	// have been executed at some point in the past.  However, they could have been removed
-	// from the container runtime now, and if we proceed, it would appear as if they
-	// never ran and will re-execute improperly except for the restartable init containers.
+	// If any of the main containers have status and are Running, Exited, or
+	// Created, then all init containers must have been executed at some point
+	// in the past. However, they could have been removed from the container
+	// runtime now, and if we proceed, it would appear as if they never ran and
+	// will re-execute improperly except for the restartable init containers.
+	//
+	// Note: this function is only called when the pod sandbox is confirmed
+	// ready (computePodActions returns early when createPodSandbox is true),
+	// so Exited containers here belong to the current sandbox and reliably
+	// indicate that the pod has already initialized. The prior concern about
+	// node-reboot false positives does not apply because a rebooted node
+	// produces a non-ready or missing sandbox, which causes computePodActions
+	// to take the createPodSandbox path before reaching this function.
 	podHasInitialized := false
 	for _, container := range pod.Spec.Containers {
 		status := podStatus.FindContainerStatusByName(container.Name)
@@ -1055,16 +1064,9 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 		}
 		switch status.State {
 		case kubecontainer.ContainerStateCreated,
-			kubecontainer.ContainerStateRunning:
+			kubecontainer.ContainerStateRunning,
+			kubecontainer.ContainerStateExited:
 			podHasInitialized = true
-		case kubecontainer.ContainerStateExited:
-			// This is a workaround for the issue that the kubelet cannot
-			// differentiate the container statuses of the previous podSandbox
-			// from the current one.
-			// If the node is rebooted, all containers will be in the exited
-			// state and the kubelet will try to recreate a new podSandbox.
-			// In this case, the kubelet should not mistakenly think that
-			// the newly created podSandbox has been initialized.
 		default:
 			// Ignore other states
 		}
