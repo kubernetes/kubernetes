@@ -1608,6 +1608,11 @@ func (kl *Kubelet) setupDataDirs(logger klog.Logger) error {
 			return fmt.Errorf("error creating checkpoint directory: %v", err)
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletLocalPodCheckpointRestore) {
+		if err := utilfs.MkdirAll(kl.getPodCheckpointsDir(), 0700); err != nil {
+			return fmt.Errorf("error creating pod checkpoint directory: %v", err)
+		}
+	}
 	if selinux.GetEnabled() {
 		err := selinux.SetFileLabel(pluginRegistrationDir, kubeletconfig.KubeletPluginsDirSELinuxLabel)
 		if err != nil {
@@ -3280,6 +3285,53 @@ func (kl *Kubelet) CheckpointContainer(
 	options.ContainerId = string(container.ID.ID)
 
 	if err := kl.containerRuntime.CheckpointContainer(ctx, options); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CheckpointPod tries to checkpoint a pod sandbox. The parameters are used to
+// look up the specified pod. If the pod specified by the given parameters
+// cannot be found an error is returned. If the pod is found the container
+// engine will be asked to checkpoint the given pod sandbox into the kubelet's default
+// checkpoint directory.
+func (kl *Kubelet) CheckpointPod(
+	ctx context.Context,
+	podUID types.UID,
+	podFullName string,
+	options *runtimeapi.CheckpointPodRequest,
+) error {
+	// Get the pod status to find the sandbox ID
+	pod, podFound := kl.podManager.GetPodByUID(podUID)
+	if !podFound {
+		return fmt.Errorf("pod %v not found", podUID)
+	}
+
+	podStatus, err := kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		return err
+	}
+
+	if podStatus.SandboxStatuses == nil || len(podStatus.SandboxStatuses) == 0 {
+		return fmt.Errorf("pod %v has no sandbox", podFullName)
+	}
+
+	// Only set default path if export parameter was not provided
+	if options.Path == "" {
+		options.Path = filepath.Join(
+			kl.getPodCheckpointsDir(),
+			fmt.Sprintf(
+				"checkpoint-%s-%s.tar",
+				podFullName,
+				time.Now().Format(time.RFC3339),
+			),
+		)
+	}
+
+	options.PodSandboxId = podStatus.SandboxStatuses[0].Id
+
+	if err := kl.containerRuntime.CheckpointPod(ctx, options); err != nil {
 		return err
 	}
 

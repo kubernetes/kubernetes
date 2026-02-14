@@ -30,5 +30,6 @@ const (
 	KubeletPluginsDirSELinuxLabel            = "system_u:object_r:container_file_t:s0"
 	KubeletContainersSharedSELinuxLabel      = "system_u:object_r:container_file_t:s0"
 	DefaultKubeletCheckpointsDirName         = "checkpoints"
+	DefaultKubeletPodCheckpointsDirName      = "pod-checkpoints"
 	DefaultKubeletUserNamespacesIDsPerPod    = 65536
 )

@@ -147,6 +147,13 @@ func (fk *fakeKubelet) CheckpointContainer(_ context.Context, podUID types.UID, 
 	return nil
 }
 
+func (fk *fakeKubelet) CheckpointPod(_ context.Context, podUID types.UID, podFullName string, options *runtimeapi.CheckpointPodRequest) error {
+	if podFullName == "checkpointingPodFailure_other" {
+		return fmt.Errorf("Returning error for test")
+	}
+	return nil
+}
+
 func (fk *fakeKubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
 	return nil, nil
 }
@@ -681,9 +688,10 @@ func TestAuthFilters(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	// Enable features.ContainerCheckpoint during test
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ContainerCheckpoint:    true,
-		zpagesfeatures.ComponentStatusz: true,
-		zpagesfeatures.ComponentFlagz:   true,
+		features.ContainerCheckpoint:              true,
+		features.KubeletLocalPodCheckpointRestore: true,
+		zpagesfeatures.ComponentStatusz:           true,
+		zpagesfeatures.ComponentFlagz:             true,
 	})
 
 	fw := newServerTest(tCtx)
@@ -1302,6 +1310,162 @@ func TestCheckpointContainer(t *testing.T) {
 	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
 	t.Run("checkpointing fails because disabled", func(t *testing.T) {
 		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 404, resp.StatusCode)
+	})
+}
+
+func TestCheckpointPod(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	podNamespace := "other"
+	podName := "foo"
+
+	setupTest := func(featureGate bool) *serverTestFramework {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletLocalPodCheckpointRestore, featureGate)
+
+		fw := newServerTest(tCtx)
+		fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+			return nil, false
+		}
+		return fw
+	}
+	fw := setupTest(true)
+	defer fw.testHTTPServer.Close()
+
+	t.Run("wrong pod namespace", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpointpod/"+podNamespace+"/"+podName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+
+	// let GetPodByName() return a result
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      podName,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "baz",
+					},
+				},
+			},
+		}, true
+	}
+
+	// Now test checkpointing of the pod fails
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      "checkpointingPodFailure",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "baz",
+					},
+				},
+			},
+		}, true
+	}
+	t.Run("checkpointing pod fails", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpointpod/"+podNamespace+"/"+podName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		assert.Equal(t, 500, resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		assert.Equal(t, "checkpointing of pod other/foo failed (Returning error for test)", string(body))
+	})
+
+	// Now test a successful pod checkpoint
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      podName,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "baz",
+					},
+				},
+			},
+		}, true
+	}
+	t.Run("checkpointing pod succeeds", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpointpod/"+podNamespace+"/"+podName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 200, resp.StatusCode)
+	})
+
+	t.Run("checkpointing pod with timeout", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpointpod/"+podNamespace+"/"+podName+"?timeout=30", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 200, resp.StatusCode)
+	})
+
+	t.Run("checkpointing pod with invalid timeout", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpointpod/"+podNamespace+"/"+podName+"?timeout=invalid", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("checkpointing pod with leaveRunning", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpointpod/"+podNamespace+"/"+podName+"?leaveRunning=true", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 200, resp.StatusCode)
+	})
+
+	t.Run("checkpointing pod with invalid leaveRunning", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpointpod/"+podNamespace+"/"+podName+"?leaveRunning=invalid", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	// Test for 404 if checkpointing support is explicitly disabled
+	fw.testHTTPServer.Close()
+	fw = setupTest(false)
+	defer fw.testHTTPServer.Close()
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      podName,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "baz",
+					},
+				},
+			},
+		}, true
+	}
+	t.Run("checkpointing pod fails because disabled", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpointpod/"+podNamespace+"/"+podName, "", nil)
 		if err != nil {
 			t.Errorf("Got error POSTing: %v", err)
 		}

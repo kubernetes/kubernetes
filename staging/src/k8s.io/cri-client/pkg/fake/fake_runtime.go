@@ -335,6 +335,26 @@ func (f *RemoteRuntime) CheckpointContainer(ctx context.Context, req *kubeapi.Ch
 	return &kubeapi.CheckpointContainerResponse{}, nil
 }
 
+// CheckpointPod checkpoints the given pod sandbox.
+func (f *RemoteRuntime) CheckpointPod(ctx context.Context, req *kubeapi.CheckpointPodRequest) (*kubeapi.CheckpointPodResponse, error) {
+	err := f.RuntimeService.CheckpointPod(ctx, &kubeapi.CheckpointPodRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.CheckpointPodResponse{}, nil
+}
+
+// RestorePod restores a pod sandbox from a checkpoint.
+func (f *RemoteRuntime) RestorePod(ctx context.Context, req *kubeapi.RestorePodRequest) (*kubeapi.RestorePodResponse, error) {
+	podID, err := f.RuntimeService.RestorePod(ctx, &kubeapi.RestorePodRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.RestorePodResponse{PodSandboxId: podID}, nil
+}
+
 func (f *RemoteRuntime) GetContainerEvents(req *kubeapi.GetEventsRequest, ces kubeapi.RuntimeService_GetContainerEventsServer) error {
 	return nil
 }

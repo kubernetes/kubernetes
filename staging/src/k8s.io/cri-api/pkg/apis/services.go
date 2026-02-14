@@ -88,6 +88,10 @@ type PodSandboxManager interface {
 	// This request is treated as best effort, and failure will not block the
 	// Kubelet with proceeding with a resize.
 	UpdatePodSandboxResources(ctx context.Context, request *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error)
+	// CheckpointPod checkpoints a pod sandbox
+	CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error
+	// RestorePod restores a pod sandbox from a checkpoint
+	RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (string, error)
 }
 
 // ContainerStatsManager contains methods for retrieving the container
