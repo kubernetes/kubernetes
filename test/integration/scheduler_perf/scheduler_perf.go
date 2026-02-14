@@ -60,6 +60,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -1160,6 +1161,15 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 		}
 		featureGates[features.OpportunisticBatching] = false
 	}
+
+	// Disable DRAConsumableCapacity for the stable allocator when emulating v1.34+.
+	// At v1.33, the feature doesn't exist (PreAlpha) so we can't set it, but it's
+	// effectively disabled, which is what the stable allocator expects.
+	if structured.AllocatorEnabled("stable") &&
+		utilfeature.DefaultFeatureGate.(featuregate.MutableVersionedFeatureGate).EmulationVersion().AtLeast(version.MustParse("1.34")) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, false)
+	}
+
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)
 
 	// 30 minutes should be plenty enough even for the 5000-node tests.
