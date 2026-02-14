@@ -126,6 +126,41 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 	return handler, admission.ValidateInitialization(handler)
 }
 
+func createCommonHandler(t *testing.T, resourceQuotas ...runtime.Object) (*resourcequota.QuotaAdmission, *fake.Clientset) {
+	t.Helper()
+	kubeClient := fake.NewClientset(resourceQuotas...)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+
+	config := &resourcequotaapi.Configuration{}
+	quotaConfiguration, err := install.NewQuotaConfigurationForAdmission(informerFactory)
+	if err != nil {
+		t.Errorf("Error occurred while creating quota configuration: %v", err)
+	}
+
+	handler, err := resourcequota.NewResourceQuota(config, 5)
+	if err != nil {
+		t.Errorf("Error occurred while creating handler: %v", err)
+	}
+	stopCh := t.Context().Done()
+
+	initializers := admission.PluginInitializers{
+		genericadmissioninitializer.New(kubeClient, nil, informerFactory, nil, nil, nil, stopCh, nil),
+		controlplaneadmission.NewPluginInitializer(quotaConfiguration, nil),
+	}
+	initializers.Initialize(handler)
+
+	informerFactory.Start(stopCh)
+	informerFactory.WaitForCacheSync(stopCh)
+	kubeClient.ClearActions()
+
+	err = admission.ValidateInitialization(handler)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
+	}
+
+	return handler, kubeClient
+}
+
 // TestAdmissionIgnoresDelete verifies that the admission controller ignores delete operations
 func TestAdmissionIgnoresDelete(t *testing.T) {
 	stopCh := make(chan struct{})
@@ -159,20 +194,10 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	}
 	resourceQuota.Status.Hard[corev1.ResourceMemory] = resource.MustParse("2Gi")
 	resourceQuota.Status.Used[corev1.ResourceMemory] = resource.MustParse("1Gi")
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+	handler, _ := createCommonHandler(t, resourceQuota)
 
-	kubeClient := fake.NewSimpleClientset()
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
-
-	handler, err := createHandler(kubeClient, informerFactory, stopCh)
-	if err != nil {
-		t.Errorf("Error occurred while creating admission plugin: %v", err)
-	}
-
-	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("Expected an error because the pod exceeded allowed quota")
 	}
