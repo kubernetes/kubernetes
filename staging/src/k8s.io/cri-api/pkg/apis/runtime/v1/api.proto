@@ -991,8 +991,23 @@ message LinuxContainerSecurityContext {
     //   <full-path-to-profile> is the full path of the profile.
     // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 10 [deprecated=true];
+    // Ulimits specifies the ulimits for the container.
+    // Each element maps to a system ulimit setting.
+    repeated Ulimit ulimits = 18;
 }
 
+// Ulimit corresponds to a ulimit setting on a Linux system.
+message Ulimit {
+    // Name of the ulimit to be set.
+    // e.g. "nofile", "nproc", "core".
+    string name = 1;
+
+    // Hard is the hard limit for the ulimit type.
+    int64 hard = 2;
+
+    // Soft is the soft limit for the ulimit type.
+    int64 soft = 3;
+}
 // LinuxContainerConfig contains platform-specific configuration for
 // Linux-based containers.
 message LinuxContainerConfig {
@@ -1742,6 +1757,8 @@ message RuntimeHandler {
 message RuntimeFeatures {
     // supplemental_groups_policy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
     bool supplemental_groups_policy = 1;
+    // Container_ulimits is set to true if the runtime supports Ulimit.
+    bool Container_ulimits = 2;
 }
 
 message StatusResponse {

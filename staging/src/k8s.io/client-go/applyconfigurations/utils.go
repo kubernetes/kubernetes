@@ -976,6 +976,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.TypedLocalObjectReferenceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("TypedObjectReference"):
 		return &applyconfigurationscorev1.TypedObjectReferenceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("Ulimit"):
+		return &applyconfigurationscorev1.UlimitApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Volume"):
 		return &applyconfigurationscorev1.VolumeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeDevice"):

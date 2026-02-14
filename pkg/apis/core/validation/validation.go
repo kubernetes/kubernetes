@@ -120,6 +120,9 @@ var allowedEphemeralContainerFields = map[string]bool{
 // In future, they can be expanded to values from
 // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 var validOS = sets.New(core.Linux, core.Windows)
+var supportedUlimitNames = sets.New("nofile", "memlock", "core", "nice", "rtprio", "stack")
+
+const maxNofileUlimitValue int64 = 1048576
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -4948,6 +4951,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 			if sc.RunAsGroup != nil {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("runAsGroup"), "cannot be set for a windows pod"))
 			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) && len(sc.Ulimits) > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("ulimits"), "cannot be set for a windows pod"))
+			}
 		}
 		return true
 	})
@@ -8429,7 +8435,36 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 
 	allErrs = append(allErrs, validateWindowsSecurityContextOptions(sc.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	allErrs = append(allErrs, ValidateAppArmorProfileField(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
+	if len(sc.Ulimits) > 0 {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("ulimits"), "may not be set when ContainerUlimits feature gate is disabled"))
+		} else {
+			allErrs = append(allErrs, validateUlimits(sc.Ulimits, fldPath.Child("ulimits"))...)
+		}
+	}
 
+	return allErrs
+}
+
+func validateUlimits(ulimits []core.Ulimit, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, ulimit := range ulimits {
+		ulimitPath := fldPath.Index(i)
+		if !supportedUlimitNames.Has(ulimit.Name) {
+			allErrs = append(allErrs, field.NotSupported(ulimitPath.Child("name"), ulimit.Name, sets.List(supportedUlimitNames)))
+		}
+		if ulimit.Soft > ulimit.Hard {
+			allErrs = append(allErrs, field.Invalid(ulimitPath.Child("soft"), ulimit.Soft, "must be less than or equal to `hard`"))
+		}
+		if ulimit.Name == "nofile" {
+			if ulimit.Hard > maxNofileUlimitValue {
+				allErrs = append(allErrs, field.Invalid(ulimitPath.Child("hard"), ulimit.Hard, fmt.Sprintf("must be less than or equal to %d for `nofile`", maxNofileUlimitValue)))
+			}
+			if ulimit.Soft > maxNofileUlimitValue {
+				allErrs = append(allErrs, field.Invalid(ulimitPath.Child("soft"), ulimit.Soft, fmt.Sprintf("must be less than or equal to %d for `nofile`", maxNofileUlimitValue)))
+			}
+		}
+	}
 	return allErrs
 }
 

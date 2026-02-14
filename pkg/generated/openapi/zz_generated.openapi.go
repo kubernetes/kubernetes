@@ -682,6 +682,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.TopologySpreadConstraint{}.OpenAPIModelName():                                                            schema_k8sio_api_core_v1_TopologySpreadConstraint(ref),
 		corev1.TypedLocalObjectReference{}.OpenAPIModelName():                                                           schema_k8sio_api_core_v1_TypedLocalObjectReference(ref),
 		corev1.TypedObjectReference{}.OpenAPIModelName():                                                                schema_k8sio_api_core_v1_TypedObjectReference(ref),
+		corev1.Ulimit{}.OpenAPIModelName():                                                                              schema_k8sio_api_core_v1_Ulimit(ref),
 		corev1.Volume{}.OpenAPIModelName():                                                                              schema_k8sio_api_core_v1_Volume(ref),
 		corev1.VolumeDevice{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_VolumeDevice(ref),
 		corev1.VolumeMount{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_VolumeMount(ref),
@@ -24830,6 +24831,13 @@ func schema_k8sio_api_core_v1_NodeFeatures(ref common.ReferenceCallback) common.
 							Format:      "",
 						},
 					},
+					"containerUlimits": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ContainerUlimits is set to true if the runtime supports per-container ulimits.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -30883,11 +30891,33 @@ func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) comm
 							Ref:         ref(corev1.AppArmorProfile{}.OpenAPIModelName()),
 						},
 					},
+					"ulimits": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "The ulimits to be applied to the container. Each element in this list maps to a system ulimit setting. If unspecified, the container runtime default ulimits will be used. Note that this field cannot be set when spec.os.name is windows.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(corev1.Ulimit{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.AppArmorProfile{}.OpenAPIModelName(), corev1.Capabilities{}.OpenAPIModelName(), corev1.SELinuxOptions{}.OpenAPIModelName(), corev1.SeccompProfile{}.OpenAPIModelName(), corev1.WindowsSecurityContextOptions{}.OpenAPIModelName()},
+			corev1.AppArmorProfile{}.OpenAPIModelName(), corev1.Capabilities{}.OpenAPIModelName(), corev1.SELinuxOptions{}.OpenAPIModelName(), corev1.SeccompProfile{}.OpenAPIModelName(), corev1.Ulimit{}.OpenAPIModelName(), corev1.WindowsSecurityContextOptions{}.OpenAPIModelName()},
 	}
 }
 
@@ -32133,6 +32163,44 @@ func schema_k8sio_api_core_v1_TypedObjectReference(ref common.ReferenceCallback)
 					},
 				},
 				Required: []string{"kind", "name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_core_v1_Ulimit(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Ulimit corresponds to a ulimit setting on a Linux system.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the ulimit to be set. Must be one of the supported ulimit names (e.g., \"nofile\", \"memlock\", \"core\").",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"hard": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Hard is the hard limit for the ulimit type. The hard limit acts as a ceiling for the soft limit. An unprivileged process may only set its soft limit to a value between 0 and the hard limit and (irreversibly) lower its hard limit.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"soft": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Soft is the soft limit for the ulimit type. The soft limit is the value that the kernel enforces for the corresponding resource. The soft limit can be increased in the process up to the hard limit value.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+				Required: []string{"name", "hard", "soft"},
 			},
 		},
 	}

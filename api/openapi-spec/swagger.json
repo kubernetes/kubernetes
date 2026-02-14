@@ -8715,6 +8715,10 @@
     "io.k8s.api.core.v1.NodeFeatures": {
       "description": "NodeFeatures describes the set of features implemented by the CRI implementation. The features contained in the NodeFeatures should depend only on the cri implementation independent of runtime handlers.",
       "properties": {
+        "containerUlimits": {
+          "description": "ContainerUlimits is set to true if the runtime supports per-container ulimits.",
+          "type": "boolean"
+        },
         "supplementalGroupsPolicy": {
           "description": "SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.",
           "type": "boolean"
@@ -11652,6 +11656,17 @@
           "$ref": "#/definitions/io.k8s.api.core.v1.SeccompProfile",
           "description": "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows."
         },
+        "ulimits": {
+          "description": "The ulimits to be applied to the container. Each element in this list maps to a system ulimit setting. If unspecified, the container runtime default ulimits will be used. Note that this field cannot be set when spec.os.name is windows.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
         "windowsOptions": {
           "$ref": "#/definitions/io.k8s.api.core.v1.WindowsSecurityContextOptions",
           "description": "The Windows specific settings applied to all containers. If unspecified, the options from the PodSecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux."
@@ -12305,6 +12320,31 @@
       "required": [
         "kind",
         "name"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.core.v1.Ulimit": {
+      "description": "Ulimit corresponds to a ulimit setting on a Linux system.",
+      "properties": {
+        "hard": {
+          "description": "Hard is the hard limit for the ulimit type. The hard limit acts as a ceiling for the soft limit. An unprivileged process may only set its soft limit to a value between 0 and the hard limit and (irreversibly) lower its hard limit.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of the ulimit to be set. Must be one of the supported ulimit names (e.g., \"nofile\", \"memlock\", \"core\").",
+          "type": "string"
+        },
+        "soft": {
+          "description": "Soft is the soft limit for the ulimit type. The soft limit is the value that the kernel enforces for the corresponding resource. The soft limit can be increased in the process up to the hard limit value.",
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "hard",
+        "soft"
       ],
       "type": "object"
     },

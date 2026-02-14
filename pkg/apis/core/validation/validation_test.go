@@ -22890,6 +22890,9 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 }
 
 func TestValidateWindowsSecurityContext(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerUlimits, true)
+
 	tests := []struct {
 		name        string
 		sc          *core.PodSpec
@@ -22911,6 +22914,12 @@ func TestValidateWindowsSecurityContext(t *testing.T) {
 	}, {
 		name:        "pod with AppArmorProfile",
 		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{AppArmorProfile: &core.AppArmorProfile{Type: core.AppArmorProfileTypeRuntimeDefault}}}}},
+		expectError: true,
+		errorMsg:    "cannot be set for a windows pod",
+		errorType:   "FieldValueForbidden",
+	}, {
+		name:        "pod with Ulimits",
+		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{Ulimits: []core.Ulimit{{Name: "nofile", Soft: 1024, Hard: 2048}}}}}},
 		expectError: true,
 		errorMsg:    "cannot be set for a windows pod",
 		errorType:   "FieldValueForbidden",
@@ -22958,6 +22967,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].SecurityContext.RunAsUser",
 		"Containers[*].SecurityContext.SELinuxOptions",
 		"Containers[*].SecurityContext.SeccompProfile",
+		"Containers[*].SecurityContext.Ulimits",
 		"Containers[*].SecurityContext.WindowsOptions",
 		"InitContainers[*].SecurityContext.AppArmorProfile",
 		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
@@ -22969,6 +22979,7 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].SecurityContext.RunAsUser",
 		"InitContainers[*].SecurityContext.SELinuxOptions",
 		"InitContainers[*].SecurityContext.SeccompProfile",
+		"InitContainers[*].SecurityContext.Ulimits",
 		"InitContainers[*].SecurityContext.WindowsOptions",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AppArmorProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
@@ -22980,6 +22991,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.RunAsUser",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SELinuxOptions",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SeccompProfile",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Ulimits",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.WindowsOptions",
 		"OS",
 		"SecurityContext.AppArmorProfile",
@@ -23342,6 +23354,9 @@ func TestValidateLinuxSecurityContext(t *testing.T) {
 }
 
 func TestValidateSecurityContext(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerUlimits, true)
+
 	runAsUser := int64(1)
 	fullValidSC := func() *core.SecurityContext {
 		return &core.SecurityContext{
@@ -23378,6 +23393,9 @@ func TestValidateSecurityContext(t *testing.T) {
 	defPmt := core.DefaultProcMount
 	procMountSet.ProcMount = &defPmt
 
+	ulimitsSet := fullValidSC()
+	ulimitsSet.Ulimits = []core.Ulimit{{Name: "nofile", Soft: 1024, Hard: 2048}}
+
 	umPmt := core.UnmaskedProcMount
 	procMountUnmasked := fullValidSC()
 	procMountUnmasked.ProcMount = &umPmt
@@ -23392,6 +23410,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		"no priv request":     {noPrivRequest, false},
 		"no run as user":      {noRunAsUser, false},
 		"proc mount set":      {procMountSet, true},
+		"ulimits set":         {ulimitsSet, false},
 		"proc mount unmasked": {procMountUnmasked, false},
 	}
 	for k, v := range successCases {
@@ -23414,6 +23433,15 @@ func TestValidateSecurityContext(t *testing.T) {
 	capSysAdminWithoutEscalation := fullValidSC()
 	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
 	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = ptr.To(false)
+
+	unsupportedUlimitName := fullValidSC()
+	unsupportedUlimitName.Ulimits = []core.Ulimit{{Name: "nproc", Soft: 1024, Hard: 2048}}
+
+	softExceedsHard := fullValidSC()
+	softExceedsHard.Ulimits = []core.Ulimit{{Name: "nofile", Soft: 4096, Hard: 2048}}
+
+	nofileOverMax := fullValidSC()
+	nofileOverMax.Ulimits = []core.Ulimit{{Name: "nofile", Soft: 1024, Hard: 1048577}}
 
 	errorCases := map[string]struct {
 		sc           *core.SecurityContext
@@ -23447,6 +23475,21 @@ func TestValidateSecurityContext(t *testing.T) {
 			errorType:   "FieldValueInvalid",
 			errorDetail: "`hostUsers` must be false to use `Unmasked`",
 		},
+		"unsupported ulimit name": {
+			sc:          unsupportedUlimitName,
+			errorType:   "FieldValueNotSupported",
+			errorDetail: "supported values",
+		},
+		"ulimit soft exceeds hard": {
+			sc:          softExceedsHard,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be less than or equal to `hard`",
+		},
+		"nofile exceeds maximum value": {
+			sc:          nofileOverMax,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must be less than or equal to 1048576 for `nofile`",
+		},
 	}
 	for k, v := range errorCases {
 		capabilities.ResetForTest()
@@ -23458,6 +23501,22 @@ func TestValidateSecurityContext(t *testing.T) {
 		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
+	}
+}
+
+func TestValidateSecurityContextUlimitsFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerUlimits, false)
+
+	sc := &core.SecurityContext{
+		Ulimits: []core.Ulimit{{Name: "nofile", Soft: 1024, Hard: 2048}},
+	}
+	errs := ValidateSecurityContext(sc, field.NewPath("field"), false)
+	if len(errs) == 0 {
+		t.Fatal("expected validation error when ContainerUlimits feature gate is disabled")
+	}
+	if errs[0].Type != field.ErrorTypeForbidden || !strings.Contains(errs[0].Detail, "ContainerUlimits feature gate is disabled") {
+		t.Fatalf("expected forbidden error for disabled feature gate, got %v", errs)
 	}
 }
 

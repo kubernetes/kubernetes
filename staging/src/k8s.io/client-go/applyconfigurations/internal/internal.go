@@ -5988,6 +5988,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.NodeFeatures
   map:
     fields:
+    - name: containerUlimits
+      type:
+        scalar: boolean
     - name: supplementalGroupsPolicy
       type:
         scalar: boolean
@@ -7769,6 +7772,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: seccompProfile
       type:
         namedType: io.k8s.api.core.v1.SeccompProfile
+    - name: ulimits
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.Ulimit
+          elementRelationship: associative
+          keys:
+          - name
     - name: windowsOptions
       type:
         namedType: io.k8s.api.core.v1.WindowsSecurityContextOptions
@@ -8150,6 +8161,21 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
+- name: io.k8s.api.core.v1.Ulimit
+  map:
+    fields:
+    - name: hard
+      type:
+        scalar: numeric
+      default: 0
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: soft
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.core.v1.Volume
   map:
     fields:

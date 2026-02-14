@@ -1281,6 +1281,7 @@ func (NodeDaemonEndpoints) SwaggerDoc() map[string]string {
 var map_NodeFeatures = map[string]string{
 	"":                         "NodeFeatures describes the set of features implemented by the CRI implementation. The features contained in the NodeFeatures should depend only on the cri implementation independent of runtime handlers.",
 	"supplementalGroupsPolicy": "SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.",
+	"containerUlimits":         "ContainerUlimits is set to true if the runtime supports per-container ulimits.",
 }
 
 func (NodeFeatures) SwaggerDoc() map[string]string {
@@ -2474,6 +2475,7 @@ var map_SecurityContext = map[string]string{
 	"procMount":                "procMount denotes the type of proc mount to use for the containers. The default value is Default which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled. Note that this field cannot be set when spec.os.name is windows.",
 	"seccompProfile":           "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows.",
 	"appArmorProfile":          "appArmorProfile is the AppArmor options to use by this container. If set, this profile overrides the pod's appArmorProfile. Note that this field cannot be set when spec.os.name is windows.",
+	"ulimits":                  "The ulimits to be applied to the container. Each element in this list maps to a system ulimit setting. If unspecified, the container runtime default ulimits will be used. Note that this field cannot be set when spec.os.name is windows.",
 }
 
 func (SecurityContext) SwaggerDoc() map[string]string {
@@ -2749,6 +2751,17 @@ var map_TypedObjectReference = map[string]string{
 
 func (TypedObjectReference) SwaggerDoc() map[string]string {
 	return map_TypedObjectReference
+}
+
+var map_Ulimit = map[string]string{
+	"":     "Ulimit corresponds to a ulimit setting on a Linux system.",
+	"name": "Name of the ulimit to be set. Must be one of the supported ulimit names (e.g., \"nofile\", \"memlock\", \"core\").",
+	"hard": "Hard is the hard limit for the ulimit type. The hard limit acts as a ceiling for the soft limit. An unprivileged process may only set its soft limit to a value between 0 and the hard limit and (irreversibly) lower its hard limit.",
+	"soft": "Soft is the soft limit for the ulimit type. The soft limit is the value that the kernel enforces for the corresponding resource. The soft limit can be increased in the process up to the hard limit value.",
+}
+
+func (Ulimit) SwaggerDoc() map[string]string {
+	return map_Ulimit
 }
 
 var map_Volume = map[string]string{

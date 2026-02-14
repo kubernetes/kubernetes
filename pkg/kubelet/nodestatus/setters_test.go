@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -55,6 +56,23 @@ import (
 const (
 	testKubeletHostname = "hostname"
 )
+
+func TestNodeFeaturesSetterIncludesContainerUlimits(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerUlimits, true)
+
+	node := &v1.Node{}
+	setter := NodeFeatures(func() *kubecontainer.RuntimeFeatures {
+		return &kubecontainer.RuntimeFeatures{
+			ContainerUlimits: true,
+		}
+	})
+
+	require.NoError(t, setter(context.Background(), node))
+	require.NotNil(t, node.Status.Features)
+	require.NotNil(t, node.Status.Features.ContainerUlimits)
+	assert.True(t, *node.Status.Features.ContainerUlimits)
+}
 
 // TODO(mtaufen): below is ported from the old kubelet_node_status_test.go code, potentially add more test coverage for NodeAddress setter in future
 func TestNodeAddress(t *testing.T) {

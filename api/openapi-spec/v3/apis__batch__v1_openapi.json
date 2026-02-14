@@ -4034,6 +4034,22 @@
             ],
             "description": "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options. Note that this field cannot be set when spec.os.name is windows."
           },
+          "ulimits": {
+            "description": "The ulimits to be applied to the container. Each element in this list maps to a system ulimit setting. If unspecified, the container runtime default ulimits will be used. Note that this field cannot be set when spec.os.name is windows.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Ulimit"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
           "windowsOptions": {
             "allOf": [
               {
@@ -4288,6 +4304,34 @@
         "required": [
           "kind",
           "name"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.Ulimit": {
+        "description": "Ulimit corresponds to a ulimit setting on a Linux system.",
+        "properties": {
+          "hard": {
+            "default": 0,
+            "description": "Hard is the hard limit for the ulimit type. The hard limit acts as a ceiling for the soft limit. An unprivileged process may only set its soft limit to a value between 0 and the hard limit and (irreversibly) lower its hard limit.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "default": "",
+            "description": "Name of the ulimit to be set. Must be one of the supported ulimit names (e.g., \"nofile\", \"memlock\", \"core\").",
+            "type": "string"
+          },
+          "soft": {
+            "default": 0,
+            "description": "Soft is the soft limit for the ulimit type. The soft limit is the value that the kernel enforces for the corresponding resource. The soft limit can be increased in the process up to the hard limit value.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "hard",
+          "soft"
         ],
         "type": "object"
       },

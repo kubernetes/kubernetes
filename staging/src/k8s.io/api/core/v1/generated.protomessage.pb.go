@@ -475,6 +475,8 @@ func (*TypedLocalObjectReference) ProtoMessage() {}
 
 func (*TypedObjectReference) ProtoMessage() {}
 
+func (*Ulimit) ProtoMessage() {}
+
 func (*Volume) ProtoMessage() {}
 
 func (*VolumeDevice) ProtoMessage() {}
