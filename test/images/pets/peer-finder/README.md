@@ -11,7 +11,7 @@ of the StatefulSet so that all peers are listed in endpoints before any peers ar
 
 There are several ways to bundle it with your main application.
 
-1. In an [init container](http://kubernetes.io/docs/user-guide/pods/init-container/),
+1. In an [init container](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/),
    to help your pod determine its peers when it first started (determine the desired set of
    peers from the governing service of the StatefulSet.  For this use case, the `--on-start` option
    can be used, but the `--on-change` option should not be used since the init container will no

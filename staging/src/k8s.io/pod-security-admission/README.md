@@ -24,7 +24,7 @@ You can reach the maintainers of this project at:
 - Slack: [#sig-auth](https://kubernetes.slack.com/messages/sig-auth)
 - Mailing List: [kubernetes-sig-auth](https://groups.google.com/forum/#!forum/kubernetes-sig-auth)
 
-Learn how to engage with the Kubernetes community on the [community page](http://kubernetes.io/community/).
+Learn how to engage with the Kubernetes community on the [community page](https://kubernetes.io/community/).
 
 ### Code of conduct
 

@@ -5,7 +5,7 @@
 
 # client-go
 
-Go clients for talking to a [kubernetes](http://kubernetes.io/) cluster.
+Go clients for talking to a [kubernetes](https://kubernetes.io/) cluster.
 
 We recommend using the `v0.x.y` tags for Kubernetes releases >= `v1.17.0` and
 `kubernetes-1.x.y` tags for Kubernetes releases < `v1.17.0`.
