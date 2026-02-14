@@ -80,8 +80,6 @@ const (
 
 	defaultStubRefreshToken = "_fake_refresh_token_"
 	defaultStubAccessToken  = "_fake_access_token_"
-
-	rsaKeyBitSize = 2048
 )
 
 var (
@@ -151,7 +149,7 @@ func runTests(t *testing.T, useAuthenticationConfig bool) {
 				caCertContent []byte,
 				caFilePath string,
 			) {
-				caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
+				caCertContent, _, caFilePath, caKeyFilePath := GenerateCert(t)
 				signingPrivateKey, publicKey := keyFunc(t)
 				oidcServer = utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, "")
 
@@ -170,7 +168,7 @@ jwt:
     username:
       claim: user
       prefix: %s
-`, oidcServer.URL(), defaultOIDCClientID, indentCertificateAuthority(string(caCertContent)), defaultOIDCUsernamePrefix)
+`, oidcServer.URL(), defaultOIDCClientID, IndentCertificateAuthority(string(caCertContent)), defaultOIDCUsernamePrefix)
 					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, &signingPrivateKey.PublicKey)
 				} else {
 					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID,
@@ -282,7 +280,7 @@ jwt:
 				caCertContent []byte,
 				caFilePath string,
 			) {
-				caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
+				caCertContent, _, caFilePath, caKeyFilePath := GenerateCert(t)
 
 				signingPrivateKey, _ = keyFunc(t)
 
@@ -303,7 +301,7 @@ jwt:
     username:
       claim: sub
       prefix: %s
-`, oidcServer.URL(), defaultOIDCClientID, indentCertificateAuthority(string(caCertContent)), defaultOIDCUsernamePrefix)
+`, oidcServer.URL(), defaultOIDCClientID, IndentCertificateAuthority(string(caCertContent)), defaultOIDCUsernamePrefix)
 					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, &signingPrivateKey.PublicKey)
 				} else {
 					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID, oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix}, &signingPrivateKey.PublicKey)
@@ -346,7 +344,7 @@ jwt:
 				caCertContent []byte,
 				caFilePath string,
 			) {
-				caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
+				caCertContent, _, caFilePath, caKeyFilePath := GenerateCert(t)
 
 				signingPrivateKey, _ = keyFunc(t)
 
@@ -366,7 +364,7 @@ jwt:
   claimMappings:
     username:
       expression: claims.sub
-`, oidcServer.URL(), defaultOIDCClientID, indentCertificateAuthority(string(caCertContent)))
+`, oidcServer.URL(), defaultOIDCClientID, IndentCertificateAuthority(string(caCertContent)))
 					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, &signingPrivateKey.PublicKey)
 				} else {
 					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{
@@ -411,7 +409,7 @@ jwt:
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, singleTestRunner(useAuthenticationConfig, rsaGenerateKey, tt))
+		t.Run(tt.name, singleTestRunner(useAuthenticationConfig, RSAGenerateKey, tt))
 	}
 
 	for _, tt := range []singleTest[*ecdsa.PrivateKey, *ecdsa.PublicKey]{
@@ -489,7 +487,7 @@ jwt:
     username:
       claim: sub
       prefix: %s
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert), defaultOIDCUsernamePrefix)
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert), defaultOIDCUsernamePrefix)
 			}
 		}
 		oidcServer, apiServer, signingPrivateKey, caCert, certPath := tt.configureInfrastructure(t, fn, keyFunc)
@@ -547,7 +545,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 		},
 	}
 
-	oidcServer, apiServer, signingPrivateKey, caCert, certPath := configureTestInfrastructure(t, func(t *testing.T, _, _ string) string { return "" }, rsaGenerateKey)
+	oidcServer, apiServer, signingPrivateKey, caCert, certPath := configureTestInfrastructure(t, func(t *testing.T, _, _ string) string { return "" }, RSAGenerateKey)
 
 	tokenURL, err := oidcServer.TokenURL()
 	require.NoError(t, err)
@@ -617,7 +615,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
@@ -669,7 +667,7 @@ jwt:
       expression: "'k8s-' + claims.sub"
     groups:
       expression: '(claims.roles.split(",") + claims.other_roles.split(",")).map(role, "prefix:" + role)'
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
@@ -719,7 +717,7 @@ jwt:
   claimValidationRules:
   - expression: 'claims.hd == "example.com"'
     message: "the hd claim must be set to example.com"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
@@ -769,7 +767,7 @@ jwt:
   userValidationRules:
   - expression: "'bar' in user.extra['example.org/foo'] && 'qux' in user.extra['example.org/baz']"
     message: "example.org/foo must be bar and example.org/baz must be qux"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
@@ -824,7 +822,7 @@ jwt:
       expression: "'k8s-' + claims.sub"
     uid:
       expression: "claims.uid"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
@@ -876,7 +874,7 @@ jwt:
   userValidationRules:
   - expression: "user.groups.all(group, !group.startsWith('system:'))"
     message: "groups cannot used reserved system: prefix"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
@@ -925,7 +923,7 @@ jwt:
   claimValidationRules:
   - expression: 'sets.equivalent(claims.aud, ["bar", "foo", "baz"])'
     message: 'aud claim must be exactly match list ["bar", "foo", "baz"]'
-`, issuerURL, indentCertificateAuthority(caCert))
+`, issuerURL, IndentCertificateAuthority(caCert))
 			},
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
@@ -972,7 +970,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
@@ -1019,7 +1017,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			configureInfrastructure: configureTestInfrastructureWithEgressProxy[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
@@ -1051,7 +1049,7 @@ jwt:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			oidcServer, apiServer, signingPrivateKey, caCert, certPath := tt.configureInfrastructure(t, tt.authConfigFn, rsaGenerateKey)
+			oidcServer, apiServer, signingPrivateKey, caCert, certPath := tt.configureInfrastructure(t, tt.authConfigFn, RSAGenerateKey)
 
 			tt.configureOIDCServerBehaviour(t, oidcServer, signingPrivateKey)
 
@@ -1110,7 +1108,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
@@ -1128,7 +1126,7 @@ jwt:
   claimMappings:
     username:
       expression: "'panda-' + claims.sub"   # this is the only new part of the config
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			assertErrFn: func(t *testing.T, errorToCheck error) {
 				assert.NoError(t, errorToCheck)
@@ -1173,7 +1171,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
@@ -1192,7 +1190,7 @@ jwt:
   claimMappings:
     username:
       expression: "'panda-' + claims.sub"   # this is a new part of the config
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			configureTestInfrastructure: func(t *testing.T, fn authenticationConfigFunc) (*utilsoidc.TestServer, *kubeapiserverapptesting.TestServer, []byte, string) {
 				t.Helper()
@@ -1263,7 +1261,7 @@ jwt:
   claimMappings:
     username:
       expression: "'snorlax-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			assertErrFn: func(t *testing.T, errorToCheck error) {
 				assert.True(t, apierrors.IsUnauthorized(errorToCheck))
@@ -1324,7 +1322,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			assertErrFn: func(t *testing.T, errorToCheck error) {
 				assert.True(t, apierrors.IsUnauthorized(errorToCheck))
@@ -1362,7 +1360,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
@@ -1380,7 +1378,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claimss.sub"  # has typo
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			assertErrFn: func(t *testing.T, errorToCheck error) {
 				assert.NoError(t, errorToCheck)
@@ -1421,7 +1419,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			newAuthConfigFn: func(t *testing.T, _, _ string) string {
 				return `
@@ -1465,7 +1463,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+`, issuerURL, defaultOIDCClientID, IndentCertificateAuthority(caCert))
 			},
 			newAuthConfigFn: func(t *testing.T, issuerURL, _ string) string {
 				return fmt.Sprintf(`
@@ -1606,7 +1604,7 @@ func configureBasicTestInfrastructureWithRandomKeyType(t *testing.T, fn authenti
 	t.Helper()
 
 	if randomBool() {
-		return configureBasicTestInfrastructure(t, fn, rsaGenerateKey)
+		return configureBasicTestInfrastructure(t, fn, RSAGenerateKey)
 	}
 
 	return configureBasicTestInfrastructure(t, fn, ecdsaGenerateKey)
@@ -1673,8 +1671,8 @@ func TestStructuredAuthenticationDiscoveryURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
-			signingPrivateKey, publicKey := rsaGenerateKey(t)
+			caCertContent, _, caFilePath, caKeyFilePath := GenerateCert(t)
+			signingPrivateKey, publicKey := RSAGenerateKey(t)
 			// set the issuer in the discovery document to issuer url (different from the discovery URL) to assert
 			// 1. discovery URL is used to fetch the discovery document and
 			// 2. issuer in the discovery document is used to validate the ID token
@@ -1699,7 +1697,7 @@ jwt:
   claimValidationRules:
   - expression: 'claims.hd == "example.com"'
     message: "the hd claim must be set to example.com"
-`, tt.issuerURL, discoveryURL, indentCertificateAuthority(string(caCertContent)))
+`, tt.issuerURL, discoveryURL, IndentCertificateAuthority(string(caCertContent)))
 
 			oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
 
@@ -1741,12 +1739,12 @@ func TestMultipleJWTAuthenticators(t *testing.T) {
 	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
 	oidc.ResetMetrics()
 
-	caCertContent1, _, caFilePath1, caKeyFilePath1 := generateCert(t)
-	signingPrivateKey1, publicKey1 := rsaGenerateKey(t)
+	caCertContent1, _, caFilePath1, caKeyFilePath1 := GenerateCert(t)
+	signingPrivateKey1, publicKey1 := RSAGenerateKey(t)
 	oidcServer1 := utilsoidc.BuildAndRunTestServer(t, caFilePath1, caKeyFilePath1, "")
 
-	caCertContent2, _, caFilePath2, caKeyFilePath2 := generateCert(t)
-	signingPrivateKey2, publicKey2 := rsaGenerateKey(t)
+	caCertContent2, _, caFilePath2, caKeyFilePath2 := GenerateCert(t)
+	signingPrivateKey2, publicKey2 := RSAGenerateKey(t)
 	oidcServer2 := utilsoidc.BuildAndRunTestServer(t, caFilePath2, caKeyFilePath2, "https://example.com")
 
 	authenticationConfig := fmt.Sprintf(`
@@ -1781,7 +1779,7 @@ jwt:
       expression: '(claims.roles.split(",") + claims.other_roles.split(",")).map(role, "system:" + role)'
     uid:
       expression: "claims.uid"
-`, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), indentCertificateAuthority(string(caCertContent2)))
+`, oidcServer1.URL(), IndentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), IndentCertificateAuthority(string(caCertContent2)))
 
 	oidcServer1.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey1)).Maybe()
 	oidcServer2.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey2)).Maybe()
@@ -1880,12 +1878,12 @@ func TestJWKSMetricsCleanupOnIssuerRemoval(t *testing.T) {
 	t.Cleanup(func() { options.UpdateAuthenticationConfigTimeout = origUpdateAuthenticationConfigTimeout })
 	options.UpdateAuthenticationConfigTimeout = 2 * hardCodedTokenCacheTTLAndPollInterval
 
-	caCertContent1, _, caFilePath1, caKeyFilePath1 := generateCert(t)
-	signingPrivateKey1, publicKey1 := rsaGenerateKey(t)
+	caCertContent1, _, caFilePath1, caKeyFilePath1 := GenerateCert(t)
+	signingPrivateKey1, publicKey1 := RSAGenerateKey(t)
 	oidcServer1 := utilsoidc.BuildAndRunTestServer(t, caFilePath1, caKeyFilePath1, "")
 
-	caCertContent2, _, caFilePath2, caKeyFilePath2 := generateCert(t)
-	signingPrivateKey2, publicKey2 := rsaGenerateKey(t)
+	caCertContent2, _, caFilePath2, caKeyFilePath2 := GenerateCert(t)
+	signingPrivateKey2, publicKey2 := RSAGenerateKey(t)
 	oidcServer2 := utilsoidc.BuildAndRunTestServer(t, caFilePath2, caKeyFilePath2, "")
 
 	authenticationConfig := fmt.Sprintf(`
@@ -1912,7 +1910,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), indentCertificateAuthority(string(caCertContent2)))
+`, oidcServer1.URL(), IndentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), IndentCertificateAuthority(string(caCertContent2)))
 
 	oidcServer1.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey1)).Maybe()
 	oidcServer2.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey2)).Maybe()
@@ -2000,7 +1998,7 @@ jwt:
   claimMappings:
     username:
       expression: "'k8s-' + claims.sub"
-`, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)))
+`, oidcServer1.URL(), IndentCertificateAuthority(string(caCertContent1)))
 
 	authConfigFilePath := apiServer.ServerOpts.Authentication.AuthenticationConfigFile
 
@@ -2099,15 +2097,6 @@ func getMetrics(t *testing.T, ctx context.Context, adminClient *kubernetes.Clien
 	return slice.SortStrings(gotMetricStrings)
 }
 
-func rsaGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
-	t.Helper()
-
-	privateKey, err := rsa.GenerateKey(rand.Reader, rsaKeyBitSize)
-	require.NoError(t, err)
-
-	return privateKey, &privateKey.PublicKey
-}
-
 func ecdsaGenerateKey(t *testing.T) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 	t.Helper()
 
@@ -2126,7 +2115,7 @@ func configureTestInfrastructureAndEgressProxy[K utilsoidc.JosePrivateKey, L uti
 ) {
 	t.Helper()
 
-	caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
+	caCertContent, _, caFilePath, caKeyFilePath := GenerateCert(t)
 
 	signingPrivateKey, publicKey := keyFunc(t)
 
@@ -2217,7 +2206,7 @@ func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, c apiSer
 
 	var customFlags []string
 	if len(c.authenticationConfigYAML) > 0 {
-		customFlags = []string{fmt.Sprintf("--authentication-config=%s", writeTempFile(t, c.authenticationConfigYAML))}
+		customFlags = []string{fmt.Sprintf("--authentication-config=%s", WriteTempFile(t, c.authenticationConfigYAML))}
 		if c.needsEgressProxyOnStart {
 			udsName := filepath.Join(t.TempDir(), "uds")
 			ready := make(chan struct{})
@@ -2239,7 +2228,7 @@ egressSelections:
       uds:
         udsName: %s
 `, udsName)
-			customFlags = append(customFlags, fmt.Sprintf("--egress-selector-config-file=%s", writeTempFile(t, egressConfig)))
+			customFlags = append(customFlags, fmt.Sprintf("--egress-selector-config-file=%s", WriteTempFile(t, egressConfig)))
 		}
 	} else {
 		customFlags = []string{
@@ -2341,42 +2330,6 @@ func configureOIDCServerToReturnExpiredIDToken(t *testing.T, returningExpiredTok
 
 func configureOIDCServerToReturnExpiredRefreshTokenErrorOnTryingToUpdateIDToken(oidcServer *utilsoidc.TestServer) {
 	oidcServer.TokenHandler().EXPECT().Token().Times(2).Return(handlers.Token{}, utilsoidc.ErrRefreshTokenExpired)
-}
-
-func generateCert(t *testing.T) (cert, key []byte, certFilePath, keyFilePath string) {
-	t.Helper()
-
-	tempDir := t.TempDir()
-	certFilePath = filepath.Join(tempDir, "localhost_127.0.0.1_.crt")
-	keyFilePath = filepath.Join(tempDir, "localhost_127.0.0.1_.key")
-
-	cert, key, err := certutil.GenerateSelfSignedCertKeyWithFixtures("localhost", []net.IP{utilsnet.ParseIPSloppy("127.0.0.1")}, nil, tempDir)
-	require.NoError(t, err)
-
-	return cert, key, certFilePath, keyFilePath
-}
-
-func writeTempFile(t *testing.T, content string) string {
-	t.Helper()
-	file, err := os.CreateTemp("", "oidc-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.Remove(file.Name()); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if err := os.WriteFile(file.Name(), []byte(content), 0600); err != nil {
-		t.Fatal(err)
-	}
-	return file.Name()
-}
-
-// indentCertificateAuthority indents the certificate authority to match
-// the format of the generated authentication config.
-func indentCertificateAuthority(caCert string) string {
-	return strings.ReplaceAll(caCert, "\n", "\n        ")
 }
 
 func testContext(t *testing.T) context.Context {
