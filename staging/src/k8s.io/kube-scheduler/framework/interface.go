@@ -365,6 +365,10 @@ func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
 // PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.
 type PostFilterResult struct {
 	*NominatingInfo
+	// Victims are the pods that need to be preempted to make room for the preemptor pod.
+	// For a preemptor that is a member of a pod group, this field skips the pods that were
+	// identified as victims for other members of the pod group.
+	Victims []*v1.Pod
 }
 
 // PreBindPreFlightResult wraps needed info for scheduler framework to act upon PreBindPreFlight phase.
