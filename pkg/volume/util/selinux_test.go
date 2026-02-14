@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -309,6 +310,9 @@ func TestGetMountSELinuxLabel(t *testing.T) {
 			enabledGates := sets.New(tt.featureGates...)
 			for _, fg := range allGates {
 				enable := enabledGates.Has(fg)
+				if !enable {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+				}
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, enable)
 			}
 			seLinuxTranslator := NewFakeSELinuxLabelTranslator()
