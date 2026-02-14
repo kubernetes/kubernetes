@@ -2086,7 +2086,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 		validators []InitContainerValidator
 	}{
 		{
-			name: "imagePullIPolicy",
+			name: "imagePullIPolicy - latest",
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
@@ -3324,6 +3324,10 @@ func TestSetDefaults_Volume(t *testing.T) {
 			given:    &v1.Volume{VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "image:v1"}}},
 			expected: &v1.Volume{VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "image:v1", PullPolicy: v1.PullIfNotPresent}}},
 		},
+		"default image volume source pull policy is IfNotPresent if digest specified": {
+			given:    &v1.Volume{VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "image:latest@sha256:5e1e2bcac305958b27077ca136f35f0abae7cf38c9af678f7d220ed0cb51d4f8"}}},
+			expected: &v1.Volume{VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "image:latest@sha256:5e1e2bcac305958b27077ca136f35f0abae7cf38c9af678f7d220ed0cb51d4f8", PullPolicy: v1.PullIfNotPresent}}},
+		},
 		"default image volume source pull policy Always if 'latest' tag is used": {
 			given:    &v1.Volume{VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "image:latest"}}},
 			expected: &v1.Volume{VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "image:latest", PullPolicy: v1.PullAlways}}},
@@ -3337,6 +3341,52 @@ func TestSetDefaults_Volume(t *testing.T) {
 			corev1.SetDefaults_Volume(tc.given)
 			if !cmp.Equal(tc.given, tc.expected) {
 				t.Errorf("expected volume %+v, but got %+v", tc.expected, tc.given)
+			}
+		})
+	}
+}
+
+func TestSetDefaults_Container(t *testing.T) {
+	for desc, tc := range map[string]struct {
+		given, expected *v1.Container
+	}{
+		"default image pull policy is IfNotPresent": {
+			given: &v1.Container{Image: "image:v1"},
+			expected: &v1.Container{
+				Image:                    "image:v1",
+				ImagePullPolicy:          v1.PullIfNotPresent,
+				TerminationMessagePath:   v1.TerminationMessagePathDefault,
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+			}},
+		"default image pull policy is Always if 'latest' tag is used": {
+			given: &v1.Container{Image: "image:latest"},
+			expected: &v1.Container{
+				Image:                    "image:latest",
+				ImagePullPolicy:          v1.PullAlways,
+				TerminationMessagePath:   v1.TerminationMessagePathDefault,
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+			}},
+		"default image pull policy is Always if implicit 'latest' tag is used": {
+			given: &v1.Container{Image: "image"},
+			expected: &v1.Container{
+				Image:                    "image",
+				ImagePullPolicy:          v1.PullAlways,
+				TerminationMessagePath:   v1.TerminationMessagePathDefault,
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+			}},
+		"default image pull policy is IfNotPresent if 'latest' tag is used with digest": {
+			given: &v1.Container{Image: "image:latest@sha256:5e1e2bcac305958b27077ca136f35f0abae7cf38c9af678f7d220ed0cb51d4f8"},
+			expected: &v1.Container{
+				Image:                    "image:latest@sha256:5e1e2bcac305958b27077ca136f35f0abae7cf38c9af678f7d220ed0cb51d4f8",
+				ImagePullPolicy:          v1.PullIfNotPresent,
+				TerminationMessagePath:   v1.TerminationMessagePathDefault,
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+			}},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			corev1.SetDefaults_Container(tc.given)
+			if !cmp.Equal(tc.given, tc.expected) {
+				t.Errorf("expected container %+v, but got %+v", tc.expected, tc.given)
 			}
 		})
 	}
