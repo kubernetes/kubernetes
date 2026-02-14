@@ -201,7 +201,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		clusterRoleDRA := rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resource-claim-controller"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
@@ -211,7 +211,12 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 				eventsRule(),
 			},
-		})
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+			clusterRoleDRA.Rules = append(clusterRoleDRA.Rules, rbacv1helpers.NewRule("update-device-status").Groups(resourceGroup).Resources("drivers").Names("*").RuleOrDie())
+		}
+		addControllerRole(&controllerRoles, &controllerRoleBindings, clusterRoleDRA)
+
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
 			rules := []rbacv1.PolicyRule{
 				// Deletes pods to evict them.

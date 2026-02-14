@@ -19,6 +19,7 @@ package nodeidentifier
 import (
 	"strings"
 
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -63,4 +64,31 @@ func (defaultNodeIdentifier) NodeIdentity(u user.Info) (string, bool) {
 
 	nodeName := strings.TrimPrefix(userName, nodeUserNamePrefix)
 	return nodeName, true
+}
+
+// NewDefaultNodeAssociater returns a default NodeAssociater implementation,
+// which returns isNode=true if the user groups contain the system:nodes group
+// and the user name matches the format system:node:<nodeName>, or if the user info
+// populates the "authentication.kubernetes.io/node-name" extra key, and
+// populates the nodeName if isNode is true
+func NewDefaultNodeAssociater() NodeAssociater {
+	return defaultNodeAssociater{}
+}
+
+// defaultNodeAssociater implements NodeAssociater
+type defaultNodeAssociater struct {
+	nodeIdentifier defaultNodeIdentifier
+}
+
+func (d defaultNodeAssociater) AssociatedNode(u user.Info) (string, bool) {
+	if u == nil {
+		return "", false
+	}
+	if nodeName, isNode := d.nodeIdentifier.NodeIdentity(u); isNode {
+		return nodeName, isNode
+	}
+	if nodeNameExtra := u.GetExtra()[serviceaccount.NodeNameKey]; len(nodeNameExtra) > 0 && len(nodeNameExtra[0]) > 0 {
+		return nodeNameExtra[0], true
+	}
+	return "", false
 }

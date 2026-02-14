@@ -21,6 +21,7 @@ import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -41,6 +42,7 @@ import (
 
 type RESTStorageProvider struct {
 	NamespaceClient v1.NamespaceInterface
+	Authorizer      authorizer.Authorizer
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -87,7 +89,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	}
 
 	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient)
+		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient, p.Authorizer)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +143,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	}
 
 	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1beta1.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient)
+		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient, p.Authorizer)
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +182,7 @@ func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorag
 	}
 
 	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient)
+		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient, p.Authorizer)
 		if err != nil {
 			return nil, err
 		}

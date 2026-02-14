@@ -432,7 +432,10 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		appsrest.StorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: client.Discovery()},
 		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
-		resourcerest.RESTStorageProvider{NamespaceClient: client.CoreV1().Namespaces()},
+		resourcerest.RESTStorageProvider{
+			NamespaceClient: client.CoreV1().Namespaces(),
+			Authorizer:      c.ControlPlane.Generic.Authorization.Authorizer,
+		},
 	}
 
 	if AdditionalStorageProvidersForTests != nil {

@@ -42,6 +42,12 @@ const (
 	// in pod.Spec.Resources.Requests, in that case, a valid name has to be specified
 	// explicitly in device class.
 	ResourceDeviceClassPrefix string = "deviceclass.resource.kubernetes.io/"
+	// VerbUpdateDriverStatus is the synthetic verb used for updating driver status
+	// so it guarantees proper authorization checks on the driver name.
+	VerbUpdateDriverStatus = "update-device-status"
+	// ResourceUpdateDriverStatus is the synthetic resource used for updating driver status.
+	// It guarantees proper authorization checks on the driver name.
+	ResourceUpdateDriverStatus = "drivers"
 )
 
 // +genclient
