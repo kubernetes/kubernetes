@@ -157,7 +157,7 @@ func newTestManager() *manager {
 	// Add test pod to pod manager, so that status manager can get the pod from pod manager if needed.
 	podManager.AddPod(getTestPod())
 	m := NewManager(
-		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
+		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, nil),
 		results.NewManager(),
 		results.NewManager(),
 		results.NewManager(),

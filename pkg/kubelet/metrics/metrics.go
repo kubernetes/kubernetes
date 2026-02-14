@@ -179,6 +179,9 @@ const (
 
 	// Metric key for podcertificate states.
 	PodCertificateStatesKey = "podcertificate_states"
+
+	// Metric key for podsapi
+	PodWatchEventsDroppedKey = "pod_watch_events_dropped_total"
 )
 
 type imageSizeBucket struct {
@@ -1193,6 +1196,16 @@ var (
 		},
 		[]string{"retry_trigger"},
 	)
+
+	// PodWatchEventsDroppedTotal tracks the number of dropped pod watch events.
+	PodWatchEventsDroppedTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodWatchEventsDroppedKey,
+			Help:           "Cumulative number of pod watch events dropped.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1311,6 +1324,7 @@ func Register() {
 			legacyregistry.MustRegister(PodInProgressResizes)
 			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
 		}
+		legacyregistry.MustRegister(PodWatchEventsDroppedTotal)
 	})
 }
 

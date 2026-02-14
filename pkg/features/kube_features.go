@@ -743,6 +743,12 @@ const (
 	// similar to how `metadata.annotations` behaves.
 	PodTopologyLabelsAdmission featuregate.Feature = "PodTopologyLabelsAdmission"
 
+	// owner: @briansonnenberg
+	// kep: https://kep.k8s.io/4188
+	//
+	// Enables the PodsAPI feature to expose pod information via a gRPC API on the kubelet.
+	PodsAPI featuregate.Feature = "PodsAPI"
+
 	// owner: @seans3
 	// kep: http://kep.k8s.io/4006
 	//
@@ -1612,6 +1618,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PodsAPI: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PortForwardWebsockets: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2317,6 +2327,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodSchedulingReadiness: {},
 
 	PodTopologyLabelsAdmission: {},
+
+	PodsAPI: {},
 
 	PortForwardWebsockets: {},
 

@@ -174,7 +174,7 @@ func TestDoProbe(t *testing.T) {
 				t.Errorf("[%s-%d] Expected result: %v but got %v", probeType, i, test.expectedResult, result)
 			}
 
-			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker(), nil)
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}
