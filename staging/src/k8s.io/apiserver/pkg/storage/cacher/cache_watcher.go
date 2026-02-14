@@ -454,6 +454,9 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
 
+	// Capture original deadline before processing initial events
+	originalDeadline, hasDeadline := ctx.Deadline()
+
 	// cacheInterval may be created from a version being more fresh than requested
 	// (e.g. for NotOlderThan semantic). In such a case, we need to prevent watch event
 	// with lower resourceVersion from being delivered to ensure watch contract.
@@ -513,6 +516,37 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	// send bookmark after sending all events in cacheInterval for watchlist request
 	if cacheInterval.initialEventsEndBookmark != nil {
 		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+
+		// For sendInitialEvents requests, extend the deadline to ensure the watch
+		// continues for the full timeout duration AFTER sending initial events.
+		// This prevents premature watch termination when initial event processing
+		// takes a long time in large clusters (issue #134837).
+		if hasDeadline {
+			// Calculate time spent sending initial events
+			timeSpentOnInitialEvents := time.Since(startTime)
+			// Extend deadline by the time spent so the ongoing watch gets the full timeout
+			newDeadline := originalDeadline.Add(timeSpentOnInitialEvents)
+
+			// Create a context that respects both parent cancellation and the new deadline.
+			// We use context.Background() to bypass the parent's deadline (context package
+			// doesn't support extending deadlines, only shortening them). This means we lose
+			// context values like APF initialization signal and tracing, but this is necessary
+			// to fix the critical bug where watches close prematurely. We still monitor parent
+			// cancellation to handle client disconnects and server shutdown.
+			parentCtx := ctx
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithDeadline(context.Background(), newDeadline)
+			go func() {
+				select {
+				case <-parentCtx.Done():
+					// Parent cancelled (client disconnect, server shutdown, etc)
+					cancel()
+				case <-ctx.Done():
+					// Our extended deadline reached or cancel() was called
+				}
+			}()
+			defer cancel()
+		}
 	}
 	c.process(ctx, resourceVersion)
 }
