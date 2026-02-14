@@ -18,6 +18,7 @@ package nodeshutdown
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -33,7 +34,7 @@ type localStorage struct {
 	Path string
 }
 
-func (l localStorage) Store(data interface{}) (err error) {
+func (l localStorage) Store(data interface{}) error {
 	b, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -41,7 +42,7 @@ func (l localStorage) Store(data interface{}) (err error) {
 	return atomicWrite(l.Path, b, 0644)
 }
 
-func (l localStorage) Load(data interface{}) (err error) {
+func (l localStorage) Load(data interface{}) error {
 	b, err := os.ReadFile(l.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -68,7 +69,7 @@ type state struct {
 func atomicWrite(filename string, data []byte, perm os.FileMode) error {
 	f, err := os.CreateTemp(filepath.Dir(filename), ".tmp-"+filepath.Base(filename))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create temp file for atomic write %q: %w",filename, err)
 	}
 	err = os.Chmod(f.Name(), perm)
 	if err != nil {
