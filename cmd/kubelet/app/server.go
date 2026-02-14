@@ -1180,8 +1180,9 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 			MinVersion:   minTLSVersion,
 			CipherSuites: tlsCipherSuites,
 		},
-		CertFile: kc.TLSCertFile,
-		KeyFile:  kc.TLSPrivateKeyFile,
+		CertFile:     kc.TLSCertFile,
+		KeyFile:      kc.TLSPrivateKeyFile,
+		ClientCAFile: kc.Authentication.X509.ClientCAFile,
 	}
 
 	if len(kc.Authentication.X509.ClientCAFile) > 0 {
@@ -1282,7 +1283,13 @@ func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodCo
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
+		canUseSecureServing := kubeDeps.TLSOptions != nil && kubeDeps.TLSOptions.CertFile != "" && kubeDeps.TLSOptions.KeyFile != "" && kubeDeps.TLSOptions.ClientCAFile != ""
+		if canUseSecureServing && utilfeature.DefaultFeatureGate.Enabled(features.KubeletServerCAAndCertReload) {
+			// non-blocking call that starts 2 processes, one for serving and another to report shutdown.
+			k.SecureServe(ctx, kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
+		} else {
+			go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
+		}
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
 		go k.ListenAndServeReadOnly(ctx, netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)

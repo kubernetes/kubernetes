@@ -981,6 +981,11 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
+- name: KubeletServerCAAndCertReload
+  versionedSpecs:
+  - default: false
+    preRelease: Alpha
+    version: "1.36"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false

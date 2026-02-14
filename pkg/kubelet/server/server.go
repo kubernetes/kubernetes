@@ -56,9 +56,13 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	apiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
+	apioptions "k8s.io/apiserver/pkg/server/options"
+
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
@@ -130,9 +134,10 @@ type Server struct {
 
 // TLSOptions holds the TLS options.
 type TLSOptions struct {
-	Config   *tls.Config
-	CertFile string
-	KeyFile  string
+	Config       *tls.Config
+	CertFile     string
+	KeyFile      string
+	ClientCAFile string
 }
 
 // containerInterface defines the restful.Container functions used on the root container
@@ -162,6 +167,75 @@ func (a *filteringContainer) Handle(path string, handler http.Handler) {
 }
 func (a *filteringContainer) RegisteredHandlePaths() []string {
 	return a.registeredHandlePaths
+}
+
+// SecureServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
+// It requires ClientCA and ServingCert files paths to be configured on tlsOptions.
+// This configuration allows reloading ClientCA and ServingCert from files if changes are detected.
+func SecureServeKubeletServer(
+	ctx context.Context,
+	host HostInterface,
+	resourceAnalyzer stats.ResourceAnalyzer,
+	checkers []healthz.HealthChecker,
+	flagz flagz.Reader,
+	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+	tlsOptions *TLSOptions,
+	auth AuthInterface,
+	tp oteltrace.TracerProvider) {
+	logger := klog.FromContext(ctx)
+
+	if tlsOptions.CertFile == "" || tlsOptions.KeyFile == "" || tlsOptions.ClientCAFile == "" {
+		err := fmt.Errorf("kubelet SecureServe requires CertFile, KeyFile and ClientCAFile to be configured in tlsOptions")
+		logger.Error(err, "validation failed")
+		os.Exit(1)
+	}
+
+	dynamicCertContent, err := dynamiccertificates.NewDynamicServingContentFromFiles("kubelet-serving-cert", tlsOptions.CertFile, tlsOptions.KeyFile)
+	if err != nil {
+		logger.Error(err, "failed to Create dynamic provider for kubelet serving cert")
+		os.Exit(1)
+	}
+
+	dyamicCAContent, err := dynamiccertificates.NewDynamicCAContentFromFile("kubelet-client-ca", tlsOptions.ClientCAFile)
+	if err != nil {
+		logger.Error(err, "failed to Create dynamic provider for kubelet client CA")
+		os.Exit(1)
+	}
+
+	ssOptions := apioptions.NewSecureServingOptions()
+	ssOptions.BindAddress = netutils.ParseIPSloppy(kubeCfg.Address)
+	ssOptions.BindPort = int(kubeCfg.Port)
+
+	ssInfo := &apiserver.SecureServingInfo{}
+	if err := ssOptions.ApplyTo(&ssInfo); err != nil {
+		logger.Error(err, "failed to Apply SecureServingInfo")
+		os.Exit(1)
+	}
+
+	ssInfo.Cert = dynamicCertContent
+	ssInfo.ClientCA = dyamicCAContent
+	ssInfo.ServerTimeoutConfig = &apiserver.TimeoutConfig{
+		ReadTimeout:  4 * 60 * time.Minute,
+		WriteTimeout: 4 * 60 * time.Minute,
+	}
+
+	handler := NewServer(ctx, host, resourceAnalyzer, checkers, flagz, auth, kubeCfg)
+	handler.InstallTracingFilter(tp)
+
+	internalStopCh := make(chan struct{})
+	stoppedCh, listenerStoppedCh, err := ssInfo.Serve(&handler, 10*time.Second, internalStopCh)
+	if err != nil {
+		close(internalStopCh)
+		logger.Error(err, "failed to start serving traffic for kubelet")
+		os.Exit(1)
+	}
+
+	go func() {
+		<-listenerStoppedCh
+		logger.Info("kubelet secure server has stopped listening")
+		<-stoppedCh
+		logger.Info("kubelet secure server as stopped")
+	}()
 }
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
