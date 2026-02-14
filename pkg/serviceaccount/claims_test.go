@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

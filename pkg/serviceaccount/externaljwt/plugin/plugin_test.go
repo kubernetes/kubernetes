@@ -30,11 +30,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	"k8s.io/kubernetes/pkg/serviceaccount"
 

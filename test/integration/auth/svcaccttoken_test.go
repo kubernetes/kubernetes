@@ -33,8 +33,8 @@ import (
 	"testing"
 	"time"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -1224,7 +1224,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			t.Fatalf("len(jwks.Keys) = %d, want 1", len(jwks.Keys))
 		}
 		key := jwks.Keys[0]
-		tok, err := jwt.ParseSigned(token)
+		tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.EdDSA, jose.HS256, jose.HS384, jose.HS512, jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.ES256})
 		if err != nil {
 			t.Fatalf("could not parse token %q: %v", token, err)
 		}

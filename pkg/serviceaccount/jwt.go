@@ -28,8 +28,8 @@ import (
 	"fmt"
 	"strings"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -336,7 +336,7 @@ func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Con
 		return nil, false, nil
 	}
 
-	tok, err := jwt.ParseSigned(tokenData)
+	tok, err := jwt.ParseSigned(tokenData, []jose.SignatureAlgorithm{jose.EdDSA, jose.HS256, jose.HS384, jose.HS512, jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.ES256})
 	if err != nil {
 		return nil, false, nil
 	}
@@ -441,6 +441,25 @@ func (j *jwtTokenAuthenticator[PrivateClaims]) hasCorrectIssuer(tokenData string
 
 // GenerateToken is shared between internal and external signer code to ensure that claim merging logic remains consistent between them.
 func GenerateToken(signer jose.Signer, iss string, claims *jwt.Claims, privateClaims interface{}) (string, error) {
+	// if audience is exactly 1 element, ensure the serialized aud string is a array with 1 element and not a string
+	if len(claims.Audience) == 1 {
+		aud := struct {
+			Aud []string `json:"aud,omitempty"`
+		}{
+			[]string{claims.Audience[0]},
+		}
+		claims.Audience = jwt.Audience{}
+
+		// claims are applied in reverse precedence
+		return jwt.Signed(signer).
+			Claims(privateClaims).
+			Claims(claims).
+			Claims(&jwt.Claims{
+				Issuer: iss,
+			}).
+			Claims(aud).
+			Serialize()
+	}
 	// claims are applied in reverse precedence
 	return jwt.Signed(signer).
 		Claims(privateClaims).
@@ -448,5 +467,5 @@ func GenerateToken(signer jose.Signer, iss string, claims *jwt.Claims, privateCl
 		Claims(&jwt.Claims{
 			Issuer: iss,
 		}).
-		CompactSerialize()
+		Serialize()
 }
