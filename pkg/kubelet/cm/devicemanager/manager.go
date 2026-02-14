@@ -612,6 +612,11 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 		return nil, nil
 	}
 
+	if required == 0 {
+		logger.V(3).Info("No devices required, nothing to do", "deviceNumber", required, "resourceName", resource, "podUID", podUID, "containerName", contName)
+		return nil, nil
+	}
+
 	// We dealt with scenario 2. If we got this far it's either scenario 3 (node reboot) or scenario 1 (steady state, normal flow).
 	logger.V(3).Info("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
 	healthyDevices, hasRegistered := m.healthyDevices[resource]
