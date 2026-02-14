@@ -60,6 +60,7 @@ type VolumeGroupSnapshottableTestSuite struct {
 func InitVolumeGroupSnapshottableTestSuite() storageframework.TestSuite {
 	patterns := []storageframework.TestPattern{
 		storageframework.VolumeGroupSnapshotDelete,
+		storageframework.VolumeGroupSnapshotRetain,
 	}
 	return InitCustomGroupSnapshottableTestSuite(patterns)
 }
