@@ -122,6 +122,7 @@ func makeContainer(id int) *container.Container {
 		ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", id)},
 		Image:   imageName(id),
 		ImageID: imageID(id),
+		State:   container.ContainerStateRunning,
 	}
 }
 
@@ -141,12 +142,14 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 				{
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 1)},
 					ImageID: imageID(1),
+					State:   container.ContainerStateRunning,
 					// The image filed is not set to simulate a no-name image
 				},
 				{
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 2)},
 					Image:   imageName(2),
 					ImageID: imageID(2),
+					State:   container.ContainerStateRunning,
 				},
 			},
 		}},
@@ -189,6 +192,7 @@ func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *
 				{
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 1)},
 					ImageID: imageID(1),
+					State:   container.ContainerStateRunning,
 					// The image field is not set to simulate a no-name image
 					ImageRuntimeHandler: testRuntimeHandler,
 				},
@@ -196,6 +200,7 @@ func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 2)},
 					Image:   imageName(2),
 					ImageID: imageID(2),
+					State:   container.ContainerStateRunning,
 					// The runtime handler field is not set to simulate the case when
 					// the feature gate "RuntimeHandlerInImageCriApi" is on and container runtime has not implemented
 					// KEP 4216, which means that runtimeHandler string is not set in the
@@ -942,5 +947,50 @@ func TestValidateImageGCPolicy(t *testing.T) {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
 		}
+	}
+}
+
+func TestIsContainerActuallyUsingImage(t *testing.T) {
+	testCases := []struct {
+		name           string
+		containerState container.State
+		expected       bool
+	}{
+		{
+			name:           "running container should be using image",
+			containerState: container.ContainerStateRunning,
+			expected:       true,
+		},
+		{
+			name:           "created container should be using image",
+			containerState: container.ContainerStateCreated,
+			expected:       true,
+		},
+		{
+			name:           "exited container should not be using image",
+			containerState: container.ContainerStateExited,
+			expected:       false,
+		},
+		{
+			name:           "unknown container should not be using image",
+			containerState: container.ContainerStateUnknown,
+			expected:       false,
+		},
+		{
+			name:           "empty state should not be using image",
+			containerState: "",
+			expected:       false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			container := &container.Container{
+				ID:    container.ContainerID{Type: "test", ID: "test-container"},
+				State: tc.containerState,
+			}
+			result := isContainerActuallyUsingImage(container)
+			assert.Equal(t, tc.expected, result)
+		})
 	}
 }
