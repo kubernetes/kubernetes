@@ -332,6 +332,9 @@ const (
 	// be true if .metadata.annotations["api-approved.kubernetes.io"] is set to a URL, otherwise it will be false.
 	// See https://github.com/kubernetes/enhancements/pull/1111 for more details.
 	KubernetesAPIApprovalPolicyConformant CustomResourceDefinitionConditionType = "KubernetesAPIApprovalPolicyConformant"
+	// StorageMigrating indicates that the underlying storage version of the CRD
+	// is undergoing migration.
+	StorageMigrating CustomResourceDefinitionConditionType = "StorageMigrating"
 )
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.

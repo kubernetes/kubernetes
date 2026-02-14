@@ -34,14 +34,6 @@ func setStatusConditions(
 		return toBeUpdatedSVM
 	}
 
-	if conditionType == svmv1beta1.MigrationSucceeded || conditionType == svmv1beta1.MigrationFailed {
-		// set running condition to false if we're finished
-		runningCond := meta.FindStatusCondition(toBeUpdatedSVM.Status.Conditions, string(svmv1beta1.MigrationRunning))
-		if runningCond != nil {
-			runningCond.Status = metav1.ConditionFalse
-		}
-	}
-
 	toBeUpdatedSVM.Status.Conditions = append(toBeUpdatedSVM.Status.Conditions, metav1.Condition{
 		Type:               string(conditionType),
 		Status:             metav1.ConditionTrue,
