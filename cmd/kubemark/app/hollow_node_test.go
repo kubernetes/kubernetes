@@ -72,7 +72,6 @@ func TestHollowNode(t *testing.T) {
 	}
 
 	for morph := range knownMorphs {
-		morph := morph
 		t.Run(morph, func(t *testing.T) {
 			s := &hollowNodeConfig{
 				KubeconfigPath: kubeconfigPath,
