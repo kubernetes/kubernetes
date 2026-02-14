@@ -283,6 +283,30 @@ func ParseQuantity(str string) (Quantity, error) {
 		return Quantity{Format: DecimalSI, s: str}, nil
 	}
 
+	// Fast path for pure integers: use math/big for safe int64 boundary checking
+	// This prevents overflow issues when parsing large integers near MaxInt64
+	if !strings.ContainsAny(str, ".eE") && !strings.ContainsAny(str, "munpkKMGTPEi") {
+		val := new(big.Int)
+		if _, ok := val.SetString(str, 10); ok {
+			maxVal := big.NewInt(math.MaxInt64)
+			minVal := big.NewInt(math.MinInt64)
+
+			// Check if value exceeds int64 bounds
+			if val.Cmp(maxVal) > 0 || val.Cmp(minVal) < 0 {
+				return Quantity{}, ErrNumeric
+			}
+
+			// Value fits in int64, return as DecimalSI quantity
+			// Preserve the canonical string for pure integers that don't end with trailing zeros
+			// (except for single "0" which is handled above)
+			intVal := val.Int64()
+			if !strings.HasSuffix(str, "000") && (len(str) == 1 || str[0] != '0') {
+				return Quantity{i: int64Amount{value: intVal}, Format: DecimalSI, s: str}, nil
+			}
+			return Quantity{i: int64Amount{value: intVal}, Format: DecimalSI}, nil
+		}
+	}
+
 	positive, value, num, denom, suf, err := parseQuantityString(str)
 	if err != nil {
 		return Quantity{}, err

@@ -1820,3 +1820,26 @@ func TestQuantityRoundtripCBOR(t *testing.T) {
 		}
 	}
 }
+
+func TestParseMaxInt64Boundary(t *testing.T) {
+	tests := []struct {
+		input       string
+		expectError bool
+	}{
+		{"9223372036854775807", false},  // MaxInt64: Should Pass
+		{"-9223372036854775808", false}, // MinInt64: Should Pass
+		{"9223372036854775808", true},   // MaxInt64 + 1: Should Fail
+		{"-9223372036854775809", true},  // MinInt64 - 1: Should Fail
+		{"1000000000000000000", false},  // Large number within int64 range: Should Pass
+		{"100000000000000000", false},   // Another large valid number
+		{"9999999999999999999", true},   // Number exceeding MaxInt64
+	}
+
+	for _, tc := range tests {
+		_, err := ParseQuantity(tc.input)
+		hasError := err != nil
+		if hasError != tc.expectError {
+			t.Errorf("Input: %s - Expected Error: %v, Got Error: %v (err=%v)", tc.input, tc.expectError, hasError, err)
+		}
+	}
+}
