@@ -174,7 +174,7 @@ func NewManager(logger logr.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 	case PolicyNone:
 		policy, err = NewNonePolicy(cpuPolicyOptions)
 		if err != nil {
-			return nil, fmt.Errorf("new none policy error: %w", err)
+			return nil, fmt.Errorf("new None policy error: %w", err)
 		}
 
 	case PolicyStatic:
@@ -182,16 +182,16 @@ func NewManager(logger logr.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 
 		reservedCPUs, ok := nodeAllocatableReservation[v1.ResourceCPU]
 		if !ok {
-			// The static policy cannot initialize without this information.
-			return nil, fmt.Errorf("[cpumanager] unable to determine reserved CPU resources for static policy")
+			// The Static policy cannot initialize without this information.
+			return nil, fmt.Errorf("[cpumanager] unable to determine reserved CPU resources for Static policy")
 		}
 		if reservedCPUs.IsZero() {
-			// The static policy requires this to be nonzero. Zero CPU reservation
+			// The Static policy requires this to be nonzero. Zero CPU reservation
 			// would allow the shared pool to be completely exhausted. At that point
 			// either we would violate our guarantee of exclusivity or need to evict
 			// any pod that has at least one container that requires zero CPUs.
 			// See the comments in policy_static.go for more details.
-			return nil, fmt.Errorf("[cpumanager] the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero")
+			return nil, fmt.Errorf("[cpumanager] the Static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero")
 		}
 
 		// Take the ceiling of the reservation, since fractional CPUs cannot be
@@ -200,7 +200,7 @@ func NewManager(logger logr.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
 		policy, err = NewStaticPolicy(logger, topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions)
 		if err != nil {
-			return nil, fmt.Errorf("new static policy error: %w", err)
+			return nil, fmt.Errorf("new Static policy error: %w", err)
 		}
 
 	default:
