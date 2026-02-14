@@ -843,6 +843,10 @@ func setup() (chan interface{}, chan interface{}, OperationExecutor) {
 // This function starts by writing to ch and blocks on the quit channel
 // until it is closed by the currently running test
 func startOperationAndBlock(ch chan<- interface{}, quit <-chan interface{}) {
-	ch <- nil
+	select {
+	case ch <- nil:
+	case <-time.After(10 * time.Second):
+		klog.Warning("Possible race condition: started operation not checked in test")
+	}
 	<-quit
 }
