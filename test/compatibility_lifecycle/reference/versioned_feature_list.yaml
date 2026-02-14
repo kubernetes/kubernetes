@@ -1111,6 +1111,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: MutablePVNodeAffinity
   versionedSpecs:
   - default: false
@@ -1123,6 +1127,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.36"
 - name: MutatingAdmissionPolicy
   versionedSpecs:
   - default: false

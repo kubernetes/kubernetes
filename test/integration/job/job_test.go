@@ -4228,6 +4228,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 
 func TestNodeSelectorUpdate(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "suspend")
+
 	t.Cleanup(closeFn)
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 	t.Cleanup(cancel)
@@ -4243,7 +4244,14 @@ func TestNodeSelectorUpdate(t *testing.T) {
 	jobNamespace := job.Namespace
 	jobClient := clientSet.BatchV1().Jobs(jobNamespace)
 
-	// (1) Unsuspend and set node selector in the same update.
+	// Since MutableSchedulingDirectives is set to true, one needs
+	// to wait for the suspend condition to be set reflecting that the
+	// job is actually suspended.
+	waitForPodsToBeActive(ctx, t, jobClient, 0, job)
+	validateJobCondition(ctx, t, clientSet, job, batchv1.JobSuspended)
+
+	// (1) set node selector in the same update.
+
 	nodeSelector := map[string]string{"foo": "bar"}
 	if _, err := updateJob(ctx, jobClient, jobName, func(j *batchv1.Job) {
 		j.Spec.Template.Spec.NodeSelector = nodeSelector
