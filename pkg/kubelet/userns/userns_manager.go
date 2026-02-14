@@ -29,10 +29,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
@@ -130,10 +128,6 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 }
 
 func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int64) (*UsernsManager, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-		return nil, nil
-	}
-
 	userNsLength := uint32(kubeletconfig.DefaultKubeletUserNamespacesIDsPerPod)
 	if idsPerPod != nil {
 		// The value is already validated as part of kubelet config validation, so we can safely
@@ -273,10 +267,6 @@ func (m *UsernsManager) record(logger klog.Logger, pod types.UID, from, length u
 
 // Release releases the user namespace allocated to the specified pod.
 func (m *UsernsManager) Release(logger klog.Logger, podUID types.UID) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-		return
-	}
-
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -285,10 +275,6 @@ func (m *UsernsManager) Release(logger klog.Logger, podUID types.UID) {
 
 // podAllocated returns true if the pod is allocated, false otherwise.
 func (m *UsernsManager) podAllocated(podUID types.UID) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-		return false
-	}
-
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -394,23 +380,10 @@ func (m *UsernsManager) createUserNs(logger klog.Logger, pod *v1.Pod) (userNs us
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
 func (m *UsernsManager) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
-	featureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
-
-	// TODO: If the default value for hostUsers ever changes, change the default value of
-	// userNamespacesEnabled as well
 	if pod == nil || pod.Spec.HostUsers == nil {
-		// if the feature is enabled, specify to use the node mode...
-		if featureEnabled {
-			return &runtimeapi.UserNamespace{
-				Mode: runtimeapi.NamespaceMode_NODE,
-			}, nil
-		}
-		// ...otherwise don't even specify it
-		return nil, nil
-	}
-	// pod.Spec.HostUsers is set to true/false
-	if !featureEnabled {
-		return nil, fmt.Errorf("the feature gate %q is disabled: can't set spec.HostUsers", features.UserNamespacesSupport)
+		return &runtimeapi.UserNamespace{
+			Mode: runtimeapi.NamespaceMode_NODE,
+		}, nil
 	}
 	if *pod.Spec.HostUsers {
 		return &runtimeapi.UserNamespace{
@@ -418,7 +391,7 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod
 		}, nil
 	}
 
-	// From here onwards, hostUsers=false and the feature gate is enabled.
+	// From here onwards, hostUsers=false.
 
 	// if the pod requested a user namespace and the runtime doesn't support user namespaces then return an error.
 	if handlerSupportsUserns, err := m.kl.HandlerSupportsUserNamespaces(runtimeHandler); err != nil || !handlerSupportsUserns {
@@ -482,9 +455,6 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod
 // allocations with the pods actually running. It frees any user namespace
 // allocation for orphaned pods.
 func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context, pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-		return nil
-	}
 	logger := klog.FromContext(ctx)
 
 	m.lock.Lock()
@@ -529,8 +499,4 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context,
 	}
 
 	return nil
-}
-
-func EnabledUserNamespacesSupport() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
 }

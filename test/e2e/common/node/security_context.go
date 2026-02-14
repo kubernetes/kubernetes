@@ -88,7 +88,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 
-		f.It("must create the user namespace if set to false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("must create the user namespace if set to false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// with hostUsers=false the pod must use a new user namespace
 			podClient := e2epod.PodClientNS(f, f.Namespace.Name)
 
@@ -127,7 +127,7 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 
 		f.It("must create a user namespace and use host network when hostUsers is false and hostNetwork is true [LinuxOnly]", feature.UserNamespacesHostNetworkSupport, framework.WithFeatureGate(features.UserNamespacesHostNetworkSupport),
-			feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+			feature.UserNamespacesSupport, func(ctx context.Context) {
 				// with hostUsers=false the pod must use a new user namespace.
 				// with hostNetwork=true the pod must use the host network namespace.
 				podClient := e2epod.PodClientNS(f, f.Namespace.Name)
@@ -201,7 +201,7 @@ var _ = SIGDescribe("Security Context", func() {
 				gomega.Expect(netNs1).To(gomega.Equal(netNs2), "two different pods with hostNetwork=true should be in the same network namespace, but they are not. NetNS1: %s, NetNS2: %s", netNs1, netNs2)
 			})
 
-		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// We need to check with the binary "getsubuids" the mappings for the kubelet.
 			// If something is not present, we skip the test as the node wasn't configured to run this test.
 			id, length, err := kubeletUsernsMappings(getsubuidsBinary)
@@ -269,7 +269,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("must not create the user namespace if set to true [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("must not create the user namespace if set to true [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// with hostUsers=true the pod must use the host user namespace
 			pod := makePod(true)
 			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
@@ -280,7 +280,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -402,7 +402,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -461,7 +461,7 @@ var _ = SIGDescribe("Security Context", func() {
 				strings.Repeat(fmt.Sprintf("=%v\n", fsGroup), len(configMap.Data)),
 			})
 		})
-		f.It("metrics should report count of started and failed user namespaced pods [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("metrics should report count of started and failed user namespaced pods [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			targetNode, err := findLinuxNode(ctx, f)
 			framework.ExpectNoError(err, "Error finding Linux node")
 			framework.Logf("Using node: %v", targetNode.Name)
@@ -976,32 +976,30 @@ var _ = SIGDescribe("User Namespaces for Restricted Pod Security Standards [Linu
 	f := framework.NewDefaultFramework("user-namespaces-pss-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 
-	ginkgo.Context("with UserNamespacesSupport enabled", func() {
-		f.It("should allow pod", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
-			name := "pod-user-namespaces-pss-" + string(uuid.NewUUID())
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: name},
-				Spec: v1.PodSpec{
-					RestartPolicy:   v1.RestartPolicyNever,
-					HostUsers:       ptr.To(false),
-					SecurityContext: &v1.PodSecurityContext{},
-					Containers: []v1.Container{
-						{
-							Name:    name,
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-							Command: []string{"whoami"},
-							SecurityContext: &v1.SecurityContext{
-								AllowPrivilegeEscalation: ptr.To(false),
-								Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
-								SeccompProfile:           &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
-							},
+	f.It("should allow userns pod", feature.UserNamespacesSupport, func(ctx context.Context) {
+		name := "pod-user-namespaces-pss-" + string(uuid.NewUUID())
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: v1.PodSpec{
+				RestartPolicy:   v1.RestartPolicyNever,
+				HostUsers:       ptr.To(false),
+				SecurityContext: &v1.PodSecurityContext{},
+				Containers: []v1.Container{
+					{
+						Name:    name,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"whoami"},
+						SecurityContext: &v1.SecurityContext{
+							AllowPrivilegeEscalation: ptr.To(false),
+							Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+							SeccompProfile:           &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
 						},
 					},
 				},
-			}
+			},
+		}
 
-			e2epodoutput.TestContainerOutput(ctx, f, "RunAsUser-RunAsNonRoot", pod, 0, []string{"root"})
-		})
+		e2epodoutput.TestContainerOutput(ctx, f, "RunAsUser-RunAsNonRoot", pod, 0, []string{"root"})
 	})
 })
 

@@ -53,8 +53,7 @@ import (
 func TestPodSecurity(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ProcMountType:         true,
-		features.UserNamespacesSupport: true,
+		features.ProcMountType: true,
 	})
 	// Start server
 	server := startPodSecurityServer(t)
@@ -101,8 +100,7 @@ func TestPodSecurityGAOnly(t *testing.T) {
 func TestPodSecurityWebhook(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ProcMountType:         true,
-		features.UserNamespacesSupport: true,
+		features.ProcMountType: true,
 	})
 
 	// Start test API server.

@@ -543,7 +543,6 @@ type KubeletConfiguration struct {
 	CrashLoopBackOff CrashLoopBackOffConfig
 
 	// UserNamespaces contains User Namespace configurations.
-	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces
 }
@@ -937,7 +936,6 @@ type UserNamespaces struct {
 	// Changing the value may require recreating all containers on the node.
 	//
 	// Default: 65536
-	// +featureGate=UserNamespacesSupport
 	// +optional
 	IDsPerPod *int64
 }

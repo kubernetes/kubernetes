@@ -5526,7 +5526,6 @@ type NodeRuntimeHandlerFeatures struct {
 	// +optional
 	RecursiveReadOnlyMounts *bool
 	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
-	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *bool
 }
@@ -5671,7 +5670,6 @@ type NodeStatus struct {
 	// +optional
 	Config *NodeConfigStatus
 	// The available runtime handlers.
-	// +featureGate=UserNamespacesSupport
 	// +optional
 	RuntimeHandlers []NodeRuntimeHandler
 	// Features describes the set of features implemented by the CRI implementation.

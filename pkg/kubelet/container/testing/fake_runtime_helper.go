@@ -22,11 +22,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -76,19 +74,12 @@ func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int6
 }
 
 func (f *FakeRuntimeHelper) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
-	featureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
 	if pod == nil || pod.Spec.HostUsers == nil {
 		return nil, nil
-	}
-	// pod.Spec.HostUsers is set to true/false
-	if !featureEnabled {
-		return nil, fmt.Errorf("the feature gate %q is disabled: can't set spec.HostUsers", features.UserNamespacesSupport)
 	}
 	if *pod.Spec.HostUsers {
 		return nil, nil
 	}
-
-	// From here onwards, hostUsers=false and the feature gate is enabled.
 
 	// if the pod requested a user namespace and the runtime doesn't support user namespaces then return an error.
 	if h, ok := f.RuntimeHandlers[runtimeHandler]; !ok {
