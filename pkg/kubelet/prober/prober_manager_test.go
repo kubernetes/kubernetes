@@ -693,3 +693,155 @@ func cleanup(t *testing.T, m *manager) {
 		t.Fatalf("Error during cleanup: %v", err)
 	}
 }
+
+func TestUpdatePodStatusStartupProbeRaceCondition(t *testing.T) {
+	ctx := ktesting.Init(t)
+
+	// Container with startup probe but no readiness probe - this is the race condition scenario
+	containerWithStartupOnly := v1.ContainerStatus{
+		Name:        "startup_only_container",
+		ContainerID: "test://startup_only_container_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
+		},
+	}
+
+	// Container with both startup and readiness probes
+	containerWithBothProbes := v1.ContainerStatus{
+		Name:        "both_probes_container",
+		ContainerID: "test://both_probes_container_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
+		},
+	}
+
+	// Container with no probes (should remain ready)
+	containerWithNoProbes := v1.ContainerStatus{
+		Name:        "no_probes_container",
+		ContainerID: "test://no_probes_container_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
+		},
+	}
+
+	podStatus := v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			containerWithStartupOnly, containerWithBothProbes, containerWithNoProbes,
+		},
+	}
+
+	m := newTestManager()
+
+	// Setup probe "workers" to simulate the presence of probes
+	m.workers = map[probeKey]*worker{
+		{testPodUID, containerWithStartupOnly.Name, startup}:  {},
+		{testPodUID, containerWithBothProbes.Name, startup}:   {},
+		{testPodUID, containerWithBothProbes.Name, readiness}: {},
+		// containerWithNoProbes has no workers (no probes)
+	}
+
+	testCases := []struct {
+		name                string
+		startupResult       *results.Result
+		readinessResult     *results.Result
+		expectedReadyStates map[string]bool
+		description         string
+	}{
+		{
+			name:            "startup probe failed, should not be ready",
+			startupResult:   &[]results.Result{results.Failure}[0],
+			readinessResult: nil, // no readiness probe result
+			expectedReadyStates: map[string]bool{
+				containerWithStartupOnly.Name: false, // Should NOT be ready due to failed startup
+				containerWithBothProbes.Name:  false, // No readiness result yet
+				containerWithNoProbes.Name:    true,  // No probes, always ready
+			},
+			description: "Container with failed startup probe should not be marked ready even without readiness probe",
+		},
+		{
+			name:            "startup probe succeeded, should be ready",
+			startupResult:   &[]results.Result{results.Success}[0],
+			readinessResult: nil, // no readiness probe result
+			expectedReadyStates: map[string]bool{
+				containerWithStartupOnly.Name: true,  // Should be ready after startup success
+				containerWithBothProbes.Name:  false, // Still needs readiness probe
+				containerWithNoProbes.Name:    true,  // No probes, always ready
+			},
+			description: "Container with successful startup probe should be ready without readiness probe",
+		},
+		{
+			name:            "startup probe not run yet, should not be ready",
+			startupResult:   nil, // startup probe hasn't run yet
+			readinessResult: nil,
+			expectedReadyStates: map[string]bool{
+				containerWithStartupOnly.Name: false, // Should NOT be ready until startup runs
+				containerWithBothProbes.Name:  false, // No probe results yet
+				containerWithNoProbes.Name:    true,  // No probes, always ready
+			},
+			description: "Container with startup probe that hasn't run yet should not be ready",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Clear previous results
+			m.startupManager = results.NewManager()
+			m.readinessManager = results.NewManager()
+
+			// Set startup probe results if specified
+			if tc.startupResult != nil {
+				m.startupManager.Set(kubecontainer.ParseContainerID(containerWithStartupOnly.ContainerID), *tc.startupResult, &v1.Pod{})
+				m.startupManager.Set(kubecontainer.ParseContainerID(containerWithBothProbes.ContainerID), *tc.startupResult, &v1.Pod{})
+			}
+
+			// Set readiness probe results if specified
+			if tc.readinessResult != nil {
+				m.readinessManager.Set(kubecontainer.ParseContainerID(containerWithBothProbes.ContainerID), *tc.readinessResult, &v1.Pod{})
+			}
+
+			// Test pod with containers having different probe configurations
+			testPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: testPodUID,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: containerWithStartupOnly.Name,
+							StartupProbe: &v1.Probe{
+								ProbeHandler: v1.ProbeHandler{Exec: &v1.ExecAction{}},
+							},
+							// No ReadinessProbe - this is key for the race condition
+						},
+						{
+							Name: containerWithBothProbes.Name,
+							StartupProbe: &v1.Probe{
+								ProbeHandler: v1.ProbeHandler{Exec: &v1.ExecAction{}},
+							},
+							ReadinessProbe: &v1.Probe{
+								ProbeHandler: v1.ProbeHandler{Exec: &v1.ExecAction{}},
+							},
+						},
+						{
+							Name: containerWithNoProbes.Name,
+							// No probes at all
+						},
+					},
+				},
+			}
+
+			// Call UpdatePodStatus to test our fix
+			m.UpdatePodStatus(ctx, testPod, &podStatus)
+
+			// Verify readiness states
+			for _, containerStatus := range podStatus.ContainerStatuses {
+				expectedReady := tc.expectedReadyStates[containerStatus.Name]
+				if containerStatus.Ready != expectedReady {
+					t.Errorf("Test case '%s': Container '%s' readiness mismatch. Expected: %v, Got: %v. %s",
+						tc.name, containerStatus.Name, expectedReady, containerStatus.Ready, tc.description)
+				}
+			}
+		})
+	}
+}
