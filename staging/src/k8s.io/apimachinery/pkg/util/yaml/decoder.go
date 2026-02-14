@@ -400,6 +400,26 @@ func NewYAMLReader(r *bufio.Reader) *YAMLReader {
 	}
 }
 
+// isYAMLDirective returns true if b only contains YAML
+// directives (lines beginning with '%').
+//
+// YAML directives may only appear at the beginning of a document and, if
+// present, must be followed by an explicit document start marker (`---`).
+// When splitting multi-document YAML streams, we must ensure directives are
+// kept in the same document as the following `---` line.
+func isYAMLDirective(b []byte) bool {
+	for line := range strings.SplitSeq(string(b), "\n") {
+		if len(line) == 0 {
+			continue
+		}
+		if strings.HasPrefix(line, "%") {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // Read returns a full YAML document.
 func (r *YAMLReader) Read() ([]byte, error) {
 	var buffer bytes.Buffer
@@ -421,6 +441,16 @@ func (r *YAMLReader) Read() ([]byte, error) {
 				}
 			}
 			if buffer.Len() != 0 {
+				// If we've only seen directives so far, this `---`
+				// is the required document start marker for those directives and must
+				// be included in the current document.
+				if isYAMLDirective(buffer.Bytes()) {
+					buffer.Write(line)
+					if err == io.EOF { //nolint:errorlint
+						return buffer.Bytes(), nil
+					}
+					continue
+				}
 				return buffer.Bytes(), nil
 			}
 			if err == io.EOF { //nolint:errorlint
