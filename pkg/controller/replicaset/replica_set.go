@@ -71,6 +71,11 @@ const (
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
 
+	// failedPodWindowMinutes timeframe is used to detect failed pods.
+	failedPodWindowMinutes = 5
+
+	maxPodFailuresPerMinute = 5
+
 	// The number of times we retry updating a ReplicaSet's status.
 	statusUpdateRetries = 1
 
@@ -626,7 +631,40 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		// prevented from spamming the API service with the pod create requests
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
+		// We can further stop the pod creations in batchPrecondition.
 		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
+			// This precondition partially improves the late rejection of the pod by kubelet
+			// (https://github.com/kubernetes/kubernetes/issues/72593) which results in pod creation hot loop between
+			// kubelet and replica set controller. To solve the worst case scenario, we will significantly slow down the
+			// creation of pods if all of them land on bad nodes.
+			// If some of them land on the good nodes, we will proceed with normal batching to prevent slow replica set
+			// rollouts. We support the creation of the initial set of 25 pods (failedPodWindowMinutes*maxPodFailuresPerMinute)
+			// before we start looking back and counting the failures. We will retry in failedPodWindowMinutes to see if
+			// pods are able to land on the good nodes.
+
+			rsPods, err := controller.FilterPodsByOwner(rsc.podIndexer, &rs.ObjectMeta, rsc.Kind, false)
+			if err != nil {
+				return err
+			}
+			now := rsc.clock.Now()
+			var failed, recentlyFailed int
+			for _, rsPod := range rsPods {
+				if v1.PodFailed == rsPod.Status.Phase {
+					failed++
+					if rsPod.Status.StartTime != nil && now.Sub(rsPod.Status.StartTime.Time) < failedPodWindowMinutes*time.Minute {
+						recentlyFailed++
+					}
+				}
+			}
+			// Stop creating new pods, if all the past pods have failed to start,
+			// and we still observe recent failures (e.g. 25 failures in the last 5 minutes).
+			// The scheduler and kubelet response is usually too slow for the initial scale up.
+			// Therefore, it takes a couple of syncs to slow down the stream of new pods.
+			if failed > 0 && failed == len(rsPods) && failedPodWindowMinutes*maxPodFailuresPerMinute < recentlyFailed {
+				return fmt.Errorf("too many pods failed to start, total failed pods: %v, recently failed pods: %v", failed, recentlyFailed)
+			}
+			return nil
+		}, func() error {
 			err := rsc.podControl.CreatePods(ctx, rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
 			if err != nil {
 				if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
@@ -806,6 +844,10 @@ func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.Replica
 	return cm.ClaimPods(ctx, filteredPods)
 }
 
+// batchPrecondition is used in the slowStartBatch to check if each batch should run.
+// err will stop the slowStartBatch execution.
+type batchPrecondition func() (err error)
+
 // slowStartBatch tries to call the provided function a total of 'count' times,
 // starting slow to check for errors, then speeding up if calls succeed.
 //
@@ -816,11 +858,18 @@ func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.Replica
 // If there are any failures in a batch, all remaining batches are skipped
 // after waiting for the current batch to complete.
 //
+// batchPrecondition function is called before each batch to see if we can continue with scaling.
+//
 // It returns the number of successful calls to the function.
-func slowStartBatch(count int, initialBatchSize int, fn func() error) (int, error) {
+func slowStartBatch(count int, initialBatchSize int, batchPrecondition batchPrecondition, fn func() error) (int, error) {
 	remaining := count
 	successes := 0
 	for batchSize := min(remaining, initialBatchSize); batchSize > 0; batchSize = min(2*batchSize, remaining) {
+		if batchPrecondition != nil {
+			if err := batchPrecondition(); err != nil {
+				return successes, err
+			}
+		}
 		errCh := make(chan error, batchSize)
 		var wg sync.WaitGroup
 		wg.Add(batchSize)
