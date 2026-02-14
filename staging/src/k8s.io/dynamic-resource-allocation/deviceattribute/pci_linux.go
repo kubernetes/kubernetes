@@ -21,9 +21,14 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	resourceapi "k8s.io/api/resource/v1"
+)
+
+var (
+	pcieRootRegexp = regexp.MustCompile(`^pci[0-9a-f]{4}:[0-9a-f]{2}$`)
 )
 
 // GetPCIeRootAttributeByPCIBusID retrieves the PCIe Root Complex for a given PCI Bus ID.
@@ -64,8 +69,15 @@ func GetPCIeRootAttributeByPCIBusID(pciBusID string) (DeviceAttribute, error) {
 // So we can resolve the actual device path by reading the symlink at /sys/bus/pci/devices/<address>.
 //
 // For example, if the PCIAddress is "0000:04:1f.0",
+//
+// In typical physical machines, /sys/bus/pci/devices/0000:04:1f.0 points to
+// /sys/devices/pci0000:00/0000:00:1c.0/0000:04:00.0/0000:04:1f.0,
+// where "pci0000:00" is the PCIe Root.
+//
+// In some virtualized environments(e.g. Hyper-V), they have more complex device hierarchies such that
+// pcie devices are behind some virtual bus controllers(e.g. Hyper-V). In such cases,
 // /sys/bus/pci/devices/0000:04:1f.0 points to
-// /sys/devices/pci0000:00/...<intermediate PCI devices>.../0000:04:1f.0,
+// /sys/devices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/VMBUS:00/000000c1-0001-0000-3130-444532304235/pci0000:00/0000:04:1f.0
 // where "pci0000:00" is the PCIe Root.
 func resolvePCIeRoot(pciBusID string) (string, error) {
 	// e.g. /sys/bus/pci/devices/0000:04:1f.0
@@ -81,8 +93,8 @@ func resolvePCIeRoot(pciBusID string) (string, error) {
 		target = filepath.Join(filepath.Dir(sysBusPath), target)
 	}
 
-	// targetAbs must be /sys/devices/pci0000:00/...<intermediate PCI devices>.../0000:04:1f.0
-	devicePathPrefix := sysfs.devices("pci")
+	// targetAbs must be of the form /sys/devices/...<intermediate bus controllers>.../pci0000:00/...<intermediate PCI devices>.../0000:04:1f.0
+	devicePathPrefix := sysfs.devices("")
 	if !strings.HasPrefix(target, devicePathPrefix) {
 		return "", fmt.Errorf("symlink target for PCI Bus ID %s is invalid: it must start with %s: %s", pciBusID, devicePathPrefix, target)
 	}
@@ -90,10 +102,14 @@ func resolvePCIeRoot(pciBusID string) (string, error) {
 		return "", fmt.Errorf("symlink target for PCI Bus ID %s is invalid: it must end with %s: %s", pciBusID, pciBusID, target)
 	}
 
-	// We need to extract the PCIe Root part, which is the first part of the path after /sys/devices/.
-	pcieRootPart := strings.Split(strings.TrimPrefix(target, sysfs.devices("")+"/"), "/")[0]
+	// Extract the PCIe Root part(pciXXXX:YY), which is of the form pci<domain>:<bus> from the absolute target path.
+	targetAbsParts := strings.Split(strings.TrimPrefix(target, devicePathPrefix+"/"), "/")
+	pcieRootPartIdx := slices.IndexFunc(targetAbsParts, func(part string) bool { return pcieRootRegexp.MatchString(part) })
+	if pcieRootPartIdx == -1 {
+		return "", fmt.Errorf("failed to find PCIe Root Complex part (pciXXXX:YY) in the device path for PCI Bus ID %s: %s", pciBusID, target)
+	}
 
-	return pcieRootPart, nil
+	return targetAbsParts[pcieRootPartIdx], nil
 }
 
 // GetPCIBusIDAttribute returns a DeviceAttribute with the PCI Bus Address("<domain>:<bus>:<device>.<function>")

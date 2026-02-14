@@ -32,6 +32,7 @@ import (
 func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 	pcieRoot := "pci0000:00"
 	intermediateBusID := "0000:01:00.0"
+	intermediateBusControllers := "LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/VMBUS:00/000000c1-0001-0000-3130-444532304235"
 	pciBusID := "0000:02:00.0"
 	expectedAttribute := DeviceAttribute{
 		Name:  StandardDeviceAttributePCIeRoot,
@@ -48,6 +49,17 @@ func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 		"valid": {
 			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
 				devicePath := mockSysfs.devices(filepath.Join(pcieRoot, intermediateBusID, pciBusID))
+				touchFile(t, devicePath)
+				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
+				createSymlink(t, devicePath, busPath)
+			},
+			address:           pciBusID,
+			expectedAttribute: &expectedAttribute,
+			expectsError:      false,
+		},
+		"valid with intermediate bus controllers": {
+			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
+				devicePath := mockSysfs.devices(filepath.Join(intermediateBusControllers, pcieRoot, intermediateBusID, pciBusID))
 				touchFile(t, devicePath)
 				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
 				createSymlink(t, devicePath, busPath)
@@ -84,7 +96,19 @@ func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 			address:           pciBusID,
 			expectedAttribute: nil,
 			expectsError:      true,
-			expectedErrMsg:    fmt.Sprintf("symlink target for PCI Bus ID %s is invalid: it must start with", pciBusID),
+			expectedErrMsg:    fmt.Sprintf("failed to find PCIe Root Complex part (pciXXXX:YY) in the device path for PCI Bus ID %s", pciBusID),
+		},
+		"invalid symlink (invalid prefix with intermediate bus controllers)": {
+			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
+				devicePath := mockSysfs.devices(filepath.Join(intermediateBusControllers, "invalid-pci-root", intermediateBusID, pciBusID))
+				touchFile(t, devicePath)
+				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
+				createSymlink(t, devicePath, busPath)
+			},
+			address:           pciBusID,
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    fmt.Sprintf("failed to find PCIe Root Complex part (pciXXXX:YY) in the device path for PCI Bus ID %s", pciBusID),
 		},
 		"invalid symlink (invalid suffix)": {
 			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
