@@ -512,7 +512,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete replication controller, after owned pods
   codename: '[sig-api-machinery] Garbage collector should keep the rc around until
-    all its pods are deleted if the deleteOptions says so [Serial] [Conformance]'
+    all its pods are deleted if the deleteOptions says so [Conformance] [Serial]'
   description: Create a replication controller with maximum allocatable Pods between
     10 and 100 replicas. Once RC is created and the all Pods are created, delete RC
     with deleteOptions.PropagationPolicy set to Foreground. Deleting the Replication
@@ -529,8 +529,8 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, multiple owners
   codename: '[sig-api-machinery] Garbage collector should not delete dependents that
-    have both valid owner and owner that''s waiting for dependents to be deleted [Serial]
-    [Conformance]'
+    have both valid owner and owner that''s waiting for dependents to be deleted [Conformance]
+    [Serial]'
   description: Create a replication controller RC1, with maximum allocatable Pods
     between 10 and 100 replicas. Create second replication controller RC2 and set
     RC2 as owner for half of those replicas. Once RC1 is created and the all Pods
@@ -551,7 +551,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete replication controller, propagation policy orphan
   codename: '[sig-api-machinery] Garbage collector should orphan pods created by rc
-    if delete options say so [Serial] [Conformance]'
+    if delete options say so [Conformance] [Serial]'
   description: Create a replication controller with maximum allocatable Pods between
     10 and 100 replicas. Once RC is created and the all Pods are created, delete RC
     with deleteOptions.PropagationPolicy set to Orphan. Deleting the Replication Controller
@@ -559,23 +559,23 @@
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Namespace, apply finalizer to a namespace
-  codename: '[sig-api-machinery] Namespaces [Serial] should apply a finalizer to a
-    Namespace [Conformance]'
+  codename: '[sig-api-machinery] Namespaces should apply a finalizer to a Namespace
+    [Conformance] [Serial]'
   description: Attempt to create a Namespace which MUST be succeed. Updating the namespace
     with a fake finalizer MUST succeed. The fake finalizer MUST be found. Removing
     the fake finalizer from the namespace MUST succeed and MUST NOT be found.
   release: v1.26
   file: test/e2e/apimachinery/namespace.go
 - testname: Namespace, apply update to a namespace
-  codename: '[sig-api-machinery] Namespaces [Serial] should apply an update to a Namespace
-    [Conformance]'
+  codename: '[sig-api-machinery] Namespaces should apply an update to a Namespace
+    [Conformance] [Serial]'
   description: When updating the namespace it MUST succeed and the field MUST equal
     the new value.
   release: v1.26
   file: test/e2e/apimachinery/namespace.go
 - testname: Namespace, apply changes to a namespace status
-  codename: '[sig-api-machinery] Namespaces [Serial] should apply changes to a namespace
-    status [Conformance]'
+  codename: '[sig-api-machinery] Namespaces should apply changes to a namespace status
+    [Conformance] [Serial]'
   description: Getting the current namespace status MUST succeed. The reported status
     phase MUST be active. Given the patching of the namespace status, the fields MUST
     equal the new values. Given the updating of the namespace status, the fields MUST
@@ -583,21 +583,22 @@
   release: v1.25
   file: test/e2e/apimachinery/namespace.go
 - testname: namespace-deletion-removes-pods
-  codename: '[sig-api-machinery] Namespaces [Serial] should ensure that all pods are
-    removed when a namespace is deleted [Conformance]'
+  codename: '[sig-api-machinery] Namespaces should ensure that all pods are removed
+    when a namespace is deleted [Conformance] [Serial]'
   description: Ensure that if a namespace is deleted then all pods are removed from
     that namespace.
   release: v1.11
   file: test/e2e/apimachinery/namespace.go
 - testname: namespace-deletion-removes-services
-  codename: '[sig-api-machinery] Namespaces [Serial] should ensure that all services
-    are removed when a namespace is deleted [Conformance]'
+  codename: '[sig-api-machinery] Namespaces should ensure that all services are removed
+    when a namespace is deleted [Conformance] [Serial]'
   description: Ensure that if a namespace is deleted then all services are removed
     from that namespace.
   release: v1.11
   file: test/e2e/apimachinery/namespace.go
 - testname: Namespace patching
-  codename: '[sig-api-machinery] Namespaces [Serial] should patch a Namespace [Conformance]'
+  codename: '[sig-api-machinery] Namespaces should patch a Namespace [Conformance]
+    [Serial]'
   description: A Namespace is created. The Namespace is patched. The Namespace and
     MUST now include the new Label.
   release: v1.18
@@ -778,7 +779,7 @@
     even if the original version has been compacted away
   codename: '[sig-api-machinery] Servers with support for API chunking should support
     continue listing from the last key if the original version has been compacted
-    away, though the list is inconsistent [Slow] [Conformance]'
+    away, though the list is inconsistent [Conformance] [Slow]'
   description: Create a large number of PodTemplates. Attempt to retrieve the first
     chunk with limit set; the server MUST return the chunk of the size not exceeding
     the limit with RemainingItems set in the response. Attempt to retrieve the second
@@ -882,8 +883,8 @@
   release: v1.19
   file: test/e2e/apimachinery/server_version.go
 - testname: ControllerRevision, resource lifecycle
-  codename: '[sig-apps] ControllerRevision [Serial] should manage the lifecycle of
-    a ControllerRevision [Conformance]'
+  codename: '[sig-apps] ControllerRevision should manage the lifecycle of a ControllerRevision
+    [Conformance] [Serial]'
   description: Creating a DaemonSet MUST succeed. Listing all ControllerRevisions
     with a label selector MUST find only one. After patching the ControllerRevision
     with a new label, the label MUST be found. Creating a new ControllerRevision for
@@ -898,13 +899,14 @@
   release: v1.25
   file: test/e2e/apps/controller_revision.go
 - testname: CronJob Suspend
-  codename: '[sig-apps] CronJob should not schedule jobs when suspended [Slow] [Conformance]'
+  codename: '[sig-apps] CronJob should not schedule jobs when suspended [Conformance]
+    [Slow]'
   description: CronJob MUST support suspension, which suppresses creation of new jobs.
   release: v1.21
   file: test/e2e/apps/cronjob.go
 - testname: CronJob ForbidConcurrent
   codename: '[sig-apps] CronJob should not schedule new jobs when ForbidConcurrent
-    [Slow] [Conformance]'
+    [Conformance] [Slow]'
   description: CronJob MUST support ForbidConcurrent policy, allowing to run single,
     previous job at the time.
   release: v1.21
@@ -928,49 +930,51 @@
   release: v1.21
   file: test/e2e/apps/cronjob.go
 - testname: DaemonSet, list and delete a collection of DaemonSets
-  codename: '[sig-apps] Daemon set [Serial] should list and delete a collection of
-    DaemonSets [Conformance]'
+  codename: '[sig-apps] Daemon set should list and delete a collection of DaemonSets
+    [Conformance] [Serial]'
   description: When a DaemonSet is created it MUST succeed. It MUST succeed when listing
     DaemonSets via a label selector. It MUST succeed when deleting the DaemonSet via
     deleteCollection.
   release: v1.22
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-FailedPodCreation
-  codename: '[sig-apps] Daemon set [Serial] should retry creating failed daemon pods
-    [Conformance]'
+  codename: '[sig-apps] Daemon set should retry creating failed daemon pods [Conformance]
+    [Serial]'
   description: A conformant Kubernetes distribution MUST create new DaemonSet Pods
     when they fail.
   release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-Rollback
-  codename: '[sig-apps] Daemon set [Serial] should rollback without unnecessary restarts
-    [Conformance]'
+  codename: '[sig-apps] Daemon set should rollback without unnecessary restarts [Conformance]
+    [Serial]'
   description: A conformant Kubernetes distribution MUST support automated, minimally
     disruptive rollback of updates to a DaemonSet.
   release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-NodeSelection
-  codename: '[sig-apps] Daemon set [Serial] should run and stop complex daemon [Conformance]'
+  codename: '[sig-apps] Daemon set should run and stop complex daemon [Conformance]
+    [Serial]'
   description: A conformant Kubernetes distribution MUST support DaemonSet Pod node
     selection via label selectors.
   release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-Creation
-  codename: '[sig-apps] Daemon set [Serial] should run and stop simple daemon [Conformance]'
+  codename: '[sig-apps] Daemon set should run and stop simple daemon [Conformance]
+    [Serial]'
   description: A conformant Kubernetes distribution MUST support the creation of DaemonSets.
     When a DaemonSet Pod is deleted, the DaemonSet controller MUST create a replacement
     Pod.
   release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-RollingUpdate
-  codename: '[sig-apps] Daemon set [Serial] should update pod when spec was updated
-    and update strategy is RollingUpdate [Conformance]'
+  codename: '[sig-apps] Daemon set should update pod when spec was updated and update
+    strategy is RollingUpdate [Conformance] [Serial]'
   description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
   release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet, status sub-resource
-  codename: '[sig-apps] Daemon set [Serial] should verify changes to a daemon set
-    status [Conformance]'
+  codename: '[sig-apps] Daemon set should verify changes to a daemon set status [Conformance]
+    [Serial]'
   description: When a DaemonSet is created it MUST succeed. Attempt to read, update
     and patch its status sub-resource; all mutating sub-resource operations MUST be
     visible to subsequent reads.
@@ -1285,7 +1289,8 @@
   file: test/e2e/apps/rc.go
 - testname: StatefulSet, Burst Scaling
   codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
-    Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]'
+    Burst scaling should run to completion even with unhealthy pods [Conformance]
+    [Slow]'
   description: StatefulSet MUST support the Parallel PodManagementPolicy for burst
     scaling. This test does not depend on a preexisting default StorageClass or a
     dynamic provisioner.
@@ -1294,7 +1299,7 @@
 - testname: StatefulSet, Scaling
   codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
     Scaling should happen in predictable order and halt if any stateful pod is unhealthy
-    [Slow] [Conformance]'
+    [Conformance] [Slow]'
   description: StatefulSet MUST create Pods in ascending order by ordinal index when
     scaling up, and delete Pods in descending order when scaling down. Scaling up
     or down MUST pause if any Pods belonging to the StatefulSet are unhealthy. This
@@ -1821,7 +1826,7 @@
   file: test/e2e/network/ingressclass.go
 - testname: Networking, intra pod http
   codename: '[sig-network] Networking Granular Checks: Pods should function for intra-pod
-    communication: http [NodeConformance] [Conformance]'
+    communication: http [Conformance] [NodeConformance]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1833,7 +1838,7 @@
   file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod udp
   codename: '[sig-network] Networking Granular Checks: Pods should function for intra-pod
-    communication: udp [NodeConformance] [Conformance]'
+    communication: udp [Conformance] [NodeConformance]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1845,7 +1850,7 @@
   file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
-    communication: http [LinuxOnly] [NodeConformance] [Conformance]'
+    communication: http [LinuxOnly] [Conformance] [NodeConformance]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1859,7 +1864,7 @@
   file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
-    communication: udp [LinuxOnly] [NodeConformance] [Conformance]'
+    communication: udp [LinuxOnly] [Conformance] [NodeConformance]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -2104,15 +2109,15 @@
   release: v1.34
   file: test/e2e/common/node/configmap.go
 - testname: ConfigMap, from environment field
-  codename: '[sig-node] ConfigMap should be consumable via environment variable [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] ConfigMap should be consumable via environment variable [Conformance]
+    [NodeConformance]'
   description: Create a Pod with an environment variable value set using a value from
     ConfigMap. A ConfigMap value MUST be accessible in the container environment.
   release: v1.9
   file: test/e2e/common/node/configmap.go
 - testname: ConfigMap, from environment variables
-  codename: '[sig-node] ConfigMap should be consumable via the environment [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] ConfigMap should be consumable via the environment [Conformance]
+    [NodeConformance]'
   description: Create a Pod with a environment source from ConfigMap. All ConfigMap
     values MUST be available as environment variables in the container.
   release: v1.9
@@ -2132,14 +2137,14 @@
   release: v1.19
   file: test/e2e/common/node/configmap.go
 - testname: ConfigMap Update
-  codename: '[sig-node] ConfigMap should update ConfigMap successfully [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] ConfigMap should update ConfigMap successfully [Conformance]
+    [NodeConformance]'
   description: Ensure that a ConfigMap object can be created and then updated successfully.
   release: v1.32
   file: test/e2e/common/node/configmap.go
 - testname: Pod Lifecycle, post start exec hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
-    hook should execute poststart exec hook properly [NodeConformance] [Conformance]'
+    hook should execute poststart exec hook properly [Conformance] [NodeConformance]'
   description: When a post start handler is specified in the container lifecycle using
     a 'Exec' action, then the handler MUST be invoked after the start of the container.
     A server pod is created that will serve http requests, create a second pod with
@@ -2149,7 +2154,7 @@
   file: test/e2e/common/node/lifecycle_hook.go
 - testname: Pod Lifecycle, post start http hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
-    hook should execute poststart http hook properly [NodeConformance] [Conformance]'
+    hook should execute poststart http hook properly [Conformance] [NodeConformance]'
   description: When a post start handler is specified in the container lifecycle using
     a HttpGet action, then the handler MUST be invoked after the start of the container.
     A server pod is created that will serve http requests, create a second pod on
@@ -2159,7 +2164,7 @@
   file: test/e2e/common/node/lifecycle_hook.go
 - testname: Pod Lifecycle, prestop exec hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
-    hook should execute prestop exec hook properly [NodeConformance] [Conformance]'
+    hook should execute prestop exec hook properly [Conformance] [NodeConformance]'
   description: When a pre-stop handler is specified in the container lifecycle using
     a 'Exec' action, then the handler MUST be invoked before the container is terminated.
     A server pod is created that will serve http requests, create a second pod with
@@ -2169,7 +2174,7 @@
   file: test/e2e/common/node/lifecycle_hook.go
 - testname: Pod Lifecycle, prestop http hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
-    hook should execute prestop http hook properly [NodeConformance] [Conformance]'
+    hook should execute prestop http hook properly [Conformance] [NodeConformance]'
   description: When a pre-stop handler is specified in the container lifecycle using
     a 'HttpGet' action, then the handler MUST be invoked before the container is terminated.
     A server pod is created that will serve http requests, create a second pod on
@@ -2180,7 +2185,7 @@
 - testname: Container Runtime, TerminationMessage, from log output of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message as empty when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
+    FallbackToLogsOnError is set [Conformance] [NodeConformance]'
   description: Create a pod with an container. Container's output is recorded in log
     and container exits successfully without an error. When container is terminated,
     terminationMessage MUST have no content as container succeed.
@@ -2189,7 +2194,7 @@
 - testname: Container Runtime, TerminationMessage, from file of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message from file when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
+    FallbackToLogsOnError is set [Conformance] [NodeConformance]'
   description: Create a pod with an container. Container's output is recorded in a
     file and the container exits successfully without an error. When container is
     terminated, terminationMessage MUST match with the content from file.
@@ -2199,7 +2204,7 @@
     failing container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message from log output if TerminationMessagePolicy FallbackToLogsOnError
-    is set [NodeConformance] [Conformance]'
+    is set [Conformance] [NodeConformance]'
   description: Create a pod with an container. Container's output is recorded in log
     and container exits with an error. When container is terminated, termination message
     MUST match the expected output recorded from container's log.
@@ -2209,7 +2214,7 @@
     path
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message if TerminationMessagePath is set as non-root user and
-    at a non-default path [NodeConformance] [Conformance]'
+    at a non-default path [Conformance] [NodeConformance]'
   description: Create a pod with a container to run it as a non-root user with a custom
     TerminationMessagePath set. Pod redirects the output to the provided path successfully.
     When the container is terminated, the termination message MUST match the expected
@@ -2218,7 +2223,7 @@
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, Restart Policy, Pod Phases
   codename: '[sig-node] Container Runtime blackbox test when starting a container
-    that exits should run with the expected status [NodeConformance] [Conformance]'
+    that exits should run with the expected status [Conformance] [NodeConformance]'
   description: If the restart policy is set to 'Always', Pod MUST be restarted when
     terminated, If restart policy is 'OnFailure', Pod MUST be started only if it is
     terminated with non-zero exit code. If the restart policy is 'Never', Pod MUST
@@ -2228,7 +2233,7 @@
   file: test/e2e/common/node/runtime.go
 - testname: Containers, with arguments
   codename: '[sig-node] Containers should be able to override the image''s default
-    arguments (container cmd) [NodeConformance] [Conformance]'
+    arguments (container cmd) [Conformance] [NodeConformance]'
   description: Default command and  from the container image entrypoint MUST be used
     when Pod does not specify the container command but the arguments from Pod spec
     MUST override when specified.
@@ -2236,7 +2241,7 @@
   file: test/e2e/common/node/containers.go
 - testname: Containers, with command
   codename: '[sig-node] Containers should be able to override the image''s default
-    command (container entrypoint) [NodeConformance] [Conformance]'
+    command (container entrypoint) [Conformance] [NodeConformance]'
   description: Default command from the container image entrypoint MUST NOT be used
     when Pod specifies the container command.  Command from Pod spec MUST override
     the command in the image.
@@ -2244,7 +2249,7 @@
   file: test/e2e/common/node/containers.go
 - testname: Containers, with command and arguments
   codename: '[sig-node] Containers should be able to override the image''s default
-    command and arguments [NodeConformance] [Conformance]'
+    command and arguments [Conformance] [NodeConformance]'
   description: Default command and arguments from the container image entrypoint MUST
     NOT be used when Pod specifies the container command and arguments.  Command and
     arguments from Pod spec MUST override the command and arguments in the image.
@@ -2252,59 +2257,59 @@
   file: test/e2e/common/node/containers.go
 - testname: Containers, without command and arguments
   codename: '[sig-node] Containers should use the image defaults if command and args
-    are blank [NodeConformance] [Conformance]'
+    are blank [Conformance] [NodeConformance]'
   description: Default command and arguments from the container image entrypoint MUST
     be used when Pod does not specify the container command
   release: v1.9
   file: test/e2e/common/node/containers.go
 - testname: DownwardAPI, environment for CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide container''s limits.cpu/memory
-    and requests.cpu/memory as env vars [NodeConformance] [Conformance]'
+    and requests.cpu/memory as env vars [Conformance] [NodeConformance]'
   description: Downward API MUST expose CPU request and Memory request set through
     environment variables at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for default CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide default limits.cpu/memory from
-    node allocatable [NodeConformance] [Conformance]'
+    node allocatable [Conformance] [NodeConformance]'
   description: Downward API MUST expose CPU request and Memory limits set through
     environment variables at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for host ip
-  codename: '[sig-node] Downward API should provide host IP as an env var [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] Downward API should provide host IP as an env var [Conformance]
+    [NodeConformance]'
   description: Downward API MUST expose Pod and Container fields as environment variables.
     Specify host IP as environment variable in the Pod Spec are visible at runtime
     in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for hostIPs
-  codename: '[sig-node] Downward API should provide hostIPs as an env var [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] Downward API should provide hostIPs as an env var [Conformance]
+    [NodeConformance]'
   description: Downward API MUST expose Pod and Container fields as environment variables.
     Specify hostIPs as environment variable in the Pod Spec are visible at runtime
     in the container.
   release: v1.32
   file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for Pod UID
-  codename: '[sig-node] Downward API should provide pod UID as env vars [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] Downward API should provide pod UID as env vars [Conformance]
+    [NodeConformance]'
   description: Downward API MUST expose Pod UID set through environment variables
     at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for name, namespace and ip
   codename: '[sig-node] Downward API should provide pod name, namespace and IP address
-    as env vars [NodeConformance] [Conformance]'
+    as env vars [Conformance] [NodeConformance]'
   description: Downward API MUST expose Pod and Container fields as environment variables.
     Specify Pod Name, namespace and IP as environment variable in the Pod Spec are
     visible at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
 - testname: Ephemeral Container, update ephemeral containers
-  codename: '[sig-node] Ephemeral Containers [NodeConformance] should update the ephemeral
-    containers in an existing pod [Conformance]'
+  codename: '[sig-node] Ephemeral Containers should update the ephemeral containers
+    in an existing pod [Conformance] [NodeConformance]'
   description: Adding an ephemeral container to pod.spec MUST result in the container
     running. There MUST now be only one ephermal container found. Updating the pod
     with another ephemeral container MUST succeed. There MUST now be two ephermal
@@ -2312,38 +2317,38 @@
   release: v1.28
   file: test/e2e/common/node/ephemeral_containers.go
 - testname: Ephemeral Container Creation
-  codename: '[sig-node] Ephemeral Containers [NodeConformance] will start an ephemeral
-    container in an existing pod [Conformance]'
+  codename: '[sig-node] Ephemeral Containers will start an ephemeral container in
+    an existing pod [Conformance] [NodeConformance]'
   description: Adding an ephemeral container to pod.spec MUST result in the container
     running.
   release: "1.25"
   file: test/e2e/common/node/ephemeral_containers.go
 - testname: init-container-starts-app-restartalways-pod
-  codename: '[sig-node] InitContainer [NodeConformance] should invoke init containers
-    on a RestartAlways pod [Conformance]'
+  codename: '[sig-node] InitContainer should invoke init containers on a RestartAlways
+    pod [Conformance] [NodeConformance]'
   description: Ensure that all InitContainers are started and all containers in pod
     started and at least one container is still running or is in the process of being
     restarted when Pod has restart policy as RestartAlways.
   release: v1.12
   file: test/e2e/common/node/init_container.go
 - testname: init-container-starts-app-restartnever-pod
-  codename: '[sig-node] InitContainer [NodeConformance] should invoke init containers
-    on a RestartNever pod [Conformance]'
+  codename: '[sig-node] InitContainer should invoke init containers on a RestartNever
+    pod [Conformance] [NodeConformance]'
   description: Ensure that all InitContainers are started and all containers in pod
     are voluntarily terminated with exit status 0, and the system is not going to
     restart any of these containers when Pod has restart policy as RestartNever.
   release: v1.12
   file: test/e2e/common/node/init_container.go
 - testname: init-container-fails-stops-app-restartnever-pod
-  codename: '[sig-node] InitContainer [NodeConformance] should not start app containers
-    and fail the pod if init containers fail on a RestartNever pod [Conformance]'
+  codename: '[sig-node] InitContainer should not start app containers and fail the
+    pod if init containers fail on a RestartNever pod [Conformance] [NodeConformance]'
   description: Ensure that app container is not started when at least one InitContainer
     fails to start and Pod has restart policy as RestartNever.
   release: v1.12
   file: test/e2e/common/node/init_container.go
 - testname: init-container-fails-stops-app-restartalways-pod
-  codename: '[sig-node] InitContainer [NodeConformance] should not start app containers
-    if init containers fail on a RestartAlways pod [Conformance]'
+  codename: '[sig-node] InitContainer should not start app containers if init containers
+    fail on a RestartAlways pod [Conformance] [NodeConformance]'
   description: Ensure that app container is not started when all InitContainers failed
     to start and Pod has restarted for few occurrences and pod has restart policy
     as RestartAlways.
@@ -2351,28 +2356,28 @@
   file: test/e2e/common/node/init_container.go
 - testname: Kubelet, log output, default
   codename: '[sig-node] Kubelet when scheduling a busybox command in a pod should
-    print the output to logs [NodeConformance] [Conformance]'
+    print the output to logs [Conformance] [NodeConformance]'
   description: By default the stdout and stderr from the process being executed in
     a pod MUST be sent to the pod's logs.
   release: v1.13
   file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, failed pod, delete
   codename: '[sig-node] Kubelet when scheduling a busybox command that always fails
-    in a pod should be possible to delete [NodeConformance] [Conformance]'
+    in a pod should be possible to delete [Conformance] [NodeConformance]'
   description: Create a Pod with terminated state. This terminated pod MUST be able
     to be deleted.
   release: v1.13
   file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, failed pod, terminated reason
   codename: '[sig-node] Kubelet when scheduling a busybox command that always fails
-    in a pod should have an terminated reason [NodeConformance] [Conformance]'
+    in a pod should have an terminated reason [Conformance] [NodeConformance]'
   description: Create a Pod with terminated state. Pod MUST have only one container.
     Container MUST be in terminated state and MUST have an terminated reason.
   release: v1.13
   file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, pod with read only root file system
   codename: '[sig-node] Kubelet when scheduling a read only busybox container should
-    not write to root filesystem [LinuxOnly] [NodeConformance] [Conformance]'
+    not write to root filesystem [LinuxOnly] [Conformance] [NodeConformance]'
   description: Create a Pod with security context set with ReadOnlyRootFileSystem
     set to true. The Pod then tries to write to the /file on the root, write operation
     to the root filesystem MUST fail as expected. This test is marked LinuxOnly since
@@ -2381,7 +2386,7 @@
   file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, hostAliases
   codename: '[sig-node] Kubelet when scheduling an agnhost Pod with hostAliases should
-    write entries to /etc/hosts [NodeConformance] [Conformance]'
+    write entries to /etc/hosts [Conformance] [NodeConformance]'
   description: Create a Pod with hostAliases and a container with command to output
     /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases
     to the output of /etc/hosts entries.
@@ -2389,7 +2394,7 @@
   file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, managed etc hosts
   codename: '[sig-node] KubeletManagedEtcHosts should test kubelet managed /etc/hosts
-    file [NodeConformance] [Conformance]'
+    file [Conformance] [NodeConformance]'
   description: Create a Pod with containers with hostNetwork set to false, one of
     the containers mounts the /etc/hosts file form the host. Create a second Pod with
     hostNetwork set to true. 1. The Pod with hostNetwork=false MUST have /etc/hosts
@@ -2414,15 +2419,15 @@
   release: v1.17
   file: test/e2e/common/node/lease.go
 - testname: Pod Eviction, Toleration limits
-  codename: '[sig-node] NoExecuteTaintManager Multiple Pods [Serial] evicts pods with
-    minTolerationSeconds [Disruptive] [Conformance]'
+  codename: '[sig-node] NoExecuteTaintManager Multiple Pods evicts pods with minTolerationSeconds
+    [Conformance] [Disruptive] [Serial]'
   description: In a multi-pods scenario with tolerationSeconds, the pods MUST be evicted
     as per the toleration time limit.
   release: v1.16
   file: test/e2e/node/taints.go
 - testname: Taint, Pod Eviction on taint removal
-  codename: '[sig-node] NoExecuteTaintManager Single Pod [Serial] removing taint cancels
-    eviction [Disruptive] [Conformance]'
+  codename: '[sig-node] NoExecuteTaintManager Single Pod removing taint cancels eviction
+    [Conformance] [Disruptive] [Serial]'
   description: The Pod with toleration timeout scheduled on a tainted Node MUST not
     be evicted if the taint is removed before toleration time ends.
   release: v1.16
@@ -2545,15 +2550,15 @@
   release: v1.9
   file: test/e2e/node/pods.go
 - testname: Pods, ActiveDeadlineSeconds
-  codename: '[sig-node] Pods should allow activeDeadlineSeconds to be updated [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] Pods should allow activeDeadlineSeconds to be updated [Conformance]
+    [NodeConformance]'
   description: Create a Pod with a unique label. Query for the Pod with the label
     as selector MUST be successful. The Pod is updated with ActiveDeadlineSeconds
     set on the Pod spec. Pod MUST terminate of the specified time elapses.
   release: v1.9
   file: test/e2e/common/node/pods.go
 - testname: Pods, lifecycle
-  codename: '[sig-node] Pods should be submitted and removed [NodeConformance] [Conformance]'
+  codename: '[sig-node] Pods should be submitted and removed [Conformance] [NodeConformance]'
   description: A Pod is created with a unique label. Pod MUST be accessible when queried
     using the label selector upon creation. Add a watch, check if the Pod is running.
     Pod then deleted, The pod deletion timestamp is observed. The watch MUST return
@@ -2562,15 +2567,15 @@
   release: v1.9
   file: test/e2e/common/node/pods.go
 - testname: Pods, update
-  codename: '[sig-node] Pods should be updated [NodeConformance] [Conformance]'
+  codename: '[sig-node] Pods should be updated [Conformance] [NodeConformance]'
   description: Create a Pod with a unique label. Query for the Pod with the label
     as selector MUST be successful. Update the pod to change the value of the Label.
     Query for the Pod with the new value for the label MUST be successful.
   release: v1.9
   file: test/e2e/common/node/pods.go
 - testname: Pods, service environment variables
-  codename: '[sig-node] Pods should contain environment variables for services [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] Pods should contain environment variables for services [Conformance]
+    [NodeConformance]'
   description: Create a server Pod listening on port 9376. A Service called fooservice
     is created for the server Pod listening on port 8765 targeting port 8080. If a
     new Pod is created in the cluster then the Pod MUST have the fooservice environment
@@ -2588,7 +2593,7 @@
   release: v1.19
   file: test/e2e/common/node/pods.go
 - testname: Pods, assigned hostip
-  codename: '[sig-node] Pods should get a host IP [NodeConformance] [Conformance]'
+  codename: '[sig-node] Pods should get a host IP [Conformance] [NodeConformance]'
   description: Create a Pod. Pod status MUST return successfully and contains a valid
     IP address.
   release: v1.9
@@ -2610,7 +2615,7 @@
   file: test/e2e/common/node/pods.go
 - testname: Pods, remote command execution over websocket
   codename: '[sig-node] Pods should support remote command execution over websockets
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created. Websocket is created to retrieve exec command output
     from this pod. Message retrieved form Websocket MUST match with expected exec
     command output.
@@ -2618,7 +2623,7 @@
   file: test/e2e/common/node/pods.go
 - testname: Pods, logs from websockets
   codename: '[sig-node] Pods should support retrieving logs from the container over
-    websockets [NodeConformance] [Conformance]'
+    websockets [Conformance] [NodeConformance]'
   description: A Pod is created. Websocket is created to retrieve log of a container
     from this pod. Message retrieved form Websocket MUST match with container's output.
   release: v1.13
@@ -2635,7 +2640,7 @@
   file: test/e2e/node/pre_stop.go
 - testname: Pod liveness probe, using http endpoint, failure
   codename: '[sig-node] Probing container should *not* be restarted with a /healthz
-    http liveness probe [NodeConformance] [Conformance]'
+    http liveness probe [Conformance] [NodeConformance]'
   description: A Pod is created with liveness probe on http endpoint '/'. Liveness
     probe on this endpoint will not fail. When liveness probe does not fail then the
     restart count MUST remain zero.
@@ -2643,7 +2648,7 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using grpc call, success
   codename: '[sig-node] Probing container should *not* be restarted with a GRPC liveness
-    probe [NodeConformance] [Conformance]'
+    probe [Conformance] [NodeConformance]'
   description: A Pod is created with liveness probe on grpc service. Liveness probe
     on this endpoint will not fail. When liveness probe does not fail then the restart
     count MUST remain zero.
@@ -2651,7 +2656,7 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using local file, no restart
   codename: '[sig-node] Probing container should *not* be restarted with a exec "cat
-    /tmp/health" liveness probe [NodeConformance] [Conformance]'
+    /tmp/health" liveness probe [Conformance] [NodeConformance]'
   description: Pod is created with liveness probe that uses 'exec' command to cat
     /temp/health file. Liveness probe MUST not fail to check health and the restart
     count should remain 0.
@@ -2659,7 +2664,7 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using tcp socket, no restart
   codename: '[sig-node] Probing container should *not* be restarted with a tcp:8080
-    liveness probe [NodeConformance] [Conformance]'
+    liveness probe [Conformance] [NodeConformance]'
   description: A Pod is created with liveness probe on tcp socket 8080. The http handler
     on port 8080 will return http errors after 10 seconds, but the socket will remain
     open. Liveness probe MUST not fail to check health and the restart count should
@@ -2668,7 +2673,7 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using http endpoint, restart
   codename: '[sig-node] Probing container should be restarted with a /healthz http
-    liveness probe [NodeConformance] [Conformance]'
+    liveness probe [Conformance] [NodeConformance]'
   description: A Pod is created with liveness probe on http endpoint /healthz. The
     http handler on the /healthz will return a http error after 10 seconds since the
     Pod is started. This MUST result in liveness check failure. The Pod MUST now be
@@ -2677,7 +2682,7 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using grpc call, failure
   codename: '[sig-node] Probing container should be restarted with a GRPC liveness
-    probe [NodeConformance] [Conformance]'
+    probe [Conformance] [NodeConformance]'
   description: A Pod is created with liveness probe on grpc service. Liveness probe
     on this endpoint should fail because of wrong probe port. When liveness probe
     does  fail then the restart count should +1.
@@ -2685,7 +2690,7 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using local file, restart
   codename: '[sig-node] Probing container should be restarted with a exec "cat /tmp/health"
-    liveness probe [NodeConformance] [Conformance]'
+    liveness probe [Conformance] [NodeConformance]'
   description: Create a Pod with liveness probe that uses ExecAction handler to cat
     /temp/health file. The Container deletes the file /temp/health after 10 second,
     triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing
@@ -2694,7 +2699,7 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
   codename: '[sig-node] Probing container should have monotonically increasing restart
-    count [NodeConformance] [Conformance]'
+    count [Conformance] [NodeConformance]'
   description: A Pod is created with liveness probe on http endpoint /healthz. The
     http handler on the /healthz will return a http error after 10 seconds since the
     Pod is started. This MUST result in liveness check failure. The Pod MUST now be
@@ -2706,7 +2711,7 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod readiness probe, with initial delay
   codename: '[sig-node] Probing container with readiness probe should not be ready
-    before initial delay and never restart [NodeConformance] [Conformance]'
+    before initial delay and never restart [Conformance] [NodeConformance]'
   description: Create a Pod that is configured with a initial delay set on the readiness
     probe. Check the Pod Start time to compare to the initial delay. The Pod MUST
     be ready only after the specified initial delay.
@@ -2714,7 +2719,7 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod readiness probe, failure
   codename: '[sig-node] Probing container with readiness probe that fails should never
-    be ready and never restart [NodeConformance] [Conformance]'
+    be ready and never restart [Conformance] [NodeConformance]'
   description: Create a Pod with a readiness probe that fails consistently. When this
     Pod is created, then the Pod MUST never be ready, never be running and restart
     count MUST be zero.
@@ -2722,19 +2727,19 @@
   file: test/e2e/common/node/container_probe.go
 - testname: Pod with the deleted RuntimeClass is rejected.
   codename: '[sig-node] RuntimeClass should reject a Pod requesting a deleted RuntimeClass
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: Pod requesting the deleted RuntimeClass must be rejected.
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
 - testname: Pod with the non-existing RuntimeClass is rejected.
   codename: '[sig-node] RuntimeClass should reject a Pod requesting a non-existent
-    RuntimeClass [NodeConformance] [Conformance]'
+    RuntimeClass [Conformance] [NodeConformance]'
   description: The Pod requesting the non-existing RuntimeClass must be rejected.
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
 - testname: RuntimeClass Overhead field must be respected.
   codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
-    and initialize its Overhead [NodeConformance] [Conformance]'
+    and initialize its Overhead [Conformance] [NodeConformance]'
   description: The Pod requesting the existing RuntimeClass must be scheduled. This
     test doesn't validate that the Pod will actually start because this functionality
     depends on container runtime and preconfigured handler. Runtime-specific functionality
@@ -2743,7 +2748,7 @@
   file: test/e2e/common/node/runtimeclass.go
 - testname: Can schedule a pod requesting existing RuntimeClass.
   codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
-    without PodOverhead [NodeConformance] [Conformance]'
+    without PodOverhead [Conformance] [NodeConformance]'
   description: The Pod requesting the existing RuntimeClass must be scheduled. This
     test doesn't validate that the Pod will actually start because this functionality
     depends on container runtime and preconfigured handler. Runtime-specific functionality
@@ -2771,8 +2776,8 @@
   release: v1.34
   file: test/e2e/common/node/secrets.go
 - testname: Secrets, pod environment field
-  codename: '[sig-node] Secrets should be consumable from pods in env vars [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] Secrets should be consumable from pods in env vars [Conformance]
+    [NodeConformance]'
   description: Create a secret. Create a Pod with Container that declares a environment
     variable which references the secret created to extract a key value from the secret.
     Pod MUST have the environment variable that contains proper value for the key
@@ -2780,8 +2785,8 @@
   release: v1.9
   file: test/e2e/common/node/secrets.go
 - testname: Secrets, pod environment from source
-  codename: '[sig-node] Secrets should be consumable via the environment [NodeConformance]
-    [Conformance]'
+  codename: '[sig-node] Secrets should be consumable via the environment [Conformance]
+    [NodeConformance]'
   description: Create a secret. Create a Pod with Container that declares a environment
     variable using 'EnvFrom' which references the secret created to extract a key
     value from the secret. Pod MUST have the environment variable that contains proper
@@ -2804,7 +2809,7 @@
   file: test/e2e/common/node/secrets.go
 - testname: Security Context, runAsUser=65534
   codename: '[sig-node] Security Context When creating a container with runAsUser
-    should run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance]'
+    should run the container with uid 65534 [LinuxOnly] [Conformance] [NodeConformance]'
   description: 'Container is created with runAsUser option by passing uid 65534 to
     run as unpriviledged user. Pod MUST be in Succeeded phase. [LinuxOnly]: This test
     is marked as LinuxOnly since Windows does not support running as UID / GID.'
@@ -2812,7 +2817,7 @@
   file: test/e2e/common/node/security_context.go
 - testname: Security Context, privileged=false.
   codename: '[sig-node] Security Context When creating a pod with privileged should
-    run the container as unprivileged when false [LinuxOnly] [NodeConformance] [Conformance]'
+    run the container as unprivileged when false [LinuxOnly] [Conformance] [NodeConformance]'
   description: 'Create a container to run in unprivileged mode by setting pod''s SecurityContext
     Privileged option as false. Pod MUST be in Succeeded phase. [LinuxOnly]: This
     test is marked as LinuxOnly since it runs a Linux-specific command.'
@@ -2821,7 +2826,7 @@
 - testname: Security Context, readOnlyRootFilesystem=false.
   codename: '[sig-node] Security Context When creating a pod with readOnlyRootFilesystem
     should run the container with writable rootfs when readOnlyRootFilesystem=false
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: Container is configured to run with readOnlyRootFilesystem to false.
     Write operation MUST be allowed and Pod MUST be in Succeeded state.
   release: v1.15
@@ -2846,8 +2851,7 @@
   file: test/e2e/node/security_context.go
 - testname: Security Context, allowPrivilegeEscalation=false.
   codename: '[sig-node] Security Context when creating containers with AllowPrivilegeEscalation
-    should not allow privilege escalation when false [LinuxOnly] [NodeConformance]
-    [Conformance]'
+    should not allow privilege escalation when false [LinuxOnly] [Conformance] [NodeConformance]'
   description: 'Configuring the allowPrivilegeEscalation to false, does not allow
     the privilege escalation operation. A container is configured with allowPrivilegeEscalation=false
     and a given uid (1000) which is not 0. When the container is run, container''s
@@ -2857,16 +2861,16 @@
   release: v1.15
   file: test/e2e/common/node/security_context.go
 - testname: Sysctls, reject invalid sysctls
-  codename: '[sig-node] Sysctls [LinuxOnly] [NodeConformance] should reject invalid
-    sysctls [Conformance]'
+  codename: '[sig-node] Sysctls [LinuxOnly] should reject invalid sysctls [Conformance]
+    [NodeConformance]'
   description: 'Pod is created with one valid and two invalid sysctls. Pod should
     not apply invalid sysctls. [LinuxOnly]: This test is marked as LinuxOnly since
     Windows does not support sysctls'
   release: v1.21
   file: test/e2e/common/node/sysctl.go
 - testname: Sysctl, test sysctls
-  codename: '[sig-node] Sysctls [LinuxOnly] [NodeConformance] should support sysctls
-    [Environment:NotInUserNS] [Conformance]'
+  codename: '[sig-node] Sysctls [LinuxOnly] should support sysctls [Environment:NotInUserNS]
+    [Conformance] [NodeConformance]'
   description: 'Pod is created with kernel.shm_rmid_forced sysctl. Kernel.shm_rmid_forced
     must be set to 1 [LinuxOnly]: This test is marked as LinuxOnly since Windows does
     not support sysctls [Environment:NotInUserNS]: The test fails in UserNS (as expected):
@@ -2875,14 +2879,14 @@
   file: test/e2e/common/node/sysctl.go
 - testname: Environment variables, expansion
   codename: '[sig-node] Variable Expansion should allow composing env vars into new
-    env vars [NodeConformance] [Conformance]'
+    env vars [Conformance] [NodeConformance]'
   description: Create a Pod with environment variables. Environment variables defined
     using previously defined environment variables MUST expand to proper values.
   release: v1.9
   file: test/e2e/common/node/expansion.go
 - testname: Environment variables, command argument expansion
   codename: '[sig-node] Variable Expansion should allow substituting values in a container''s
-    args [NodeConformance] [Conformance]'
+    args [Conformance] [NodeConformance]'
   description: Create a Pod with environment variables and container command arguments
     using them. Container command arguments using the  defined environment variables
     MUST expand to proper values.
@@ -2890,7 +2894,7 @@
   file: test/e2e/common/node/expansion.go
 - testname: Environment variables, command expansion
   codename: '[sig-node] Variable Expansion should allow substituting values in a container''s
-    command [NodeConformance] [Conformance]'
+    command [Conformance] [NodeConformance]'
   description: Create a Pod with environment variables and container command using
     them. Container command using the  defined environment variables MUST expand to
     proper values.
@@ -2927,7 +2931,7 @@
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath ready from failed state
   codename: '[sig-node] Variable Expansion should verify that a failing subpath expansion
-    can be modified during the lifecycle of a container [Slow] [Conformance]'
+    can be modified during the lifecycle of a container [Conformance] [Slow]'
   description: Verify that a failing subpath expansion can be modified during the
     lifecycle of a container.
   release: v1.19
@@ -2976,22 +2980,22 @@
   release: v1.26
   file: test/e2e/scheduling/limit_range.go
 - testname: Scheduler, resource limits
-  codename: '[sig-scheduling] SchedulerPredicates [Serial] validates resource limits
-    of pods that are allowed to run [Conformance]'
+  codename: '[sig-scheduling] SchedulerPredicates validates resource limits of pods
+    that are allowed to run [Conformance] [Serial]'
   description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
   release: v1.9
   file: test/e2e/scheduling/predicates.go
 - testname: Scheduler, node selector matching
-  codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector
-    is respected if matching [Conformance]'
+  codename: '[sig-scheduling] SchedulerPredicates validates that NodeSelector is respected
+    if matching [Conformance] [Serial]'
   description: 'Create a label on the node {k: v}. Then create a Pod with a NodeSelector
     set to {k: v}. Check to see if the Pod is scheduled. When the NodeSelector matches
     then Pod MUST be scheduled on that node.'
   release: v1.9
   file: test/e2e/scheduling/predicates.go
 - testname: Scheduler, node selector not matching
-  codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector
-    is respected if not matching [Conformance]'
+  codename: '[sig-scheduling] SchedulerPredicates validates that NodeSelector is respected
+    if not matching [Conformance] [Serial]'
   description: Create a Pod with a NodeSelector set to a value that does not match
     a node in the cluster. Since there are no nodes matching the criteria the Pod
     MUST not be scheduled.
@@ -2999,17 +3003,17 @@
   file: test/e2e/scheduling/predicates.go
 - testname: Scheduling, HostPort and Protocol match, HostIPs different but one is
     default HostIP (0.0.0.0)
-  codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that there exists
-    conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP
-    [Conformance]'
+  codename: '[sig-scheduling] SchedulerPredicates validates that there exists conflict
+    between pods with same hostPort and protocol but one using 0.0.0.0 hostIP [Conformance]
+    [Serial]'
   description: Pods with the same HostPort and Protocol, but different HostIPs, MUST
     NOT schedule to the same node if one of those IPs is the default HostIP of 0.0.0.0,
     which represents all IPs on the host.
   release: v1.16
   file: test/e2e/scheduling/predicates.go
 - testname: Pod preemption verification
-  codename: '[sig-scheduling] SchedulerPreemption [Serial] PreemptionExecutionPath
-    runs ReplicaSets to verify preemption running path [Conformance]'
+  codename: '[sig-scheduling] SchedulerPreemption PreemptionExecutionPath runs ReplicaSets
+    to verify preemption running path [Conformance] [Serial]'
   description: Four levels of Pods in ReplicaSets with different levels of Priority,
     restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first
     followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected
@@ -3017,32 +3021,32 @@
   release: v1.19
   file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, Verify PriorityClass endpoints
-  codename: '[sig-scheduling] SchedulerPreemption [Serial] PriorityClass endpoints
-    verify PriorityClass endpoints can be operated with different HTTP methods [Conformance]'
+  codename: '[sig-scheduling] SchedulerPreemption PriorityClass endpoints verify PriorityClass
+    endpoints can be operated with different HTTP methods [Conformance] [Serial]'
   description: Verify that PriorityClass endpoints can be listed. When any mutable
     field is either patched or updated it MUST succeed. When any immutable field is
     either patched or updated it MUST fail.
   release: v1.20
   file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, Basic Preemption
-  codename: '[sig-scheduling] SchedulerPreemption [Serial] validates basic preemption
-    works [Conformance]'
+  codename: '[sig-scheduling] SchedulerPreemption validates basic preemption works
+    [Conformance] [Serial]'
   description: When a higher priority pod is created and no node with enough resources
     is found, the scheduler MUST preempt a lower priority pod and schedule the high
     priority pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, Preemption for critical pod
-  codename: '[sig-scheduling] SchedulerPreemption [Serial] validates lower priority
-    pod preemption by critical pod [Conformance]'
+  codename: '[sig-scheduling] SchedulerPreemption validates lower priority pod preemption
+    by critical pod [Conformance] [Serial]'
   description: When a critical pod is created and no node with enough resources is
     found, the scheduler MUST preempt a lower priority pod to schedule the critical
     pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
 - testname: Verify the DisruptionTarget condition is added to the preempted pod
-  codename: '[sig-scheduling] SchedulerPreemption [Serial] validates pod disruption
-    condition is added to the preempted pod [Conformance]'
+  codename: '[sig-scheduling] SchedulerPreemption validates pod disruption condition
+    is added to the preempted pod [Conformance] [Serial]'
   description: ' 1. Run a low priority pod with finalizer which consumes 1/1 of node
     resources 2. Schedule a higher priority pod which also consumes 1/1 of node resources
     3. See if the pod with lower priority is preempted and has the pod disruption
@@ -3088,8 +3092,8 @@
   release: v1.24
   file: test/e2e/storage/csistoragecapacity.go
 - testname: ConfigMap Volume, text data, binary data
-  codename: '[sig-storage] ConfigMap binary data should be reflected in volume [NodeConformance]
-    [Conformance]'
+  codename: '[sig-storage] ConfigMap binary data should be reflected in volume [Conformance]
+    [NodeConformance]'
   description: The ConfigMap that is created with text data and binary data MUST be
     accessible to read from the newly created Pod using the volume mount that is mapped
     to custom path in the Pod. ConfigMap's text data and binary data MUST be verified
@@ -3098,7 +3102,7 @@
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, create, update and delete
   codename: '[sig-storage] ConfigMap optional updates should be reflected in volume
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: The ConfigMap that is created MUST be accessible to read from the newly
     created Pod using the volume mount that is mapped to custom path in the Pod. When
     the config map is updated the change to the config map MUST be verified by reading
@@ -3107,8 +3111,8 @@
   release: v1.9
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, without mapping
-  codename: '[sig-storage] ConfigMap should be consumable from pods in volume [NodeConformance]
-    [Conformance]'
+  codename: '[sig-storage] ConfigMap should be consumable from pods in volume [Conformance]
+    [NodeConformance]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. The ConfigMap that is created MUST
     be accessible to read from the newly created Pod using the volume mount. The data
@@ -3118,7 +3122,7 @@
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, without mapping, non-root user
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume as non-root
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. Pod is run as a non-root user with
     uid=1000. The ConfigMap that is created MUST be accessible to read from the newly
@@ -3128,7 +3132,7 @@
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, without mapping, volume mode set
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume with
-    defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
+    defaultMode set [LinuxOnly] [Conformance] [NodeConformance]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. File mode is changed to a custom
     value of '0x400'. The ConfigMap that is created MUST be accessible to read from
@@ -3140,7 +3144,7 @@
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, with mapping
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume with
-    mappings [NodeConformance] [Conformance]'
+    mappings [Conformance] [NodeConformance]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. Files are mapped to a path in the
     volume. The ConfigMap that is created MUST be accessible to read from the newly
@@ -3150,7 +3154,7 @@
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, with mapping, volume mode set
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume with
-    mappings and Item mode set [LinuxOnly] [NodeConformance] [Conformance]'
+    mappings and Item mode set [LinuxOnly] [Conformance] [NodeConformance]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. Files are mapped to a path in the
     volume. File mode is changed to a custom value of '0x400'. The ConfigMap that
@@ -3162,7 +3166,7 @@
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, with mapping, non-root user
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume with
-    mappings as non-root [NodeConformance] [Conformance]'
+    mappings as non-root [Conformance] [NodeConformance]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. Files are mapped to a path in the
     volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created
@@ -3172,7 +3176,7 @@
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, multiple volume maps
   codename: '[sig-storage] ConfigMap should be consumable in multiple volumes in the
-    same pod [NodeConformance] [Conformance]'
+    same pod [Conformance] [NodeConformance]'
   description: The ConfigMap that is created MUST be accessible to read from the newly
     created Pod using the volume mount that is mapped to multiple paths in the Pod.
     The content MUST be accessible from all the mapped volume mounts.
@@ -3189,8 +3193,8 @@
   release: v1.21
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, update
-  codename: '[sig-storage] ConfigMap updates should be reflected in volume [NodeConformance]
-    [Conformance]'
+  codename: '[sig-storage] ConfigMap updates should be reflected in volume [Conformance]
+    [NodeConformance]'
   description: The ConfigMap that is created MUST be accessible to read from the newly
     created Pod using the volume mount that is mapped to custom path in the Pod. When
     the ConfigMap is updated the change to the config map MUST be verified by reading
@@ -3199,7 +3203,7 @@
   file: test/e2e/common/storage/configmap_volume.go
 - testname: DownwardAPI volume, CPU limits
   codename: '[sig-storage] Downward API volume should provide container''s cpu limit
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the CPU limits. The container runtime MUST be able to access
     CPU limits from the specified path on the mounted volume.
@@ -3207,7 +3211,7 @@
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, CPU request
   codename: '[sig-storage] Downward API volume should provide container''s cpu request
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the CPU request. The container runtime MUST be able to access
     CPU request from the specified path on the mounted volume.
@@ -3215,7 +3219,7 @@
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, memory limits
   codename: '[sig-storage] Downward API volume should provide container''s memory
-    limit [NodeConformance] [Conformance]'
+    limit [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the memory limits. The container runtime MUST be able to access
     memory limits from the specified path on the mounted volume.
@@ -3223,7 +3227,7 @@
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, memory request
   codename: '[sig-storage] Downward API volume should provide container''s memory
-    request [NodeConformance] [Conformance]'
+    request [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the memory request. The container runtime MUST be able to
     access memory request from the specified path on the mounted volume.
@@ -3231,7 +3235,7 @@
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, CPU limit, default node allocatable
   codename: '[sig-storage] Downward API volume should provide node allocatable (cpu)
-    as default cpu limit if the limit is not set [NodeConformance] [Conformance]'
+    as default cpu limit if the limit is not set [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the CPU limits. CPU limits is not specified for the container.
     The container runtime MUST be able to access CPU limits from the specified path
@@ -3240,7 +3244,7 @@
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, memory limit, default node allocatable
   codename: '[sig-storage] Downward API volume should provide node allocatable (memory)
-    as default memory limit if the limit is not set [NodeConformance] [Conformance]'
+    as default memory limit if the limit is not set [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the memory limits. memory limits is not specified for the
     container. The container runtime MUST be able to access memory limits from the
@@ -3248,8 +3252,8 @@
   release: v1.9
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, pod name
-  codename: '[sig-storage] Downward API volume should provide podname only [NodeConformance]
-    [Conformance]'
+  codename: '[sig-storage] Downward API volume should provide podname only [Conformance]
+    [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the Pod name. The container runtime MUST be able to access
     Pod name from the specified path on the mounted volume.
@@ -3257,7 +3261,7 @@
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, volume mode 0400
   codename: '[sig-storage] Downward API volume should set DefaultMode on files [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource with the volumesource
     mode set to -r-------- and DownwardAPIVolumeFiles contains a item for the Pod
     name. The container runtime MUST be able to access Pod name from the specified
@@ -3267,7 +3271,7 @@
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, file mode 0400
   codename: '[sig-storage] Downward API volume should set mode on item file [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the Pod name with the file mode set to -r--------. The container
     runtime MUST be able to access Pod name from the specified path on the mounted
@@ -3277,7 +3281,7 @@
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, update annotations
   codename: '[sig-storage] Downward API volume should update annotations on modification
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains list of items for each of the Pod annotations. The container runtime
     MUST be able to access Pod annotations from the specified path on the mounted
@@ -3287,7 +3291,7 @@
   file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, update label
   codename: '[sig-storage] Downward API volume should update labels on modification
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains list of items for each of the Pod labels. The container runtime MUST
     be able to access Pod labels from the specified path on the mounted volume. Update
@@ -3306,7 +3310,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0644
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0644,default)
-    [LinuxOnly] [NodeConformance] [Conformance]'
+    [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644.
     Volume is mounted into the container where container is run as a non-root user.
     The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents
@@ -3316,7 +3320,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0644, non-root user
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0644,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0644. Volume is mounted into the container where container
     is run as a non-root user. The volume MUST have mode -rw-r--r-- and mount type
@@ -3327,7 +3331,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0666
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0666,default)
-    [LinuxOnly] [NodeConformance] [Conformance]'
+    [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666.
     Volume is mounted into the container where container is run as a non-root user.
     The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents
@@ -3337,7 +3341,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0666,, non-root user
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0666,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0666. Volume is mounted into the container where container
     is run as a non-root user. The volume MUST have mode -rw-rw-rw- and mount type
@@ -3348,7 +3352,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0777
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0777,default)
-    [LinuxOnly] [NodeConformance] [Conformance]'
+    [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777.
     Volume is mounted into the container where container is run as a non-root user.
     The volume MUST have mode -rwxrwxrwx and mount type set to tmpfs and the contents
@@ -3358,7 +3362,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0777, non-root user
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0777,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0777. Volume is mounted into the container where container
     is run as a non-root user. The volume MUST have mode -rwxrwxrwx and mount type
@@ -3369,7 +3373,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0644
   codename: '[sig-storage] EmptyDir volumes should support (root,0644,default) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644.
     The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents
     MUST be readable. This test is marked LinuxOnly since Windows does not support
@@ -3378,7 +3382,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0644
   codename: '[sig-storage] EmptyDir volumes should support (root,0644,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0644. The volume MUST have mode -rw-r--r-- and mount type set
     to tmpfs and the contents MUST be readable. This test is marked LinuxOnly since
@@ -3388,7 +3392,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0666
   codename: '[sig-storage] EmptyDir volumes should support (root,0666,default) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666.
     The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents
     MUST be readable. This test is marked LinuxOnly since Windows does not support
@@ -3397,7 +3401,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0666
   codename: '[sig-storage] EmptyDir volumes should support (root,0666,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0666. The volume MUST have mode -rw-rw-rw- and mount type set
     to tmpfs and the contents MUST be readable. This test is marked LinuxOnly since
@@ -3407,7 +3411,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0777
   codename: '[sig-storage] EmptyDir volumes should support (root,0777,default) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777.  The
     volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs and the contents
     MUST be readable. This test is marked LinuxOnly since Windows does not support
@@ -3416,7 +3420,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0777
   codename: '[sig-storage] EmptyDir volumes should support (root,0777,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0777.  The volume MUST have mode set as -rwxrwxrwx and mount
     type set to tmpfs and the contents MUST be readable. This test is marked LinuxOnly
@@ -3426,7 +3430,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode default
   codename: '[sig-storage] EmptyDir volumes volume on default medium should have the
-    correct mode [LinuxOnly] [NodeConformance] [Conformance]'
+    correct mode [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume, the volume MUST have mode
     set as -rwxrwxrwx and mount type set to tmpfs. This test is marked LinuxOnly since
     Windows does not support setting specific file permissions.
@@ -3434,7 +3438,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode default
   codename: '[sig-storage] EmptyDir volumes volume on tmpfs should have the correct
-    mode [LinuxOnly] [NodeConformance] [Conformance]'
+    mode [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs. This test
     is marked LinuxOnly since Windows does not support setting specific file permissions,
@@ -3443,7 +3447,7 @@
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir Wrapper Volume, ConfigMap volumes, no race
   codename: '[sig-storage] EmptyDir wrapper volumes should not cause race condition
-    when used for configmaps [Serial] [Conformance]'
+    when used for configmaps [Conformance] [Serial]'
   description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes
     mounted. Pod MUST NOT fail waiting for Volumes.
   release: v1.13
@@ -3481,7 +3485,7 @@
   file: test/e2e/storage/persistent_volumes.go
 - testname: Projected Volume, multiple projections
   codename: '[sig-storage] Projected combined should project all components that make
-    up the projection API [Projection] [NodeConformance] [Conformance]'
+    up the projection API [Projection] [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for secrets, configMap
     and downwardAPI with pod name, cpu and memory limits and cpu and memory requests.
     Pod MUST be able to read the secrets, configMap values and the cpu and memory
@@ -3490,7 +3494,7 @@
   file: test/e2e/common/storage/projected_combined.go
 - testname: Projected Volume, ConfigMap, create, update and delete
   codename: '[sig-storage] Projected configMap optional updates should be reflected
-    in volume [NodeConformance] [Conformance]'
+    in volume [Conformance] [NodeConformance]'
   description: Create a Pod with three containers with ConfigMaps namely a create,
     update and delete container. Create Container when started MUST not have configMap,
     update and delete containers MUST be created with a ConfigMap value as 'value-1'.
@@ -3502,7 +3506,7 @@
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, volume mode default
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap with default permission mode. Pod MUST be able to read the content
     of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
@@ -3510,7 +3514,7 @@
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, non-root user
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    as non-root [NodeConformance] [Conformance]'
+    as non-root [Conformance] [NodeConformance]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap as non-root user with uid 1000. Pod MUST be able to read the content
     of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
@@ -3518,7 +3522,7 @@
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, volume mode 0400
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
+    with defaultMode set [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap with permission mode set to 0400. Pod MUST be able to read the content
     of the ConfigMap successfully and the mode on the volume MUST be -r--------. This
@@ -3528,7 +3532,7 @@
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, mapped
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    with mappings [NodeConformance] [Conformance]'
+    with mappings [Conformance] [NodeConformance]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap with default permission mode. The ConfigMap is also mapped to a custom
     path. Pod MUST be able to read the content of the ConfigMap from the custom location
@@ -3537,7 +3541,7 @@
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, mapped, volume mode 0400
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    with mappings and Item mode set [LinuxOnly] [NodeConformance] [Conformance]'
+    with mappings and Item mode set [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap with permission mode set to 0400. The ConfigMap is also mapped to
     a custom path. Pod MUST be able to read the content of the ConfigMap from the
@@ -3548,7 +3552,7 @@
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, mapped, non-root user
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    with mappings as non-root [NodeConformance] [Conformance]'
+    with mappings as non-root [Conformance] [NodeConformance]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap as non-root user with uid 1000. The ConfigMap is also mapped to a
     custom path. Pod MUST be able to read the content of the ConfigMap from the custom
@@ -3557,7 +3561,7 @@
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, multiple volume paths
   codename: '[sig-storage] Projected configMap should be consumable in multiple volumes
-    in the same pod [NodeConformance] [Conformance]'
+    in the same pod [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source 'ConfigMap' to store
     a configMap. The configMap is mapped to two different volume mounts. Pod MUST
     be able to read the content of the configMap successfully from the two volume
@@ -3566,7 +3570,7 @@
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, update
   codename: '[sig-storage] Projected configMap updates should be reflected in volume
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap and performs a create and update to new value. Pod MUST be able to
     create the configMap with value-1. Pod MUST be able to update the value in the
@@ -3575,7 +3579,7 @@
   file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, DownwardAPI, CPU limits
   codename: '[sig-storage] Projected downwardAPI should provide container''s cpu limit
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the cpu limits from the mounted DownwardAPIVolumeFiles.
@@ -3583,7 +3587,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, CPU request
   codename: '[sig-storage] Projected downwardAPI should provide container''s cpu request
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the cpu request from the mounted DownwardAPIVolumeFiles.
@@ -3591,7 +3595,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, memory limits
   codename: '[sig-storage] Projected downwardAPI should provide container''s memory
-    limit [NodeConformance] [Conformance]'
+    limit [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the memory limits from the mounted DownwardAPIVolumeFiles.
@@ -3599,7 +3603,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, memory request
   codename: '[sig-storage] Projected downwardAPI should provide container''s memory
-    request [NodeConformance] [Conformance]'
+    request [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the memory request from the mounted DownwardAPIVolumeFiles.
@@ -3607,7 +3611,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, CPU limit, node allocatable
   codename: '[sig-storage] Projected downwardAPI should provide node allocatable (cpu)
-    as default cpu limit if the limit is not set [NodeConformance] [Conformance]'
+    as default cpu limit if the limit is not set [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory
     resources for requests and limits are NOT specified for the container. Pod MUST
@@ -3616,7 +3620,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, memory limit, node allocatable
   codename: '[sig-storage] Projected downwardAPI should provide node allocatable (memory)
-    as default memory limit if the limit is not set [NodeConformance] [Conformance]'
+    as default memory limit if the limit is not set [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory
     resources for requests and limits are NOT specified for the container. Pod MUST
@@ -3624,8 +3628,8 @@
   release: v1.9
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, pod name
-  codename: '[sig-storage] Projected downwardAPI should provide podname only [NodeConformance]
-    [Conformance]'
+  codename: '[sig-storage] Projected downwardAPI should provide podname only [Conformance]
+    [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the pod name from the mounted DownwardAPIVolumeFiles.
@@ -3633,7 +3637,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, volume mode 0400
   codename: '[sig-storage] Projected downwardAPI should set DefaultMode on files [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. The default mode
     for the volume mount is set to 0400. Pod MUST be able to read the pod name from
@@ -3644,7 +3648,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, volume mode 0400
   codename: '[sig-storage] Projected downwardAPI should set mode on item file [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. The default mode
     for the volume mount is set to 0400. Pod MUST be able to read the pod name from
@@ -3655,7 +3659,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, update annotation
   codename: '[sig-storage] Projected downwardAPI should update annotations on modification
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests and annotation items.
     Pod MUST be able to read the annotations from the mounted DownwardAPIVolumeFiles.
@@ -3665,7 +3669,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, update labels
   codename: '[sig-storage] Projected downwardAPI should update labels on modification
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests and label items. Pod
     MUST be able to read the labels from the mounted DownwardAPIVolumeFiles. Labels
@@ -3674,7 +3678,7 @@
   file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, Secrets, create, update delete
   codename: '[sig-storage] Projected secret optional updates should be reflected in
-    volume [NodeConformance] [Conformance]'
+    volume [Conformance] [NodeConformance]'
   description: Create a Pod with three containers with secrets namely a create, update
     and delete container. Create Container when started MUST no have a secret, update
     and delete containers MUST be created with a secret value. Create a secret in
@@ -3686,7 +3690,7 @@
   file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, volume mode default
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key with default permission mode. Pod MUST be able to
     read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
@@ -3694,7 +3698,7 @@
   file: test/e2e/common/storage/projected_secret.go
 - testname: Project Volume, Secrets, non-root, custom fsGroup
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance] [Conformance]'
+    as non-root with defaultMode and fsGroup set [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key. The volume has permission mode set to 0440, fsgroup
     set to 1001 and user set to non-root uid of 1000. Pod MUST be able to read the
@@ -3705,7 +3709,7 @@
   file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, volume mode 0400
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
+    with defaultMode set [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key with permission mode set to 0x400 on the Pod. Pod
     MUST be able to read the content of the key successfully and the mode MUST be
@@ -3715,7 +3719,7 @@
   file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, mapped
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    with mappings [NodeConformance] [Conformance]'
+    with mappings [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key with default permission mode. The secret is also mapped
     to a custom path. Pod MUST be able to read the content of the key successfully
@@ -3724,7 +3728,7 @@
   file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, mapped, volume mode 0400
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    with mappings and Item Mode set [LinuxOnly] [NodeConformance] [Conformance]'
+    with mappings and Item Mode set [LinuxOnly] [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key with permission mode set to 0400. The secret is also
     mapped to a specific name. Pod MUST be able to read the content of the key successfully
@@ -3734,7 +3738,7 @@
   file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, mapped, multiple paths
   codename: '[sig-storage] Projected secret should be consumable in multiple volumes
-    in a pod [NodeConformance] [Conformance]'
+    in a pod [Conformance] [NodeConformance]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key. The secret is mapped to two different volume mounts.
     Pod MUST be able to read the content of the key successfully from the two volume
@@ -3743,7 +3747,7 @@
   file: test/e2e/common/storage/projected_secret.go
 - testname: Secrets Volume, create, update and delete
   codename: '[sig-storage] Secrets optional updates should be reflected in volume
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: Create a Pod with three containers with secrets volume sources namely
     a create, update and delete container. Create Container when started MUST not
     have secret, update and delete containers MUST be created with a secret value.
@@ -3756,8 +3760,8 @@
 - testname: Secrets Volume, volume mode default, secret with same name in different
     namespace
   codename: '[sig-storage] Secrets should be able to mount in a volume regardless
-    of a different secret existing with same name in different namespace [NodeConformance]
-    [Conformance]'
+    of a different secret existing with same name in different namespace [Conformance]
+    [NodeConformance]'
   description: Create a secret with same name in two namespaces. Create a Pod with
     secret volume source configured into the container. Pod MUST be able to read the
     secrets from the mounted volume from the container runtime and only secrets which
@@ -3766,8 +3770,8 @@
   release: v1.12
   file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, default
-  codename: '[sig-storage] Secrets should be consumable from pods in volume [NodeConformance]
-    [Conformance]'
+  codename: '[sig-storage] Secrets should be consumable from pods in volume [Conformance]
+    [NodeConformance]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container. Pod MUST be able to read the secret from the mounted volume
     from the container runtime and the file mode of the secret MUST be -rw-r--r--
@@ -3776,7 +3780,7 @@
   file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, volume mode 0440, fsGroup 1001 and uid 1000
   codename: '[sig-storage] Secrets should be consumable from pods in volume as non-root
-    with defaultMode and fsGroup set [LinuxOnly] [NodeConformance] [Conformance]'
+    with defaultMode and fsGroup set [LinuxOnly] [Conformance] [NodeConformance]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container with file mode set to 0x440 as a non-root user with uid 1000
     and fsGroup id 1001. Pod MUST be able to read the secret from the mounted volume
@@ -3787,7 +3791,7 @@
   file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, volume mode 0400
   codename: '[sig-storage] Secrets should be consumable from pods in volume with defaultMode
-    set [LinuxOnly] [NodeConformance] [Conformance]'
+    set [LinuxOnly] [Conformance] [NodeConformance]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container with file mode set to 0x400. Pod MUST be able to read the secret
     from the mounted volume from the container runtime and the file mode of the secret
@@ -3797,7 +3801,7 @@
   file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, mapping
   codename: '[sig-storage] Secrets should be consumable from pods in volume with mappings
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container with a custom path. Pod MUST be able to read the secret from
     the mounted volume from the specified custom path. The file mode of the secret
@@ -3806,7 +3810,7 @@
   file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, mapping, volume mode 0400
   codename: '[sig-storage] Secrets should be consumable from pods in volume with mappings
-    and Item Mode set [LinuxOnly] [NodeConformance] [Conformance]'
+    and Item Mode set [LinuxOnly] [Conformance] [NodeConformance]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container with a custom path and file mode set to 0x400. Pod MUST be
     able to read the secret from the mounted volume from the specified custom path.
@@ -3816,7 +3820,7 @@
   file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, mapping multiple volume paths
   codename: '[sig-storage] Secrets should be consumable in multiple volumes in a pod
-    [NodeConformance] [Conformance]'
+    [Conformance] [NodeConformance]'
   description: Create a secret. Create a Pod with two secret volume sources configured
     into the container in to two different custom paths. Pod MUST be able to read
     the secret from the both the mounted volumes from the two specified custom paths.
