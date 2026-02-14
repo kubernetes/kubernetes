@@ -70,15 +70,15 @@ func (p *plugin) Admit(ctx context.Context, attributes admission.Attributes, o a
 
 	resources := sets.String{}
 	for _, container := range pod.Spec.Containers {
-		for resourceName := range container.Resources.Requests {
-			if helper.IsExtendedResourceName(resourceName) {
+		for resourceName, resourceQuantity := range container.Resources.Requests {
+			if helper.IsExtendedResourceName(resourceName) && resourceQuantity.Value() > 0 {
 				resources.Insert(string(resourceName))
 			}
 		}
 	}
 	for _, container := range pod.Spec.InitContainers {
-		for resourceName := range container.Resources.Requests {
-			if helper.IsExtendedResourceName(resourceName) {
+		for resourceName, resourceQuantity := range container.Resources.Requests {
+			if helper.IsExtendedResourceName(resourceName) && resourceQuantity.Value() > 0 {
 				resources.Insert(string(resourceName))
 			}
 		}
