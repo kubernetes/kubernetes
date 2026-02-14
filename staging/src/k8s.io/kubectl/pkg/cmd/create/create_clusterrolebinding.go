@@ -42,8 +42,11 @@ var (
 		Create a cluster role binding for a particular cluster role.`))
 
 	clusterRoleBindingExample = templates.Examples(i18n.T(`
-		  # Create a cluster role binding for user1, user2, and group1 using the cluster-admin cluster role
-		  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1`))
+		# Create a cluster role binding for user1, user2, and group1 using the cluster-admin cluster role
+		kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1
+
+		# Create a cluster role binding for service account monitoring:sa-admin using the cluster-admin cluster role
+		kubectl create clusterrolebinding cluster-sa-admin --clusterrole=cluster-admin --serviceaccount=monitoring:sa-admin`))
 )
 
 // ClusterRoleBindingOptions is returned by NewCmdCreateClusterRoleBinding
