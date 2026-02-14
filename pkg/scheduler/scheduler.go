@@ -561,7 +561,17 @@ func (sched *Scheduler) Run(ctx context.Context) {
 // NewInformerFactory creates a SharedInformerFactory and initializes a scheduler specific
 // in-place podInformer.
 func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration) informers.SharedInformerFactory {
-	informerFactory := informers.NewSharedInformerFactory(cs, resyncPeriod)
+	// Dropping `.metadata.managedFields` to improve memory usage.
+	// The Extract workflow (i.e. `ExtractPod`) should be unused.
+	trim := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			if accessor.GetManagedFields() != nil {
+				accessor.SetManagedFields(nil)
+			}
+		}
+		return obj, nil
+	}
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(cs, resyncPeriod, informers.WithTransform(trim))
 	informerFactory.InformerFor(&v1.Pod{}, newPodInformer)
 	return informerFactory
 }
@@ -648,18 +658,6 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.Sh
 		options.FieldSelector = selector
 	}
 	informer := coreinformers.NewFilteredPodInformer(cs, metav1.NamespaceAll, resyncPeriod, cache.Indexers{}, tweakListOptions)
-
-	// Dropping `.metadata.managedFields` to improve memory usage.
-	// The Extract workflow (i.e. `ExtractPod`) should be unused.
-	trim := func(obj interface{}) (interface{}, error) {
-		if accessor, err := meta.Accessor(obj); err == nil {
-			if accessor.GetManagedFields() != nil {
-				accessor.SetManagedFields(nil)
-			}
-		}
-		return obj, nil
-	}
-	informer.SetTransform(trim)
 	return informer
 }
 

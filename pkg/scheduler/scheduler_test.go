@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -1463,3 +1464,29 @@ func (f fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v
 }
 
 var _ fwk.PermitPlugin = &fakePermitPlugin{}
+
+func TestNewInformerFactoryTrim(t *testing.T) {
+	cs := fake.NewClientset()
+	informerFactory := NewInformerFactory(cs, 0)
+	pd := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Name:      "test",
+		Namespace: "default",
+	}, Spec: v1.PodSpec{}}
+	pd.SetManagedFields([]metav1.ManagedFieldsEntry{
+		{
+			Manager:    "update",
+			Operation:  metav1.ManagedFieldsOperationApply,
+			APIVersion: "apps/v1",
+		},
+	})
+	lister := informerFactory.Core().V1().Pods().Lister()
+
+	informerFactory.Start(nil)
+	informerFactory.WaitForCacheSync(nil)
+	_, err := cs.CoreV1().Pods("default").Create(context.Background(), pd, metav1.CreateOptions{})
+	require.NoError(t, err)
+	time.Sleep(time.Millisecond * 10)
+	p, err := lister.Pods("default").Get("test")
+	require.NoError(t, err)
+	require.Equal(t, []metav1.ManagedFieldsEntry(nil), p.GetManagedFields())
+}
