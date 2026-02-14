@@ -33,5 +33,13 @@ func (c *fakeEvictions) Evict(ctx context.Context, eviction *policy.Eviction) er
 	action.Object = eviction
 
 	_, err := c.Fake.Invokes(action, eviction)
+	if err == nil {
+		deleteAction := core.DeleteActionImpl{}
+		deleteAction.Verb = "delete"
+		deleteAction.Namespace = c.Namespace()
+		deleteAction.Resource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+		deleteAction.Name = eviction.Name
+		_, err = c.Fake.Invokes(deleteAction, eviction)
+	}
 	return err
 }
