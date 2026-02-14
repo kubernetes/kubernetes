@@ -94,9 +94,8 @@ var (
 	pvBoundImmediateNode2      = makeTestPV("pv-bound-immediate", "node2", "1G", "1", immediateBoundPVC, immediateClass)
 
 	// PVs for CSI migration
-	migrationPVBound             = makeTestPVForCSIMigration(zone1Labels, boundMigrationPVC, true)
-	migrationPVBoundToUnbound    = makeTestPVForCSIMigration(zone1Labels, unboundPVC, true)
-	nonmigrationPVBoundToUnbound = makeTestPVForCSIMigration(zone1Labels, unboundPVC, false)
+	migrationPVBound          = makeTestPVForCSIMigration(zone1Labels, boundMigrationPVC, true)
+	migrationPVBoundToUnbound = makeTestPVForCSIMigration(zone1Labels, unboundPVC, true)
 
 	// storage class names
 	waitClass                = "waitClass"
@@ -110,10 +109,6 @@ var (
 	node1NoLabels = makeNode("node1").Node
 	node1Zone1    = makeNode("node1").withLabel("topology.gke.io/zone", "us-east-1").Node
 	node1Zone2    = makeNode("node1").withLabel("topology.gke.io/zone", "us-east-2").Node
-
-	// csiNode objects
-	csiNode1Migrated    = makeCSINode("node1", "kubernetes.io/gce-pd")
-	csiNode1NotMigrated = makeCSINode("node1", "")
 
 	// node topology
 	nodeLabelKey   = "nodeKey"
@@ -129,13 +124,12 @@ var (
 )
 
 type testEnv struct {
-	client                  clientset.Interface
-	reactor                 *pvtesting.VolumeReactor
-	binder                  SchedulerVolumeBinder
-	internalBinder          *volumeBinder
-	internalPodInformer     coreinformers.PodInformer
-	internalNodeInformer    coreinformers.NodeInformer
-	internalCSINodeInformer storageinformers.CSINodeInformer
+	client               clientset.Interface
+	reactor              *pvtesting.VolumeReactor
+	binder               SchedulerVolumeBinder
+	internalBinder       *volumeBinder
+	internalPodInformer  coreinformers.PodInformer
+	internalNodeInformer coreinformers.NodeInformer
 
 	// For CSIStorageCapacity feature testing:
 	internalCSIDriverInformer          storageinformers.CSIDriverInformer
@@ -160,7 +154,6 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	csiNodeInformer := informerFactory.Storage().V1().CSINodes()
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 	csiDriverInformer := informerFactory.Storage().V1().CSIDrivers()
@@ -175,7 +168,6 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		feature.Features{},
 		podInformer,
 		nodeInformer,
-		csiNodeInformer,
 		pvcInformer,
 		informerFactory.Core().V1().PersistentVolumes(),
 		classInformer,
@@ -259,13 +251,12 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 	}
 
 	return &testEnv{
-		client:                  client,
-		reactor:                 reactor,
-		binder:                  binder,
-		internalBinder:          internalBinder,
-		internalPodInformer:     podInformer,
-		internalNodeInformer:    nodeInformer,
-		internalCSINodeInformer: csiNodeInformer,
+		client:               client,
+		reactor:              reactor,
+		binder:               binder,
+		internalBinder:       internalBinder,
+		internalPodInformer:  podInformer,
+		internalNodeInformer: nodeInformer,
 
 		internalCSIDriverInformer:          csiDriverInformer,
 		internalCSIStorageCapacityInformer: csiStorageCapacityInformer,
@@ -276,13 +267,6 @@ func (env *testEnv) initNodes(cachedNodes []*v1.Node) {
 	nodeInformer := env.internalNodeInformer.Informer()
 	for _, node := range cachedNodes {
 		nodeInformer.GetIndexer().Add(node)
-	}
-}
-
-func (env *testEnv) initCSINodes(cachedCSINodes []*storagev1.CSINode) {
-	csiNodeInformer := env.internalCSINodeInformer.Informer()
-	for _, csiNode := range cachedCSINodes {
-		csiNodeInformer.GetIndexer().Add(csiNode)
 	}
 }
 
@@ -725,17 +709,6 @@ func pvRemoveClaimUID(pv *v1.PersistentVolume) *v1.PersistentVolume {
 	newPV := pv.DeepCopy()
 	newPV.Spec.ClaimRef.UID = ""
 	return newPV
-}
-
-func makeCSINode(name, migratedPlugin string) *storagev1.CSINode {
-	return &storagev1.CSINode{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Annotations: map[string]string{
-				v1.MigratedPluginsAnnotationKey: migratedPlugin,
-			},
-		},
-	}
 }
 
 func makeCSIDriver(name string, storageCapacity bool) *storagev1.CSIDriver {
@@ -1182,8 +1155,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		pod *v1.Pod
 
 		// Setup
-		initNodes    []*v1.Node
-		initCSINodes []*storagev1.CSINode
+		initNodes []*v1.Node
 
 		// Expected return values
 		reasons    ConflictReasons
@@ -1191,28 +1163,15 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 	}
 	scenarios := map[string]scenarioType{
 		"pvc-bound": {
-			podPVCs:      []*v1.PersistentVolumeClaim{boundMigrationPVC},
-			pvs:          []*v1.PersistentVolume{migrationPVBound},
-			initNodes:    []*v1.Node{node1Zone1},
-			initCSINodes: []*storagev1.CSINode{csiNode1Migrated},
-		},
-		"pvc-bound,csinode-not-migrated": {
-			podPVCs:      []*v1.PersistentVolumeClaim{boundMigrationPVC},
-			pvs:          []*v1.PersistentVolume{migrationPVBound},
-			initNodes:    []*v1.Node{node1Zone1},
-			initCSINodes: []*storagev1.CSINode{csiNode1NotMigrated},
-		},
-		"pvc-bound,missing-csinode": {
 			podPVCs:   []*v1.PersistentVolumeClaim{boundMigrationPVC},
 			pvs:       []*v1.PersistentVolume{migrationPVBound},
 			initNodes: []*v1.Node{node1Zone1},
 		},
 		"pvc-bound,node-different-zone": {
-			podPVCs:      []*v1.PersistentVolumeClaim{boundMigrationPVC},
-			pvs:          []*v1.PersistentVolume{migrationPVBound},
-			initNodes:    []*v1.Node{node1Zone2},
-			initCSINodes: []*storagev1.CSINode{csiNode1Migrated},
-			reasons:      ConflictReasons{ErrReasonNodeConflict},
+			podPVCs:   []*v1.PersistentVolumeClaim{boundMigrationPVC},
+			pvs:       []*v1.PersistentVolume{migrationPVBound},
+			initNodes: []*v1.Node{node1Zone2},
+			reasons:   ConflictReasons{ErrReasonNodeConflict},
 		},
 	}
 
@@ -1231,10 +1190,6 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 			node = scenario.initNodes[0]
 		} else {
 			node = node1
-		}
-
-		if len(scenario.initCSINodes) > 0 {
-			testEnv.initCSINodes(scenario.initCSINodes)
 		}
 
 		// a. Init pvc cache
@@ -1771,10 +1726,9 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 
 	type scenarioType struct {
 		// Inputs
-		initPVs      []*v1.PersistentVolume
-		initPVCs     []*v1.PersistentVolumeClaim
-		initNodes    []*v1.Node
-		initCSINodes []*storagev1.CSINode
+		initPVs   []*v1.PersistentVolume
+		initPVCs  []*v1.PersistentVolumeClaim
+		initNodes []*v1.Node
 
 		bindings        []*BindingInfo
 		provisionedPVCs []*v1.PersistentVolumeClaim
@@ -1794,7 +1748,6 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 			initPVs:         []*v1.PersistentVolume{migrationPVBound},
 			initPVCs:        []*v1.PersistentVolumeClaim{provMigrationPVCBound},
 			initNodes:       []*v1.Node{node1Zone1},
-			initCSINodes:    []*storagev1.CSINode{csiNode1Migrated},
 			apiPVCs:         []*v1.PersistentVolumeClaim{addProvisionAnn(provMigrationPVCBound)},
 			expectedBound:   true,
 		},
@@ -1804,23 +1757,6 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 			initPVs:         []*v1.PersistentVolume{migrationPVBoundToUnbound},
 			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
 			initNodes:       []*v1.Node{node1Zone1},
-			initCSINodes:    []*storagev1.CSINode{csiNode1Migrated},
-		},
-		"binding-without-csinode": {
-			bindings:        []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
-			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{migrationPVBoundToUnbound},
-			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
-			initNodes:       []*v1.Node{node1Zone1},
-			initCSINodes:    []*storagev1.CSINode{},
-		},
-		"binding-non-migrated-plugin": {
-			bindings:        []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
-			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{migrationPVBoundToUnbound},
-			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
-			initNodes:       []*v1.Node{node1Zone1},
-			initCSINodes:    []*storagev1.CSINode{csiNode1NotMigrated},
 		},
 		"binding-node-pv-in-different-zones": {
 			bindings:        []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
@@ -1828,16 +1764,7 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 			initPVs:         []*v1.PersistentVolume{migrationPVBoundToUnbound},
 			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
 			initNodes:       []*v1.Node{node1Zone2},
-			initCSINodes:    []*storagev1.CSINode{csiNode1Migrated},
 			shouldFail:      true,
-		},
-		"binding-node-pv-different-zones-migration-off": {
-			bindings:        []*BindingInfo{makeBinding(unboundPVC, nonmigrationPVBoundToUnbound)},
-			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{nonmigrationPVBoundToUnbound},
-			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
-			initNodes:       []*v1.Node{node1Zone2},
-			initCSINodes:    []*storagev1.CSINode{csiNode1Migrated},
 		},
 	}
 
@@ -1853,7 +1780,6 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 		testEnv := newTestBinder(t, ctx)
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		testEnv.initNodes(scenario.initNodes)
-		testEnv.initCSINodes(scenario.initCSINodes)
 		testEnv.initVolumes(t, scenario.initPVs, nil)
 		testEnv.initClaims(t, scenario.initPVCs, nil)
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)

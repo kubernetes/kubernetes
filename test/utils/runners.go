@@ -925,9 +925,6 @@ func (s *NodeAllocatableStrategy) createCSINode(ctx context.Context, nodeName st
 	csiNode := &storagev1.CSINode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
-			Annotations: map[string]string{
-				v1.MigratedPluginsAnnotationKey: strings.Join(s.MigratedPlugins, ","),
-			},
 		},
 		Spec: storagev1.CSINodeSpec{
 			Drivers: []storagev1.CSINodeDriver{},
@@ -971,8 +968,6 @@ func (s *NodeAllocatableStrategy) updateCSINode(ctx context.Context, csiNode *st
 			csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, d)
 		}
 	}
-	csiNode.Annotations[v1.MigratedPluginsAnnotationKey] = strings.Join(s.MigratedPlugins, ",")
-
 	_, err := client.StorageV1().CSINodes().Update(ctx, csiNode, metav1.UpdateOptions{})
 	return err
 }
