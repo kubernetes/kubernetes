@@ -35,7 +35,7 @@ import (
 
 func createRemoteImageServiceWithTracerProvider(endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.ImageManagerService {
 	logger := klog.Background()
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, tp, &logger)
+	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, tp, &logger, false)
 	require.NoError(t, err)
 
 	return runtimeService
@@ -43,7 +43,7 @@ func createRemoteImageServiceWithTracerProvider(endpoint string, tp oteltrace.Tr
 
 func createRemoteImageServiceWithoutTracerProvider(endpoint string, t *testing.T) internalapi.ImageManagerService {
 	logger := klog.Background()
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), &logger)
+	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), &logger, false)
 	require.NoError(t, err)
 
 	return runtimeService

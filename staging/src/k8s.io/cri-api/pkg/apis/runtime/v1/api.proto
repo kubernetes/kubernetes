@@ -48,6 +48,12 @@ service RuntimeService {
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
     // ListPodSandbox returns a list of PodSandboxes.
     rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
+    // StreamPodSandboxes returns a stream of PodSandboxes.
+    // This is an alternative to ListPodSandbox that streams results one item at a time,
+    // avoiding the gRPC message size limit for nodes with many pods.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamPodSandboxes(StreamPodSandboxesRequest) returns (stream StreamPodSandboxesResponse) {}
 
     // CreateContainer creates a new container in specified PodSandbox
     rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
@@ -66,6 +72,12 @@ service RuntimeService {
     rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
     // ListContainers lists all containers by filters.
     rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
+    // StreamContainers returns a stream of containers.
+    // This is an alternative to ListContainers that streams results one item at a time,
+    // avoiding the gRPC message size limit for nodes with many containers.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamContainers(StreamContainersRequest) returns (stream StreamContainersResponse) {}
     // ContainerStatus returns status of the container. If the container is not
     // present, returns an error.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
@@ -93,12 +105,24 @@ service RuntimeService {
     rpc ContainerStats(ContainerStatsRequest) returns (ContainerStatsResponse) {}
     // ListContainerStats returns stats of all running containers.
     rpc ListContainerStats(ListContainerStatsRequest) returns (ListContainerStatsResponse) {}
+    // StreamContainerStats returns a stream of container stats.
+    // This is an alternative to ListContainerStats that streams results one item at a time,
+    // avoiding the gRPC message size limit for nodes with many containers.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamContainerStats(StreamContainerStatsRequest) returns (stream StreamContainerStatsResponse) {}
 
     // PodSandboxStats returns stats of the pod sandbox. If the pod sandbox does not
     // exist, the call returns an error.
     rpc PodSandboxStats(PodSandboxStatsRequest) returns (PodSandboxStatsResponse) {}
     // ListPodSandboxStats returns stats of the pod sandboxes matching a filter.
     rpc ListPodSandboxStats(ListPodSandboxStatsRequest) returns (ListPodSandboxStatsResponse) {}
+    // StreamPodSandboxStats returns a stream of pod sandbox stats.
+    // This is an alternative to ListPodSandboxStats that streams results one item at a time,
+    // avoiding the gRPC message size limit for nodes with many pods.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamPodSandboxStats(StreamPodSandboxStatsRequest) returns (stream StreamPodSandboxStatsResponse) {}
 
     // UpdateRuntimeConfig updates the runtime configuration based on the given request.
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
@@ -121,6 +145,12 @@ service RuntimeService {
 
     // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
     rpc ListPodSandboxMetrics(ListPodSandboxMetricsRequest) returns (ListPodSandboxMetricsResponse) {}
+    // StreamPodSandboxMetrics returns a stream of pod sandbox metrics.
+    // This is an alternative to ListPodSandboxMetrics that streams results one item at a time,
+    // avoiding the gRPC message size limit for nodes with many pods.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamPodSandboxMetrics(StreamPodSandboxMetricsRequest) returns (stream StreamPodSandboxMetricsResponse) {}
 
     // RuntimeConfig returns configuration information of the runtime.
     // A couple of notes:
@@ -143,6 +173,12 @@ service RuntimeService {
 service ImageService {
     // ListImages lists existing images.
     rpc ListImages(ListImagesRequest) returns (ListImagesResponse) {}
+    // StreamImages returns a stream of images.
+    // This is an alternative to ListImages that streams results one item at a time,
+    // avoiding the gRPC message size limit for nodes with many images.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamImages(StreamImagesRequest) returns (stream StreamImagesResponse) {}
     // ImageStatus returns the status of the image. If the image is not
     // present, returns a response with ImageStatusResponse.Image set to
     // nil.
@@ -678,6 +714,16 @@ message ListPodSandboxResponse {
     repeated PodSandbox items = 1;
 }
 
+message StreamPodSandboxesRequest {
+    // Filter for the list request.
+    PodSandboxFilter filter = 1;
+}
+
+message StreamPodSandboxesResponse {
+    // A single PodSandbox.
+    PodSandbox pod_sandbox = 1;
+}
+
 message PodSandboxStatsRequest {
     // ID of the pod sandbox for which to retrieve stats.
     string pod_sandbox_id = 1;
@@ -706,6 +752,16 @@ message ListPodSandboxStatsRequest {
 message ListPodSandboxStatsResponse {
     // Stats of the pod sandbox.
     repeated PodSandboxStats stats = 1;
+}
+
+message StreamPodSandboxStatsRequest {
+    // Filter for the list request.
+    PodSandboxStatsFilter filter = 1;
+}
+
+message StreamPodSandboxStatsResponse {
+    // Stats of a single pod sandbox.
+    PodSandboxStats pod_sandbox_stats = 1;
 }
 
 // PodSandboxAttributes provides basic information of the pod sandbox.
@@ -1378,6 +1434,16 @@ message ListContainersResponse {
     repeated Container containers = 1;
 }
 
+message StreamContainersRequest {
+    // Filter for the list request.
+    ContainerFilter filter = 1;
+}
+
+message StreamContainersResponse {
+    // A single Container.
+    Container container = 1;
+}
+
 message ContainerStatusRequest {
     // ID of the container for which to retrieve status.
     string container_id = 1;
@@ -1612,6 +1678,16 @@ message ListImagesResponse {
     repeated Image images = 1;
 }
 
+message StreamImagesRequest {
+    // Filter to list images.
+    ImageFilter filter = 1;
+}
+
+message StreamImagesResponse {
+    // A single Image.
+    Image image = 1;
+}
+
 message ImageStatusRequest {
     // Spec of the image.
     ImageSpec image = 1;
@@ -1844,6 +1920,16 @@ message ListContainerStatsResponse {
     repeated ContainerStats stats = 1;
 }
 
+message StreamContainerStatsRequest {
+    // Filter for the list request.
+    ContainerStatsFilter filter = 1;
+}
+
+message StreamContainerStatsResponse {
+    // Stats of a single container.
+    ContainerStats container_stats = 1;
+}
+
 // ContainerAttributes provides basic information of the container.
 message ContainerAttributes {
     // ID of the container.
@@ -2058,6 +2144,13 @@ message ListPodSandboxMetricsRequest {}
 
 message ListPodSandboxMetricsResponse {
     repeated PodSandboxMetrics pod_metrics = 1;
+}
+
+message StreamPodSandboxMetricsRequest {}
+
+message StreamPodSandboxMetricsResponse {
+    // Metrics of a single pod sandbox.
+    PodSandboxMetrics pod_sandbox_metrics = 1;
 }
 
 message PodSandboxMetrics {

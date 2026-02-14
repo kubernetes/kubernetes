@@ -371,6 +371,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: CRIListStreaming
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: CrossNamespaceVolumeDataSource
   versionedSpecs:
   - default: false

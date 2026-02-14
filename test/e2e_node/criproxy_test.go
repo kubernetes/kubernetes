@@ -28,6 +28,8 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -249,6 +251,96 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			framework.ExpectNoError(err)
 
 			gomega.Expect(imagePullDuration).To(gomega.BeNumerically(">=", delayTime), "PullImages should take more than 10 seconds")
+		})
+	})
+
+	// CRI streaming API tests
+	framework.Context("CRI streaming list operations", feature.CriProxy, framework.WithFeatureGate(features.CRIListStreaming), func() {
+		ginkgo.BeforeEach(func() {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+			}
+			ginkgo.DeferCleanup(func() error {
+				return resetCRIProxyInjector(e2eCriProxy)
+			})
+		})
+
+		ginkgo.It("should use streaming RPCs for listing pods and containers", func(ctx context.Context) {
+			// Track which streaming APIs were called
+			apiCalled := make(map[string]bool)
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				apiCalled[apiName] = true
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			// Wait for kubelet to make list calls (which should use streaming when enabled)
+			gomega.Eventually(func() bool {
+				return apiCalled[criproxy.StreamContainers] && apiCalled[criproxy.StreamPodSandboxes] && apiCalled[criproxy.StreamImages] &&
+					!apiCalled[criproxy.ListContainers] && !apiCalled[criproxy.ListPodSandbox] && !apiCalled[criproxy.ListImages]
+			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(
+				gomega.BeTrueBecause("Expected streaming APIs to be called for listing operations"))
+		})
+
+		ginkgo.It("should fall back to unary RPC when streaming returns Unimplemented", func(ctx context.Context) {
+			// Track API calls to verify fallback behavior
+			streamCallCount := 0
+			listCallCount := 0
+
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				switch apiName {
+				case criproxy.StreamContainers:
+					streamCallCount++
+					// Return Unimplemented error to trigger fallback
+					return status.Error(codes.Unimplemented, "streaming not supported")
+				case criproxy.ListContainers:
+					listCallCount++
+				}
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			// Verify that after the streaming RPC returned Unimplemented,
+			// the fallback to unary RPC was used
+			gomega.Eventually(func() bool {
+				return listCallCount > 0
+			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(
+				gomega.BeTrueBecause("Expected fallback to ListContainers after StreamContainers returned Unimplemented"))
+
+			// Verify streaming was attempted at least once
+			gomega.Expect(streamCallCount).To(gomega.BeNumerically(">=", 1),
+				"Expected StreamContainers to be attempted at least once before falling back")
+		})
+
+		ginkgo.It("should fall back to unary RPC for images when streaming returns Unimplemented", func(ctx context.Context) {
+			// Track API calls to verify fallback behavior for image service
+			streamCallCount := 0
+			listCallCount := 0
+
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+				switch apiName {
+				case criproxy.StreamImages:
+					streamCallCount++
+					// Return Unimplemented error to trigger fallback
+					return status.Error(codes.Unimplemented, "streaming not supported")
+				case criproxy.ListImages:
+					listCallCount++
+				}
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			//
+			// Verify that after the streaming RPC returned Unimplemented,
+			// the fallback to unary RPC was used
+			gomega.Eventually(func() bool {
+				return listCallCount > 0
+			}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(
+				gomega.BeTrueBecause("Expected fallback to ListImages after StreamImages returned Unimplemented"))
+
+			// Verify streaming was attempted at least once
+			gomega.Expect(streamCallCount).To(gomega.BeNumerically(">=", 1),
+				"Expected StreamImages to be attempted at least once before falling back")
 		})
 	})
 })
