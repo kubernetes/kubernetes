@@ -23,12 +23,10 @@ import (
 
 	"github.com/google/uuid"
 
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -93,7 +91,7 @@ func createSpecCache(crd *apiextensionsv1.CustomResourceDefinition) *specCache {
 			}
 			s, err := builder.BuildOpenAPIV2(crd, v.Name, builder.Options{
 				V2:                      true,
-				IncludeSelectableFields: utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors),
+				IncludeSelectableFields: true,
 			})
 			// Defaults must be pruned here for CRDs to cleanly merge with the static
 			// spec that already has defaults pruned
