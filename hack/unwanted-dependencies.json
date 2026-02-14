@@ -96,8 +96,6 @@
       "github.com/davecgh/go-spew": [
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
         "github.com/go-task/slim-sprig/v3",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
@@ -181,8 +179,6 @@
         "go.etcd.io/etcd/server/v3"
       ],
       "github.com/mailru/easyjson": [
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5",
@@ -217,8 +213,6 @@
         "github.com/coreos/go-semver",
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
         "github.com/go-task/slim-sprig/v3",
         "github.com/google/cadvisor",
         "github.com/google/cel-go",
@@ -260,7 +254,6 @@
       "github.com/golang/protobuf",
       "github.com/google/btree",
       "github.com/json-iterator/go",
-      "github.com/mailru/easyjson",
       "github.com/modern-go/concurrent",
       "github.com/modern-go/reflect2",
       "golang.org/x/exp",
