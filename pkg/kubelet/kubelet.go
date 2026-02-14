@@ -2629,6 +2629,8 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 
 		if e.Type == pleg.ContainerDied {
 			if containerID, ok := e.Data.(string); ok {
+				parsedContainerID := kubecontainer.BuildContainerID(kl.containerRuntime.Type(), containerID)
+				kl.statusManager.SetContainerReadiness(logger, e.ID, parsedContainerID, false)
 				kl.cleanUpContainersInPod(e.ID, containerID)
 			}
 		}
