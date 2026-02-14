@@ -524,8 +524,8 @@ func TestRecordBounds(t *testing.T) {
 	err = m.record(logger, types.UID(fmt.Sprintf("%d", 0)), 65536, 65536)
 	require.NoError(t, err)
 
-	// The next allocation should fail, as there is no space left.
+	// The next allocation should NOT fail, even if out of range, to allow Kubelet to start.
 	err = m.record(logger, types.UID(fmt.Sprintf("%d", 2)), uint32(2*65536), 65536)
-	assert.Error(t, err)
-	assert.ErrorContains(t, err, "out of range")
+	assert.NoError(t, err)
+	assert.True(t, m.podAllocated(types.UID(fmt.Sprintf("%d", 2))))
 }
