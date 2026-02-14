@@ -505,7 +505,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 func verifyDefaultStorageClass(ctx context.Context, c clientset.Interface, scName string, expectedDefault bool) {
 	sc, err := c.StorageV1().StorageClasses().Get(ctx, scName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	gomega.Expect(storageutil.IsDefaultAnnotation(sc.ObjectMeta)).To(gomega.Equal(expectedDefault))
+	gomega.Expect(storageutil.HasDefaultAnnotation(sc.ObjectMeta)).To(gomega.Equal(expectedDefault))
 }
 
 func updateDefaultStorageClass(ctx context.Context, c clientset.Interface, scName string, defaultStr string) {
@@ -513,13 +513,11 @@ func updateDefaultStorageClass(ctx context.Context, c clientset.Interface, scNam
 	framework.ExpectNoError(err)
 
 	if defaultStr == "" {
-		delete(sc.Annotations, storageutil.BetaIsDefaultStorageClassAnnotation)
 		delete(sc.Annotations, storageutil.IsDefaultStorageClassAnnotation)
 	} else {
 		if sc.Annotations == nil {
 			sc.Annotations = make(map[string]string)
 		}
-		sc.Annotations[storageutil.BetaIsDefaultStorageClassAnnotation] = defaultStr
 		sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = defaultStr
 	}
 
