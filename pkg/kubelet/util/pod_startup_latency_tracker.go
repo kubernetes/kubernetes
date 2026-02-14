@@ -34,6 +34,8 @@ type PodStartupLatencyTracker interface {
 	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
 	RecordImageStartedPulling(podUID types.UID)
 	RecordImageFinishedPulling(podUID types.UID)
+	RecordInitContainerStarted(podUID types.UID, startedAt time.Time)
+	RecordInitContainerFinished(podUID types.UID, finishedAt time.Time)
 	RecordStatusUpdated(pod *v1.Pod)
 	DeletePodStartupState(podUID types.UID)
 }
@@ -42,15 +44,26 @@ type basicPodStartupLatencyTracker struct {
 	// protect against concurrent read and write on pods map
 	lock sync.Mutex
 	pods map[types.UID]*perPodState
+	// Track pods that were excluded from SLI due to unschedulability
+	// These pods should never be re-added even if they later become schedulable
+	excludedPods map[types.UID]bool
 	// metrics for the first network pod only
 	firstNetworkPodSeen bool
 	// For testability
 	clock clock.Clock
 }
 
+type imagePullSession struct {
+	start time.Time
+	end   time.Time
+}
 type perPodState struct {
-	firstStartedPulling time.Time
-	lastFinishedPulling time.Time
+	// Session-based image pulling tracking for accurate overlap handling
+	imagePullSessions       []imagePullSession
+	imagePullSessionsStarts []time.Time // Track multiple concurrent pull starts
+	// Init container tracking
+	totalInitContainerRuntime time.Duration
+	currentInitContainerStart time.Time
 	// first time, when pod status changed into Running
 	observedRunningTime time.Time
 	// log, if pod latency was already Observed
@@ -60,8 +73,9 @@ type perPodState struct {
 // NewPodStartupLatencyTracker creates an instance of PodStartupLatencyTracker
 func NewPodStartupLatencyTracker() PodStartupLatencyTracker {
 	return &basicPodStartupLatencyTracker{
-		pods:  map[types.UID]*perPodState{},
-		clock: clock.RealClock{},
+		pods:         map[types.UID]*perPodState{},
+		excludedPods: map[types.UID]bool{},
+		clock:        clock.RealClock{},
 	}
 }
 
@@ -77,13 +91,29 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 
 	state := p.pods[pod.UID]
 	if state == nil {
-		// create a new record for pod, only if it was not yet acknowledged by the Kubelet
-		// this is required, as we want to log metric only for those pods, that where scheduled
-		// after Kubelet started
-		if pod.Status.StartTime.IsZero() {
-			p.pods[pod.UID] = &perPodState{}
+		// if pod was previously unschedulable, don't track it again
+		if p.excludedPods[pod.UID] {
+			return
 		}
 
+		// create a new record for pod
+		if pod.Status.StartTime.IsZero() {
+			if isPodUnschedulable(pod) {
+				p.excludedPods[pod.UID] = true
+				return
+			}
+
+			// if pod is schedulable then track it
+			state = &perPodState{}
+			p.pods[pod.UID] = state
+		}
+		return
+	}
+
+	// remove existing pods from tracking (this handles cases where scheduling state becomes known later)
+	if isPodUnschedulable(pod) {
+		delete(p.pods, pod.UID)
+		p.excludedPods[pod.UID] = true
 		return
 	}
 
@@ -102,29 +132,74 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 		ctx := context.TODO()
 		logger := klog.FromContext(ctx)
 		podStartingDuration := when.Sub(pod.CreationTimestamp.Time)
-		imagePullingDuration := state.lastFinishedPulling.Sub(state.firstStartedPulling)
-		podStartSLOduration := (podStartingDuration - imagePullingDuration).Seconds()
+		podStartSLOduration := podStartingDuration
+
+		totalImagesPullingTime := calculateImagePullingTime(state.imagePullSessions)
+		if totalImagesPullingTime > 0 {
+			podStartSLOduration -= totalImagesPullingTime
+		}
+
+		if state.totalInitContainerRuntime > 0 {
+			podStartSLOduration -= state.totalInitContainerRuntime
+		}
+
+		podIsStateful := isStatefulPod(pod)
 
 		logger.Info("Observed pod startup duration",
 			"pod", klog.KObj(pod),
-			"podStartSLOduration", podStartSLOduration,
+			"podStartSLOduration", podStartSLOduration.Seconds(),
 			"podStartE2EDuration", podStartingDuration,
+			"totalImagesPullingTime", totalImagesPullingTime,
+			"totalInitContainerRuntime", state.totalInitContainerRuntime,
+			"isStatefulPod", podIsStateful,
 			"podCreationTimestamp", pod.CreationTimestamp.Time,
-			"firstStartedPulling", state.firstStartedPulling,
-			"lastFinishedPulling", state.lastFinishedPulling,
+			"imagePullSessionsCount", len(state.imagePullSessions),
+			"imagePullSessionsStartsCount", len(state.imagePullSessionsStarts),
 			"observedRunningTime", state.observedRunningTime,
 			"watchObservedRunningTime", when)
 
-		metrics.PodStartSLIDuration.WithLabelValues().Observe(podStartSLOduration)
 		metrics.PodStartTotalDuration.WithLabelValues().Observe(podStartingDuration.Seconds())
-		state.metricRecorded = true
-		// if is the first Pod with network track the start values
-		// these metrics will help to identify problems with the CNI plugin
-		if !pod.Spec.HostNetwork && !p.firstNetworkPodSeen {
-			metrics.FirstNetworkPodStartSLIDuration.Set(podStartSLOduration)
-			p.firstNetworkPodSeen = true
+		if !podIsStateful {
+			metrics.PodStartSLIDuration.WithLabelValues().Observe(podStartSLOduration.Seconds())
+			// if is the first Pod with network track the start values
+			// these metrics will help to identify problems with the CNI plugin
+			if !pod.Spec.HostNetwork && !p.firstNetworkPodSeen {
+				metrics.FirstNetworkPodStartSLIDuration.Set(podStartSLOduration.Seconds())
+				p.firstNetworkPodSeen = true
+			}
 		}
+		state.metricRecorded = true
 	}
+}
+
+// calculateImagePullingTime computes the total time spent pulling images,
+// accounting for overlapping pull sessions properly
+func calculateImagePullingTime(sessions []imagePullSession) time.Duration {
+	if len(sessions) == 0 {
+		return 0
+	}
+
+	var totalTime time.Duration
+	var currentEnd time.Time
+
+	for i, session := range sessions {
+		if session.end.IsZero() {
+			continue
+		}
+
+		if i == 0 || session.start.After(currentEnd) {
+			// First session or no overlap with previous session
+			totalTime += session.end.Sub(session.start)
+			currentEnd = session.end
+		} else if session.end.After(currentEnd) {
+			// Partial overlap - add only the non-overlapping part
+			totalTime += session.end.Sub(currentEnd)
+			currentEnd = session.end
+		}
+		// If session.end <= currentEnd, it's completely overlapped
+	}
+
+	return totalTime
 }
 
 func (p *basicPodStartupLatencyTracker) RecordImageStartedPulling(podUID types.UID) {
@@ -136,9 +211,8 @@ func (p *basicPodStartupLatencyTracker) RecordImageStartedPulling(podUID types.U
 		return
 	}
 
-	if state.firstStartedPulling.IsZero() {
-		state.firstStartedPulling = p.clock.Now()
-	}
+	now := p.clock.Now()
+	state.imagePullSessionsStarts = append(state.imagePullSessionsStarts, now)
 }
 
 func (p *basicPodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.UID) {
@@ -150,8 +224,48 @@ func (p *basicPodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.
 		return
 	}
 
-	if !state.firstStartedPulling.IsZero() {
-		state.lastFinishedPulling = p.clock.Now() // Now is always grater than values from the past.
+	now := p.clock.Now()
+
+	// Complete the oldest pull session if we have active starts
+	if len(state.imagePullSessionsStarts) > 0 {
+		// Take the first (oldest) start and create a session
+		startTime := state.imagePullSessionsStarts[0]
+		session := imagePullSession{
+			start: startTime,
+			end:   now,
+		}
+		state.imagePullSessions = append(state.imagePullSessions, session)
+		state.imagePullSessionsStarts = state.imagePullSessionsStarts[1:]
+	}
+}
+
+func (p *basicPodStartupLatencyTracker) RecordInitContainerStarted(podUID types.UID, startedAt time.Time) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	state := p.pods[podUID]
+	if state == nil {
+		return
+	}
+
+	state.currentInitContainerStart = startedAt
+}
+
+func (p *basicPodStartupLatencyTracker) RecordInitContainerFinished(podUID types.UID, finishedAt time.Time) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	state := p.pods[podUID]
+	if state == nil {
+		return
+	}
+
+	if !state.currentInitContainerStart.IsZero() {
+		initDuration := finishedAt.Sub(state.currentInitContainerStart)
+		if initDuration > 0 {
+			state.totalInitContainerRuntime += initDuration
+		}
+		state.currentInitContainerStart = time.Time{}
 	}
 }
 
@@ -197,9 +311,42 @@ func hasPodStartedSLO(pod *v1.Pod) bool {
 	return true
 }
 
+// isStatefulPod determines if a pod is stateful according to the SLI documentation:
+// "A stateful pod is defined as a pod that mounts at least one volume with sources
+// other than secrets, config maps, downward API and empty dir."
+// This should reflect the "stateful pod" definition
+// ref: https://github.com/kubernetes/community/blob/master/sig-scalability/slos/pod_startup_latency.md
+func isStatefulPod(pod *v1.Pod) bool {
+	for _, volume := range pod.Spec.Volumes {
+		// Check if this volume is NOT a stateless/ephemeral type
+		if volume.Secret == nil &&
+			volume.ConfigMap == nil &&
+			volume.DownwardAPI == nil &&
+			volume.EmptyDir == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// isPodUnschedulable determines if a pod should be excluded from SLI tracking
+// according to the SLI definition: "By schedulable pod we mean a pod that has to be
+// immediately (without actions from any other components) schedulable in the cluster
+// without causing any preemption."
+// Any pod with PodScheduled=False is not immediately schedulable and should be excluded.
+func isPodUnschedulable(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodScheduled && condition.Status == v1.ConditionFalse {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *basicPodStartupLatencyTracker) DeletePodStartupState(podUID types.UID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	delete(p.pods, podUID)
+	delete(p.excludedPods, podUID)
 }
