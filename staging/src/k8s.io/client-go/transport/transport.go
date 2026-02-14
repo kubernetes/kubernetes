@@ -187,7 +187,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 				return dynamicCertLoader()
 			}
 			if c.HasCertCallback() {
-				cert, err := c.TLS.GetCertHolder.GetCert()
+				cert, err := c.TLS.GetCertHolder.GetCert(context.TODO())
 				if err != nil {
 					return nil, err
 				}
