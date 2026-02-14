@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"sync"
 	"time"
 
 	eventsapiv1 "k8s.io/api/events/v1"
@@ -38,7 +39,17 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+	var eventsOnce sync.Once
+	var eventsStorage *eventstore.REST
+	var eventsStorageErr error
+	var storageGetter eventStorageGetter = func() (*eventstore.REST, error) {
+		eventsOnce.Do(func() {
+			eventsStorage, eventsStorageErr = eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))
+		})
+		return eventsStorage, eventsStorageErr
+	}
+
+	if storageMap, err := p.v1Storage(apiResourceConfigSource, storageGetter); err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[eventsapiv1.SchemeGroupVersion.Version] = storageMap
@@ -47,12 +58,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	return apiGroupInfo, nil
 }
 
-func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, storageGetter eventStorageGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
 	// events
 	if resource := "events"; apiResourceConfigSource.ResourceEnabled(eventsapiv1.SchemeGroupVersion.WithResource(resource)) {
-		eventsStorage, err := eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))
+		eventsStorage, err := storageGetter()
 		if err != nil {
 			return storage, err
 		}
@@ -61,6 +72,8 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 
 	return storage, nil
 }
+
+type eventStorageGetter func() (*eventstore.REST, error)
 
 func (p RESTStorageProvider) GroupName() string {
 	return events.GroupName
