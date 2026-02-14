@@ -344,15 +344,6 @@ type PersistentVolumeSource struct {
 	CSI *CSIPersistentVolumeSource `json:"csi,omitempty" protobuf:"bytes,22,opt,name=csi"`
 }
 
-const (
-	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
-	// It's currently still used and will be held for backwards compatibility
-	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
-
-	// MountOptionAnnotation defines mount option annotation used in PVs
-	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
-)
-
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

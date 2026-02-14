@@ -579,6 +579,67 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 }
 
+func TestValidateMountOptionInPersistentVolumeAnnotations(t *testing.T) {
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		volume            *core.PersistentVolume
+	}{
+		"volume with valid mount option for nfs": {
+			isExpectedFailure: false,
+			volume: testVolumeWithMountOption("good-nfs-mount-volume", "", "ro,nfsvers=3", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					NFS: &core.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+		},
+		"volume with mount option for host path": {
+			isExpectedFailure: true,
+			volume: testVolumeWithMountOption("bad-hostpath-mount-volume", "", "ro,nfsvers=3", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{Path: "/a/.."},
+				},
+			}),
+		},
+	}
+
+	for name, scenario := range scenarios {
+		errs := ValidateMountOptionInPersistentVolumeAnnotations(scenario.volume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
+func testVolumeWithMountOption(name string, namespace string, mountOptions string, spec core.PersistentVolumeSpec) *core.PersistentVolume {
+	annotations := map[string]string{
+		core.MountOptionAnnotation: mountOptions,
+	}
+	objMeta := metav1.ObjectMeta{
+		Name:        name,
+		Annotations: annotations,
+	}
+
+	if namespace != "" {
+		objMeta.Namespace = namespace
+	}
+
+	return &core.PersistentVolume{
+		ObjectMeta: objMeta,
+		Spec:       spec,
+	}
+}
+
 func TestValidatePersistentVolumeSpec(t *testing.T) {
 	fsmode := core.PersistentVolumeFilesystem
 	blockmode := core.PersistentVolumeBlock

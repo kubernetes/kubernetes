@@ -2262,7 +2262,39 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 func ValidatePersistentVolume(pv *core.PersistentVolume, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
+	allErrs = append(allErrs, ValidatePersistentVolumeAnnotations(pv)...)
 	allErrs = append(allErrs, ValidatePersistentVolumeSpec(&pv.Spec, pv.ObjectMeta.Name, false, field.NewPath("spec"), opts)...)
+	return allErrs
+}
+
+func ValidatePersistentVolumeAnnotations(pv *core.PersistentVolume) field.ErrorList {
+	return ValidateMountOptionInPersistentVolumeAnnotations(pv)
+}
+
+func ValidateMountOptionInPersistentVolumeAnnotations(pv *core.PersistentVolume) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// if PV is of these types we don't return errors
+	// since mount options is supported
+	if pv.Spec.GCEPersistentDisk != nil ||
+		pv.Spec.AWSElasticBlockStore != nil ||
+		pv.Spec.Glusterfs != nil ||
+		pv.Spec.NFS != nil ||
+		pv.Spec.RBD != nil ||
+		pv.Spec.Quobyte != nil ||
+		pv.Spec.ISCSI != nil ||
+		pv.Spec.Cinder != nil ||
+		pv.Spec.CephFS != nil ||
+		pv.Spec.AzureFile != nil ||
+		pv.Spec.VsphereVolume != nil ||
+		pv.Spec.AzureDisk != nil ||
+		pv.Spec.PhotonPersistentDisk != nil {
+		return allErrs
+	}
+	// any other type if mount option is present lets return error
+	if _, ok := pv.Annotations[core.MountOptionAnnotation]; ok {
+		metaField := field.NewPath("metadata")
+		allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", core.MountOptionAnnotation), "may not specify mount options for this volume type"))
+	}
 	return allErrs
 }
 

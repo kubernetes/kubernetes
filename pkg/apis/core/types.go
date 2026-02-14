@@ -337,15 +337,6 @@ type PersistentVolumeClaimVolumeSource struct {
 	ReadOnly bool
 }
 
-const (
-	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
-	// It's deprecated and will be removed in a future release. (#51440)
-	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
-
-	// MountOptionAnnotation defines mount option annotation used in PVs
-	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
-)
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PersistentVolume struct captures the details of the implementation of PV storage
