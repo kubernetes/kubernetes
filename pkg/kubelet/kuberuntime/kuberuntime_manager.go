@@ -1898,12 +1898,13 @@ func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.Containe
 	sort.Sort(containerStatusByCreated(kubeContainerStatuses))
 
 	return &kubecontainer.PodStatus{
-		ID:                kubetypes.UID(event.PodSandboxStatus.Metadata.Uid),
-		Name:              event.PodSandboxStatus.Metadata.Name,
-		Namespace:         event.PodSandboxStatus.Metadata.Namespace,
-		IPs:               podIPs,
-		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
-		ContainerStatuses: kubeContainerStatuses,
+		ID:                      kubetypes.UID(event.PodSandboxStatus.Metadata.Uid),
+		Name:                    event.PodSandboxStatus.Metadata.Name,
+		Namespace:               event.PodSandboxStatus.Metadata.Namespace,
+		IPs:                     podIPs,
+		SandboxStatuses:         []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
+		ActiveContainerStatuses: kubeContainerStatuses,
+		ContainerStatuses:       kubeContainerStatuses,
 	}
 }
 
@@ -1994,6 +1995,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 				for _, cs := range resp.ContainersStatuses {
 					cStatus := m.convertToKubeContainerStatus(ctx, uid, cs)
 					containerStatuses = append(containerStatuses, cStatus)
+					activeContainerStatuses = containerStatuses
 				}
 			}
 		}
