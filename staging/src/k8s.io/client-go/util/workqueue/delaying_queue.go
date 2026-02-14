@@ -276,12 +276,6 @@ const maxWait = 10 * time.Second
 func (q *delayingType[T]) waitingLoop(logger klog.Logger) {
 	defer utilruntime.HandleCrashWithLogger(logger)
 
-	// Make a placeholder channel to use when there are no items in our list
-	never := make(<-chan time.Time)
-
-	// Make a timer that expires when the item at the head of the waiting queue is ready
-	var nextReadyAtTimer clock.Timer
-
 	waitingForQueue := &waitForPriorityQueue[T]{}
 	heap.Init(waitingForQueue)
 
@@ -307,15 +301,13 @@ func (q *delayingType[T]) waitingLoop(logger klog.Logger) {
 		}
 
 		// Set up a wait for the first item's readyAt (if one exists)
-		nextReadyAt := never
+		// nil channel means "wait forever"
+		var nextReadyAt <-chan time.Time
 		if waitingForQueue.Len() > 0 {
-			if nextReadyAtTimer != nil {
-				nextReadyAtTimer.Stop()
-			}
 			entry := waitingForQueue.Peek().(*waitFor[T])
-			nextReadyAtTimer = q.clock.NewTimer(entry.readyAt.Sub(now))
-			nextReadyAt = nextReadyAtTimer.C()
+			nextReadyAt = q.clock.After(entry.readyAt.Sub(now))
 		}
+		q.metrics.delayedCount(len(waitingEntryByData))
 
 		select {
 		case <-q.stopCh:
