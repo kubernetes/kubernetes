@@ -35,6 +35,9 @@ type Args struct {
 	// PluralExceptions define a list of pluralizer exceptions in Type:PluralType format.
 	// The default list is "Endpoints:Endpoints"
 	PluralExceptions []string
+
+	// Bazel determines if the generated clientset should use Bazel-style paths (repeated version).
+	Bazel bool
 }
 
 // New returns default arguments for the generator.
@@ -62,6 +65,8 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"if true, omit the intermediate \"internalversion\" and \"externalversions\" subdirectories")
 	fs.StringSliceVar(&args.PluralExceptions, "plural-exceptions", args.PluralExceptions,
 		"list of comma separated plural exception definitions in Type:PluralizedType format")
+	fs.BoolVar(&args.Bazel, "bazel", args.Bazel,
+		"when set, informer-gen will generate a clientset that uses Bazel-style paths (repeated version)")
 }
 
 // Validate checks the given arguments.

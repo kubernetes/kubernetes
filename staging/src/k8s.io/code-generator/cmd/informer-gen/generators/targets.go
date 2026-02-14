@@ -134,8 +134,13 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			targetGroupVersions = internalGroupVersions
 		} else {
 			parts := strings.Split(p.Path, "/")
-			gv.Group = clientgentypes.Group(parts[len(parts)-2])
-			gv.Version = clientgentypes.Version(parts[len(parts)-1])
+			if args.Bazel {
+				gv.Group = clientgentypes.Group(parts[len(parts)-3])
+				gv.Version = clientgentypes.Version(parts[len(parts)-2])
+			} else {
+				gv.Group = clientgentypes.Group(parts[len(parts)-2])
+				gv.Version = clientgentypes.Version(parts[len(parts)-1])
+			}
 			targetGroupVersions = externalGroupVersions
 		}
 		groupPackageName := gv.Group.NonEmpty()
