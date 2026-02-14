@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,10 +33,39 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	// DefNativeHistogramBucketFactor is the default growth factor for native histogram buckets.
+	// A value of 1.1 means each bucket is at most 10% wider than the previous one.
+	DefNativeHistogramBucketFactor = 1.1
+	// DefNativeHistogramMaxBucketNumber is the default maximum number of buckets for native histograms.
+	// Based on the OTel SDK recommendation for base2 exponential bucket histogram aggregation.
+	DefNativeHistogramMaxBucketNumber = 160
+)
+
 var (
 	labelValueAllowLists = map[string]*MetricLabelAllowList{}
 	allowListLock        sync.RWMutex
+
+	// nativeHistogramsEnabled controls whether histogram metrics should be exposed
+	// in native histogram format in addition to classic format.
+	// This should be set by components based on the NativeHistograms feature gate.
+	nativeHistogramsEnabled atomic.Bool
 )
+
+// EnableNativeHistograms enables native histogram support for all histogram metrics.
+// When enabled, histogram metrics will be exposed in both classic and native
+// histogram formats (when using protobuf exposition format).
+// This should be called during component initialization based on the NativeHistograms
+// feature gate value.
+func EnableNativeHistograms() {
+	nativeHistogramsEnabled.Store(true)
+}
+
+// NativeHistogramsEnabled returns whether native histograms are enabled.
+// This is primarily for testing purposes.
+func NativeHistogramsEnabled() bool {
+	return nativeHistogramsEnabled.Load()
+}
 
 // ResetLabelValueAllowLists resets the allow lists for label values.
 // NOTE: This should only be used in test.
@@ -201,7 +231,7 @@ func (o *HistogramOpts) annotateStabilityLevel() {
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
 func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
-	return prometheus.HistogramOpts{
+	opts := prometheus.HistogramOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
 		Name:        o.Name,
@@ -209,6 +239,15 @@ func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 		ConstLabels: o.ConstLabels,
 		Buckets:     o.Buckets,
 	}
+
+	// When native histograms are enabled, configure exponential bucket options
+	// to expose metrics in both classic and native histogram formats.
+	if nativeHistogramsEnabled.Load() {
+		opts.NativeHistogramBucketFactor = DefNativeHistogramBucketFactor
+		opts.NativeHistogramMaxBucketNumber = DefNativeHistogramMaxBucketNumber
+	}
+
+	return opts
 }
 
 // TimingHistogramOpts bundles the options for creating a TimingHistogram metric. It is

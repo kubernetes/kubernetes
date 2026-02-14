@@ -49,6 +49,7 @@ import (
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -288,6 +289,7 @@ func CreateConfig(
 ) {
 	proxyTransport := CreateProxyTransport()
 
+	opts.Metrics.EnableNativeHistograms = utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.NativeHistograms)
 	opts.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
 

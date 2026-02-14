@@ -48,6 +48,7 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/slis"
@@ -93,6 +94,12 @@ the cloud specific control loops shipped with Kubernetes.`,
 			if err := logsapi.ValidateAndApply(logOptions, utilfeature.DefaultFeatureGate); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
+			}
+
+			// Enable native histograms if the feature gate is enabled.
+			// This must be called before any metrics are registered.
+			if utilfeature.DefaultFeatureGate.Enabled(features.NativeHistograms) {
+				metrics.EnableNativeHistograms()
 			}
 
 			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)

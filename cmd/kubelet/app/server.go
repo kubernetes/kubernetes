@@ -83,6 +83,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
@@ -663,6 +664,12 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if len(s.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
+	}
+
+	// Enable native histograms if the feature gate is enabled.
+	// This must be called before any metrics are registered.
+	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.NativeHistograms) {
+		metrics.EnableNativeHistograms()
 	}
 
 	// About to get clients and such, detect standaloneMode

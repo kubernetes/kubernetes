@@ -196,6 +196,12 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		metrics.SetShowHidden()
 	}
 
+	// Enable native histograms if the feature gate is enabled.
+	// This must be called before any metrics are registered.
+	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.NativeHistograms) {
+		metrics.EnableNativeHistograms()
+	}
+
 	s.NodeName, err = nodeutil.GetHostname(config.HostnameOverride)
 	if err != nil {
 		return nil, err
