@@ -50,10 +50,6 @@ var (
 	// - run only CPU Manager tests on specific jobs, i.e., ci-kubernetes-node-kubelet-serial-cpu-manager and pull-kubernetes-node-kubelet-serial-cpu-manager
 	CPUManager = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
 
-	// Owner: sig-node
-	// Marks test that exercise checkpointing of containers
-	CheckpointContainer = framework.WithFeature(framework.ValidFeatures.Add("CheckpointContainer"))
-
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	CloudProvider = framework.WithFeature(framework.ValidFeatures.Add("CloudProvider"))
 
