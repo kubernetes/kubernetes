@@ -36,7 +36,6 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -47,15 +46,6 @@ import (
 var k8sVersionString = kubeadmconstants.MinimumControlPlaneVersion.String()
 var nodeName = "mynode"
 var cfgFiles = map[string][]byte{
-	"InitConfiguration_v1beta3": []byte(fmt.Sprintf(`
-apiVersion: %s
-kind: InitConfiguration
-`, kubeadmapiv1old.SchemeGroupVersion.String())),
-	"ClusterConfiguration_v1beta3": []byte(fmt.Sprintf(`
-apiVersion: %s
-kind: ClusterConfiguration
-kubernetesVersion: %s
-`, kubeadmapiv1old.SchemeGroupVersion.String(), k8sVersionString)),
 	"InitConfiguration_v1beta4": []byte(fmt.Sprintf(`
 apiVersion: %s
 kind: InitConfiguration
@@ -561,7 +551,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			getAPIEndpoint:      true,
 		},
 		{
-			name: "valid v1beta3 - new control plane == true", // InitConfiguration composed with data from different places, without node specific information
+			name: "valid v1beta4 - new control plane == true", // InitConfiguration composed with data from different places, without node specific information
 			staticPods: []testresources.FakeStaticPod{
 				{
 					NodeName:  nodeName,

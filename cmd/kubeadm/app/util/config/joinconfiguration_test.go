@@ -128,7 +128,7 @@ func TestBytesToJoinConfiguration(t *testing.T) {
 
 				got, _ := BytesToJoinConfiguration(bytes, options)
 				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.JoinConfiguration{}, "Timeouts"),
-					cmpopts.IgnoreFields(kubeadmapi.Discovery{}, "Timeout"), cmpopts.IgnoreFields(kubeadmapi.NodeRegistrationOptions{}, "Name")); diff != "" {
+					cmpopts.IgnoreFields(kubeadmapi.NodeRegistrationOptions{}, "Name")); diff != "" {
 					t.Errorf("LoadJoinConfigurationFromFile returned unexpected diff (-want,+got):\n%s", diff)
 				}
 			})
