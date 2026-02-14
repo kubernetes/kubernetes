@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -800,6 +801,48 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	if buf.String() != "service/frontend\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
+}
+
+func TestDeleteObjectWithFinalizersWarning(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
+
+	// Add finalizers and deletion timestamp to the object
+	rcWithFinalizer := rc.Items[0].DeepCopy()
+	now := metav1.NewTime(time.Now())
+	rcWithFinalizer.DeletionTimestamp = &now
+	rcWithFinalizer.Finalizers = []string{"foregroundDeletion", "another-finalizer", "third-finalizer", "fourth-finalizer"}
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, rcWithFinalizer)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, _, errOut := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdDelete(tf, streams)
+	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	expectedWarningPart := "The resource \"redis-master\" has finalizers (foregroundDeletion, another-finalizer, third-finalizer, and 1 more) and will not be deleted until they are removed."
+	if !strings.Contains(errOut.String(), expectedWarningPart) {
+		t.Errorf("expected warning to contain %q, got %q", expectedWarningPart, errOut.String())
+	}
+
 }
 
 func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
