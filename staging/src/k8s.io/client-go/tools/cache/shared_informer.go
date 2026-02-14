@@ -173,6 +173,13 @@ type SharedInformer interface {
 	// AddEventHandlerWithOptions is a variant of AddEventHandlerWithResyncPeriod where
 	// all optional parameters are passed in a struct.
 	AddEventHandlerWithOptions(handler ResourceEventHandler, options HandlerOptions) (ResourceEventHandlerRegistration, error)
+	// AddContextEventHandler is a variant of AddEventHandler where the
+	// handler is removed when the context is cancelled.
+	AddContextEventHandler(ctx context.Context, handler ResourceEventHandler) (ResourceEventHandlerRegistration, error)
+	// AddContextEventHandlerWithOptions is a variant of
+	// AddEventHandlerWithOptions where the handler is removed when the
+	// context is cancelled.
+	AddContextEventHandlerWithOptions(ctx context.Context, handler ResourceEventHandler, options HandlerOptions) (ResourceEventHandlerRegistration, error)
 	// RemoveEventHandler removes a formerly added event handler given by
 	// its registration handle.
 	// This function is guaranteed to be idempotent, and thread-safe.
@@ -935,6 +942,22 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 	s.processor.wg.Start(listener.watchSynced)
 
 	return handle, nil
+}
+
+func (s *sharedIndexInformer) AddContextEventHandler(ctx context.Context, handler ResourceEventHandler) (ResourceEventHandlerRegistration, error) {
+	return s.AddContextEventHandlerWithOptions(ctx, handler, HandlerOptions{})
+}
+
+func (s *sharedIndexInformer) AddContextEventHandlerWithOptions(ctx context.Context, handler ResourceEventHandler, options HandlerOptions) (ResourceEventHandlerRegistration, error) {
+	registration, err := s.AddEventHandlerWithOptions(handler, options)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		<-ctx.Done()
+		utilruntime.HandleError(s.RemoveEventHandler(registration))
+	}()
+	return registration, nil
 }
 
 func (s *sharedIndexInformer) handleDeltas(logger klog.Logger, obj interface{}, isInInitialList bool) error {
