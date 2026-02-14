@@ -195,6 +195,15 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 			http2Options.MaxConcurrentStreams = 100
 		}
 
+		// use the overridden HTTP2ReadIdleTimeout value, without HTTP2ReadIdleTimeout HTTP2PingTimeout has no usage
+		if s.HTTP2ReadIdleTimeout > 0 {
+			http2Options.ReadIdleTimeout = s.HTTP2ReadIdleTimeout
+
+			if s.HTTP2PingTimeout > 0 {
+				http2Options.PingTimeout = s.HTTP2PingTimeout
+			}
+		}
+
 		// increase the connection buffer size from the 1MB default to handle the specified number of concurrent streams
 		http2Options.MaxUploadBufferPerConnection = http2Options.MaxUploadBufferPerStream * int32(http2Options.MaxConcurrentStreams)
 		// apply settings to the server
