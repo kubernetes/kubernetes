@@ -28,6 +28,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	fakecpumanager "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 
 	"k8s.io/klog/v2"
@@ -137,7 +138,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	logger := klog.FromContext(ctx)
 
 	cm.topologyManager = topologymanager.NewFakeManager()
-	cm.cpuManager = cpumanager.NewFakeManager(logger)
+	cm.cpuManager = fakecpumanager.NewFakeManager(logger)
 	cm.memoryManager = memorymanager.NewFakeManager(logger)
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {

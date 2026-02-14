@@ -29,6 +29,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	fakecpumanager "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -53,7 +54,7 @@ func (cm *containerManagerStub) Start(ctx context.Context, _ *v1.Node, _ ActiveP
 	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Starting stub container manager")
 	cm.memoryManager = memorymanager.NewFakeManager(logger)
-	cm.cpuManager = cpumanager.NewFakeManager(logger)
+	cm.cpuManager = fakecpumanager.NewFakeManager(logger)
 	return nil
 }
 

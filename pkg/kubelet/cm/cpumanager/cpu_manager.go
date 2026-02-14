@@ -43,7 +43,7 @@ import (
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
 type ActivePodsFunc func() []*v1.Pod
 
-type runtimeService interface {
+type RuntimeService interface {
 	UpdateContainerResources(ctx context.Context, id string, resources *runtimeapi.ContainerResources) error
 }
 
@@ -57,7 +57,7 @@ type Manager interface {
 	// Start is called during Kubelet initialization.
 	// Start takes a `Context` because it may possibly spin the reconcileState helper, which in turn
 	// needs to update container state, which takes a context.
-	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime RuntimeService, initialContainers containermap.ContainerMap) error
 
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
@@ -118,7 +118,7 @@ type manager struct {
 
 	// containerRuntime is the container runtime service interface needed
 	// to make UpdateContainerResources() calls against the containers.
-	containerRuntime runtimeService
+	containerRuntime RuntimeService
 
 	// activePods is a method for listing active pods on the node
 	// so all the containers can be updated in the reconciliation loop.
@@ -220,7 +220,7 @@ func NewManager(logger logr.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 	return manager, nil
 }
 
-func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime RuntimeService, initialContainers containermap.ContainerMap) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "policy", m.policy.Name())
 	logger.Info("Reconciling", "reconcilePeriod", m.reconcilePeriod)
