@@ -114,6 +114,12 @@ func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntr
 			floor = int(*config.Min)
 		}
 		scaled := int(*config.MaxPerCore) * detectNumCPU()
+		// Cap the value to 1M to avoid excessive memory usage on high-core machines
+		const maxLimit = 1048576
+		if scaled > maxLimit {
+			logger.V(3).Info("GetConntrackMax: capping scaled conntrack-max-per-core", "scaled", scaled, "limit", maxLimit)
+			return maxLimit, nil
+		}
 		if scaled > floor {
 			logger.V(3).Info("GetConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil
@@ -124,7 +130,7 @@ func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntr
 	return 0, nil
 }
 
-func detectNumCPU() int {
+var detectNumCPU = func() int {
 	// try get numCPU from /sys firstly due to a known issue (https://github.com/kubernetes/kubernetes/issues/99225)
 	_, numCPU, err := machine.GetTopology(sysfs.NewRealSysFs())
 	if err != nil || numCPU < 1 {
