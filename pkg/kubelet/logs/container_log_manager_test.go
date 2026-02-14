@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
@@ -99,11 +100,16 @@ func TestRotateLogs(t *testing.T) {
 		clock:       testingclock.NewFakeClock(now),
 		mutex:       sync.Mutex{},
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.NewTypedMaxOfRateLimiter(
+				workqueue.NewTypedItemExponentialFailureRateLimiter[string](1*time.Millisecond, 30*time.Second),
+				&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(50), 200)},
+			),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
 		),
-		maxWorkers:       10,
-		monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
+		maxWorkers:               10,
+		monitoringPeriod:         v1.Duration{Duration: 10 * time.Second},
+		highThroughputContainers: make(map[string]time.Time),
+		highThroughputMutex:      sync.RWMutex{},
 	}
 	testLogs := []string{
 		"test-log-1",
@@ -190,6 +196,106 @@ func TestRotateLogs(t *testing.T) {
 	assert.Equal(t, testLogs[3], logs[4].Name())
 }
 
+func TestHighThroughputContainerDetection(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	dir, err := os.MkdirTemp("", "test-high-throughput-detection")
+	require.NoError(t, err)
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("Failed to remove test directory: %v", err)
+		}
+	}()
+
+	const (
+		testMaxFiles = 3
+		testMaxSize  = 10
+	)
+	now := time.Now()
+	f := critest.NewFakeRuntimeService()
+	c := &containerLogManager{
+		runtimeService: f,
+		policy: LogRotatePolicy{
+			MaxSize:  testMaxSize,
+			MaxFiles: testMaxFiles,
+		},
+		osInterface: container.RealOS{},
+		clock:       testingclock.NewFakeClock(now),
+		mutex:       sync.Mutex{},
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedMaxOfRateLimiter(
+				workqueue.NewTypedItemExponentialFailureRateLimiter[string](1*time.Millisecond, 30*time.Second),
+				&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(50), 200)},
+			),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+		),
+		maxWorkers:               10,
+		monitoringPeriod:         v1.Duration{Duration: 10 * time.Second},
+		highThroughputContainers: make(map[string]time.Time),
+		highThroughputMutex:      sync.RWMutex{},
+	}
+
+	// Create a log file that exceeds 2x the max size (high-throughput scenario)
+	highThroughputLog := filepath.Join(dir, "high-throughput-log")
+	fd, err := os.Create(highThroughputLog)
+	require.NoError(t, err)
+	// Write content that's 3x the max size to trigger high-throughput detection
+	content := make([]byte, testMaxSize*3)
+	for i := range content {
+		content[i] = 'A'
+	}
+	_, err = fd.Write(content)
+	require.NoError(t, err)
+	err = fd.Close()
+	require.NoError(t, err)
+
+	testContainers := []*critest.FakeContainer{
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:      "high-throughput-container",
+				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				LogPath: highThroughputLog,
+			},
+		},
+	}
+	f.SetFakeContainers(testContainers)
+
+	// Process the container
+	require.NoError(t, c.rotateLogs(tCtx))
+
+	// Start a routine that can monitor the queue and shutdown the queue
+	go func() {
+		pollTimeoutCtx, cancel := context.WithTimeout(tCtx, 10*time.Second)
+		defer cancel()
+		err = wait.PollUntilContextCancel(pollTimeoutCtx, 5*time.Millisecond, false, func(ctx context.Context) (done bool, err error) {
+			return c.queue.Len() == 0, nil
+		})
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
+		c.queue.ShutDown()
+	}()
+
+	// Process the queue items
+	c.processQueueItems(tCtx, 1)
+
+	// Verify that the container was detected as high-throughput during processing
+	// Note: The container is removed from tracking after successful rotation,
+	// so we need to check that the rotation actually happened by looking at the files
+	logs, err := os.ReadDir(dir)
+	require.NoError(t, err)
+
+	// Should have the rotated log file with timestamp
+	rotated := false
+	timestamp := now.Format(timestampFormat)
+	for _, log := range logs {
+		if log.Name() == "high-throughput-log."+timestamp {
+			rotated = true
+			break
+		}
+	}
+	assert.True(t, rotated, "High-throughput container log should have been rotated with timestamp")
+}
+
 func TestClean(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	dir, err := os.MkdirTemp("", "test-clean")
@@ -212,11 +318,16 @@ func TestClean(t *testing.T) {
 		clock:       testingclock.NewFakeClock(now),
 		mutex:       sync.Mutex{},
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.NewTypedMaxOfRateLimiter(
+				workqueue.NewTypedItemExponentialFailureRateLimiter[string](1*time.Millisecond, 30*time.Second),
+				&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(50), 200)},
+			),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
 		),
-		maxWorkers:       10,
-		monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
+		maxWorkers:               10,
+		monitoringPeriod:         v1.Duration{Duration: 10 * time.Second},
+		highThroughputContainers: make(map[string]time.Time),
+		highThroughputMutex:      sync.RWMutex{},
 	}
 	testLogs := []string{
 		"test-log-1",
