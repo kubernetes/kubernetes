@@ -492,10 +492,11 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 						}
 
 						preemptPodFn := preemptionPlugin.Evaluator.PreemptPod
-						preemptionPlugin.Evaluator.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor, victim *v1.Pod, pluginName string) error {
+						preemptionPlugin.Evaluator.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.Preemptor, victim *v1.Pod, pluginName string) error {
 							// block the preemption goroutine to complete until the test case allows it to proceed.
+							preemptorName := preemptor.Members()[0].Name
 							lock.Lock()
-							ch, ok := preemptionDoneChannels[preemptor.Name]
+							ch, ok := preemptionDoneChannels[preemptorName]
 							lock.Unlock()
 							if ok {
 								<-ch
