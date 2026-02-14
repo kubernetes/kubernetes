@@ -55,3 +55,15 @@ func Minimum[T constraints.Integer](_ context.Context, _ operation.Operation, fl
 	}
 	return nil
 }
+
+// MinLength verifies that the specified value is longer than min
+// characters.
+func MinLength[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, min int) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	if len(*value) < min {
+		return field.ErrorList{field.TooShort(fldPath, *value, min).WithOrigin("minLength")}
+	}
+	return nil
+}
