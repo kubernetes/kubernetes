@@ -100,7 +100,7 @@ func (v *volumeModifyStressTestSuite) SkipUnsupportedTests(driver storageframewo
 		e2eskipper.Skipf("Driver %q does not support VolumeAttributesClass tests - skipping", driver.GetDriverInfo().Name)
 	}
 	// Skip block storage tests if the driver we are testing against does not support block volumes
-	// TODO: This should be made generic so that it doesn't have to be re-written for every test that uses the 	BlockVolModeDynamicPV testcase
+	// TODO: This should be made generic so that it doesn't have to be re-written for every test that uses the BlockVolModeDynamicPV testcase
 	if !driverInfo.Capabilities[storageframework.CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
 		e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
 	}

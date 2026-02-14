@@ -161,7 +161,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(ctx context.Context, c clie
 
 	if secondPod != nil {
 		ginkgo.By("Starting the second pod")
-		_, err = c.CoreV1().Pods(clientPod.Namespace).Create(context.TODO(), secondPod, metav1.CreateOptions{})
+		_, err = c.CoreV1().Pods(clientPod.Namespace).Create(ctx, secondPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "when starting the second pod")
 	}
 
@@ -192,7 +192,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(ctx context.Context, c clie
 		framework.ExpectNoError(err, "while waiting for the second pod Running")
 
 		ginkgo.By("Getting the second pod uuid.")
-		secondPod, err := c.CoreV1().Pods(secondPod.Namespace).Get(context.TODO(), secondPod.Name, metav1.GetOptions{})
+		secondPod, err := c.CoreV1().Pods(secondPod.Namespace).Get(ctx, secondPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "getting the second UID")
 
 		ginkgo.By("Expecting the volume mount to be found in the second pod.")
@@ -203,7 +203,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(ctx context.Context, c clie
 
 		ginkgo.By("Testing that written file is accessible in the second pod.")
 		CheckReadFromPath(ctx, f, secondPod, v1.PersistentVolumeFilesystem, false, volumePath, byteLen, seed)
-		err = c.CoreV1().Pods(secondPod.Namespace).Delete(context.TODO(), secondPod.Name, metav1.DeleteOptions{})
+		err = c.CoreV1().Pods(secondPod.Namespace).Delete(ctx, secondPod.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "when deleting the second pod")
 		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, secondPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
 		framework.ExpectNoError(err, "when waiting for the second pod to disappear")
@@ -304,7 +304,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(ctx context.Context, c client
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected find stdout to be empty.")
 
-	framework.Logf("Volume unmaped on node %s", clientPod.Spec.NodeName)
+	framework.Logf("Volume unmapped on node %s", clientPod.Spec.NodeName)
 }
 
 // TestVolumeUnmapsFromDeletedPod tests that a volume unmaps if the client pod was deleted while the kubelet was down.
@@ -473,7 +473,7 @@ func CheckReadWriteToPath(ctx context.Context, f *framework.Framework, pod *v1.P
 		err := e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
 		framework.ExpectNoError(err, "Failed to write to file1")
 		// grep file1 (read from file and check contents)
-		err = e2epod.VerifyExecInPodSucceed(ctx, f, pod, readFile("Hello word.", path))
+		err = e2epod.VerifyExecInPodSucceed(ctx, f, pod, readFile("Hello world.", path))
 		framework.ExpectNoError(err, "Failed to read from file1")
 		// Check that writing to directory as block volume fails
 		err = e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)

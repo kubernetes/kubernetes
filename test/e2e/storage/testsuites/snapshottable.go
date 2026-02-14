@@ -242,7 +242,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				err = storageutils.DeleteSnapshotWithoutWaiting(ctx, dc, vs.GetNamespace(), vs.GetName())
 				framework.ExpectNoError(err)
 				framework.Logf("deleting restored pod %q/%q", restoredPod.Namespace, restoredPod.Name)
-				err = cs.CoreV1().Pods(restoredPod.Namespace).Delete(context.TODO(), restoredPod.Name, metav1.DeleteOptions{})
+				err = cs.CoreV1().Pods(restoredPod.Namespace).Delete(ctx, restoredPod.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 				deleteVolumeSnapshot(ctx, f, dc, sr, pattern, vscontent)
 			})
