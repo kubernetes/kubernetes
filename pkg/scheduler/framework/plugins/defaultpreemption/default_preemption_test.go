@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -36,6 +37,7 @@ import (
 	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,12 +54,12 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -2332,6 +2334,286 @@ func TestPreempt(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+// TestRollingUpdatePreemption tests that preemption works correctly during rolling updates
+// when pods have equal priority (both priority 0).
+func TestRollingUpdatePreemption(t *testing.T) {
+	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
+
+	// Define the ReplicaSet GVK
+	replicaSetGVK := schema.GroupVersionKind{
+		Group:   "apps",
+		Version: "v1",
+		Kind:    "ReplicaSet",
+	}
+
+	// Define the StatefulSet GVK
+	statefulSetGVK := schema.GroupVersionKind{
+		Group:   "apps",
+		Version: "v1",
+		Kind:    "StatefulSet",
+	}
+
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		pods            []*v1.Pod
+		nodes           []*v1.Node
+		wantResult      *fwk.PostFilterResult
+		wantStatus      *fwk.Status
+		acceptableNodes []string // For tests where nominated node could be any of these
+	}{
+		{
+			name: "preemption succeeds for equal priority pods from different ReplicaSets during rolling update",
+			pod: st.MakePod().
+				Name("new-rs-pod").
+				UID("new-rs-pod").
+				Namespace(v1.NamespaceDefault).
+				Priority(0).
+				Label("app", "myapp").
+				Label("pod-template-hash", "new-hash").
+				OwnerReference("myapp-new", replicaSetGVK).
+				Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().
+					Name("old-rs-pod").
+					UID("old-rs-pod").
+					Namespace(v1.NamespaceDefault).
+					Priority(0).
+					Node("node1").
+					Label("app", "myapp").
+					Label("pod-template-hash", "old-hash").
+					OwnerReference("myapp-old", replicaSetGVK).
+					Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "preemption fails for equal priority pods from same ReplicaSet",
+			pod: st.MakePod().
+				Name("same-rs-pod-1").
+				UID("same-rs-pod-1").
+				Namespace(v1.NamespaceDefault).
+				Priority(0).
+				Label("app", "myapp").
+				Label("pod-template-hash", "same-hash").
+				OwnerReference("myapp-same", replicaSetGVK).
+				Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().
+					Name("same-rs-pod-2").
+					UID("same-rs-pod-2").
+					Namespace(v1.NamespaceDefault).
+					Priority(0).
+					Node("node1").
+					Label("app", "myapp").
+					Label("pod-template-hash", "same-hash").
+					OwnerReference("myapp-same", replicaSetGVK).
+					Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."),
+		},
+		{
+			name: "preemption fails for equal priority StatefulSet pods",
+			pod: st.MakePod().
+				Name("statefulset-pod-1").
+				UID("statefulset-pod-1").
+				Namespace(v1.NamespaceDefault).
+				Priority(0).
+				Label("app", "myapp").
+				OwnerReference("myapp", statefulSetGVK).
+				Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().
+					Name("statefulset-pod-2").
+					UID("statefulset-pod-2").
+					Namespace(v1.NamespaceDefault).
+					Priority(0).
+					Node("node1").
+					Label("app", "myapp").
+					OwnerReference("myapp", statefulSetGVK).
+					Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."),
+		},
+		{
+			name: "preemption fails for equal priority pods from different Deployments",
+			pod: st.MakePod().
+				Name("deployment1-pod").
+				UID("deployment1-pod").
+				Namespace(v1.NamespaceDefault).
+				Priority(0).
+				Label("app", "app1").
+				Label("pod-template-hash", "hash1").
+				OwnerReference("deployment1-rs", replicaSetGVK).
+				Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().
+					Name("deployment2-pod").
+					UID("deployment2-pod").
+					Namespace(v1.NamespaceDefault).
+					Priority(0).
+					Node("node1").
+					Label("app", "app2").
+					Label("pod-template-hash", "hash2").
+					OwnerReference("deployment2-rs", replicaSetGVK).
+					Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."),
+		},
+		{
+			name: "preemption succeeds on one of multiple nodes during rolling update",
+			pod: st.MakePod().
+				Name("new-rs-pod").
+				UID("new-rs-pod").
+				Namespace(v1.NamespaceDefault).
+				Priority(0).
+				Label("app", "myapp").
+				Label("pod-template-hash", "new-hash").
+				OwnerReference("myapp-new", replicaSetGVK).
+				Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().
+					Name("old-rs-pod-1").
+					UID("old-rs-pod-1").
+					Namespace(v1.NamespaceDefault).
+					Priority(0).
+					Node("node1").
+					Label("app", "myapp").
+					Label("pod-template-hash", "old-hash").
+					OwnerReference("myapp-old", replicaSetGVK).
+					Obj(),
+				st.MakePod().
+					Name("old-rs-pod-2").
+					UID("old-rs-pod-2").
+					Namespace(v1.NamespaceDefault).
+					Priority(0).
+					Node("node2").
+					Label("app", "myapp").
+					Label("pod-template-hash", "old-hash").
+					OwnerReference("myapp-old", replicaSetGVK).
+					Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(onePodRes).Obj(),
+			},
+			acceptableNodes: []string{"node1", "node2"}, // Either node is acceptable
+			wantStatus:      fwk.NewStatus(fwk.Success),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Index the potential victim pods in the fake client
+			podItems := []v1.Pod{}
+			for _, pod := range tt.pods {
+				podItems = append(podItems, *pod)
+			}
+			cs := clientsetfake.NewClientset(&v1.PodList{Items: podItems})
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			podInformer := informerFactory.Core().V1().Pods().Informer()
+
+			if err := podInformer.GetStore().Add(tt.pod); err != nil {
+				t.Fatal(err)
+			}
+			for i := range tt.pods {
+				if err := podInformer.GetStore().Add(tt.pods[i]); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// Register plugins
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			// DO NOT START THE INFORMER - the framework handles this
+			// The key fix: removed informerFactory.Start() and defer informerFactory.Shutdown()
+
+			f, err := tf.NewFramework(
+				ctx,
+				registeredPlugins,
+				"",
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			state := framework.NewCycleState()
+
+			// Run PreFilter plugins to populate state
+			if _, status, _ := f.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+				t.Errorf("Unexpected PreFilter Status: %v", status)
+			}
+
+			// Build filteredNodesStatuses - mark all nodes as Unschedulable so preemption is attempted
+			nodeStatusMap := make(map[string]*fwk.Status)
+			for _, node := range tt.nodes {
+				nodeStatusMap[node.Name] = fwk.NewStatus(fwk.Unschedulable)
+			}
+			filteredNodesStatuses := framework.NewNodeToStatus(nodeStatusMap, fwk.NewStatus(fwk.UnschedulableAndUnresolvable))
+
+			gotResult, gotStatus := p.PostFilter(ctx, state, tt.pod, filteredNodesStatuses)
+
+			// Validate status
+			if gotStatus.Code() != tt.wantStatus.Code() {
+				t.Errorf("Expected status code %v, got %v", tt.wantStatus.Code(), gotStatus.Code())
+			}
+
+			// For tests with multiple acceptable nodes, check if nominated node is one of them
+			// FIX #1: Use slices.Contains instead of loop
+			if len(tt.acceptableNodes) > 0 {
+				if gotStatus.Code() != fwk.Success {
+					t.Errorf("Expected success status, got: %v", gotStatus)
+				}
+				// Using slices.Contains as required by the linter
+				if !slices.Contains(tt.acceptableNodes, gotResult.NominatedNodeName) {
+					t.Errorf("Expected nominated node to be one of %v, got %s", tt.acceptableNodes, gotResult.NominatedNodeName)
+				}
+			} else if tt.wantResult != nil {
+				// For single-node tests, do exact comparison
+				if diff := cmp.Diff(tt.wantResult, gotResult); diff != "" {
+					t.Errorf("Unexpected postFilterResult (-want, +got):\n%s", diff)
+				}
+			}
+		})
 	}
 }
 

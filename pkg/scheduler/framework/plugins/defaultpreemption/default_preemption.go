@@ -348,9 +348,160 @@ func (pl *DefaultPreemption) OrderedScoreFuncs(ctx context.Context, nodesToVicti
 }
 
 // isPreemptionAllowed returns whether the victim residing on nodeInfo can be preempted by the preemptor
+// A victim can be preempted if it has strictly lower priority than the preemptor.
+// Example: victim priority=0, preemptor priority=10 → preemption allowed
+//
+// ROLLING UPDATE PREEMPTION (Equal Priority Scenario):
+// When priorities are equal, preemption is allowed ONLY if ALL of these conditions are met:
+//  1. Same Namespace: Both pods must be in the same namespace
+//  2. Deployment-Managed: Both pods must be managed by Deployments (via ReplicaSet owners)
+//  3. Rolling Update: Pods must belong to different ReplicaSets of the same Deployment
 func (pl *DefaultPreemption) isPreemptionAllowed(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool {
-	// The victim must have lower priority than the preemptor, in addition to any filtering implemented by IsEligiblePod
-	return corev1helpers.PodPriority(victim.GetPod()) < corev1helpers.PodPriority(preemptor) && pl.IsEligiblePod(nodeInfo, victim, preemptor)
+	victimPod := victim.GetPod()
+	victimPriority := corev1helpers.PodPriority(victimPod)
+	preemptorPriority := corev1helpers.PodPriority(preemptor)
+
+	// Standard: victim has lower priority
+	if victimPriority < preemptorPriority {
+		return pl.IsEligiblePod(nodeInfo, victim, preemptor)
+	}
+
+	// Equal priority: check rolling update scenario
+	if victimPriority == preemptorPriority {
+		// SAFEGUARD 1: Must be same namespace
+		if victimPod.Namespace != preemptor.Namespace {
+			return false
+		}
+
+		// SAFEGUARD 2: Must be Deployment-managed (not StatefulSet)
+		if !isDeploymentManaged(victimPod) || !isDeploymentManaged(preemptor) {
+			return false
+		}
+
+		// SAFEGUARD 3: Must be different ReplicaSets of same Deployment
+		if isRollingUpdate(victimPod, preemptor) {
+			return pl.IsEligiblePod(nodeInfo, victim, preemptor)
+		}
+	}
+
+	return false
+}
+
+// isDeploymentManaged checks if a pod is managed by a Deployment (via ReplicaSet)
+func isDeploymentManaged(pod *v1.Pod) bool {
+	// Check if pod has ReplicaSet owner
+	for _, owner := range pod.OwnerReferences {
+		if owner.Kind == "ReplicaSet" {
+			return true
+		}
+	}
+	return false
+}
+
+// isRollingUpdate checks if victim and preemptor are from different ReplicaSets
+// of the same Deployment
+func isRollingUpdate(victim, preemptor *v1.Pod) bool {
+	// Get ReplicaSet names from owner references
+	victimRS := getReplicaSetName(victim)
+	preemptorRS := getReplicaSetName(preemptor)
+
+	// Both must have ReplicaSet owners
+	if victimRS == "" || preemptorRS == "" {
+		return false
+	}
+
+	// Must be different ReplicaSets
+	if victimRS == preemptorRS {
+		return false
+	}
+
+	// Must belong to the same Deployment
+	return belongToSameDeployment(victim, preemptor)
+}
+
+// getReplicaSetName extracts the ReplicaSet name from pod's owner references
+func getReplicaSetName(pod *v1.Pod) string {
+	for _, owner := range pod.OwnerReferences {
+		if owner.Kind == "ReplicaSet" {
+			return owner.Name
+		}
+	}
+	return ""
+}
+
+// belongToSameDeployment checks if two pods belong to the same Deployment
+func belongToSameDeployment(pod1, pod2 *v1.Pod) bool {
+	// ReplicaSets from the same Deployment share all labels except pod-template-hash
+	// We'll use common selector labels to determine if they're from the same Deployment
+
+	labels1 := pod1.Labels
+	labels2 := pod2.Labels
+
+	if labels1 == nil || labels2 == nil {
+		return false
+	}
+
+	// Common Deployment selector labels to check
+	commonLabels := []string{
+		"app",
+		"app.kubernetes.io/name",
+		"app.kubernetes.io/instance",
+		"app.kubernetes.io/component",
+	}
+
+	// Count matching labels
+	matchCount := 0
+	for _, label := range commonLabels {
+		val1, exists1 := labels1[label]
+		val2, exists2 := labels2[label]
+
+		if exists1 && exists2 && val1 == val2 {
+			matchCount++
+		}
+	}
+
+	// If at least one common label matches, consider them from same Deployment
+	if matchCount > 0 {
+		return true
+	}
+
+	// Alternative: Check if all labels match except pod-template-hash
+	// This is more strict but more accurate
+	return labelsMatchExceptHash(labels1, labels2)
+}
+
+// labelsMatchExceptHash checks if all labels match except pod-template-hash
+func labelsMatchExceptHash(labels1, labels2 map[string]string) bool {
+	// Create copies without pod-template-hash
+	filtered1 := make(map[string]string)
+	filtered2 := make(map[string]string)
+
+	for k, v := range labels1 {
+		if k != "pod-template-hash" {
+			filtered1[k] = v
+		}
+	}
+
+	for k, v := range labels2 {
+		if k != "pod-template-hash" {
+			filtered2[k] = v
+		}
+	}
+
+	// Must have same number of labels (excluding pod-template-hash)
+	if len(filtered1) != len(filtered2) {
+		return false
+	}
+
+	// All labels must match
+	for k, v1 := range filtered1 {
+		v2, exists := filtered2[k]
+		if !exists || v1 != v2 {
+			return false
+		}
+	}
+
+	return len(filtered1) > 0 // At least one label must exist
 }
 
 // podTerminatingByPreemption returns true if the pod is in the termination state caused by scheduler preemption.
