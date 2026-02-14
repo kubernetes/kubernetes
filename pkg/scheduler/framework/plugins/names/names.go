@@ -22,6 +22,7 @@ const (
 	DefaultPreemption               = "DefaultPreemption"
 	DynamicResources                = "DynamicResources"
 	GangScheduling                  = "GangScheduling"
+	TopologyPlacement               = "TopologyPlacement"
 	ImageLocality                   = "ImageLocality"
 	InterPodAffinity                = "InterPodAffinity"
 	NodeAffinity                    = "NodeAffinity"
