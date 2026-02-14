@@ -43,14 +43,6 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 		}
 	}
 
-	// Drop the contents of the dataSourceRef field if the AnyVolumeDataSource
-	// feature gate is disabled.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
-		if !dataSourceRefInUse(oldPVCSpec) {
-			pvcSpec.DataSourceRef = nil
-		}
-	}
-
 	// Drop the contents of the dataSourceRef field if the CrossNamespaceVolumeDataSource
 	// feature gate is disabled and dataSourceRef.Namespace is specified.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CrossNamespaceVolumeDataSource) &&
@@ -68,8 +60,6 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 // and the dataSourceRef field is not filled in, then we will drop "invalid" data sources
 // (anything other than a PVC or a VolumeSnapshot) from this request as if an empty PVC had
 // been requested.
-// This should be called after DropDisabledFields so that if the AnyVolumeDataSource feature
-// gate is disabled, dataSourceRef will be forced to empty, ensuring pre-1.22 behavior.
 // This should be called before NormalizeDataSources, so that data sources other than PVCs
 // and VolumeSnapshots can only be set through the dataSourceRef field and not the dataSource
 // field.
@@ -160,10 +150,6 @@ func dataSourceRefInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 // as long as both are not explicitly set.
 // This should be used by creates/gets of PVCs, but not updates
 func NormalizeDataSources(pvcSpec *core.PersistentVolumeClaimSpec) {
-	// Don't enable this behavior if the feature gate is not on
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
-		return
-	}
 	if pvcSpec.DataSource != nil && pvcSpec.DataSourceRef == nil {
 		// Using the old way of setting a data source
 		pvcSpec.DataSourceRef = &core.TypedObjectReference{

@@ -27,16 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -227,46 +223,23 @@ func TestDefaultOnReadPvc(t *testing.T) {
 	}
 
 	var tests = map[string]struct {
-		anyEnabled    bool
 		dataSource    bool
 		dataSourceRef bool
 		want          bool
 		wantRef       bool
 	}{
-		"any disabled with empty ds": {
-			anyEnabled: false,
-		},
-		"any disabled with volume ds": {
-			dataSource: true,
-			want:       true,
-		},
-		"any disabled with volume ds ref": {
-			dataSourceRef: true,
-			wantRef:       true,
-		},
-		"any disabled with both data sources": {
-			dataSource:    true,
-			dataSourceRef: true,
-			want:          true,
-			wantRef:       true,
-		},
-		"any enabled with empty ds": {
-			anyEnabled: true,
-		},
-		"any enabled with volume ds": {
-			anyEnabled: true,
+		"empty ds": {},
+		"volume ds": {
 			dataSource: true,
 			want:       true,
 			wantRef:    true,
 		},
-		"any enabled with volume ds ref": {
-			anyEnabled:    true,
+		"volume ds ref": {
 			dataSourceRef: true,
 			want:          true,
 			wantRef:       true,
 		},
-		"any enabled with both data sources": {
-			anyEnabled:    true,
+		"both data sources": {
 			dataSource:    true,
 			dataSourceRef: true,
 			want:          true,
@@ -276,9 +249,6 @@ func TestDefaultOnReadPvc(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			// TODO: this will be removed in 1.36
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)
 			pvc := new(api.PersistentVolumeClaim)
 			if test.dataSource {
 				pvc.Spec.DataSource = dataSource.DeepCopy()
@@ -299,12 +269,12 @@ func TestDefaultOnReadPvc(t *testing.T) {
 			storage.defaultOnReadPvc(pvc)
 
 			if !reflect.DeepEqual(pvc.Spec.DataSource, expectDataSource) {
-				t.Errorf("data source does not match, test: %s, anyEnabled: %v, dataSource: %v, expected: %v",
-					testName, test.anyEnabled, test.dataSource, test.want)
+				t.Errorf("data source does not match, test: %s, dataSource: %v, expected: %v",
+					testName, test.dataSource, test.want)
 			}
 			if !reflect.DeepEqual(pvc.Spec.DataSourceRef, expectDataSourceRef) {
-				t.Errorf("data source ref does not match, test: %s, anyEnabled: %v, dataSourceRef: %v, expected: %v",
-					testName, test.anyEnabled, test.dataSourceRef, test.wantRef)
+				t.Errorf("data source ref does not match, test: %s, dataSourceRef: %v, expected: %v",
+					testName, test.dataSourceRef, test.wantRef)
 			}
 		})
 	}
