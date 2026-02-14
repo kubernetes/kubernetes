@@ -116,9 +116,9 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
-	etcdBookmarkCounts = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:           "etcd_bookmark_counts",
+	etcdBookmarkCounts = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "etcd_bookmark_total",
 			Help:           "Number of etcd bookmarks (progress notify events) split by kind.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
