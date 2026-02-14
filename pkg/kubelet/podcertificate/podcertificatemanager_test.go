@@ -182,6 +182,19 @@ func TestTransitionInitialToWait(t *testing.T) {
 	if diff := cmp.Diff(gotPCRClone, wantPCR); diff != "" {
 		t.Fatalf("PodCertificateManager created a bad PCR; diff (-got +want)\n%s", diff)
 	}
+
+	// Verify OwnerReferences are set correctly for garbage collection.
+	wantOwnerRefs := []metav1.OwnerReference{
+		{
+			APIVersion: "v1",
+			Kind:       "Pod",
+			Name:       workloadPod.ObjectMeta.Name,
+			UID:        workloadPod.ObjectMeta.UID,
+		},
+	}
+	if diff := cmp.Diff(gotPCR.ObjectMeta.OwnerReferences, wantOwnerRefs); diff != "" {
+		t.Fatalf("PodCertificateRequest has incorrect OwnerReferences; diff (-got +want)\n%s", diff)
+	}
 }
 
 func TestPCRDeletedWhileWaiting(t *testing.T) {
