@@ -1139,6 +1139,69 @@ func TestSub(t *testing.T) {
 	}
 }
 
+func TestQuoRound(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        int64
+		roundVal int64
+		expected Quantity
+	}{
+		{decQuantity(10, 0, DecimalSI), 2, 0, intQuantity(5, 0, DecimalSI)},                                                              // normal division
+		{decQuantity(-10, 0, BinarySI), 2, 0, decQuantity(-5, 0, BinarySI)},                                                              // normal division, negative number
+		{decQuantity(100, 0, BinarySI), 3, 3, Quantity{d: infDecAmount{inf.NewDec(33333, 3)}}},                                           // arbitrary precision on an infinite decimal
+		{decQuantity(0, 0, DecimalSI), 2, 0, intQuantity(0, 0, DecimalSI)},                                                               // zero
+		{decQuantity(0, 0, DecimalSI), 2, 100, intQuantity(0, 0, DecimalSI)},                                                             // roundVal doesn't affect zero division
+		{decQuantity(-0, 100, DecimalSI), 2, 0, intQuantity(0, 0, DecimalSI)},                                                            // negative sign and roundVal don't affect zero division
+		{decQuantity(5, -1, DecimalSI), 2, 4, Quantity{d: infDecAmount{inf.NewDec(2500, 4)}}},                                            // fraction division
+		{decQuantity(5, -2, DecimalSI), 2, 6, Quantity{d: infDecAmount{inf.NewDec(250, 4)}}},                                             // fraction division, different precision
+		{decQuantity(-5, -1, DecimalSI), 2, 4, Quantity{d: infDecAmount{inf.NewDec(-2500, 4)}}},                                          // negative fraction division
+		{decQuantity(-5, -1, DecimalSI), -2, 4, Quantity{d: infDecAmount{inf.NewDec(2500, 4)}}},                                          // negative fraction divided by a negative number changes sign
+		{decQuantity(5, -1000, DecimalSI), 2, 1002, Quantity{d: infDecAmount{inf.NewDec(250, 1002)}}},                                    // fraction division, beyond normal float limits
+		{decQuantity(-1152921504606846976, 0, DecimalSI), 2, 0, intQuantity(-576460752303423488, 0, DecimalSI)},                          // negative large number
+		{intQuantity(100, 0, BinarySI), 3, 15, Quantity{d: infDecAmount{inf.NewDec(33333333333333333, 15)}}},                             // high precision division
+		{intQuantity(-100, 0, BinarySI), 3, 15, Quantity{d: infDecAmount{inf.NewDec(-33333333333333333, 15)}}},                           // negative high precision division
+		{decQuantity(mostNegative, 0, DecimalSI), 2, 0, bigDecQuantity(big.NewInt(0).Quo(bigMostNegative, big.NewInt(2)), 0, DecimalSI)}, // int negative bounds division
+		{decQuantity(mostPositive, 0, DecimalSI), 2, 0, bigDecQuantity(big.NewInt(0).Quo(bigMostPositive, big.NewInt(2)), 0, DecimalSI)}, // int positive bounds division
+		{decQuantity(1152921504606846976, 0, DecimalSI), 576460752303423488, 0, intQuantity(2, 0, DecimalSI)},                            // large number division
+		{decQuantity(-1152921504606846976, 0, DecimalSI), -576460752303423488, 0, intQuantity(2, 0, DecimalSI)},                          // negative large number changes sign
+		{intQuantity(9223372036854775, 0, DecimalSI), 3, 2, decQuantity(307445734561825833, -2, DecimalSI)},                              // a large number that turns into an infinite fraction
+	}
+
+	for i, test := range tests {
+		test.a.QuoRound(test.b, test.roundVal)
+		if test.a.Cmp(test.expected) != 0 {
+			fmt.Println(test.a.d.Dec)
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
+	}
+}
+
+func TestQuoIntegerDivision(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        int64
+		expected Quantity
+	}{
+		{decQuantity(10, 0, DecimalSI), 2, intQuantity(5, 0, DecimalSI)},                                                              // normal division
+		{decQuantity(-10, 0, BinarySI), 2, decQuantity(-5, 0, BinarySI)},                                                              // negative number division
+		{decQuantity(100, 0, BinarySI), 3, intQuantity(33, 0, DecimalSI)},                                                             // infinite decimal, gets rounded to its integer part
+		{decQuantity(0, 0, DecimalSI), 2, intQuantity(0, 0, DecimalSI)},                                                               // zero
+		{decQuantity(-0, 0, DecimalSI), 2, intQuantity(0, 0, DecimalSI)},                                                              // negative sign doesn't affect zero
+		{decQuantity(1152921504606846976, 0, DecimalSI), 2, intQuantity(576460752303423488, 0, DecimalSI)},                            // large number
+		{decQuantity(-1152921504606846976, 0, DecimalSI), 2, intQuantity(-576460752303423488, 0, DecimalSI)},                          // negative large number
+		{decQuantity(mostNegative, 0, DecimalSI), 2, bigDecQuantity(big.NewInt(0).Quo(bigMostNegative, big.NewInt(2)), 0, DecimalSI)}, // int negative bounds division
+		{decQuantity(mostPositive, 0, DecimalSI), 2, bigDecQuantity(big.NewInt(0).Quo(bigMostPositive, big.NewInt(2)), 0, DecimalSI)}, // int positive bounds division
+		{decQuantity(-1152921504606846976, 0, DecimalSI), -576460752303423488, intQuantity(2, 0, DecimalSI)},                          // large negative numbers, sign flips
+	}
+
+	for i, test := range tests {
+		test.a.QuoIntegerDivision(test.b)
+		if test.a.Cmp(test.expected) != 0 {
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
+	}
+}
+
 func TestNeg(t *testing.T) {
 	tests := []struct {
 		a        Quantity
