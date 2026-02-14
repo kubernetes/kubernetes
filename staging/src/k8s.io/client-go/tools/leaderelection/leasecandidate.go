@@ -190,10 +190,7 @@ func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 	clone := lease.DeepCopy()
 	clone.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
 	_, err = c.leaseClient.Update(ctx, clone, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (c *LeaseCandidate) newLeaseCandidate() *v1beta1.LeaseCandidate {

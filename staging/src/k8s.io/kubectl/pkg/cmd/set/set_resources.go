@@ -212,11 +212,7 @@ func (o *SetResourcesOptions) Validate() error {
 	}
 
 	o.ResourceRequirements, err = generateversioned.HandleResourceRequirementsV1(map[string]string{"limits": o.Limits, "requests": o.Requests})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Run performs the execution of 'set resources' sub command

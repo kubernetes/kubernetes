@@ -79,11 +79,7 @@ func UpdatePreShutdownInfo(h windows.Handle, timeoutMilliSeconds uint32) error {
 	}
 
 	err := windows.ChangeServiceConfig2(h, windows.SERVICE_CONFIG_PRESHUTDOWN_INFO, (*byte)(unsafe.Pointer(&preshutdownInfo)))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 var thehandler *handler // This is, unfortunately, a global along with the service, which means only one service per process.

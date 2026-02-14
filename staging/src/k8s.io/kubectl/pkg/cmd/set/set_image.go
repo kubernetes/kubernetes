@@ -202,11 +202,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	o.Infos, err = builder.Do().Infos()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate makes sure provided values in SetImageOptions are valid

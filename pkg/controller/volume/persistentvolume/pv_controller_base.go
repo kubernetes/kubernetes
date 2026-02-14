@@ -686,10 +686,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context,
 		return newClaim, err
 	}
 	_, err = ctrl.storeClaimUpdate(logger, newClaim)
-	if err != nil {
-		return newClaim, err
-	}
-	return newClaim, nil
+	return newClaim, err
 }
 
 // Stateless functions

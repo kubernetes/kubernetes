@@ -156,11 +156,7 @@ func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate checks to the PodDisruptionBudgetOpts to see if there is sufficient information run the command

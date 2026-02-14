@@ -493,8 +493,5 @@ func addObjectToDigest(h hash.Hash64, objectMeta metav1.Object) error {
 		return err
 	}
 	_, err = h.Write([]byte(objectMeta.GetResourceVersion()))
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

@@ -313,10 +313,7 @@ func (pl *DynamicResources) deleteClaim(ctx context.Context, claim *resourceapi.
 
 	logger.V(5).Info("Delete", "resourceclaim", klog.KObj(claim))
 	err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func partitionContainerIndices(containers []v1.Container, numInitContainers int) ([]int, []int) {

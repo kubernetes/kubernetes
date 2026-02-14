@@ -157,11 +157,7 @@ func (o *CreateSecretTLSOptions) Complete(f cmdutil.Factory, cmd *cobra.Command,
 	}
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate checks if CreateSecretTLSOptions hass sufficient value to run

@@ -50,9 +50,5 @@ func runPostUpgrade(c workflow.RunData) error {
 	// recovered if anything goes wrong.
 	unwantedFlags := []string{}
 	err := upgrade.RemoveKubeletArgsFromFile(data.KubeletDir(), data.KubeConfigDir(), unwantedFlags, data.DryRun(), data.OutputWriter())
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
