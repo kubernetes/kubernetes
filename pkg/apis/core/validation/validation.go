@@ -8189,7 +8189,21 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *core.
 
 // ValidateNamespace tests if required fields are set.
 func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
-	allErrs := ValidateObjectMeta(&namespace.ObjectMeta, false, ValidateNamespaceName, field.NewPath("metadata"))
+
+	validateName := func(fldPath *field.Path, name string) field.ErrorList {
+		return validate.ShortName(context.Background(), operation.Operation{}, fldPath, &name, nil).MarkCoveredByDeclarative()
+	}
+
+	allErrs := ValidateObjectMetaWithOpts(&namespace.ObjectMeta, false, validateName, field.NewPath("metadata"))
+
+	// TODO: update this block when increasing declarative validation coverage
+	matcher := field.ErrorMatcher{}.ByType().ByField()
+	for i, err := range allErrs {
+		if matcher.Matches(&field.Error{Type: field.ErrorTypeRequired, Field: "metadata.name"}, err) {
+			allErrs[i] = err.MarkCoveredByDeclarative()
+		}
+	}
+
 	for i := range namespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]), field.NewPath("spec", "finalizers"))...)
 	}
@@ -8218,12 +8232,29 @@ func validateKubeFinalizerName(stringValue string, fldPath *field.Path) field.Er
 // ValidateNamespaceUpdate tests to make sure a namespace update can be applied.
 func ValidateNamespaceUpdate(newNamespace *core.Namespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
+
+	// TODO: update this block when increasing declarative validation coverage
+	matcher := field.ErrorMatcher{}.ByType().ByField()
+	for i, err := range allErrs {
+		if matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err) {
+			allErrs[i] = err.MarkCoveredByDeclarative().WithOrigin("immutable")
+		}
+	}
 	return allErrs
 }
 
 // ValidateNamespaceStatusUpdate tests to see if the update is legal for an end user to make.
 func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
+
+	// TODO: update this block when increasing declarative validation coverage
+	matcher := field.ErrorMatcher{}.ByType().ByField()
+	for i, err := range allErrs {
+		if matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err) {
+			allErrs[i] = err.MarkCoveredByDeclarative().WithOrigin("immutable")
+		}
+	}
+
 	if newNamespace.DeletionTimestamp.IsZero() {
 		if newNamespace.Status.Phase != core.NamespaceActive {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("status", "Phase"), newNamespace.Status.Phase, "may only be 'Active' if `deletionTimestamp` is empty"))
@@ -8239,6 +8270,14 @@ func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *core.Namespace) f
 // ValidateNamespaceFinalizeUpdate tests to see if the update is legal for an end user to make.
 func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
+
+	// TODO: update this block when increasing declarative validation coverage
+	matcher := field.ErrorMatcher{}.ByType().ByField()
+	for i, err := range allErrs {
+		if matcher.Matches(&field.Error{Type: field.ErrorTypeInvalid, Field: "metadata.name"}, err) {
+			allErrs[i] = err.MarkCoveredByDeclarative().WithOrigin("immutable")
+		}
+	}
 
 	fldPath := field.NewPath("spec", "finalizers")
 	for i := range newNamespace.Spec.Finalizers {

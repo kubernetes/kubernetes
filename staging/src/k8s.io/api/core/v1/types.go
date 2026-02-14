@@ -7110,6 +7110,8 @@ type NamespaceCondition struct {
 // +genclient:skipVerbs=deleteCollection
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
+// +k8s:supportsSubresource=/finalize
+// +k8s:supportsSubresource=/status
 
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
@@ -7118,6 +7120,9 @@ type Namespace struct {
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:subfield(name)=+k8s:required
+	// +k8s:subfield(name)=+k8s:immutable
+	// +k8s:subfield(name)=+k8s:format=k8s-short-name
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines the behavior of the Namespace.
