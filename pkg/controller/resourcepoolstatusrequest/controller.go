@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -202,7 +202,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	c.rebuildAllocationCache(logger)
 
 	logger.Info("Starting workers", "count", workers)
-	for i := 0; i < workers; i++ {
+	for range workers {
 		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
@@ -310,10 +310,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		}
 
 		allocatedDevices := c.allocationData[key]
-		availableDevices := info.totalDevices - allocatedDevices
-		if availableDevices < 0 {
-			availableDevices = 0
-		}
+		availableDevices := max(0, info.totalDevices-allocatedDevices)
 
 		pools = append(pools, resourcev1alpha1.PoolStatus{
 			Driver:           info.driver,
@@ -438,13 +435,9 @@ func (c *Controller) updatePoolData(slice *resourcev1.ResourceSlice) {
 			sliceCount:   1,
 			generation:   slice.Spec.Pool.Generation,
 		}
-	} else {
-		// Update existing pool info
-		// For now, rebuild to get accurate counts
-		// This is called frequently, so we do a lazy rebuild
-		if slice.Spec.Pool.Generation > info.generation {
-			info.generation = slice.Spec.Pool.Generation
-		}
+	} else if slice.Spec.Pool.Generation > info.generation {
+		// Update existing pool info generation if newer
+		info.generation = slice.Spec.Pool.Generation
 	}
 }
 

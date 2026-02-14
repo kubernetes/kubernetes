@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -352,7 +352,7 @@ func testLimitTruncation(tCtx ktesting.TContext) {
 	driverName := "test-limit.example.com"
 
 	// Create multiple ResourceSlices with different pools
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		sliceName := fmt.Sprintf("test-slice-limit-%d", i)
 		poolName := fmt.Sprintf("pool-%d", i)
 		nodeName := fmt.Sprintf("node-%d", i)
@@ -568,4 +568,3 @@ func testValidationErrors(tCtx ktesting.TContext) {
 		tCtx.Errorf("expected Invalid error for invalid driver name, got: %v", err)
 	}
 }
-

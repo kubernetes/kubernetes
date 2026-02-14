@@ -500,7 +500,6 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 func newResourcePoolStatusRequestControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.ResourcePoolStatusRequestController,
-		aliases:     []string{"resourcepool-status-request-controller"},
 		constructor: newResourcePoolStatusRequestController,
 		requiredFeatureGates: []featuregate.Feature{
 			features.DRAResourcePoolStatus,

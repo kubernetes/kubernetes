@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,14 +32,14 @@ import (
 
 func TestCalculatePoolStatus(t *testing.T) {
 	testCases := []struct {
-		name           string
-		request        *resourcev1alpha1.ResourcePoolStatusRequest
-		slices         []*resourcev1.ResourceSlice
-		claims         []*resourcev1.ResourceClaim
-		expectedPools  int
-		expectedTotal  int32
-		expectedAlloc  int32
-		expectedTrunc  bool
+		name          string
+		request       *resourcev1alpha1.ResourcePoolStatusRequest
+		slices        []*resourcev1.ResourceSlice
+		claims        []*resourcev1.ResourceClaim
+		expectedPools int
+		expectedTotal int32
+		expectedAlloc int32
+		expectedTrunc bool
 	}{
 		{
 			name: "single-pool-no-allocations",
@@ -447,7 +447,7 @@ func TestRebuildAllocationCache(t *testing.T) {
 
 func makeSlice(name, driver, pool, node string, deviceCount int) *resourcev1.ResourceSlice {
 	devices := make([]resourcev1.Device, deviceCount)
-	for i := 0; i < deviceCount; i++ {
+	for i := range deviceCount {
 		devices[i] = resourcev1.Device{
 			Name: fmt.Sprintf("device-%d", i),
 		}
