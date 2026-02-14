@@ -334,7 +334,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 
 	cfg := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:                &apiserver.AnonymousAuthConfig{Enabled: true},
+		Anonymous:                s.Anonymous,
 		CacheTTL:                 s.CacheTTL,
 		WebhookRetryBackoff:      s.WebhookRetryBackoff,
 		TokenAccessReviewTimeout: s.TokenRequestTimeout,
