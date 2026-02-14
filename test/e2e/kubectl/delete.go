@@ -20,10 +20,12 @@ package kubectl
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,6 +103,28 @@ var _ = SIGDescribe("Kubectl delete", func() {
 				return false, err
 			})
 			framework.ExpectNoError(err, "waiting for the deployment that is deleted after getting confirmation by user")
+		})
+	})
+
+	ginkgo.Describe("concurrent", func() {
+		ginkgo.It("should delete all resources", func(ctx context.Context) {
+			const labelSelector = "test=kubectl-delete-concurrent"
+			const n = 10
+
+			ginkgo.By("create multiple services")
+			for i := 0; i < n; i++ {
+				name := fmt.Sprintf("kubectl-delete-concurrent-%d", i)
+				e2ekubectl.RunKubectlOrDie(ns, "create", "service", "clusterip", "--clusterip=None", name)
+				e2ekubectl.RunKubectlOrDie(ns, "label", "service", name, labelSelector)
+			}
+
+			ginkgo.By("delete all services concurrently")
+			e2ekubectl.RunKubectlOrDie(ns, "delete", "services", "--selector", labelSelector, fmt.Sprintf("--concurrency=%d", n/3))
+
+			ginkgo.By("ensure all services were deleted successfully")
+			serviceList, err := c.CoreV1().Services(ns).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+			framework.ExpectNoError(err, "get all services matching the given selector")
+			gomega.Expect(serviceList.Items).To(gomega.BeEmpty())
 		})
 	})
 })
