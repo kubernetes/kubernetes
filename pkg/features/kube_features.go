@@ -110,6 +110,14 @@ const (
 	// Allow the usage of options to fine-tune the cpumanager policies.
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
 
+	// owner: @hahahaheihei
+	// kep:  https://kep.k8s.io/XXXX
+	//
+	// Enables kubelet to use cgroup v2 cpu.idle for best-effort pods.
+	// When enabled, best-effort pods will use SCHED_IDLE scheduling policy
+	// instead of minimal cpu.weight.
+	CPUIdleForBestEffortQoS featuregate.Feature = "CPUIdleForBestEffortQoS"
+
 	// owner: @aramase
 	// kep:  http://kep.k8s.io/5538
 	//
@@ -1168,6 +1176,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 	},
 
+	CPUIdleForBestEffortQoS: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	ClusterTrustBundleProjection: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
@@ -2129,6 +2141,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CPUManagerPolicyBetaOptions: {},
 
 	CPUManagerPolicyOptions: {},
+
+	CPUIdleForBestEffortQoS: {},
 
 	CSIServiceAccountTokenSecrets: {},
 

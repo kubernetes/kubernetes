@@ -50,6 +50,13 @@ var (
 	// - run only CPU Manager tests on specific jobs, i.e., ci-kubernetes-node-kubelet-serial-cpu-manager and pull-kubernetes-node-kubelet-serial-cpu-manager
 	CPUManager = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
 
+	// owning-sig: sig-node
+	// This label is used for tests which need:
+	// - run only CPUIdleForBestEffortQoS tests on specific jobs
+	// - cgroup v2 enabled on nodes
+	// - kernel version >= 5.4
+	CPUIdleForBestEffortQoS = framework.WithFeature(framework.ValidFeatures.Add("CPUIdleForBestEffortQoS"))
+
 	// Owner: sig-node
 	// Marks test that exercise checkpointing of containers
 	CheckpointContainer = framework.WithFeature(framework.ValidFeatures.Add("CheckpointContainer"))

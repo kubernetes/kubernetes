@@ -32,7 +32,9 @@ import (
 	units "github.com/docker/go-units"
 	"github.com/go-logr/logr"
 	libcontainercgroups "github.com/opencontainers/cgroups"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 
 	"k8s.io/component-helpers/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -60,6 +62,7 @@ type qosContainerManagerImpl struct {
 	getNodeAllocatable func() v1.ResourceList
 	cgroupRoot         CgroupName
 	qosReserved        map[v1.ResourceName]int64
+	cpuidleSupported   bool
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
@@ -70,15 +73,64 @@ func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName,
 	}
 
 	return &qosContainerManagerImpl{
-		subsystems:    subsystems,
-		cgroupManager: cgroupManager,
-		cgroupRoot:    cgroupRoot,
-		qosReserved:   nodeConfig.QOSReserved,
+		subsystems:       subsystems,
+		cgroupManager:    cgroupManager,
+		cgroupRoot:       cgroupRoot,
+		qosReserved:      nodeConfig.QOSReserved,
+		cpuidleSupported: isCPUIdleSupported(),
 	}, nil
 }
 
 func (m *qosContainerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 	return m.qosContainersInfo
+}
+
+func isKernelVersionAvailable(major, minor int) bool {
+	kernelVersion, err := utilkernel.GetVersion()
+	if err != nil {
+		return false
+	}
+	requireVersion := version.MustParseGeneric(fmt.Sprintf("%d.%d", major, minor))
+	return kernelVersion.AtLeast(requireVersion)
+}
+
+// isCPUIdleSupported check the node have the basic enviroment to support cpu.idle feature
+// - kernel version >= 5.4 (cpu.idel )
+// - cgroup v2
+func isCPUIdleSupported() bool {
+	// Check kernel version (cpu.idle was added in kernel 5.4)
+	if !isKernelVersionAvailable(5, 4) {
+		return false
+	}
+
+	// Check cgroup v2 is enabled
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		return false
+	}
+
+	return true
+}
+
+// setBestEffortResourceParemeter sets the ResourceConfig for BestEffort QoS class
+// If CPUIdleForBestEffortQoS feature gate is enabled and the node support cpu.idle feature,
+// set cpu.idle to 1 in Unified field of ResourceConfig.
+// Otherwise, set cpu.shares to MinShares.
+func (m *qosContainerManagerImpl) setBestEffortResourceParemeter(rp *ResourceConfig) {
+	isCPUIdleFGEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUIdleForBestEffortQoS)
+	if m.cpuidleSupported {
+		if rp.Unified == nil {
+			rp.Unified = make(map[string]string)
+		}
+		if isCPUIdleFGEnabled {
+			rp.Unified[Cgroup2CPUIdle] = "1"
+			return
+		}
+		// disable cpu.idle if feature gate is disabled,
+		// to prevent interface with the normal activation of the cpu.shares/cpu.weight value
+		rp.Unified[Cgroup2CPUIdle] = "0"
+	}
+	minShares := uint64(MinShares)
+	rp.CPUShares = &minShares
 }
 
 func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error {
@@ -100,10 +152,9 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 	// Create containers for both qos classes
 	for qosClass, containerName := range qosClasses {
 		resourceParameters := &ResourceConfig{}
-		// the BestEffort QoS class has a statically configured minShares value
+		// the BestEffort QoS class has a statically configured minShares value or set cpu.idle value if feature enabled
 		if qosClass == v1.PodQOSBestEffort {
-			minShares := uint64(MinShares)
-			resourceParameters.CPUShares = &minShares
+			m.setBestEffortResourceParemeter(resourceParameters)
 		}
 
 		// containerConfig object stores the cgroup specifications
@@ -192,9 +243,8 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 		}
 	}
 
-	// make sure best effort is always 2 shares
-	bestEffortCPUShares := uint64(MinShares)
-	configs[v1.PodQOSBestEffort].ResourceParameters.CPUShares = &bestEffortCPUShares
+	// the BestEffort QoS class has a statically configured minShares value or set cpu.idle value if feature enabled
+	m.setBestEffortResourceParemeter(configs[v1.PodQOSBestEffort].ResourceParameters)
 
 	// set burstable shares based on current observe state
 	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
