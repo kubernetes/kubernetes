@@ -842,64 +842,6 @@ func TestValidateEncryptedDEKSource(t *testing.T) {
 	}
 }
 
-func TestEnvelopeMetrics(t *testing.T) {
-	envelopeService := newTestEnvelopeService()
-	transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
-		testStateFunc(testContext(t), envelopeService, clock.RealClock{}, randomBool()),
-		testAPIServerID,
-	)
-
-	dataCtx := value.DefaultContext(testContextText)
-
-	kmsv2Transformer := value.PrefixTransformer{Prefix: []byte("k8s:enc:kms:v2:"), Transformer: transformer}
-
-	testCases := []struct {
-		desc                  string
-		keyVersionFromEncrypt string
-		prefix                value.Transformer
-		metrics               []string
-		want                  string
-	}{
-		{
-			desc:                  "keyIDHash total",
-			keyVersionFromEncrypt: testKeyVersion,
-			prefix:                value.NewPrefixTransformers(nil, kmsv2Transformer),
-			metrics: []string{
-				"apiserver_envelope_encryption_key_id_hash_total",
-			},
-			want: fmt.Sprintf(`
-				# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
-				# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-				apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-				apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-				`, testAPIServerIDHash, testKeyHash, testProviderName, metrics.FromStorageLabel, testAPIServerIDHash, testKeyHash, testProviderName, metrics.ToStorageLabel),
-		},
-	}
-
-	metrics.KeyIDHashTotal.Reset()
-	metrics.InvalidKeyIDFromStatusTotal.Reset()
-
-	for _, tt := range testCases {
-		t.Run(tt.desc, func(t *testing.T) {
-			defer metrics.KeyIDHashTotal.Reset()
-			defer metrics.InvalidKeyIDFromStatusTotal.Reset()
-			ctx := testContext(t)
-			envelopeService.keyVersion = tt.keyVersionFromEncrypt
-			transformedData, err := tt.prefix.TransformToStorage(ctx, []byte(testText), dataCtx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, _, err := tt.prefix.TransformFromStorage(ctx, transformedData, dataCtx); err != nil {
-				t.Fatal(err)
-			}
-
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
 // TestEnvelopeMetricsCache validates the correctness of the apiserver_envelope_encryption_dek_source_cache_size metric
 // and asserts that all of the associated logic is go routine safe.
 // 1. Multiple transformers are created, which should result in unique cache size for each provider

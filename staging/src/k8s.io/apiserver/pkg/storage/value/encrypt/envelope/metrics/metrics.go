@@ -63,7 +63,6 @@ var (
 
 	lastFromStorage                                 time.Time
 	lastToStorage                                   time.Time
-	keyIDHashTotalMetricLabels                      *lru.Cache
 	keyIDHashStatusLastTimestampSecondsMetricLabels *lru.Cache
 	cacheSize                                       = 100
 
@@ -104,21 +103,6 @@ var (
 			Buckets: metrics.ExponentialBuckets(0.0001, 2, 20),
 		},
 		[]string{"provider_name", "method_name", "grpc_status_code"},
-	)
-
-	// keyIDHashTotal is the number of times a keyID is used
-	// e.g. apiserver_envelope_encryption_key_id_hash_total counter
-	// apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="sha256",key_id_hash="sha256",
-	// provider_name="providerName",transformation_type="from_storage"} 1
-	KeyIDHashTotal = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "key_id_hash_total",
-			Help:           "Number of times a keyID is used split by transformation type, provider, and apiserver identity.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"transformation_type", "provider_name", "key_id_hash", "apiserver_id_hash"},
 	)
 
 	// keyIDHashLastTimestampSeconds is the last time in seconds when a keyID was used
@@ -174,24 +158,10 @@ var registerMetricsFunc sync.Once
 var hashPool *sync.Pool
 
 func registerLRUMetrics() {
-	if keyIDHashTotalMetricLabels != nil {
-		keyIDHashTotalMetricLabels.Clear()
-	}
 	if keyIDHashStatusLastTimestampSecondsMetricLabels != nil {
 		keyIDHashStatusLastTimestampSecondsMetricLabels.Clear()
 	}
 
-	keyIDHashTotalMetricLabels = lru.NewWithEvictionFunc(cacheSize, func(key lru.Key, _ interface{}) {
-		item := key.(metricLabels)
-		if deleted := KeyIDHashTotal.DeleteLabelValues(item.transformationType, item.providerName, item.keyIDHash, item.apiServerIDHash); deleted {
-			klog.InfoS("Deleted keyIDHashTotalMetricLabels", "transformationType", item.transformationType,
-				"providerName", item.providerName, "keyIDHash", item.keyIDHash, "apiServerIDHash", item.apiServerIDHash)
-		}
-		if deleted := KeyIDHashLastTimestampSeconds.DeleteLabelValues(item.transformationType, item.providerName, item.keyIDHash, item.apiServerIDHash); deleted {
-			klog.InfoS("Deleted keyIDHashLastTimestampSecondsMetricLabels", "transformationType", item.transformationType,
-				"providerName", item.providerName, "keyIDHash", item.keyIDHash, "apiServerIDHash", item.apiServerIDHash)
-		}
-	})
 	keyIDHashStatusLastTimestampSecondsMetricLabels = lru.NewWithEvictionFunc(cacheSize, func(key lru.Key, _ interface{}) {
 		item := key.(metricLabels)
 		if deleted := KeyIDHashStatusLastTimestampSeconds.DeleteLabelValues(item.providerName, item.keyIDHash, item.apiServerIDHash); deleted {
@@ -210,7 +180,6 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(dekCacheFillPercent)
 		legacyregistry.MustRegister(dekCacheInterArrivals)
 		legacyregistry.MustRegister(DekSourceCacheSize)
-		legacyregistry.MustRegister(KeyIDHashTotal)
 		legacyregistry.MustRegister(KeyIDHashLastTimestampSeconds)
 		legacyregistry.MustRegister(KeyIDHashStatusLastTimestampSeconds)
 		legacyregistry.MustRegister(InvalidKeyIDFromStatusTotal)
@@ -218,13 +187,13 @@ func RegisterMetrics() {
 	})
 }
 
-// RecordKeyID records total count and last time in seconds when a KeyID was used for TransformFromStorage and TransformToStorage operations
+// RecordKeyID records last time in seconds when a KeyID was used for TransformFromStorage and TransformToStorage operations
 func RecordKeyID(transformationType, providerName, keyID, apiServerID string) {
 	lockRecordKeyID.Lock()
 	defer lockRecordKeyID.Unlock()
 
-	keyIDHash, apiServerIDHash := addLabelToCache(keyIDHashTotalMetricLabels, transformationType, providerName, keyID, apiServerID)
-	KeyIDHashTotal.WithLabelValues(transformationType, providerName, keyIDHash, apiServerIDHash).Inc()
+	keyIDHash := getHash(keyID)
+	apiServerIDHash := getHash(apiServerID)
 	KeyIDHashLastTimestampSeconds.WithLabelValues(transformationType, providerName, keyIDHash, apiServerIDHash).SetToCurrentTime()
 }
 
