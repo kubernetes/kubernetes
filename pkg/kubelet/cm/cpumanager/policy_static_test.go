@@ -2100,3 +2100,343 @@ func getPodUncoreCacheIDs(s state.Reader, topo *topology.CPUTopology, pod *v1.Po
 	}
 	return uncoreCacheIDs, nil
 }
+
+func TestReleaseLeakedCPUs(t *testing.T) {
+	testCases := []struct {
+		description     string
+		pod             *v1.Pod
+		stAssignments   state.ContainerCPUAssignments
+		stDefaultCPUSet cpuset.CPUSet
+		expLeakedCPUs   cpuset.CPUSet
+		expDefaultSet   cpuset.CPUSet
+	}{
+		{
+			description: "No leaked CPUs",
+			pod: WithPodUID(makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"}, // init container
+				},
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"}, // app container
+				}), "test-pod-1"),
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-1": map[string]cpuset.CPUSet{
+					"initContainer-0": cpuset.New(0, 4),
+					"appContainer-0":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(2, 3, 6, 7),
+			expLeakedCPUs:   cpuset.New(0, 4),             // init container CPUs are released
+			expDefaultSet:   cpuset.New(0, 2, 3, 4, 6, 7), // leaked CPUs returned to default
+		},
+		{
+			description: "Leaked CPUs from init container when init containers have more CPUs",
+			pod: WithPodUID(makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"4000m", "4000m"}, // init container - request 4 CPUs
+				},
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"}, // app container - request 2 CPUs
+				}), "test-pod-2"),
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-2": map[string]cpuset.CPUSet{
+					"initContainer-0": cpuset.New(0, 4, 2, 6),
+					"appContainer-0":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(3, 7),
+			expLeakedCPUs:   cpuset.New(2, 6),       // 2 CPUs leaked from init container
+			expDefaultSet:   cpuset.New(2, 3, 6, 7), // leaked CPUs returned to default
+		},
+		{
+			description: "No leaked CPUs when app containers have more CPUs",
+			pod: WithPodUID(makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"}, // init container
+				},
+				[]struct{ request, limit string }{
+					{"4000m", "4000m"}, // app container
+				}), "test-pod-4"),
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-4": map[string]cpuset.CPUSet{
+					"initContainer-0": cpuset.New(0, 4),
+					"appContainer-0":  cpuset.New(1, 5, 2, 6),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(3, 7),
+			expLeakedCPUs:   cpuset.New(0, 4),
+			expDefaultSet:   cpuset.New(0, 3, 4, 7),
+		},
+		{
+			description: "Multiple leaked CPUs from multiple init containers",
+			pod: WithPodUID(makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"4000m", "4000m"}, // init container 1 - request 4 CPUs
+					{"2000m", "2000m"}, // init container 2 - request 2 CPUs
+				},
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"}, // app container - request 2 CPUs
+				}), "test-pod-3"),
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-3": map[string]cpuset.CPUSet{
+					"initContainer-0": cpuset.New(0, 4, 2, 6),
+					"initContainer-1": cpuset.New(3, 7),
+					"appContainer-0":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(),
+			expLeakedCPUs:   cpuset.New(2, 3, 6, 7),
+			expDefaultSet:   cpuset.New(2, 3, 6, 7),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				assignments:   testCase.stAssignments,
+				defaultCPUSet: testCase.stDefaultCPUSet,
+			}
+
+			leakedCPUs := policy.ReleaseLeakedCPUs(logger, st, testCase.pod)
+
+			if !leakedCPUs.Equals(testCase.expLeakedCPUs) {
+				t.Errorf("ReleaseLeakedCPUs() error (%v). expected leaked CPUs %v but got %v",
+					testCase.description, testCase.expLeakedCPUs, leakedCPUs)
+			}
+
+			if !st.GetDefaultCPUSet().Equals(testCase.expDefaultSet) {
+				t.Errorf("ReleaseLeakedCPUs() error (%v). expected default CPUSet %v but got %v",
+					testCase.description, testCase.expDefaultSet, st.GetDefaultCPUSet())
+			}
+		})
+	}
+}
+
+func TestUpdateCPUsForInitC(t *testing.T) {
+	testCases := []struct {
+		description     string
+		pod             *v1.Pod
+		containerName   string
+		leakedCPUs      cpuset.CPUSet
+		stAssignments   state.ContainerCPUAssignments
+		stDefaultCPUSet cpuset.CPUSet
+		expCPUSet       cpuset.CPUSet
+		shouldUpdate    bool
+	}{
+		{
+			description: "Update init container with leaked CPUs",
+			pod: WithPodUID(makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"4000m", "4000m"}, // request 4 CPUs to match allocation
+				},
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"},
+				}), "test-pod-1"),
+			containerName: "init-1",
+			leakedCPUs:    cpuset.New(2, 6),
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-1": map[string]cpuset.CPUSet{
+					"init-1": cpuset.New(0, 4, 2, 6),
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(3, 7),
+			expCPUSet:       cpuset.New(0, 1, 4, 5), // should replace leaked CPU with available one
+			shouldUpdate:    true,
+		},
+		{
+			description: "No update when pod doesn't have leaked CPUs",
+			pod: WithPodUID(makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"},
+				},
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"},
+				}), "test-pod-2"),
+			containerName: "init-1",
+			leakedCPUs:    cpuset.New(),
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-2": map[string]cpuset.CPUSet{
+					"init-1": cpuset.New(1, 5), // doesn't contain leaked CPUs
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(2, 3, 6, 7),
+			expCPUSet:       cpuset.New(1, 5), // should remain unchanged
+			shouldUpdate:    false,
+		},
+		{
+			description: "Update init container with partial leaked CPUs",
+			pod: WithPodUID(makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"3000m", "3000m"},
+				},
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"},
+				}), "test-pod-3"),
+			containerName: "init-1",
+			leakedCPUs:    cpuset.New(2, 4),
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod-3": map[string]cpuset.CPUSet{
+					"init-1": cpuset.New(0, 4, 2), // contains one leaked CPU
+					"app-1":  cpuset.New(1, 5),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(3, 6, 7),
+			expCPUSet:       cpuset.New(0, 1, 5), // should replace leaked CPU with available one
+			shouldUpdate:    true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+			st := &mockState{
+				assignments:   testCase.stAssignments,
+				defaultCPUSet: testCase.stDefaultCPUSet,
+			}
+			policy.UpdateCPUsForInitC(logger, st, testCase.pod, testCase.containerName, testCase.leakedCPUs)
+			if testCase.shouldUpdate {
+				cset, found := st.GetCPUSet(string(testCase.pod.UID), testCase.containerName)
+				if !found {
+					t.Errorf("UpdateCPUsForInitC() error (%v). expected container %v to be present in assignments",
+						testCase.description, testCase.containerName)
+				} else if !cset.Equals(testCase.expCPUSet) {
+					t.Errorf("UpdateCPUsForInitC() error (%v). expected CPUSet %v but got %v",
+						testCase.description, testCase.expCPUSet, cset)
+				}
+			} else {
+				// If no update expected, verify the container either doesn't exist or has unchanged CPUSet
+				if cset, found := st.GetCPUSet(string(testCase.pod.UID), testCase.containerName); found {
+					if !testCase.expCPUSet.IsEmpty() && !cset.Equals(testCase.expCPUSet) {
+						t.Errorf("UpdateCPUsForInitC() error (%v). expected CPUSet %v but got %v",
+							testCase.description, testCase.expCPUSet, cset)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestGetSidecarCPUsBeforeInit(t *testing.T) {
+	testCases := []struct {
+		description    string
+		pod            *v1.Pod
+		containerName  string
+		stAssignments  state.ContainerCPUAssignments
+		expSidecarCPUs cpuset.CPUSet
+	}{
+		{
+			description: "No sidecar containers before init container",
+			pod: WithPodUID(makeMultiContainerPodWithOptions(
+				[]*containerOptions{
+					{request: "2000m", limit: "2000m"},                                                 // regular init container
+					{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicyAlways}, // sidecar init container
+				},
+				[]*containerOptions{
+					{request: "2000m", limit: "2000m"}, // app container
+				},
+			), "test-pod"),
+			containerName: "initContainer-0",
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod": map[string]cpuset.CPUSet{
+					"initContainer-0": cpuset.New(1, 5), // current init container
+					"initContainer-1": cpuset.New(0, 4), // sidecar container
+				},
+			},
+			expSidecarCPUs: cpuset.New(), // should not get CPUs from sidecar initContainer-0
+		},
+		{
+			description: "One sidecar container before init container",
+			pod: WithPodUID(makeMultiContainerPodWithOptions(
+				[]*containerOptions{
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyOnFailure}, // regular init container
+				},
+				[]*containerOptions{
+					{request: "1000m", limit: "1000m"}, // regular app container
+				},
+			), "test-pod"),
+			containerName: "initContainer-1",
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod": map[string]cpuset.CPUSet{
+					"initContainer-0": cpuset.New(0, 4), // sidecar container
+					"initContainer-1": cpuset.New(1, 5), // current init container
+				},
+			},
+			expSidecarCPUs: cpuset.New(0, 4), // should get CPUs from sidecar initContainer-0
+		},
+		{
+			description: "Multiple sidecar containers before init container",
+			pod: WithPodUID(makeMultiContainerPodWithOptions(
+				[]*containerOptions{
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container 1
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container 2
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyOnFailure}, // regular init container
+				},
+				[]*containerOptions{
+					{request: "1000m", limit: "1000m"}, // regular app container
+				},
+			), "test-pod"),
+			containerName: "initContainer-2",
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod": map[string]cpuset.CPUSet{
+					"initContainer-0": cpuset.New(0, 4), // sidecar init container 1
+					"initContainer-1": cpuset.New(1, 5), // sidecar init container 2
+					"initContainer-2": cpuset.New(2, 6), // current init container
+				},
+			},
+			expSidecarCPUs: cpuset.New(0, 1, 4, 5), // should get CPUs from sidecar initContainer-0 and initContainer-1
+		},
+		{
+			description: "Init container after some sidecars",
+			pod: WithPodUID(makeMultiContainerPodWithOptions(
+				[]*containerOptions{
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container 1
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyOnFailure}, // regular init container
+					{request: "1000m", limit: "1000m", restartPolicy: v1.ContainerRestartPolicyAlways},    // sidecar init container 2
+				},
+				[]*containerOptions{
+					{request: "1000m", limit: "1000m"}, // regular app container
+				},
+			), "test-pod"),
+			containerName: "initContainer-1",
+			stAssignments: state.ContainerCPUAssignments{
+				"test-pod": map[string]cpuset.CPUSet{
+					"initContainer-0": cpuset.New(2, 6), // sidecar init container 1
+					"initContainer-1": cpuset.New(0, 4), // current init container
+					"initContainer-2": cpuset.New(3, 5), // sidecar init container 2
+				},
+			},
+			expSidecarCPUs: cpuset.New(2, 6), // should get CPUs from sidecar initContainer-0 only
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+			st := &mockState{
+				assignments:   testCase.stAssignments,
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			staticPolicy := policy.(*staticPolicy)
+			sidecarCPUs := staticPolicy.getSidecarCPUsBeforeInit(st, testCase.pod, testCase.containerName)
+			if !sidecarCPUs.Equals(testCase.expSidecarCPUs) {
+				t.Errorf("getSidecarCPUsBeforeInit() error (%v). expected %v but got %v",
+					testCase.description, testCase.expSidecarCPUs, sidecarCPUs)
+			}
+		})
+	}
+}

@@ -30,6 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -418,6 +419,54 @@ func (m *manager) removeStaleState(rootLogger logr.Logger) {
 	})
 }
 
+func (m *manager) isAllInitContainerTerminated(rootLogger logr.Logger, pod *v1.Pod) bool {
+	podLogger := klog.LoggerWithValues(rootLogger, "pod", klog.KObj(pod))
+	pstatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
+	if !ok {
+		podLogger.V(5).Info("skipping pod; status not found")
+		return false
+	}
+	for _, container := range pod.Spec.InitContainers {
+		if !podutil.IsRestartableInitContainer(&container) {
+			continue
+		}
+		logger := klog.LoggerWithValues(podLogger, "containerName", container.Name)
+
+		cstatus, err := findContainerStatusByName(&pstatus, container.Name)
+		if err != nil {
+			logger.V(5).Info("skipping container; ID not found in pod status", "err", err)
+			return false
+		}
+
+		if cstatus.State.Terminated == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// If there are leaked CPUs of a Pod, release them and reallocate CPUs for the InitContainer which assigned leaked CPUs.
+func (m *manager) releasePodUnallocatedCPUs(rootLogger logr.Logger) {
+	for _, pod := range m.activePods() {
+		if !m.isAllInitContainerTerminated(rootLogger, pod) {
+			continue
+		}
+
+		// 1. Calculate and release all leaked CPUs
+		leakedCPUs := m.policy.ReleaseLeakedCPUs(rootLogger, m.state, pod)
+		if leakedCPUs.Size() == 0 {
+			continue
+		}
+		// 2. Update non-restartable InitContainer CPUs
+		for _, initC := range pod.Spec.InitContainers {
+			if podutil.IsRestartableInitContainer(&initC) {
+				continue
+			}
+			m.policy.UpdateCPUsForInitC(rootLogger, m.state, pod, initC.Name, leakedCPUs)
+		}
+	}
+}
+
 func (m *manager) reconcileState(ctx context.Context) (success []reconciledContainer, failure []reconciledContainer) {
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
@@ -425,6 +474,7 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 	rootLogger := klog.FromContext(ctx)
 
 	m.removeStaleState(rootLogger)
+	m.releasePodUnallocatedCPUs(rootLogger)
 	for _, pod := range m.activePods() {
 		podLogger := klog.LoggerWithValues(rootLogger, "pod", klog.KObj(pod))
 
