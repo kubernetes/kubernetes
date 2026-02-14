@@ -55,9 +55,6 @@ var (
 	CheckpointContainer = framework.WithFeature(framework.ValidFeatures.Add("CheckpointContainer"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	CloudProvider = framework.WithFeature(framework.ValidFeatures.Add("CloudProvider"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ClusterDowngrade = framework.WithFeature(framework.ValidFeatures.Add("ClusterDowngrade"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
