@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -516,8 +517,32 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		return nil, NewNotRegisteredErrForType(s.schemeName, t)
 	}
 
-	gvk, ok := target.KindForGroupVersionKinds(kinds)
-	if !ok {
+	// If multiple kinds are registered with the same Go type, prefer the GVK from the object's field.
+	// This prevents the problem where the first registered kind is always selected instead of the actual kind.
+	objGVK := in.GetObjectKind().GroupVersionKind()
+	var gvk schema.GroupVersionKind
+	var found bool
+
+	// Check if the object's GVK is in the list of registered kinds
+	// Only prefer objGVK if target can accept it directly (no conversion needed).
+	// Otherwise, use standard selection logic which respects target's preferred group/version.
+	if len(objGVK.Kind) > 0 && len(objGVK.Version) > 0 && slices.Contains(kinds, objGVK) {
+		// Found the object's GVK in the registered kinds
+		// Check if target can accept objGVK directly without conversion
+		if targetGVK, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{objGVK}); ok && targetGVK == objGVK {
+			// Target can accept objGVK directly, use it
+			gvk = targetGVK
+			found = true
+		}
+		// If target requires conversion, we'll fall through to standard selection logic
+	}
+
+	// If object's GVK wasn't found in registered kinds, use the standard selection logic
+	if !found {
+		gvk, found = target.KindForGroupVersionKinds(kinds)
+	}
+
+	if !found {
 		// try to see if this type is listed as unversioned (for legacy support)
 		// TODO: when we move to server API versions, we should completely remove the unversioned concept
 		if unversionedKind, ok := s.unversionedTypes[t]; ok {
