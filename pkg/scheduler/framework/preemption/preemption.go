@@ -84,6 +84,14 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 	}
 }
 
+// AddPreemptingPodForTest adds a pod UID to the preempting set for testing purposes only.
+// This method should only be used in tests to simulate ongoing preemption scenarios.
+func (ev *Evaluator) AddPreemptingPodForTest(podUID types.UID) {
+	ev.mu.Lock()
+	defer ev.mu.Unlock()
+	ev.preempting.Insert(podUID)
+}
+
 // Preempt returns a PostFilterResult carrying suggested nominatedNodeName, along with a Status.
 // The semantics of returned <PostFilterResult, Status> varies on different scenarios:
 //
@@ -458,4 +466,117 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 	}
 	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
+}
+
+// EarlyNominate tries to find a nominatedNodeName for pods on resources that preempting and will not be used by the preemptor pod.
+// It returns a PostFilterResult carrying suggested nominatedNodeName, along with a Status.
+// The semantics of returned <PostFilterResult, Status> varies on different scenarios:
+//
+//   - <nil, Error>. This denotes it's a transient/rare error that may be self-healed in future cycles.
+//
+//   - <nil, Unschedulable>. This denotes that the pod has failed to be early nominated on the resources of already preempting pods.
+//
+//   - <non-nil PostFilterResult, Success>. It's the regular happy path
+//     and the non-empty nominatedNodeName will be applied to the preemptor pod.
+func (ev *Evaluator) EarlyNominate(ctx context.Context, state fwk.CycleState, pod *v1.Pod) (*fwk.PostFilterResult, *fwk.Status) {
+	logger := klog.FromContext(ctx)
+
+	// 0) Fetch the latest version of <pod>.
+	// It's safe to directly fetch pod here. Because the informer cache has already been
+	// initialized when creating the Scheduler obj.
+	// However, tests may need to manually initialize the shared pod informer.
+	podNamespace, podName := pod.Namespace, pod.Name
+	pod, err := ev.PodLister.Pods(pod.Namespace).Get(pod.Name)
+	if err != nil {
+		logger.Error(err, "Could not get the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
+		return nil, fwk.AsStatus(err)
+	}
+
+	// 1) Find all pods that are currently preempting using the in-memory set.
+	ev.mu.RLock()
+	preemptingUIDs := ev.preempting.Clone()
+	ev.mu.RUnlock()
+
+	if preemptingUIDs.Len() == 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "No preempting pods for early nomination")
+	}
+
+	preemptingPods := make(map[string][]*v1.Pod)
+	for uid := range preemptingUIDs {
+		allPods, err := ev.PodLister.List(labels.Everything())
+		if err != nil {
+			logger.Error(err, "Could not list all pods when early nominating")
+			return nil, fwk.AsStatus(err)
+		}
+		for _, p := range allPods {
+			if p.UID == uid {
+				preemptingPods[p.Spec.NodeName] = append(preemptingPods[p.Spec.NodeName], p)
+				break
+			}
+		}
+	}
+
+	preemptedPods := make(map[string][]*v1.Pod)
+
+	for nodeName := range preemptingPods {
+		preemptedPods[nodeName] = []*v1.Pod{}
+		nodeInfo, err := ev.Handler.SnapshotSharedLister().NodeInfos().Get(nodeName)
+		if err != nil {
+			logger.Error(err, "Could not get NodeInfo for node with preempting pods", "node", klog.KRef("", nodeName))
+			return nil, fwk.AsStatus(err)
+		}
+		for _, pi := range nodeInfo.GetPods() {
+			p := pi.GetPod()
+			if p.DeletionTimestamp != nil && p.Status.Reason == v1.PodReasonPreemptionByScheduler {
+				preemptedPods[nodeName] = append(preemptedPods[nodeName], p)
+			}
+		}
+	}
+
+	if len(preemptingPods) == 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "No preempting pods for early nomination")
+	}
+
+	// 2) Find nodes with extra resources due to preempting pods.
+	checkNode := func(nodeName string, pods []*v1.Pod) (*fwk.PostFilterResult, *fwk.Status) {
+		logger.V(5).Info("Check the node with preempting pods for early nomination", "node", nodeName, "preemptingPodsNumber", len(pods))
+		nodeInfo, err := ev.Handler.SnapshotSharedLister().NodeInfos().Get(nodeName)
+		if err != nil {
+			logger.Error(err, "Could not get NodeInfo for node with preempting pods", "node", klog.KRef("", nodeName))
+			return nil, fwk.AsStatus(err)
+		}
+		// Remove preempting pods from the nodeInfo.
+		for _, p := range preemptedPods[nodeName] {
+			if err := nodeInfo.RemovePod(logger, p); err != nil {
+				logger.Error(err, "Could not remove preempted pod from nodeInfo", "pod", klog.KObj(p), "node", nodeName)
+			}
+		}
+		for _, p := range preemptingPods[nodeName] {
+			preemptingPod, err := ev.PodLister.Pods(p.Namespace).Get(p.Name)
+			if err != nil {
+				logger.Error(err, "Could not get Pod for preempting pod", "pod", klog.KObj(p))
+				return nil, fwk.AsStatus(err)
+			}
+			podInfo, err := framework.NewPodInfo(preemptingPod)
+			if err != nil {
+				logger.Error(err, "Could not create PodInfo for preempting pod", "pod", klog.KObj(p))
+				return nil, fwk.AsStatus(err)
+			}
+			nodeInfo.AddPodInfo(podInfo)
+		}
+		status := ev.Handler.RunFilterPlugins(ctx, state, pod, nodeInfo)
+		if status.IsSuccess() {
+			logger.V(2).Info("Early nominated the pod on the node with preempting pods", "pod", klog.KObj(pod), "node", nodeName)
+			return framework.NewPostFilterResultWithNominatedNode(nodeName), fwk.NewStatus(fwk.Success)
+		}
+		return nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("Cannot early nominate the pod on the node with preempting pods %q", nodeName))
+	}
+
+	for nodeName, pods := range preemptingPods {
+		result, status := checkNode(nodeName, pods)
+		if status.IsSuccess() {
+			return result, status
+		}
+	}
+	return nil, fwk.NewStatus(fwk.Unschedulable, "No available node with preempting pods for early nomination")
 }

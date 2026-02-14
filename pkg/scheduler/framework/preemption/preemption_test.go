@@ -51,6 +51,14 @@ import (
 var (
 	midPriority, highPriority = int32(100), int32(1000)
 
+	smallRes = map[v1.ResourceName]string{
+		v1.ResourceCPU:    "100m",
+		v1.ResourceMemory: "100",
+	}
+	largeRes = map[v1.ResourceName]string{
+		v1.ResourceCPU:    "250m",
+		v1.ResourceMemory: "250",
+	}
 	veryLargeRes = map[v1.ResourceName]string{
 		v1.ResourceCPU:    "500m",
 		v1.ResourceMemory: "500",
@@ -262,6 +270,154 @@ func TestDryRunPreemption(t *testing.T) {
 				})
 				if diff := cmp.Diff(tt.expected[cycle], got, cmp.AllowUnexported(candidate{})); diff != "" {
 					t.Errorf("cycle %d: unexpected candidates (-want, +got): %s", cycle, diff)
+				}
+			}
+		})
+	}
+}
+
+func TestEarlyNominate(t *testing.T) {
+	tests := []struct {
+		name               string
+		nodes              []*v1.Node
+		testPod            *v1.Pod
+		preemptingPods     []*v1.Pod
+		preemptedPods      []*v1.Pod
+		expectedResult     string
+		expectedSuccess    bool
+		expectedStatusCode fwk.Code
+	}{
+		{
+			name: "successful early nomination with preempting pod",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(veryLargeRes).Obj(),
+			},
+			testPod: st.MakePod().Name("test-pod").UID("test-pod").Priority(highPriority).Req(smallRes).Obj(),
+			preemptingPods: []*v1.Pod{
+				st.MakePod().Name("preempting-pod").UID("preempting-pod").Node("node1").Priority(highPriority).Req(smallRes).Obj(),
+			},
+			preemptedPods: []*v1.Pod{
+				st.MakePod().Name("preempted-pod").UID("preempted-pod").Node("node1").Priority(midPriority).Req(largeRes).Obj(),
+			},
+			expectedResult:     "node1",
+			expectedSuccess:    true,
+			expectedStatusCode: fwk.Success,
+		},
+		{
+			name: "no preempting pods available",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(veryLargeRes).Obj(),
+			},
+			testPod:            st.MakePod().Name("test-pod").UID("test-pod").Priority(highPriority).Req(smallRes).Obj(),
+			preemptingPods:     []*v1.Pod{},
+			expectedResult:     "",
+			expectedSuccess:    false,
+			expectedStatusCode: fwk.Unschedulable,
+		},
+		{
+			name: "multiple preempting pods on different nodes, any suitable",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(veryLargeRes).Obj(),
+			},
+			testPod: st.MakePod().Name("test-pod").UID("test-pod").Priority(highPriority).Req(smallRes).Obj(),
+			preemptingPods: []*v1.Pod{
+				st.MakePod().Name("preempting-pod1").UID("preempting-pod1").Node("node1").Priority(highPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("preempting-pod2").UID("preempting-pod2").Node("node2").Priority(highPriority).Req(smallRes).Obj(),
+			},
+			expectedResult:     "", // Will be set to any valid node
+			expectedSuccess:    true,
+			expectedStatusCode: fwk.Success,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+
+			preemptingSet := sets.New[types.UID]()
+			for _, pod := range tt.preemptingPods {
+				preemptingSet.Insert(pod.UID)
+			}
+
+			for _, pod := range tt.preemptedPods {
+				if pod.DeletionTimestamp == nil {
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+				}
+				if pod.Status.Reason == "" {
+					pod.Status.Reason = v1.PodReasonPreemptionByScheduler
+				}
+			}
+
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+
+			var objs []runtime.Object
+			objs = append(objs, tt.testPod)
+			for _, p := range append(tt.preemptingPods, tt.preemptedPods...) {
+				objs = append(objs, p)
+			}
+			for _, n := range tt.nodes {
+				objs = append(objs, n)
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
+			parallelism := parallelize.DefaultParallelism
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			allPods := tt.preemptedPods // Only preempted pods go in the snapshot, not preempting pods
+			snapshot := internalcache.NewSnapshot(allPods, tt.nodes)
+
+			fwk, err := tf.NewFramework(
+				ctx,
+				registeredPlugins, "",
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithParallelism(parallelism),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithLogger(logger),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			pe := Evaluator{
+				PluginName: "TestPlugin",
+				Handler:    fwk,
+				PodLister:  informerFactory.Core().V1().Pods().Lister(),
+				preempting: preemptingSet,
+			}
+
+			state := framework.NewCycleState()
+			result, status := pe.EarlyNominate(ctx, state, tt.testPod)
+
+			if tt.expectedSuccess {
+				if !status.IsSuccess() {
+					t.Errorf("Expected success but got status: %v", status)
+				}
+				if result == nil {
+					t.Errorf("Expected non-nil result for successful early nomination")
+				} else if tt.expectedResult != "" && result.NominatedNodeName != tt.expectedResult {
+					t.Errorf("Expected nominated node %q, got %q", tt.expectedResult, result.NominatedNodeName)
+				} else if tt.expectedResult == "" && result.NominatedNodeName != "node1" && result.NominatedNodeName != "node2" {
+					// For the case where we expect any valid node, check that it's one of the valid options
+					t.Errorf("Expected nominated node to be either 'node1' or 'node2', got %q", result.NominatedNodeName)
+				}
+			} else {
+				if status.IsSuccess() {
+					t.Errorf("Expected failure but got success")
+				}
+				if status.Code() != tt.expectedStatusCode {
+					t.Errorf("Expected status code %v, got %v", tt.expectedStatusCode, status.Code())
 				}
 			}
 		})
