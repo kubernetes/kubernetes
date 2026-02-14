@@ -193,6 +193,15 @@ var (
 		},
 		[]string{"result"},
 	)
+
+	transportCAReloads = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_transport_ca_reload_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of times a CA reload is attempted, partitioned by the result and reason for the reload attempt",
+		},
+		[]string{"result", "reason"},
+	)
 )
 
 func init() {
@@ -208,6 +217,7 @@ func init() {
 	legacyregistry.MustRegister(execPluginCalls)
 	legacyregistry.MustRegister(transportCacheEntries)
 	legacyregistry.MustRegister(transportCacheCalls)
+	legacyregistry.MustRegister(transportCAReloads)
 	metrics.Register(metrics.RegisterOpts{
 		ClientCertExpiry:      execPluginCertTTLAdapter,
 		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
@@ -222,6 +232,7 @@ func init() {
 		ExecPluginPolicyCalls: &policyAdapter{m: execPluginPolicyCalls},
 		TransportCacheEntries: &transportCacheAdapter{m: transportCacheEntries},
 		TransportCreateCalls:  &transportCacheCallsAdapter{m: transportCacheCalls},
+		TransportCAReloads:    &transportCAReloadsAdapter{m: transportCAReloads},
 	})
 }
 
@@ -311,4 +322,12 @@ type transportCacheCallsAdapter struct {
 
 func (t *transportCacheCallsAdapter) Increment(result string) {
 	t.m.WithLabelValues(result).Inc()
+}
+
+type transportCAReloadsAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (t *transportCAReloadsAdapter) Increment(result, reason string) {
+	t.m.WithLabelValues(result, reason).Inc()
 }
