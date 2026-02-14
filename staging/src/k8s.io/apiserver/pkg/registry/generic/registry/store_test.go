@@ -2369,6 +2369,78 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 }
 
+func TestStoreWatchOptions(t *testing.T) {
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	table := map[string]struct {
+		options *metainternalversion.ListOptions
+	}{
+		"all": {
+			options: &metainternalversion.ListOptions{
+				LabelSelector:   labels.Everything(),
+				FieldSelector:   fields.Everything(),
+				ResourceVersion: "0",
+			},
+		},
+		"noLabelSelector": {
+			options: &metainternalversion.ListOptions{
+				FieldSelector:   fields.Everything(),
+				ResourceVersion: "0",
+			},
+		},
+		"noFieldSelector": {
+			options: &metainternalversion.ListOptions{
+				LabelSelector:   labels.Everything(),
+				ResourceVersion: "0",
+			},
+		},
+		"noResourceVersion": {
+			options: &metainternalversion.ListOptions{
+				LabelSelector: labels.Everything(),
+				FieldSelector: fields.Everything(),
+			},
+		},
+		"nil": {
+			options: nil,
+		},
+	}
+
+	for name, m := range table {
+		t.Run(name, func(t *testing.T) {
+			ctx := testContext
+
+			podA := &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "test",
+				},
+				Spec: example.PodSpec{NodeName: "machine"},
+			}
+
+			destroyFunc, registry := NewTestGenericStoreRegistry(t)
+			defer destroyFunc()
+
+			wi, err := registry.Watch(ctx, m.options)
+			if err != nil {
+				t.Errorf("%v: unexpected error: %v", name, err)
+			} else {
+				obj, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+				if err != nil {
+					got, open := <-wi.ResultChan()
+					if !open {
+						t.Errorf("%v: unexpected channel close", name)
+					} else {
+						if e, a := obj, got.Object; !reflect.DeepEqual(e, a) {
+							t.Errorf("Expected %#v, got %#v", e, a)
+						}
+					}
+				}
+				wi.Stop()
+			}
+		})
+	}
+}
+
 func TestStoreWatch(t *testing.T) {
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	noNamespaceContext := genericapirequest.NewContext()
