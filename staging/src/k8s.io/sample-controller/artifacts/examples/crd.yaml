@@ -5,13 +5,15 @@ metadata:
   # for more information on the below annotation, please see
   # https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/2337-k8s.io-group-protection/README.md
   annotations:
-    "api-approved.kubernetes.io": "unapproved, experimental-only; please get an approval from Kubernetes API reviewers if you're trying to develop a CRD in the *.k8s.io or *.kubernetes.io groups"
+    "api-approved.kubernetes.io": "https://github.com/kubernetes/kubernetes/issues/12345"
 spec:
   group: samplecontroller.k8s.io
   versions:
     - name: v1alpha1
       served: true
       storage: true
+      subresources:
+        status: {}
       schema:
         # schema used for validation
         openAPIV3Schema:

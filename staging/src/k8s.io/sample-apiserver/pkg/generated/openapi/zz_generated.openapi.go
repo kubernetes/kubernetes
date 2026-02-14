@@ -1402,6 +1402,27 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"shardingStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "shardingStrategy Instructs the server to shard based on the object's unique ID.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"shardRangeStart": {
+						SchemaProps: spec.SchemaProps{
+							Description: "shardRangeStart Defines the inclusive range (<=) of virtual buckets this client wants to receive",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"shardRangeEnd": {
+						SchemaProps: spec.SchemaProps{
+							Description: "shardRangeEnd Defines the inclusive range (>=) of virtual buckets this client wants to receive",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

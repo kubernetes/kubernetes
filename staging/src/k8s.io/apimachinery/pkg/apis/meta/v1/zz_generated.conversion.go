@@ -440,6 +440,27 @@ func autoConvert_url_Values_To_v1_ListOptions(in *url.Values, out *ListOptions, 
 	} else {
 		out.SendInitialEvents = nil
 	}
+	if values, ok := map[string][]string(*in)["shardingStrategy"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.ShardingStrategy, s); err != nil {
+			return err
+		}
+	} else {
+		out.ShardingStrategy = ""
+	}
+	if values, ok := map[string][]string(*in)["shardRangeStart"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.ShardRangeStart, s); err != nil {
+			return err
+		}
+	} else {
+		out.ShardRangeStart = ""
+	}
+	if values, ok := map[string][]string(*in)["shardRangeEnd"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.ShardRangeEnd, s); err != nil {
+			return err
+		}
+	} else {
+		out.ShardRangeEnd = ""
+	}
 	return nil
 }
 

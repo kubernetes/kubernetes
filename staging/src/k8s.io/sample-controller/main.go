@@ -18,13 +18,16 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"k8s.io/sample-controller/pkg/signals"
+
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
@@ -33,13 +36,28 @@ import (
 )
 
 var (
-	masterURL  string
-	kubeconfig string
+	masterURL        string
+	kubeconfig       string
+	shardingStrategy string
+	shardRangeStart  string
+	shardRangeEnd    string
+	shard            int
+	shardTotal       int
 )
 
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
+	if shard != -1 && shardTotal > 0 {
+		if shard >= shardTotal {
+			klog.ErrorS(nil, "shard index must be less than shard total", "shard", shard, "total", shardTotal)
+			return
+		}
+		start, end := CalculateShardRange(shard, shardTotal)
+		shardingStrategy = "uid"
+		shardRangeStart = start
+		shardRangeEnd = end
+	}
 
 	// set up signals so we handle the shutdown signal gracefully
 	ctx := signals.SetupSignalHandler()
@@ -63,8 +81,20 @@ func main() {
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
-	exampleInformerFactory := informers.NewSharedInformerFactory(exampleClient, time.Second*30)
+	tweakListOptions := func(options *metav1.ListOptions) {
+		if shardingStrategy != "" {
+			options.ShardingStrategy = shardingStrategy
+			if shardRangeStart != "" {
+				options.ShardRangeStart = shardRangeStart
+			}
+			if shardRangeEnd != "" {
+				options.ShardRangeEnd = shardRangeEnd
+			}
+		}
+	}
+
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*30, kubeinformers.WithTweakListOptions(tweakListOptions))
+	exampleInformerFactory := informers.NewSharedInformerFactoryWithOptions(exampleClient, time.Second*30, informers.WithTweakListOptions(tweakListOptions))
 
 	controller := NewController(ctx, kubeClient, exampleClient,
 		kubeInformerFactory.Apps().V1().Deployments(),
@@ -84,4 +114,37 @@ func main() {
 func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&shardingStrategy, "sharding-strategy", "", "Strategy for sharding watches. Currently only 'uid' is supported.")
+	flag.StringVar(&shardRangeStart, "shard-range-start", "", "Start of the shard range (inclusive).")
+	flag.StringVar(&shardRangeEnd, "shard-range-end", "", "End of the shard range (inclusive).")
+	flag.IntVar(&shard, "shard", -1, "If set, the shard index to run. Must be used with --shard-total.")
+	flag.IntVar(&shardTotal, "shard-total", 0, "If set, the total number of shards. Must be used with --shard.")
+}
+
+// CalculateShardRange computes the [start, end) hex prefixes for a given shard.
+// index is 0-based (0 to total-1).
+// We *could* eventually make this a helper function in client-go, but for alpha this will be user defined.
+// Based on data, we can determine if we need to make the library more high level such that users don't have to manually calculate shard.
+func CalculateShardRange(index, total int) (start, end string) {
+	if total <= 1 {
+		return "", "" // Match everything
+	}
+
+	span := 256 / total
+	startInt := span * index
+	endInt := span * (index + 1)
+
+	if index == total-1 {
+		end = "" // "Infinite" upper bound
+	} else {
+		end = fmt.Sprintf("%02x", endInt)
+	}
+
+	if index == 0 {
+		start = "" // "Infinite" lower bound
+	} else {
+		start = fmt.Sprintf("%02x", startInt)
+	}
+
+	return start, end
 }

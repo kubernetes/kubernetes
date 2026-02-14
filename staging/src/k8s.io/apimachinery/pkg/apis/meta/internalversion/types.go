@@ -89,6 +89,13 @@ type ListOptions struct {
 	// Defaults to true if `resourceVersion=""` or `resourceVersion="0"` (for backward
 	// compatibility reasons) and to false otherwise.
 	SendInitialEvents *bool
+
+	// shardingStrategy Instructs the server to shard based on the object's unique ID.
+	ShardingStrategy string
+	// shardRangeStart Defines the inclusive range (<=) of virtual buckets this client wants to receive
+	ShardRangeStart string
+	// shardRangeEnd Defines the inclusive range (>=) of virtual buckets this client wants to receive
+	ShardRangeEnd string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

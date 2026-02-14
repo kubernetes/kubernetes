@@ -300,6 +300,12 @@ type ListOptions struct {
 	// ResourceVersion. The newest available data is preferred, but any data not older than this
 	// ResourceVersion may be served.
 	ResourceVersion string
+	// ShardingStrategy Instructs the server to shard based on the object's unique ID.
+	ShardingStrategy string
+	// ShardRangeStart Defines the inclusive range (<=) of virtual buckets this client wants to receive
+	ShardRangeStart string
+	// ShardRangeEnd Defines the inclusive range (>=) of virtual buckets this client wants to receive
+	ShardRangeEnd string
 	// ResourceVersionMatch provides the rule for how the resource version constraint applies. If set
 	// to the default value "" the legacy resource version semantic apply.
 	ResourceVersionMatch metav1.ResourceVersionMatch
