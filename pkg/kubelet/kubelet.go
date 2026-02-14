@@ -2011,6 +2011,14 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		podStatus.IPs = []string{apiPodStatus.PodIP}
 	}
 
+	// Emit ContainerTerminated Event
+	for _, cs := range podStatus.ContainerStatuses {
+		if cs.State == kubecontainer.ContainerStateExited {
+			kl.recorder.Eventf(pod, v1.EventTypeNormal, events.TerminatedContainer,
+				"Container %s terminated. Restart count: %d. %s", cs.Name, cs.RestartCount, "Container will be restarted if in restart policy")
+		}
+	}
+
 	// If the pod is terminal, we don't need to continue to setup the pod
 	if apiPodStatus.Phase == v1.PodSucceeded || apiPodStatus.Phase == v1.PodFailed {
 		kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
