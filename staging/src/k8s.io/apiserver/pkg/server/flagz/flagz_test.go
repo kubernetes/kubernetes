@@ -30,11 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	cbordirect "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
 	v1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"sigs.k8s.io/yaml"
 )
 
@@ -375,5 +378,37 @@ func TestNewFlagzCodecFactory(t *testing.T) {
 	_, err := newFlagzCodecFactory(scheme, "", nil)
 	if err != nil {
 		t.Fatalf("unknown media type(s) detected - update newFlagzCodecFactory to explicitly handle them: %v", err)
+	}
+}
+
+func TestMetrics(t *testing.T) {
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	fs.String("test-flag", "test-value", "usage")
+	fakeReader := NamedFlagSetsReader{
+		FlagSets: cliflag.NamedFlagSets{
+			FlagSets: map[string]*pflag.FlagSet{
+				"test": fs,
+			},
+		},
+	}
+
+	mux := http.NewServeMux()
+	Install(mux, "test-server", fakeReader)
+	metrics.Register()
+	metrics.Reset()
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s", DefaultFlagzPath), nil)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	mux.ServeHTTP(httptest.NewRecorder(), req)
+
+	expected := strings.NewReader(`
+        # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
+        # TYPE apiserver_request_total counter
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/flagz",verb="GET",version=""} 1
+`)
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, expected, "apiserver_request_total"); err != nil {
+		t.Error(err)
 	}
 }
