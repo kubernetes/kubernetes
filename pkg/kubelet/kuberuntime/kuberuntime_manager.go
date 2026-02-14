@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
@@ -951,7 +952,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 	// Always update the pod status once. Even if there was a resize error, the resize may have been
 	// partially actuated.
-	defer m.runtimeHelper.SetPodWatchCondition(pod.UID, "doPodResizeAction", func(*kubecontainer.PodStatus) bool { return true })
+	defer m.runtimeHelper.RequestPodReSync(pod.UID)
 
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 		if podResources.Memory == nil {
@@ -1237,7 +1238,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
-
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.
@@ -1405,6 +1405,24 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeNormal, events.SandboxChanged, "Pod sandbox changed, it will be killed and re-created.")
 		} else {
 			logger.V(4).Info("SyncPod received new pod, will create a sandbox for it", "pod", klog.KObj(pod))
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && pleg.IsEventedPLEGInUse() {
+		// Don't bother resyncing pod status if there are no changes.
+		if podContainerChanges.KillPod || podContainerChanges.CreateSandbox || len(podContainerChanges.InitContainersToStart) > 0 ||
+			len(podContainerChanges.ContainersToStart) > 0 || len(podContainerChanges.ContainersToKill) > 0 ||
+			len(podContainerChanges.EphemeralContainersToStart) > 0 || len(podContainerChanges.ContainersToReset) > 0 {
+			// To ensure state consistency and avoid race conditions,
+			// we update the container cache after the completion of SyncPod.
+			defer func() {
+				// Don't resync if SyncPod returned any error. The pod worker
+				// will retry at an appropriate time. This avoids hot-looping.
+				if result.Error() != nil {
+					return
+				}
+				m.runtimeHelper.RequestPodReSync(pod.UID)
+			}()
 		}
 	}
 
@@ -1898,12 +1916,13 @@ func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.Containe
 	sort.Sort(containerStatusByCreated(kubeContainerStatuses))
 
 	return &kubecontainer.PodStatus{
-		ID:                kubetypes.UID(event.PodSandboxStatus.Metadata.Uid),
-		Name:              event.PodSandboxStatus.Metadata.Name,
-		Namespace:         event.PodSandboxStatus.Metadata.Namespace,
-		IPs:               podIPs,
-		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
-		ContainerStatuses: kubeContainerStatuses,
+		ID:                      kubetypes.UID(event.PodSandboxStatus.Metadata.Uid),
+		Name:                    event.PodSandboxStatus.Metadata.Name,
+		Namespace:               event.PodSandboxStatus.Metadata.Namespace,
+		IPs:                     podIPs,
+		SandboxStatuses:         []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
+		ActiveContainerStatuses: kubeContainerStatuses,
+		ContainerStatuses:       kubeContainerStatuses,
 	}
 }
 
@@ -1994,6 +2013,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 				for _, cs := range resp.ContainersStatuses {
 					cStatus := m.convertToKubeContainerStatus(ctx, uid, cs)
 					containerStatuses = append(containerStatuses, cStatus)
+					activeContainerStatuses = containerStatuses
 				}
 			}
 		}
