@@ -5570,7 +5570,7 @@ type ReplicationControllerSpec struct {
 	// Label keys and values that must match in order to be controlled by this replication
 	// controller, if empty defaulted to labels on Pod template.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
-	// +optional
+	// +k8s:required
 	// +mapType=atomic
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
@@ -5584,7 +5584,7 @@ type ReplicationControllerSpec struct {
 	// insufficient replicas are detected. This takes precedence over a TemplateRef.
 	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
-	// +optional
+	// +k8s:required
 	Template *PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
 }
 
