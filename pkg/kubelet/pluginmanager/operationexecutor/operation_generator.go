@@ -32,7 +32,6 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"k8s.io/client-go/tools/record"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
@@ -45,17 +44,11 @@ const (
 var _ OperationGenerator = &operationGenerator{}
 
 type operationGenerator struct {
-
-	// recorder is used to record events in the API server
-	recorder record.EventRecorder
 }
 
 // NewOperationGenerator is returns instance of operationGenerator
-func NewOperationGenerator(recorder record.EventRecorder) OperationGenerator {
-
-	return &operationGenerator{
-		recorder: recorder,
-	}
+func NewOperationGenerator() OperationGenerator {
+	return &operationGenerator{}
 }
 
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable

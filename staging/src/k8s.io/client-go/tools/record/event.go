@@ -105,10 +105,10 @@ type EventRecorder interface {
 	Event(object runtime.Object, eventtype, reason, message string)
 
 	// Eventf is just like Event, but with Sprintf for the message field.
-	Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{})
+	Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...any)
 
 	// AnnotatedEventf is just like eventf, but with annotations attached
-	AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{})
+	AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...any)
 }
 
 // EventRecorderLogger extends EventRecorder such that a logger can
@@ -139,7 +139,7 @@ type EventBroadcaster interface {
 
 	// StartLogging starts sending events received from this EventBroadcaster to the given logging
 	// function. The return value can be ignored or used to stop recording, if desired.
-	StartLogging(logf func(format string, args ...interface{})) watch.Interface
+	StartLogging(logf func(format string, args ...any)) watch.Interface
 
 	// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured
 	// logging function. The return value can be ignored or used to stop recording, if desired.
@@ -172,7 +172,7 @@ func NewEventRecorderAdapter(recorder EventRecorderLogger) *EventRecorderAdapter
 }
 
 // Eventf is a wrapper around v1 Eventf
-func (a *EventRecorderAdapter) Eventf(regarding, _ runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+func (a *EventRecorderAdapter) Eventf(regarding, _ runtime.Object, eventtype, reason, action, note string, args ...any) {
 	a.recorder.Eventf(regarding, eventtype, reason, note, args...)
 }
 
@@ -191,9 +191,10 @@ func NewBroadcaster(opts ...BroadcasterOption) EventBroadcaster {
 		opt(&c)
 	}
 	eventBroadcaster := &eventBroadcasterImpl{
-		Broadcaster:   watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
-		sleepDuration: c.sleepDuration,
-		options:       c.CorrelatorOptions,
+		Broadcaster:      watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		sleepDuration:    c.sleepDuration,
+		options:          c.CorrelatorOptions,
+		defaultNamespace: c.defaultNamespace,
 	}
 	ctx := c.Context
 	if ctx == nil {
@@ -253,20 +254,30 @@ func WithSleepDuration(sleepDuration time.Duration) BroadcasterOption {
 	}
 }
 
+// WithDefaultNamespace sets the namespace for events without a namespace set.
+// Uses the 'default' namespace if not set, or called with an empty string.
+func WithDefaultNamespace(ns string) BroadcasterOption {
+	return func(c *config) {
+		c.defaultNamespace = ns
+	}
+}
+
 type BroadcasterOption func(*config)
 
 type config struct {
 	CorrelatorOptions
 	context.Context
-	sleepDuration time.Duration
+	sleepDuration    time.Duration
+	defaultNamespace string
 }
 
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
-	sleepDuration  time.Duration
-	options        CorrelatorOptions
-	cancelationCtx context.Context
-	cancel         func()
+	sleepDuration    time.Duration
+	options          CorrelatorOptions
+	defaultNamespace string
+	cancelationCtx   context.Context
+	cancel           func()
 }
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
@@ -371,7 +382,7 @@ func recordEvent(ctx context.Context, sink EventSink, event *v1.Event, patch []b
 
 // StartLogging starts sending events received from this EventBroadcaster to the given logging function.
 // The return value can be ignored or used to stop recording, if desired.
-func (e *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
+func (e *eventBroadcasterImpl) StartLogging(logf func(format string, args ...any)) watch.Interface {
 	return e.StartEventWatcher(
 		func(e *v1.Event) {
 			logf("Event(%#v): type: '%v' reason: '%v' %v", e.InvolvedObject, e.Type, e.Reason, e.Message)
@@ -424,14 +435,21 @@ func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) w
 
 // NewRecorder returns an EventRecorder that records events with the given event source.
 func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorderLogger {
-	return &recorderImplLogger{recorderImpl: &recorderImpl{scheme, source, e.Broadcaster, clock.RealClock{}}, logger: klog.Background()}
+	return &recorderImplLogger{recorderImpl: &recorderImpl{
+		scheme:           scheme,
+		source:           source,
+		Broadcaster:      e.Broadcaster,
+		clock:            clock.RealClock{},
+		defaultNamespace: e.defaultNamespace,
+	}, logger: klog.Background()}
 }
 
 type recorderImpl struct {
 	scheme *runtime.Scheme
 	source v1.EventSource
 	*watch.Broadcaster
-	clock clock.PassiveClock
+	clock            clock.PassiveClock
+	defaultNamespace string
 }
 
 var _ EventRecorder = &recorderImpl{}
@@ -473,24 +491,32 @@ func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, me
 	recorder.generateEvent(klog.Background(), object, nil, eventtype, reason, message)
 }
 
-func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...any) {
 	recorder.Event(object, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (recorder *recorderImpl) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+func (recorder *recorderImpl) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...any) {
 	recorder.generateEvent(klog.Background(), object, annotations, eventtype, reason, fmt.Sprintf(messageFmt, args...))
+}
+
+func (recorder *recorderImpl) eventNamespace(ref *v1.ObjectReference) string {
+	if ref.Namespace != "" {
+		return ref.Namespace
+	}
+
+	if recorder.defaultNamespace != "" {
+		return recorder.defaultNamespace
+	}
+
+	return metav1.NamespaceDefault
 }
 
 func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, annotations map[string]string, eventtype, reason, message string) *v1.Event {
 	t := metav1.Time{Time: recorder.clock.Now()}
-	namespace := ref.Namespace
-	if namespace == "" {
-		namespace = metav1.NamespaceDefault
-	}
 	return &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        util.GenerateEventName(ref.Name, t.UnixNano()),
-			Namespace:   namespace,
+			Namespace:   recorder.eventNamespace(ref),
 			Annotations: annotations,
 		},
 		InvolvedObject: *ref,
@@ -514,11 +540,11 @@ func (recorder recorderImplLogger) Event(object runtime.Object, eventtype, reaso
 	recorder.recorderImpl.generateEvent(recorder.logger, object, nil, eventtype, reason, message)
 }
 
-func (recorder recorderImplLogger) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+func (recorder recorderImplLogger) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...any) {
 	recorder.Event(object, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (recorder recorderImplLogger) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+func (recorder recorderImplLogger) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...any) {
 	recorder.generateEvent(recorder.logger, object, annotations, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
