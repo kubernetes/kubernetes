@@ -86,3 +86,14 @@ are associated with a [kubernetes resource](https://git.k8s.io/community/contrib
 
 Some of the definitions may have these extensions. For more information about PatchStrategy and PatchMergeKey see
 [strategic-merge-patch](https://git.k8s.io/community/contributors/devel/sig-api-machinery/strategic-merge-patch.md).
+
+### Kubernetes-specific OpenAPI extensions
+
+Kubernetes uses several custom OpenAPI extensions to describe additional schema behavior.
+
+| Extension | Type | Description |
+|-----------|------|-------------|
+| `x-kubernetes-list-type` | string | Defines how lists are treated — possible values are `atomic`, `set`, or `map`. |
+| `x-kubernetes-map-key` | string | Used when `x-kubernetes-list-type` is set to `map`. Specifies which field in the list acts as the unique key. |
+| `x-kubernetes-unions` | boolean | Indicates that a structure is a union type (only one of the fields may be set). |
+
