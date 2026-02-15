@@ -94,6 +94,12 @@ request-based pattern with a low-load, event-driven, cached model.
 The data flow is as follows:
 
 ```mermaid
+---
+config:
+  flowchart:
+    subGraphTitleMargin:
+      bottom: 30
+---
 graph TD
     subgraph "Kubernetes API"
         API_Server[API Server]
