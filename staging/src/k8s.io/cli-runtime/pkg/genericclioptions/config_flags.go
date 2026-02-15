@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/utils/ptr"
 )
@@ -159,9 +160,6 @@ func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 
 func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	// use the standard defaults for this client command
-	// DEPRECATED: remove and replace with something more accurate
-	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
 
 	if f.KubeConfig != nil {
 		loadingRules.ExplicitPath = *f.KubeConfig
@@ -245,6 +243,10 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	if f.Timeout != nil {
 		overrides.Timeout = *f.Timeout
 	}
+
+	// create a default config with the SAME overrides so runtime parameters
+	// don't affect the IsDefaultConfig check
+	loadingRules.DefaultClientConfig = clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), overrides)
 
 	// we only have an interactive prompt when a password is allowed
 	if f.Password == nil {

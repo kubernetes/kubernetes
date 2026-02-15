@@ -132,8 +132,14 @@ func pruneTESTS(suites *junitxml.JUnitTestSuites) {
 		name := suite.Name
 		regex := regexp.MustCompile(`^(.*?)/([^/]+)/?$`)
 		match := regex.FindStringSubmatch(name)
-		updatedTestcase.Classname = match[1]
-		updatedTestcase.Name = match[2]
+		// Handle suites that don't match the expected pattern
+		if len(match) < 3 {
+			updatedTestcase.Classname = ""
+			updatedTestcase.Name = name
+		} else {
+			updatedTestcase.Classname = match[1]
+			updatedTestcase.Name = match[2]
+		}
 		updatedTestcase.Time = suite.Time
 		updatedSystemOut := ""
 		updatedSystemErr := ""
