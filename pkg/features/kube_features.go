@@ -348,6 +348,13 @@ const (
 	// which avoids frequent relisting of containers which helps optimize performance.
 	EventedPLEG featuregate.Feature = "EventedPLEG"
 
+	// owner: @atiratree
+	// kep: http://kep.k8s.io/4563
+	//
+	// Enables a new .spec.evictionResponders Pod field and an EvictionRequest Resource.
+	// This can be used by a set of requesters and responders to coordinate graceful eviction of pods.
+	EvictionRequestAPI featuregate.Feature = "EvictionRequestAPI"
+
 	// owner: @andrewsykim @SergeyKanzhelev
 	//
 	// Ensure kubelet respects exec probe timeouts. Feature gate exists in-case existing workloads
@@ -1397,6 +1404,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	EvictionRequestAPI: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ExecProbeTimeout: {
 		{Version: version.MustParse("1.20"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.38
@@ -2329,6 +2340,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	EnvFiles: {},
 
 	EventedPLEG: {},
+
+	EvictionRequestAPI: {},
 
 	ExecProbeTimeout: {},
 
