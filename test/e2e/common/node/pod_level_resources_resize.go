@@ -379,10 +379,33 @@ func doBurstablePodLevelResizeTests(f *framework.Framework) {
 			resourceRequestsLimits{cpuReq: "5m", cpuLim: "25m"},
 			true,
 		),
+		// Container has no limits to avoid auto-defaulting of pod-level limits
+		// (per KEP-2837, pod-level limits are defaulted when pod-level requests are set
+		// and ALL containers have limits)
 		ginkgo.Entry("pod-level resize with limits add",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: "2m"},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: "2m"},
+				},
+			},
+			resourceRequestsLimits{cpuReq: "4m"},
+			resourceRequestsLimits{cpuReq: "5m", cpuLim: "25m"},
+			false,
+		),
+		// Container has limits, so pod-level limits are auto-defaulted to container limits (10m)
+		// per KEP-2837 PodLevelResourcesFixUpdateDefaulting. This tests updating those
+		// auto-defaulted limits via resize.
+		ginkgo.Entry("pod-level resize with auto-defaulted limits update",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
 					Resources: &cgroups.ContainerResources{CPUReq: "2m", CPULim: "10m"},
 				},
 			},
@@ -392,7 +415,7 @@ func doBurstablePodLevelResizeTests(f *framework.Framework) {
 					Resources: &cgroups.ContainerResources{CPUReq: "2m", CPULim: "10m"},
 				},
 			},
-			resourceRequestsLimits{cpuReq: "4m"},
+			resourceRequestsLimits{cpuReq: "4m", cpuLim: "10m"},
 			resourceRequestsLimits{cpuReq: "5m", cpuLim: "25m"},
 			false,
 		),

@@ -47,6 +47,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -83,6 +84,72 @@ func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return fields
 }
 
+// defaultPodResourceLimits sets pod-level limits from aggregated container limits
+// when pod-level requests are set but limits are not, and ALL containers have limits defined.
+// pod-level limits should only be defaulted to the sum of container limits if all containers have limits set.
+// This is gated by PodLevelResources and PodLevelResourcesFixUpdateDefaulting.
+func defaultPodResourceLimits(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		return
+	}
+	if pod.Spec.Resources == nil ||
+		len(pod.Spec.Resources.Requests) == 0 ||
+		len(pod.Spec.Resources.Limits) > 0 {
+		return
+	}
+
+	// Determine which resources we need to default (only CPU and memory from pod-level requests)
+	resourcesToDefault := make(map[api.ResourceName]bool)
+	for resName := range pod.Spec.Resources.Requests {
+		if resName == api.ResourceCPU || resName == api.ResourceMemory {
+			resourcesToDefault[resName] = true
+		}
+	}
+	if len(resourcesToDefault) == 0 {
+		return
+	}
+
+	// Only default if ALL containers have limits defined for the resources we're defaulting.
+	// If any container is missing a limit for a resource we need to default, skip defaulting entirely.
+	for _, container := range pod.Spec.Containers {
+		for resName := range resourcesToDefault {
+			if container.Resources.Limits == nil {
+				return
+			}
+			if _, hasLimit := container.Resources.Limits[resName]; !hasLimit {
+				return
+			}
+		}
+	}
+	for _, container := range pod.Spec.InitContainers {
+		for resName := range resourcesToDefault {
+			if container.Resources.Limits == nil {
+				return
+			}
+			if _, hasLimit := container.Resources.Limits[resName]; !hasLimit {
+				return
+			}
+		}
+	}
+
+	// Convert internal pod -> v1 pod for aggregation helper
+	obj, err := legacyscheme.Scheme.ConvertToVersion(pod, apiv1.SchemeGroupVersion)
+	if err != nil {
+		return
+	}
+	v1Pod := obj.(*apiv1.Pod)
+	aggrLimits := resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{})
+
+	// Default pod-level limits to aggregated container limits
+	pod.Spec.Resources.Limits = api.ResourceList{}
+	for resName := range resourcesToDefault {
+		if q, ok := aggrLimits[apiv1.ResourceName(resName)]; ok {
+			pod.Spec.Resources.Limits[resName] = q
+		}
+	}
+}
+
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
@@ -93,7 +160,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 
 	podutil.DropDisabledPodFields(pod, nil)
-
+	defaultPodResourceLimits(pod)
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
 	mutateTopologySpreadConstraints(pod)
@@ -418,6 +485,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	defaultPodResourceLimits(newPod)
 	updatePodGeneration(newPod, oldPod)
 }
 

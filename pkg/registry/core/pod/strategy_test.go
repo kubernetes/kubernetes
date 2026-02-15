@@ -318,6 +318,94 @@ func TestGetPodQOS(t *testing.T) {
 	}
 }
 
+func TestPodLevelLimitsDefaultedFromContainerLimitsWhenRequestsSet(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	pod := newPod("plr-defaulting", []api.Container{
+		newContainer("c1", getResourceList("", ""), getResourceList("100m", "128Mi")),
+		newContainer("c2", getResourceList("", ""), getResourceList("100m", "128Mi")),
+	})
+
+	// Pod-level requests are set, pod-level limits are intentionally unset.
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	if pod.Spec.Resources == nil {
+		t.Fatalf("expected pod.Spec.Resources to be non-nil")
+	}
+	if pod.Spec.Resources.Limits == nil {
+		t.Fatalf("expected pod.Spec.Resources.Limits to be defaulted, got nil")
+	}
+
+	want := getResourceList("200m", "256Mi") // sum of container limits
+	if diff := cmp.Diff(want, pod.Spec.Resources.Limits); diff != "" {
+		t.Fatalf("unexpected pod-level limits (-want, +got):\n%s", diff)
+	}
+}
+
+func TestPodLevelLimitsDefaultedOnUpdateWhenRequestsSet(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	// Old pod has pod-level requests but no limits (simulating pre-fix state)
+	oldPod := newPod("plr-update-defaulting", []api.Container{
+		newContainer("c1", getResourceList("", ""), getResourceList("100m", "128Mi")),
+		newContainer("c2", getResourceList("", ""), getResourceList("100m", "128Mi")),
+	})
+	oldPod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	// New pod is the same (no-op update, but triggers defaulting)
+	newPod := oldPod.DeepCopy()
+
+	ResizeStrategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+
+	if newPod.Spec.Resources == nil {
+		t.Fatalf("expected newPod.Spec.Resources to be non-nil")
+	}
+	if newPod.Spec.Resources.Limits == nil {
+		t.Fatalf("expected newPod.Spec.Resources.Limits to be defaulted, got nil")
+	}
+
+	want := getResourceList("200m", "256Mi") // sum of container limits
+	if diff := cmp.Diff(want, newPod.Spec.Resources.Limits); diff != "" {
+		t.Fatalf("unexpected pod-level limits (-want, +got):\n%s", diff)
+	}
+}
+
+// pod-level limits are only defaulted when ALL containers have limits defined.
+// If any container is missing limits, pod-level limits should NOT be defaulted.
+func TestPodLevelLimitsNotDefaultedWhenContainerMissingLimits(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	// Container c1 has limits, but c2 does NOT have limits
+	pod := newPod("plr-missing-limits", []api.Container{
+		newContainer("c1", getResourceList("50m", "64Mi"), getResourceList("100m", "128Mi")),
+		newContainer("c2", getResourceList("50m", "64Mi"), getResourceList("", "")), // No limits!
+	})
+
+	// Pod-level requests are set, pod-level limits are intentionally unset.
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	// Since not all containers have limits, pod-level limits should NOT be defaulted
+	if pod.Spec.Resources == nil {
+		t.Fatalf("expected pod.Spec.Resources to be non-nil")
+	}
+	if len(pod.Spec.Resources.Limits) > 0 {
+		t.Fatalf("expected pod.Spec.Resources.Limits to remain unset when not all containers have limits, got %v", pod.Spec.Resources.Limits)
+	}
+}
+
 func TestSchedulingGatedCondition(t *testing.T) {
 	tests := []struct {
 		name string
