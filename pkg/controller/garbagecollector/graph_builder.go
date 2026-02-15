@@ -777,6 +777,25 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 		// one event, so we need to further process the event.
 		gb.processTransitions(logger, event.oldObj, accessor, newNode)
 	case (event.eventType == addEvent || event.eventType == updateEvent) && found:
+		// handle changes in apiVersion/kind
+		if !event.virtual &&
+			(existingNode.identity.APIVersion != event.gvk.GroupVersion().String() || existingNode.identity.Kind != event.gvk.Kind) {
+			// Update apiVersion/kind in existingNode.
+			oldExistingNode := existingNode
+			existingNode = existingNode.clone()
+			existingNode.identity.APIVersion = event.gvk.GroupVersion().String()
+			existingNode.identity.Kind = event.gvk.Kind
+			gb.uidToNode.Write(existingNode)
+
+			// Update owners.
+			for _, owner := range existingNode.owners {
+				ownerNode, ok := gb.uidToNode.Read(owner.UID)
+				if ok {
+					ownerNode.replaceDependentIfItExists(oldExistingNode, existingNode)
+				}
+			}
+		}
+
 		// handle changes in ownerReferences
 		added, removed, changed := referencesDiffs(existingNode.owners, accessor.GetOwnerReferences())
 		if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
