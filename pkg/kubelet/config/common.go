@@ -238,10 +238,10 @@ func getStaticPodPriorityWarning(pod *api.Pod) string {
 		return "Static Pod has non-nil PriorityClassName and nil Priority. Kubelet will not make use of the priority. Mirror pod creation may fail."
 
 	case podSpec.Priority != nil && len(podSpec.PriorityClassName) == 0:
-		return "Static Pod has Priority set without PriorityClassName. Mirror Pod creation may fail if the default priority class doesn't match the given priority"
+		return "Static Pod has Priority set without PriorityClassName. Mirror Pod creation may fail if the default priority class doesn't match the given priority."
 
 	case podSpec.Priority != nil && (*podSpec.Priority != nodeCriticalPriority || podSpec.PriorityClassName != schedulingapi.SystemNodeCritical):
-		return "Static Pod has non-standard values for Priority and PriorityClassName. Mirror Pod may be attempted to be evicted from the node ineffectively"
+		return fmt.Sprintf("Static Pod has a priority other than %d or a priorityClassName other than %s. Mirror Pod may be attempted to be evicted from the node ineffectively.", nodeCriticalPriority, schedulingapi.SystemNodeCritical)
 	}
 
 	return ""
