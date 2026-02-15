@@ -74,6 +74,9 @@ type frameworkImpl struct {
 	permitPlugins        []fwk.PermitPlugin
 	batchablePlugins     []fwk.SignPlugin
 
+	placementGeneratePlugins []fwk.PlacementGeneratorPlugin
+	placementScorePlugins    []fwk.PlacementScorerPlugin
+
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
 
@@ -129,6 +132,8 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Permit, &f.permitPlugins},
 		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
+		{&plugins.PlacementGenerate, &f.placementGeneratePlugins},
+		{&plugins.PlacementScore, &f.placementScorePlugins},
 	}
 }
 
