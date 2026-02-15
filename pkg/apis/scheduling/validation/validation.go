@@ -21,10 +21,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -75,9 +73,7 @@ func ValidateWorkload(workload *scheduling.Workload) field.ErrorList {
 
 func validateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if spec.ControllerRef != nil {
-		allErrs = append(allErrs, validateControllerRef(spec.ControllerRef, fldPath.Child("controllerRef"))...)
-	}
+	// ControllerRef field validation is handled by declarative validation.
 	allErrs = append(allErrs, validatePodGroups(fldPath, spec, operation.Create)...)
 	return allErrs
 }
@@ -94,30 +90,6 @@ func validatePodGroups(fldPath *field.Path, spec *scheduling.WorkloadSpec, op op
 		// spec.PodGroups is immutable after create.
 		for i := range spec.PodGroups {
 			allErrs = append(allErrs, validatePodGroup(&spec.PodGroups[i], podGroupsPath.Index(i), existingPodGroups)...)
-		}
-	}
-	return allErrs
-}
-
-func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *field.Path) field.ErrorList {
-	var allErrs = field.ErrorList{}
-	if ref.APIGroup != "" {
-		for _, msg := range validation.IsDNS1123Subdomain(ref.APIGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg).WithOrigin("format=k8s-long-name").MarkCoveredByDeclarative())
-		}
-	}
-	if ref.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
-	} else {
-		for _, msg := range content.IsPathSegmentName(ref.Kind) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg).WithOrigin("format=k8s-path-segment-name").MarkCoveredByDeclarative())
-		}
-	}
-	if ref.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
-	} else {
-		for _, msg := range content.IsPathSegmentName(ref.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg).WithOrigin("format=k8s-path-segment-name").MarkCoveredByDeclarative())
 		}
 	}
 	return allErrs
@@ -148,7 +120,7 @@ func validateWorkloadSpecUpdate(spec, oldSpec *scheduling.WorkloadSpec, fldPath 
 	if oldSpec.ControllerRef != nil {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.ControllerRef, oldSpec.ControllerRef, fldPath.Child("controllerRef")).WithOrigin("update").MarkCoveredByDeclarative()...)
 	} else if spec.ControllerRef != nil {
-		allErrs = append(allErrs, validateControllerRef(spec.ControllerRef, fldPath.Child("controllerRef"))...)
+		// ControllerRef field validation on new values is handled by declarative validation.
 	}
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroups, oldSpec.PodGroups, fldPath.Child("podGroups")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validatePodGroups(fldPath, spec, operation.Update)...)

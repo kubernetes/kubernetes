@@ -188,13 +188,13 @@ func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("apiGroup"), &obj.APIGroup, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.APIGroup }), oldObj != nil)...)
 
@@ -207,14 +207,14 @@ func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("kind"), &obj.Kind, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Kind }), oldObj != nil)...)
 
@@ -227,14 +227,14 @@ func Validate_TypedLocalObjectReference(ctx context.Context, op operation.Operat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.PathSegmentName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.TypedLocalObjectReference) *string { return &oldObj.Name }), oldObj != nil)...)
 
