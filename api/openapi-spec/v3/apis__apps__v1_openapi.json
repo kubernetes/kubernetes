@@ -1283,7 +1283,7 @@
               }
             ],
             "default": {},
-            "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata."
+            "description": "metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata."
           },
           "spec": {
             "allOf": [
