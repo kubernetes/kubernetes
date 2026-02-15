@@ -284,3 +284,62 @@ func TestCacheMiss(t *testing.T) {
 		})
 	}
 }
+
+func TestDataKeyGenerationFailure(t *testing.T) {
+	RegisterMetrics()
+	dataKeyGenerationFailuresTotal.Reset()
+
+	RecordDataKeyGeneration(time.Unix(0, 0), errors.New("data key generation failed"))
+	defer dataKeyGenerationFailuresTotal.Reset()
+
+	want := `
+		# HELP apiserver_storage_data_key_generation_failures_total [BETA] Total number of failed data encryption key(DEK) generation operations.
+		# TYPE apiserver_storage_data_key_generation_failures_total counter
+		apiserver_storage_data_key_generation_failures_total 1
+	`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "apiserver_storage_data_key_generation_failures_total"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDataKeyGenerationLatency(t *testing.T) {
+	RegisterMetrics()
+	dataKeyGenerationFailuresTotal.Reset()
+
+	sinceInSeconds = func(start time.Time) float64 {
+		return time.Unix(0, 1*int64(time.Millisecond)).Sub(start).Seconds()
+	}
+
+	RecordDataKeyGeneration(time.Unix(0, 0), nil)
+
+	want := `
+		# HELP apiserver_storage_data_key_generation_duration_seconds [BETA] Latencies in seconds of data encryption key(DEK) generation operations.
+		# TYPE apiserver_storage_data_key_generation_duration_seconds histogram
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="5e-06"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="1e-05"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="2e-05"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="4e-05"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="8e-05"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00016"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00032"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00064"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00128"} 1
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00256"} 1
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00512"} 1
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.01024"} 1
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.02048"} 1
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.04096"} 1
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="+Inf"} 1
+		apiserver_storage_data_key_generation_duration_seconds_sum 0.001
+		apiserver_storage_data_key_generation_duration_seconds_count 1
+		# HELP apiserver_storage_data_key_generation_failures_total [BETA] Total number of failed data encryption key(DEK) generation operations.
+		# TYPE apiserver_storage_data_key_generation_failures_total counter
+		apiserver_storage_data_key_generation_failures_total 0
+	`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want),
+		"apiserver_storage_data_key_generation_duration_seconds",
+		"apiserver_storage_data_key_generation_failures_total",
+	); err != nil {
+		t.Fatal(err)
+	}
+}
