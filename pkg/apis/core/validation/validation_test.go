@@ -30476,3 +30476,71 @@ func TestValidateWorkloadReference(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateAffinity(t *testing.T) {
+	testCases := []struct {
+		name      string
+		affinity  *core.Affinity
+		expectErr bool
+	}{
+		{
+			name:      "nil affinity",
+			affinity:  nil,
+			expectErr: false,
+		},
+		{
+			name: "valid affinity",
+			affinity: &core.Affinity{
+				NodeAffinity: &core.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+						NodeSelectorTerms: []core.NodeSelectorTerm{
+							{
+								MatchExpressions: []core.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: core.NodeSelectorOpIn,
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "invalid affinity",
+			affinity: &core.Affinity{
+				NodeAffinity: &core.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+						NodeSelectorTerms: []core.NodeSelectorTerm{
+							{
+								MatchExpressions: []core.NodeSelectorRequirement{
+									{
+										Key:      "invalid key",
+										Operator: core.NodeSelectorOpIn,
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateAffinity(tc.affinity, PodValidationOptions{}, field.NewPath("affinity"))
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("expected errors but got none")
+			}
+			if !tc.expectErr && len(errs) > 0 {
+				t.Errorf("expected no errors but got: %v", errs)
+			}
+		})
+	}
+}
