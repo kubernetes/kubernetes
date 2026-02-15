@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -525,5 +526,74 @@ func TestCleanListScope(t *testing.T) {
 				t.Errorf("unexpected scope = %s, expected = %s", actualScope, scenario.expectedScope)
 			}
 		})
+	}
+}
+
+func TestRequestFilterDuration(t *testing.T) {
+	// Ensure metrics are registered
+	Register()
+
+	// Verify the metric is registered with BETA stability and can record values
+	Reset()
+	RecordFilterLatency(context.Background(), "test-filter", 10*time.Millisecond)
+
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %v", err)
+	}
+
+	found := false
+	for _, mf := range metrics {
+		if mf.GetName() == "apiserver_request_filter_duration_seconds" {
+			found = true
+			// Verify the help text contains [BETA]
+			help := mf.GetHelp()
+			if !strings.Contains(help, "[BETA]") {
+				t.Errorf("Expected help text to contain [BETA], got: %s", help)
+			}
+			// Verify that observations were recorded
+			if len(mf.GetMetric()) == 0 {
+				t.Error("Metric has no observations")
+			}
+			break
+		}
+	}
+
+	if !found {
+		t.Error("Metric apiserver_request_filter_duration_seconds not found in registry")
+	}
+}
+
+func TestRequestSLIDuration(t *testing.T) {
+	// Ensure metrics are registered
+	Register()
+
+	// request_sli_duration_seconds is recorded in MonitorRequest which requires
+	// a full request context. We verify the metric is registered with BETA stability
+	// by observing a value first to initialize it, then checking the registry.
+	// Record a sample observation to initialize the metric
+	requestSliLatencies.WithLabelValues("GET", "", "v1", "pods", "", "cluster", "kube-apiserver").Observe(0.1)
+
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %v", err)
+	}
+
+	found := false
+	metricName := "apiserver_request_sli_duration_seconds"
+	for _, mf := range metrics {
+		if mf.GetName() == metricName {
+			found = true
+			// Verify the help text contains [BETA]
+			help := mf.GetHelp()
+			if !strings.Contains(help, "[BETA]") {
+				t.Errorf("Expected help text to contain [BETA], got: %s", help)
+			}
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Metric %s not found in registry after initialization", metricName)
 	}
 }

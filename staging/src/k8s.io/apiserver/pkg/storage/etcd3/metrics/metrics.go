@@ -120,7 +120,7 @@ var (
 		&compbasemetrics.GaugeOpts{
 			Name:           "etcd_bookmark_counts",
 			Help:           "Number of etcd bookmarks (progress notify events) split by kind.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)

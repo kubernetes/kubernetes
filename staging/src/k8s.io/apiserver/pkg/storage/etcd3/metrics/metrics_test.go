@@ -313,6 +313,44 @@ apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} -1
 	}
 }
 
+func TestRecordEtcdBookmark(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	registry.MustRegister(etcdBookmarkCounts)
+
+	testCases := []struct {
+		desc          string
+		groupResource schema.GroupResource
+		want          string
+	}{
+		{
+			desc:          "record bookmark for pods",
+			groupResource: schema.GroupResource{Group: "", Resource: "pods"},
+			want: `# HELP etcd_bookmark_counts [BETA] Number of etcd bookmarks (progress notify events) split by kind.
+# TYPE etcd_bookmark_counts gauge
+etcd_bookmark_counts{group="",resource="pods"} 1
+`,
+		},
+		{
+			desc:          "record bookmark for deployments",
+			groupResource: schema.GroupResource{Group: "apps", Resource: "deployments"},
+			want: `# HELP etcd_bookmark_counts [BETA] Number of etcd bookmarks (progress notify events) split by kind.
+# TYPE etcd_bookmark_counts gauge
+etcd_bookmark_counts{group="apps",resource="deployments"} 1
+`,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			defer registry.Reset()
+			RecordEtcdBookmark(test.groupResource)
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), "etcd_bookmark_counts"); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestDeleteStoreStats(t *testing.T) {
 	registry := metrics.NewKubeRegistry()
 	registry.MustRegister(objectCounts)
