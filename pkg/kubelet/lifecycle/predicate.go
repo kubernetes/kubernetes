@@ -20,15 +20,19 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sort"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/types"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -92,6 +96,133 @@ type getNodeAnyWayFuncType func(ctx context.Context, useCache bool) (*v1.Node, e
 
 type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error
 
+// nodeInfoCache caches NodeInfo to avoid expensive reconstruction on every admission.
+// The cache is invalidated when pods are added, removed, or their resources change.
+type nodeInfoCache struct {
+	mu sync.RWMutex
+	// cached NodeInfo for the node
+	nodeInfo *schedulerframework.NodeInfo
+	// Track pod UIDs and their resource versions to detect changes
+	// Map of pod UID -> (Generation + ResourceVersion hash)
+	podVersions map[types.UID]string
+	// Track the node's ResourceVersion to detect node changes
+	nodeResourceVersion string
+}
+
+// newNodeInfoCache creates a new NodeInfo cache
+func newNodeInfoCache() *nodeInfoCache {
+	return &nodeInfoCache{
+		podVersions: make(map[types.UID]string),
+	}
+}
+
+// needsUpdate checks if the cache needs to be updated based on current pods and node
+func (c *nodeInfoCache) needsUpdate(pods []*v1.Pod, node *v1.Node) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// Check if cache is empty
+	if c.nodeInfo == nil {
+		return true
+	}
+
+	// Check if node changed
+	if node.ResourceVersion != c.nodeResourceVersion {
+		return true
+	}
+
+	// Check if number of pods changed
+	if len(pods) != len(c.podVersions) {
+		return true
+	}
+
+	// Check if any pod changed
+	for _, pod := range pods {
+		// Create a version key that includes generation and key resource fields
+		versionKey := fmt.Sprintf("%d-%s-%s", pod.Generation, pod.ResourceVersion, getPodResourceHash(pod))
+		if c.podVersions[pod.UID] != versionKey {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getPodResourceHash creates a hash of pod's resource-related fields
+func getPodResourceHash(pod *v1.Pod) string {
+	// Track key resource fields that affect NodeInfo
+	// - Container requests/limits (including extended resources like GPUs)
+	// - Pod phase/status
+	// - Allocated resources (for in-place resize)
+	hash := string(pod.Status.Phase)
+
+	// Helper to append all resources from a ResourceList to the hash
+	// This ensures extended resources (e.g., nvidia.com/gpu) are also tracked
+	// Sort resource names for deterministic hash (map iteration order is random)
+	appendResources := func(rl v1.ResourceList) {
+		if rl == nil {
+			return
+		}
+		// Sort resource names to ensure deterministic hash
+		names := make([]string, 0, len(rl))
+		for rName := range rl {
+			names = append(names, string(rName))
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			quant := rl[v1.ResourceName(name)]
+			hash += name + ":" + quant.String() + ";"
+		}
+	}
+
+	for _, container := range pod.Spec.Containers {
+		appendResources(container.Resources.Requests)
+	}
+	for _, container := range pod.Spec.InitContainers {
+		appendResources(container.Resources.Requests)
+	}
+	// Include allocated resources if present (in-place resize)
+	if pod.Status.Resize != "" {
+		hash += string(pod.Status.Resize)
+	}
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		appendResources(containerStatus.AllocatedResources)
+	}
+	return hash
+}
+
+// update updates the cache with new NodeInfo
+func (c *nodeInfoCache) update(pods []*v1.Pod, node *v1.Node, nodeInfo *schedulerframework.NodeInfo) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.nodeInfo = nodeInfo
+	c.nodeResourceVersion = node.ResourceVersion
+	
+	// Update pod versions
+	c.podVersions = make(map[types.UID]string)
+	for _, pod := range pods {
+		versionKey := fmt.Sprintf("%d-%s-%s", pod.Generation, pod.ResourceVersion, getPodResourceHash(pod))
+		c.podVersions[pod.UID] = versionKey
+	}
+}
+
+// get returns the cached NodeInfo (or nil if cache is invalid)
+func (c *nodeInfoCache) get() *schedulerframework.NodeInfo {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.nodeInfo
+}
+
+// invalidate clears the cache
+func (c *nodeInfoCache) invalidate() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.nodeInfo = nil
+	c.podVersions = make(map[types.UID]string)
+	c.nodeResourceVersion = ""
+}
+
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
 type AdmissionFailureHandler interface {
@@ -102,6 +233,8 @@ type predicateAdmitHandler struct {
 	getNodeAnyWayFunc        getNodeAnyWayFuncType
 	pluginResourceUpdateFunc pluginResourceUpdateFuncType
 	admissionFailureHandler  AdmissionFailureHandler
+	// cache for NodeInfo to avoid expensive reconstruction
+	cache *nodeInfoCache
 }
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
@@ -110,9 +243,10 @@ var _ PodAdmitHandler = &predicateAdmitHandler{}
 // if a pod can be admitted from the perspective of predicates.
 func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) PodAdmitHandler {
 	return &predicateAdmitHandler{
-		getNodeAnyWayFunc,
-		pluginResourceUpdateFunc,
-		admissionFailureHandler,
+		getNodeAnyWayFunc:        getNodeAnyWayFunc,
+		pluginResourceUpdateFunc: pluginResourceUpdateFunc,
+		admissionFailureHandler:  admissionFailureHandler,
+		cache:                    newNodeInfoCache(),
 	}
 }
 
@@ -159,8 +293,27 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 
 	pods := attrs.OtherPods
-	nodeInfo := schedulerframework.NewNodeInfo(pods...)
-	nodeInfo.SetNode(node)
+	
+	// Try to use cached NodeInfo if it's still valid
+	var nodeInfo *schedulerframework.NodeInfo
+	if w.cache.needsUpdate(pods, node) {
+		// Cache is stale, reconstruct NodeInfo
+		kubeletmetrics.AdmissionNodeInfoCacheMissesTotal.Inc()
+		logger.V(4).Info("NodeInfo cache miss, reconstructing", "node", node.Name, "podCount", len(pods))
+		nodeInfo = schedulerframework.NewNodeInfo(pods...)
+		nodeInfo.SetNode(node)
+		
+		// Update the cache with the new NodeInfo
+		w.cache.update(pods, node, nodeInfo)
+	} else {
+		// Cache is valid, use it
+		kubeletmetrics.AdmissionNodeInfoCacheHitsTotal.Inc()
+		logger.V(5).Info("NodeInfo cache hit", "node", node.Name, "podCount", len(pods))
+		nodeInfo = w.cache.get()
+		// Note: We still need to set the node in case node object changed
+		// but the cache logic determined it's equivalent
+		nodeInfo.SetNode(node)
+	}
 
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
@@ -449,7 +602,7 @@ func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework
 	}
 
 	// Check taint/toleration except for static pods
-	if !types.IsStaticPod(pod) {
+	if !kubetypes.IsStaticPod(pod) {
 		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(logger, nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			// Kubelet is only interested in the NoExecute taint.
 			return t.Effect == v1.TaintEffectNoExecute
