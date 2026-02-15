@@ -88,7 +88,7 @@ func newRetryWatcher(ctx context.Context, initialResourceVersion string, watcher
 		lastResourceVersion: initialResourceVersion,
 		watcherClient:       watcherClient,
 		doneChan:            make(chan struct{}),
-		resultChan:          make(chan watch.Event, 0),
+		resultChan:          make(chan watch.Event),
 		minRestartDelay:     minRestartDelay,
 	}
 

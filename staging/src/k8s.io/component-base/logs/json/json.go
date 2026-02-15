@@ -36,12 +36,12 @@ var (
 )
 
 type runtime struct {
-	v uint32
+	v atomic.Uint32
 }
 
 func (r *runtime) ZapV() zapcore.Level {
 	// zap levels are inverted: everything with a verbosity >= threshold gets logged.
-	return -zapcore.Level(atomic.LoadUint32(&r.v))
+	return -zapcore.Level(r.v.Load())
 }
 
 // Enabled implements the zapcore.LevelEnabler interface.
@@ -50,7 +50,7 @@ func (r *runtime) Enabled(level zapcore.Level) bool {
 }
 
 func (r *runtime) SetVerbosityLevel(v uint32) error {
-	atomic.StoreUint32(&r.v, v)
+	r.v.Store(v)
 	return nil
 }
 
@@ -60,7 +60,8 @@ var _ zapcore.LevelEnabler = &runtime{}
 // control interface. The separate error stream is optional and may be nil.
 // The encoder config is also optional.
 func NewJSONLogger(v logsapi.VerbosityLevel, infoStream, errorStream zapcore.WriteSyncer, encoderConfig *zapcore.EncoderConfig) (logr.Logger, logsapi.RuntimeControl) {
-	r := &runtime{v: uint32(v)}
+	var r runtime
+	r.v.Store(uint32(v))
 
 	if encoderConfig == nil {
 		encoderConfig = &zapcore.EncoderConfig{
@@ -77,7 +78,7 @@ func NewJSONLogger(v logsapi.VerbosityLevel, infoStream, errorStream zapcore.Wri
 	encoder := zapcore.NewJSONEncoder(*encoderConfig)
 	var core zapcore.Core
 	if errorStream == nil {
-		core = zapcore.NewCore(encoder, infoStream, r)
+		core = zapcore.NewCore(encoder, infoStream, &r)
 	} else {
 		highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 			return lvl >= zapcore.ErrorLevel && r.Enabled(lvl)

@@ -744,7 +744,7 @@ func TestDrain(t *testing.T) {
 		for _, test := range tests {
 			t.Run(test.description, func(t *testing.T) {
 				newNode := &corev1.Node{}
-				var deletions, evictions int32
+				var deletions, evictions atomic.Int32
 				tf := cmdtesting.NewTestFactory()
 				defer tf.Cleanup()
 
@@ -804,7 +804,7 @@ func TestDrain(t *testing.T) {
 						case m.isFor("GET", "/namespaces/default/pods/bar"):
 							return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.Pod{})}, nil
 						case m.isFor("GET", "/pods"):
-							if test.failUponEvictionOrDeletion && atomic.LoadInt32(&evictions) > 0 || atomic.LoadInt32(&deletions) > 0 {
+							if test.failUponEvictionOrDeletion && evictions.Load() > 0 || deletions.Load() > 0 {
 								return nil, errors.New("request failed")
 							}
 							values, err := url.ParseQuery(req.URL.RawQuery)
@@ -842,13 +842,13 @@ func TestDrain(t *testing.T) {
 							}
 							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 						case m.isFor("DELETE", "/namespaces/default/pods/bar"):
-							atomic.AddInt32(&deletions, 1)
+							deletions.Add(1)
 							if test.failUponEvictionOrDeletion {
 								return nil, errors.New("request failed")
 							}
 							return &http.Response{StatusCode: http.StatusNoContent, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.pods[0])}, nil
 						case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
-							atomic.AddInt32(&evictions, 1)
+							evictions.Add(1)
 							if test.failUponEvictionOrDeletion {
 								return nil, errors.New("request failed")
 							}
@@ -887,8 +887,8 @@ func TestDrain(t *testing.T) {
 					t.Fatalf("%s: unexpected error when using %s: %s", test.description, currMethod, fatalMsg)
 				}
 
-				deleted := deletions > 0
-				evicted := evictions > 0
+				deleted := deletions.Load() > 0
+				evicted := evictions.Load() > 0
 
 				if test.expectDelete {
 					// Test Delete
@@ -900,8 +900,8 @@ func TestDrain(t *testing.T) {
 						if !evicted {
 							t.Fatalf("%s: pod never evicted", test.description)
 						}
-						if evictions > 1 {
-							t.Fatalf("%s: asked to evict same pod %d too many times", test.description, evictions-1)
+						if evictions.Load() > 1 {
+							t.Fatalf("%s: asked to evict same pod %d too many times", test.description, evictions.Load()-1)
 						}
 					}
 				}
@@ -909,12 +909,12 @@ func TestDrain(t *testing.T) {
 					if deleted {
 						t.Fatalf("%s: unexpected delete when using %s", test.description, currMethod)
 					}
-					if deletions > 1 {
-						t.Fatalf("%s: asked to deleted same pod %d too many times", test.description, deletions-1)
+					if deletions.Load() > 1 {
+						t.Fatalf("%s: asked to deleted same pod %d too many times", test.description, deletions.Load()-1)
 					}
 				}
 				if deleted && evicted {
-					t.Fatalf("%s: same pod deleted %d times and evicted %d times", test.description, deletions, evictions)
+					t.Fatalf("%s: same pod deleted %d times and evicted %d times", test.description, deletions.Load(), evictions.Load())
 				}
 
 				if len(test.expectWarning) > 0 {

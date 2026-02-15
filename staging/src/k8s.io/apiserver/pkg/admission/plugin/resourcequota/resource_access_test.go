@@ -135,8 +135,8 @@ func TestGetQuotas(t *testing.T) {
 	var (
 		testNamespace1              = "test-a"
 		testNamespace2              = "test-b"
-		listCallCountTestNamespace1 int64
-		listCallCountTestNamespace2 int64
+		listCallCountTestNamespace1 atomic.Int64
+		listCallCountTestNamespace2 atomic.Int64
 	)
 	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
@@ -157,9 +157,9 @@ func TestGetQuotas(t *testing.T) {
 	kubeClient.AddReactor("list", "resourcequotas", func(action core.Action) (bool, runtime.Object, error) {
 		switch action.GetNamespace() {
 		case testNamespace1:
-			atomic.AddInt64(&listCallCountTestNamespace1, 1)
+			listCallCountTestNamespace1.Add(1)
 		case testNamespace2:
-			atomic.AddInt64(&listCallCountTestNamespace2, 1)
+			listCallCountTestNamespace2.Add(1)
 		default:
 			t.Error("unexpected namespace")
 		}
@@ -222,11 +222,11 @@ func TestGetQuotas(t *testing.T) {
 	// since all the calls with the same namespace will be held, they must
 	// be caught on the singleflight group. there are two different sets of
 	// namespace calls hence only 2.
-	if listCallCountTestNamespace1 != 1 {
-		t.Errorf("Expected 1 resource quota call, got %d", listCallCountTestNamespace1)
+	if listCallCountTestNamespace1.Load() != 1 {
+		t.Errorf("Expected 1 resource quota call, got %d", listCallCountTestNamespace1.Load())
 	}
-	if listCallCountTestNamespace2 != 1 {
-		t.Errorf("Expected 1 resource quota call, got %d", listCallCountTestNamespace2)
+	if listCallCountTestNamespace2.Load() != 1 {
+		t.Errorf("Expected 1 resource quota call, got %d", listCallCountTestNamespace2.Load())
 	}
 
 	// invalidate the cache
@@ -239,10 +239,10 @@ func TestGetQuotas(t *testing.T) {
 		t.Errorf("Expected %d resource quotas, got %d", len(resourceQuotas), len(quotas))
 	}
 
-	if listCallCountTestNamespace1 != 2 {
-		t.Errorf("Expected 2 resource quota call, got %d", listCallCountTestNamespace1)
+	if listCallCountTestNamespace1.Load() != 2 {
+		t.Errorf("Expected 2 resource quota call, got %d", listCallCountTestNamespace1.Load())
 	}
-	if listCallCountTestNamespace2 != 1 {
-		t.Errorf("Expected 1 resource quota call, got %d", listCallCountTestNamespace2)
+	if listCallCountTestNamespace2.Load() != 1 {
+		t.Errorf("Expected 1 resource quota call, got %d", listCallCountTestNamespace2.Load())
 	}
 }

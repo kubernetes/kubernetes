@@ -126,10 +126,8 @@ func benchmarkSharedIndexInformer(b *testing.B, readers int, watcher *watch.Fake
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
 	var reads atomic.Int64
-	for i := 0; i < readers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range readers {
+		wg.Go(func() {
 			for {
 				select {
 				case <-stop:
@@ -143,7 +141,7 @@ func benchmarkSharedIndexInformer(b *testing.B, readers int, watcher *watch.Fake
 				}
 				reads.Add(1)
 			}
-		}()
+		})
 	}
 
 	writes.Store(0)

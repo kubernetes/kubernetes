@@ -210,7 +210,7 @@ func TestConnectionPings(t *testing.T) {
 			return
 		}
 
-		var pingsSent int64
+		var pingsSent atomic.Int64
 		srvSPDYConn := newConnection(
 			spdyConn,
 			func(stream httpstream.Stream, replySent <-chan struct{}) error {
@@ -220,7 +220,7 @@ func TestConnectionPings(t *testing.T) {
 			},
 			pingPeriod,
 			func() (time.Duration, error) {
-				atomic.AddInt64(&pingsSent, 1)
+				pingsSent.Add(1)
 				return 0, nil
 			})
 		defer srvSPDYConn.Close()
@@ -235,7 +235,7 @@ func TestConnectionPings(t *testing.T) {
 		}
 
 		// Count pings sent by the server.
-		gotPings := atomic.LoadInt64(&pingsSent)
+		gotPings := pingsSent.Load()
 		if gotPings < 1 {
 			t.Errorf("server: failed to send any pings (check logs)")
 		}

@@ -55,9 +55,9 @@ func TestCloseAll(t *testing.T) {
 
 // TestCloseAllRace ensures CloseAll works with connections being simultaneously dialed
 func TestCloseAllRace(t *testing.T) {
-	conns := int64(0)
+	var conns atomic.Int64
 	dialer := NewDialer(func(ctx context.Context, network, address string) (net.Conn, error) {
-		return closeOnlyConn{onClose: func() { atomic.AddInt64(&conns, -1) }}, nil
+		return closeOnlyConn{onClose: func() { conns.Add(-1) }}, nil
 	})
 
 	const raceCount = 5000
@@ -86,7 +86,7 @@ func TestCloseAllRace(t *testing.T) {
 				t.Error(err)
 				return
 			}
-			atomic.AddInt64(&conns, 1)
+			conns.Add(1)
 		}
 	}()
 
@@ -102,14 +102,14 @@ func TestCloseAllRace(t *testing.T) {
 	// Expect all connections to close within 5 seconds
 	for start := time.Now(); time.Since(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
 		// Ensure all connections were closed
-		if c := atomic.LoadInt64(&conns); c == 0 {
+		if c := conns.Load(); c == 0 {
 			break
 		} else {
 			t.Logf("got %d open connections, want 0, will retry", c)
 		}
 	}
 	// Ensure all connections were closed
-	if c := atomic.LoadInt64(&conns); c != 0 {
+	if c := conns.Load(); c != 0 {
 		t.Fatalf("got %d open connections, want 0", c)
 	}
 }

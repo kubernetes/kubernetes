@@ -25,14 +25,14 @@ import (
 
 func TestRealEventClock(t *testing.T) {
 	ec := Real{}
-	var numDone int32
+	var numDone atomic.Int32
 	now := ec.Now()
 	const batchSize = 100
 	times := make(chan time.Time, batchSize+1)
 	try := func(abs bool, d time.Duration) {
 		f := func(u time.Time) {
 			realD := ec.Since(now)
-			atomic.AddInt32(&numDone, 1)
+			numDone.Add(1)
 			times <- u
 			if realD < d {
 				t.Errorf("Asked for %v, got %v", d, realD)
@@ -50,8 +50,8 @@ func TestRealEventClock(t *testing.T) {
 		try(i%2 == 0, d)
 	}
 	time.Sleep(time.Second * 4)
-	if atomic.LoadInt32(&numDone) != batchSize+1 {
-		t.Errorf("Got only %v events", numDone)
+	if numDone.Load() != batchSize+1 {
+		t.Errorf("Got only %v events", numDone.Load())
 	}
 	lastTime := now
 	for i := 0; i <= batchSize; i++ {

@@ -68,11 +68,11 @@ type testEnvelopeService struct {
 	disabled     bool
 	keyVersion   string
 	ciphertext   []byte
-	decryptCalls int32
+	decryptCalls atomic.Int32
 }
 
 func (t *testEnvelopeService) Decrypt(ctx context.Context, uid string, req *kmsservice.DecryptRequest) ([]byte, error) {
-	atomic.AddInt32(&t.decryptCalls, 1)
+	t.decryptCalls.Add(1)
 	if t.disabled {
 		return nil, fmt.Errorf("Envelope service was disabled")
 	}
@@ -232,8 +232,8 @@ func TestEnvelopeCaching(t *testing.T) {
 					}
 				}
 			}
-			if int(envelopeService.decryptCalls) != tt.expectedDecryptCalls {
-				t.Fatalf("expected %d decrypt calls, got %d", tt.expectedDecryptCalls, envelopeService.decryptCalls)
+			if int(envelopeService.decryptCalls.Load()) != tt.expectedDecryptCalls {
+				t.Fatalf("expected %d decrypt calls, got %d", tt.expectedDecryptCalls, envelopeService.decryptCalls.Load())
 			}
 		})
 	}
