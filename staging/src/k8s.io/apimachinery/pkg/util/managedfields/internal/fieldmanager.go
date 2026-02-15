@@ -39,6 +39,7 @@ const DefaultMaxUpdateManagers int = 10
 const DefaultTrackOnCreateProbability float32 = 1
 
 var atMostEverySecond = NewAtMostEvery(time.Second)
+var atMostEverySecondRestore = NewAtMostEvery(time.Second)
 
 // FieldManager updates the managed fields and merges applied
 // configurations.
@@ -140,11 +141,26 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 }
 
 // UpdateNoErrors is the same as Update, but it will not return
-// errors. If an error happens, the object is returned with
+// errors. If an error happens, we try to preserve the managedFields from
+// liveObj. If that is not possible the object is returned with
 // managedFields cleared.
 func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager string) runtime.Object {
 	obj, err := f.Update(liveObj, newObj, manager)
 	if err != nil {
+		// Preserve the managedFields from the live object rather than
+		// stripping them entirely, to avoid silent data loss when the
+		// managedFields update fails (e.g. due to an unavailable
+		// conversion webhook).
+		if liveAccessor, err := meta.Accessor(liveObj); err == nil {
+			if newAccessor, err := meta.Accessor(newObj); err == nil {
+				atMostEverySecondRestore.Do(func() {
+					klog.ErrorS(err, "[SHOULD NOT HAPPEN] failed to update managedFields (restored previous managedFields from live object)", "versionKind",
+						newObj.GetObjectKind().GroupVersionKind(), "namespace", newAccessor.GetNamespace(), "name", newAccessor.GetName())
+				})
+				newAccessor.SetManagedFields(liveAccessor.GetManagedFields())
+				return newObj
+			}
+		}
 		atMostEverySecond.Do(func() {
 			ns, name := "unknown", "unknown"
 			if accessor, err := meta.Accessor(newObj); err == nil {
