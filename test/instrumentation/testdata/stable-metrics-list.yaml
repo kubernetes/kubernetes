@@ -256,6 +256,46 @@
   labels:
   - deprecated_version
   - stability_level
+- name: goroutines
+  subsystem: scheduler
+  help: Number of running goroutines split by the work they do such as binding.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - operation
+- name: permit_wait_duration_seconds
+  subsystem: scheduler
+  help: Duration of waiting on permit.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: plugin_evaluation_total
+  subsystem: scheduler
+  help: Number of attempts to schedule pods by each plugin and the extension point
+    (available only in PreFilter, Filter, PreScore, and Score).
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - extension_point
+  - plugin
+  - profile
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
@@ -285,6 +325,16 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: unschedulable_pods
+  subsystem: scheduler
+  help: The number of unschedulable pods broken down by plugin name. A pod will increment
+    the gauge for all plugins that caused it to not schedule and so this metric have
+    meaning only when broken down by plugin.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - plugin
+  - profile
 - name: adds_total
   subsystem: workqueue
   help: Total number of adds handled by workqueue
