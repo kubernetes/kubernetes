@@ -574,7 +574,7 @@ func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect [
 
 	for _, v := range crd.Crd.Spec.Versions {
 		if err := waitForDefinition(f.ClientSet, definitionName(crd, v.Name), expect); err != nil {
-			return nil, fmt.Errorf("%v", err)
+			return nil, fmt.Errorf("%w", err)
 		}
 	}
 	return crd, nil
@@ -585,7 +585,7 @@ func cleanupCRD(ctx context.Context, f *framework.Framework, crd *crd.TestCrd) e
 	for _, v := range crd.Crd.Spec.Versions {
 		name := definitionName(crd, v.Name)
 		if err := waitForDefinitionCleanup(f.ClientSet, name); err != nil {
-			return fmt.Errorf("%v", err)
+			return fmt.Errorf("%w", err)
 		}
 	}
 	return nil

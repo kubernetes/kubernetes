@@ -591,17 +591,17 @@ func getPodFromStandaloneKubelet(ctx context.Context, podNamespace string, podNa
 
 	if resp.StatusCode != 200 {
 		framework.Logf("/pods response status not 200. Response was: %+v", resp)
-		return nil, fmt.Errorf("/pods response was not 200: %v", err)
+		return nil, fmt.Errorf("/pods response was not 200: %w", err)
 	}
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("/pods response was unable to be read: %v", err)
+		return nil, fmt.Errorf("/pods response was unable to be read: %w", err)
 	}
 
 	pods, err := decodePods(respBody)
 	if err != nil {
-		return nil, fmt.Errorf("unable to decode /pods: %v", err)
+		return nil, fmt.Errorf("unable to decode /pods: %w", err)
 	}
 
 	for _, p := range pods.Items {

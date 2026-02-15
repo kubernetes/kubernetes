@@ -955,7 +955,7 @@ func waitForScaleUpStatus(ctx context.Context, c clientset.Interface, cond func(
 		return cond(status), nil
 	})
 	if err != nil {
-		err = fmt.Errorf("failed to find expected scale up status: %v, last status: %v, final err: %v", err, status, finalErr)
+		err = fmt.Errorf("failed to find expected scale up status: %v, last status: %v, final err: %w", err, status, finalErr)
 	}
 	return status, err
 }

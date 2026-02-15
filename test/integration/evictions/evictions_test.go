@@ -163,7 +163,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	close(errCh)
 	var errList []error
 	if err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).Delete(context.TODO(), pdb.Name, deleteOption); err != nil {
-		errList = append(errList, fmt.Errorf("Failed to delete PodDisruptionBudget: %v", err))
+		errList = append(errList, fmt.Errorf("Failed to delete PodDisruptionBudget: %w", err))
 	}
 	for err := range errCh {
 		errList = append(errList, err)

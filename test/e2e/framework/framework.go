@@ -581,7 +581,7 @@ func (f *Framework) CreateNamespace(ctx context.Context, baseName string, labels
 		// is patched with the secret and can then be referenced by all the pods spawned by E2E process, and repository authentication should be successful.
 		secret, err := f.createSecretFromDockerConfig(ctx, ns.Name)
 		if err != nil {
-			return ns, fmt.Errorf("failed to create secret from docker config file: %v", err)
+			return ns, fmt.Errorf("failed to create secret from docker config file: %w", err)
 		}
 
 		serviceAccountClient := f.ClientSet.CoreV1().ServiceAccounts(ns.Name)
@@ -612,7 +612,7 @@ func firstNonEmptyPSaLevelOrRestricted(levelConfig ...admissionapi.Level) string
 func (f *Framework) createSecretFromDockerConfig(ctx context.Context, namespace string) (*v1.Secret, error) {
 	contents, err := os.ReadFile(TestContext.E2EDockerConfigFile)
 	if err != nil {
-		return nil, fmt.Errorf("error reading docker config file: %v", err)
+		return nil, fmt.Errorf("error reading docker config file: %w", err)
 	}
 
 	secretObject := &v1.Secret{

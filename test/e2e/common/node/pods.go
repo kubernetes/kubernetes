@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"runtime/debug"
@@ -584,7 +585,7 @@ var _ = SIGDescribe("Pods", func() {
 			for {
 				var msg []byte
 				if err := websocket.Message.Receive(ws, &msg); err != nil {
-					if err == io.EOF {
+					if errors.Is(err, io.EOF) {
 						break
 					}
 					framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
@@ -665,7 +666,7 @@ var _ = SIGDescribe("Pods", func() {
 		for {
 			var msg []byte
 			if err := websocket.Message.Receive(ws, &msg); err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)

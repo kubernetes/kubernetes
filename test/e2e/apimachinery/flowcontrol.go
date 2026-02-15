@@ -769,7 +769,7 @@ func getPriorityLevelNominalConcurrency(ctx context.Context, c clientset.Interfa
 		var v model.Vector
 		err := sampleDecoder.Decode(&v)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return 0, err

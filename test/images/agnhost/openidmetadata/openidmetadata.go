@@ -186,7 +186,7 @@ func withInClusterOauth2Client(ctx context.Context) (context.Context, error) {
 
 	rt, err := rest.TransportFor(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("could not get roundtripper: %v", err)
+		return nil, fmt.Errorf("could not get roundtripper: %w", err)
 	}
 
 	return context.WithValue(ctx,

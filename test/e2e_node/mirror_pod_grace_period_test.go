@@ -143,7 +143,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				gomega.Eventually(ctx, func(ctx context.Context) error {
 					podList, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
 					if err != nil {
-						return fmt.Errorf("failed listing pods while waiting for all pods to be terminated: %v", err)
+						return fmt.Errorf("failed listing pods while waiting for all pods to be terminated: %w", err)
 					}
 					var remainingPods []string
 
@@ -320,7 +320,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				gomega.Eventually(ctx, func(ctx context.Context) error {
 					_, _, err := getCRIClient()
 					if err != nil {
-						return fmt.Errorf("error getting cri client: %v", err)
+						return fmt.Errorf("error getting cri client: %w", err)
 					}
 					return nil
 				}, 2*time.Minute, time.Second*5).Should(gomega.Succeed())

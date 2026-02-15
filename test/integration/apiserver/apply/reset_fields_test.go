@@ -448,7 +448,7 @@ func expectConflict(objRet *unstructured.Unstructured, err error, dynamicClient 
 			Namespace(namespace).
 			Get(context.TODO(), name, metav1.GetOptions{})
 		if err2 != nil {
-			return fmt.Errorf("instead got error %w, and failed to Get object: %v", err, err2)
+			return fmt.Errorf("instead got error %w, and failed to Get object: %w", err, err2)
 		}
 	}
 	marshBytes, marshErr := json.Marshal(objRet)

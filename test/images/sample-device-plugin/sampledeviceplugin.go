@@ -58,12 +58,12 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]*pluginapi.Devi
 
 			// clean first
 			if err := os.RemoveAll(fpath); err != nil {
-				return nil, fmt.Errorf("failed to clean fake device file from previous run: %s", err)
+				return nil, fmt.Errorf("failed to clean fake device file from previous run: %w", err)
 			}
 
 			f, err := os.Create(fpath)
 			if err != nil && !os.IsExist(err) {
-				return nil, fmt.Errorf("failed to create fake device file: %s", err)
+				return nil, fmt.Errorf("failed to create fake device file: %w", err)
 			}
 
 			f.Close()
@@ -244,7 +244,7 @@ func createCDIFile(logger klog.Logger, devs []*pluginapi.Device) error {
 	}
 	content += "]}"
 	if err := os.WriteFile(cdiPath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to create CDI file: %s", err)
+		return fmt.Errorf("failed to create CDI file: %w", err)
 	}
 	logger.Info("Created CDI file", "path", cdiPath, "devices", devs)
 	return nil

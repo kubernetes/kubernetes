@@ -108,7 +108,7 @@ func (a *APIServer) Start(ctx context.Context) error {
 			return
 		}
 		if errs := completedOptions.Validate(); len(errs) != 0 {
-			errCh <- fmt.Errorf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
+			errCh <- fmt.Errorf("failed to validate ServerRunOptions: %w", utilerrors.NewAggregate(errs))
 			return
 		}
 

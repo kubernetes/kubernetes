@@ -409,7 +409,7 @@ func TestPodCreateEphemeralContainers(t *testing.T) {
 func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, containers []v1.EphemeralContainer) (*v1.Pod, error) {
 	result, err := podsClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pod: %v", err)
+		return nil, fmt.Errorf("failed to create pod: %w", err)
 	}
 
 	if len(containers) == 0 {
@@ -418,12 +418,12 @@ func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, cont
 
 	pod.Spec.EphemeralContainers = containers
 	if _, err := podsClient.Update(context.TODO(), pod, metav1.UpdateOptions{}); err == nil {
-		return nil, fmt.Errorf("unexpected allowed direct update of ephemeral containers during set up: %v", err)
+		return nil, fmt.Errorf("unexpected allowed direct update of ephemeral containers during set up: %w", err)
 	}
 
 	result, err = podsClient.UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update ephemeral containers for test case set up: %v", err)
+		return nil, fmt.Errorf("failed to update ephemeral containers for test case set up: %w", err)
 	}
 
 	return result, nil

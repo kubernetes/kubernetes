@@ -532,7 +532,7 @@ func parseResourceVersion(response []byte) (string, float64, error) {
 	var resultBodyMap map[string]interface{}
 	err := json.Unmarshal(response, &resultBodyMap)
 	if err != nil {
-		return "", 0, fmt.Errorf("unexpected error unmarshaling resultBody: %v", err)
+		return "", 0, fmt.Errorf("unexpected error unmarshaling resultBody: %w", err)
 	}
 	metadata, ok := resultBodyMap["metadata"].(map[string]interface{})
 	if !ok {
@@ -548,7 +548,7 @@ func parseResourceVersion(response []byte) (string, float64, error) {
 	}
 	resourceVersion, err := strconv.ParseFloat(resourceVersionString, 64)
 	if err != nil {
-		return "", 0, fmt.Errorf("unexpected error, could not parse resourceVersion as float64, err: %s. JSON response: %v", err, string(response))
+		return "", 0, fmt.Errorf("unexpected error, could not parse resourceVersion as float64, err: %w. JSON response: %v", err, string(response))
 	}
 	return id, resourceVersion, nil
 }

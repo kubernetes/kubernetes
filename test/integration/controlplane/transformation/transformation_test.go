@@ -305,12 +305,12 @@ func (e *transformTest) createEncryptionConfig() (
 ) {
 	tempDir, err := os.MkdirTemp("", "secrets-encryption-test")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %v", err)
+		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
 	if err = os.WriteFile(filepath.Join(tempDir, encryptionConfigFileName), []byte(e.transformerConfig), 0644); err != nil {
 		os.RemoveAll(tempDir)
-		return tempDir, fmt.Errorf("error while writing encryption config: %v", err)
+		return tempDir, fmt.Errorf("error while writing encryption config: %w", err)
 	}
 
 	return tempDir, nil
@@ -320,7 +320,7 @@ func (e *transformTest) getEncryptionConfig() (*apiserverv1.ProviderConfiguratio
 	var config apiserverv1.EncryptionConfiguration
 	err := yaml.Unmarshal([]byte(e.transformerConfig), &config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract transformer key: %v", err)
+		return nil, fmt.Errorf("failed to extract transformer key: %w", err)
 	}
 
 	return &config.Resources[0].Providers[0], nil
@@ -358,7 +358,7 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 		},
 	}
 	if _, err := e.restClient.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-		return nil, fmt.Errorf("error while writing secret: %v", err)
+		return nil, fmt.Errorf("error while writing secret: %w", err)
 	}
 
 	return secret, nil
@@ -375,7 +375,7 @@ func (e *transformTest) createConfigMap(name, namespace string) (*corev1.ConfigM
 		},
 	}
 	if _, err := e.restClient.CoreV1().ConfigMaps(cm.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
-		return nil, fmt.Errorf("error while writing configmap: %v", err)
+		return nil, fmt.Errorf("error while writing configmap: %w", err)
 	}
 
 	return cm, nil
@@ -403,7 +403,7 @@ func (e *transformTest) createJob(name, namespace string) (*batchv1.Job, error) 
 		},
 	}
 	if _, err := e.restClient.BatchV1().Jobs(job.Namespace).Create(context.TODO(), job, metav1.CreateOptions{}); err != nil {
-		return nil, fmt.Errorf("error while creating job: %v", err)
+		return nil, fmt.Errorf("error while creating job: %w", err)
 	}
 
 	return job, nil
@@ -448,7 +448,7 @@ func (e *transformTest) createDeployment(name, namespace string) (*appsv1.Deploy
 		},
 	}
 	if _, err := e.restClient.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{}); err != nil {
-		return nil, fmt.Errorf("error while creating deployment: %v", err)
+		return nil, fmt.Errorf("error while creating deployment: %w", err)
 	}
 
 	return deployment, nil
@@ -490,7 +490,7 @@ func (e *transformTest) createPod(namespace string, dynamicInterface dynamic.Int
 	podGVR := gvr("", "v1", "pods")
 	pod, err := createResource(dynamicInterface, podGVR, namespace)
 	if err != nil {
-		return nil, fmt.Errorf("error while writing pod: %v", err)
+		return nil, fmt.Errorf("error while writing pod: %w", err)
 	}
 	return pod, nil
 }
@@ -508,7 +508,7 @@ func (e *transformTest) inplaceUpdatePod(namespace string, obj *unstructured.Uns
 	podGVR := gvr("", "v1", "pods")
 	pod, err := inplaceUpdateResource(dynamicInterface, podGVR, namespace, obj)
 	if err != nil {
-		return nil, fmt.Errorf("error while writing pod: %v", err)
+		return nil, fmt.Errorf("error while writing pod: %w", err)
 	}
 	return pod, nil
 }
@@ -516,7 +516,7 @@ func (e *transformTest) inplaceUpdatePod(namespace string, obj *unstructured.Uns
 func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetResponse, error) {
 	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create etcd client: %v", err)
+		return nil, fmt.Errorf("failed to create etcd client: %w", err)
 	}
 	// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
 	// close the client (which we can do by closing rawClient).
@@ -524,7 +524,7 @@ func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetRespons
 
 	response, err := etcdClient.Get(context.Background(), path, clientv3.WithPrefix())
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve secret from etcd %v", err)
+		return nil, fmt.Errorf("failed to retrieve secret from etcd %w", err)
 	}
 
 	return response, nil
@@ -533,7 +533,7 @@ func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetRespons
 func (e *transformTest) writeRawRecordToETCD(path string, data []byte) (*clientv3.PutResponse, error) {
 	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create etcd client: %v", err)
+		return nil, fmt.Errorf("failed to create etcd client: %w", err)
 	}
 	// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
 	// close the client (which we can do by closing rawClient).
@@ -541,7 +541,7 @@ func (e *transformTest) writeRawRecordToETCD(path string, data []byte) (*clientv
 
 	response, err := etcdClient.Put(context.Background(), path, string(data))
 	if err != nil {
-		return nil, fmt.Errorf("failed to write secret to etcd %v", err)
+		return nil, fmt.Errorf("failed to write secret to etcd %w", err)
 	}
 
 	return response, nil
@@ -551,7 +551,7 @@ func (e *transformTest) printMetrics() error {
 	e.Logf("Transformation Metrics:")
 	metrics, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
-		return fmt.Errorf("failed to gather metrics: %s", err)
+		return fmt.Errorf("failed to gather metrics: %w", err)
 	}
 
 	for _, mf := range metrics {
@@ -632,7 +632,7 @@ func mustNotHaveLivez(t kubeapiservertesting.Logger, checkName, wantBodyContains
 func getHealthz(checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
 	client, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to create a client: %v", err)
+		return "", false, fmt.Errorf("failed to create a client: %w", err)
 	}
 
 	req := client.CoreV1().RESTClient().Get().AbsPath(fmt.Sprintf("/healthz%v", checkName)).Param("verbose", "true")
@@ -646,7 +646,7 @@ func getHealthz(checkName string, clientConfig *rest.Config, excludes ...string)
 func getLivez(checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
 	client, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to create a client: %v", err)
+		return "", false, fmt.Errorf("failed to create a client: %w", err)
 	}
 
 	req := client.CoreV1().RESTClient().Get().AbsPath(fmt.Sprintf("/livez%v", checkName)).Param("verbose", "true")

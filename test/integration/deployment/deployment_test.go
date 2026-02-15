@@ -1280,7 +1280,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		newRS, err = testutil.GetNewReplicaSet(tester.deployment, c)
 		if err != nil {
-			return false, fmt.Errorf("failed to get new replicaset of deployment %q after orphaning: %v", deploymentName, err)
+			return false, fmt.Errorf("failed to get new replicaset of deployment %q after orphaning: %w", deploymentName, err)
 		}
 		return newRS != nil, nil
 	}); err != nil {

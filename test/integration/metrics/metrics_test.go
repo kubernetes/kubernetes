@@ -55,7 +55,7 @@ func scrapeMetrics(s *kubeapiservertesting.TestServer) (testutil.Metrics, error)
 
 	body, err := client.RESTClient().Get().AbsPath("metrics").DoRaw(context.TODO())
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	metrics := testutil.NewMetrics()
 	err = testutil.ParseMetrics(string(body), &metrics)

@@ -1026,7 +1026,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 		revs, err := clientset.AppsV1().ControllerRevisions(ds.Namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
-			return false, fmt.Errorf("failed to list controllerrevision: %v", err)
+			return false, fmt.Errorf("failed to list controllerrevision: %w", err)
 		}
 		if revs.Size() == 0 {
 			return false, fmt.Errorf("no avaialable controllerrevision")

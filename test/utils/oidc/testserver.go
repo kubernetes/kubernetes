@@ -73,7 +73,7 @@ func (ts *TestServer) URL() string {
 func (ts *TestServer) TokenURL() (string, error) {
 	url, err := url.JoinPath(ts.httpServer.URL, tokenWebPath)
 	if err != nil {
-		return "", fmt.Errorf("error joining paths: %v", err)
+		return "", fmt.Errorf("error joining paths: %w", err)
 	}
 
 	return url, nil

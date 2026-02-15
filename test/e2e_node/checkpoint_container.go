@@ -20,6 +20,7 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -289,7 +290,7 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 			tr := tar.NewReader(fileReader)
 			for {
 				hdr, err := tr.Next()
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					// End of archive
 					break
 				}

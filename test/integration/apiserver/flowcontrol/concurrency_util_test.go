@@ -18,6 +18,7 @@ package flowcontrol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -324,11 +325,11 @@ func getRequestMetricsSnapshot(c clientset.Interface) (metricSnapshot, error) {
 	for {
 		var v model.Vector
 		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// Expected loop termination condition.
 				return snapshot, nil
 			}
-			return nil, fmt.Errorf("failed decoding metrics: %v", err)
+			return nil, fmt.Errorf("failed decoding metrics: %w", err)
 		}
 		for _, metric := range v {
 			plLabel := string(metric.Metric[labelPriorityLevel])

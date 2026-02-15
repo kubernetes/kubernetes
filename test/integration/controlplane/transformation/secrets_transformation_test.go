@@ -663,17 +663,17 @@ func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx va
 
 	block, err := newAESCipher(transformerConfig.AESGCM.Keys[0].Secret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create block cipher: %v", err)
+		return nil, fmt.Errorf("failed to create block cipher: %w", err)
 	}
 
 	gcmTransformer, err := aestransformer.NewGCMTransformer(block)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create transformer from block: %v", err)
+		return nil, fmt.Errorf("failed to create transformer from block: %w", err)
 	}
 
 	clearText, _, err := gcmTransformer.TransformFromStorage(ctx, cipherText, dataCtx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decypt secret: %v", err)
+		return nil, fmt.Errorf("failed to decypt secret: %w", err)
 	}
 
 	return clearText, nil
@@ -691,7 +691,7 @@ func unSealWithCBCTransformer(ctx context.Context, cipherText []byte, dataCtx va
 
 	clearText, _, err := cbcTransformer.TransformFromStorage(ctx, cipherText, dataCtx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decypt secret: %v", err)
+		return nil, fmt.Errorf("failed to decypt secret: %w", err)
 	}
 
 	return clearText, nil
@@ -700,12 +700,12 @@ func unSealWithCBCTransformer(ctx context.Context, cipherText []byte, dataCtx va
 func newAESCipher(key string) (cipher.Block, error) {
 	k, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode config secret: %v", err)
+		return nil, fmt.Errorf("failed to decode config secret: %w", err)
 	}
 
 	block, err := aes.NewCipher(k)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create AES cipher: %v", err)
+		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
 
 	return block, nil

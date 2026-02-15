@@ -540,7 +540,7 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 				strings.ContainsAny(item.Value, ",:") {
 				dataFile, err := os.CreateTemp("", "metadata")
 				if err != nil {
-					return "", fmt.Errorf("unable to create temp file %v", err)
+					return "", fmt.Errorf("unable to create temp file %w", err)
 				}
 				defer os.Remove(dataFile.Name()) // clean up
 				if err = dataFile.Close(); err != nil {
@@ -548,7 +548,7 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 				}
 
 				if err = os.WriteFile(dataFile.Name(), []byte(item.Value), 0666); err != nil {
-					return "", fmt.Errorf("could not write contents of metadata item into file %v", err)
+					return "", fmt.Errorf("could not write contents of metadata item into file %w", err)
 				}
 				itemFileArgs = append(itemFileArgs, item.Key+"="+dataFile.Name())
 			} else {
@@ -753,7 +753,7 @@ func (g *GCERunner) rebootInstance(instance *gceInstance) error {
 
 		return false, nil
 	}); waitErr != nil {
-		return fmt.Errorf("the instance %s still response to SSH: %v", instance.Name, waitErr)
+		return fmt.Errorf("the instance %s still response to SSH: %w", instance.Name, waitErr)
 	}
 
 	// wait until the instance will response again to SSH

@@ -299,7 +299,7 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 	}
 	formatted := &bytes.Buffer{}
 	if err := json.Indent(formatted, b, "", "  "); err != nil {
-		return fmt.Errorf("indenting error: %v", err)
+		return fmt.Errorf("indenting error: %w", err)
 	}
 	return os.WriteFile(destFile, formatted.Bytes(), 0644)
 }

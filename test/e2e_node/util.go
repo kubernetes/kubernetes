@@ -159,7 +159,7 @@ func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResour
 	defer cancel()
 	resp, err := client.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
 	if err != nil {
-		return nil, fmt.Errorf("%v.Get(_) = _, %v", client, err)
+		return nil, fmt.Errorf("%v.Get(_) = _, %w", client, err)
 	}
 	return resp, nil
 }
@@ -498,7 +498,7 @@ func waitForAllContainerRemoval(ctx context.Context, podName, podNS string) {
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("got error waiting for all containers to be removed from CRI: %v", err)
+			return fmt.Errorf("got error waiting for all containers to be removed from CRI: %w", err)
 		}
 
 		if len(containers) > 0 {

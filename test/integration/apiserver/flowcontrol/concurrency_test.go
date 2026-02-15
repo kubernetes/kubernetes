@@ -18,6 +18,7 @@ package flowcontrol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -184,11 +185,11 @@ func getNominalConcurrencyOfPriorityLevel(c clientset.Interface) (map[string]int
 	for {
 		var v model.Vector
 		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// Expected loop termination condition.
 				return concurrency, nil
 			}
-			return nil, fmt.Errorf("failed decoding metrics: %v", err)
+			return nil, fmt.Errorf("failed decoding metrics: %w", err)
 		}
 		for _, metric := range v {
 			switch name := string(metric.Metric[model.MetricNameLabel]); name {
@@ -216,11 +217,11 @@ func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, map[
 	for {
 		var v model.Vector
 		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// Expected loop termination condition.
 				return allReqCounts, rejectReqCounts, nil
 			}
-			return nil, nil, fmt.Errorf("failed decoding metrics: %v", err)
+			return nil, nil, fmt.Errorf("failed decoding metrics: %w", err)
 		}
 		for _, metric := range v {
 			switch name := string(metric.Metric[model.MetricNameLabel]); name {

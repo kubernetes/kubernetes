@@ -671,7 +671,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	podClient := clientSet.CoreV1().Pods(namespace)
 	pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return false, fmt.Errorf("Failed to list pods: %v", err)
+		return false, fmt.Errorf("Failed to list pods: %w", err)
 	}
 	var ret = true
 	if len(pods.Items) != podNum {
@@ -680,7 +680,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	}
 	rcs, err := rcClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return false, fmt.Errorf("Failed to list replication controllers: %v", err)
+		return false, fmt.Errorf("Failed to list replication controllers: %w", err)
 	}
 	if len(rcs.Items) != rcNum {
 		ret = false

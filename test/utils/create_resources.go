@@ -79,7 +79,7 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %w", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -96,7 +96,7 @@ func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *a
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %w", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -113,7 +113,7 @@ func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *a
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %w", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -130,7 +130,7 @@ func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.S
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %w", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -147,7 +147,7 @@ func CreatePersistentVolumeWithRetries(c clientset.Interface, obj *v1.Persistent
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %w", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -164,7 +164,7 @@ func CreatePersistentVolumeClaimWithRetries(c clientset.Interface, namespace str
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %w", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }

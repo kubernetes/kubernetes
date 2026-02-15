@@ -208,10 +208,10 @@ func authInterceptor(creds *CSICreds, req interface{}) error {
 	if creds != nil {
 		authenticated, authErr := isAuthenticated(req, creds)
 		if !authenticated {
-			if authErr == ErrNoCredentials {
+			if errors.Is(authErr, ErrNoCredentials) {
 				return status.Error(codes.InvalidArgument, authErr.Error())
 			}
-			if authErr == ErrAuthFailed {
+			if errors.Is(authErr, ErrAuthFailed) {
 				return status.Error(codes.Unauthenticated, authErr.Error())
 			}
 		}

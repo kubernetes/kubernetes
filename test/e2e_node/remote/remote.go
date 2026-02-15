@@ -72,7 +72,7 @@ func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string
 	klog.V(2).Infof("Building archive...")
 	tardir, err := os.MkdirTemp("", "node-e2e-archive")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temporary directory %v", err)
+		return "", fmt.Errorf("failed to create temporary directory %w", err)
 	}
 	defer os.RemoveAll(tardir)
 
@@ -95,7 +95,7 @@ func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string
 
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get working directory %v", err)
+		return "", fmt.Errorf("failed to get working directory %w", err)
 	}
 	return filepath.Join(dir, archiveName), nil
 }

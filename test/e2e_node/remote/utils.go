@@ -114,7 +114,7 @@ func setupCNI(host, workspace string) error {
 		fmt.Sprintf("curl -s -L %s | tar -xz -C %s", getCNIURL(), cniPath),
 	)
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
-		return fmt.Errorf("failed to install cni plugin on %q: %v output: %q", host, err, output)
+		return fmt.Errorf("failed to install cni plugin on %q: %w output: %q", host, err, output)
 	}
 
 	// The added CNI network config is not needed for kubenet. It is only
@@ -127,7 +127,7 @@ func setupCNI(host, workspace string) error {
 		fmt.Sprintf("echo %s > %s", quote(cniConfig), filepath.Join(cniConfigPath, "mynet.conf")),
 	)
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
-		return fmt.Errorf("failed to write cni configuration on %q: %v output: %q", host, err, output)
+		return fmt.Errorf("failed to write cni configuration on %q: %w output: %q", host, err, output)
 	}
 	return nil
 }
@@ -147,7 +147,7 @@ func setupECRCredentialProvider(host, workspace string) error {
 		fmt.Sprintf("chmod a+x %s/ecr-credential-provider", workspace),
 	)
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
-		return fmt.Errorf("failed to install ecr-credential-provider plugin on %q: %v output: %q", host, err, output)
+		return fmt.Errorf("failed to install ecr-credential-provider plugin on %q: %w output: %q", host, err, output)
 	}
 	return nil
 }
@@ -168,7 +168,7 @@ func configureCredentialProvider(host, workspace string) error {
 		fmt.Sprintf("echo %s > %s", quote(credentialProviderConfig), filepath.Join(workspace, "credential-provider.yaml")),
 	)
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
-		return fmt.Errorf("failed to write credential provider configuration on %q: %v output: %q", host, err, output)
+		return fmt.Errorf("failed to write credential provider configuration on %q: %w output: %q", host, err, output)
 	}
 
 	return nil
@@ -190,7 +190,7 @@ func configureFirewall(host string) error {
 	)
 	output, err := SSH(host, "sh", "-c", cmd)
 	if err != nil {
-		return fmt.Errorf("failed to configured firewall on %q: %v output: %v", host, err, output)
+		return fmt.Errorf("failed to configured firewall on %q: %w output: %v", host, err, output)
 	}
 	return nil
 }

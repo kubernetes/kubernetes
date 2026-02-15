@@ -151,12 +151,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				v1alphaPodResources, err = getV1alpha1NodeDevices(ctx)
 				if err != nil {
-					return fmt.Errorf("failed to get node local podresources by accessing the (v1alpha) podresources API endpoint: %v", err)
+					return fmt.Errorf("failed to get node local podresources by accessing the (v1alpha) podresources API endpoint: %w", err)
 				}
 
 				v1PodResources, err = getV1NodeDevices(ctx)
 				if err != nil {
-					return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %v", err)
+					return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %w", err)
 				}
 
 				if len(v1alphaPodResources.PodResources) > 0 {
@@ -810,7 +810,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				v1PodResources, err = getV1NodeDevices(ctx)
 				if err != nil {
-					return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %v", err)
+					return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %w", err)
 				}
 
 				if len(v1PodResources.PodResources) > 0 {

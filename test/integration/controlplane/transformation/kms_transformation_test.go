@@ -100,14 +100,14 @@ func (r envelope) cipherTextPayload() []byte {
 func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
 	block, err := aes.NewCipher(r.plainTextDEK)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize AES Cipher: %v", err)
+		return nil, fmt.Errorf("failed to initialize AES Cipher: %w", err)
 	}
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
 	ctx := context.Background()
 	dataCtx := value.DefaultContext([]byte(secretETCDPath))
 	aesgcmTransformer, err := aestransformer.NewGCMTransformer(block)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create transformer from block: %v", err)
+		return nil, fmt.Errorf("failed to create transformer from block: %w", err)
 	}
 	plainSecret, _, err := aesgcmTransformer.TransformFromStorage(ctx, r.cipherTextPayload(), dataCtx)
 	if err != nil {

@@ -103,7 +103,7 @@ func RunCustomEtcd(logger klog.Logger, dataDir string, customFlags []string) (ur
 	etcdPath, err := getEtcdPath()
 	if err != nil {
 		fmt.Fprint(os.Stderr, installEtcd)
-		return "", nil, fmt.Errorf("could not find etcd in PATH: %v", err)
+		return "", nil, fmt.Errorf("could not find etcd in PATH: %w", err)
 	}
 	etcdDataDir, err := os.MkdirTemp(os.TempDir(), dataDir)
 	if err != nil {
@@ -171,7 +171,7 @@ func RunCustomEtcd(logger klog.Logger, dataDir string, customFlags []string) (ur
 				// Try to parse as JSON object. If we get anything that isn't JSON or an object, we just dump the remaining output.
 				var msg map[string]any
 				err := dec.Decode(&msg)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					// all done
 					break
 				}
@@ -226,7 +226,7 @@ func RunCustomEtcd(logger klog.Logger, dataDir string, customFlags []string) (ur
 	}
 
 	if err := cmd.Start(); err != nil {
-		return "", nil, fmt.Errorf("failed to run etcd: %v", err)
+		return "", nil, fmt.Errorf("failed to run etcd: %w", err)
 	}
 
 	var i int32 = 1

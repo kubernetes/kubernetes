@@ -173,7 +173,7 @@ func (client *closeWaitClient) Run(logger *log.Logger, rawOptions interface{}) e
 	buf := make([]byte, 1, 1)
 	size, err := conn.Read(buf)
 
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 

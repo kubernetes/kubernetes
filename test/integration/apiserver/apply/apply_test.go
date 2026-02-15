@@ -3043,14 +3043,14 @@ func createNamespace(client clientset.Interface, name string) error {
 	namespace := v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	namespaceBytes, err := yaml.Marshal(namespace)
 	if err != nil {
-		return fmt.Errorf("Failed to marshal namespace: %v", err)
+		return fmt.Errorf("Failed to marshal namespace: %w", err)
 	}
 	_, err = client.CoreV1().RESTClient().Get().
 		Resource("namespaces").
 		SetHeader("Content-Type", "application/yaml").
 		Body(namespaceBytes).Do(context.TODO()).Get()
 	if err != nil {
-		return fmt.Errorf("Failed to create namespace: %v", err)
+		return fmt.Errorf("Failed to create namespace: %w", err)
 	}
 	return nil
 }

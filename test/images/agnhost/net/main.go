@@ -134,7 +134,7 @@ func executeRunner(name string, rawOptions string) (logOutput, error) {
 	if ok {
 		options := runner.NewOptions()
 		if err := json.Unmarshal([]byte(rawOptions), options); err != nil {
-			return logOutput{}, fmt.Errorf("Invalid options JSON: %v", err)
+			return logOutput{}, fmt.Errorf("Invalid options JSON: %w", err)
 		}
 
 		log.Printf("Options: %+v", options)

@@ -353,7 +353,7 @@ func generateOutput(b *testing.B, config loadGeneratorConfig, files ...*os.File)
 			buffer := make([]byte, max)
 			actual, err := file.Read(buffer)
 			if err != nil {
-				if err != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					b.Fatal(err)
 				}
 				buffer = nil

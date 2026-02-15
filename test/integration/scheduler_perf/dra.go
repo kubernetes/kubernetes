@@ -109,7 +109,7 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 	create := func(i int) {
 		err := func() error {
 			if _, err := tCtx.Client().ResourceV1().ResourceClaims(op.Namespace).Create(tCtx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
-				return fmt.Errorf("create claim: %v", err)
+				return fmt.Errorf("create claim: %w", err)
 			}
 			return nil
 		}()

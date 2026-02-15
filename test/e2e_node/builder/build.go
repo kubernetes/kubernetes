@@ -59,7 +59,7 @@ func BuildTargets(cgo bool) error {
 	klog.Infof("Building k8s binaries...")
 	k8sRoot, err := utils.GetK8sRootDir()
 	if err != nil {
-		return fmt.Errorf("failed to locate kubernetes root directory %v", err)
+		return fmt.Errorf("failed to locate kubernetes root directory %w", err)
 	}
 	targets := buildCGOTargets
 	if !cgo {
@@ -84,7 +84,7 @@ func BuildTargets(cgo bool) error {
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to build go packages %v", err)
+		return fmt.Errorf("failed to build go packages %w", err)
 	}
 	return nil
 }

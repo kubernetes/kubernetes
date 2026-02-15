@@ -346,7 +346,7 @@ func (config *DeploymentConfig) create() error {
 	config.applyTo(&deployment.Spec.Template)
 
 	if err := CreateDeploymentWithRetries(config.Client, config.Namespace, deployment); err != nil {
-		return fmt.Errorf("error creating deployment: %v", err)
+		return fmt.Errorf("error creating deployment: %w", err)
 	}
 	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, ptr.Deref(deployment.Spec.Replicas, 0))
 	return nil
@@ -417,7 +417,7 @@ func (config *ReplicaSetConfig) create() error {
 	config.applyTo(&rs.Spec.Template)
 
 	if err := CreateReplicaSetWithRetries(config.Client, config.Namespace, rs); err != nil {
-		return fmt.Errorf("error creating replica set: %v", err)
+		return fmt.Errorf("error creating replica set: %w", err)
 	}
 	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, ptr.Deref(rs.Spec.Replicas, 0))
 	return nil
@@ -497,7 +497,7 @@ func (config *RCConfig) create() error {
 	config.applyTo(rc.Spec.Template)
 
 	if err := CreateRCWithRetries(config.Client, config.Namespace, rc); err != nil {
-		return fmt.Errorf("error creating replication controller: %v", err)
+		return fmt.Errorf("error creating replication controller: %w", err)
 	}
 	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, ptr.Deref(rc.Spec.Replicas, 0))
 	return nil
@@ -1151,7 +1151,7 @@ func MakePodSpec() v1.PodSpec {
 
 func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1.Pod) error {
 	if err := CreatePodWithRetries(client, namespace, podTemplate); err != nil {
-		return fmt.Errorf("error creating pod: %v", err)
+		return fmt.Errorf("error creating pod: %w", err)
 	}
 	return nil
 }
@@ -1224,7 +1224,7 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		if err := CreatePersistentVolumeClaimWithRetries(client, namespace, pvc); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error creating PVC: %s", err)
+			createError = fmt.Errorf("error creating PVC: %w", err)
 			return
 		}
 
@@ -1232,21 +1232,21 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		if _, err := client.CoreV1().PersistentVolumeClaims(namespace).UpdateStatus(ctx, pvc, metav1.UpdateOptions{}); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error updating PVC status: %s", err)
+			createError = fmt.Errorf("error updating PVC status: %w", err)
 			return
 		}
 
 		if err := CreatePersistentVolumeWithRetries(client, pv); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error creating PV: %s", err)
+			createError = fmt.Errorf("error creating PV: %w", err)
 			return
 		}
 		// We need to update statuses separately, as creating pv/pvc resets status to the default one.
 		if _, err := client.CoreV1().PersistentVolumes().UpdateStatus(ctx, pv, metav1.UpdateOptions{}); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error updating PV status: %s", err)
+			createError = fmt.Errorf("error updating PV status: %w", err)
 			return
 		}
 
@@ -1255,7 +1255,7 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		if err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error getting pod template: %s", err)
+			createError = fmt.Errorf("error getting pod template: %w", err)
 			return
 		}
 		pod = pod.DeepCopy()

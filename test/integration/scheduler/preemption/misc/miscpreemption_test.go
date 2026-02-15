@@ -963,11 +963,11 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 			init: func() error {
 				_, err := testutils.CreatePV(cs, pv1)
 				if err != nil {
-					return fmt.Errorf("cannot create pv: %v", err)
+					return fmt.Errorf("cannot create pv: %w", err)
 				}
 				_, err = testutils.CreatePVC(cs, pvc1)
 				if err != nil {
-					return fmt.Errorf("cannot create pvc: %v", err)
+					return fmt.Errorf("cannot create pvc: %w", err)
 				}
 				return nil
 			},
@@ -1002,10 +1002,10 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 			preemptedPodIndexes: map[int]struct{}{0: {}},
 			cleanup: func() error {
 				if err := testutils.DeletePVC(cs, pvc1.Name, pvc1.Namespace); err != nil {
-					return fmt.Errorf("cannot delete pvc: %v", err)
+					return fmt.Errorf("cannot delete pvc: %w", err)
 				}
 				if err := testutils.DeletePV(cs, pv1.Name); err != nil {
-					return fmt.Errorf("cannot delete pv: %v", err)
+					return fmt.Errorf("cannot delete pv: %w", err)
 				}
 				return nil
 			},
@@ -1016,13 +1016,13 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 				for _, pv := range []*v1.PersistentVolume{pv1, pv2} {
 					_, err := testutils.CreatePV(cs, pv)
 					if err != nil {
-						return fmt.Errorf("cannot create pv: %v", err)
+						return fmt.Errorf("cannot create pv: %w", err)
 					}
 				}
 				for _, pvc := range []*v1.PersistentVolumeClaim{pvc1, pvc2} {
 					_, err := testutils.CreatePVC(cs, pvc)
 					if err != nil {
-						return fmt.Errorf("cannot create pvc: %v", err)
+						return fmt.Errorf("cannot create pvc: %w", err)
 					}
 				}
 				return nil
@@ -1082,12 +1082,12 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 			cleanup: func() error {
 				for _, pvc := range []*v1.PersistentVolumeClaim{pvc1, pvc2} {
 					if err := testutils.DeletePVC(cs, pvc.Name, pvc.Namespace); err != nil {
-						return fmt.Errorf("cannot delete pvc: %v", err)
+						return fmt.Errorf("cannot delete pvc: %w", err)
 					}
 				}
 				for _, pv := range []*v1.PersistentVolume{pv1, pv2} {
 					if err := testutils.DeletePV(cs, pv.Name); err != nil {
-						return fmt.Errorf("cannot delete pv: %v", err)
+						return fmt.Errorf("cannot delete pv: %w", err)
 					}
 				}
 				return nil
@@ -1099,13 +1099,13 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 				for _, pv := range []*v1.PersistentVolume{pv1, pv2} {
 					_, err := testutils.CreatePV(cs, pv)
 					if err != nil {
-						return fmt.Errorf("cannot create pv: %v", err)
+						return fmt.Errorf("cannot create pv: %w", err)
 					}
 				}
 				for _, pvc := range []*v1.PersistentVolumeClaim{pvc1, pvc2} {
 					_, err := testutils.CreatePVC(cs, pvc)
 					if err != nil {
-						return fmt.Errorf("cannot create pvc: %v", err)
+						return fmt.Errorf("cannot create pvc: %w", err)
 					}
 				}
 				return nil
@@ -1162,12 +1162,12 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 			cleanup: func() error {
 				for _, pvc := range []*v1.PersistentVolumeClaim{pvc1, pvc2} {
 					if err := testutils.DeletePVC(cs, pvc.Name, pvc.Namespace); err != nil {
-						return fmt.Errorf("cannot delete pvc: %v", err)
+						return fmt.Errorf("cannot delete pvc: %w", err)
 					}
 				}
 				for _, pv := range []*v1.PersistentVolume{pv1, pv2} {
 					if err := testutils.DeletePV(cs, pv.Name); err != nil {
-						return fmt.Errorf("cannot delete pv: %v", err)
+						return fmt.Errorf("cannot delete pv: %w", err)
 					}
 				}
 				return nil

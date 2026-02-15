@@ -56,7 +56,7 @@ func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, 
 		err = scale.WaitForScaleHasDesiredReplicas(scalesGetter, gvr.GroupResource(), name, namespace, size, waitForReplicas)
 	}
 	if err != nil {
-		return fmt.Errorf("error while scaling %s to %d replicas: %v", name, size, err)
+		return fmt.Errorf("error while scaling %s to %d replicas: %w", name, size, err)
 	}
 	return nil
 }

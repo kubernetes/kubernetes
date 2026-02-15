@@ -629,7 +629,7 @@ func triggerSpecUpdateWithProbeCRD(t *testing.T, apiextensionsclient *apiextensi
 		}
 		return exist, nil
 	}); err != nil {
-		return fmt.Errorf("failed to observe probe CRD path in the spec: %v", err)
+		return fmt.Errorf("failed to observe probe CRD path in the spec: %w", err)
 	}
 	return nil
 }

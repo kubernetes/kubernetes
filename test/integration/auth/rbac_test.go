@@ -90,7 +90,7 @@ type testRESTOptionsGetter struct {
 func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource, example runtime.Object) (generic.RESTOptions, error) {
 	storageConfig, err := getter.config.ControlPlane.Extra.StorageFactory.NewConfig(resource, example)
 	if err != nil {
-		return generic.RESTOptions{}, fmt.Errorf("failed to get storage: %v", err)
+		return generic.RESTOptions{}, fmt.Errorf("failed to get storage: %w", err)
 	}
 	return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource.Resource}, nil
 }
@@ -143,25 +143,25 @@ func (b bootstrapRoles) bootstrap(client clientset.Interface) error {
 	for _, r := range b.clusterRoles {
 		_, err := client.RbacV1().ClusterRoles().Create(ctx, &r, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to make request: %v", err)
+			return fmt.Errorf("failed to make request: %w", err)
 		}
 	}
 	for _, r := range b.roles {
 		_, err := client.RbacV1().Roles(r.Namespace).Create(ctx, &r, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to make request: %v", err)
+			return fmt.Errorf("failed to make request: %w", err)
 		}
 	}
 	for _, r := range b.clusterRoleBindings {
 		_, err := client.RbacV1().ClusterRoleBindings().Create(ctx, &r, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to make request: %v", err)
+			return fmt.Errorf("failed to make request: %w", err)
 		}
 	}
 	for _, r := range b.roleBindings {
 		_, err := client.RbacV1().RoleBindings(r.Namespace).Create(ctx, &r, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to make request: %v", err)
+			return fmt.Errorf("failed to make request: %w", err)
 		}
 	}
 

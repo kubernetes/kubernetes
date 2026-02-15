@@ -19,6 +19,7 @@ package apimachinery
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -75,7 +76,7 @@ func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
 func websocketConfig(url *url.URL, config *restclient.Config, protocols []string) (*websocket.Config, error) {
 	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create tls config: %v", err)
+		return nil, fmt.Errorf("Failed to create tls config: %w", err)
 	}
 	if url.Scheme == "https" {
 		url.Scheme = "wss"
@@ -84,11 +85,11 @@ func websocketConfig(url *url.URL, config *restclient.Config, protocols []string
 	}
 	headers, err := headersForConfig(config, url)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to load http headers: %v", err)
+		return nil, fmt.Errorf("Failed to load http headers: %w", err)
 	}
 	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create websocket config: %v", err)
+		return nil, fmt.Errorf("Failed to create websocket config: %w", err)
 	}
 	cfg.Header = headers
 	cfg.TlsConfig = tlsConfig
@@ -166,7 +167,7 @@ func TestWebsocketWatchClientTimeout(t *testing.T) {
 				for {
 					var msg []byte
 					if err := websocket.Message.Receive(wsConn, &msg); err != nil {
-						if err == io.EOF {
+						if errors.Is(err, io.EOF) {
 							resultCh <- buf.String()
 							return
 						}

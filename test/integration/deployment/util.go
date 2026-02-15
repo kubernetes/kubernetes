@@ -174,7 +174,7 @@ func addPodConditionReady(pod *v1.Pod, time metav1.Time) {
 
 func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image string) error {
 	if err := testutil.WaitForDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image, d.t.Logf, pollInterval, pollTimeout); err != nil {
-		return fmt.Errorf("failed to wait for Deployment revision %s: %v", d.deployment.Name, err)
+		return fmt.Errorf("failed to wait for Deployment revision %s: %w", d.deployment.Name, err)
 	}
 	return nil
 }
@@ -399,11 +399,11 @@ func (d *deploymentTester) waitForDeploymentWithCondition(reason string, condTyp
 func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(d.deployment.Spec.Selector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse deployment selector: %v", err)
+		return nil, fmt.Errorf("failed to parse deployment selector: %w", err)
 	}
 	pods, err := d.c.CoreV1().Pods(d.deployment.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list deployment pods, will retry later: %v", err)
+		return nil, fmt.Errorf("failed to list deployment pods, will retry later: %w", err)
 	}
 	newRS, err := d.getNewReplicaSet()
 	if err != nil {
@@ -455,11 +455,11 @@ func (d *deploymentTester) waitForReadyReplicas() error {
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
+			return false, fmt.Errorf("failed to get deployment %q: %w", d.deployment.Name, err)
 		}
 		return deployment.Status.ReadyReplicas == *deployment.Spec.Replicas, nil
 	}); err != nil {
-		return fmt.Errorf("failed to wait for .readyReplicas to equal .replicas: %v", err)
+		return fmt.Errorf("failed to wait for .readyReplicas to equal .replicas: %w", err)
 	}
 	return nil
 }
@@ -483,7 +483,7 @@ func (d *deploymentTester) markUpdatedPodsReadyWithoutComplete() error {
 		}
 		return true, nil
 	}); err != nil {
-		return fmt.Errorf("failed to mark all updated pods as ready: %v", err)
+		return fmt.Errorf("failed to mark all updated pods as ready: %w", err)
 	}
 	return nil
 }

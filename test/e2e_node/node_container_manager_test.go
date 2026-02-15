@@ -140,7 +140,7 @@ func expectFileValToEqual(filePath string, expectedValue, delta int64) error {
 	}
 	actual, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
 	if err != nil {
-		return fmt.Errorf("failed to parse output %v", err)
+		return fmt.Errorf("failed to parse output %w", err)
 	}
 
 	// Ensure that values are within a delta range to work around rounding errors.

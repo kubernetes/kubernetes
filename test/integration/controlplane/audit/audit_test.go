@@ -426,12 +426,12 @@ func testAudit(t *testing.T, version string, level auditinternal.Level, enableMu
 		// check for corresponding audit logs
 		stream, err := os.Open(logFile.Name())
 		if err != nil {
-			return false, fmt.Errorf("unexpected error: %v", err)
+			return false, fmt.Errorf("unexpected error: %w", err)
 		}
 		defer stream.Close()
 		missingReport, err := utils.CheckAuditLines(stream, getExpectedEvents(level, enableMutatingWebhook, namespace), versions[version])
 		if err != nil {
-			return false, fmt.Errorf("unexpected error: %v", err)
+			return false, fmt.Errorf("unexpected error: %w", err)
 		}
 		if len(missingReport.MissingEvents) > 0 {
 			lastMissingReport = missingReport.String()
@@ -472,12 +472,12 @@ func testAuditCrossGroupSubResource(t *testing.T, version string, expEvents []ut
 		// check for corresponding audit logs
 		stream, err := os.Open(logFile.Name())
 		if err != nil {
-			return false, fmt.Errorf("unexpected error: %v", err)
+			return false, fmt.Errorf("unexpected error: %w", err)
 		}
 		defer stream.Close()
 		missingReport, err := utils.CheckAuditLines(stream, expEvents, versions[version])
 		if err != nil {
-			return false, fmt.Errorf("unexpected error: %v", err)
+			return false, fmt.Errorf("unexpected error: %w", err)
 		}
 		if len(missingReport.MissingEvents) > 0 {
 			lastMissingReport = missingReport.String()

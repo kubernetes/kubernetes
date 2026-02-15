@@ -209,7 +209,7 @@ func loadProfiles(path string) error {
 func resolveSymlink(basePath string, entry os.DirEntry) (os.FileInfo, error) {
 	info, err := entry.Info()
 	if err != nil {
-		return nil, fmt.Errorf("error getting the fileInfo: %v", err)
+		return nil, fmt.Errorf("error getting the fileInfo: %w", err)
 	}
 	if info.Mode()&os.ModeSymlink == 0 {
 		// Not a symlink.

@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -87,7 +88,7 @@ var _ = SIGDescribe("SSH", func() {
 
 				result, err := e2essh.SSH(ctx, testCase.cmd, host, framework.TestContext.Provider)
 				stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
-				if err != testCase.expectedError {
+				if !errors.Is(err, testCase.expectedError) {
 					framework.Failf("Ran %s on %s, got error %v, expected %v", testCase.cmd, host, err, testCase.expectedError)
 				}
 				if testCase.checkStdout && stdout != testCase.expectedStdout {

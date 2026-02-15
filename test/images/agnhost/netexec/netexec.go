@@ -19,6 +19,7 @@ package netexec
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -239,7 +240,7 @@ func startServer(server *http.Server, exitCh chan shutdownRequest, fn func() err
 	}()
 
 	if err := fn(); err != nil {
-		if err == http.ErrServerClosed {
+		if errors.Is(err, http.ErrServerClosed) {
 			// wait until the goroutine calls os.Exit()
 			select {}
 		}
@@ -473,14 +474,14 @@ func createHTTPClient(transport *http.Transport) *http.Client {
 func dialUDP(request string, addr net.Addr) (string, error) {
 	Conn, err := net.DialUDP("udp", nil, addr.(*net.UDPAddr))
 	if err != nil {
-		return "", fmt.Errorf("udp dial failed. err:%v", err)
+		return "", fmt.Errorf("udp dial failed. err:%w", err)
 	}
 
 	defer Conn.Close()
 	buf := []byte(request)
 	_, err = Conn.Write(buf)
 	if err != nil {
-		return "", fmt.Errorf("udp connection write failed. err:%v", err)
+		return "", fmt.Errorf("udp connection write failed. err:%w", err)
 	}
 	udpResponse := make([]byte, 2048)
 	Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -494,20 +495,20 @@ func dialUDP(request string, addr net.Addr) (string, error) {
 func dialSCTP(request string, addr net.Addr) (string, error) {
 	Conn, err := sctp.DialSCTP("sctp", nil, addr.(*sctp.SCTPAddr))
 	if err != nil {
-		return "", fmt.Errorf("sctp dial failed. err:%v", err)
+		return "", fmt.Errorf("sctp dial failed. err:%w", err)
 	}
 
 	defer Conn.Close()
 	buf := []byte(request)
 	_, err = Conn.Write(buf)
 	if err != nil {
-		return "", fmt.Errorf("sctp connection write failed. err:%v", err)
+		return "", fmt.Errorf("sctp connection write failed. err:%w", err)
 	}
 	sctpResponse := make([]byte, 1024)
 	Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	count, err := Conn.Read(sctpResponse)
 	if err != nil || count == 0 {
-		return "", fmt.Errorf("reading from sctp connection failed. err:'%v'", err)
+		return "", fmt.Errorf("reading from sctp connection failed. err:'%w'", err)
 	}
 	return string(sctpResponse[0:count]), nil
 }

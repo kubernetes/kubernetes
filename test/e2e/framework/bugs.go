@@ -73,7 +73,7 @@ func FormatBugs() error {
 	lines := make([]string, 0, len(bugs))
 	wd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("get current directory: %v", err)
+		return fmt.Errorf("get current directory: %w", err)
 	}
 	// Sort by file name, line number, message. For the sake of simplicity
 	// this uses the full file name even though the output the may use a

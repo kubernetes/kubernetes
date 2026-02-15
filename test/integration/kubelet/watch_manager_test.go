@@ -130,7 +130,7 @@ func TestWatchBasedManager(t *testing.T) {
 				})
 				if err != nil {
 					select {
-					case errCh <- fmt.Errorf("failed on :%s: %v", name, err):
+					case errCh <- fmt.Errorf("failed on :%s: %w", name, err):
 					default:
 					}
 				}

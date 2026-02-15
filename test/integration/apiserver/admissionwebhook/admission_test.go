@@ -374,7 +374,7 @@ func (h *holder) verifyRequest(webhookOptions webhookOptions, request *admission
 
 	if h.expectObject {
 		if err := h.verifyObject(converted, request.Object.Object); err != nil {
-			return fmt.Errorf("object error: %v", err)
+			return fmt.Errorf("object error: %w", err)
 		}
 	} else if request.Object.Object != nil {
 		return fmt.Errorf("unexpected object: %#v", request.Object.Object)
@@ -382,7 +382,7 @@ func (h *holder) verifyRequest(webhookOptions webhookOptions, request *admission
 
 	if h.expectOldObject {
 		if err := h.verifyObject(converted, request.OldObject.Object); err != nil {
-			return fmt.Errorf("old object error: %v", err)
+			return fmt.Errorf("old object error: %w", err)
 		}
 	} else if request.OldObject.Object != nil {
 		return fmt.Errorf("unexpected old object: %#v", request.OldObject.Object)
@@ -390,7 +390,7 @@ func (h *holder) verifyRequest(webhookOptions webhookOptions, request *admission
 
 	if h.expectOptions {
 		if err := h.verifyOptions(request.Options.Object); err != nil {
-			return fmt.Errorf("options error: %v", err)
+			return fmt.Errorf("options error: %w", err)
 		}
 	} else if request.Options.Object != nil {
 		return fmt.Errorf("unexpected options: %#v", request.Options.Object)
