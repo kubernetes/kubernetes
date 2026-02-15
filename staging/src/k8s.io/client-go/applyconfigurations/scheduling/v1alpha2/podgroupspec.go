@@ -30,6 +30,15 @@ type PodGroupSpecApplyConfiguration struct {
 	// It is copied from a template if the PodGroup is created from one.
 	// This field is immutable.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// the group. Pods must reference these claims in order to consume the
+	// allocated devices.
+	//
+	// This is an alpha-level field and requires that the
+	// DRAWorkloadResourceClaims feature gate is enabled.
+	//
+	// This field is immutable.
+	ResourceClaims []PodGroupResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
 }
 
 // PodGroupSpecApplyConfiguration constructs a declarative configuration of the PodGroupSpec type for use with
@@ -51,5 +60,18 @@ func (b *PodGroupSpecApplyConfiguration) WithPodGroupTemplateRef(value *PodGroup
 // If called multiple times, the SchedulingPolicy field is set to the value of the last call.
 func (b *PodGroupSpecApplyConfiguration) WithSchedulingPolicy(value *PodGroupSchedulingPolicyApplyConfiguration) *PodGroupSpecApplyConfiguration {
 	b.SchedulingPolicy = value
+	return b
+}
+
+// WithResourceClaims adds the given value to the ResourceClaims field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ResourceClaims field.
+func (b *PodGroupSpecApplyConfiguration) WithResourceClaims(values ...*PodGroupResourceClaimApplyConfiguration) *PodGroupSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithResourceClaims")
+		}
+		b.ResourceClaims = append(b.ResourceClaims, *values[i])
+	}
 	return b
 }

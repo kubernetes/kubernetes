@@ -39,6 +39,10 @@ spec:
     name: nameValue
   podGroupTemplates:
   - name: nameValue
+    resourceClaims:
+    - name: nameValue
+      resourceClaimName: resourceClaimNameValue
+      resourceClaimTemplateName: resourceClaimTemplateNameValue
     schedulingPolicy:
       basic: {}
       gang:

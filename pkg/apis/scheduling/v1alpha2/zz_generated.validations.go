@@ -106,6 +106,86 @@ func Validate_PodGroup(ctx context.Context, op operation.Operation, fldPath *fie
 	return errs
 }
 
+var unionMembershipFor_k8s_io_api_scheduling_v1alpha2_PodGroupResourceClaim_ = validate.NewUnionMembership(validate.NewUnionMember("resourceClaimName"), validate.NewUnionMember("resourceClaimTemplateName"))
+
+// Validate_PodGroupResourceClaim validates an instance of PodGroupResourceClaim according
+// to declarative validation rules in the API schema.
+func Validate_PodGroupResourceClaim(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *schedulingv1alpha2.PodGroupResourceClaim) (errs field.ErrorList) {
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_scheduling_v1alpha2_PodGroupResourceClaim_, func(obj *schedulingv1alpha2.PodGroupResourceClaim) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.ResourceClaimName != nil
+	}, func(obj *schedulingv1alpha2.PodGroupResourceClaim) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.ResourceClaimTemplateName != nil
+	})...)
+
+	// field schedulingv1alpha2.PodGroupResourceClaim.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupResourceClaim) *string { return &oldObj.Name }), oldObj != nil)...)
+
+	// field schedulingv1alpha2.PodGroupResourceClaim.ResourceClaimName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("resourceClaimName"), obj.ResourceClaimName, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupResourceClaim) *string { return oldObj.ResourceClaimName }), oldObj != nil)...)
+
+	// field schedulingv1alpha2.PodGroupResourceClaim.ResourceClaimTemplateName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("resourceClaimTemplateName"), obj.ResourceClaimTemplateName, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupResourceClaim) *string {
+			return oldObj.ResourceClaimTemplateName
+		}), oldObj != nil)...)
+
+	return errs
+}
+
 var unionMembershipFor_k8s_io_api_scheduling_v1alpha2_PodGroupSchedulingPolicy_ = validate.NewUnionMembership(validate.NewUnionMember("basic"), validate.NewUnionMember("gang"))
 
 // Validate_PodGroupSchedulingPolicy validates an instance of PodGroupSchedulingPolicy according
@@ -220,6 +300,42 @@ func Validate_PodGroupSpec(ctx context.Context, op operation.Operation, fldPath 
 			return &oldObj.SchedulingPolicy
 		}), oldObj != nil)...)
 
+	// field schedulingv1alpha2.PodGroupSpec.ResourceClaims
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha2.PodGroupResourceClaim, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha2.PodGroupResourceClaim, b schedulingv1alpha2.PodGroupResourceClaim) bool {
+				return a.Name == b.Name
+			})...)
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha2.PodGroupResourceClaim, b schedulingv1alpha2.PodGroupResourceClaim) bool {
+				return a.Name == b.Name
+			}, validate.SemanticDeepEqual, Validate_PodGroupResourceClaim)...)
+			return
+		}(fldPath.Child("resourceClaims"), obj.ResourceClaims, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupSpec) []schedulingv1alpha2.PodGroupResourceClaim {
+			return oldObj.ResourceClaims
+		}), oldObj != nil)...)
+
 	return errs
 }
 
@@ -258,6 +374,42 @@ func Validate_PodGroupTemplate(ctx context.Context, op operation.Operation, fldP
 			return
 		}(fldPath.Child("schedulingPolicy"), &obj.SchedulingPolicy, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupTemplate) *schedulingv1alpha2.PodGroupSchedulingPolicy {
 			return &oldObj.SchedulingPolicy
+		}), oldObj != nil)...)
+
+	// field schedulingv1alpha2.PodGroupTemplate.ResourceClaims
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []schedulingv1alpha2.PodGroupResourceClaim, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha2.PodGroupResourceClaim, b schedulingv1alpha2.PodGroupResourceClaim) bool {
+				return a.Name == b.Name
+			})...)
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a schedulingv1alpha2.PodGroupResourceClaim, b schedulingv1alpha2.PodGroupResourceClaim) bool {
+				return a.Name == b.Name
+			}, validate.SemanticDeepEqual, Validate_PodGroupResourceClaim)...)
+			return
+		}(fldPath.Child("resourceClaims"), obj.ResourceClaims, safe.Field(oldObj, func(oldObj *schedulingv1alpha2.PodGroupTemplate) []schedulingv1alpha2.PodGroupResourceClaim {
+			return oldObj.ResourceClaims
 		}), oldObj != nil)...)
 
 	return errs

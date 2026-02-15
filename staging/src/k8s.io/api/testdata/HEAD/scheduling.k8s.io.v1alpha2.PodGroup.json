@@ -55,7 +55,14 @@
       "gang": {
         "minCount": 1
       }
-    }
+    },
+    "resourceClaims": [
+      {
+        "name": "nameValue",
+        "resourceClaimName": "resourceClaimNameValue",
+        "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+      }
+    ]
   },
   "status": {
     "conditions": [

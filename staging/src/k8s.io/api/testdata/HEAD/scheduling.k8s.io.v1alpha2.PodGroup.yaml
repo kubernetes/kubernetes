@@ -37,6 +37,10 @@ spec:
     workload:
       podGroupTemplateName: podGroupTemplateNameValue
       workloadName: workloadNameValue
+  resourceClaims:
+  - name: nameValue
+    resourceClaimName: resourceClaimNameValue
+    resourceClaimTemplateName: resourceClaimTemplateNameValue
   schedulingPolicy:
     basic: {}
     gang:

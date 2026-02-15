@@ -14475,6 +14475,19 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.PodGroupStatus
       default: {}
+- name: io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaim
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resourceClaimName
+      type:
+        scalar: string
+    - name: resourceClaimTemplateName
+      type:
+        scalar: string
 - name: io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingPolicy
   map:
     fields:
@@ -14496,6 +14509,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: podGroupTemplateRef
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.PodGroupTemplateReference
+    - name: resourceClaims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaim
+          elementRelationship: associative
+          keys:
+          - name
     - name: schedulingPolicy
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingPolicy
@@ -14518,6 +14539,14 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: resourceClaims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaim
+          elementRelationship: associative
+          keys:
+          - name
     - name: schedulingPolicy
       type:
         namedType: io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingPolicy

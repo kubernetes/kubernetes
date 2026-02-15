@@ -116,6 +116,28 @@
           }
         ]
       },
+      "io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaim": {
+        "description": "PodGroupResourceClaim references exactly one ResourceClaim, either directly or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim for the PodGroup.\n\nIt adds a name to it that uniquely identifies the ResourceClaim inside the PodGroup. Pods that need access to the ResourceClaim reference it with this name.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name uniquely identifies this resource claim inside the PodGroup. This must be a DNS_LABEL.",
+            "type": "string"
+          },
+          "resourceClaimName": {
+            "description": "ResourceClaimName is the name of a ResourceClaim object in the same namespace as this PodGroup. The ResourceClaim will be reserved for the PodGroup instead of its individual pods.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+            "type": "string"
+          },
+          "resourceClaimTemplateName": {
+            "description": "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this PodGroup.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this PodGroup. When this PodGroup is deleted, the ResourceClaim will also be deleted. The PodGroup name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingPolicy": {
         "description": "PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup. Exactly one policy must be set.",
         "properties": {
@@ -156,6 +178,24 @@
               }
             ],
             "description": "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable."
+          },
+          "resourceClaims": {
+            "description": "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods must reference these claims in order to consume the allocated devices.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaim"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge,retainKeys"
           },
           "schedulingPolicy": {
             "allOf": [
@@ -203,6 +243,24 @@
             "default": "",
             "description": "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
             "type": "string"
+          },
+          "resourceClaims": {
+            "description": "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods must reference these claims in order to consume the allocated devices.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha2.PodGroupResourceClaim"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge,retainKeys"
           },
           "schedulingPolicy": {
             "allOf": [

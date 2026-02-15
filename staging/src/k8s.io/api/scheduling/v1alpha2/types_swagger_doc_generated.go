@@ -65,6 +65,17 @@ func (PodGroupList) SwaggerDoc() map[string]string {
 	return map_PodGroupList
 }
 
+var map_PodGroupResourceClaim = map[string]string{
+	"":                          "PodGroupResourceClaim references exactly one ResourceClaim, either directly or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim for the PodGroup.\n\nIt adds a name to it that uniquely identifies the ResourceClaim inside the PodGroup. Pods that need access to the ResourceClaim reference it with this name.",
+	"name":                      "Name uniquely identifies this resource claim inside the PodGroup. This must be a DNS_LABEL.",
+	"resourceClaimName":         "ResourceClaimName is the name of a ResourceClaim object in the same namespace as this PodGroup. The ResourceClaim will be reserved for the PodGroup instead of its individual pods.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+	"resourceClaimTemplateName": "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this PodGroup.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this PodGroup. When this PodGroup is deleted, the ResourceClaim will also be deleted. The PodGroup name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+}
+
+func (PodGroupResourceClaim) SwaggerDoc() map[string]string {
+	return map_PodGroupResourceClaim
+}
+
 var map_PodGroupSchedulingPolicy = map[string]string{
 	"":      "PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup. Exactly one policy must be set.",
 	"basic": "Basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior.",
@@ -79,6 +90,7 @@ var map_PodGroupSpec = map[string]string{
 	"":                    "PodGroupSpec defines the desired state of a PodGroup.",
 	"podGroupTemplateRef": "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable.",
 	"schedulingPolicy":    "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. It is copied from a template if the PodGroup is created from one. This field is immutable.",
+	"resourceClaims":      "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods must reference these claims in order to consume the allocated devices.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
 }
 
 func (PodGroupSpec) SwaggerDoc() map[string]string {
@@ -98,6 +110,7 @@ var map_PodGroupTemplate = map[string]string{
 	"":                 "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
 	"name":             "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
 	"schedulingPolicy": "SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
+	"resourceClaims":   "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods must reference these claims in order to consume the allocated devices.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
 }
 
 func (PodGroupTemplate) SwaggerDoc() map[string]string {

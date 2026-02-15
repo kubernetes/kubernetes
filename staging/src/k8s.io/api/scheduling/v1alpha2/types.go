@@ -150,7 +150,7 @@ type PodGroupTemplate struct {
 	// +k8s:maxItems=4
 	// +k8s:alpha(since:"1.36")=+k8s:immutable
 	// +featureGate=DRAWorkloadResourceClaims
-	ResourceClaims []PodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ResourceClaims []PodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,3,rep,name=resourceClaims"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -208,7 +208,7 @@ type PodGroupResourceClaim struct {
 	// +required
 	// +k8s:required
 	// +k8s:format=k8s-short-name
-	Name string `json:"name"`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// ResourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this PodGroup. The ResourceClaim will be reserved for the
@@ -221,7 +221,7 @@ type PodGroupResourceClaim struct {
 	// +k8s:optional
 	// +k8s:unionMember
 	// +k8s:format=k8s-long-name
-	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
+	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
 
 	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
 	// object in the same namespace as this PodGroup.
@@ -243,7 +243,7 @@ type PodGroupResourceClaim struct {
 	// +k8s:optional
 	// +k8s:unionMember
 	// +k8s:format=k8s-long-name
-	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,3,opt,name=resourceClaimTemplateName"`
 }
 
 // +genclient
@@ -325,7 +325,7 @@ type PodGroupSpec struct {
 	// +k8s:maxItems=4
 	// +k8s:alpha(since:"1.36")=+k8s:immutable
 	// +featureGate=DRAWorkloadResourceClaims
-	ResourceClaims []PodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ResourceClaims []PodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,3,rep,name=resourceClaims"`
 }
 
 // PodGroupStatus represents information about the status of a pod group.
