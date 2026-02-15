@@ -816,6 +816,40 @@ func TestGetNonExistObjectIgnoreNotFound(t *testing.T) {
 	}
 }
 
+func TestGetForbiddenResourceIgnoreForbidden(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	forbiddenBody := `{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"pods is forbidden: User \"test\" cannot list resource \"pods\" in API group \"\" in the namespace \"test\"","reason":"Forbidden","details":{"kind":"pods"},"code":403}`
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods" && m == "GET":
+				return &http.Response{StatusCode: http.StatusForbidden, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader(forbiddenBody))}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	// With --ignore-forbidden, the forbidden error should be suppressed
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		t.Errorf("unexpected fatal error with --ignore-forbidden: %s", str)
+	})
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.Flags().Set("ignore-forbidden", "true") //nolint:errcheck
+	cmd.Flags().Set("output", "yaml")           //nolint:errcheck
+	cmd.Run(cmd, []string{"pods"})
+}
+
 func TestEmptyResult(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 
