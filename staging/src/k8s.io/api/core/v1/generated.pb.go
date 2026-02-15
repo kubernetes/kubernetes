@@ -9393,6 +9393,13 @@ func (m *PodResourceClaim) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.PodGroupResourceClaim != nil {
+		i -= len(*m.PodGroupResourceClaim)
+		copy(dAtA[i:], *m.PodGroupResourceClaim)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.PodGroupResourceClaim)))
+		i--
+		dAtA[i] = 0x2a
+	}
 	if m.ResourceClaimTemplateName != nil {
 		i -= len(*m.ResourceClaimTemplateName)
 		copy(dAtA[i:], *m.ResourceClaimTemplateName)
@@ -18355,6 +18362,10 @@ func (m *PodResourceClaim) Size() (n int) {
 		l = len(*m.ResourceClaimTemplateName)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.PodGroupResourceClaim != nil {
+		l = len(*m.PodGroupResourceClaim)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -22888,6 +22899,7 @@ func (this *PodResourceClaim) String() string {
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`ResourceClaimName:` + valueToStringGenerated(this.ResourceClaimName) + `,`,
 		`ResourceClaimTemplateName:` + valueToStringGenerated(this.ResourceClaimTemplateName) + `,`,
+		`PodGroupResourceClaim:` + valueToStringGenerated(this.PodGroupResourceClaim) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -52767,6 +52779,39 @@ func (m *PodResourceClaim) Unmarshal(dAtA []byte) error {
 			}
 			s := string(dAtA[iNdEx:postIndex])
 			m.ResourceClaimTemplateName = &s
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodGroupResourceClaim", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.PodGroupResourceClaim = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

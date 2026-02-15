@@ -899,6 +899,7 @@ spec:
       - conditionType: conditionTypeValue
       resourceClaims:
       - name: nameValue
+        podGroupResourceClaim: podGroupResourceClaimValue
         resourceClaimName: resourceClaimNameValue
         resourceClaimTemplateName: resourceClaimTemplateNameValue
       resources:

@@ -3942,8 +3942,8 @@ type PodResourceClaim struct {
 	// ResourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this pod.
 	//
-	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
-	// be set.
+	// Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
+	// PodGroupResourceClaim must be set.
 	ResourceClaimName *string
 
 	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -3959,9 +3959,18 @@ type PodResourceClaim struct {
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
 	//
-	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
-	// be set.
+	// Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
+	// PodGroupResourceClaim must be set.
 	ResourceClaimTemplateName *string
+
+	// PodGroupResourceClaim refers to the name of a claim associated with this
+	// pod's PodGroup.
+	//
+	// Exactly one of ResourceClaimName, ResourceClaimTemplateName, or
+	// PodGroupResourceClaim must be set.
+	//
+	// +featureGate=WorkloadPodGroupResourceClaimTemplate
+	PodGroupResourceClaim *string
 }
 
 // PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim

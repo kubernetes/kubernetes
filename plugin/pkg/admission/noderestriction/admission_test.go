@@ -1116,7 +1116,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			attributes: admission.NewAttributesRecord(pvcpod, nil, podKind, pvcpod.Namespace, pvcpod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "can not create pods that reference persistentvolumeclaims",
 		},
-		{
+		{ // TODO: I don't think we need a test here specifically for podgroup claims.
 			name:       "forbid create of pod referencing resourceclaim",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(claimpod, nil, podKind, claimpod.Namespace, claimpod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),

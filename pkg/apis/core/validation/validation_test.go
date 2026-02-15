@@ -23104,6 +23104,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ResourceClaims[*].Name",
 		"ResourceClaims[*].ResourceClaimName",
 		"ResourceClaims[*].ResourceClaimTemplateName",
+		"ResourceClaims[*].PodGroupResourceClaim",
 		"Resources",
 		"RestartPolicy",
 		"RuntimeClassName",
@@ -26985,6 +26986,7 @@ func TestValidatePVSecretReference(t *testing.T) {
 func TestValidateDynamicResourceAllocation(t *testing.T) {
 	externalClaimName := "some-claim"
 	externalClaimTemplateName := "some-claim-template"
+	externalPodGroupClaimName := "podgroup-claim"
 	shortPodName := &metav1.ObjectMeta{
 		Name: "some-pod",
 	}
@@ -27004,6 +27006,14 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		podtest.SetResourceClaims(core.PodResourceClaim{
 			Name:              "my-claim-reference",
 			ResourceClaimName: &externalClaimName,
+		}),
+	)
+	goodPodGroupClaimReference := podtest.MakePod("",
+		podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-reference"}}}))),
+		podtest.SetRestartPolicy(core.RestartPolicyAlways),
+		podtest.SetResourceClaims(core.PodResourceClaim{
+			Name:                  "my-claim-reference",
+			PodGroupResourceClaim: &externalPodGroupClaimName,
 		}),
 	)
 
@@ -27053,6 +27063,17 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
 			if errs := ValidatePodSpec(&v.Spec, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	successCasesPodGroupEnabled := map[string]*core.Pod{
+		"podgroup claim reference": goodPodGroupClaimReference,
+	}
+	for k, v := range successCasesPodGroupEnabled {
+		t.Run("podgroup enabled "+k, func(t *testing.T) {
+			if errs := ValidatePodSpec(&v.Spec, shortPodName, field.NewPath("field"), PodValidationOptions{WorkloadPodGroupResourceClaimTemplateEnabled: true}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -27188,6 +27209,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			pod.Spec.ResourceClaims[0].ResourceClaimName = &notLabel
 			return pod
 		}(),
+		"podgroup disabled": goodPodGroupClaimReference,
 	}
 	for k, v := range failureCases {
 		podMeta := shortPodName
@@ -27200,6 +27222,43 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		if errs := ValidatePodSpec(&v.Spec, podMeta, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
+	}
+
+	failureCasesPodGroupEnabled := map[string]*core.Pod{
+		"static pod with podgroup claim reference": goodPodGroupClaimReference,
+		"resource claim source empty": podtest.MakePod("",
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name: "my-claim",
+			}),
+		),
+		"resource claim reference and podgroup": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:                  "my-claim",
+				ResourceClaimName:     &externalClaimName,
+				PodGroupResourceClaim: &externalPodGroupClaimName,
+			}),
+		),
+		"invalid podgroup claim reference name": func() *core.Pod {
+			pod := goodPodGroupClaimReference.DeepCopy()
+			notLabel := ".foo_bar"
+			pod.Spec.ResourceClaims[0].PodGroupResourceClaim = &notLabel
+			return pod
+		}(),
+	}
+	for k, v := range failureCasesPodGroupEnabled {
+		podMeta := shortPodName
+		if strings.HasPrefix(k, "static pod") {
+			podMeta = podMeta.DeepCopy()
+			podMeta.Annotations = map[string]string{
+				core.MirrorPodAnnotationKey: "True",
+			}
+		}
+		t.Run("podgroup enabled "+k, func(t *testing.T) {
+			if errs := ValidatePodSpec(&v.Spec, podMeta, field.NewPath("field"), PodValidationOptions{WorkloadPodGroupResourceClaimTemplateEnabled: true}); len(errs) == 0 {
+				t.Errorf("expected failure for %q", k)
+			}
+		})
 	}
 }
 
