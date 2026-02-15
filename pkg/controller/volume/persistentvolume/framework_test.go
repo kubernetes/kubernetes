@@ -717,16 +717,16 @@ func wrapTestWithInjectedOperation(ctx context.Context, toWrap testCall, injectB
 		// Run the tested function (typically syncClaim/syncVolume) in a
 		// separate goroutine.
 		var testError error
-		var testFinished int32
+		var testFinished atomic.Int32
 
 		go func() {
 			testError = toWrap(ctrl, reactor, test)
 			// Let the "main" test function know that syncVolume has finished.
-			atomic.StoreInt32(&testFinished, 1)
+			testFinished.Store(1)
 		}()
 
 		// Wait for the controller to finish the test function.
-		for atomic.LoadInt32(&testFinished) == 0 {
+		for testFinished.Load() == 0 {
 			time.Sleep(time.Millisecond * 10)
 		}
 

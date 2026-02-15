@@ -30,19 +30,19 @@ import (
 var _ MetricRecorder = &fakePodsRecorder{}
 
 type fakePodsRecorder struct {
-	counter int64
+	counter atomic.Int64
 }
 
 func (r *fakePodsRecorder) Inc() {
-	atomic.AddInt64(&r.counter, 1)
+	r.counter.Add(1)
 }
 
 func (r *fakePodsRecorder) Dec() {
-	atomic.AddInt64(&r.counter, -1)
+	r.counter.Add(-1)
 }
 
 func (r *fakePodsRecorder) Clear() {
-	atomic.StoreInt64(&r.counter, 0)
+	r.counter.Store(0)
 }
 
 func TestInc(t *testing.T) {
@@ -50,32 +50,36 @@ func TestInc(t *testing.T) {
 	var wg sync.WaitGroup
 	loops := 100
 	wg.Add(loops)
-	for i := 0; i < loops; i++ {
+	for range loops {
 		go func() {
 			fakeRecorder.Inc()
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	if fakeRecorder.counter != int64(loops) {
-		t.Errorf("Expected %v, got %v", loops, fakeRecorder.counter)
+	got := fakeRecorder.counter.Load()
+	if got != int64(loops) {
+		t.Errorf("Expected %v, got %v", loops, got)
 	}
+
 }
 
 func TestDec(t *testing.T) {
-	fakeRecorder := fakePodsRecorder{counter: 100}
+	var fakeRecorder fakePodsRecorder
+	fakeRecorder.counter.Store(100)
 	var wg sync.WaitGroup
 	loops := 100
 	wg.Add(loops)
-	for i := 0; i < loops; i++ {
+	for range loops {
 		go func() {
 			fakeRecorder.Dec()
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	if fakeRecorder.counter != int64(0) {
-		t.Errorf("Expected %v, got %v", loops, fakeRecorder.counter)
+	got := fakeRecorder.counter.Load()
+	if got != int64(0) {
+		t.Errorf("Expected %v, got %v", loops, got)
 	}
 }
 
@@ -84,26 +88,28 @@ func TestClear(t *testing.T) {
 	var wg sync.WaitGroup
 	incLoops, decLoops := 100, 80
 	wg.Add(incLoops + decLoops)
-	for i := 0; i < incLoops; i++ {
+	for range incLoops {
 		go func() {
 			fakeRecorder.Inc()
 			wg.Done()
 		}()
 	}
-	for i := 0; i < decLoops; i++ {
+	for range decLoops {
 		go func() {
 			fakeRecorder.Dec()
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	if fakeRecorder.counter != int64(incLoops-decLoops) {
-		t.Errorf("Expected %v, got %v", incLoops-decLoops, fakeRecorder.counter)
+	got := fakeRecorder.counter.Load()
+	if got  != int64(incLoops-decLoops) {
+		t.Errorf("Expected %v, got %v", incLoops-decLoops, got)
 	}
 	// verify Clear() works
 	fakeRecorder.Clear()
-	if fakeRecorder.counter != int64(0) {
-		t.Errorf("Expected %v, got %v", 0, fakeRecorder.counter)
+	got = fakeRecorder.counter.Load()
+	if got != int64(0) {
+		t.Errorf("Expected %v, got %v", 0, got)
 	}
 }
 
