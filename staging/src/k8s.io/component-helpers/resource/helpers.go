@@ -505,3 +505,21 @@ func reuseOrClearResourceList(reuse v1.ResourceList) v1.ResourceList {
 	}
 	return reuse
 }
+
+// AllContainersHaveLimitForResource checks if all containers in the pod explicitly
+// define a resource limit for a specific resource.
+func AllContainersHaveLimitForResource(pod *v1.Pod, resource v1.ResourceName) bool {
+	for _, container := range pod.Spec.Containers {
+		if _, exists := container.Resources.Limits[resource]; !exists {
+			return false
+		}
+	}
+
+	for _, container := range pod.Spec.InitContainers {
+		if _, exists := container.Resources.Limits[resource]; !exists {
+			return false
+		}
+	}
+
+	return true
+}
