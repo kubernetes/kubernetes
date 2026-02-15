@@ -65,6 +65,11 @@ const (
 
 	// BackoffGCInterval is the time that has to pass before next iteration of backoff GC is run
 	BackoffGCInterval = 1 * time.Minute
+
+	// ExpectationsTimeout is the duration after which expectations are considered expired.
+	// This prevents the controller from being permanently blocked when Pod creation/delete
+	// events are lost or suppressed (e.g., by admission webhooks setting deletionTimestamp).
+	ExpectationsTimeout = 1 * time.Minute
 )
 
 // Reasons for DaemonSet events
@@ -330,6 +335,9 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	}
 	wg.Go(func() {
 		wait.Until(dsc.failedPodsBackoff.GC, BackoffGCInterval, ctx.Done())
+	})
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, dsc.expectationEnqueue, ExpectationsTimeout)
 	})
 	<-ctx.Done()
 }
@@ -1469,4 +1477,17 @@ func (dsc *DaemonSetsController) syncNodeUpdate(ctx context.Context, nodeName st
 	}
 
 	return nil
+}
+
+func (dsc *DaemonSetsController) expectationEnqueue(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	keys := dsc.expectations.ListExpectationKeys()
+	for index := range keys {
+		key := keys[index]
+		item, exists, err := dsc.expectations.GetExpectations(key)
+		if exists && item != nil && err == nil && !item.Fulfilled() && item.IsExpired() {
+			logger.Info("Controller expectations expired, reEnqueue", "key", key)
+			dsc.queue.Add(key)
+		}
+	}
 }
