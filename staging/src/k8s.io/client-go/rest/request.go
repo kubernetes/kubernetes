@@ -333,7 +333,7 @@ func (r *Request) Name(resourceName string) *Request {
 		return r
 	}
 	if len(resourceName) == 0 {
-		r.err = fmt.Errorf("resource name may not be empty")
+		r.err = errors.NewBadRequest("resource name may not be empty")
 		return r
 	}
 	if len(r.resourceName) != 0 {

@@ -378,6 +378,83 @@ func Test202StatusCode(t *testing.T) {
 	verifyStatusCode(t, transport, "DELETE", kubeConfig.Host+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
 }
 
+func TestPostPodBadBody(t *testing.T) {
+	ctx, client, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	restClient := client.CoreV1().RESTClient()
+
+	sa := []byte(`{
+	   "apiVersion": "v1",
+	   "kind": "ServiceAccount",
+	   "metadata": {
+	       "name": "default"
+	   }
+	}`)
+
+	restClient.
+		Post().
+		Namespace("default").
+		Resource("serviceaccounts").
+		Body(sa).
+		Do(ctx)
+
+	var statusCode int
+
+	badBody := []byte(`{
+        "spec": {
+            "runtimeClassName": ""
+        }
+    }`)
+
+	result := restClient.
+		Post().
+		Namespace("default").
+		Resource("pods").
+		Body(badBody).
+		Do(ctx)
+
+	result.StatusCode(&statusCode)
+
+	if statusCode != http.StatusBadRequest {
+		t.Fatalf("Expected status code to be %d, got %v (Result: %#v)", http.StatusBadRequest, statusCode, result.Error())
+	}
+}
+
+func TestPostNodeProxyNullBody(t *testing.T) {
+	ctx, client, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	preRequestBody := []byte(`{
+        "metadata": {
+            "name": "fixed"
+        }
+    }`)
+
+	restClient := client.CoreV1().RESTClient()
+
+	restClient.
+		Post().
+		Resource("nodes").
+		Body(preRequestBody).
+		Do(ctx)
+
+	var statusCode int
+
+	result := restClient.
+		Post().
+		Resource("nodes").
+		Name("fixed").
+		SubResource("proxy").
+		Do(ctx)
+
+	result.StatusCode(&statusCode)
+
+	if statusCode != http.StatusBadRequest {
+		t.Fatalf("Expected status code to be %d, got %v (Result: %#v)", http.StatusBadRequest, statusCode, result.Error())
+	}
+}
+
 var (
 	invalidContinueToken        = "invalidContinueToken"
 	invalidResourceVersion      = "invalid"
