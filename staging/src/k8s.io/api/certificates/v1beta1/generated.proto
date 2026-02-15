@@ -39,6 +39,7 @@ message CertificateSigningRequest {
   // spec contains the certificate request, and is immutable after creation.
   // Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
   // Other fields are derived by Kubernetes and cannot be modified by users.
+  // +required
   optional CertificateSigningRequestSpec spec = 2;
 
   // Derived information about the request.
@@ -154,6 +155,8 @@ message CertificateSigningRequestSpec {
   //  "microsoft sgc",
   //  "netscape sgc"
   // +listType=atomic
+  // +required
+  // +k8s:required
   repeated string usages = 5;
 
   // Information about the requesting user.
