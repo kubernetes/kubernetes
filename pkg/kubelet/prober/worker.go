@@ -29,6 +29,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
 
@@ -332,7 +333,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, output, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
@@ -354,6 +355,19 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	} else {
 		w.lastResult = result
 		w.resultRun = 1
+	}
+
+	// Record probe failure event with FailureThreshold context
+	if result == results.Failure {
+		if w.resultRun < int(w.spec.FailureThreshold) {
+			// Failure is suppressed by threshold
+			w.probeManager.prober.recordContainerEvent(ctx, w.pod, &w.container, v1.EventTypeWarning, events.ContainerUnhealthy,
+				"%s probe failed: %s (failure %d/%d)", w.probeType, output, w.resultRun, w.spec.FailureThreshold)
+		} else {
+			// Failure threshold reached
+			w.probeManager.prober.recordContainerEvent(ctx, w.pod, &w.container, v1.EventTypeWarning, events.ContainerUnhealthy,
+				"%s probe failed: %s", w.probeType, output)
+		}
 	}
 
 	if (result == results.Failure && w.resultRun < int(w.spec.FailureThreshold)) ||
