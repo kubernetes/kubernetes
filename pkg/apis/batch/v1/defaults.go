@@ -68,6 +68,12 @@ func SetDefaults_Job(obj *batchv1.Job) {
 			}
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
+		if obj.Spec.GangPolicy == nil {
+			obj.Spec.GangPolicy = &batchv1.GangPolicy{Policy: batchv1.NoGang}
+		}
+	}
 	if obj.Spec.ManualSelector == nil {
 		obj.Spec.ManualSelector = ptr.To(false)
 	}

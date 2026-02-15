@@ -31,6 +31,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -8050,5 +8051,755 @@ func setDurationDuringTest(val *time.Duration, newVal time.Duration) func() {
 	*val = newVal
 	return func() {
 		*val = origVal
+	}
+}
+
+func TestEnsureWorkloadForJob(t *testing.T) {
+	tests := []struct {
+		name                 string
+		featureGateEnabled   bool
+		job                  *batch.Job
+		expectWorkloadCreate bool
+		expectedMinCount     int32
+	}{
+		{
+			name:               "creates workload for JobAsGang policy when feature gate enabled",
+			featureGateEnabled: true,
+			job: &batch.Job{
+				TypeMeta: metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-gang-job",
+					UID:       "test-gang-job-uid",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.JobSpec{
+					Parallelism: ptr.To[int32](3),
+					Completions: ptr.To[int32](3),
+					GangPolicy: &batch.GangPolicy{
+						Policy: batch.JobAsGang,
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"foo": "bar"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Image: "foo/bar"},
+							},
+						},
+					},
+				},
+			},
+			expectWorkloadCreate: true,
+			expectedMinCount:     3,
+		},
+		{
+			name:               "does not create workload for JobAsGang policy when feature gate disabled",
+			featureGateEnabled: false,
+			job: &batch.Job{
+				TypeMeta: metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-gang-job-disabled",
+					UID:       "test-gang-job-disabled-uid",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.JobSpec{
+					Parallelism: ptr.To[int32](3),
+					Completions: ptr.To[int32](3),
+					GangPolicy: &batch.GangPolicy{
+						Policy: batch.JobAsGang,
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"foo": "bar"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Image: "foo/bar"},
+							},
+						},
+					},
+				},
+			},
+			expectWorkloadCreate: false,
+		},
+		{
+			name:               "does not create workload for job without gang policy",
+			featureGateEnabled: true,
+			job: &batch.Job{
+				TypeMeta: metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-normal-job",
+					UID:       "test-normal-job-uid",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.JobSpec{
+					Parallelism: ptr.To[int32](2),
+					Completions: ptr.To[int32](2),
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"foo": "bar"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Image: "foo/bar"},
+							},
+						},
+					},
+				},
+			},
+			expectWorkloadCreate: false,
+		},
+		{
+			name:               "does not create workload for NoGang policy",
+			featureGateEnabled: true,
+			job: &batch.Job{
+				TypeMeta: metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nogang-job",
+					UID:       "test-nogang-job-uid",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.JobSpec{
+					Parallelism: ptr.To[int32](2),
+					Completions: ptr.To[int32](2),
+					GangPolicy: &batch.GangPolicy{
+						Policy: batch.NoGang,
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"foo": "bar"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Image: "foo/bar"},
+							},
+						},
+					},
+				},
+			},
+			expectWorkloadCreate: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.JobGangPolicy:   tt.featureGateEnabled,
+				features.GangScheduling:  tt.featureGateEnabled,
+				features.GenericWorkload: tt.featureGateEnabled,
+			})
+			_, ctx := ktesting.NewTestContext(t)
+			clientset := fake.NewClientset()
+			manager, _ := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+
+			// Call ensureWorkloadForJob
+			err := manager.ensureWorkloadForJob(ctx, tt.job)
+			if err != nil {
+				t.Fatalf("Failed to ensure workload: %v", err)
+			}
+
+			// Verify workload creation expectation
+			workload, err := clientset.SchedulingV1alpha1().Workloads(tt.job.Namespace).Get(ctx, tt.job.Name, metav1.GetOptions{})
+			if tt.expectWorkloadCreate {
+				if err != nil {
+					t.Fatalf("Expected workload to be created, but got error: %v", err)
+				}
+
+				// Verify workload spec
+				if workload.Name != tt.job.Name {
+					t.Errorf("Expected workload name %s, got %s", tt.job.Name, workload.Name)
+				}
+				if len(workload.Spec.PodGroups) != 1 {
+					t.Errorf("Expected 1 pod group, got %d", len(workload.Spec.PodGroups))
+				}
+				if workload.Spec.PodGroups[0].Policy.Gang == nil {
+					t.Fatal("Expected gang policy to be set")
+				}
+				if workload.Spec.PodGroups[0].Policy.Gang.MinCount != tt.expectedMinCount {
+					t.Errorf("Expected minCount %d, got %d", tt.expectedMinCount, workload.Spec.PodGroups[0].Policy.Gang.MinCount)
+				}
+
+				// Verify owner reference
+				if len(workload.OwnerReferences) != 1 {
+					t.Fatalf("Expected 1 owner reference, got %d", len(workload.OwnerReferences))
+				}
+				ownerRef := workload.OwnerReferences[0]
+				if ownerRef.Name != tt.job.Name || ownerRef.UID != tt.job.UID {
+					t.Errorf("Owner reference mismatch: expected %s/%s, got %s/%s", tt.job.Name, tt.job.UID, ownerRef.Name, ownerRef.UID)
+				}
+				if !*ownerRef.Controller {
+					t.Error("Expected controller to be true")
+				}
+
+				// Test idempotency - calling again should not error
+				err = manager.ensureWorkloadForJob(ctx, tt.job)
+				if err != nil {
+					t.Fatalf("Failed on second call (idempotency check): %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Fatal("Expected workload to not exist, but it does")
+				}
+				if !apierrors.IsNotFound(err) {
+					t.Fatalf("Expected NotFound error, got: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestEnsureWorkloadForJobRecreatesOnParallelismChange(t *testing.T) {
+	tests := []struct {
+		name               string
+		initialParallelism int32
+		updatedParallelism int32
+		expectedFinalCount int32
+	}{
+		{
+			name:               "recreates workload when parallelism increases",
+			initialParallelism: 3,
+			updatedParallelism: 5,
+			expectedFinalCount: 5,
+		},
+		{
+			name:               "recreates workload when parallelism decreases",
+			initialParallelism: 5,
+			updatedParallelism: 2,
+			expectedFinalCount: 2,
+		},
+		{
+			name:               "does not recreate workload when parallelism unchanged",
+			initialParallelism: 3,
+			updatedParallelism: 3,
+			expectedFinalCount: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.JobGangPolicy:   true,
+				features.GangScheduling:  true,
+				features.GenericWorkload: true,
+			})
+			_, ctx := ktesting.NewTestContext(t)
+			clientset := fake.NewClientset()
+			manager, _ := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+
+			job := &batch.Job{
+				TypeMeta: metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-elastic-job",
+					UID:       "test-elastic-job-uid",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.JobSpec{
+					Parallelism: ptr.To(tt.initialParallelism),
+					Completions: ptr.To(tt.initialParallelism),
+					GangPolicy: &batch.GangPolicy{
+						Policy: batch.JobAsGang,
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"foo": "bar"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Image: "foo/bar"},
+							},
+						},
+					},
+				},
+			}
+
+			// First call - creates workload with initial parallelism
+			err := manager.ensureWorkloadForJob(ctx, job)
+			if err != nil {
+				t.Fatalf("Failed to create initial workload: %v", err)
+			}
+
+			// Verify initial workload
+			initialWorkload, err := clientset.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get initial workload: %v", err)
+			}
+			if initialWorkload.Spec.PodGroups[0].Policy.Gang.MinCount != tt.initialParallelism {
+				t.Errorf("Expected initial minCount %d, got %d", tt.initialParallelism, initialWorkload.Spec.PodGroups[0].Policy.Gang.MinCount)
+			}
+
+			// Update job parallelism
+			job.Spec.Parallelism = ptr.To(tt.updatedParallelism)
+			job.Spec.Completions = ptr.To(tt.updatedParallelism)
+
+			// Second call - should update workload minCount if parallelism changed
+			err = manager.ensureWorkloadForJob(ctx, job)
+			if err != nil {
+				t.Fatalf("Failed to ensure workload after parallelism change: %v", err)
+			}
+
+			// Verify final workload has the correct minCount
+			finalWorkload, err := clientset.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get final workload: %v", err)
+			}
+			if finalWorkload.Spec.PodGroups[0].Policy.Gang.MinCount != tt.expectedFinalCount {
+				t.Errorf("Expected final minCount %d, got %d", tt.expectedFinalCount, finalWorkload.Spec.PodGroups[0].Policy.Gang.MinCount)
+			}
+		})
+	}
+}
+
+func TestWorkloadRefSetOnPodTemplates(t *testing.T) {
+	tests := []struct {
+		name                 string
+		featureGateEnabled   bool
+		gangPolicy           *batch.GangPolicy
+		expectWorkloadRef    bool
+		expectedWorkloadName string
+		expectedPodGroupName string
+	}{
+		{
+			name:               "WorkloadRef set on PodTemplates for JobAsGang policy with feature gate enabled",
+			featureGateEnabled: true,
+			gangPolicy: &batch.GangPolicy{
+				Policy: batch.JobAsGang,
+			},
+			expectWorkloadRef:    true,
+			expectedWorkloadName: "test-gang-job",
+			expectedPodGroupName: "test-gang-job",
+		},
+		{
+			name:               "WorkloadRef not set for JobAsGang policy when feature gate disabled",
+			featureGateEnabled: false,
+			gangPolicy: &batch.GangPolicy{
+				Policy: batch.JobAsGang,
+			},
+			expectWorkloadRef: false,
+		},
+		{
+			name:               "WorkloadRef not set for NoGang policy",
+			featureGateEnabled: true,
+			gangPolicy: &batch.GangPolicy{
+				Policy: batch.NoGang,
+			},
+			expectWorkloadRef: false,
+		},
+		{
+			name:               "WorkloadRef not set when no gang policy",
+			featureGateEnabled: true,
+			gangPolicy:         nil,
+			expectWorkloadRef:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.JobGangPolicy:   tt.featureGateEnabled,
+				features.GangScheduling:  tt.featureGateEnabled,
+				features.GenericWorkload: tt.featureGateEnabled,
+			})
+			logger, ctx := ktesting.NewTestContext(t)
+			clientset := fake.NewClientset()
+			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+
+			// Create a job with gang policy
+			job := &batch.Job{
+				TypeMeta: metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-gang-job",
+					UID:       types.UID("test-gang-job-uid"),
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.JobSpec{
+					Parallelism:  ptr.To[int32](2),
+					Completions:  ptr.To[int32](5),
+					BackoffLimit: ptr.To[int32](6),
+					GangPolicy:   tt.gangPolicy,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"job-name": "test-gang-job"},
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"job-name": "test-gang-job"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Image: "foo/bar"},
+							},
+							RestartPolicy: v1.RestartPolicyOnFailure,
+						},
+					},
+				},
+			}
+
+			// Add job to informer and to the client
+			if err := sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job); err != nil {
+				t.Fatalf("Failed to add job to indexer: %v", err)
+			}
+			_, err := clientset.BatchV1().Jobs(job.Namespace).Create(ctx, job, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create job: %v", err)
+			}
+
+			// Setup fake pod control
+			fakePodControl := controller.FakePodControl{}
+			manager.podControl = &fakePodControl
+
+			// Setup update handler to handle status updates
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+				return clientset.BatchV1().Jobs(job.Namespace).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+			}
+
+			// Sync the job
+			key, err := controller.KeyFunc(job)
+			if err != nil {
+				t.Fatalf("Failed to get job key: %v", err)
+			}
+
+			err = manager.syncJob(ctx, key)
+			if err != nil {
+				t.Fatalf("Failed to sync job: %v", err)
+			}
+
+			// Verify pods were created
+			if len(fakePodControl.Templates) == 0 {
+				t.Fatal("Expected pods to be created, but none were created")
+			}
+
+			// Verify WorkloadRef on all created pod templates
+			for i, podTemplate := range fakePodControl.Templates {
+				if tt.expectWorkloadRef {
+					if podTemplate.Spec.WorkloadRef == nil {
+						t.Errorf("Pod template %d: Expected WorkloadRef to be set, but it was nil", i)
+					} else {
+						if podTemplate.Spec.WorkloadRef.Name != tt.expectedWorkloadName {
+							t.Errorf("Pod template %d: Expected WorkloadRef.Name = %q, got %q", i, tt.expectedWorkloadName, podTemplate.Spec.WorkloadRef.Name)
+						}
+						if podTemplate.Spec.WorkloadRef.PodGroup != tt.expectedPodGroupName {
+							t.Errorf("Pod template %d: Expected WorkloadRef.PodGroup = %q, got %q", i, tt.expectedPodGroupName, podTemplate.Spec.WorkloadRef.PodGroup)
+						}
+					}
+				} else {
+					if podTemplate.Spec.WorkloadRef != nil {
+						t.Errorf("Pod template %d: Expected WorkloadRef to be nil, but got %+v", i, podTemplate.Spec.WorkloadRef)
+					}
+				}
+			}
+
+			// For JobAsGang with feature gate enabled, also verify the workload was created
+			if tt.expectWorkloadRef {
+				workload, err := clientset.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Errorf("Expected workload to be created for JobAsGang policy, but got error: %v", err)
+				} else if workload.Name != job.Name {
+					t.Errorf("Expected workload name %s, got %s", job.Name, workload.Name)
+				}
+			}
+
+			// Log the created pods for debugging
+			logger.V(4).Info("Created pod templates", "count", len(fakePodControl.Templates))
+		})
+	}
+}
+
+func TestEnsureWorkloadForJobDoesNotCreateWhenSuspended(t *testing.T) {
+	tests := []struct {
+		name                 string
+		suspended            bool
+		expectWorkloadCreate bool
+	}{
+		{
+			name:                 "does not create workload when job is suspended",
+			suspended:            true,
+			expectWorkloadCreate: false,
+		},
+		{
+			name:                 "creates workload when job is not suspended",
+			suspended:            false,
+			expectWorkloadCreate: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.JobGangPolicy:   true,
+				features.GangScheduling:  true,
+				features.GenericWorkload: true,
+			})
+			_, ctx := ktesting.NewTestContext(t)
+			clientset := fake.NewClientset()
+			manager, _ := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+
+			job := &batch.Job{
+				TypeMeta: metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-suspend-job",
+					UID:       "test-suspend-job-uid",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.JobSpec{
+					Parallelism: ptr.To[int32](3),
+					Completions: ptr.To[int32](3),
+					Suspend:     ptr.To(tt.suspended),
+					GangPolicy: &batch.GangPolicy{
+						Policy: batch.JobAsGang,
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"foo": "bar"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Image: "foo/bar"},
+							},
+						},
+					},
+				},
+			}
+
+			// Call ensureWorkloadForJob
+			err := manager.ensureWorkloadForJob(ctx, job)
+			if err != nil {
+				t.Fatalf("Failed to ensure workload: %v", err)
+			}
+
+			// Verify workload creation expectation
+			workload, err := clientset.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
+			if tt.expectWorkloadCreate {
+				if err != nil {
+					t.Fatalf("Expected workload to be created, but got error: %v", err)
+				}
+				if workload.Name != job.Name {
+					t.Errorf("Expected workload name %s, got %s", job.Name, workload.Name)
+				}
+			} else {
+				if err == nil {
+					t.Fatal("Expected workload to not exist, but it does")
+				}
+				if !apierrors.IsNotFound(err) {
+					t.Fatalf("Expected NotFound error, got: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteWorkloadForJob(t *testing.T) {
+	tests := []struct {
+		name                 string
+		featureGateEnabled   bool
+		gangPolicy           *batch.GangPolicy
+		workloadExists       bool
+		expectWorkloadDelete bool
+	}{
+		{
+			name:                 "deletes workload when job is suspended and workload exists",
+			featureGateEnabled:   true,
+			gangPolicy:           &batch.GangPolicy{Policy: batch.JobAsGang},
+			workloadExists:       true,
+			expectWorkloadDelete: true,
+		},
+		{
+			name:                 "no error when workload does not exist",
+			featureGateEnabled:   true,
+			gangPolicy:           &batch.GangPolicy{Policy: batch.JobAsGang},
+			workloadExists:       false,
+			expectWorkloadDelete: false,
+		},
+		{
+			name:                 "no-op when feature gate disabled",
+			featureGateEnabled:   false,
+			gangPolicy:           &batch.GangPolicy{Policy: batch.JobAsGang},
+			workloadExists:       true,
+			expectWorkloadDelete: false,
+		},
+		{
+			name:                 "no-op for NoGang policy",
+			featureGateEnabled:   true,
+			gangPolicy:           &batch.GangPolicy{Policy: batch.NoGang},
+			workloadExists:       true,
+			expectWorkloadDelete: false,
+		},
+		{
+			name:                 "no-op when no gang policy",
+			featureGateEnabled:   true,
+			gangPolicy:           nil,
+			workloadExists:       true,
+			expectWorkloadDelete: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.JobGangPolicy:   tt.featureGateEnabled,
+				features.GangScheduling:  tt.featureGateEnabled,
+				features.GenericWorkload: tt.featureGateEnabled,
+			})
+			_, ctx := ktesting.NewTestContext(t)
+			clientset := fake.NewClientset()
+			manager, _ := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+
+			job := &batch.Job{
+				TypeMeta: metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-delete-workload-job",
+					UID:       "test-delete-workload-job-uid",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: batch.JobSpec{
+					Parallelism: ptr.To[int32](3),
+					Completions: ptr.To[int32](3),
+					Suspend:     ptr.To(true),
+					GangPolicy:  tt.gangPolicy,
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"foo": "bar"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Image: "foo/bar"},
+							},
+						},
+					},
+				},
+			}
+
+			// Pre-create workload if needed
+			if tt.workloadExists {
+				workload := &schedulingv1alpha1.Workload{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      job.Name,
+						Namespace: job.Namespace,
+					},
+					Spec: schedulingv1alpha1.WorkloadSpec{
+						PodGroups: []schedulingv1alpha1.PodGroup{
+							{
+								Name: job.Name,
+								Policy: schedulingv1alpha1.PodGroupPolicy{
+									Gang: &schedulingv1alpha1.GangSchedulingPolicy{
+										MinCount: 3,
+									},
+								},
+							},
+						},
+					},
+				}
+				_, err := clientset.SchedulingV1alpha1().Workloads(job.Namespace).Create(ctx, workload, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create workload: %v", err)
+				}
+			}
+
+			// Call deleteWorkloadForJob
+			err := manager.deleteWorkloadForJob(ctx, job)
+			if err != nil {
+				t.Fatalf("Failed to delete workload: %v", err)
+			}
+
+			// Verify workload was deleted (or not, depending on the test case)
+			_, err = clientset.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
+			if tt.expectWorkloadDelete {
+				if err == nil {
+					t.Fatal("Expected workload to be deleted, but it still exists")
+				}
+				if !apierrors.IsNotFound(err) {
+					t.Fatalf("Expected NotFound error, got: %v", err)
+				}
+			} else if tt.workloadExists {
+				// For cases where we don't expect deletion but workload existed
+				if err != nil {
+					t.Fatalf("Expected workload to still exist, but got error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestWorkloadLifecycleWithSuspend(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.JobGangPolicy:   true,
+		features.GangScheduling:  true,
+		features.GenericWorkload: true,
+	})
+	_, ctx := ktesting.NewTestContext(t)
+	clientset := fake.NewClientset()
+	manager, _ := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+
+	job := &batch.Job{
+		TypeMeta: metav1.TypeMeta{Kind: "Job"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-lifecycle-job",
+			UID:       "test-lifecycle-job-uid",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: batch.JobSpec{
+			Parallelism: ptr.To[int32](3),
+			Completions: ptr.To[int32](3),
+			Suspend:     ptr.To(false),
+			GangPolicy: &batch.GangPolicy{
+				Policy: batch.JobAsGang,
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Image: "foo/bar"},
+					},
+				},
+			},
+		},
+	}
+
+	// Step 1: Job is not suspended - workload should be created
+	err := manager.ensureWorkloadForJob(ctx, job)
+	if err != nil {
+		t.Fatalf("Step 1: Failed to ensure workload: %v", err)
+	}
+	_, err = clientset.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Step 1: Expected workload to be created, but got error: %v", err)
+	}
+
+	// Step 2: Suspend the job - workload should be deleted
+	job.Spec.Suspend = ptr.To(true)
+	err = manager.deleteWorkloadForJob(ctx, job)
+	if err != nil {
+		t.Fatalf("Step 2: Failed to delete workload: %v", err)
+	}
+	_, err = clientset.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("Step 2: Expected workload to be deleted, but got: %v", err)
+	}
+
+	// Step 3: Resume the job - workload should be recreated
+	job.Spec.Suspend = ptr.To(false)
+	err = manager.ensureWorkloadForJob(ctx, job)
+	if err != nil {
+		t.Fatalf("Step 3: Failed to ensure workload: %v", err)
+	}
+	workload, err := clientset.SchedulingV1alpha1().Workloads(job.Namespace).Get(ctx, job.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Step 3: Expected workload to be recreated, but got error: %v", err)
+	}
+	if workload.Spec.PodGroups[0].Policy.Gang.MinCount != 3 {
+		t.Errorf("Step 3: Expected minCount 3, got %d", workload.Spec.PodGroups[0].Policy.Gang.MinCount)
 	}
 }

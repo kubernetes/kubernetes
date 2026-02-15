@@ -166,6 +166,24 @@ const (
 	Failed PodReplacementPolicy = "Failed"
 )
 
+// GangSchedulingPolicy specifies the gang scheduling mode for a Job.
+// +enum
+type GangSchedulingPolicy string
+
+const (
+	// NoGang means that the Job does not use gang scheduling.
+	NoGang GangSchedulingPolicy = "NoGang"
+	// JobAsGang means that all pods in the Job are scheduled as a gang.
+	JobAsGang GangSchedulingPolicy = "JobAsGang"
+)
+
+// GangPolicy defines the gang scheduling configuration for a Job.
+type GangPolicy struct {
+	// Policy specifies the gang scheduling mode.
+	// +optional
+	Policy GangSchedulingPolicy
+}
+
 // PodFailurePolicyOnExitCodesRequirement describes the requirement for handling
 // a failed pod based on its container exit codes. In particular, it lookups the
 // .state.terminated.exitCode for each app container and init container status,
@@ -469,6 +487,11 @@ type JobSpec struct {
 	// This field is immutable.
 	// +optional
 	ManagedBy *string
+
+	// GangPolicy specifies the gang scheduling configuration for this Job.
+	// When set, all pods in the Job are scheduled as a group according to the specified policy.
+	// +optional
+	GangPolicy *GangPolicy
 }
 
 // JobStatus represents the current state of a Job.

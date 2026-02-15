@@ -1942,7 +1942,10 @@
         "completionMode": "completionModeValue",
         "suspend": true,
         "podReplacementPolicy": "podReplacementPolicyValue",
-        "managedBy": "managedByValue"
+        "managedBy": "managedByValue",
+        "gangPolicy": {
+          "policy": "policyValue"
+        }
       }
     },
     "successfulJobsHistoryLimit": 6,
