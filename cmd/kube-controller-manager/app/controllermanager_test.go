@@ -97,6 +97,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.StorageVersionGarbageCollectorController,
 		names.ResourceClaimController,
 		names.DeviceTaintEvictionController,
+		names.ResourcePoolStatusRequestController,
 		names.LegacyServiceAccountTokenCleanerController,
 		names.ValidatingAdmissionPolicyStatusController,
 		names.ServiceCIDRController,

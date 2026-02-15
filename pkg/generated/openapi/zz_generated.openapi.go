@@ -68,6 +68,7 @@ import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	v1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
@@ -1020,6 +1021,11 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.ResourceSlice{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_ResourceSlice(ref),
 		resourcev1.ResourceSliceList{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceList(ref),
 		resourcev1.ResourceSliceSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceSpec(ref),
+		resourcev1alpha1.PoolStatus{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1alpha1_PoolStatus(ref),
+		resourcev1alpha1.ResourcePoolStatusRequest{}.OpenAPIModelName():                                                 schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequest(ref),
+		resourcev1alpha1.ResourcePoolStatusRequestList{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestList(ref),
+		resourcev1alpha1.ResourcePoolStatusRequestSpec{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestSpec(ref),
+		resourcev1alpha1.ResourcePoolStatusRequestStatus{}.OpenAPIModelName():                                           schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestStatus(ref),
 		v1alpha3.CELDeviceSelector{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref),
 		v1alpha3.DeviceSelector{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
 		v1alpha3.DeviceTaint{}.OpenAPIModelName():                                                                       schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref),
@@ -48483,6 +48489,325 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 		},
 		Dependencies: []string{
 			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.CounterSet{}.OpenAPIModelName(), resourcev1.Device{}.OpenAPIModelName(), resourcev1.ResourcePool{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha1_PoolStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PoolStatus contains status information for a single resource pool.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"driver": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Driver is the DRA driver name for this pool.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"poolName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PoolName is the name of the pool.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeName is the node this pool is associated with. Empty for non-node-local pools.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"totalDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TotalDevices is the total number of devices in the pool across all slices.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"allocatedDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocatedDevices is the number of devices currently allocated to claims.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"availableDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AvailableDevices is the number of devices available for allocation. This equals TotalDevices - AllocatedDevices - UnavailableDevices.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"unavailableDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"sliceCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SliceCount is the number of ResourceSlices that make up this pool.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"generation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Generation is the maximum metadata.generation observed across all ResourceSlices in this pool. Can be used to detect changes.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+				Required: []string{"driver", "poolName", "totalDevices", "allocatedDevices", "availableDevices", "sliceCount"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. The request follows a request/response pattern similar to CertificateSigningRequest - create a request, and the controller populates the status.\n\nOnce status.observationTime is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the filters for which pools to include in the status.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(resourcev1alpha1.ResourcePoolStatusRequestSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is populated by the controller with the calculated pool status.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(resourcev1alpha1.ResourcePoolStatusRequestStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			resourcev1alpha1.ResourcePoolStatusRequestSpec{}.OpenAPIModelName(), resourcev1alpha1.ResourcePoolStatusRequestStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequestList is a collection of ResourcePoolStatusRequests.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of ResourcePoolStatusRequests.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1alpha1.ResourcePoolStatusRequest{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			resourcev1alpha1.ResourcePoolStatusRequest{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequestSpec defines the filters for the pool status request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"driver": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. This field is required to bound the scope of the request.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"poolName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"limit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated and status.truncated will be set to true.\n\nDefault: 100 Maximum: 1000",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"driver"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequestStatus contains the calculated pool status information.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"observationTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ObservationTime is the timestamp when the controller calculated this status. Once set, the request is considered complete and will not be reprocessed. Users should delete and recreate the request to get updated information.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"pools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Pools contains the status of each pool matching the request filters. The list is sorted by driver, then pool name.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1alpha1.PoolStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions provide information about the state of the request.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"validationErrors": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ValidationErrors contains any validation errors encountered while processing the request. If present, the request may have partial or no results.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"truncated": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Truncated indicates whether the response was truncated due to the limit. If true, there are more pools matching the filter criteria than were returned.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"totalMatchingPools": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1alpha1.PoolStatus{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 

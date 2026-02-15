@@ -59,6 +59,7 @@ import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	v1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
@@ -384,6 +385,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1().ResourceClaimTemplates().Informer()}, nil
 	case resourcev1.SchemeGroupVersion.WithResource("resourceslices"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1().ResourceSlices().Informer()}, nil
+
+		// Group=resource.k8s.io, Version=v1alpha1
+	case resourcev1alpha1.SchemeGroupVersion.WithResource("resourcepoolstatusrequests"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha1().ResourcePoolStatusRequests().Informer()}, nil
 
 		// Group=resource.k8s.io, Version=v1alpha3
 	case v1alpha3.SchemeGroupVersion.WithResource("devicetaintrules"):

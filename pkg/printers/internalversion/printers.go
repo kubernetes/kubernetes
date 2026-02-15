@@ -696,6 +696,16 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(nodeResourceSliceColumnDefinitions, printResourceSlice)
 	_ = h.TableHandler(nodeResourceSliceColumnDefinitions, printResourceSliceList)
 
+	resourcePoolStatusRequestColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Driver", Type: "string", Description: "The driver to query pools for."},
+		{Name: "Pools", Type: "integer", Description: "Total number of matching pools."},
+		{Name: "Status", Type: "string", Description: "Processing status (Complete, Pending)."},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(resourcePoolStatusRequestColumnDefinitions, printResourcePoolStatusRequest)
+	_ = h.TableHandler(resourcePoolStatusRequestColumnDefinitions, printResourcePoolStatusRequestList)
+
 	deviceTaintColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		// The filter criteria are not printed. They could be lengthy (CEL!) and in practice many of them
@@ -3252,6 +3262,36 @@ func printResourceSliceList(list *resource.ResourceSliceList, options printers.G
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printResourceSlice(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printResourcePoolStatusRequest(obj *resource.ResourcePoolStatusRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	status := "Pending"
+	for _, cond := range obj.Status.Conditions {
+		if cond.Type == "Complete" && cond.Status == metav1.ConditionTrue {
+			status = "Complete"
+			break
+		}
+	}
+
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Driver, obj.Status.TotalMatchingPools, status, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printResourcePoolStatusRequestList(list *resource.ResourcePoolStatusRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printResourcePoolStatusRequest(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

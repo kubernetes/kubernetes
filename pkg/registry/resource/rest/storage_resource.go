@@ -18,6 +18,7 @@ package rest
 
 import (
 	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
@@ -32,6 +33,7 @@ import (
 	devicetaintrulestore "k8s.io/kubernetes/pkg/registry/resource/devicetaintrule/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
+	resourcepoolstatusrequeststore "k8s.io/kubernetes/pkg/registry/resource/resourcepoolstatusrequest/storage"
 	resourceslicestore "k8s.io/kubernetes/pkg/registry/resource/resourceslice/storage"
 )
 
@@ -52,6 +54,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[resourcev1.SchemeGroupVersion.Version] = storageMap
+	}
+
+	if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[resourcev1alpha1.SchemeGroupVersion.Version] = storageMap
 	}
 
 	if storageMap, err := p.v1alpha3Storage(apiResourceConfigSource, restOptionsGetter, p.NamespaceClient); err != nil {
@@ -109,6 +117,21 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 			return nil, err
 		}
 		storage[resource] = resourceSliceStorage
+	}
+
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	if resource := "resourcepoolstatusrequests"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		resourcePoolStatusRequestStorage, resourcePoolStatusRequestStatusStorage, err := resourcepoolstatusrequeststore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourcePoolStatusRequestStorage
+		storage[resource+"/status"] = resourcePoolStatusRequestStatusStorage
 	}
 
 	return storage, nil

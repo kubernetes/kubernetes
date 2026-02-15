@@ -8093,3 +8093,62 @@ func TestPrintWorkloadList(t *testing.T) {
 		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
 	}
 }
+
+func TestPrintResourcePoolStatusRequest(t *testing.T) {
+	tests := []struct {
+		name     string
+		request  resourceapis.ResourcePoolStatusRequest
+		expected []metav1.TableRow
+	}{
+		{
+			name: "ResourcePoolStatusRequest with Pending status",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+			},
+			// Columns: Name, Driver, Pools, Status, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", int32(0), "Pending", "5m"}}},
+		},
+		{
+			name: "ResourcePoolStatusRequest with Complete status",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: resourceapis.ResourcePoolStatusRequestStatus{
+					TotalMatchingPools: 3,
+					Conditions: []metav1.Condition{
+						{
+							Type:   "Complete",
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			// Columns: Name, Driver, Pools, Status, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", int32(3), "Complete", "5m"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printResourcePoolStatusRequest(&test.request, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}

@@ -66,6 +66,7 @@ import (
 	rbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	resourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1"
+	resourcev1alpha1 "k8s.io/client-go/kubernetes/typed/resource/v1alpha1"
 	resourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
 	resourcev1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
@@ -128,6 +129,7 @@ type Interface interface {
 	ResourceV1beta2() resourcev1beta2.ResourceV1beta2Interface
 	ResourceV1beta1() resourcev1beta1.ResourceV1beta1Interface
 	ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interface
+	ResourceV1alpha1() resourcev1alpha1.ResourceV1alpha1Interface
 	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
 	SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface
 	SchedulingV1() schedulingv1.SchedulingV1Interface
@@ -186,6 +188,7 @@ type Clientset struct {
 	resourceV1beta2               *resourcev1beta2.ResourceV1beta2Client
 	resourceV1beta1               *resourcev1beta1.ResourceV1beta1Client
 	resourceV1alpha3              *resourcev1alpha3.ResourceV1alpha3Client
+	resourceV1alpha1              *resourcev1alpha1.ResourceV1alpha1Client
 	schedulingV1alpha1            *schedulingv1alpha1.SchedulingV1alpha1Client
 	schedulingV1beta1             *schedulingv1beta1.SchedulingV1beta1Client
 	schedulingV1                  *schedulingv1.SchedulingV1Client
@@ -423,6 +426,11 @@ func (c *Clientset) ResourceV1beta1() resourcev1beta1.ResourceV1beta1Interface {
 // ResourceV1alpha3 retrieves the ResourceV1alpha3Client
 func (c *Clientset) ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interface {
 	return c.resourceV1alpha3
+}
+
+// ResourceV1alpha1 retrieves the ResourceV1alpha1Client
+func (c *Clientset) ResourceV1alpha1() resourcev1alpha1.ResourceV1alpha1Interface {
+	return c.resourceV1alpha1
 }
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client
@@ -688,6 +696,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.resourceV1alpha1, err = resourcev1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.schedulingV1alpha1, err = schedulingv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -783,6 +795,7 @@ func New(c rest.Interface) *Clientset {
 	cs.resourceV1beta2 = resourcev1beta2.New(c)
 	cs.resourceV1beta1 = resourcev1beta1.New(c)
 	cs.resourceV1alpha3 = resourcev1alpha3.New(c)
+	cs.resourceV1alpha1 = resourcev1alpha1.New(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)
 	cs.schedulingV1beta1 = schedulingv1beta1.New(c)
 	cs.schedulingV1 = schedulingv1.New(c)

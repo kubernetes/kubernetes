@@ -561,6 +561,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: DRAResourcePoolStatus
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: DRASchedulerFilterTimeout
   versionedSpecs:
   - default: true

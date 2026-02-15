@@ -12876,6 +12876,108 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.CounterSet
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha1.PoolStatus
+  map:
+    fields:
+    - name: allocatedDevices
+      type:
+        scalar: numeric
+      default: 0
+    - name: availableDevices
+      type:
+        scalar: numeric
+      default: 0
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: generation
+      type:
+        scalar: numeric
+    - name: nodeName
+      type:
+        scalar: string
+    - name: poolName
+      type:
+        scalar: string
+      default: ""
+    - name: sliceCount
+      type:
+        scalar: numeric
+      default: 0
+    - name: totalDevices
+      type:
+        scalar: numeric
+      default: 0
+    - name: unavailableDevices
+      type:
+        scalar: numeric
+- name: io.k8s.api.resource.v1alpha1.ResourcePoolStatusRequest
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1alpha1.ResourcePoolStatusRequestSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.resource.v1alpha1.ResourcePoolStatusRequestStatus
+      default: {}
+- name: io.k8s.api.resource.v1alpha1.ResourcePoolStatusRequestSpec
+  map:
+    fields:
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: limit
+      type:
+        scalar: numeric
+    - name: poolName
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1alpha1.ResourcePoolStatusRequestStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: observationTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: pools
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha1.PoolStatus
+          elementRelationship: atomic
+    - name: totalMatchingPools
+      type:
+        scalar: numeric
+    - name: truncated
+      type:
+        scalar: boolean
+    - name: validationErrors
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.DeviceTaint
   map:
     fields:

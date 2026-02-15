@@ -58,6 +58,7 @@ import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	v1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
@@ -113,6 +114,7 @@ import (
 	applyconfigurationsrbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
 	applyconfigurationsrbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
 	applyconfigurationsresourcev1 "k8s.io/client-go/applyconfigurations/resource/v1"
+	applyconfigurationsresourcev1alpha1 "k8s.io/client-go/applyconfigurations/resource/v1alpha1"
 	resourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
 	applyconfigurationsresourcev1beta1 "k8s.io/client-go/applyconfigurations/resource/v1beta1"
 	applyconfigurationsresourcev1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
@@ -1626,6 +1628,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ResourceSliceApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &applyconfigurationsresourcev1.ResourceSliceSpecApplyConfiguration{}
+
+		// Group=resource.k8s.io, Version=v1alpha1
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("PoolStatus"):
+		return &applyconfigurationsresourcev1alpha1.PoolStatusApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourcePoolStatusRequest"):
+		return &applyconfigurationsresourcev1alpha1.ResourcePoolStatusRequestApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourcePoolStatusRequestSpec"):
+		return &applyconfigurationsresourcev1alpha1.ResourcePoolStatusRequestSpecApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourcePoolStatusRequestStatus"):
+		return &applyconfigurationsresourcev1alpha1.ResourcePoolStatusRequestStatusApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaint"):

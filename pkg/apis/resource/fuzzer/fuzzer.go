@@ -106,5 +106,28 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				r.NodeName = nil
 			}
 		},
+		func(r *resource.ResourcePoolStatusRequestStatus, c randfill.Continue) {
+			c.FillNoCustom(r)
+			// Empty slices become nil after round-tripping through JSON.
+			// Ensure they are either nil or have at least one element.
+			if len(r.Pools) == 0 {
+				r.Pools = nil
+			}
+			if len(r.Conditions) == 0 {
+				r.Conditions = nil
+			}
+			if len(r.ValidationErrors) == 0 {
+				r.ValidationErrors = nil
+			}
+		},
+		func(r *resource.ResourcePoolStatusRequestSpec, c randfill.Continue) {
+			c.FillNoCustom(r)
+			// Limit has a default value of 100, so ensure it's set
+			// to prevent defaulting during round-trip.
+			if r.Limit == nil {
+				limit := int32(c.Int31n(1000) + 1)
+				r.Limit = &limit
+			}
+		},
 	}
 }
