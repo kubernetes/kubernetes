@@ -4473,7 +4473,7 @@ func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, clien
 func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Interface, queuedPodStore *clientcache.FIFO, cache internalcache.Cache, apiDispatcher *apidispatcher.APIDispatcher,
 	informerFactory informers.SharedInformerFactory, broadcaster events.EventBroadcaster, fns ...tf.RegisterPluginFunc) (*Scheduler, chan error) {
 
-	var recorder events.EventRecorder
+	var recorder events.EventRecorderLogger
 	if broadcaster != nil {
 		recorder = broadcaster.NewRecorder(scheme.Scheme, testSchedulerName)
 	} else {
