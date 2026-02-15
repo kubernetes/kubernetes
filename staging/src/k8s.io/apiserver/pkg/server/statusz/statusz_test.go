@@ -32,9 +32,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
@@ -458,5 +461,40 @@ func TestNewStatuszCodecFactory(t *testing.T) {
 	_, err := newStatuszCodecFactory(scheme, "", nil)
 	if err != nil {
 		t.Fatalf("unknown media type(s) detected - update newStatuszCodecFactory to explicitly handle them: %v", err)
+	}
+}
+
+func TestMetrics(t *testing.T) {
+	fakeStartTime := time.Now()
+	fakeBinaryVersion := parseVersion(t, "1.31")
+	fakeEmulationVersion := parseVersion(t, "1.30")
+	fakeListedPaths := []string{"/livez/ping", "/readyz/ping"}
+
+	reg := fakeRegistry{
+		startTime:    fakeStartTime,
+		goVer:        "1.21",
+		binaryVer:    fakeBinaryVersion,
+		emulationVer: fakeEmulationVersion,
+		listedPaths:  fakeListedPaths,
+	}
+
+	mux := http.NewServeMux()
+	Install(mux, "test-server", reg)
+	metrics.Register()
+	metrics.Reset()
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s", DefaultStatuszPath), nil)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	mux.ServeHTTP(httptest.NewRecorder(), req)
+
+	expected := strings.NewReader(`
+        # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
+        # TYPE apiserver_request_total counter
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/statusz",verb="GET",version=""} 1
+`)
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, expected, "apiserver_request_total"); err != nil {
+		t.Error(err)
 	}
 }
