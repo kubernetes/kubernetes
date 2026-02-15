@@ -267,6 +267,8 @@ type DriverInfo struct {
 	StressTestOptions *StressTestOptions
 	// [Optional] Scale parameters for volume snapshot stress tests.
 	VolumeSnapshotStressTestOptions *VolumeSnapshotStressTestOptions
+	// [Optional] Scale parameters for volume group snapshot stress tests.
+	VolumeGroupSnapshotStressTestOptions *VolumeGroupSnapshotStressTestOptions
 	// [Optional] Scale parameters for volume modify stress tests.
 	VolumeModifyStressTestOptions *VolumeModifyStressTestOptions
 	// [Optional] Parameters for performance tests
@@ -288,6 +290,15 @@ type VolumeSnapshotStressTestOptions struct {
 	// up to 1 volume per pod.
 	NumPods int
 	// Number of snapshots to create for each volume.
+	NumSnapshots int
+}
+
+// VolumeGroupSnapshotStressTestOptions contains parameters used for volume group snapshot stress tests.
+type VolumeGroupSnapshotStressTestOptions struct {
+	// Number of pods to create in the StatefulSet. This will create
+	// that many PVCs with the same label for group snapshotting.
+	NumPods int
+	// Number of volume group snapshots to create.
 	NumSnapshots int
 }
 
