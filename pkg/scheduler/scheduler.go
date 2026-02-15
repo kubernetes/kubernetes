@@ -153,6 +153,9 @@ type Option func(*schedulerOptions)
 type ScheduleResult struct {
 	// Name of the selected node.
 	SuggestedHost string
+	// SuggestedNodeGeneration is the generation of the node when we selected it (from snapshot).
+	// Used for optimistic locking: assume() verifies the cache's node generation still matches.
+	SuggestedNodeGeneration int64
 	// The number of nodes the scheduler evaluated the pod against in the filtering
 	// phase and beyond.
 	EvaluatedNodes int

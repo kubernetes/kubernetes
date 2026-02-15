@@ -4734,3 +4734,86 @@ func queuedPodInfoForPod(pod *v1.Pod) *framework.QueuedPodInfo {
 		},
 	}
 }
+
+// TestAssumeOptimisticLocking verifies that assume() detects a generation mismatch when
+// another actor (e.g. a second scheduler replica) has assumed a pod on the same node
+// between our SchedulePod and assume(). This prevents the multi-replica race (issue #136782).
+func TestAssumeOptimisticLocking(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	logger := klog.FromContext(ctx)
+
+	// One node with room for multiple pods.
+	node := makeNode("node1", 1000, 10*mb)
+	node.Status.Allocatable[v1.ResourcePods] = resource.MustParse("110")
+	node.Status.Capacity[v1.ResourcePods] = resource.MustParse("110")
+
+	cache := internalcache.New(ctx, nil)
+	cache.AddNode(logger, node)
+	snapshot := internalcache.NewEmptySnapshot()
+	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+		t.Fatalf("UpdateSnapshot: %v", err)
+	}
+
+	cs := clientsetfake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(cs, 0)
+	registerPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterFilterPlugin(noderesources.Name, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit)),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+	fwk, err := tf.NewFramework(
+		ctx,
+		registerPlugins, "",
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+	)
+	if err != nil {
+		t.Fatalf("NewFramework: %v", err)
+	}
+
+	sched := &Scheduler{
+		Cache:                    cache,
+		nodeInfoSnapshot:         snapshot,
+		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+	}
+	sched.applyDefaultHandlers()
+
+	// Pod to be scheduled by "this replica".
+	pod1 := st.MakePod().Name("pod1").UID("pod1").Namespace("default").SchedulerName(testSchedulerName).Obj()
+	podInfo1 := queuedPodInfoForPod(pod1)
+
+	// 1) Run SchedulePod; we get a result with SuggestedHost and SuggestedNodeGeneration.
+	state := framework.NewCycleState()
+	result, err := sched.SchedulePod(ctx, fwk, state, podInfo1)
+	if err != nil {
+		t.Fatalf("SchedulePod: %v", err)
+	}
+	if result.SuggestedHost != node.Name {
+		t.Fatalf("expected SuggestedHost %q, got %q", node.Name, result.SuggestedHost)
+	}
+	expectedGen := result.SuggestedNodeGeneration
+
+	// 2) Simulate another scheduler replica: assume a different pod on the same node.
+	//    This bumps the cache's node generation.
+	pod2 := st.MakePod().Name("pod2").UID("pod2").Namespace("default").SchedulerName(testSchedulerName).Obj()
+	pod2.Spec.NodeName = node.Name
+	if err := cache.AssumePod(logger, pod2); err != nil {
+		t.Fatalf("AssumePod(pod2): %v", err)
+	}
+
+	// 3) Now assume(pod1) with the generation we captured earlier. With optimistic locking,
+	//    the cache's node generation has changed, so assume should fail.
+	err = sched.assume(logger, podInfo1, result.SuggestedHost, expectedGen)
+	if err == nil {
+		t.Fatal("expected assume() to fail with generation mismatch, got nil")
+	}
+	if !strings.Contains(err.Error(), "generation mismatch") {
+		t.Errorf("expected error to contain %q, got: %v", "generation mismatch", err)
+	}
+	if !strings.Contains(err.Error(), "retry needed") {
+		t.Errorf("expected error to contain %q, got: %v", "retry needed", err)
+	}
+}
