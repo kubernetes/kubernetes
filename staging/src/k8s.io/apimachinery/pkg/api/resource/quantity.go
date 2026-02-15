@@ -306,7 +306,8 @@ func ParseQuantity(str string) (Quantity, error) {
 		case exponent >= 0 && len(denom) == 0:
 			// only handle positive binary numbers with the fast path
 			mantissa = int64(int64(mantissa) << uint64(exponent))
-			// 1Mi (2^20) has ~6 digits of decimal precision, so exponent*3/10 -1 is roughly the precision
+			// 1Mi (2^20) has ~6 digits of decimal precision,
+			// so exponent*3/10 -1 is roughly the precision
 			precision = 15 - int32(len(num)) - int32(float32(exponent)*3/10) - 1
 		default:
 			precision = -1
@@ -314,36 +315,64 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 
 	if precision >= 0 {
-		// if we have a denominator, shift the entire value to the left by the number of places in the
-		// denominator
+		// if we have a denominator, shift the entire value to the left
+		// by the number of places in the denominator
 		scale -= int32(len(denom))
 		if scale >= int32(Nano) {
 			shifted := num + denom
 
-			var value int64
-			value, err := strconv.ParseInt(shifted, 10, 64)
+			var v int64
+			v, err = strconv.ParseInt(shifted, 10, 64)
 			if err != nil {
 				return Quantity{}, ErrNumeric
 			}
-			if result, ok := int64Multiply(value, int64(mantissa)); ok {
+			if result, ok := int64Multiply(v, int64(mantissa)); ok {
 				if !positive {
 					result = -result
 				}
 				// if the number is in canonical form, reuse the string
 				switch format {
 				case BinarySI:
-					if exponent%10 == 0 && (value&0x07 != 0) {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+					if exponent%10 == 0 && (v&0x07 != 0) {
+						return Quantity{
+							i:      int64Amount{value: result, scale: Scale(scale)},
+							Format: format,
+							s:      str,
+						}, nil
 					}
 				default:
 					if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+						return Quantity{
+							i:      int64Amount{value: result, scale: Scale(scale)},
+							Format: format,
+							s:      str,
+						}, nil
 					}
 				}
-				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
+				return Quantity{
+					i:      int64Amount{value: result, scale: Scale(scale)},
+					Format: format,
+				}, nil
 			}
 		}
 	}
+
+	// --------------------------------------------------------------------
+	// FIX: handle plain base-10 integers that fit into int64 using fast path
+	// --------------------------------------------------------------------
+	if base == 10 && exponent == 0 && len(denom) == 0 {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if !positive {
+				v = -v
+			}
+			return Quantity{
+				i:      int64Amount{value: v},
+				Format: format,
+				s:      value,
+			}, nil
+		}
+	}
+	// --------------------------------------------------------------------
 
 	amount := new(inf.Dec)
 	if _, ok := amount.SetString(value); !ok {
@@ -366,22 +395,18 @@ func ParseQuantity(str string) (Quantity, error) {
 		amount.Neg(amount)
 	}
 
-	// This rounds non-zero values up to the minimum representable value, under the theory that
-	// if you want some resources, you should get some resources, even if you asked for way too small
-	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
-	// the side effect of rounding values < .5n to zero.
+	// Round non-zero values up to minimum representable value.
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
 		amount.Round(amount, Nano.infScale(), inf.RoundUp)
 	}
 
 	// The max is just a simple cap.
-	// TODO: this prevents accumulating quantities greater than int64, for instance quota across a cluster
 	if format == BinarySI && amount.Cmp(maxAllowed.Dec) > 0 {
 		amount.Set(maxAllowed.Dec)
 	}
 
 	if format == BinarySI && amount.Cmp(decOne) < 0 && amount.Cmp(decZero) > 0 {
-		// This avoids rounding and hopefully confusion, too.
+		// avoid rounding for small binary values
 		format = DecimalSI
 	}
 	if sign == -1 {
