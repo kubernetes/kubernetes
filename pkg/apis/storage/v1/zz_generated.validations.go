@@ -39,6 +39,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type CSINode
+	scheme.AddValidationFunc((*storagev1.CSINode)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_CSINode(ctx, op, nil /* fldPath */, obj.(*storagev1.CSINode), safe.Cast[*storagev1.CSINode](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type StorageClass
 	scheme.AddValidationFunc((*storagev1.StorageClass)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -56,6 +64,79 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_CSINode validates an instance of CSINode according
+// to declarative validation rules in the API schema.
+func Validate_CSINode(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.CSINode) (errs field.ErrorList) {
+	// field storagev1.CSINode.TypeMeta has no validation
+	// field storagev1.CSINode.ObjectMeta has no validation
+
+	// field storagev1.CSINode.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *storagev1.CSINodeSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CSINodeSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *storagev1.CSINode) *storagev1.CSINodeSpec { return &oldObj.Spec }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_CSINodeDriver validates an instance of CSINodeDriver according
+// to declarative validation rules in the API schema.
+func Validate_CSINodeDriver(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.CSINodeDriver) (errs field.ErrorList) {
+	// field storagev1.CSINodeDriver.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63)...)
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *storagev1.CSINodeDriver) *string { return &oldObj.Name }), oldObj != nil)...)
+
+	// field storagev1.CSINodeDriver.NodeID has no validation
+	// field storagev1.CSINodeDriver.TopologyKeys has no validation
+	// field storagev1.CSINodeDriver.Allocatable has no validation
+	return errs
+}
+
+// Validate_CSINodeSpec validates an instance of CSINodeSpec according
+// to declarative validation rules in the API schema.
+func Validate_CSINodeSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.CSINodeSpec) (errs field.ErrorList) {
+	// field storagev1.CSINodeSpec.Drivers
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []storagev1.CSINodeDriver, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_CSINodeDriver)...)
+			return
+		}(fldPath.Child("drivers"), obj.Drivers, safe.Field(oldObj, func(oldObj *storagev1.CSINodeSpec) []storagev1.CSINodeDriver { return oldObj.Drivers }), oldObj != nil)...)
+
+	return errs
 }
 
 // Validate_StorageClass validates an instance of StorageClass according
