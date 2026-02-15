@@ -227,6 +227,22 @@
   help: Number of requested image volumes.
   type: Counter
   stabilityLevel: BETA
+- name: kubernetes_build_info
+  help: A metric with a constant '1' value labeled by major, minor, git version, git
+    commit, git tree state, build date, Go version, and compiler from which Kubernetes
+    was built, and platform on which it is running.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - build_date
+  - compiler
+  - git_commit
+  - git_tree_state
+  - git_version
+  - go_version
+  - major
+  - minor
+  - platform
 - name: feature_enabled
   namespace: kubernetes
   help: This metric records the data about the stage and enablement of a k8s feature.
@@ -256,6 +272,13 @@
   labels:
   - deprecated_version
   - stability_level
+- name: running_managed_controllers
+  help: Indicates where instances of a controller are currently running
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - manager
+  - name
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
