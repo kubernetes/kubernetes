@@ -340,6 +340,9 @@ func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllO
 	if v.ForbiddenGenerics.Nullable {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nullable"), "must be false to be structural"))
 	}
+	if v.ForbiddenGenerics.ExternalDocs != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("externalDocs"), "must be undefined to be structural"))
+	}
 
 	if v.ForbiddenExtensions.XPreserveUnknownFields {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-preserve-unknown-fields"), "must be false to be structural"))

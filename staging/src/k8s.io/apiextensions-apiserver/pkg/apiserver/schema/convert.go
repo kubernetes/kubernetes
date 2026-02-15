@@ -37,7 +37,6 @@ import (
 //   - definitions.
 //
 // The follow fields are not preserved:
-// - externalDocs
 // - example.
 func NewStructural(s *apiextensions.JSONSchemaProps) (*Structural, error) {
 	if s == nil {
@@ -125,6 +124,12 @@ func newGenerics(s *apiextensions.JSONSchemaProps) (*Generic, error) {
 	}
 	if s.Default != nil {
 		g.Default = JSON{interface{}(*s.Default)}
+	}
+	if s.ExternalDocs != nil {
+		g.ExternalDocs = &ExternalDocumentation{
+			Description: s.ExternalDocs.Description,
+			URL:         s.ExternalDocs.URL,
+		}
 	}
 
 	return g, nil
