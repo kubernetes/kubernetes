@@ -523,14 +523,16 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
 	// This node is likely the only candidate that will fit the pod, and hence we try it first before iterating over all nodes.
 	// We take the same tack for hinted nodes from the batch module.
-	if len(pod.Status.NominatedNodeName) > 0 || len(nodeHint) > 0 {
-		feasibleNodes, err := sched.evaluateNominatedNode(ctx, pod, schedFramework, state, nodeHint, diagnosis)
-		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
-		}
-		// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
-		if len(feasibleNodes) != 0 {
-			return feasibleNodes, diagnosis, nodeHint, signature, nil
+	for _, nominated := range []string{pod.Status.NominatedNodeName, nodeHint} {
+		if len(nominated) > 0 {
+			feasibleNodes, err := sched.evaluateNominatedNode(ctx, pod, schedFramework, state, preRes, nominated, diagnosis)
+			if err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", nominated)
+			}
+			// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
+			if len(feasibleNodes) != 0 {
+				return feasibleNodes, diagnosis, nodeHint, signature, nil
+			}
 		}
 	}
 
@@ -577,19 +579,23 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 	return feasibleNodesAfterExtender, diagnosis, nodeHint, signature, nil
 }
 
-func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, schedFramework framework.Framework, state fwk.CycleState, nodeHint string, diagnosis framework.Diagnosis) ([]fwk.NodeInfo, error) {
-	// In the future we could potentially use the hint if the nominated node failed.
-	// https://github.com/kubernetes/kubernetes/issues/135163
-	nnn := pod.Status.NominatedNodeName
-	if len(nnn) == 0 {
-		nnn = nodeHint
-	}
-
-	nodeInfo, err := sched.nodeInfoSnapshot.Get(nnn)
+func (sched *Scheduler) evaluateNominatedNode(
+	ctx context.Context,
+	pod *v1.Pod,
+	schedFramework framework.Framework,
+	state fwk.CycleState,
+	preRes *fwk.PreFilterResult,
+	nominated string,
+	diagnosis framework.Diagnosis,
+) ([]fwk.NodeInfo, error) {
+	nodeInfo, err := sched.nodeInfoSnapshot.Get(nominated)
 	if err != nil {
 		return nil, err
 	}
 	node := []fwk.NodeInfo{nodeInfo}
+	if !preRes.AllNodes() && !preRes.NodeNames.Has(nominated) {
+		return nil, errors.New("nominated node is absent in PreFilterResult")
+	}
 	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, schedFramework, state, pod, &diagnosis, node)
 	if err != nil {
 		return nil, err
