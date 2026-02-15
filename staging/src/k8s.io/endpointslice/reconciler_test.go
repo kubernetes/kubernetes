@@ -19,6 +19,7 @@ package endpointslice
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -50,6 +51,10 @@ import (
 const (
 	controllerName = "endpointslice-controller.k8s.io"
 )
+
+func init() {
+	metrics.RegisterMetrics()
+}
 
 func expectAction(t *testing.T, actions []k8stesting.Action, index int, verb, resource string) {
 	t.Helper()
@@ -1347,6 +1352,116 @@ func TestReconcileEndpointSlicesMetrics(t *testing.T) {
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 10, addedPerSync: 20, removedPerSync: 10, numCreated: 1, numUpdated: 1, numDeleted: 0, slicesChangedPerSync: 2})
 }
 
+func TestReconcileEndpointSlicesMetrics_HistogramDeltas(t *testing.T) {
+	client := newClientset()
+	namespace := "test"
+	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+
+	// existing slice has one stale endpoint and one endpoint that should remain.
+	stalePod := newPod(0, namespace, true, 1, false)
+	keepPod := newPod(1, namespace, true, 1, false)
+	newDesiredPod := newPod(2, namespace, true, 1, false)
+
+	existingSlice := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
+	existingSlice.Endpoints = []discovery.Endpoint{
+		podToEndpoint(stalePod, &corev1.Node{}, &svc, discovery.AddressTypeIPv4),
+		podToEndpoint(keepPod, &corev1.Node{}, &svc, discovery.AddressTypeIPv4),
+	}
+	createEndpointSlices(t, client, namespace, []*discovery.EndpointSlice{existingSlice})
+	fetchedSlices := fetchEndpointSlices(t, client, namespace)
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+
+	addedCountBefore, err := testutil.GetHistogramMetricCount(metrics.EndpointsAddedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsAddedPerSyncCountBefore")
+	addedSumBefore, err := testutil.GetHistogramMetricValue(metrics.EndpointsAddedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsAddedPerSyncSumBefore")
+
+	removedCountBefore, err := testutil.GetHistogramMetricCount(metrics.EndpointsRemovedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsRemovedPerSyncCountBefore")
+	removedSumBefore, err := testutil.GetHistogramMetricValue(metrics.EndpointsRemovedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsRemovedPerSyncSumBefore")
+
+	// Reconcile should add 1 endpoint (newDesiredPod) and remove 1 endpoint (stalePod).
+	reconcileHelper(t, r, &svc, []*corev1.Pod{keepPod, newDesiredPod}, []*discovery.EndpointSlice{&fetchedSlices[0]}, time.Now())
+
+	addedCountAfter, err := testutil.GetHistogramMetricCount(metrics.EndpointsAddedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsAddedPerSyncCountAfter")
+	addedSumAfter, err := testutil.GetHistogramMetricValue(metrics.EndpointsAddedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsAddedPerSyncSumAfter")
+
+	removedCountAfter, err := testutil.GetHistogramMetricCount(metrics.EndpointsRemovedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsRemovedPerSyncCountAfter")
+	removedSumAfter, err := testutil.GetHistogramMetricValue(metrics.EndpointsRemovedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsRemovedPerSyncSumAfter")
+
+	if got := addedCountAfter - addedCountBefore; got != 1 {
+		t.Fatalf("expected 1 new observation for endpoints_added_per_sync, got %d", got)
+	}
+	if got := addedSumAfter - addedSumBefore; math.Abs(got-1) > 1e-9 {
+		t.Fatalf("expected sample sum delta of 1 for endpoints_added_per_sync, got %v", got)
+	}
+
+	if got := removedCountAfter - removedCountBefore; got != 1 {
+		t.Fatalf("expected 1 new observation for endpoints_removed_per_sync, got %d", got)
+	}
+	if got := removedSumAfter - removedSumBefore; math.Abs(got-1) > 1e-9 {
+		t.Fatalf("expected sample sum delta of 1 for endpoints_removed_per_sync, got %v", got)
+	}
+}
+
+func TestReconcileEndpointSlicesMetrics_GaugeUpdates(t *testing.T) {
+	client := newClientset()
+	namespace := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+
+	// Establish a deterministic baseline (no endpoints and trafficDistribution=nil).
+	reconcileHelper(t, r, &svc, []*corev1.Pod{}, []*discovery.EndpointSlice{}, time.Now())
+	baselineSlices := fetchEndpointSlices(t, client, namespace)
+	if len(baselineSlices) != 1 {
+		t.Fatalf("expected 1 baseline EndpointSlice, got %d", len(baselineSlices))
+	}
+
+	endpointsDesiredBefore, err := testutil.GetGaugeMetricValue(metrics.EndpointsDesired.WithLabelValues())
+	handleErr(t, err, "endpoints_desired")
+	numEndpointSlicesBefore, err := testutil.GetGaugeMetricValue(metrics.NumEndpointSlices.WithLabelValues())
+	handleErr(t, err, "num_endpoint_slices")
+	desiredEndpointSlicesBefore, err := testutil.GetGaugeMetricValue(metrics.DesiredEndpointSlices.WithLabelValues())
+	handleErr(t, err, "desired_endpoint_slices")
+	preferCloseServicesBefore, err := testutil.GetGaugeMetricValue(metrics.ServicesCountByTrafficDistribution.WithLabelValues(corev1.ServiceTrafficDistributionPreferClose))
+	handleErr(t, err, "services_count_by_traffic_distribution[traffic_distribution=PreferClose]")
+
+	// Drive a real reconcile path that updates gauge metrics.
+	svc.Spec.TrafficDistribution = ptr.To(corev1.ServiceTrafficDistributionPreferClose)
+	keepPod := newPod(1, namespace, true, 1, false)
+	newDesiredPod := newPod(2, namespace, true, 1, false)
+	reconcileHelper(t, r, &svc, []*corev1.Pod{keepPod, newDesiredPod}, []*discovery.EndpointSlice{&baselineSlices[0]}, time.Now())
+
+	endpointsDesiredAfter, err := testutil.GetGaugeMetricValue(metrics.EndpointsDesired.WithLabelValues())
+	handleErr(t, err, "endpoints_desired")
+	numEndpointSlicesAfter, err := testutil.GetGaugeMetricValue(metrics.NumEndpointSlices.WithLabelValues())
+	handleErr(t, err, "num_endpoint_slices")
+	desiredEndpointSlicesAfter, err := testutil.GetGaugeMetricValue(metrics.DesiredEndpointSlices.WithLabelValues())
+	handleErr(t, err, "desired_endpoint_slices")
+	preferCloseServicesAfter, err := testutil.GetGaugeMetricValue(metrics.ServicesCountByTrafficDistribution.WithLabelValues(corev1.ServiceTrafficDistributionPreferClose))
+	handleErr(t, err, "services_count_by_traffic_distribution[traffic_distribution=PreferClose]")
+
+	if got := endpointsDesiredAfter - endpointsDesiredBefore; got != 2 {
+		t.Fatalf("expected endpoints_desired delta to be 2, got %v", got)
+	}
+	if got := numEndpointSlicesAfter - numEndpointSlicesBefore; got != 0 {
+		t.Fatalf("expected num_endpoint_slices delta to be 0, got %v", got)
+	}
+	if got := desiredEndpointSlicesAfter - desiredEndpointSlicesBefore; got != 0 {
+		t.Fatalf("expected desired_endpoint_slices delta to be 0, got %v", got)
+	}
+	if got := preferCloseServicesAfter - preferCloseServicesBefore; got != 1 {
+		t.Fatalf("expected services_count_by_traffic_distribution{traffic_distribution=PreferClose} delta to be 1, got %v", got)
+	}
+}
+
 // When a Service has a non-nil deletionTimestamp we want to avoid creating any
 // new EndpointSlices but continue to allow updates and deletes through. This
 // test uses 3 EndpointSlices, 1 "to-create", 1 "to-update", and 1 "to-delete".
@@ -2513,8 +2628,9 @@ func handleErr(t *testing.T, err error, metricName string) {
 	}
 }
 
+// setupMetrics resets EndpointSlice metrics to a clean state between tests.
+// Metrics are registered once via init().
 func setupMetrics() {
-	metrics.RegisterMetrics()
 	metrics.NumEndpointSlices.Reset()
 	metrics.DesiredEndpointSlices.Reset()
 	metrics.EndpointsDesired.Reset()
