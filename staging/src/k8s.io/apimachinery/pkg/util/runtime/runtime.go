@@ -17,14 +17,17 @@ limitations under the License.
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
 )
 
 var (
@@ -155,7 +158,45 @@ var ErrorHandlers = []ErrorHandler{
 	backoffError(1 * time.Millisecond),
 }
 
+// ErrorHandler is called indirectly through [HandleError], [HandleErrorWithContext] or [HandleErrorWithLogger].
+// It is passed the same parameters that a structured logging backend needs to log a problem.
+// It follows the semantic described for [HandleErrorWithContext] and [logr.Logger.Error]:
+// - err is optional and may be nil
+// - msg is string that describes the problem
+// - keysAndValues contains additional information that varies between different occurrences of the problem
+//
+// [ErrorToString] can be used to convert these parameters into a single string, using the klog text output.
 type ErrorHandler func(ctx context.Context, err error, msg string, keysAndValues ...interface{})
+
+// ErrorToString takes the parameters passed to [ErrorHandler] and
+// formats them as a string using the klog text output.
+//
+// If any of the values is a multi-line string, then the resulting
+// string also uses line breaks and indention for the sake of readability.
+// Does not include a trailing newline.
+//
+// Use errors.New if an error instead of a string is needed.
+func ErrorToString(err error, msg string, keysAndValues ...interface{}) string {
+	var buffer bytes.Buffer
+
+	// There's no API for suppressing the header, so we let it fill with constant
+	// information and then just strip it. Will become simpler should
+	// https://github.com/kubernetes/klog/issues/429 get implemented.
+	config := textlogger.NewConfig(
+		textlogger.Output(&buffer),
+		textlogger.Backtrace(func(int) (string, int) { return "", 0 }),
+		textlogger.FixedTime(time.Time{}),
+	)
+	logger := textlogger.NewLogger(config)
+	logger.Error(err, msg, keysAndValues...)
+	result := buffer.String()
+	result = strings.TrimSpace(result)
+	index := strings.Index(result, "] ")
+	if index > 0 {
+		return result[index+2:]
+	}
+	return result
+}
 
 // HandlerError is a method to invoke when a non-user facing piece of code cannot
 // return an error and needs to indicate it has been ignored. Invoking this method
