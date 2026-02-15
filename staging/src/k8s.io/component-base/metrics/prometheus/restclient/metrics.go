@@ -189,7 +189,7 @@ var (
 			Name:           "rest_client_transport_create_calls_total",
 			StabilityLevel: k8smetrics.ALPHA,
 			Help: "Number of calls to get a new transport, partitioned by the result of the operation " +
-				"hit: obtained from the cache, miss: created and added to the cache, uncacheable: created and not cached",
+				"hit: obtained from the cache, miss: created and added to the cache, miss-gc: recreated and added back to the cache after being garbage collected, uncacheable: created and not cached",
 		},
 		[]string{"result"},
 	)
