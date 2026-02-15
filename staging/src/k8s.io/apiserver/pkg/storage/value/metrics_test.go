@@ -251,3 +251,36 @@ func TestLatency(t *testing.T) {
 		})
 	}
 }
+
+func TestCacheMiss(t *testing.T) {
+	testCases := []struct {
+		desc    string
+		metrics []string
+		want    string
+	}{
+		{
+			desc: "cache miss",
+			metrics: []string{
+				"apiserver_storage_envelope_transformation_cache_misses_total",
+			},
+			want: `
+			# HELP apiserver_storage_envelope_transformation_cache_misses_total [BETA] Total number of cache misses while accessing key decryption key(KEK).
+			# TYPE apiserver_storage_envelope_transformation_cache_misses_total counter
+			apiserver_storage_envelope_transformation_cache_misses_total 1
+				`,
+		},
+	}
+
+	RegisterMetrics()
+	envelopeTransformationCacheMissTotal.Reset()
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			RecordCacheMiss()
+			defer envelopeTransformationCacheMissTotal.Reset()
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
