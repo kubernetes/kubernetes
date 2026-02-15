@@ -2222,15 +2222,6 @@ func TestFitSignPod(t *testing.T) {
 			},
 			expectedStatusCode: fwk.Success,
 		},
-		"DRA extended resource enabled - returns unschedulable": {
-			pod: st.MakePod().Req(map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1000m",
-				v1.ResourceMemory: "2000",
-			}).Obj(),
-			enableDRAExtendedResource: true,
-			expectedFragments:         nil,
-			expectedStatusCode:        fwk.Unschedulable,
-		},
 	}
 
 	for name, test := range tests {

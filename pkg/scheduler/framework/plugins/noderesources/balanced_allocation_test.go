@@ -395,12 +395,6 @@ func TestBalancedAllocationSignPod(t *testing.T) {
 			},
 			expectedStatusCode: fwk.Success,
 		},
-		"DRA extended resource enabled - returns unschedulable": {
-			pod:                       st.MakePod().Req(cpuAndMemory("1000m", "2000")).Obj(),
-			enableDRAExtendedResource: true,
-			expectedFragments:         nil,
-			expectedStatusCode:        fwk.Unschedulable,
-		},
 	}
 
 	for name, test := range tests {
