@@ -877,6 +877,10 @@ type EmptyDirVolumeSource struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 	// +optional
 	SizeLimit *resource.Quantity
+	// StickyBit set the emptyDir permission to 1777, not 0777
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
+	// +optional
+	StickyBit *bool
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.

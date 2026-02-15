@@ -1257,6 +1257,11 @@ message EmptyDirVolumeSource {
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
   // +optional
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity sizeLimit = 2;
+
+  // StickyBit set the emptyDir permission to 1777, not 0777
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
+  // +optional
+  optional bool stickyBit = 3;
 }
 
 // EndpointAddress is a tuple that describes single IP address.

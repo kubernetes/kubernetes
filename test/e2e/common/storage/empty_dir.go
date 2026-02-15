@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -359,6 +360,14 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 		result := e2epod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
 		gomega.Expect(result).To(gomega.Equal(expectedResult), "failed to match expected string %s with %s", expectedResult, result)
 	})
+
+	f.It("should set sticky bit on default medium [LinuxOnly]", f.WithFeatureGate(features.EmptyDirStickyBit), func(ctx context.Context) {
+		doTestStickyBit(ctx, f, v1.StorageMediumDefault)
+	})
+
+	f.It("should set sticky bit on tmpfs medium [LinuxOnly]", f.WithFeatureGate(features.EmptyDirStickyBit), func(ctx context.Context) {
+		doTestStickyBit(ctx, f, v1.StorageMediumMemory)
+	})
 })
 
 const (
@@ -634,4 +643,60 @@ func testPodWithVolume(uid int64, path string, source *v1.EmptyDirVolumeSource) 
 	}
 
 	return pod
+}
+
+func doTestStickyBit(ctx context.Context, f *framework.Framework, medium v1.StorageMedium) {
+	stickyBitTrue := true
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod-emptydir-stickybit-" + string(uuid.NewUUID()),
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "test-vol",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    medium,
+							StickyBit: &stickyBitTrue,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:    "test-container",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", e2epod.InfiniteSleepCommand},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "test-vol",
+							MountPath: "/test-volume",
+						},
+					},
+				},
+			},
+			TerminationGracePeriodSeconds: new(int64), // 0
+			RestartPolicy:                 v1.RestartPolicyNever,
+		},
+	}
+
+	ginkgo.By("Creating pod with emptyDir stickyBit enabled")
+	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+	ginkgo.By("Waiting for the pod to be running")
+	err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to start pod %s", pod.Name)
+
+	ginkgo.By("Checking directory permissions include sticky bit")
+	// stat -c '%a' returns octal permissions including sticky bit (e.g. "1777")
+	result := e2epod.ExecShellInContainer(f, pod.Name, "test-container", "stat -c '%a' /test-volume")
+	gomega.Expect(result).To(gomega.Equal("1777"), "expected sticky bit permissions 1777, got %s", result)
+
+	if medium == v1.StorageMediumMemory {
+		ginkgo.By("Verifying mount type is tmpfs")
+		mountType := e2epod.ExecShellInContainer(f, pod.Name, "test-container", "stat -f -c '%T' /test-volume")
+		gomega.Expect(mountType).To(gomega.Equal("tmpfs"), "expected tmpfs mount type, got %s", mountType)
+	}
 }
