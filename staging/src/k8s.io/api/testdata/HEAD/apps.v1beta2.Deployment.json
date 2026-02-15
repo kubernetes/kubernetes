@@ -817,7 +817,14 @@
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
-              }
+              },
+              "ulimits": [
+                {
+                  "name": "nameValue",
+                  "hard": 2,
+                  "soft": 3
+                }
+              ]
             },
             "stdin": true,
             "stdinOnce": true,
@@ -1131,7 +1138,14 @@
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
-              }
+              },
+              "ulimits": [
+                {
+                  "name": "nameValue",
+                  "hard": 2,
+                  "soft": 3
+                }
+              ]
             },
             "stdin": true,
             "stdinOnce": true,
@@ -1445,7 +1459,14 @@
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
-              }
+              },
+              "ulimits": [
+                {
+                  "name": "nameValue",
+                  "hard": 2,
+                  "soft": 3
+                }
+              ]
             },
             "stdin": true,
             "stdinOnce": true,

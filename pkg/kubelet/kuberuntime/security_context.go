@@ -117,8 +117,27 @@ func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runti
 	if securityContext.ReadOnlyRootFilesystem != nil {
 		sc.ReadonlyRootfs = *securityContext.ReadOnlyRootFilesystem
 	}
+	if securityContext.Ulimits != nil {
+		sc.Ulimits = convertToRuntimeUlimits(securityContext.Ulimits)
+	}
 
 	return sc
+}
+
+// convertToRuntimeUlimits converts v1.Ulimit to runtimeapi.Ulimit.
+func convertToRuntimeUlimits(ulimits []v1.Ulimit) []*runtimeapi.Ulimit {
+	if len(ulimits) == 0 {
+		return nil
+	}
+	runtimeUlimits := make([]*runtimeapi.Ulimit, len(ulimits))
+	for i, u := range ulimits {
+		runtimeUlimits[i] = &runtimeapi.Ulimit{
+			Name: u.Name,
+			Hard: u.Hard,
+			Soft: u.Soft,
+		}
+	}
+	return runtimeUlimits
 }
 
 // convertToRuntimeSELinuxOption converts v1.SELinuxOptions to runtimeapi.SELinuxOption.

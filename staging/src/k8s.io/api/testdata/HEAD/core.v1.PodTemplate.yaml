@@ -369,6 +369,10 @@ template:
         seccompProfile:
           localhostProfile: localhostProfileValue
           type: typeValue
+        ulimits:
+        - hard: 2
+          name: nameValue
+          soft: 3
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
           gmsaCredentialSpecName: gmsaCredentialSpecNameValue
@@ -597,6 +601,10 @@ template:
         seccompProfile:
           localhostProfile: localhostProfileValue
           type: typeValue
+        ulimits:
+        - hard: 2
+          name: nameValue
+          soft: 3
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
           gmsaCredentialSpecName: gmsaCredentialSpecNameValue
@@ -828,6 +836,10 @@ template:
         seccompProfile:
           localhostProfile: localhostProfileValue
           type: typeValue
+        ulimits:
+        - hard: 2
+          name: nameValue
+          soft: 3
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
           gmsaCredentialSpecName: gmsaCredentialSpecNameValue

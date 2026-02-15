@@ -607,7 +607,7 @@ func TestRuntimeStatusString(t *testing.T) {
 	}
 
 	result := status.String()
-	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true"
+	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true, ContainerUlimits: false"
 	assert.Equal(t, expected, result, "String()")
 }
 
@@ -692,14 +692,21 @@ func TestRuntimeFeaturesString(t *testing.T) {
 			features: &RuntimeFeatures{
 				SupplementalGroupsPolicy: true,
 			},
-			expected: "SupplementalGroupsPolicy: true",
+			expected: "SupplementalGroupsPolicy: true, ContainerUlimits: false",
 		},
 		{
 			name: "features with SupplementalGroupsPolicy false",
 			features: &RuntimeFeatures{
 				SupplementalGroupsPolicy: false,
 			},
-			expected: "SupplementalGroupsPolicy: false",
+			expected: "SupplementalGroupsPolicy: false, ContainerUlimits: false",
+		},
+		{
+			name: "features with ContainerUlimits true",
+			features: &RuntimeFeatures{
+				ContainerUlimits: true,
+			},
+			expected: "SupplementalGroupsPolicy: false, ContainerUlimits: true",
 		},
 		{
 			name:     "nil features",

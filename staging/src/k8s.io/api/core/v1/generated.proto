@@ -2783,6 +2783,10 @@ message NodeFeatures {
   // SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
   // +optional
   optional bool supplementalGroupsPolicy = 1;
+
+  // ContainerUlimits is set to true if the runtime supports per-container ulimits.
+  // +optional
+  optional bool containerUlimits = 2;
 }
 
 // NodeList is the whole list of all Nodes which have been registered with master.
@@ -5993,6 +5997,15 @@ message SecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional AppArmorProfile appArmorProfile = 12;
+
+  // The ulimits to be applied to the container.
+  // Each element in this list maps to a system ulimit setting.
+  // If unspecified, the container runtime default ulimits will be used.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  repeated Ulimit ulimits = 13;
 }
 
 // SerializedReference is a reference to serialized object.
@@ -6795,6 +6808,24 @@ message TypedObjectReference {
   // +featureGate=CrossNamespaceVolumeDataSource
   // +optional
   optional string namespace = 4;
+}
+
+// Ulimit corresponds to a ulimit setting on a Linux system.
+message Ulimit {
+  // Name of the ulimit to be set.
+  // Must be one of the supported ulimit names (e.g., "nofile", "memlock", "core").
+  optional string name = 1;
+
+  // Hard is the hard limit for the ulimit type.
+  // The hard limit acts as a ceiling for the soft limit.
+  // An unprivileged process may only set its soft limit to a value between 0 and the hard limit
+  // and (irreversibly) lower its hard limit.
+  optional int64 hard = 2;
+
+  // Soft is the soft limit for the ulimit type.
+  // The soft limit is the value that the kernel enforces for the corresponding resource.
+  // The soft limit can be increased in the process up to the hard limit value.
+  optional int64 soft = 3;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

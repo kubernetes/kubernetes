@@ -18,6 +18,7 @@ package features
 
 import (
 	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/containerulimits"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
 )
@@ -26,6 +27,7 @@ import (
 // New features are added to this list to be automatically included in both
 // discovery and inference logic.
 var AllFeatures = []nodedeclaredfeatures.Feature{
+	containerulimits.Feature,
 	restartallcontainers.Feature,
 	inplacepodresize.GuaranteedQoSPodCPUResizeFeature,
 	inplacepodresize.PodLevelResourcesResizeFeature,

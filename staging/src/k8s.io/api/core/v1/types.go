@@ -6626,6 +6626,9 @@ type NodeFeatures struct {
 	// SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
 	// +optional
 	SupplementalGroupsPolicy *bool `json:"supplementalGroupsPolicy,omitempty" protobuf:"varint,1,opt,name=supplementalGroupsPolicy"`
+	// ContainerUlimits is set to true if the runtime supports per-container ulimits.
+	// +optional
+	ContainerUlimits *bool `json:"containerUlimits,omitempty" protobuf:"varint,2,opt,name=containerUlimits"`
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -8280,6 +8283,32 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty" protobuf:"bytes,12,opt,name=appArmorProfile"`
+	// The ulimits to be applied to the container.
+	// Each element in this list maps to a system ulimit setting.
+	// If unspecified, the container runtime default ulimits will be used.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	Ulimits []Ulimit `json:"ulimits,omitempty" protobuf:"bytes,13,rep,name=ulimits"`
+}
+
+// Ulimit corresponds to a ulimit setting on a Linux system.
+type Ulimit struct {
+	// Name of the ulimit to be set.
+	// Must be one of the supported ulimit names (e.g., "nofile", "memlock", "core").
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// Hard is the hard limit for the ulimit type.
+	// The hard limit acts as a ceiling for the soft limit.
+	// An unprivileged process may only set its soft limit to a value between 0 and the hard limit
+	// and (irreversibly) lower its hard limit.
+	Hard int64 `json:"hard" protobuf:"varint,2,opt,name=hard"`
+
+	// Soft is the soft limit for the ulimit type.
+	// The soft limit is the value that the kernel enforces for the corresponding resource.
+	// The soft limit can be increased in the process up to the hard limit value.
+	Soft int64 `json:"soft" protobuf:"varint,3,opt,name=soft"`
 }
 
 // +enum
