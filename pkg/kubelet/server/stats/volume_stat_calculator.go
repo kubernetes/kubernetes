@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -40,9 +41,9 @@ type volumeStatCalculator struct {
 	statsProvider Provider
 	jitterPeriod  time.Duration
 	pod           *v1.Pod
-	stopChannel   chan struct{}
+	ctx           context.Context
+	cancel        context.CancelFunc
 	startO        sync.Once
-	stopO         sync.Once
 	latest        atomic.Value
 	eventRecorder record.EventRecorder
 }
@@ -55,22 +56,25 @@ type PodVolumeStats struct {
 }
 
 // newVolumeStatCalculator creates a new VolumeStatCalculator
-func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration, pod *v1.Pod, eventRecorder record.EventRecorder) *volumeStatCalculator {
+func newVolumeStatCalculator(parentCtx context.Context, statsProvider Provider, jitterPeriod time.Duration, pod *v1.Pod, eventRecorder record.EventRecorder) *volumeStatCalculator {
+	ctx, cancel := context.WithCancel(parentCtx)
 	return &volumeStatCalculator{
 		statsProvider: statsProvider,
 		jitterPeriod:  jitterPeriod,
+		ctx:           ctx,
+		cancel:        cancel,
 		pod:           pod,
-		stopChannel:   make(chan struct{}),
 		eventRecorder: eventRecorder,
 	}
 }
 
 // StartOnce starts pod volume calc that will occur periodically in the background until s.StopOnce is called
-func (s *volumeStatCalculator) StartOnce(logger klog.Logger) *volumeStatCalculator {
+func (s *volumeStatCalculator) StartOnce() *volumeStatCalculator {
 	s.startO.Do(func() {
-		go wait.JitterUntil(func() {
+		go wait.JitterUntilWithContext(s.ctx, func(ctx context.Context) {
+			logger := klog.FromContext(ctx)
 			s.calcAndStoreStats(logger)
-		}, s.jitterPeriod, 1.0, true, s.stopChannel)
+		}, s.jitterPeriod, 1.0, true)
 	})
 	return s
 }
@@ -78,9 +82,7 @@ func (s *volumeStatCalculator) StartOnce(logger klog.Logger) *volumeStatCalculat
 // StopOnce stops background pod volume calculation.  Will not stop a currently executing calculations until
 // they complete their current iteration.
 func (s *volumeStatCalculator) StopOnce() *volumeStatCalculator {
-	s.stopO.Do(func() {
-		close(s.stopChannel)
-	})
+	s.cancel()
 	return s
 }
 
