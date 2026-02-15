@@ -98,21 +98,31 @@ type AdmissionFailureHandler interface {
 	HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason) ([]PredicateFailureReason, error)
 }
 
+// NodeInfoProvider provides NodeInfo snapshots for admission decisions.
+// This interface allows the predicateAdmitHandler to use a cached NodeInfo
+// rather than rebuilding it from scratch on every admission.
+type NodeInfoProvider interface {
+	// Snapshot returns a deep copy of the cached NodeInfo for safe concurrent use.
+	Snapshot() *schedulerframework.NodeInfo
+}
+
 type predicateAdmitHandler struct {
 	getNodeAnyWayFunc        getNodeAnyWayFuncType
 	pluginResourceUpdateFunc pluginResourceUpdateFuncType
 	admissionFailureHandler  AdmissionFailureHandler
+	nodeInfoProvider         NodeInfoProvider
 }
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
 
-// NewPredicateAdmitHandler returns a PodAdmitHandler which is used to evaluates
+// NewPredicateAdmitHandler returns a PodAdmitHandler which is used to evaluate
 // if a pod can be admitted from the perspective of predicates.
-func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) PodAdmitHandler {
+func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType, nodeInfoProvider NodeInfoProvider) PodAdmitHandler {
 	return &predicateAdmitHandler{
-		getNodeAnyWayFunc,
-		pluginResourceUpdateFunc,
-		admissionFailureHandler,
+		getNodeAnyWayFunc:        getNodeAnyWayFunc,
+		pluginResourceUpdateFunc: pluginResourceUpdateFunc,
+		admissionFailureHandler:  admissionFailureHandler,
+		nodeInfoProvider:         nodeInfoProvider,
 	}
 }
 
@@ -158,9 +168,15 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 
-	pods := attrs.OtherPods
-	nodeInfo := schedulerframework.NewNodeInfo(pods...)
+	// Use cached NodeInfo snapshot instead of rebuilding from scratch.
+	// This is O(n) for the snapshot vs O(n*m) for NewNodeInfo where n=pods, m=containers.
+	nodeInfo := w.nodeInfoProvider.Snapshot()
+	// Ensure node is current (cache may have slightly stale node if updated between events)
 	nodeInfo.SetNode(node)
+	// Remove the pod being admitted from the snapshot. This is necessary for resize
+	// operations where the old version of the pod is still in the cache. For new pods,
+	// this is a no-op since they're not in the cache yet.
+	_ = nodeInfo.RemovePod(logger, admitPod)
 
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
