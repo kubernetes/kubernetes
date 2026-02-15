@@ -64,6 +64,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.GarbageCollectorController,
 		names.DaemonSetController,
 		names.JobController,
+		names.PodGroupProtectionController,
 		names.DeploymentController,
 		names.ReplicaSetController,
 		names.HorizontalPodAutoscalerController,
