@@ -4276,6 +4276,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 	tests := []struct {
 		name              string
 		pod               *v1.Pod
+		preFilterResult   *fwk.PreFilterResult
 		nodeReturnCodeMap map[string]fwk.Code
 		expectedCount     int32
 	}{
@@ -4295,6 +4296,12 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			nodeReturnCodeMap: map[string]fwk.Code{"node1": fwk.Unschedulable},
 			expectedCount:     4,
 		},
+		{
+			name:            "nominated pod absent in preFilter result, filter is called for nodes in preFilter result",
+			pod:             st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			preFilterResult: &fwk.PreFilterResult{NodeNames: sets.New("node2", "node3")},
+			expectedCount:   2,
+		},
 	}
 
 	for _, test := range tests {
@@ -4311,12 +4318,16 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			for _, n := range nodes {
 				cache.AddNode(logger, n)
 			}
-			plugin := tf.FakeFilterPlugin{FailedNodeReturnCodeMap: test.nodeReturnCodeMap}
-			registerFakeFilterFunc := tf.RegisterFilterPlugin(
+			plugin := tf.FakePreFilterAndFilterPlugin{
+				FakePreFilterPlugin: &tf.FakePreFilterPlugin{Result: test.preFilterResult},
+				FakeFilterPlugin:    &tf.FakeFilterPlugin{FailedNodeReturnCodeMap: test.nodeReturnCodeMap},
+			}
+			registerFakeFilterFunc := tf.RegisterPluginAsExtensions(
 				"FakeFilter",
 				func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return &plugin, nil
 				},
+				"PreFilter", "Filter",
 			)
 			registerPlugins := []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
