@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -266,4 +267,76 @@ func TestSupportsRequestWatchProgress(t *testing.T) {
 			}
 		})
 	}
+}
+
+// alwaysFailClient is a mock client whose Status always returns an error.
+type alwaysFailClient struct {
+	endpoints []string
+}
+
+func (c *alwaysFailClient) Endpoints() []string {
+	return c.endpoints
+}
+
+func (c *alwaysFailClient) Status(ctx context.Context, endpoint string) (*clientv3.StatusResponse, error) {
+	return nil, fmt.Errorf("connection refused")
+}
+
+func TestCheckClientRetriesAreBounded(t *testing.T) {
+	checker := newDefaultFeatureSupportChecker()
+	checker.checkClientTimeout = 200 * time.Millisecond
+
+	mockClient := &alwaysFailClient{endpoints: []string{"localhost:2379"}}
+	ctx := context.Background()
+
+	checker.checkClient(ctx, mockClient)
+
+	// Wait for goroutine to finish (timeout + margin)
+	time.Sleep(500 * time.Millisecond)
+
+	checker.lock.Lock()
+	_, found := checker.checkingEndpoint["localhost:2379"]
+	checker.lock.Unlock()
+
+	assert.False(t, found, "endpoint should be removed from checkingEndpoint after timeout")
+}
+
+func TestCheckClientRetryAfterFailure(t *testing.T) {
+	checker := newDefaultFeatureSupportChecker()
+	checker.checkClientTimeout = 200 * time.Millisecond
+
+	failClient := &alwaysFailClient{endpoints: []string{"localhost:2379"}}
+	ctx := context.Background()
+
+	// First call: starts goroutine that will time out
+	checker.checkClient(ctx, failClient)
+
+	// Wait for timeout
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify endpoint was removed
+	checker.lock.Lock()
+	_, found := checker.checkingEndpoint["localhost:2379"]
+	checker.lock.Unlock()
+	assert.False(t, found, "endpoint should be removed after first failure")
+
+	// Second call with a working client should start a new goroutine
+	workingClient := &MockEtcdClient{
+		EndpointVersion: []mockEndpointVersion{
+			{Version: "3.5.13", Endpoint: "localhost:2379"},
+		},
+	}
+	checker.checkClient(ctx, workingClient)
+
+	// Wait for goroutine to finish
+	time.Sleep(500 * time.Millisecond)
+
+	// Endpoint should remain in the map (success keeps it)
+	checker.lock.Lock()
+	_, found = checker.checkingEndpoint["localhost:2379"]
+	checker.lock.Unlock()
+	assert.True(t, found, "endpoint should remain in checkingEndpoint after successful check")
+
+	// Feature should be supported now
+	assert.True(t, checker.Supports(storage.RequestWatchProgress), "feature should be supported after successful retry")
 }
