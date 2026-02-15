@@ -73,7 +73,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "envelope_transformation_cache_misses_total",
 			Help:           "Total number of cache misses while accessing key decryption key(KEK).",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 
