@@ -417,23 +417,39 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 	}
 
 	if len(cidrs) == 0 {
-		return delegate
+		// Wrap delegate function to add logging
+		return func(req *http.Request) (*url.URL, error) {
+			return delegateAndLog(delegate, req)
+		}
 	}
 
 	return func(req *http.Request) (*url.URL, error) {
 		ip := netutils.ParseIPSloppy(req.URL.Hostname())
 		if ip == nil {
-			return delegate(req)
+			return delegateAndLog(delegate, req)
 		}
 
 		for _, cidr := range cidrs {
 			if cidr.Contains(ip) {
+				klog.V(6).Infof("Request to %s not proxied (matches NO_PROXY CIDR %s)", req.URL.Host, cidr.String())
 				return nil, nil
 			}
 		}
 
-		return delegate(req)
+		// IP doesn't match any CIDR, check other rules via delegate function
+		return delegateAndLog(delegate, req)
 	}
+}
+
+// delegateAndLog calls the delegate function and logs the proxy decision
+func delegateAndLog(delegate func(req *http.Request) (*url.URL, error), req *http.Request) (*url.URL, error) {
+	proxyURL, err := delegate(req)
+	if proxyURL != nil {
+		klog.V(5).Infof("Request to %s proxied via %s", req.URL.Host, proxyURL.String())
+	} else {
+		klog.V(6).Infof("Request to %s not proxied", req.URL.Host)
+	}
+	return proxyURL, err
 }
 
 // DialerFunc implements Dialer for the provided function.
