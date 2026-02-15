@@ -285,6 +285,50 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: storage_operation_duration_seconds
+  help: Storage operation duration
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - migrated
+  - operation_name
+  - status
+  - volume_plugin
+  buckets:
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+  - 15
+  - 25
+  - 50
+  - 120
+  - 300
+  - 600
+- name: volume_operation_total_seconds
+  help: Storage operation end to end duration in seconds
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - operation_name
+  - plugin_name
+  buckets:
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+  - 15
+  - 25
+  - 50
+  - 120
+  - 300
+  - 600
 - name: adds_total
   subsystem: workqueue
   help: Total number of adds handled by workqueue
