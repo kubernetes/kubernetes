@@ -3965,3 +3965,42 @@ func TestStatefulSetMetrics(t *testing.T) {
 		})
 	}
 }
+
+func TestStatefulSetAvailableCondition(t *testing.T) {
+	testCases := []struct {
+		name              string
+		replicas          int32
+		availableReplicas int32
+		expectedStatus    v1.ConditionStatus
+	}{
+		{"available - all replicas", 3, 3, v1.ConditionTrue},
+		{"available - meets minimum (3-1=2)", 3, 2, v1.ConditionTrue},
+		{"unavailable - below minimum", 3, 1, v1.ConditionFalse},
+		{"zero replicas", 0, 0, v1.ConditionTrue},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			set := newStatefulSet(tc.replicas)
+			client := fake.NewClientset(set)
+			_, _, ssc := setupController(client)
+
+			status := apps.StatefulSetStatus{
+				Replicas:           tc.replicas,
+				AvailableReplicas:  tc.availableReplicas,
+				ObservedGeneration: set.Generation,
+			}
+			if _, err := ssc.UpdateStatefulSet(context.TODO(), set, []*v1.Pod{}, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			if err := ssc.(*defaultStatefulSetControl).updateStatefulSetStatus(context.TODO(), set, &status); err != nil {
+				t.Fatal(err)
+			}
+
+			cond := GetStatefulSetCondition(status, apps.StatefulSetAvailable)
+			if cond == nil || cond.Status != tc.expectedStatus {
+				t.Errorf("Expected Available=%v, got %v", tc.expectedStatus, cond)
+			}
+		})
+	}
+}

@@ -335,6 +335,71 @@ func TestStatefulSetAvailable(t *testing.T) {
 	}
 }
 
+func TestStatefulSetAvailableCondition(t *testing.T) {
+	tCtx, closeFn, controller, informerFactory, client := scSetup(t)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(client, "test-available-condition", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+	cancel := runControllerAndInformers(tCtx, controller, informerFactory)
+	defer cancel()
+
+	getAvailableCondition := func(sts *appsv1.StatefulSet) *appsv1.StatefulSetCondition {
+		for _, cond := range sts.Status.Conditions {
+			if cond.Type == appsv1.StatefulSetAvailable {
+				return &cond
+			}
+		}
+		return nil
+	}
+
+	sts := newSTS("my-sts", ns.Name, 3)
+	stss, _ := createSTSsPods(t, client, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+	sts = stss[0]
+	waitSTSStable(t, client, sts)
+
+	stsClient := client.AppsV1().StatefulSets(ns.Name)
+
+	// Verify Available=False initially (pods not ready yet)
+	if err := wait.PollUntilContextTimeout(tCtx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		newSts, err := stsClient.Get(ctx, sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		cond := getAvailableCondition(newSts)
+		if cond == nil {
+			return false, nil
+		}
+		return cond.Status == v1.ConditionFalse && cond.Reason == statefulset.MinimumReplicasUnavailable, nil
+	}); err != nil {
+		t.Fatalf("Failed to verify initial Available=False condition: %v", err)
+	}
+
+	podClient := client.CoreV1().Pods(ns.Name)
+	pods := getPods(t, podClient, labelMap())
+	if len(pods.Items) != 3 {
+		t.Fatalf("len(pods) = %d, want 3", len(pods.Items))
+	}
+
+	setPodsReadyCondition(t, client, pods, v1.ConditionTrue, time.Now().Add(-10*time.Minute))
+	// Verify transition to Available=True after pods become ready
+	if err := wait.PollUntilContextTimeout(tCtx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		newSts, err := stsClient.Get(ctx, sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if newSts.Status.AvailableReplicas != 3 {
+			return false, nil
+		}
+		cond := getAvailableCondition(newSts)
+		if cond == nil {
+			return false, nil
+		}
+		return cond.Status == v1.ConditionTrue && cond.Reason == statefulset.MinimumReplicasAvailable, nil
+	}); err != nil {
+		t.Fatalf("Failed to verify Available=True condition after pods ready: %v", err)
+	}
+}
+
 func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1.PodList, conditionStatus v1.ConditionStatus, lastTransitionTime time.Time) {
 	replicas := int32(len(pods.Items))
 	var readyPods int32
