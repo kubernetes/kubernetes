@@ -132,3 +132,18 @@ func TestManagedFieldClientset(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{"k99": "v99"}, cm.Data)
 }
+
+func TestNewClientsetCreateDoesNotMutateInputTypeMeta(t *testing.T) {
+	client := NewClientset()
+
+	// TypeMeta should not be stamped onto the input object as a side effect of Create.
+	in := &v1.ConfigMap{
+		ObjectMeta: meta_v1.ObjectMeta{Name: "cm-1", Namespace: "default"},
+		Data:       map[string]string{"k0": "v0"},
+	}
+
+	_, err := client.CoreV1().ConfigMaps("default").Create(context.Background(), in, meta_v1.CreateOptions{FieldManager: "test-manager"})
+	require.NoError(t, err)
+	require.Empty(t, in.APIVersion)
+	require.Empty(t, in.Kind)
+}
