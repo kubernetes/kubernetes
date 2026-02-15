@@ -120,6 +120,8 @@ type CertificateSigningRequestSpec struct {
 	//  "microsoft sgc",
 	//  "netscape sgc"
 	// +listType=atomic
+	// +required
+	// +k8s:required
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// Information about the requesting user.
