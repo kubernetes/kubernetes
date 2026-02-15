@@ -42,6 +42,7 @@ type CertificateSigningRequest struct {
 	// spec contains the certificate request, and is immutable after creation.
 	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
 	// Other fields are derived by Kubernetes and cannot be modified by users.
+	// +required
 	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Derived information about the request.
@@ -120,6 +121,8 @@ type CertificateSigningRequestSpec struct {
 	//  "microsoft sgc",
 	//  "netscape sgc"
 	// +listType=atomic
+	// +required
+	// +k8s:required
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// Information about the requesting user.
