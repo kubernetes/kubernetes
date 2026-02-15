@@ -119,8 +119,6 @@ func validateWorkloadSpecUpdate(spec, oldSpec *scheduling.WorkloadSpec, fldPath 
 	var allErrs field.ErrorList
 	if oldSpec.ControllerRef != nil {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.ControllerRef, oldSpec.ControllerRef, fldPath.Child("controllerRef")).WithOrigin("update").MarkCoveredByDeclarative()...)
-	} else if spec.ControllerRef != nil {
-		// ControllerRef field validation on new values is handled by declarative validation.
 	}
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroups, oldSpec.PodGroups, fldPath.Child("podGroups")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validatePodGroups(fldPath, spec, operation.Update)...)

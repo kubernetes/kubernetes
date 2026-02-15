@@ -119,7 +119,7 @@ type WorkloadSpec struct {
 	// When set, it cannot be changed.
 	//
 	// +optional
-	// +k8s:alpha(since:"1.35")=+k8s:optional
+	// +k8s:optional
 	// +k8s:alpha(since:"1.35")=+k8s:update=NoModify
 	ControllerRef *TypedLocalObjectReference `json:"controllerRef,omitempty" protobuf:"bytes,1,opt,name=controllerRef"`
 
