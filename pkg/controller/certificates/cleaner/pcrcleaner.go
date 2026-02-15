@@ -63,7 +63,7 @@ func NewPCRCleanerController(
 }
 
 func (c *PCRCleanerController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting PodCertificateRequest cleaner controller")

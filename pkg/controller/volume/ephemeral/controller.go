@@ -168,7 +168,7 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 }
 
 func (ec *ephemeralController) Run(ctx context.Context, workers int) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ephemeral volume controller")

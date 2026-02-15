@@ -188,7 +188,7 @@ func ruleExists(haystack []rbacv1.PolicyRule, needle rbacv1.PolicyRule) bool {
 
 // Run starts the controller and blocks until stopCh is closed.
 func (c *ClusterRoleAggregationController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ClusterRoleAggregator controller")

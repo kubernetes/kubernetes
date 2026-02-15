@@ -111,7 +111,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 
 // Run runs controller loops and returns when they are done
 func (tc *TokenCleaner) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting token cleaner controller")
