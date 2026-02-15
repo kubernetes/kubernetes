@@ -2023,11 +2023,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		f.It("allocates devices for PodGroups", func(ctx context.Context) {
 			tCtx := f.TContext(ctx)
 
-			workload := b.Workload()
+			claim := b.ExternalClaim()
+			workload := b.WorkloadExternal(claim.Name)
 			podGroupTemplate := workload.Spec.PodGroupTemplates[0]
 			podGroup := b.PodGroup(workload, podGroupTemplate)
-			pod := b.GroupedPodWithClaim(podGroup, "todo")
-			b.Create(tCtx, workload, podGroup, pod)
+			pod := b.GroupedPodWithClaim(podGroup, podGroupTemplate.ResourceClaims[0].Name)
+			b.Create(tCtx, workload, podGroup, claim, pod)
 		})
 	}
 

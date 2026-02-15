@@ -43,6 +43,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -176,7 +177,7 @@ func TestDRA(t *testing.T) {
 				})
 				tCtx.Run("ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				tCtx.Run("UsesAllResources", testUsesAllResources)
-				tCtx.Run("WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, false) })
+				tCtx.Run("WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, false, false) })
 			},
 		},
 		"v1beta1": {
@@ -216,6 +217,7 @@ func TestDRA(t *testing.T) {
 				resourcev1beta1.SchemeGroupVersion:  true,
 				resourcev1beta2.SchemeGroupVersion:  true,
 				resourcealphaapi.SchemeGroupVersion: true,
+				schedulingapi.SchemeGroupVersion:    true,
 			},
 			features: map[featuregate.Feature]bool{
 				// Additional DRA feature gates go here,
@@ -257,7 +259,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 20) })
 				tCtx.Run("ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				tCtx.Run("UsesAllResources", testUsesAllResources)
-				tCtx.Run("WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, true) })
+				tCtx.Run("WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, true, true) })
 			},
 		},
 	} {
@@ -1854,13 +1856,47 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 // testWorkloadResourceClaims creates a PodGroup with resource claims and a
 // Pod referencing those claims and then checks whether those claims getting
 // dropped when the DRAWorkloadResourceClaims feature is enabled.
-func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadResourceClaimsEnabled bool) {
+func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadAPIEnabled, workloadResourceClaimsEnabled bool) {
 	tCtx.Parallel()
 
 	namespace := createTestNamespace(tCtx, nil)
 
 	podGroupClaimName := "podgroup-claim"
 	podGroupName := "podgroup"
+	podGroup := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podGroupName,
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.PodGroupSpec{
+			PodGroupTemplateRef: &schedulingapi.PodGroupTemplateReference{
+				Workload: &schedulingapi.WorkloadPodGroupTemplateReference{
+					WorkloadName:         "workload",
+					PodGroupTemplateName: "template",
+				},
+			},
+			SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+				Basic: &schedulingapi.BasicSchedulingPolicy{},
+			},
+			ResourceClaims: []schedulingapi.PodGroupResourceClaim{
+				{
+					Name:              podGroupClaimName,
+					ResourceClaimName: &claimName,
+				},
+			},
+		},
+	}
+	podGroup, err := tCtx.Client().SchedulingV1alpha2().PodGroups(namespace).Create(tCtx, podGroup, metav1.CreateOptions{FieldValidation: "Strict"})
+	if workloadAPIEnabled {
+		tCtx.ExpectNoError(err, "create PodGroup")
+		if workloadResourceClaimsEnabled {
+			assert.NotEmpty(tCtx, podGroup.Spec.ResourceClaims, "should store resource claims in PodGroup spec")
+		} else {
+			assert.Empty(tCtx, podGroup.Spec.ResourceClaims, "should drop resource claims from PodGroup spec")
+		}
+	} else {
+		assert.True(tCtx, apierrors.IsNotFound(err), "PodGroup API should not be available")
+	}
 
 	podClaimName := "podgroup-" + resourceName
 	podWithClaimName := podWithClaimName.DeepCopy()

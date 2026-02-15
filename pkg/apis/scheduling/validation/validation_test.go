@@ -355,6 +355,38 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 				w.Spec.ControllerRef = nil
 			}),
 		},
+		"add resource claim": {
+			old: mkWorkload(),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].ResourceClaims = append(w.Spec.PodGroupTemplates[0].ResourceClaims, scheduling.PodGroupResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: new("my-claim-name"),
+				})
+			}),
+		},
+		"remove resource claim": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].ResourceClaims = append(w.Spec.PodGroupTemplates[0].ResourceClaims, scheduling.PodGroupResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: new("my-claim-name"),
+				})
+			}),
+			update: mkWorkload(),
+		},
+		"change resource claim": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].ResourceClaims = append(w.Spec.PodGroupTemplates[0].ResourceClaims, scheduling.PodGroupResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: new("my-claim-name"),
+				})
+			}),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].ResourceClaims = append(w.Spec.PodGroupTemplates[0].ResourceClaims, scheduling.PodGroupResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: new("my-otherclaim-name"),
+				})
+			}),
+		},
 	}
 	for name, tc := range failureCases {
 		tc.old.ResourceVersion = "0"
@@ -562,6 +594,15 @@ func TestValidatePodGroupUpdate(t *testing.T) {
 			old: mkPodGroup(),
 			update: mkPodGroup(func(pg *scheduling.PodGroup) {
 				pg.Spec.SchedulingPolicy.Basic = &scheduling.BasicSchedulingPolicy{}
+			}),
+		},
+		"change resource claims": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.ResourceClaims = append(pg.Spec.ResourceClaims, scheduling.PodGroupResourceClaim{
+					Name:              "new-claim",
+					ResourceClaimName: new("resource-claim"),
+				})
 			}),
 		},
 	}

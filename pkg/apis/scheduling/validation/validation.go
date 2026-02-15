@@ -82,6 +82,7 @@ func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.Er
 func validatePodGroupSpecUpdate(spec, oldSpec *scheduling.PodGroupSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := apivalidation.ValidateImmutableField(spec.PodGroupTemplateRef, oldSpec.PodGroupTemplateRef, fldPath.Child("podGroupTemplateRef")).WithOrigin("immutable").MarkCoveredByDeclarative()
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SchedulingPolicy, oldSpec.SchedulingPolicy, fldPath.Child("schedulingPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ResourceClaims, oldSpec.ResourceClaims, fldPath.Child("resourceClaims")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 

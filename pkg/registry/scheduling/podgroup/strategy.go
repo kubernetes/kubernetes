@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // podGroupStrategy implements behavior for PodGroup objects.
@@ -66,6 +68,8 @@ func (*podGroupStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	podGroup := obj.(*scheduling.PodGroup)
 	// Status must not be set by user on create.
 	podGroup.Status = scheduling.PodGroupStatus{}
+
+	dropDisabledFields(podGroup, nil)
 }
 
 func (*podGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -88,6 +92,8 @@ func (*podGroupStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	newPodGroup := obj.(*scheduling.PodGroup)
 	oldPodGroup := old.(*scheduling.PodGroup)
 	newPodGroup.Status = oldPodGroup.Status
+
+	dropDisabledFields(newPodGroup, oldPodGroup)
 }
 
 func (*podGroupStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -144,4 +150,31 @@ func (r *podGroupStatusStrategy) ValidateUpdate(ctx context.Context, obj, old ru
 // WarningsOnUpdate returns warnings for the given update.
 func (*podGroupStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+func dropDisabledFields(podGroup, oldPodGroup *scheduling.PodGroup) {
+	var podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec
+	if podGroup != nil {
+		podGroupSpec = &podGroup.Spec
+	}
+	if oldPodGroup != nil {
+		oldPodGroupSpec = &oldPodGroup.Spec
+	}
+	dropDisabledSpecFields(podGroupSpec, oldPodGroupSpec)
+}
+
+func dropDisabledSpecFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec)
+}
+
+// dropDisabledDRAWorkloadResourceClaimsFields removes resource claim references
+// unless they are already used by the old PodGroup spec.
+func dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) && !draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
+		podGroupSpec.ResourceClaims = nil
+	}
+}
+
+func draWorkloadResourceClaimsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && len(podGroupSpec.ResourceClaims) > 0
 }

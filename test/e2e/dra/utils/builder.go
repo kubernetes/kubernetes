@@ -381,6 +381,19 @@ func (b *Builder) Workload() *schedulingv1alpha2.Workload {
 	return workload
 }
 
+// WorkloadExternal creates a Workload with one PodGroupTemplate that refers to
+// one ResourceClaim with the given name.
+func (b *Builder) WorkloadExternal(externalClaimName string) *schedulingv1alpha2.Workload {
+	workload := b.Workload()
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha2.PodGroupResourceClaim{
+		{
+			Name:              "resource-claim",
+			ResourceClaimName: &externalClaimName,
+		},
+	}
+	return workload
+}
+
 // PodGroup returns a simple PodGroup owned by the given Workload with no
 // resource claims.
 func (b *Builder) PodGroup(workload *schedulingv1alpha2.Workload, template schedulingv1alpha2.PodGroupTemplate) *schedulingv1alpha2.PodGroup {
@@ -397,6 +410,7 @@ func (b *Builder) PodGroup(workload *schedulingv1alpha2.Workload, template sched
 				},
 			},
 			SchedulingPolicy: template.SchedulingPolicy,
+			ResourceClaims:   template.ResourceClaims,
 		},
 	}
 	b.podGroupCounter++

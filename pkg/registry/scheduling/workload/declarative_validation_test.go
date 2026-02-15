@@ -18,6 +18,7 @@ package workload
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -134,6 +135,88 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"valid with basic policy": {
 			input: mkValidWorkload(setBasicPolicy(0)),
+		},
+		"ok resourceClaimName reference": {
+			input: mkValidWorkload(addResourceClaims(scheduling.PodGroupResourceClaim{Name: "claim", ResourceClaimName: new("resource-claim")})),
+		},
+		"ok resourceClaimTemplateName reference": {
+			input: mkValidWorkload(addResourceClaims(scheduling.PodGroupResourceClaim{Name: "claim", ResourceClaimTemplateName: new("resource-claim-template")})),
+		},
+		"ok multiple claims": {
+			input: mkValidWorkload(addResourceClaims(
+				scheduling.PodGroupResourceClaim{Name: "claim-1", ResourceClaimName: new("resource-claim-1")},
+				scheduling.PodGroupResourceClaim{Name: "claim-2", ResourceClaimName: new("resource-claim-2")},
+			)),
+		},
+		"claim name with prefix": {
+			input: mkValidWorkload(addResourceClaims(scheduling.PodGroupResourceClaim{Name: "../my-claim", ResourceClaimName: new("resource-claim")})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name"),
+			},
+		},
+		"claim name with path": {
+			input: mkValidWorkload(addResourceClaims(scheduling.PodGroupResourceClaim{Name: "my/claim", ResourceClaimName: new("resource-claim")})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name"),
+			},
+		},
+		"duplicate claim entries": {
+			input: mkValidWorkload(addResourceClaims(
+				scheduling.PodGroupResourceClaim{Name: "my-claim", ResourceClaimName: new("resource-claim-1")},
+				scheduling.PodGroupResourceClaim{Name: "my-claim", ResourceClaimName: new("resource-claim-2")},
+			)),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(1), nil),
+			},
+		},
+		"resource claim source empty": {
+			input: mkValidWorkload(addResourceClaims(
+				scheduling.PodGroupResourceClaim{Name: "my-claim"},
+			)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(0), nil, "").WithOrigin("union"),
+			},
+		},
+		"resource claim reference and template": {
+			input: mkValidWorkload(addResourceClaims(
+				scheduling.PodGroupResourceClaim{
+					Name:                      "my-claim",
+					ResourceClaimName:         new("resource-claim"),
+					ResourceClaimTemplateName: new("resource-claim-template"),
+				},
+			)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(0), nil, "").WithOrigin("union"),
+			},
+		},
+		"invalid claim reference name": {
+			input: mkValidWorkload(addResourceClaims(
+				scheduling.PodGroupResourceClaim{Name: "my-claim", ResourceClaimName: new(".foo_bar")},
+			)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(0).Child("resourceClaimName"), nil, "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		"invalid claim template name": {
+			input: mkValidWorkload(addResourceClaims(
+				scheduling.PodGroupResourceClaim{Name: "my-claim", ResourceClaimTemplateName: new(".foo_bar")},
+			)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(0).Child("resourceClaimTemplateName"), nil, "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		"too many claims": {
+			input: mkValidWorkload(func(pg *scheduling.Workload) {
+				for i := range scheduling.MaxPodGroupResourceClaims + 1 {
+					pg.Spec.PodGroupTemplates[0].ResourceClaims = append(pg.Spec.PodGroupTemplates[0].ResourceClaims, scheduling.PodGroupResourceClaim{
+						Name:              "my-claim-" + strconv.Itoa(i),
+						ResourceClaimName: new("resource-claim"),
+					})
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims"), scheduling.MaxPodGroupResourceClaims+1, scheduling.MaxPodGroupResourceClaims).WithOrigin("maxItems"),
+			},
 		},
 	}
 	for k, tc := range testCases {
@@ -352,5 +435,11 @@ func setControllerRef(apiGroup, kind, name string) func(obj *scheduling.Workload
 			Kind:     kind,
 			Name:     name,
 		}
+	}
+}
+
+func addResourceClaims(claims ...scheduling.PodGroupResourceClaim) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		obj.Spec.PodGroupTemplates[0].ResourceClaims = append(obj.Spec.PodGroupTemplates[0].ResourceClaims, claims...)
 	}
 }
