@@ -196,6 +196,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
 		defaultHugePagePodLimits(obj)
 		defaultPodRequests(obj)
+		defaultPodLimits(obj)
 	}
 
 	if obj.Spec.EnableServiceLinks == nil {
@@ -474,6 +475,83 @@ func defaultPodRequests(obj *v1.Pod) {
 	if len(podReqs) > 0 {
 		obj.Spec.Resources.Requests = podReqs
 	}
+}
+
+// defaultPodLimits applies default values for pod-level limits only when
+// pod-level requests are set and pod-level limits are unset, in the following
+// scenario: when all containers (regular, init or sidecar) have limits set,
+// the pod-level limits become equal to the aggregated limits of all containers
+// in the pod.
+// This defaulting behavior ensures that when pod-level requests are specified,
+// but pod-level limits are not, and all containers have limits defined, the
+// pod-level limits will be automatically set to the aggregated container limits,
+// as detailed in KEP-2837 rows 10, 12:
+// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#comprehensive-tabular-view
+func defaultPodLimits(obj *v1.Pod) {
+	// We only populate defaults when the pod-level resources are partly specified already.
+	if obj.Spec.Resources == nil {
+		return
+	}
+
+	// Only default pod limits if pod requests are set.
+	if len(obj.Spec.Resources.Requests) == 0 {
+		return
+	}
+
+	// Don't default if pod limits are already set.
+	if len(obj.Spec.Resources.Limits) > 0 {
+		return
+	}
+
+	// Check if all containers have limits set for supported pod-level resources.
+	// If not all containers have limits, don't default pod limits - containers
+	// will have access to resources up to node allocatable capacity.
+	for i := range obj.Spec.Containers {
+		if !containerHasSupportedLimits(&obj.Spec.Containers[i]) {
+			return
+		}
+	}
+	for i := range obj.Spec.InitContainers {
+		if !containerHasSupportedLimits(&obj.Spec.InitContainers[i]) {
+			return
+		}
+	}
+
+	var podLims v1.ResourceList
+	podLims = obj.Spec.Resources.Limits
+	if podLims == nil {
+		podLims = make(v1.ResourceList)
+	}
+
+	aggrCtrLims := resourcehelper.AggregateContainerLimits(obj, resourcehelper.PodResourcesOptions{})
+
+	// When all containers specify limits for a supported resource and pod-level limits
+	// are not set, the pod-level limits default to the aggregated limits of all containers.
+	for key, aggrCtrLim := range aggrCtrLims {
+		if _, exists := podLims[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+			podLims[key] = aggrCtrLim.DeepCopy()
+		}
+	}
+
+	// Only set pod-level resource limits in the PodSpec if the limits map
+	// contains entries after collecting container-level limits.
+	if len(podLims) > 0 {
+		obj.Spec.Resources.Limits = podLims
+	}
+}
+
+// containerHasSupportedLimits checks if a container has limits set for at least one
+// supported pod-level resource.
+func containerHasSupportedLimits(container *v1.Container) bool {
+	if container.Resources.Limits == nil {
+		return false
+	}
+	for key := range container.Resources.Limits {
+		if resourcehelper.IsSupportedPodLevelResource(key) {
+			return true
+		}
+	}
+	return false
 }
 
 // defaultHugePagePodLimits applies default values for pod-level limits, only when
