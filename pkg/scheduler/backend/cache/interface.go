@@ -94,6 +94,11 @@ type Cache interface {
 	// RemoveNode removes overall information about node.
 	RemoveNode(logger klog.Logger, node *v1.Node) error
 
+	// GetNodeGeneration returns the current generation of the node in the cache.
+	// Used for optimistic locking: assume() verifies it matches the generation at schedule time.
+	// Returns an error if the node is not found in the cache.
+	GetNodeGeneration(nodeName string) (int64, error)
+
 	// UpdateSnapshot updates the passed infoSnapshot to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.

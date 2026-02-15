@@ -17,6 +17,9 @@ limitations under the License.
 package fake
 
 import (
+	"errors"
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
@@ -72,4 +75,12 @@ func (c *Cache) UpdateSnapshot(logger klog.Logger, nodeSnapshot *internalcache.S
 		return c.UpdateSnapshotFunc(nodeSnapshot)
 	}
 	return c.Cache.UpdateSnapshot(logger, nodeSnapshot)
+}
+
+// GetNodeGeneration delegates to the embedded cache; returns error if cache is nil.
+func (c *Cache) GetNodeGeneration(nodeName string) (int64, error) {
+	if c.Cache == nil {
+		return 0, fmt.Errorf("fake.Cache: GetNodeGeneration(%q) called with nil embedded cache: %w", nodeName, errors.New("nil cache"))
+	}
+	return c.Cache.GetNodeGeneration(nodeName)
 }
