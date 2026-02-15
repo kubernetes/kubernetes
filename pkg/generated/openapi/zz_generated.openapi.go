@@ -14384,7 +14384,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"spec"},
+				Required: []string{"spec", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -14989,6 +14989,7 @@ func schema_k8sio_api_autoscaling_v1_Scale(ref common.ReferenceCallback) common.
 						},
 					},
 				},
+				Required: []string{"status"},
 			},
 		},
 		Dependencies: []string{
@@ -15116,7 +15117,7 @@ func schema_k8sio_api_autoscaling_v2_ContainerResourceMetricStatus(ref common.Re
 						},
 					},
 				},
-				Required: []string{"name", "current", "container"},
+				Required: []string{"name", "container"},
 			},
 		},
 		Dependencies: []string{
@@ -15213,7 +15214,7 @@ func schema_k8sio_api_autoscaling_v2_ExternalMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"metric", "current"},
+				Required: []string{"metric"},
 			},
 		},
 		Dependencies: []string{
@@ -15925,7 +15926,7 @@ func schema_k8sio_api_autoscaling_v2_ObjectMetricStatus(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"metric", "current", "describedObject"},
+				Required: []string{"metric", "describedObject"},
 			},
 		},
 		Dependencies: []string{
@@ -15985,7 +15986,7 @@ func schema_k8sio_api_autoscaling_v2_PodsMetricStatus(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"metric", "current"},
+				Required: []string{"metric"},
 			},
 		},
 		Dependencies: []string{
@@ -16047,7 +16048,7 @@ func schema_k8sio_api_autoscaling_v2_ResourceMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"name", "current"},
+				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{

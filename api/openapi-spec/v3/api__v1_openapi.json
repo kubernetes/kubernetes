@@ -167,6 +167,9 @@
             "description": "status is the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only."
           }
         },
+        "required": [
+          "status"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {

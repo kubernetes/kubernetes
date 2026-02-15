@@ -39,12 +39,15 @@ option go_package = "k8s.io/api/autoscaling/v2";
 // should be set.
 message ContainerResourceMetricSource {
   // name is the name of the resource in question.
+  // +required
   optional string name = 1;
 
   // target specifies the target value for the given metric
+  // +required
   optional MetricTarget target = 2;
 
   // container is the name of the container in the pods of the scaling target
+  // +required
   optional string container = 3;
 }
 
@@ -55,21 +58,26 @@ message ContainerResourceMetricSource {
 // normal per-pod metrics using the "pods" source.
 message ContainerResourceMetricStatus {
   // name is the name of the resource in question.
+  // +required
   optional string name = 1;
 
   // current contains the current value for the given metric
+  // +optional
   optional MetricValueStatus current = 2;
 
   // container is the name of the container in the pods of the scaling target
+  // +required
   optional string container = 3;
 }
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
   // kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  // +required
   optional string kind = 1;
 
   // name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // +required
   optional string name = 2;
 
   // apiVersion is the API version of the referent
@@ -82,9 +90,11 @@ message CrossVersionObjectReference {
 // messaging service, or QPS from loadbalancer running outside of cluster).
 message ExternalMetricSource {
   // metric identifies the target metric by name and selector
+  // +required
   optional MetricIdentifier metric = 1;
 
   // target specifies the target value for the given metric
+  // +required
   optional MetricTarget target = 2;
 }
 
@@ -92,23 +102,28 @@ message ExternalMetricSource {
 // not associated with any Kubernetes object.
 message ExternalMetricStatus {
   // metric identifies the target metric by name and selector
+  // +required
   optional MetricIdentifier metric = 1;
 
   // current contains the current value for the given metric
+  // +optional
   optional MetricValueStatus current = 2;
 }
 
 // HPAScalingPolicy is a single policy which must hold true for a specified past interval.
 message HPAScalingPolicy {
   // type is used to specify the scaling policy.
+  // +required
   optional string type = 1;
 
   // value contains the amount of change which is permitted by the policy.
   // It must be greater than zero
+  // +required
   optional int32 value = 2;
 
   // periodSeconds specifies the window of time for which the policy should hold true.
   // PeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).
+  // +required
   optional int32 periodSeconds = 3;
 }
 
@@ -206,9 +221,11 @@ message HorizontalPodAutoscalerBehavior {
 // a HorizontalPodAutoscaler at a certain point.
 message HorizontalPodAutoscalerCondition {
   // type describes the current condition
+  // +required
   optional string type = 1;
 
   // status is the status of the condition (True, False, Unknown)
+  // +required
   optional string status = 2;
 
   // lastTransitionTime is the last time the condition transitioned from
@@ -240,6 +257,7 @@ message HorizontalPodAutoscalerList {
 message HorizontalPodAutoscalerSpec {
   // scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
   // should be collected, as well as to actually change the replica count.
+  // +required
   optional CrossVersionObjectReference scaleTargetRef = 1;
 
   // minReplicas is the lower limit for the number of replicas to which the autoscaler
@@ -317,6 +335,7 @@ message HorizontalPodAutoscalerStatus {
 // MetricIdentifier defines the name and optionally selector for a metric
 message MetricIdentifier {
   // name is the name of the given metric
+  // +required
   optional string name = 1;
 
   // selector is the string-encoded form of a standard kubernetes label selector for the given metric
@@ -331,6 +350,7 @@ message MetricIdentifier {
 message MetricSpec {
   // type is the type of metric source.  It should be one of "ContainerResource", "External",
   // "Object", "Pods" or "Resource", each mapping to a matching field in the object.
+  // +required
   optional string type = 1;
 
   // object refers to a metric describing a single kubernetes object
@@ -373,6 +393,7 @@ message MetricSpec {
 message MetricStatus {
   // type is the type of metric source.  It will be one of "ContainerResource", "External",
   // "Object", "Pods" or "Resource", each corresponds to a matching field in the object.
+  // +required
   optional string type = 1;
 
   // object refers to a metric describing a single kubernetes object
@@ -414,6 +435,7 @@ message MetricStatus {
 // MetricTarget defines the target value, average value, or average utilization of a specific metric
 message MetricTarget {
   // type represents whether the metric type is Utilization, Value, or AverageValue
+  // +required
   optional string type = 1;
 
   // value is the target value of the metric (as a quantity).
@@ -455,12 +477,15 @@ message MetricValueStatus {
 // kubernetes object (for example, hits-per-second on an Ingress object).
 message ObjectMetricSource {
   // describedObject specifies the descriptions of a object,such as kind,name apiVersion
+  // +required
   optional CrossVersionObjectReference describedObject = 1;
 
   // target specifies the target value for the given metric
+  // +required
   optional MetricTarget target = 2;
 
   // metric identifies the target metric by name and selector
+  // +required
   optional MetricIdentifier metric = 3;
 }
 
@@ -468,12 +493,15 @@ message ObjectMetricSource {
 // kubernetes object (for example, hits-per-second on an Ingress object).
 message ObjectMetricStatus {
   // metric identifies the target metric by name and selector
+  // +required
   optional MetricIdentifier metric = 1;
 
   // current contains the current value for the given metric
+  // +optional
   optional MetricValueStatus current = 2;
 
   // DescribedObject specifies the descriptions of a object,such as kind,name apiVersion
+  // +required
   optional CrossVersionObjectReference describedObject = 3;
 }
 
@@ -483,9 +511,11 @@ message ObjectMetricStatus {
 // value.
 message PodsMetricSource {
   // metric identifies the target metric by name and selector
+  // +required
   optional MetricIdentifier metric = 1;
 
   // target specifies the target value for the given metric
+  // +required
   optional MetricTarget target = 2;
 }
 
@@ -493,9 +523,11 @@ message PodsMetricSource {
 // the current scale target (for example, transactions-processed-per-second).
 message PodsMetricStatus {
   // metric identifies the target metric by name and selector
+  // +required
   optional MetricIdentifier metric = 1;
 
   // current contains the current value for the given metric
+  // +optional
   optional MetricValueStatus current = 2;
 }
 
@@ -508,9 +540,11 @@ message PodsMetricStatus {
 // should be set.
 message ResourceMetricSource {
   // name is the name of the resource in question.
+  // +required
   optional string name = 1;
 
   // target specifies the target value for the given metric
+  // +required
   optional MetricTarget target = 2;
 }
 
@@ -521,9 +555,11 @@ message ResourceMetricSource {
 // normal per-pod metrics using the "pods" source.
 message ResourceMetricStatus {
   // name is the name of the resource in question.
+  // +required
   optional string name = 1;
 
   // current contains the current value for the given metric
+  // +optional
   optional MetricValueStatus current = 2;
 }
 
