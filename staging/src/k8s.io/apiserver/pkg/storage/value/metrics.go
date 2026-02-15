@@ -84,7 +84,7 @@ var (
 			Name:           "data_key_generation_duration_seconds",
 			Help:           "Latencies in seconds of data encryption key(DEK) generation operations.",
 			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 14),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 
@@ -94,7 +94,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "data_key_generation_failures_total",
 			Help:           "Total number of failed data encryption key(DEK) generation operations.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 )
@@ -137,7 +137,7 @@ func RecordDataKeyGeneration(start time.Time, err error) {
 }
 
 // sinceInSeconds gets the time since the specified start in seconds.
-func sinceInSeconds(start time.Time) float64 {
+var sinceInSeconds = func(start time.Time) float64 {
 	return time.Since(start).Seconds()
 }
 
