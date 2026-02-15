@@ -163,6 +163,19 @@ func (n *node) deleteDependent(dependent *node) {
 	delete(n.dependents, dependent)
 }
 
+func (n *node) replaceDependentIfItExists(oldDependent, newDependent *node) {
+	n.dependentsLock.Lock()
+	defer n.dependentsLock.Unlock()
+
+	for dep := range n.dependents {
+		if ownerReferenceMatchesCoordinates(dep.identity.OwnerReference, oldDependent.identity.OwnerReference) {
+			delete(n.dependents, dep)
+			n.dependents[newDependent] = struct{}{}
+			return
+		}
+	}
+}
+
 func (n *node) dependentsLength() int {
 	n.dependentsLock.RLock()
 	defer n.dependentsLock.RUnlock()
