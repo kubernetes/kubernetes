@@ -2528,3 +2528,5 @@ func init() {
 	runtime.Must(clientfeatures.AddVersionedFeaturesToExistingFeatureGates(ca))
 	clientfeatures.ReplaceFeatureGates(ca)
 }
+
+PodNetworkHealth featuregate.Feature = "PodNetworkHealth"
