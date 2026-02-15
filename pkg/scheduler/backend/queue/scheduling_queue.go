@@ -111,6 +111,10 @@ type SchedulingQueue interface {
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
 	Pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
+	// PopSpecificPod removes the pod from the queue and returns it.
+	// It behaves like Pop for the popped pod (metrics, in-flight tracking, etc.).
+	// It returns nil if the pod is not in the queue.
+	PopSpecificPod(logger klog.Logger, pod *v1.Pod) *framework.QueuedPodInfo
 	// Done must be called for pod returned by Pop. This allows the queue to
 	// keep track of which pods are currently being processed.
 	Done(types.UID)
@@ -899,6 +903,8 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	pInfo.BackoffExpiration = time.Time{}
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
+	// Pod with Workload reference should always need the cycle after got unschedulable for some reason.
+	pInfo.NeedsPodGroupCycle = pod.Spec.WorkloadRef != nil
 
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
@@ -971,6 +977,50 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 // as it would lead to scheduling throughput degradation.
 func (p *PriorityQueue) Pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	return p.activeQ.pop(logger)
+}
+
+// PopSpecificPod removes the pod from the queue and returns it.
+// It behaves like Pop for the popped pod (metrics, in-flight tracking, etc.).
+// It returns nil if the pod is not in the queue.
+func (p *PriorityQueue) PopSpecificPod(logger klog.Logger, pod *v1.Pod) *framework.QueuedPodInfo {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	pInfoLookup := newQueuedPodInfoForLookup(pod)
+
+	var pInfo *framework.QueuedPodInfo
+	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
+		pInfo, _ = unlockedActiveQ.get(pInfoLookup)
+	})
+	if pInfo != nil {
+		if err := p.activeQ.delete(pInfo); err != nil {
+			return nil
+		}
+	} else {
+		var exists bool
+		pInfo, exists = p.backoffQ.get(pInfoLookup)
+		if exists {
+			if !p.backoffQ.delete(pInfo) {
+				return nil
+			}
+		} else {
+			pInfo = p.unschedulablePods.get(pod)
+			if pInfo != nil {
+				p.unschedulablePods.delete(pod, pInfo.Gated())
+			} else {
+				// Not found in any queue
+				return nil
+			}
+		}
+	}
+
+	err := p.activeQ.movePodToInFlight(logger, pInfo)
+	if err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Discarding the popped pod")
+		return nil
+	}
+
+	return pInfo
 }
 
 // Done must be called for pod returned by Pop. This allows the queue to
@@ -1439,6 +1489,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 		Timestamp:               now,
 		InitialAttemptTimestamp: nil,
 		UnschedulablePlugins:    sets.New(plugins...),
+		NeedsPodGroupCycle:      pod.Spec.WorkloadRef != nil,
 	}
 }
 

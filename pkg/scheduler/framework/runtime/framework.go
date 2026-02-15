@@ -36,6 +36,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -55,24 +56,28 @@ const (
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
 type frameworkImpl struct {
-	registry             Registry
-	snapshotSharedLister fwk.SharedLister
-	waitingPods          *waitingPodsMap
-	scorePluginWeight    map[string]int
-	preEnqueuePlugins    []fwk.PreEnqueuePlugin
-	enqueueExtensions    []fwk.EnqueueExtensions
-	queueSortPlugins     []fwk.QueueSortPlugin
-	preFilterPlugins     []fwk.PreFilterPlugin
-	filterPlugins        []fwk.FilterPlugin
-	postFilterPlugins    []fwk.PostFilterPlugin
-	preScorePlugins      []fwk.PreScorePlugin
-	scorePlugins         []fwk.ScorePlugin
-	reservePlugins       []fwk.ReservePlugin
-	preBindPlugins       []fwk.PreBindPlugin
-	bindPlugins          []fwk.BindPlugin
-	postBindPlugins      []fwk.PostBindPlugin
-	permitPlugins        []fwk.PermitPlugin
-	batchablePlugins     []fwk.SignPlugin
+	registry                  Registry
+	snapshotSharedLister      fwk.SharedLister
+	waitingPods               *waitingPodsMap
+	scorePluginWeight         map[string]int
+	preEnqueuePlugins         []fwk.PreEnqueuePlugin
+	enqueueExtensions         []fwk.EnqueueExtensions
+	queueSortPlugins          []fwk.QueueSortPlugin
+	preFilterPlugins          []fwk.PreFilterPlugin
+	filterPlugins             []fwk.FilterPlugin
+	postFilterPlugins         []fwk.PostFilterPlugin
+	preScorePlugins           []fwk.PreScorePlugin
+	scorePlugins              []fwk.ScorePlugin
+	reservePlugins            []fwk.ReservePlugin
+	preBindPlugins            []fwk.PreBindPlugin
+	bindPlugins               []fwk.BindPlugin
+	postBindPlugins           []fwk.PostBindPlugin
+	permitPlugins             []fwk.PermitPlugin
+	batchablePlugins          []fwk.SignPlugin
+	placementGeneratorPlugins []fwk.PlacementGeneratorPlugin
+
+	placementGeneratePlugins []fwk.PlacementGeneratorPlugin
+	placementScorePlugins    []fwk.PlacementScorerPlugin
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
@@ -129,6 +134,8 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Permit, &f.permitPlugins},
 		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
+		{&plugins.PlacementGenerate, &f.placementGeneratePlugins},
+		{&plugins.PlacementScore, &f.placementScorePlugins},
 	}
 }
 
@@ -1621,6 +1628,11 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state fwk.CycleState
 	return status
 }
 
+func (f *frameworkImpl) RunPlacementGeneratorPlugins(ctx context.Context, state fwk.CycleState, podGroup *fwk.PodGroupInfo, parentPlacements []*fwk.ParentPlacement) ([]*fwk.ParentPlacement, *fwk.Status) {
+	// https://github.com/kubernetes/kubernetes/pull/136686
+	return nil, fwk.NewStatus(fwk.Error, "Not yet implemented")
+}
+
 func (f *frameworkImpl) runBindPlugin(ctx context.Context, bp fwk.BindPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return bp.Bind(ctx, state, pod, nodeName)
@@ -1800,6 +1812,50 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleSta
 	return nil
 }
 
+// RunPermitPluginsWithoutWaiting runs the set of configured permit plugins. If any of these
+// plugins returns a status other than "Success" or "Wait", it does not continue
+// running the remaining plugins and returns an error. If any of the
+// plugins returns "Wait", this function will NOT create a waiting pod object,
+// but just return status with "Wait" code. It's caller's responsibility to act on that code.
+func (f *frameworkImpl) RunPermitPluginsWithoutWaiting(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Permit, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+	var waitStatus *fwk.Status
+	logger := klog.FromContext(ctx)
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs {
+		logger = klog.LoggerWithName(logger, "Permit")
+		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
+	}
+	for _, pl := range f.permitPlugins {
+		ctx := ctx
+		if verboseLogs {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			ctx = klog.NewContext(ctx, logger)
+		}
+		status, _ := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
+		if !status.IsSuccess() {
+			if status.IsRejected() {
+				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
+				return status.WithPlugin(pl.Name())
+			}
+			if !status.IsWait() {
+				err := status.AsError()
+				logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
+				return fwk.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithPlugin(pl.Name())
+			}
+			waitStatus = status
+		}
+	}
+	if waitStatus != nil {
+		logger.V(4).Info("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
+		return waitStatus
+	}
+	return nil
+}
+
 func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Permit(ctx, state, pod, nodeName)
@@ -1808,6 +1864,115 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin
 	status, timeout := pl.Permit(ctx, state, pod, nodeName)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.Permit, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status, timeout
+}
+
+// RunPlacementGeneratorPlugins runs the set of configured PlacementGenerator plugins.
+// It implements a "chaining" mechanism where the placements generated by plugin N
+// become the "parent" search space for plugin N+1.
+func (f *frameworkImpl) RunPlacementGeneratorPlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup *fwk.PodGroupInfo, initialParents []*fwk.PlacementInfo) ([]*fwk.PlacementInfo, *fwk.Status) {
+	// 1. Initialize the search space.
+	// If no parent placements are provided (typical for the start of the cycle),
+	// we construct a "Root" parent containing ALL nodes in the cluster.
+	currentParents := initialParents
+	if len(currentParents) == 0 {
+		allNodeInfos, err := f.snapshotSharedLister.NodeInfos().List()
+		if err != nil {
+			return nil, fwk.AsStatus(fmt.Errorf("listing nodes for root placement: %w", err))
+		}
+
+		// Create a synthetic "Root" placement that matches everything.
+		currentParents = []*fwk.PlacementInfo{
+			{
+				Placement: fwk.Placement{
+					// Nil NodeSelector implies "match everything"
+				},
+				PlacementNodes: allNodeInfos,
+			},
+		}
+	}
+
+	// 2. Iterate through the generator chain
+	for _, pl := range f.placementGeneratorPlugins {
+		// A. Generate placements using the current set of parents
+		placements, status := pl.GeneratePlacements(ctx, state, podGroup, currentParents)
+		if status != nil && !status.IsSuccess() {
+			return nil, status
+		}
+
+		// B. Prepare 'currentParents' for the next plugin.
+		// We must convert the generated []*Placement into []*ParentPlacement.
+		// This involves finding which nodes actually match the new placements.
+
+		// Optimization: The new nodes MUST be a subset of the previous parent's nodes.
+		// We collect all available nodes from the current parents to narrow the search.
+		sourceNodes := getAllNodesFromParents(currentParents)
+
+		var nextParents []*fwk.PlacementInfo
+		for _, p := range placements {
+			// Find nodes that match this placement's selector
+			matchingNodes := filterNodesMatchingSelector(sourceNodes, p.NodeSelector)
+
+			// Only propagate placements that actually have feasible nodes
+			if len(matchingNodes) > 0 {
+				nextParents = append(nextParents, &fwk.PlacementInfo{
+					Placement:      *p,
+					PlacementNodes: matchingNodes,
+				})
+			}
+		}
+
+		// If the chain produced no feasible domains, we can stop early.
+		if len(nextParents) == 0 {
+			return nil, nil
+		}
+
+		currentParents = nextParents
+	}
+
+	return currentParents, nil
+}
+
+// Helper: Collects distinct nodes from a list of ParentPlacements
+func getAllNodesFromParents(parents []*fwk.PlacementInfo) []fwk.NodeInfo {
+	// Use a map to deduplicate if parents overlap
+	seen := sets.NewString()
+	var result []fwk.NodeInfo
+
+	for _, p := range parents {
+		for _, node := range p.PlacementNodes {
+			if !seen.Has(node.Node().Name) {
+				seen.Insert(node.Node().Name)
+				result = append(result, node)
+			}
+		}
+	}
+	return result
+}
+
+// Helper: Filter nodes that match the given NodeSelector
+func filterNodesMatchingSelector(nodes []fwk.NodeInfo, selector *v1.NodeSelector) []fwk.NodeInfo {
+	if selector == nil {
+		return nodes // Match all
+	}
+
+	// Parse the API NodeSelector into a helper object that supports matching
+	ns, err := nodeaffinity.NewNodeSelector(selector)
+	if err != nil {
+		// If the selector is invalid, it matches no nodes.
+		return nil
+	}
+
+	var matches []fwk.NodeInfo
+	for _, node := range nodes {
+		if ns.Match(node.Node()) {
+			matches = append(matches, node)
+		}
+	}
+	return matches
+}
+
+func (f *frameworkImpl) HasPlacementGeneratorPlugins() bool {
+	return len(f.placementGeneratorPlugins) > 0
 }
 
 func (f *frameworkImpl) WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool {

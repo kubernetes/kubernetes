@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -439,6 +440,148 @@ func TestNewSnapshot(t *testing.T) {
 
 			if diff := cmp.Diff(test.expectedUsedPVCSet, snapshot.usedPVCSet); diff != "" {
 				t.Errorf("Unexpected usedPVCSet (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSnapshot_AssumeForget(t *testing.T) {
+	node1 := st.MakeNode().Name("node-1").Obj()
+	node2 := st.MakeNode().Name("node-2").Obj()
+
+	pod1 := st.MakePod().Name("pod-1").UID("pod-1").Node("node-1").Obj()
+	pod2 := st.MakePod().Name("pod-2").UID("pod-2").Node("node-1").Obj()
+	pod3 := st.MakePod().Name("pod-3").UID("pod-3").Node("node-2").Obj()
+	podOnWrongNode := st.MakePod().Name("pod-x").UID("pod-x").Node("node-x").Obj()
+
+	pod2Info, _ := framework.NewPodInfo(pod2)
+	pod3Info, _ := framework.NewPodInfo(pod3)
+	podOnWrongNodeInfo, _ := framework.NewPodInfo(podOnWrongNode)
+
+	tests := []struct {
+		name                string
+		initialPods         []*v1.Pod
+		initialNodes        []*v1.Node
+		podsToAssume        []*framework.PodInfo
+		podsToForget        []*v1.Pod
+		forgetAll           bool
+		expectAssumeErr     bool
+		expectForgetErr     bool
+		expectedPodsOnNodes map[string]sets.Set[string]
+	}{
+		{
+			name:         "assume a pod successfully",
+			initialPods:  []*v1.Pod{pod1},
+			initialNodes: []*v1.Node{node1, node2},
+			podsToAssume: []*framework.PodInfo{pod2Info, pod3Info},
+			expectedPodsOnNodes: map[string]sets.Set[string]{
+				"node-1": sets.New("pod-1", "pod-2"),
+				"node-2": sets.New("pod-3"),
+			},
+		},
+		{
+			name:            "assume a pod on a non-existing node",
+			initialPods:     []*v1.Pod{pod1},
+			initialNodes:    []*v1.Node{node1},
+			podsToAssume:    []*framework.PodInfo{podOnWrongNodeInfo},
+			expectAssumeErr: true,
+		},
+		{
+			name:         "forget a pod successfully",
+			initialPods:  []*v1.Pod{pod1},
+			initialNodes: []*v1.Node{node1, node2},
+			podsToAssume: []*framework.PodInfo{pod2Info, pod3Info},
+			podsToForget: []*v1.Pod{pod2},
+			expectedPodsOnNodes: map[string]sets.Set[string]{
+				"node-1": sets.New("pod-1"),
+				"node-2": sets.New("pod-3"),
+			},
+		},
+		{
+			name:            "forget a pod that was not assumed",
+			initialPods:     []*v1.Pod{pod1},
+			initialNodes:    []*v1.Node{node1, node2},
+			podsToForget:    []*v1.Pod{pod2},
+			expectForgetErr: true,
+		},
+		{
+			name:         "forget all assumed pods",
+			initialPods:  []*v1.Pod{pod1},
+			initialNodes: []*v1.Node{node1, node2},
+			podsToAssume: []*framework.PodInfo{pod2Info, pod3Info},
+			forgetAll:    true,
+			expectedPodsOnNodes: map[string]sets.Set[string]{
+				"node-1": sets.New("pod-1"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			snapshot := NewSnapshot(tt.initialPods, tt.initialNodes)
+
+			for _, p := range tt.podsToAssume {
+				err := snapshot.AssumePod(p)
+				if tt.expectAssumeErr {
+					if err == nil {
+						t.Fatalf("Exepcted AssumePod to fail but is hasn't")
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("Failed to assume pod %q: %v", p.Pod.Name, err)
+				}
+			}
+
+			if tt.forgetAll {
+				snapshot.forgetAllAssumedPods(logger)
+				if len(snapshot.assumedPods) != 0 {
+					t.Errorf("Expected assumedPods to be empty, but has %d pods", len(snapshot.assumedPods))
+				}
+			} else {
+				for _, p := range tt.podsToForget {
+					err := snapshot.ForgetPod(logger, p)
+					if tt.expectForgetErr {
+						if err == nil {
+							t.Fatalf("Exepcted ForgetPod to fail but is hasn't")
+						}
+						return
+					}
+					if err != nil {
+						t.Fatalf("Failed to forget pod %q: %v", p.Name, err)
+					}
+				}
+			}
+
+			nodeInfos, err := snapshot.List()
+			if err != nil {
+				t.Fatalf("Failed to list snapshotted nodes: %v", err)
+			}
+			for nodeName, expectedPods := range tt.expectedPodsOnNodes {
+				nodeInfo, err := snapshot.Get(nodeName)
+				if err != nil {
+					t.Fatalf("Failed to get node %q from snapshot: %v", nodeName, err)
+				}
+				gotPods := nodeInfo.GetPods()
+				if len(expectedPods) != len(gotPods) {
+					t.Errorf("Unexpected number of pods on node %q: want %d, got %d", nodeName, len(expectedPods), len(gotPods))
+				}
+				for _, p := range nodeInfo.GetPods() {
+					podName := p.GetPod().Name
+					if !expectedPods.Has(podName) {
+						t.Errorf("Unexpected pod %q on node %q", podName, nodeName)
+					}
+				}
+				// Safety check that nodeInfoList's pods were also updated.
+				for _, nInfo := range nodeInfos {
+					if nInfo.Node().Name == nodeInfo.Node().Name {
+						if diff := cmp.Diff(nodeInfo.GetPods(), nInfo.GetPods(), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+							t.Errorf("Unexpected nodeInfo state in nodeInfoList (-want +got):\n%s", diff)
+						}
+					}
+				}
 			}
 		})
 	}

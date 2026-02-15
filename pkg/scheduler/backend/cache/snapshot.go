@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -41,6 +42,13 @@ type Snapshot struct {
 	// keyed in the format "namespace/name".
 	usedPVCSet sets.Set[string]
 	generation int64
+	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
+	// This map should be emptied before the next cycle starts.
+	assumedPods map[string]*v1.Pod
+
+	hasPlacement          bool
+	placementNodeInfoList []fwk.NodeInfo
+	placementNodeInfoSet  sets.Set[string]
 }
 
 var _ fwk.SharedLister = &Snapshot{}
@@ -50,6 +58,7 @@ func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
 		nodeInfoMap: make(map[string]*framework.NodeInfo),
 		usedPVCSet:  sets.New[string](),
+		assumedPods: make(map[string]*v1.Pod),
 	}
 }
 
@@ -165,8 +174,11 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 	return s
 }
 
-// NumNodes returns the number of nodes in the snapshot.
-func (s *Snapshot) NumNodes() int {
+// NumNodes returns the number of nodes in the snapshot for the current placement.
+func (s *Snapshot) NumNodesInPlacement() int {
+	if s.hasPlacement {
+		return len(s.placementNodeInfoList)
+	}
 	return len(s.nodeInfoList)
 }
 
@@ -196,4 +208,88 @@ func (s *Snapshot) Get(nodeName string) (fwk.NodeInfo, error) {
 
 func (s *Snapshot) IsPVCUsedByPods(key string) bool {
 	return s.usedPVCSet.Has(key)
+}
+
+// AssumePod assumes a given pod in the snapshot.
+// ForgetPod should be called on the snapshot before syncing it with the cache.
+// This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
+func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
+	pod := podInfo.Pod
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+	nodeInfo, ok := s.nodeInfoMap[pod.Spec.NodeName]
+	if !ok {
+		return fmt.Errorf("assumed node %q not found in the snapshot", pod.Spec.NodeName)
+	}
+	// Calling AddPodInfo increases the Generation number of the nodeInfo.
+	// Since this operation only affects the snapshot,
+	// we should keep the old number to remain consistent with the cached value.
+	oldGeneration := nodeInfo.Generation
+	nodeInfo.AddPodInfo(podInfo)
+	nodeInfo.Generation = oldGeneration
+	s.assumedPods[key] = pod
+	return nil
+}
+
+// ForgetPod forgets a given pod from the snapshot.
+// This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
+func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+	assumedPod, ok := s.assumedPods[key]
+	if !ok {
+		return fmt.Errorf("assumed pod %q not found in the snapshot", key)
+	}
+	delete(s.assumedPods, key)
+	nodeName := assumedPod.Spec.NodeName
+	if nodeInfo, ok := s.nodeInfoMap[nodeName]; ok {
+		// Calling RemovePod increases the Generation number of the nodeInfo.
+		// Since this operation only affects the snapshot,
+		// we should keep the old number to remain consistent with the cached value.
+		oldGeneration := nodeInfo.Generation
+		nodeInfo.RemovePod(logger, pod)
+		nodeInfo.Generation = oldGeneration
+	}
+	return nil
+}
+
+// forgetAllAssumedPods forgets all assumed pods from the snapshot.
+// This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
+func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
+	for _, pod := range s.assumedPods {
+		s.ForgetPod(logger, pod)
+	}
+}
+
+func (s *Snapshot) SetPlacement(placement *fwk.PlacementInfo) {
+	s.placementNodeInfoList = placement.PlacementNodes
+	s.placementNodeInfoSet = sets.New[string]()
+	for _, node := range placement.PlacementNodes {
+		s.placementNodeInfoSet.Insert(node.Node().Name)
+	}
+	s.hasPlacement = true
+}
+
+func (s *Snapshot) UnsetPlacement() {
+	s.hasPlacement = false
+	s.placementNodeInfoList = nil
+	s.placementNodeInfoSet = nil
+}
+
+func (s *Snapshot) GetInPlacement(nodeName string) (fwk.NodeInfo, error) {
+	if !s.hasPlacement || s.placementNodeInfoSet.Has(nodeName) {
+		return s.Get(nodeName)
+	}
+	return nil, fmt.Errorf("Node %q not found in placement", nodeName)
+}
+
+func (s *Snapshot) ListInPlacement() ([]fwk.NodeInfo, error) {
+	if !s.hasPlacement {
+		return s.List()
+	}
+	return s.placementNodeInfoList, nil
 }

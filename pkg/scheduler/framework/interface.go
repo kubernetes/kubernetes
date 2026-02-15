@@ -238,6 +238,13 @@ type Framework interface {
 	// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
 	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
 
+	// RunPermitPluginsWithoutWaiting runs the set of configured permit plugins. If any of these
+	// plugins returns a status other than "Success" or "Wait", it does not continue
+	// running the remaining plugins and returns an error. If any of the
+	// plugins returns "Wait", this function will NOT create a waiting pod object,
+	// but just return status with "Wait" code. It's caller's responsibility to act on that code.
+	RunPermitPluginsWithoutWaiting(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+
 	// WillWaitOnPermit returns whether this pod will wait on permit by checking if the pod is a waiting pod.
 	WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool
 
@@ -250,6 +257,10 @@ type Framework interface {
 	// or "Success". If none of the plugins handled binding, RunBindPlugins returns
 	// code=5("skip") status.
 	RunBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+
+	// RunPlacementGeneratorPlugins runs the set of configured PlacementGenerator plugins.
+	// It returns the combined list of generated Placements.
+	RunPlacementGeneratorPlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup *fwk.PodGroupInfo, initialParents []*fwk.PlacementInfo) ([]*fwk.PlacementInfo, *fwk.Status)
 
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool
