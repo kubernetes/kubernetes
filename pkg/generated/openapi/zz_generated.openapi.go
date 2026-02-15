@@ -17491,7 +17491,7 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequestSpec(ref common.R
 						},
 					},
 				},
-				Required: []string{"request", "signerName"},
+				Required: []string{"request", "signerName", "usages"},
 			},
 		},
 	}
@@ -17926,7 +17926,7 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestSpec(ref com
 						},
 					},
 				},
-				Required: []string{"request"},
+				Required: []string{"request", "usages"},
 			},
 		},
 	}
