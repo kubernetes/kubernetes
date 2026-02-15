@@ -65,15 +65,6 @@ type mockMonitor struct {
 	garbagecollector.Monitor
 }
 
-type mockResourceSyncer struct {
-	cache.Controller
-	lastSyncRV string
-}
-
-func (m *mockResourceSyncer) LastSyncResourceVersion() string {
-	return m.lastSyncRV
-}
-
 func newMockMonitor(lastSyncRV string, items []runtime.Object) *mockMonitor {
 	store := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	for _, item := range items {
@@ -82,10 +73,8 @@ func newMockMonitor(lastSyncRV string, items []runtime.Object) *mockMonitor {
 
 	return &mockMonitor{
 		Monitor: garbagecollector.Monitor{
-			Store: store,
-			Controller: &mockResourceSyncer{
-				lastSyncRV: lastSyncRV,
-			},
+			LastSyncResourceVersion: func() string { return lastSyncRV },
+			Store:                   store,
 		},
 	}
 }

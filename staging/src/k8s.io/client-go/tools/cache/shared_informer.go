@@ -37,8 +37,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
-
-	clientgofeaturegate "k8s.io/client-go/features"
 )
 
 // SharedInformer provides eventually consistent linkage of its
@@ -179,8 +177,6 @@ type SharedInformer interface {
 	RemoveEventHandler(handle ResourceEventHandlerRegistration) error
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
-	// GetController is deprecated, it does nothing useful
-	GetController() Controller
 	// Run starts and runs the shared informer, returning after it stops.
 	// The informer will be stopped when stopCh is closed.
 	//
@@ -586,7 +582,7 @@ func (c SyncResult) AsError() error {
 // notifications to each of the informer's clients.
 type sharedIndexInformer struct {
 	indexer    Indexer
-	controller Controller
+	controller *ControllerImpl
 
 	// synced gets created when creating the sharedIndexInformer.
 	// It gets closed when Run detects that the processor created
@@ -634,37 +630,6 @@ type sharedIndexInformer struct {
 
 	// keyFunc is called when processing deltas by the underlying process function.
 	keyFunc KeyFunc
-}
-
-// dummyController hides the fact that a SharedInformer is different from a dedicated one
-// where a caller can `Run`.  The run method is disconnected in this case, because higher
-// level logic will decide when to start the SharedInformer and related controller.
-// Because returning information back is always asynchronous, the legacy callers shouldn't
-// notice any change in behavior.
-type dummyController struct {
-	informer *sharedIndexInformer
-}
-
-func (v *dummyController) RunWithContext(context.Context) {
-}
-
-func (v *dummyController) Run(stopCh <-chan struct{}) {
-}
-
-func (v *dummyController) HasSynced() bool {
-	return v.informer.HasSynced()
-}
-
-func (v *dummyController) HasSyncedChecker() DoneChecker {
-	return v.informer.HasSyncedChecker()
-}
-
-func (v *dummyController) LastSyncResourceVersion() string {
-	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
-		return v.informer.LastSyncResourceVersion()
-	}
-
-	return ""
 }
 
 type updateNotification struct {
@@ -748,7 +713,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		}
 
 		s.controller = New(cfg)
-		s.controller.(*controller).clock = s.clock
+		s.controller.clock = s.clock
 		s.started = true
 	}()
 
@@ -842,10 +807,6 @@ func (s *sharedIndexInformer) AddIndexers(indexers Indexers) error {
 	}
 
 	return s.indexer.AddIndexers(indexers)
-}
-
-func (s *sharedIndexInformer) GetController() Controller {
-	return &dummyController{informer: s}
 }
 
 func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error) {
