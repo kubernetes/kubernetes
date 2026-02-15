@@ -919,8 +919,9 @@ func TestGarbageCollectorSync(t *testing.T) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
+	logger := tCtx.Logger()
 
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)

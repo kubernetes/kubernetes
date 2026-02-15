@@ -214,7 +214,7 @@ func TestRunOp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			client := fake.NewSimpleClientset()
 			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 

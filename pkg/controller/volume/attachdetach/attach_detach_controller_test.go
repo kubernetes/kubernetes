@@ -85,7 +85,8 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 }
 
 func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 
 	// Arrange
 	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
@@ -203,7 +204,7 @@ func BenchmarkPopulateActualStateOfWorld(b *testing.B) {
 	fakeKubeClient := largeClusterClient(b, 10000)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 
-	logger, tCtx := ktesting.NewTestContext(b)
+	tCtx := ktesting.Init(b)
 	adc := createADC(b, tCtx, fakeKubeClient, informerFactory, nil)
 
 	// Act
@@ -212,7 +213,7 @@ func BenchmarkPopulateActualStateOfWorld(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		err := adc.populateActualStateOfWorld(logger)
+		err := adc.populateActualStateOfWorld(tCtx.Logger())
 		if err != nil {
 			b.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 		}
@@ -223,7 +224,8 @@ func BenchmarkNodeUpdate(b *testing.B) {
 	fakeKubeClient := largeClusterClient(b, 3000)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 
-	logger, tCtx := ktesting.NewTestContext(b)
+	tCtx := ktesting.Init(b)
+	logger := tCtx.Logger()
 	adc := createADC(b, tCtx, fakeKubeClient, informerFactory, nil)
 
 	informerFactory.Start(tCtx.Done())
@@ -282,7 +284,9 @@ func Test_AttachDetachControllerRecovery(t *testing.T) {
 
 func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2 []*v1.Pod) {
 	tCtx := ktesting.Init(t)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(tCtx.Logger())
+	logger := tCtx.Logger()
+
+	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	plugins := controllervolumetesting.CreateTestPlugin(true)
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
@@ -294,7 +298,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	// Create the controller
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	logger, tCtx := ktesting.NewTestContext(t)
 	defer tCtx.Cancel("test case terminating")
 
 	adcObj, err := NewAttachDetachController(
@@ -538,7 +541,9 @@ func Test_ADC_VolumeAttachmentRecovery(t *testing.T) {
 
 func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	tCtx := ktesting.Init(t)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(tCtx.Logger())
+	logger := tCtx.Logger()
+
+	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	var plugins []volume.VolumePlugin
 
@@ -553,7 +558,6 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	// Create the controller
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	logger, tCtx := ktesting.NewTestContext(t)
 	defer tCtx.Cancel("test case terminating")
 
 	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, plugins)
