@@ -17,7 +17,7 @@
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 
-TAG ?= 3.10.1
+TAG ?= 3.10.2
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
@@ -32,7 +32,7 @@ OUTPUT_TYPE ?= docker
 BASE.linux := scratch
 # Source for windows pause image base is located at https://github.com/microsoft/windows-pause-image-base
 # BASE.windows includes separate manifests per os.version.
-BASE.windows := mcr.microsoft.com/oss/kubernetes/windows-pause-image-base:v0.4.1@sha256:37cc10768383b55611d724a05eb18564cb5184c89b0c2faa7d4eff63475092df
+BASE.windows := mcr.microsoft.com/oss/v2/kubernetes/windows-pause-image-base:v0.4.1@sha256:ba474944e82cac8913e0a402c7727c35d469977026b636bf460f0d52112c4e4f
 BASE := ${BASE.${OS}}
 
 JQ_IMAGE := ghcr.io/jqlang/jq@sha256:a186dcd84a1e28bb48cdf3d7768b890d08621a87bb651fadb7db6815a6bf5ad5
