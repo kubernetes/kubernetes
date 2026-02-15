@@ -148,3 +148,32 @@ func TestRemoveString(t *testing.T) {
 		}
 	}
 }
+
+func TestUniqueString(t *testing.T) {
+	tests := []struct {
+		testName string
+		input    []string
+		want     []string
+	}{
+		{
+			testName: "Nil input slice",
+			input:    nil,
+			want:     nil,
+		},
+		{
+			testName: "Empty input slice",
+			input:    []string{},
+			want:     []string{},
+		},
+		{
+			testName: "Duplicate strings",
+			input:    []string{"a", "b", "a", "c", "b"},
+			want:     []string{"a", "b", "c"},
+		},
+	}
+	for _, tt := range tests {
+		if got := UniqueString(tt.input); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("%v: UniqueString(%v) = %v WANT %v", tt.testName, tt.input, got, tt.want)
+		}
+	}
+}
