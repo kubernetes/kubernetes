@@ -121,11 +121,11 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"policy with neither basic nor gang": {
 			input:        mkValidWorkload(clearPodGroupPolicy(0)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), nil, "").WithOrigin("union").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), nil, "").WithOrigin("union")},
 		},
 		"policy with both basic and gang": {
 			input:        mkValidWorkload(setBothPolicies(0)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), nil, "").WithOrigin("union").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), nil, "").WithOrigin("union")},
 		},
 		"valid with basic policy": {
 			input: mkValidWorkload(setBasicPolicy(0)),

@@ -69,18 +69,18 @@ message PodGroupPolicy {
   // standard Kubernetes scheduling behavior.
   //
   // +optional
-  // +k8s:alpha(since:"1.35")=+k8s:optional
+  // +k8s:optional
   // +oneOf=PolicySelection
-  // +k8s:alpha(since:"1.35")=+k8s:unionMember
+  // +k8s:unionMember
   optional BasicSchedulingPolicy basic = 2;
 
   // Gang specifies that the pods in this group should be scheduled using
   // all-or-nothing semantics.
   //
   // +optional
-  // +k8s:alpha(since:"1.35")=+k8s:optional
+  // +k8s:optional
   // +oneOf=PolicySelection
-  // +k8s:alpha(since:"1.35")=+k8s:unionMember
+  // +k8s:unionMember
   optional GangSchedulingPolicy gang = 3;
 }
 

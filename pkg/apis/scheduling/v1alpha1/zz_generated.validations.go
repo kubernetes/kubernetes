@@ -129,7 +129,7 @@ func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPat
 			return false
 		}
 		return obj.Gang != nil
-	}).MarkAlpha()...)
+	})...)
 
 	// field schedulingv1alpha1.PodGroupPolicy.Basic
 	errs = append(errs,
@@ -140,7 +140,7 @@ func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -160,7 +160,7 @@ func Validate_PodGroupPolicy(ctx context.Context, op operation.Operation, fldPat
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {

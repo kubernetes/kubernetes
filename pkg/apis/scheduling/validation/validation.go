@@ -132,39 +132,8 @@ func validatePodGroup(podGroup *scheduling.PodGroup, fldPath *field.Path, existi
 	} else {
 		existingPodGroups.Insert(podGroup.Name)
 	}
-	allErrs = append(allErrs, validatePodGroupPolicy(&podGroup.Policy, fldPath.Child("policy"))...)
+	// PodGroupPolicy union validation is handled by declarative validation.
 	return allErrs
-}
-
-func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	var setFields []string
-
-	if policy.Basic != nil {
-		setFields = append(setFields, "`basic`")
-	}
-	if policy.Gang != nil {
-		setFields = append(setFields, "`gang`")
-	}
-
-	switch {
-	case len(setFields) == 0:
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `basic`, `gang`").WithOrigin("union").MarkCoveredByDeclarative())
-	case len(setFields) > 1:
-		allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")),
-			"exactly one of `basic`, `gang` is required, but multiple fields are set").WithOrigin("union").MarkCoveredByDeclarative())
-	case policy.Basic != nil:
-		allErrs = append(allErrs, validatBasicSchedulingPolicy(policy.Basic, fldPath.Child("basic"))...)
-	case policy.Gang != nil:
-		// Gang scheduling policy validation is handled by declarative validation.
-	}
-
-	return allErrs
-}
-
-func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldPath *field.Path) field.ErrorList {
-	// BasicSchedulingPolicy has no fields.
-	return nil
 }
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.

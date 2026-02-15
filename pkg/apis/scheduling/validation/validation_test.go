@@ -260,16 +260,6 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "controllerRef", "apiGroup"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')").MarkCoveredByDeclarative(),
 			},
 		},
-		"two policies": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[0].Policy.Gang = &scheduling.GangSchedulingPolicy{
-					MinCount: 2,
-				}
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), "{`basic`, `gang`}", "exactly one of `basic`, `gang` is required, but multiple fields are set").MarkCoveredByDeclarative(),
-			},
-		},
 		"two pod groups with the same name": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.PodGroups[1].Name = w.Spec.PodGroups[0].Name
@@ -348,24 +338,6 @@ func TestValidateWorkload(t *testing.T) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Duplicate(field.NewPath("spec", "podGroups").Index(1), scheduling.PodGroup{Name: "group1", Policy: scheduling.PodGroupPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 1}}}).MarkCoveredByDeclarative(),
-			},
-		},
-		"no policy set": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[0].Policy = scheduling.PodGroupPolicy{}
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), "", "must specify one of: `basic`, `gang`").MarkCoveredByDeclarative(),
-			},
-		},
-		"multiple policies set": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[0].Policy.Gang = &scheduling.GangSchedulingPolicy{
-					MinCount: 2,
-				}
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy"), "{`basic`, `gang`}", "exactly one of `basic`, `gang` is required, but multiple fields are set").MarkCoveredByDeclarative(),
 			},
 		},
 	}
