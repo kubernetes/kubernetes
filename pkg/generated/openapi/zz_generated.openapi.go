@@ -17947,7 +17947,7 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequestSpec(ref common.R
 						},
 					},
 				},
-				Required: []string{"request", "signerName"},
+				Required: []string{"request", "signerName", "usages"},
 			},
 		},
 	}
@@ -19143,7 +19143,7 @@ func schema_k8sio_api_certificates_v1beta1_PodCertificateRequestSpec(ref common.
 						},
 					},
 				},
-				Required: []string{"signerName", "podName", "podUID", "serviceAccountName", "serviceAccountUID", "nodeName", "nodeUID", "stubPKCS10Request"},
+				Required: []string{"signerName", "podName", "podUID", "serviceAccountName", "serviceAccountUID", "nodeName", "nodeUID"},
 			},
 		},
 	}
