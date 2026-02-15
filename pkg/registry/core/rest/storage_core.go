@@ -145,6 +145,7 @@ func New(c Config, authorizer authorizer.Authorizer) (*legacyProvider, error) {
 			c.Informers.Core().V1().Services(),
 			c.Informers.Networking().V1().ServiceCIDRs(),
 			c.Informers.Networking().V1().IPAddresses(),
+			c.Informers.Core().V1().Namespaces(),
 		).RunUntil
 	}
 
