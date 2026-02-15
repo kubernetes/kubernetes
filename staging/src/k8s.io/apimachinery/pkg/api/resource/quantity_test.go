@@ -23,6 +23,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode"
@@ -1820,3 +1821,30 @@ func TestQuantityRoundtripCBOR(t *testing.T) {
 		}
 	}
 }
+
+// TestMustParseMaxInt64 reproduces the bug where resource quantity parsing could panic
+// on values close or equal to math.MaxInt64.
+// See Issue #135487
+func TestMustParseMaxInt64(t *testing.T) {
+	maxIntStr := strconv.FormatInt(math.MaxInt64, 10)
+
+	// This function should NOT panic.
+	// We use defer to catch the panic if it happens.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("MustParse panicked with MaxInt64 input: %v", r)
+		}
+	}()
+
+	q := MustParse(maxIntStr)
+
+	// Verify the value is correct
+	val, ok := q.AsInt64()
+	if !ok {
+		t.Errorf("AsInt64() returned error (false) for valid int64 input")
+	}
+	if val != math.MaxInt64 {
+		t.Errorf("Expected %d, got %d", int64(math.MaxInt64), val)
+	}
+}
+
