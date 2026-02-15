@@ -21,19 +21,37 @@ limitations under the License.
 
 package v1
 
+func (*ApplyConfiguration) ProtoMessage() {}
+
 func (*AuditAnnotation) ProtoMessage() {}
 
 func (*ExpressionWarning) ProtoMessage() {}
 
+func (*JSONPatch) ProtoMessage() {}
+
 func (*MatchCondition) ProtoMessage() {}
 
 func (*MatchResources) ProtoMessage() {}
+
+func (*MutatingAdmissionPolicy) ProtoMessage() {}
+
+func (*MutatingAdmissionPolicyBinding) ProtoMessage() {}
+
+func (*MutatingAdmissionPolicyBindingList) ProtoMessage() {}
+
+func (*MutatingAdmissionPolicyBindingSpec) ProtoMessage() {}
+
+func (*MutatingAdmissionPolicyList) ProtoMessage() {}
+
+func (*MutatingAdmissionPolicySpec) ProtoMessage() {}
 
 func (*MutatingWebhook) ProtoMessage() {}
 
 func (*MutatingWebhookConfiguration) ProtoMessage() {}
 
 func (*MutatingWebhookConfigurationList) ProtoMessage() {}
+
+func (*Mutation) ProtoMessage() {}
 
 func (*NamedRuleWithOperations) ProtoMessage() {}
 

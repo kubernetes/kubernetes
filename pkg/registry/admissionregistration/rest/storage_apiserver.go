@@ -116,6 +116,25 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource] = policyBindingStorage
 	}
 
+	// mutatingadmissionpolicies
+	if resource := "mutatingadmissionpolicies"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1.SchemeGroupVersion.WithResource(resource)) {
+		policyStorage, err := mutatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
+		if err != nil {
+			return storage, err
+		}
+		policyGetter = policyStorage
+		storage[resource] = policyStorage
+	}
+
+	// mutatingadmissionpolicybindings
+	if resource := "mutatingadmissionpolicybindings"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1.SchemeGroupVersion.WithResource(resource)) {
+		mutationpolicybindingstorage, err := mutationpolicybindingstorage.NewREST(restOptionsGetter, p.Authorizer, &mutationpolicybindingstorage.DefaultPolicyGetter{Getter: policyGetter}, r)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = mutationpolicybindingstorage
+	}
+
 	return storage, nil
 }
 

@@ -558,6 +558,42 @@
     MUST cause pods created by that RC to be orphaned.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+- testname: MutatingAdmissionPolicy
+  codename: '[sig-api-machinery] MutatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should mutate a Deployment [Conformance]'
+  description: ' The MutatingAdmissionPolicy should mutate a deployment as the expression
+    defined inside the policy.'
+  release: v1.36
+  file: test/e2e/apimachinery/mutatingadmissionpolicy.go
+- testname: MutatingAdmissionPolicy
+  codename: '[sig-api-machinery] MutatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should mutate a Deployment with annotations [Conformance]'
+  description: ' The MutatingAdmissionPolicy should mutate a deployment by adding
+    annotations as defined in the policy.'
+  release: v1.36
+  file: test/e2e/apimachinery/mutatingadmissionpolicy.go
+- testname: MutatingAdmissionPolicy API
+  codename: '[sig-api-machinery] MutatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should support MutatingAdmissionPolicy API operations [Conformance]'
+  description: ' The admissionregistration.k8s.io API group MUST exist in the /apis
+    discovery document. The admissionregistration.k8s.io/v1 API group/version MUST
+    exist in the /apis/admissionregistration.k8s.io discovery document. The mutatingadmissionpolicies
+    resource MUST exist in the /apis/admissionregistration.k8s.io/v1 discovery document.
+    The mutatingadmissionpolicies resource must support create, get, list, watch,
+    update, patch, delete, and deletecollection.'
+  release: v1.36
+  file: test/e2e/apimachinery/mutatingadmissionpolicy.go
+- testname: MutatingAdmissionPolicyBinding API
+  codename: '[sig-api-machinery] MutatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should support MutatingAdmissionPolicyBinding API operations [Conformance]'
+  description: ' The admissionregistration.k8s.io API group MUST exist in the /apis
+    discovery document. The admissionregistration.k8s.io/v1 API group/version MUST
+    exist in the /apis/admissionregistration.k8s.io discovery document. The MutatingAdmissionPolicyBinding
+    resources MUST exist in the /apis/admissionregistration.k8s.io/v1 discovery document.
+    The MutatingAdmissionPolicyBinding resource must support create, get, list, watch,
+    update, patch, delete, and deletecollection.'
+  release: v1.36
+  file: test/e2e/apimachinery/mutatingadmissionpolicy.go
 - testname: Namespace, apply finalizer to a namespace
   codename: '[sig-api-machinery] Namespaces [Serial] should apply a finalizer to a
     Namespace [Conformance]'

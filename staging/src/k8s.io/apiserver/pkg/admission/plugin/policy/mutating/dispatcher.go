@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +49,7 @@ func NewDispatcher(a authorizer.Authorizer, m *matching.Matcher, tcm patch.TypeC
 		authz:                a,
 		typeConverterManager: tcm,
 	}
-	res.Dispatcher = generic.NewPolicyDispatcher(
+	res.Dispatcher = generic.NewPolicyDispatcher[*Policy, *PolicyBinding, PolicyEvaluator](
 		NewMutatingAdmissionPolicyAccessor,
 		NewMutatingAdmissionPolicyBindingAccessor,
 		m,
@@ -210,7 +210,7 @@ func (d *dispatcher) dispatchInvocations(
 			policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
 			reinvokeCtx.SetShouldReinvoke()
 		}
-		if invocation.Policy.Spec.ReinvocationPolicy == v1beta1.IfNeededReinvocationPolicy {
+		if invocation.Policy.Spec.ReinvocationPolicy == admissionregistrationv1.IfNeededReinvocationPolicy {
 			policyReinvokeCtx.AddReinvocablePolicyToPreviouslyInvoked(invocationKey)
 		}
 	}

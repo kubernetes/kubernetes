@@ -328,12 +328,12 @@ func findMutatingPolicyPreexistingExpressions(mutatingPolicy *admissionregistrat
 	for _, mc := range mutatingPolicy.Spec.MatchConditions {
 		preexisting.matchConditionExpressions.Insert(mc.Expression)
 	}
-	for _, v := range mutatingPolicy.Spec.Mutations {
-		if v.ApplyConfiguration != nil {
-			preexisting.applyConfigurationExpressions.Insert(v.ApplyConfiguration.Expression)
+	for _, m := range mutatingPolicy.Spec.Mutations {
+		if m.ApplyConfiguration != nil {
+			preexisting.applyConfigurationExpressions.Insert(m.ApplyConfiguration.Expression)
 		}
-		if v.JSONPatch != nil {
-			preexisting.jsonPatchExpressions.Insert(v.JSONPatch.Expression)
+		if m.JSONPatch != nil {
+			preexisting.jsonPatchExpressions.Insert(m.JSONPatch.Expression)
 		}
 	}
 	return preexisting
