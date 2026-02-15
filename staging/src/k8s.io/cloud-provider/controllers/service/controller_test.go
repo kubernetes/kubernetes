@@ -1493,6 +1493,83 @@ func TestNeedsUpdate(t *testing.T) {
 			return
 		},
 		expectedNeedsUpdate: true,
+	}, {
+		testName: "If LoadBalancer status ingress is cleared",
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = defaultExternalService()
+			oldSvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "1.2.3.4"}}
+			newSvc = defaultExternalService()
+			newSvc.Status.LoadBalancer.Ingress = nil
+			return
+		},
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If LoadBalancer status was already empty",
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = defaultExternalService()
+			oldSvc.Status.LoadBalancer.Ingress = nil
+			newSvc = defaultExternalService()
+			newSvc.Status.LoadBalancer.Ingress = nil
+			return
+		},
+		expectedNeedsUpdate: false,
+	}, {
+		testName: "If LoadBalancer status hostname ingress is cleared",
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = defaultExternalService()
+			oldSvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{Hostname: "lb.example.com"}}
+			newSvc = defaultExternalService()
+			newSvc.Status.LoadBalancer.Ingress = nil
+			return
+		},
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If LoadBalancer status with multiple ingress entries is cleared",
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = defaultExternalService()
+			oldSvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{
+				{IP: "1.2.3.4"},
+				{IP: "5.6.7.8"},
+				{Hostname: "lb.example.com"},
+			}
+			newSvc = defaultExternalService()
+			newSvc.Status.LoadBalancer.Ingress = nil
+			return
+		},
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If LoadBalancer status ingress is cleared to empty slice",
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = defaultExternalService()
+			oldSvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "1.2.3.4"}}
+			newSvc = defaultExternalService()
+			newSvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{}
+			return
+		},
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If LoadBalancer status unchanged with populated ingress",
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = defaultExternalService()
+			oldSvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "1.2.3.4"}}
+			newSvc = defaultExternalService()
+			newSvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "1.2.3.4"}}
+			return
+		},
+		expectedNeedsUpdate: false,
+	}, {
+		testName: "If service with LoadBalancerClass has status cleared",
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			lbClass := "custom-lb-class"
+			oldSvc = defaultExternalService()
+			oldSvc.Spec.LoadBalancerClass = &lbClass
+			oldSvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "1.2.3.4"}}
+			newSvc = defaultExternalService()
+			newSvc.Spec.LoadBalancerClass = &lbClass
+			newSvc.Status.LoadBalancer.Ingress = nil
+			return
+		},
+		expectedNeedsUpdate: false,
 	}}
 
 	for _, tc := range testCases {
