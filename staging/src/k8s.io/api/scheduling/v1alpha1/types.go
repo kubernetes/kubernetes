@@ -218,7 +218,7 @@ type GangSchedulingPolicy struct {
 	// It must be a positive integer.
 	//
 	// +required
-	// +k8s:alpha(since:"1.35")=+k8s:required
-	// +k8s:alpha(since:"1.35")=+k8s:minimum=0
+	// +k8s:required
+	// +k8s:minimum=0
 	MinCount int32 `json:"minCount" protobuf:"varint,1,opt,name=minCount"`
 }

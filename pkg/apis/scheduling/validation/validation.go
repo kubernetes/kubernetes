@@ -165,7 +165,7 @@ func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Pa
 	case policy.Basic != nil:
 		allErrs = append(allErrs, validatBasicSchedulingPolicy(policy.Basic, fldPath.Child("basic"))...)
 	case policy.Gang != nil:
-		allErrs = append(allErrs, validateGangSchedulingPolicy(policy.Gang, fldPath.Child("gang"))...)
+		// Gang scheduling policy validation is handled by declarative validation.
 	}
 
 	return allErrs
@@ -174,21 +174,6 @@ func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Pa
 func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldPath *field.Path) field.ErrorList {
 	// BasicSchedulingPolicy has no fields.
 	return nil
-}
-
-func validateGangSchedulingPolicy(policy *scheduling.GangSchedulingPolicy, fldPath *field.Path) field.ErrorList {
-	// To match the declarative validation behavior, we return Required for 0.
-	// Declarative validation treats 0 as "missing" via validate.RequiredValue()
-	// and returns early before checking the minimum constraint.
-	// For non-zero values, declarative validation returns early without any validation,
-	// so we don't mark them as covered.
-	var allErrs field.ErrorList
-	if policy.MinCount == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("minCount"), "").MarkCoveredByDeclarative())
-	} else if policy.MinCount < 0 {
-		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(policy.MinCount), fldPath.Child("minCount")).WithOrigin("minimum").MarkCoveredByDeclarative()...)
-	}
-	return allErrs
 }
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.

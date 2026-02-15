@@ -79,11 +79,11 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		// instead of checking minimum constraint and returning Invalid error.
 		"gang minCount zero": {
 			input:        mkValidWorkload(setPodGroupMinCount(0, 0)),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), "").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), "")},
 		},
 		"gang minCount negative": {
 			input:        mkValidWorkload(setPodGroupMinCount(0, -1)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), nil, "").WithOrigin("minimum").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("policy", "gang", "minCount"), nil, "").WithOrigin("minimum")},
 		},
 		"valid with controllerRef": {
 			input: mkValidWorkload(setControllerRef("apps", "Deployment", "my-deployment")),

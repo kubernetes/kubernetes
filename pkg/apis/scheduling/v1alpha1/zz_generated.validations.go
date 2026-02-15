@@ -62,14 +62,14 @@ func Validate_GangSchedulingPolicy(ctx context.Context, op operation.Operation, 
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha()...)
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
 		}(fldPath.Child("minCount"), &obj.MinCount, safe.Field(oldObj, func(oldObj *schedulingv1alpha1.GangSchedulingPolicy) *int32 { return &oldObj.MinCount }), oldObj != nil)...)
 
