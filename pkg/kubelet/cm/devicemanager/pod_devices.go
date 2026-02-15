@@ -36,12 +36,14 @@ type deviceAllocateInfo struct {
 	allocResp *pluginapi.ContainerAllocateResponse
 }
 
-type resourceAllocateInfo map[string]deviceAllocateInfo // Keyed by resourceName.
-type containerDevices map[string]resourceAllocateInfo   // Keyed by containerName.
-type podDevices struct {
-	sync.RWMutex
-	devs map[string]containerDevices // Keyed by podUID.
-}
+type (
+	resourceAllocateInfo map[string]deviceAllocateInfo   // Keyed by resourceName.
+	containerDevices     map[string]resourceAllocateInfo // Keyed by containerName.
+	podDevices           struct {
+		sync.RWMutex
+		devs map[string]containerDevices // Keyed by podUID.
+	}
+)
 
 // NewPodDevices is a function that returns object of podDevices type with its own guard
 // RWMutex and a map where key is a pod UID and value contains
@@ -104,16 +106,15 @@ func (pdev *podDevices) podDevices(podUID, resource string) sets.Set[string] {
 
 	ret := sets.New[string]()
 	for contName := range pdev.devs[podUID] {
-		ret = ret.Union(pdev.containerDevices(podUID, contName, resource))
+		ret = ret.Union(pdev.containerDevicesLocked(podUID, contName, resource))
 	}
 	return ret
 }
 
-// Returns list of device Ids allocated to the given container for the given resource.
+// containerDevicesLocked returns list of device Ids allocated to the given container for the given resource.
 // Returns nil if we don't have cached state for the given <podUID, contName, resource>.
-func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets.Set[string] {
-	pdev.RLock()
-	defer pdev.RUnlock()
+// Caller must hold pdev.RLock().
+func (pdev *podDevices) containerDevicesLocked(podUID, contName, resource string) sets.Set[string] {
 	if _, podExists := pdev.devs[podUID]; !podExists {
 		return nil
 	}
@@ -125,6 +126,14 @@ func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets
 		return nil
 	}
 	return devs.deviceIds.Devices()
+}
+
+// Returns list of device Ids allocated to the given container for the given resource.
+// Returns nil if we don't have cached state for the given <podUID, contName, resource>.
+func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets.Set[string] {
+	pdev.RLock()
+	defer pdev.RUnlock()
+	return pdev.containerDevicesLocked(podUID, contName, resource)
 }
 
 // Populates allocatedResources with the device resources allocated to the specified <podUID, contName>.
@@ -220,7 +229,8 @@ func (pdev *podDevices) toCheckpointData(logger klog.Logger) []checkpoint.PodDev
 					ContainerName: conName,
 					ResourceName:  resource,
 					DeviceIDs:     devices.deviceIds,
-					AllocResp:     allocResp})
+					AllocResp:     allocResp,
+				})
 			}
 		}
 	}
