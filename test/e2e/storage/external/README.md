@@ -51,3 +51,31 @@ supports them, for example snapshotting:
            e2e.test \
            -- \
            -storage.testdriver=/tmp/hostpath-testdriver.yaml
+
+**ReadWriteMany (RWX) Capabilities**
+
+For drivers that support ReadWriteMany access mode, use one of the following capabilities:
+
+- **`RWX`**: Driver supports RWX on all volume modes it supports (filesystem and block).
+  - Use for drivers like NFS, Azure File that universally support RWX.
+  - Backward compatible with existing test configurations.
+  - Note: Filesystem RWX volumes don't support specifying `fsType` - tests with non-empty fsType will be skipped.
+
+- **`RWXFilesystemOnly`**: Driver supports RWX only on filesystem volumes.
+  - Use for drivers that support for filesystem and block volumes (e.g., vSphere CSI) where only filesystem volumes support RWX.
+  - Block volume RWX tests will be skipped automatically.
+  - Tests with non-empty `fsType` will be skipped (filesystem format is pre-determined by the storage backend).
+
+- **`RWXBlockOnly`**: Driver supports RWX only on block volumes.
+  - Use for drivers that support both filesystem and block volumes where only block volumes support RWX.
+  - Filesystem volume RWX tests will be skipped automatically.
+
+Example for vSphere CSI with filesystem RWX support:
+```yaml
+DriverInfo:
+  Name: vsphere.csi.k8s.io
+  Capabilities:
+    persistence: true
+    block: true
+    RWXFilesystemOnly: true
+```
