@@ -28,7 +28,7 @@ import (
 func TestPodGroupState_AssumeForget(t *testing.T) {
 	pgs := newPodGroupState()
 	pod := st.MakePod().Namespace("ns1").Name("p1").UID("p1").
-		WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+		SchedulingGroup(&v1.PodSchedulingGroup{PodGroupName: ptr.To("pg1")}).Obj()
 
 	pgs.addPod(pod)
 	if pgs.AssumedPods().Has(pod.UID) {

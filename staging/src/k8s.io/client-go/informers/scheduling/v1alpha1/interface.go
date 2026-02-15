@@ -26,8 +26,6 @@ import (
 type Interface interface {
 	// PriorityClasses returns a PriorityClassInformer.
 	PriorityClasses() PriorityClassInformer
-	// Workloads returns a WorkloadInformer.
-	Workloads() WorkloadInformer
 }
 
 type version struct {
@@ -44,9 +42,4 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // PriorityClasses returns a PriorityClassInformer.
 func (v *version) PriorityClasses() PriorityClassInformer {
 	return &priorityClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// Workloads returns a WorkloadInformer.
-func (v *version) Workloads() WorkloadInformer {
-	return &workloadInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

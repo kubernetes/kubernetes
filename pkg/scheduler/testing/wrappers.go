@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -866,9 +866,9 @@ func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
 	return p
 }
 
-// WorkloadRef sets workloadRef of the inner pod.
-func (p *PodWrapper) WorkloadRef(workloadRef *v1.WorkloadReference) *PodWrapper {
-	p.Spec.WorkloadRef = workloadRef
+// SchedulingGroup sets schedulingGroup of the inner pod.
+func (p *PodWrapper) SchedulingGroup(schedulingGroup *v1.PodSchedulingGroup) *PodWrapper {
+	p.Spec.SchedulingGroup = schedulingGroup
 	return p
 }
 
@@ -1591,9 +1591,9 @@ func (wrapper *WorkloadWrapper) Namespace(namespace string) *WorkloadWrapper {
 	return wrapper
 }
 
-// PodGroup injects the pod group into the inner Workload.
-func (wrapper *WorkloadWrapper) PodGroup(pg *schedulingapi.PodGroup) *WorkloadWrapper {
-	wrapper.Spec.PodGroups = append(wrapper.Spec.PodGroups, *pg)
+// PodGroupTemplate injects the pod group template into the inner Workload.
+func (wrapper *WorkloadWrapper) PodGroupTemplate(pgt *schedulingapi.PodGroupTemplate) *WorkloadWrapper {
+	wrapper.Spec.PodGroupTemplates = append(wrapper.Spec.PodGroupTemplates, *pgt)
 	return wrapper
 }
 
@@ -1605,28 +1605,68 @@ func MakePodGroup() *PodGroupWrapper {
 	return &PodGroupWrapper{}
 }
 
-// Obj returns the inner PodGroup.
-func (wrapper *PodGroupWrapper) Obj() *schedulingapi.PodGroup {
-	return &wrapper.PodGroup
-}
-
-// Name sets `name` as the name of the inner PodGroup.
+// Name sets `name` as the name of the inner PodGroupWrapper.
 func (wrapper *PodGroupWrapper) Name(name string) *PodGroupWrapper {
 	wrapper.PodGroup.Name = name
 	return wrapper
 }
 
+// Namespace sets `namespace` as the namespace of the inner PodGroupWrapper.
+func (wrapper *PodGroupWrapper) Namespace(namespace string) *PodGroupWrapper {
+	wrapper.PodGroup.Namespace = namespace
+	return wrapper
+}
+
+// Obj returns the inner PodGroupWrapper.
+func (wrapper *PodGroupWrapper) Obj() *schedulingapi.PodGroup {
+	return &wrapper.PodGroup
+}
+
 // MinCount sets the MinCount for the Gang scheduling policy.
 func (wrapper *PodGroupWrapper) MinCount(count int32) *PodGroupWrapper {
-	if wrapper.Policy.Gang == nil {
-		wrapper.Policy.Gang = &schedulingapi.GangSchedulingPolicy{}
+	if wrapper.PodGroup.Spec.SchedulingPolicy.Gang == nil {
+		wrapper.PodGroup.Spec.SchedulingPolicy.Gang = &schedulingapi.GangSchedulingPolicy{}
 	}
-	wrapper.Policy.Gang.MinCount = count
+	wrapper.PodGroup.Spec.SchedulingPolicy.Gang.MinCount = count
 	return wrapper
 }
 
 // BasicPolicy sets the PodGroup policy to Basic.
 func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
-	wrapper.Policy.Basic = &schedulingapi.BasicSchedulingPolicy{}
+	wrapper.PodGroup.Spec.SchedulingPolicy.Basic = &schedulingapi.BasicSchedulingPolicy{}
+	return wrapper
+}
+
+// PodGroupTemplateWrapper wraps a PodGroupTemplate inside.
+type PodGroupTemplateWrapper struct{ schedulingapi.PodGroupTemplate }
+
+// MakePodGroupTemplate creates a PodGroupTemplate wrapper.
+func MakePodGroupTemplate() *PodGroupTemplateWrapper {
+	return &PodGroupTemplateWrapper{}
+}
+
+// Obj returns the inner PodGroupTemplate.
+func (wrapper *PodGroupTemplateWrapper) Obj() *schedulingapi.PodGroupTemplate {
+	return &wrapper.PodGroupTemplate
+}
+
+// Name sets `name` as the name of the inner PodGroupTemplate.
+func (wrapper *PodGroupTemplateWrapper) Name(name string) *PodGroupTemplateWrapper {
+	wrapper.PodGroupTemplate.Name = name
+	return wrapper
+}
+
+// MinCount sets the MinCount for the Gang scheduling policy.
+func (wrapper *PodGroupTemplateWrapper) MinCount(count int32) *PodGroupTemplateWrapper {
+	if wrapper.SchedulingPolicy.Gang == nil {
+		wrapper.SchedulingPolicy.Gang = &schedulingapi.GangSchedulingPolicy{}
+	}
+	wrapper.SchedulingPolicy.Gang.MinCount = count
+	return wrapper
+}
+
+// BasicPolicy sets the PodGroup policy to Basic.
+func (wrapper *PodGroupTemplateWrapper) BasicPolicy() *PodGroupTemplateWrapper {
+	wrapper.SchedulingPolicy.Basic = &schedulingapi.BasicSchedulingPolicy{}
 	return wrapper
 }

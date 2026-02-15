@@ -22,11 +22,11 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha1"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -41,10 +41,10 @@ const (
 )
 
 // GangScheduling is a plugin that enforces "all-or-nothing" scheduling for pods
-// belonging to a Workload with a Gang scheduling policy.
+// belonging to a PodGroup with a Gang scheduling policy.
 type GangScheduling struct {
 	handle         fwk.Handle
-	workloadLister schedulinglisters.WorkloadLister
+	podGroupLister schedulinglisters.PodGroupLister
 }
 
 var _ fwk.EnqueueExtensions = &GangScheduling{}
@@ -56,7 +56,7 @@ var _ fwk.PermitPlugin = &GangScheduling{}
 func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &GangScheduling{
 		handle:         fh,
-		workloadLister: fh.SharedInformerFactory().Scheduling().V1alpha1().Workloads().Lister(),
+		podGroupLister: fh.SharedInformerFactory().Scheduling().V1alpha2().PodGroups().Lister(),
 	}, nil
 }
 
@@ -69,11 +69,11 @@ func (pl *GangScheduling) Name() string {
 func (pl *GangScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return []fwk.ClusterEventWithHint{
 		// A new pod being added might be the one that completes a gang, meeting its MinCount requirement.
-		// Workload reference is immutable, so there is no need to subscribe on Pod/Update event.
+		// PodSchedulingGroup field is immutable, so there is no need to subscribe on Pod/Update event.
 		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
-		// A Workload being added can be making a waiting gang schedulable.
-		// Workload's PodGroups are immutable, so there's no need to handle Workload/Update event.
-		{Event: fwk.ClusterEvent{Resource: fwk.Workload, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterWorkloadAdded},
+		// A PodGroup being added can be making a waiting gang schedulable.
+		// PodGroups are immutable, so there's no need to handle PodGroup/Update event.
+		{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodGroupAdded},
 	}, nil
 }
 
@@ -83,64 +83,61 @@ func (pl *GangScheduling) isSchedulableAfterPodAdded(logger klog.Logger, pod *v1
 		return fwk.Queue, err
 	}
 
-	if !helper.MatchingWorkloadReference(pod, addedPod) {
-		logger.V(5).Info("another pod was added but it doesn't match the target pod's workload",
-			"pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "addedPod", klog.KObj(addedPod), "addedWorkloadRef", pod.Spec.WorkloadRef)
+	if !helper.MatchingSchedulingGroup(pod, addedPod) {
+		logger.V(5).Info("another pod was added but it doesn't match the target pod's scheduling group",
+			"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPod", klog.KObj(addedPod), "addedPodSchedulingGroup", addedPod.Spec.SchedulingGroup)
 		return fwk.QueueSkip, nil
 	}
 
-	logger.V(5).Info("another pod was added and it matches the target pod's workload, which may make the pod schedulable",
-		"pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "addedPod", klog.KObj(addedPod), "addedWorkloadRef", pod.Spec.WorkloadRef)
+	logger.V(5).Info("another pod was added and it matches the target pod's scheduling group, which may make the pod schedulable",
+		"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPod", klog.KObj(addedPod), "addedPodSchedulingGroup", addedPod.Spec.SchedulingGroup)
 	return fwk.Queue, nil
 }
 
-func (pl *GangScheduling) isSchedulableAfterWorkloadAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, addedWorkload, err := util.As[*schedulingapi.Workload](oldObj, newObj)
+func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	_, addedPodGroup, err := util.As[*schedulingapi.PodGroup](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
 
-	if pod.Spec.WorkloadRef == nil || pod.Namespace != addedWorkload.Namespace || pod.Spec.WorkloadRef.Name != addedWorkload.Name {
-		logger.V(5).Info("workload was added but it doesn't match the target pod's workloadRef",
-			"pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "addedWorkload", klog.KObj(addedWorkload))
+	if pod.Spec.SchedulingGroup == nil || pod.Namespace != addedPodGroup.Namespace || *pod.Spec.SchedulingGroup.PodGroupName != addedPodGroup.Name {
+		logger.V(5).Info("pod group was added but it doesn't match the target pod's scheduling group",
+			"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPodGroup", klog.KObj(addedPodGroup))
 		return fwk.QueueSkip, nil
 	}
 
-	logger.V(5).Info("workload was added and it matches the target pod's workload, which may make the pod schedulable",
-		"pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "addedWorkload", klog.KObj(addedWorkload))
+	logger.V(5).Info("pod group was added and it matches the target pod's scheduling group, which may make the pod schedulable",
+		"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPodGroup", klog.KObj(addedPodGroup))
 	return fwk.Queue, nil
 }
 
 // PreEnqueue checks if the pod belongs to a gang and, if so, whether the gang has met its MinCount of available pods.
 // If not, the pod is rejected until more pods arrive.
 func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Status {
-	if pod.Spec.WorkloadRef == nil {
+	if pod.Spec.SchedulingGroup == nil {
 		return nil
 	}
 
 	namespace := pod.Namespace
-	workloadRef := pod.Spec.WorkloadRef
+	schedulingGroup := pod.Spec.SchedulingGroup
 
-	workload, err := pl.workloadLister.Workloads(namespace).Get(workloadRef.Name)
+	podGroup, err := pl.podGroupLister.PodGroups(namespace).Get(*schedulingGroup.PodGroupName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			// The pod is unschedulable until its Workload object is created.
-			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for pods's workload %q to appear in scheduling queue", workloadRef.Name))
+			// The pod is unschedulable until its PodGroup object is created.
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for pods's pod group %q to appear in scheduling queue", *schedulingGroup.PodGroupName))
 		}
-		klog.FromContext(ctx).Error(err, "Failed to get workload", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef)
-		return fwk.AsStatus(fmt.Errorf("failed to get workload %s/%s", namespace, workloadRef.Name))
+		klog.FromContext(ctx).Error(err, "Failed to get pod group", "pod", klog.KObj(pod), "schedulingGroup", schedulingGroup)
+		return fwk.AsStatus(fmt.Errorf("failed to get pod group %s/%s", namespace, *schedulingGroup.PodGroupName))
 	}
 
-	policy, ok := helper.PodGroupPolicy(workload, workloadRef.PodGroup)
-	if !ok {
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod group %q doesn't exist for a workload %q", workloadRef.PodGroup, workload.Name))
-	}
+	policy := podGroup.Spec.SchedulingPolicy
 	// This plugin only cares about pods with a Gang scheduling policy.
 	if policy.Gang == nil {
 		return nil
 	}
 
-	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(namespace, workloadRef)
+	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(namespace, schedulingGroup)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
@@ -154,13 +151,13 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 }
 
 // Reserve is called after a node has been selected for the pod. For gang pods,
-// this stage marks the pod as "assumed" in the WorkloadManager,
+// this stage marks the pod as "assumed" in the PodGroupManager,
 // contributing to the count of pods ready to be co-scheduled at the Permit stage.
 func (pl *GangScheduling) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
-	if pod.Spec.WorkloadRef == nil {
+	if pod.Spec.SchedulingGroup == nil {
 		return nil
 	}
-	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(pod.Namespace, pod.Spec.WorkloadRef)
+	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(pod.Namespace, pod.Spec.SchedulingGroup)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
@@ -168,15 +165,15 @@ func (pl *GangScheduling) Reserve(ctx context.Context, cs fwk.CycleState, pod *v
 	return nil
 }
 
-// Unreserve removes the gang pod from the "assumed" state in the WorkloadManager,
+// Unreserve removes the gang pod from the "assumed" state in the PodGroupManager,
 // ensuring it doesn't count towards the Permit quorum.
 func (pl *GangScheduling) Unreserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
-	if pod.Spec.WorkloadRef == nil {
+	if pod.Spec.SchedulingGroup == nil {
 		return
 	}
-	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(pod.Namespace, pod.Spec.WorkloadRef)
+	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(pod.Namespace, pod.Spec.SchedulingGroup)
 	if err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Failed to get pod group state", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef)
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to get pod group state", "pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup)
 		return
 	}
 	podGroupState.ForgetPod(pod.UID)
@@ -185,31 +182,28 @@ func (pl *GangScheduling) Unreserve(ctx context.Context, cs fwk.CycleState, pod 
 // Permit forces all pods in a gang to wait at this stage. Once the number of waiting (assumed) pods
 // reaches the gang's MinCount, all pods in the gang are permitted to proceed to binding simultaneously.
 func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
-	if pod.Spec.WorkloadRef == nil {
+	if pod.Spec.SchedulingGroup == nil {
 		return nil, 0
 	}
 
 	logger := klog.FromContext(ctx)
 	namespace := pod.Namespace
-	workloadRef := pod.Spec.WorkloadRef
+	schedulingGroup := pod.Spec.SchedulingGroup
 
-	workload, err := pl.workloadLister.Workloads(namespace).Get(workloadRef.Name)
+	podGroup, err := pl.podGroupLister.PodGroups(namespace).Get(*schedulingGroup.PodGroupName)
 	if err != nil {
-		// It's likely that the workload was removed or another error happened.
-		// Returning error to retry the Pod when the Workload is added again.
-		return fwk.AsStatus(fmt.Errorf("failed to get workload %s/%s: %w", namespace, workloadRef.Name, err)), 0
+		// It's likely that the pod group was removed or another error happened.
+		// Returning error to retry the Pod when the pod group is added again.
+		return fwk.AsStatus(fmt.Errorf("failed to get podGroup %s/%s: %w", namespace, *schedulingGroup.PodGroupName, err)), 0
 	}
 
-	policy, ok := helper.PodGroupPolicy(workload, workloadRef.PodGroup)
-	if !ok {
-		return fwk.AsStatus(fmt.Errorf("pod group %q doesn't exist for a workload %q", workloadRef.PodGroup, workload.Name)), 0
-	}
+	policy := podGroup.Spec.SchedulingPolicy
 	// This plugin only cares about pods with a Gang scheduling policy.
 	if policy.Gang == nil {
 		return nil, 0
 	}
 
-	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(namespace, workloadRef)
+	podGroupState, err := pl.handle.WorkloadManager().PodGroupState(namespace, schedulingGroup)
 	if err != nil {
 		return fwk.AsStatus(err), 0
 	}
@@ -219,11 +213,11 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		// Activate unscheduled pods from this pod group in case they were waiting for this pod to be scheduled.
 		unscheduledPods := podGroupState.UnscheduledPods()
 		pl.handle.Activate(klog.FromContext(ctx), unscheduledPods)
-		logger.V(4).Info("Quorum is not met for a gang. Waiting for another pod to allow", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "activatedPods", len(unscheduledPods))
+		logger.V(4).Info("Quorum is not met for a gang. Waiting for another pod to allow", "pod", klog.KObj(pod), "schedulingGroup", schedulingGroup, "activatedPods", len(unscheduledPods))
 		return fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be waiting on permit"), podGroupState.SchedulingTimeout()
 	}
 
-	logger.V(4).Info("Quorum is met for a gang. Allowing other pods from a gang waiting on permit", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "allowedPods", len(assumedPods))
+	logger.V(4).Info("Quorum is met for a gang. Allowing other pods from a gang waiting on permit", "pod", klog.KObj(pod), "schedulingGroup", schedulingGroup, "allowedPods", len(assumedPods))
 
 	// The quorum is met. Allow this pod and signal all other waiting pods from the same gang to proceed.
 	for podUID := range assumedPods {

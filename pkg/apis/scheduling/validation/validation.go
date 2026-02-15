@@ -66,6 +66,55 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	return allErrs
 }
 
+// ValidatePodGroup tests if all fields in a PodGroup are set correctly.
+func ValidatePodGroup(podGroup *scheduling.PodGroup) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodGroupSpec(&podGroup.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validatePodGroupSpec(spec *scheduling.PodGroupSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.PodGroupTemplateRef != nil {
+		allErrs = append(allErrs, validatePodGroupTemplateRef(spec.PodGroupTemplateRef, fldPath.Child("podGroupTemplateRef"))...)
+	}
+	allErrs = append(allErrs, validatePodGroupSchedulingPolicy(&spec.SchedulingPolicy, fldPath.Child("schedulingPolicy"))...)
+	return allErrs
+}
+
+func validatePodGroupTemplateRef(ref *scheduling.PodGroupTemplateReference, fldPath *field.Path) field.ErrorList {
+	var allErrs = field.ErrorList{}
+	if ref.WorkloadName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("workloadName"), ""))
+	} else {
+		for _, detail := range apivalidation.ValidatePodGroupName(ref.WorkloadName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("workloadName"), ref.WorkloadName, detail).WithOrigin("format=k8s-short-name"))
+		}
+	}
+	if ref.PodGroupTemplateName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("podGroupTemplateName"), ""))
+	} else {
+		for _, detail := range apivalidation.ValidatePodGroupName(ref.PodGroupTemplateName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroupTemplateName"), ref.PodGroupTemplateName, detail).WithOrigin("format=k8s-short-name"))
+		}
+	}
+	return allErrs
+}
+
+// ValidatePodGroupUpdate tests if an update to PodGroup is valid.
+func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&podGroup.ObjectMeta, &oldPodGroup.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodGroupSpecUpdate(&podGroup.Spec, &oldPodGroup.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validatePodGroupSpecUpdate(spec, oldSpec *scheduling.PodGroupSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroupTemplateRef, oldSpec.PodGroupTemplateRef, fldPath.Child("podGroupTemplateRef")).WithOrigin("immutable")...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SchedulingPolicy, oldSpec.SchedulingPolicy, fldPath.Child("schedulingPolicy")).WithOrigin("immutable")...)
+	return allErrs
+}
+
 // ValidateWorkload tests if all fields in a Workload are set correctly.
 func ValidateWorkload(workload *scheduling.Workload) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, apivalidation.ValidateWorkloadName, field.NewPath("metadata"))
@@ -78,22 +127,22 @@ func validateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) fi
 	if spec.ControllerRef != nil {
 		allErrs = append(allErrs, validateControllerRef(spec.ControllerRef, fldPath.Child("controllerRef"))...)
 	}
-	allErrs = append(allErrs, validatePodGroups(fldPath, spec, operation.Create)...)
+	allErrs = append(allErrs, validatePodGroupTemplates(fldPath, spec, operation.Create)...)
 	return allErrs
 }
 
-func validatePodGroups(fldPath *field.Path, spec *scheduling.WorkloadSpec, op operation.Type) field.ErrorList {
+func validatePodGroupTemplates(fldPath *field.Path, spec *scheduling.WorkloadSpec, op operation.Type) field.ErrorList {
 	var allErrs field.ErrorList
 	existingPodGroups := sets.New[string]()
-	podGroupsPath := fldPath.Child("podGroups")
-	if len(spec.PodGroups) == 0 {
+	podGroupsPath := fldPath.Child("podGroupTemplates")
+	if len(spec.PodGroupTemplates) == 0 {
 		allErrs = append(allErrs, field.Required(podGroupsPath, "must have at least one item").MarkCoveredByDeclarative())
-	} else if len(spec.PodGroups) > scheduling.WorkloadMaxPodGroups {
-		allErrs = append(allErrs, field.TooMany(podGroupsPath, len(spec.PodGroups), scheduling.WorkloadMaxPodGroups).WithOrigin("maxItems").MarkCoveredByDeclarative())
+	} else if len(spec.PodGroupTemplates) > scheduling.WorkloadMaxPodGroupTemplates {
+		allErrs = append(allErrs, field.TooMany(podGroupsPath, len(spec.PodGroupTemplates), scheduling.WorkloadMaxPodGroupTemplates).WithOrigin("maxItems").MarkCoveredByDeclarative())
 	} else if op != operation.Update {
-		// spec.PodGroups is immutable after create.
-		for i := range spec.PodGroups {
-			allErrs = append(allErrs, validatePodGroup(&spec.PodGroups[i], podGroupsPath.Index(i), existingPodGroups)...)
+		// spec.PodGroupTemplates is immutable after create.
+		for i := range spec.PodGroupTemplates {
+			allErrs = append(allErrs, validatePodGroupTemplate(&spec.PodGroupTemplates[i], podGroupsPath.Index(i), existingPodGroups)...)
 		}
 	}
 	return allErrs
@@ -123,29 +172,29 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 	return allErrs
 }
 
-func validatePodGroup(podGroup *scheduling.PodGroup, fldPath *field.Path, existingPodGroups sets.Set[string]) field.ErrorList {
+func validatePodGroupTemplate(podGroupTemplate *scheduling.PodGroupTemplate, fldPath *field.Path, existingPodGroupTemplates sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	// To match the declarative validation behavior, we return Required for empty string.
 	// Declarative validation treats "" as "missing" via validate.RequiredValue()
 	// and returns early before checking the format constraint.
-	if podGroup.Name == "" {
+	if podGroupTemplate.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
-		for _, detail := range apivalidation.ValidatePodGroupName(podGroup.Name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail).WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative())
+		for _, detail := range apivalidation.ValidatePodGroupName(podGroupTemplate.Name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroupTemplate.Name, detail).WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative())
 		}
 	}
-	if existingPodGroups.Has(podGroup.Name) {
+	if existingPodGroupTemplates.Has(podGroupTemplate.Name) {
 		// MarkCoveredByDeclarative is not needed here because the duplicate check is done.
-		allErrs = append(allErrs, field.Duplicate(fldPath, podGroup).MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Duplicate(fldPath, podGroupTemplate.Name).MarkCoveredByDeclarative())
 	} else {
-		existingPodGroups.Insert(podGroup.Name)
+		existingPodGroupTemplates.Insert(podGroupTemplate.Name)
 	}
-	allErrs = append(allErrs, validatePodGroupPolicy(&podGroup.Policy, fldPath.Child("policy"))...)
+	allErrs = append(allErrs, validatePodGroupSchedulingPolicy(&podGroupTemplate.SchedulingPolicy, fldPath.Child("schedulingPolicy"))...)
 	return allErrs
 }
 
-func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Path) field.ErrorList {
+func validatePodGroupSchedulingPolicy(policy *scheduling.PodGroupSchedulingPolicy, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	var setFields []string
 
@@ -163,7 +212,7 @@ func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Pa
 		allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")),
 			"exactly one of `basic`, `gang` is required, but multiple fields are set").WithOrigin("union").MarkCoveredByDeclarative())
 	case policy.Basic != nil:
-		allErrs = append(allErrs, validatBasicSchedulingPolicy(policy.Basic, fldPath.Child("basic"))...)
+		allErrs = append(allErrs, validateBasicSchedulingPolicy(policy.Basic, fldPath.Child("basic"))...)
 	case policy.Gang != nil:
 		allErrs = append(allErrs, validateGangSchedulingPolicy(policy.Gang, fldPath.Child("gang"))...)
 	}
@@ -171,7 +220,7 @@ func validatePodGroupPolicy(policy *scheduling.PodGroupPolicy, fldPath *field.Pa
 	return allErrs
 }
 
-func validatBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldPath *field.Path) field.ErrorList {
+func validateBasicSchedulingPolicy(policy *scheduling.BasicSchedulingPolicy, fldPath *field.Path) field.ErrorList {
 	// BasicSchedulingPolicy has no fields.
 	return nil
 }
@@ -205,7 +254,13 @@ func validateWorkloadSpecUpdate(spec, oldSpec *scheduling.WorkloadSpec, fldPath 
 	} else if spec.ControllerRef != nil {
 		allErrs = append(allErrs, validateControllerRef(spec.ControllerRef, fldPath.Child("controllerRef"))...)
 	}
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroups, oldSpec.PodGroups, fldPath.Child("podGroups")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-	allErrs = append(allErrs, validatePodGroups(fldPath, spec, operation.Update)...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroupTemplates, oldSpec.PodGroupTemplates, fldPath.Child("podGroupTemplates")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, validatePodGroupTemplates(fldPath, spec, operation.Update)...)
+	return allErrs
+}
+
+// ValidatePodGroupStatusUpdate tests if an update to the status of a PodGroup is valid.
+func ValidatePodGroupStatusUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&podGroup.ObjectMeta, &oldPodGroup.ObjectMeta, field.NewPath("metadata"))
 	return allErrs
 }

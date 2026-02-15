@@ -676,10 +676,10 @@ func addAllEventHandlers(
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
-		case fwk.Workload:
+		case fwk.PodGroup:
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-				if handlerRegistration, err = informerFactory.Scheduling().V1alpha1().Workloads().Informer().AddEventHandler(
-					buildEvtResHandler(at, fwk.Workload),
+				if handlerRegistration, err = informerFactory.Scheduling().V1alpha2().PodGroups().Informer().AddEventHandler(
+					buildEvtResHandler(at, fwk.PodGroup),
 				); err != nil {
 					return err
 				}

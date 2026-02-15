@@ -263,6 +263,8 @@ items:
   - apiGroups:
     - scheduling.k8s.io
     resources:
+    - podgroups
+    - podgroups/status
     - workloads
     verbs:
     - create
@@ -427,6 +429,8 @@ items:
   - apiGroups:
     - scheduling.k8s.io
     resources:
+    - podgroups
+    - podgroups/status
     - workloads
     verbs:
     - get
@@ -997,6 +1001,8 @@ items:
   - apiGroups:
     - scheduling.k8s.io
     resources:
+    - podgroups
+    - podgroups/status
     - workloads
     verbs:
     - get

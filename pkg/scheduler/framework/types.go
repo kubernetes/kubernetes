@@ -76,7 +76,7 @@ var (
 		fwk.ResourceClaim,
 		fwk.ResourceSlice,
 		fwk.DeviceClass,
-		fwk.Workload,
+		fwk.PodGroup,
 	}
 )
 
@@ -156,7 +156,7 @@ func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.All}},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.Workload, ActionType: fwk.All}})
+		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.All}})
 	}
 	return events
 }

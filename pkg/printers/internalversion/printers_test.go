@@ -8005,10 +8005,10 @@ func TestPrintWorkload(t *testing.T) {
 			Namespace: "ns1",
 		},
 		Spec: scheduling.WorkloadSpec{
-			PodGroups: []scheduling.PodGroup{
+			PodGroupTemplates: []scheduling.PodGroupTemplate{
 				{
 					Name: "foo",
-					Policy: scheduling.PodGroupPolicy{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 						Gang: &scheduling.GangSchedulingPolicy{
 							MinCount: 5,
 						},
@@ -8040,10 +8040,10 @@ func TestPrintWorkloadList(t *testing.T) {
 					Namespace: "ns1",
 				},
 				Spec: scheduling.WorkloadSpec{
-					PodGroups: []scheduling.PodGroup{
+					PodGroupTemplates: []scheduling.PodGroupTemplate{
 						{
 							Name: "foo",
-							Policy: scheduling.PodGroupPolicy{
+							SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 								Gang: &scheduling.GangSchedulingPolicy{
 									MinCount: 5,
 								},
@@ -8059,10 +8059,10 @@ func TestPrintWorkloadList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: scheduling.WorkloadSpec{
-					PodGroups: []scheduling.PodGroup{
+					PodGroupTemplates: []scheduling.PodGroupTemplate{
 						{
 							Name: "bar",
-							Policy: scheduling.PodGroupPolicy{
+							SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 								Gang: &scheduling.GangSchedulingPolicy{
 									MinCount: 5,
 								},
@@ -8083,6 +8083,87 @@ func TestPrintWorkloadList(t *testing.T) {
 	rows, err := printWorkloadList(workloadList, printers.GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Error generating table rows for WorkloadList: %#v", err)
+	}
+
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintPodGroup(t *testing.T) {
+	podGroup := &scheduling.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "podgroup1",
+			Namespace: "ns1",
+		},
+		Spec: scheduling.PodGroupSpec{
+			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+				Gang: &scheduling.GangSchedulingPolicy{
+					MinCount: 5,
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Age
+	expected := []metav1.TableRow{{Cells: []interface{}{"podgroup1", "<unknown>"}}}
+
+	rows, err := printPodGroup(podGroup, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for PodGroup: %#v", err)
+	}
+	rows[0].Object.Object = nil
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintPodGroupList(t *testing.T) {
+	podGroupList := &scheduling.PodGroupList{
+		Items: []scheduling.PodGroup{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "podgroup1",
+					Namespace: "ns1",
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 5,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup2",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 5,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"podgroup1", "<unknown>"}},
+		{Cells: []interface{}{"podgroup2", "0s"}},
+	}
+
+	rows, err := printPodGroupList(podGroupList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for PodGroupList: %#v", err)
 	}
 
 	for i := range rows {

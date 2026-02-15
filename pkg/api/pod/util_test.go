@@ -6417,16 +6417,15 @@ func TestAllowTaintTolerationComparisonOperators(t *testing.T) {
 	}
 }
 
-func TestDisabledWorkload(t *testing.T) {
-	podWithWorkload := &api.Pod{
+func TestDisabledSchedulingGroup(t *testing.T) {
+	podWithSchedulingGroup := &api.Pod{
 		Spec: api.PodSpec{
-			WorkloadRef: &api.WorkloadReference{
-				Name:     "w",
-				PodGroup: "pg",
+			SchedulingGroup: &api.PodSchedulingGroup{
+				PodGroupName: ptr.To("pg"),
 			},
 		},
 	}
-	podWithoutWorkload := &api.Pod{
+	podWithoutSchedulingGroup := &api.Pod{
 		Spec: api.PodSpec{},
 	}
 
@@ -6438,56 +6437,56 @@ func TestDisabledWorkload(t *testing.T) {
 		wantPod *api.Pod
 	}{
 		{
-			name:    "old with workload / new with workload / disabled",
-			oldPod:  podWithWorkload,
-			newPod:  podWithWorkload,
-			wantPod: podWithWorkload,
+			name:    "old with scheduling group / new with scheduling group / disabled",
+			oldPod:  podWithSchedulingGroup,
+			newPod:  podWithSchedulingGroup,
+			wantPod: podWithSchedulingGroup,
 		},
 		{
-			name:    "old without workload / new with workload / disabled",
-			oldPod:  podWithoutWorkload,
-			newPod:  podWithWorkload,
-			wantPod: podWithoutWorkload,
+			name:    "old without scheduling group / new with scheduling group / disabled",
+			oldPod:  podWithoutSchedulingGroup,
+			newPod:  podWithSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 		{
-			name:    "old with workload / new without workload / disabled",
-			oldPod:  podWithWorkload,
-			newPod:  podWithoutWorkload,
-			wantPod: podWithoutWorkload,
+			name:    "old with scheduling group / new without scheduling group / disabled",
+			oldPod:  podWithSchedulingGroup,
+			newPod:  podWithoutSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 		{
-			name:    "old without workload / new without workload / disabled",
-			oldPod:  podWithoutWorkload,
-			newPod:  podWithoutWorkload,
-			wantPod: podWithoutWorkload,
+			name:    "old without scheduling group / new without scheduling group / disabled",
+			oldPod:  podWithoutSchedulingGroup,
+			newPod:  podWithoutSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 		{
-			name:    "old with workload / new with workload / enabled",
+			name:    "old with scheduling group / new with scheduling group / enabled",
 			enabled: true,
-			oldPod:  podWithWorkload,
-			newPod:  podWithWorkload,
-			wantPod: podWithWorkload,
+			oldPod:  podWithSchedulingGroup,
+			newPod:  podWithSchedulingGroup,
+			wantPod: podWithSchedulingGroup,
 		},
 		{
-			name:    "old without workload / new with workload / enabled",
+			name:    "old without scheduling group / new with scheduling group / enabled",
 			enabled: true,
-			oldPod:  podWithoutWorkload,
-			newPod:  podWithWorkload,
-			wantPod: podWithWorkload,
+			oldPod:  podWithoutSchedulingGroup,
+			newPod:  podWithSchedulingGroup,
+			wantPod: podWithSchedulingGroup,
 		},
 		{
-			name:    "old with workload / new without workload / enabled",
+			name:    "old with scheduling group / new without scheduling group / enabled",
 			enabled: true,
-			oldPod:  podWithWorkload,
-			newPod:  podWithoutWorkload,
-			wantPod: podWithoutWorkload,
+			oldPod:  podWithSchedulingGroup,
+			newPod:  podWithoutSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 		{
-			name:    "old without workload / new without workload / enabled",
+			name:    "old without scheduling group / new without scheduling group / enabled",
 			enabled: true,
-			oldPod:  podWithoutWorkload,
-			newPod:  podWithoutWorkload,
-			wantPod: podWithoutWorkload,
+			oldPod:  podWithoutSchedulingGroup,
+			newPod:  podWithoutSchedulingGroup,
+			wantPod: podWithoutSchedulingGroup,
 		},
 	}
 
