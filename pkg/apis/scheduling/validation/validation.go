@@ -125,16 +125,7 @@ func validateControllerRef(ref *scheduling.TypedLocalObjectReference, fldPath *f
 
 func validatePodGroup(podGroup *scheduling.PodGroup, fldPath *field.Path, existingPodGroups sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
-	// To match the declarative validation behavior, we return Required for empty string.
-	// Declarative validation treats "" as "missing" via validate.RequiredValue()
-	// and returns early before checking the format constraint.
-	if podGroup.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
-	} else {
-		for _, detail := range apivalidation.ValidatePodGroupName(podGroup.Name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), podGroup.Name, detail).WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative())
-		}
-	}
+	// PodGroup.Name required and format validation is handled by declarative validation.
 	if existingPodGroups.Has(podGroup.Name) {
 		// MarkCoveredByDeclarative is not needed here because the duplicate check is done.
 		allErrs = append(allErrs, field.Duplicate(fldPath, podGroup).MarkCoveredByDeclarative())

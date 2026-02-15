@@ -65,11 +65,11 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"empty podGroup name": {
 			input:        mkValidWorkload(setPodGroupName(0, "")),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroups").Index(0).Child("name"), "").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroups").Index(0).Child("name"), "")},
 		},
 		"invalid podGroup name": {
 			input:        mkValidWorkload(setPodGroupName(0, "Invalid_Name")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name").MarkAlpha()},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroups").Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name")},
 		},
 		"duplicate podGroup names": {
 			input:        mkValidWorkload(addPodGroup("main")),

@@ -170,8 +170,8 @@ type PodGroup struct {
 	// It must be a DNS label. This field is immutable.
 	//
 	// +required
-	// +k8s:alpha(since:"1.35")=+k8s:required
-	// +k8s:alpha(since:"1.35")=+k8s:format=k8s-short-name
+	// +k8s:required
+	// +k8s:format=k8s-short-name
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// Policy defines the scheduling policy for this PodGroup.

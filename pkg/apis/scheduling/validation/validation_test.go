@@ -260,14 +260,6 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "controllerRef", "apiGroup"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')").MarkCoveredByDeclarative(),
 			},
 		},
-		"no pod group name": {
-			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[0].Name = ""
-			}),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "podGroups").Index(0).Child("name"), "").MarkCoveredByDeclarative(),
-			},
-		},
 		"two policies": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Spec.PodGroups[0].Policy.Gang = &scheduling.GangSchedulingPolicy{
