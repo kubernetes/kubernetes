@@ -772,6 +772,68 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 	}
 }
 
+// TestNewConnectionClosesConnOnFailedUpgrade verifies that when NewConnection
+// receives a non-101 response (failed SPDY upgrade), the underlying network
+// connection (s.conn) is closed. This prevents file descriptor leaks in the
+// apiserver when kubectl exec targets a container that cannot be found.
+// Regression test for https://github.com/kubernetes/kubernetes/issues/135245
+func TestNewConnectionClosesConnOnFailedUpgrade(t *testing.T) {
+	testCases := map[string]struct {
+		statusCode       int
+		connectionHeader string
+		upgradeHeader    string
+	}{
+		"forbidden status": {
+			statusCode:       http.StatusForbidden,
+			connectionHeader: "Upgrade",
+			upgradeHeader:    "SPDY/3.1",
+		},
+		"missing connection header": {
+			statusCode:       http.StatusSwitchingProtocols,
+			connectionHeader: "",
+			upgradeHeader:    "SPDY/3.1",
+		},
+		"missing upgrade header": {
+			statusCode:       http.StatusSwitchingProtocols,
+			connectionHeader: "Upgrade",
+			upgradeHeader:    "",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(serverHandler(t, serverHandlerConfig{
+				shouldError:      true,
+				statusCode:       tc.statusCode,
+				connectionHeader: tc.connectionHeader,
+				upgradeHeader:    tc.upgradeHeader,
+			}))
+			defer server.Close()
+
+			spdyTransport, err := NewRoundTripper(nil)
+			require.NoError(t, err)
+
+			req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+			require.NoError(t, err)
+
+			client := &http.Client{Transport: spdyTransport}
+			resp, err := client.Do(req)
+			require.NoError(t, err)
+
+			// NewConnection should fail because the upgrade was not successful.
+			_, err = spdyTransport.NewConnection(resp)
+			require.Error(t, err)
+
+			// The underlying connection must have been closed by NewConnection.
+			// Verify by attempting to read from it — a closed connection returns an error.
+			assert.NotNil(t, spdyTransport.conn, "conn should have been set by RoundTrip")
+			buf := make([]byte, 1)
+			_, readErr := spdyTransport.conn.Read(buf)
+			assert.Error(t, readErr, "expected error reading from closed connection, indicating conn was properly closed")
+		})
+	}
+}
+
 func TestRoundTripPassesContextToDialer(t *testing.T) {
 	urls := []string{"http://127.0.0.1:1233/", "https://127.0.0.1:1233/"}
 	for _, u := range urls {
