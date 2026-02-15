@@ -1268,6 +1268,64 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	expectUnorderedSlicesWithTopLevelAttrs(t, fetchedSlices, expectedSlices)
 }
 
+// TestReconcileFixesNilEndpoints ensures that if an existing EndpointSlice has
+// nil Endpoints (which serializes to null), it is updated to have empty Endpoints
+// (which serializes to []). This is required for strict JSON clients.
+func TestReconcileFixesNilEndpoints(t *testing.T) {
+	client := newClientset()
+	setupMetrics()
+	namespace := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+
+	// Manually create a slice with explicit nil Endpoints to simulate the bug state.
+	// We avoid helpers like newEmptyEndpointSlice because they initialize Endpoints to [].
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+	ownerRef := metav1.NewControllerRef(&svc, gvk)
+	nilSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo-nil-endpoints",
+			Namespace: namespace,
+			Labels: map[string]string{
+				discovery.LabelServiceName: svc.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			OwnerReferences: []metav1.OwnerReference{*ownerRef},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints:   nil, // Explicitly nil to simulate the bug
+	}
+
+	existingSlices := []*discovery.EndpointSlice{nilSlice}
+	createEndpointSlices(t, client, namespace, existingSlices)
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+
+	// Track actions before reconciliation to verify the update action later
+	numActionsBefore := len(client.Actions())
+
+	// Run Reconcile with 0 pods.
+	// The reconciler should see that 'nil' (existing) != '[]' (desired) and trigger an update.
+	reconcileHelper(t, r, &svc, []*corev1.Pod{}, existingSlices, time.Now())
+
+	actions := client.Actions()
+	if len(actions) != numActionsBefore+1 {
+		t.Fatalf("Expected 1 additional action (update), got %d", len(actions)-numActionsBefore)
+	}
+
+	expectAction(t, actions, numActionsBefore, "update", "endpointslices")
+
+	// Verify the update payload forces Endpoints to be an empty slice instead of nil
+	updateAction := actions[numActionsBefore].(k8stesting.UpdateAction)
+	obj := updateAction.GetObject().(*discovery.EndpointSlice)
+
+	if obj.Endpoints == nil {
+		t.Error("Expected updated slice to have non-nil Endpoints, got nil")
+	}
+	if len(obj.Endpoints) != 0 {
+		t.Errorf("Expected updated slice to have empty Endpoints, got length %d", len(obj.Endpoints))
+	}
+}
+
 // This test ensures that maxEndpointsPerSlice configuration results in
 // appropriate endpoints distribution among slices
 func TestReconcileMaxEndpointsPerSlice(t *testing.T) {
