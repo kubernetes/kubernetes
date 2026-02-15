@@ -326,13 +326,16 @@ func connectionToDialerCreator(c apiserver.Connection) (*dialerCreator, error) {
 				},
 			}, nil
 		} else if c.Transport.TCP != nil {
-			tlsConfig, err := getTLSConfig(c.Transport.TCP.TLSConfig)
-			if err != nil {
-				return nil, err
-			}
 			proxyAddress, err := getProxyAddress(c.Transport.TCP.URL)
 			if err != nil {
 				return nil, err
+			}
+			// tlsConfig may be nil if the transport URL scheme uses HTTP.
+			var tlsConfig *tls.Config
+			if c.Transport.TCP.TLSConfig != nil {
+				if tlsConfig, err = getTLSConfig(c.Transport.TCP.TLSConfig); err != nil {
+					return nil, err
+				}
 			}
 			return &dialerCreator{
 				connector: &tcpHTTPConnectConnector{
