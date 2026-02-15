@@ -3193,6 +3193,140 @@ func TestPermitPlugins(t *testing.T) {
 	}
 }
 
+func TestPermitPluginsWithoutWaiting(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins []*TestPlugin
+		want    *fwk.Status
+	}{
+		{
+			name:    "NilPermitPlugin",
+			plugins: []*TestPlugin{},
+			want:    nil,
+		},
+		{
+			name: "SuccessPermitPlugin",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PermitStatus: int(fwk.Success)},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "UnschedulablePermitPlugin",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PermitStatus: int(fwk.Unschedulable)},
+				},
+			},
+			want: fwk.NewStatus(fwk.Unschedulable, injectReason).WithPlugin("TestPlugin"),
+		},
+		{
+			name: "ErrorPermitPlugin",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PermitStatus: int(fwk.Error)},
+				},
+			},
+			want: fwk.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)).WithPlugin("TestPlugin"),
+		},
+		{
+			name: "UnschedulableAndUnresolvablePermitPlugin",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PermitStatus: int(fwk.UnschedulableAndUnresolvable)},
+				},
+			},
+			want: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, injectReason).WithPlugin("TestPlugin"),
+		},
+		{
+			// Test cases are similar to TestPermitPlugins except this one.
+			// RunPermitPluginsWithoutWaiting returns the actual plugin's status in case of waiting,
+			// instead of generic message.
+			name: "WaitPermitPlugin",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PermitStatus: int(fwk.Wait)},
+				},
+			},
+			want: fwk.NewStatus(fwk.Wait, "injected status"),
+		},
+		{
+			name: "SuccessSuccessPermitPlugin",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PermitStatus: int(fwk.Success)},
+				},
+				{
+					name: "TestPlugin 1",
+					inj:  injectedResult{PermitStatus: int(fwk.Success)},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "ErrorAndErrorPlugins",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PermitStatus: int(fwk.Error)},
+				},
+				{
+					name: "TestPlugin 1",
+					inj:  injectedResult{PermitStatus: int(fwk.Error)},
+				},
+			},
+			want: fwk.AsStatus(fmt.Errorf(`running Permit plugin "TestPlugin": %w`, errInjectedStatus)).WithPlugin("TestPlugin"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			registry := Registry{}
+			configPlugins := &config.Plugins{}
+
+			for _, pl := range tt.plugins {
+				tmpPl := pl
+				if err := registry.Register(pl.name, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return tmpPl, nil
+				}); err != nil {
+					t.Fatalf("Unable to register Permit plugin: %s", pl.name)
+				}
+
+				configPlugins.Permit.Enabled = append(
+					configPlugins.Permit.Enabled,
+					config.Plugin{Name: pl.name},
+				)
+			}
+			profile := config.KubeSchedulerProfile{Plugins: configPlugins}
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile,
+				WithWaitingPods(NewWaitingPodsMap()),
+			)
+			defer func() {
+				_ = f.Close()
+			}()
+			if err != nil {
+				t.Fatalf("fail to create framework: %s", err)
+			}
+
+			status := f.RunPermitPluginsWithoutWaiting(ctx, state, pod, "")
+			if diff := cmp.Diff(tt.want, status, statusCmpOpts...); diff != "" {
+				t.Errorf("Wrong status code (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 // withMetricsRecorder set metricsRecorder for the scheduling frameworkImpl.
 func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 	return func(o *frameworkOptions) {

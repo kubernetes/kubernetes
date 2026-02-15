@@ -1206,6 +1206,35 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			}
 		}
 	}
+	assumePod := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.AssumePod(logger, pods[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	assumePodInSnapshot := func(i int) operation {
+		return func(t *testing.T) {
+			podInfo, _ := framework.NewPodInfo(pods[i])
+			if err := snapshot.AssumePod(podInfo); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	forgetPod := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.ForgetPod(logger, pods[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	forgetPodInSnapshot := func(i int) operation {
+		return func(t *testing.T) {
+			if err := snapshot.ForgetPod(logger, pods[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
 	addPodWithAffinity := func(i int) operation {
 		return func(t *testing.T) {
 			if err := cache.AddPod(logger, podsWithAffinity[i]); err != nil {
@@ -1467,6 +1496,16 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			},
 			expected:           []*v1.Node{nodes[0], nodes[1]},
 			expectedUsedPVCSet: sets.New("test-ns/test-pvc1", "test-ns/test-pvc2"),
+		},
+		{
+			name: "Assume and forget in cache, and in snapshot",
+			operations: []operation{
+				addNode(0), addNode(2), addNode(4), addNode(8), updateSnapshot(),
+				assumePod(8), assumePodInSnapshot(4), assumePod(0), forgetPod(0),
+				assumePodInSnapshot(2), forgetPodInSnapshot(4), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[0], nodes[8], nodes[4], nodes[2]},
+			expectedUsedPVCSet: sets.New[string](),
 		},
 	}
 

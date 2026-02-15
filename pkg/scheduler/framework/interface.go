@@ -238,6 +238,13 @@ type Framework interface {
 	// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
 	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
 
+	// RunPermitPluginsWithoutWaiting runs the set of configured permit plugins. If any of these
+	// plugins returns a status other than "Success" or "Wait", it does not continue
+	// running the remaining plugins and returns an error. If any of the
+	// plugins returns "Wait", this function will NOT create a waiting pod object,
+	// but just return status with "Wait" code. It's caller's responsibility to act on that code.
+	RunPermitPluginsWithoutWaiting(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+
 	// WillWaitOnPermit returns whether this pod will wait on permit by checking if the pod is a waiting pod.
 	WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool
 

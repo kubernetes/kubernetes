@@ -553,6 +553,11 @@ type QueuedPodInfo struct {
 	// GatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
 	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
 	GatingPluginEvents []fwk.ClusterEvent
+	// NeedsPodGroupScheduling says whether the pod needs to pass a pod group scheduling cycle or not.
+	// If set to false, it means that the pod either passed the pod group cycle
+	// or doesn't belong to any pod group.
+	// This field can only be set to true when GenericWorkload feature flag is enabled.
+	NeedsPodGroupScheduling bool
 }
 
 func (pqi *QueuedPodInfo) GetPodInfo() fwk.PodInfo {
@@ -618,6 +623,7 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
 		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
+		NeedsPodGroupScheduling: pqi.NeedsPodGroupScheduling,
 	}
 }
 
@@ -628,6 +634,43 @@ func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
 	pqi.PendingPlugins.Clear()
 	pqi.GatingPlugin = ""
 	pqi.GatingPluginEvents = nil
+}
+
+// QueuedPodGroupInfo is a PodGroupInfo wrapper with additional information related to
+// the pod group's status in the scheduling queue and stores all queued pods from that pod group.
+type QueuedPodGroupInfo struct {
+	*PodGroupInfo
+	// QueuedPodInfos are the pod group's pods that are currently queued.
+	// The order of the pods is deterministic and based on the priority and InitialAttemptTimestamp.
+	QueuedPodInfos []*QueuedPodInfo
+}
+
+// PodGroupInfo is a wrapper around the PodGroup API object together with a list of pods that belong to the pod group.
+// Typically used as an input to pod group scheduling cycle plugins.
+type PodGroupInfo struct {
+	// Namespace is a namespace of this pod group.
+	Namespace string
+	// WorkloadRef is a reference to this particular pod group.
+	WorkloadRef *v1.WorkloadReference
+	// UnscheduledPods are pods that are currently being considered for scheduling.
+	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
+	// WorkloadManager.PodGroupState can be used for that.
+	// The order of the pods is deterministic and based on signature, priority and timestamp.
+	UnscheduledPods []*v1.Pod
+}
+
+func (pgi *PodGroupInfo) GetName() string {
+	if pgi.WorkloadRef == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s/%s", pgi.WorkloadRef.Name, pgi.WorkloadRef.PodGroup, pgi.WorkloadRef.PodGroupReplicaKey)
+}
+
+func (pgi *PodGroupInfo) GetNamespace() string {
+	if pgi.WorkloadRef == nil {
+		return ""
+	}
+	return pgi.Namespace
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
