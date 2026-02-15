@@ -132,6 +132,33 @@
   - 10
   - 15
   - 30
+- name: data_key_generation_duration_seconds
+  subsystem: storage
+  namespace: apiserver
+  help: Latencies in seconds of data encryption key(DEK) generation operations.
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 5e-06
+  - 1e-05
+  - 2e-05
+  - 4e-05
+  - 8e-05
+  - 0.00016
+  - 0.00032
+  - 0.00064
+  - 0.00128
+  - 0.00256
+  - 0.00512
+  - 0.01024
+  - 0.02048
+  - 0.04096
+- name: data_key_generation_failures_total
+  subsystem: storage
+  namespace: apiserver
+  help: Total number of failed data encryption key(DEK) generation operations.
+  type: Counter
+  stabilityLevel: BETA
 - name: envelope_transformation_cache_misses_total
   subsystem: storage
   namespace: apiserver
