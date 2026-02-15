@@ -692,7 +692,6 @@ func NewMainKubelet(ctx context.Context,
 		klet.getRootDir(),
 		klet.statusManager,
 		func(pod *v1.Pod) { klet.HandlePodSyncs(ctx, []*v1.Pod{pod}) },
-		klet.GetActivePods,
 		klet.podManager.GetPodByUID,
 		klet.sourcesReady,
 		kubeDeps.Recorder,
@@ -2812,7 +2811,8 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 	for _, pod := range pods {
 		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
-		// Update NodeInfo cache if pod resources may have changed
+		// Update NodeInfo cache if pod resources may have changed.
+		// No admission gate needed — updates only arrive for already-admitted pods.
 		if oldPod != nil {
 			kl.nodeInfoCache.UpdatePod(logger, oldPod, pod)
 		}

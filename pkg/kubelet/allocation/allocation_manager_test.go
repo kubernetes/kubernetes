@@ -2408,7 +2408,6 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			}
 			pod.Annotations["pod-sync-triggered"] = "true"
 		},
-		func() []*v1.Pod { return allocatedPods },
 		func(uid types.UID) (*v1.Pod, bool) {
 			for _, p := range allocatedPods {
 				if p.UID == uid {

@@ -122,7 +122,6 @@ type manager struct {
 
 	ticker         *time.Ticker
 	triggerPodSync func(pod *v1.Pod)
-	getActivePods  func() []*v1.Pod
 	getPodByUID    func(types.UID) (*v1.Pod, bool)
 
 	allocationMutex        sync.Mutex
@@ -134,7 +133,6 @@ type manager struct {
 func NewManager(checkpointDirectory string,
 	statusManager status.Manager,
 	triggerPodSync func(pod *v1.Pod),
-	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
@@ -151,7 +149,6 @@ func NewManager(checkpointDirectory string,
 
 		ticker:         time.NewTicker(initialRetryDelay),
 		triggerPodSync: triggerPodSync,
-		getActivePods:  getActivePods,
 		getPodByUID:    getPodByUID,
 		recorder:       recorder,
 	}
@@ -178,7 +175,6 @@ func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string
 func NewInMemoryManager(
 	statusManager status.Manager,
 	triggerPodSync func(pod *v1.Pod),
-	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
@@ -192,7 +188,6 @@ func NewInMemoryManager(
 
 		ticker:         time.NewTicker(initialRetryDelay),
 		triggerPodSync: triggerPodSync,
-		getActivePods:  getActivePods,
 		getPodByUID:    getPodByUID,
 		recorder:       recorder,
 	}
@@ -536,8 +531,7 @@ func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	}
 
 	// Check if we can admit the pod; if so, update the allocation.
-	allocatedPods := m.getAllocatedPods(activePods)
-	ok, reason, message := m.canAdmitPod(logger, allocatedPods, pod, lifecycle.AddOperation)
+	ok, reason, message := m.canAdmitPod(logger, pod, lifecycle.AddOperation)
 
 	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
@@ -573,7 +567,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 	}
 
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := m.canAdmitPod(logger, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
+	fit, reason, message := m.canAdmitPod(logger, pod, lifecycle.ResizeOperation)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(pod); err != nil {
@@ -606,18 +600,11 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
-// cannot. "pod" is new pod, while "pods" are all admitted pods
-// The function returns a boolean value indicating whether the pod
+// cannot. The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
-// allocatedPods should represent the pods that have already been admitted, along with their
-// admitted (allocated) resources.
-func (m *manager) canAdmitPod(logger klog.Logger, allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) (bool, string, string) {
-	// Filter out the pod being evaluated.
-	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
-
-	// If any handler rejects, the pod is rejected.
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods, Operation: operation}
+func (m *manager) canAdmitPod(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) (bool, string, string) {
+	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, Operation: operation}
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation)
@@ -626,18 +613,6 @@ func (m *manager) canAdmitPod(logger klog.Logger, allocatedPods []*v1.Pod, pod *
 	}
 
 	return true, "", ""
-}
-
-func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return activePods
-	}
-
-	allocatedPods := make([]*v1.Pod, len(activePods))
-	for i, pod := range activePods {
-		allocatedPods[i], _ = m.UpdatePodFromAllocation(pod)
-	}
-	return allocatedPods
 }
 
 func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {

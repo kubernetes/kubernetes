@@ -336,7 +336,6 @@ func newTestKubeletWithImageList(
 	kubelet.allocationManager = allocation.NewInMemoryManager(
 		kubelet.statusManager,
 		func(pod *v1.Pod) { kubelet.HandlePodSyncs(tCtx, []*v1.Pod{pod}) },
-		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
 		kubelet.recorder,

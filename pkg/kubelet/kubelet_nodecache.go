@@ -79,6 +79,7 @@ func (kl *Kubelet) getNodeSync() (*v1.Node, error) {
 }
 
 // setCachedNode updates both the Node object cache and the NodeInfo cache.
+// nodeInfoCache may be nil during test setup or partial initialization.
 func (kl *Kubelet) setCachedNode(node *v1.Node) {
 	kl.cachedNode = node
 	if kl.nodeInfoCache != nil {
