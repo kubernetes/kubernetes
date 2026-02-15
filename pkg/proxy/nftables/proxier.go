@@ -93,7 +93,8 @@ const (
 	firewallCheckChain = "firewall-check"
 
 	// masquerading
-	masqueradingChain = "masquerading"
+	masqueradingChain     = "masquerading"
+	hairpinConnectionsSet = "hairpin-connections"
 )
 
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
@@ -154,7 +155,6 @@ type Proxier struct {
 	// updating nftables with some partial data after kube-proxy restart.
 	endpointSlicesSynced bool
 	servicesSynced       bool
-	syncedOnce           bool
 	lastFullSync         time.Time
 	needFullSync         bool
 	initialized          int32
@@ -197,6 +197,7 @@ type Proxier struct {
 	noEndpointServices  *nftElementStorage
 	noEndpointNodePorts *nftElementStorage
 	serviceNodePorts    *nftElementStorage
+	hairpinConnections  *nftElementStorage
 }
 
 // Proxier implements proxy.Provider
@@ -267,6 +268,7 @@ func NewProxier(ctx context.Context,
 		noEndpointServices:  newNFTElementStorage("map", noEndpointServicesMap),
 		noEndpointNodePorts: newNFTElementStorage("map", noEndpointNodePortsMap),
 		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
+		hairpinConnections:  newNFTElementStorage("set", hairpinConnectionsSet),
 	}
 
 	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", proxyutil.FullSyncPeriod)
@@ -463,12 +465,27 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		ensureChain(chain, tx, createdChains, false)
 	}
 
+	// add hairpin-connections set
+	tx.Add(&knftables.Set{
+		Name:    hairpinConnectionsSet,
+		Type:    ipvX_addr + " . " + ipvX_addr + " . inet_proto . inet_service",
+		Comment: ptr.To("service hairpin connections"),
+	})
+
 	// Add the rules in the masquerading chain
 	tx.Add(&knftables.Rule{
 		Chain: masqueradingChain,
 		Rule: knftables.Concat(
 			"mark", "and", proxier.masqueradeMark, "!=", "0",
 			"mark", "set", "mark", "xor", proxier.masqueradeMark,
+			"masquerade fully-random",
+		),
+	})
+	tx.Add(&knftables.Rule{
+		Chain: masqueradingChain,
+		Rule: knftables.Concat(
+			"ct status dnat",
+			ipX, "saddr", ".", ipX, "daddr", ".", "meta l4proto", ".", "th dport", "@", hairpinConnectionsSet,
 			"masquerade fully-random",
 		),
 	})
@@ -614,6 +631,33 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Type:    "inet_proto . inet_service : verdict",
 		Comment: ptr.To("NodePort traffic"),
 	})
+
+	if proxier.masqueradeAll {
+		tx.Add(&knftables.Rule{
+			Chain: servicesChain,
+			Rule: knftables.Concat(
+				ipX, "daddr", "@", clusterIPsSet,
+				proxier.masqueradeRule,
+			),
+			Comment: ptr.To("masquerade all clusterIP traffic"),
+		})
+	} else if proxier.localDetector.IsImplemented() {
+		// This masquerades off-cluster traffic to a service VIP. The
+		// idea is that you can establish a static route for your
+		// Service range, routing to any node, and that node will
+		// bridge into the Service for you. Since that might bounce
+		// off-node, we masquerade here.
+		tx.Add(&knftables.Rule{
+			Chain: servicesChain,
+			Rule: knftables.Concat(
+				ipX, "daddr", "@", clusterIPsSet,
+				proxier.localDetector.IfNotLocalNFT(),
+				proxier.masqueradeRule,
+			),
+			Comment: ptr.To("masquerade clusterIP traffic from outside cluster"),
+		})
+	}
+
 	tx.Add(&knftables.Rule{
 		Chain: servicesChain,
 		Rule: knftables.Concat(
@@ -649,6 +693,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	proxier.noEndpointServices.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.noEndpointNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.serviceNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
+	proxier.hairpinConnections.readOrReset(tx, proxier.nftables, proxier.logger)
 }
 
 // Sync is called to synchronize the proxier state to nftables as soon as possible.
@@ -1034,7 +1079,6 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	doFullSync := proxier.needFullSync || (time.Since(proxier.lastFullSync) > proxyutil.FullSyncPeriod)
 
 	defer func() {
-		proxier.syncedOnce = true
 		metrics.SyncProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
 		if !doFullSync {
 			metrics.SyncPartialProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
@@ -1165,16 +1209,33 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			!serviceUpdateResult.UpdatedServices.Has(svcName.NamespacedName) &&
 			!endpointUpdateResult.UpdatedServices.Has(svcName.NamespacedName)
 
-		// Note the endpoint chains that will be used
+		// We only use separate endpoint chains when adding affinity rules
+		serviceUsesAffinity := svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP
+
+		// Note the endpoints that will be used
 		for _, ep := range allLocallyReachableEndpoints {
-			if epInfo, ok := ep.(*endpointInfo); ok {
-				ensureChain(epInfo.chainName, tx, activeChains, skipServiceUpdate ||
-					proxier.epChainSkipUpdate(existingChains, existingAffinitySets, svcInfo, epInfo))
-				// Note the affinity sets that will be used
-				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-					activeAffinitySets.Insert(epInfo.affinitySetName)
-				}
+			epInfo, ok := ep.(*endpointInfo)
+			if !ok {
+				continue
 			}
+
+			// If using affinity, note the endpoint chain and affinity set
+			// names, and ensure that the chain exists.
+			if serviceUsesAffinity {
+				ensureChain(epInfo.chainName, tx, activeChains, skipServiceUpdate)
+				activeAffinitySets.Insert(epInfo.affinitySetName)
+			}
+
+			// Add endpoint to the hairpin set
+			proxier.hairpinConnections.ensureElem(tx, &knftables.Element{
+				Set: hairpinConnectionsSet,
+				Key: []string{
+					epInfo.IP(),
+					epInfo.IP(),
+					protocol,
+					strconv.Itoa(epInfo.Port()),
+				},
+			})
 		}
 
 		// clusterPolicyChain contains the endpoints used with "Cluster" traffic policy
@@ -1426,35 +1487,6 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			continue
 		}
 
-		// Set up internal traffic handling.
-		if hasInternalEndpoints {
-			if proxier.masqueradeAll {
-				tx.Add(&knftables.Rule{
-					Chain: internalTrafficChain,
-					Rule: knftables.Concat(
-						ipX, "daddr", svcInfo.ClusterIP(),
-						proxier.masqueradeRule,
-					),
-					Comment: ptr.To("masquerade all service traffic"),
-				})
-			} else if proxier.localDetector.IsImplemented() {
-				// This masquerades off-cluster traffic to a service VIP. The
-				// idea is that you can establish a static route for your
-				// Service range, routing to any node, and that node will
-				// bridge into the Service for you. Since that might bounce
-				// off-node, we masquerade here.
-				tx.Add(&knftables.Rule{
-					Chain: internalTrafficChain,
-					Rule: knftables.Concat(
-						ipX, "daddr", svcInfo.ClusterIP(),
-						proxier.localDetector.IfNotLocalNFT(),
-						proxier.masqueradeRule,
-					),
-					Comment: ptr.To("masquerade traffic from outside cluster"),
-				})
-			}
-		}
-
 		// Set up external traffic handling (if any "external" destinations are
 		// enabled). All captured traffic for all external destinations should
 		// jump to externalTrafficChain, which will handle some special cases and
@@ -1592,44 +1624,32 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			}
 		}
 
-		// If Cluster policy is in use, create the chain and create rules jumping
-		// from clusterPolicyChain to the clusterEndpoints
-		if usesClusterPolicyChain {
-			proxier.writeServiceToEndpointRules(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
-		}
-
-		// If Local policy is in use, create rules jumping from localPolicyChain
-		// to the localEndpoints
-		if usesLocalPolicyChain {
-			proxier.writeServiceToEndpointRules(tx, svcInfo, localPolicyChain, localEndpoints)
-		}
-
-		// Generate the per-endpoint chains
-		for _, ep := range allLocallyReachableEndpoints {
-			epInfo, ok := ep.(*endpointInfo)
-			if !ok {
-				proxier.logger.Error(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
-				continue
+		// Write the endpoint rules and/or chains
+		if !serviceUsesAffinity {
+			if usesClusterPolicyChain {
+				proxier.writeServiceToEndpointDNATs(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
+			}
+			if usesLocalPolicyChain {
+				proxier.writeServiceToEndpointDNATs(tx, svcInfo, localPolicyChain, localEndpoints)
+			}
+		} else {
+			if usesClusterPolicyChain {
+				proxier.writeServiceToEndpointJumps(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
+			}
+			if usesLocalPolicyChain {
+				proxier.writeServiceToEndpointJumps(tx, svcInfo, localPolicyChain, localEndpoints)
 			}
 
-			if proxier.epChainSkipUpdate(existingChains, existingAffinitySets, svcInfo, epInfo) {
-				// If the EP chain is already updated, we can skip it.
-				continue
-			}
-			endpointChain := epInfo.chainName
+			// And generate the per-endpoint chains and affinity sets
+			for _, ep := range allLocallyReachableEndpoints {
+				epInfo, ok := ep.(*endpointInfo)
+				if !ok {
+					continue
+				}
 
-			// Handle traffic that loops back to the originator with SNAT.
-			tx.Add(&knftables.Rule{
-				Chain: endpointChain,
-				Rule: knftables.Concat(
-					ipX, "saddr", epInfo.IP(),
-					proxier.masqueradeRule,
-				),
-				Comment: ptr.To("masquerade hairpin traffic"),
-			})
+				endpointChain := epInfo.chainName
 
-			// Handle session affinity
-			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
+				// Handle session affinity
 				tx.Add(&knftables.Rule{
 					Chain: endpointChain,
 					Rule: knftables.Concat(
@@ -1637,16 +1657,16 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 						"{", ipX, "saddr", "}",
 					),
 				})
-			}
 
-			// DNAT to final destination.
-			tx.Add(&knftables.Rule{
-				Chain: endpointChain,
-				Rule: knftables.Concat(
-					"meta l4proto", protocol,
-					"dnat to", epInfo.String(),
-				),
-			})
+				// DNAT to final destination.
+				tx.Add(&knftables.Rule{
+					Chain: endpointChain,
+					Rule: knftables.Concat(
+						"meta l4proto", protocol,
+						"dnat to", epInfo.String(),
+					),
+				})
+			}
 		}
 	}
 
@@ -1684,6 +1704,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.noEndpointServices.cleanupLeftoverKeys(tx)
 	proxier.noEndpointNodePorts.cleanupLeftoverKeys(tx)
 	proxier.serviceNodePorts.cleanupLeftoverKeys(tx)
+	proxier.hairpinConnections.cleanupLeftoverKeys(tx)
 
 	// Sync rules.
 	proxier.logger.V(2).Info("Reloading service nftables data",
@@ -1742,55 +1763,12 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	return
 }
 
-// epChainSkipUpdate returns true if the EP chain doesn't need to be updated.
-func (proxier *Proxier) epChainSkipUpdate(existingChains, existingAffinitySets sets.Set[string], svcInfo *servicePortInfo, epInfo *endpointInfo) bool {
-	if proxier.syncedOnce {
-		// We only skip updating EP chains during the first sync to speed up kube-proxy restart, otherwise return false.
-		return false
-	}
-	if existingChains == nil || existingAffinitySets == nil {
-		// listing existing objects failed, can't skip updating
-		return false
-	}
-	// EP chain can have up to 3 rules:
-	// - loopback masquerade rule
-	//   - includes the endpoint IP
-	// - affinity rule when session affinity is set to ClusterIP
-	//   - includes the affinity set name
-	// - DNAT rule
-	//   - includes the endpoint IP + port
-	// EP chain name includes the endpoint IP + port => loopback and DNAT rules are pre-defined by the chain name.
-	// When session affinity is set to ClusterIP, the affinity set is created for local endpoints.
-	// Therefore, we can check that sessions affinity hasn't changed by checking if the affinity set exists.
-	wantAffinitySet := svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP
-	return existingChains.Has(epInfo.chainName) && wantAffinitySet == existingAffinitySets.Has(epInfo.affinitySetName)
-}
-
-func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
-	// First write session affinity rules, if applicable.
-	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-		ipX := "ip"
-		if proxier.ipFamily == v1.IPv6Protocol {
-			ipX = "ip6"
-		}
-
-		for _, ep := range endpoints {
-			epInfo, ok := ep.(*endpointInfo)
-			if !ok {
-				continue
-			}
-
-			tx.Add(&knftables.Rule{
-				Chain: svcChain,
-				Rule: knftables.Concat(
-					ipX, "saddr", "@", epInfo.affinitySetName,
-					"goto", epInfo.chainName,
-				),
-			})
-		}
+func (proxier *Proxier) writeServiceToEndpointDNATs(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
+	ipX := "ip"
+	if proxier.ipFamily == v1.IPv6Protocol {
+		ipX = "ip6"
 	}
 
-	// Now write loadbalancing rule
 	var elements []string
 	for i, ep := range endpoints {
 		epInfo, ok := ep.(*endpointInfo)
@@ -1799,12 +1777,53 @@ func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, s
 		}
 
 		elements = append(elements,
+			strconv.Itoa(i), ":", epInfo.IP(), ".", strconv.Itoa(epInfo.Port()),
+		)
+		if i != len(endpoints)-1 {
+			elements = append(elements, ",")
+		}
+	}
+	tx.Add(&knftables.Rule{
+		Chain: svcChain,
+		Rule: knftables.Concat(
+			"meta l4proto", strings.ToLower(string(svcInfo.Protocol())),
+			"dnat", ipX, "addr . port to",
+			"numgen random mod", len(endpoints), "map",
+			"{", elements, "}",
+		),
+	})
+}
+
+func (proxier *Proxier) writeServiceToEndpointJumps(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
+	ipX := "ip"
+	if proxier.ipFamily == v1.IPv6Protocol {
+		ipX = "ip6"
+	}
+
+	var elements []string
+	// Write the affinity rules, construct the vmap elements
+	for i, ep := range endpoints {
+		epInfo, ok := ep.(*endpointInfo)
+		if !ok {
+			continue
+		}
+
+		tx.Add(&knftables.Rule{
+			Chain: svcChain,
+			Rule: knftables.Concat(
+				ipX, "saddr", "@", epInfo.affinitySetName,
+				"goto", epInfo.chainName,
+			),
+		})
+
+		elements = append(elements,
 			strconv.Itoa(i), ":", "goto", epInfo.chainName,
 		)
 		if i != len(endpoints)-1 {
 			elements = append(elements, ",")
 		}
 	}
+	// Now write the vmap, for the case where no affinity rule matched
 	tx.Add(&knftables.Rule{
 		Chain: svcChain,
 		Rule: knftables.Concat(
