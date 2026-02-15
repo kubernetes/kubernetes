@@ -32,9 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
@@ -631,7 +633,35 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.BackoffLimitPerIndex, oldSpec.BackoffLimitPerIndex, fldPath.Child("backoffLimitPerIndex"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ManagedBy, oldSpec.ManagedBy, fldPath.Child("managedBy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SuccessPolicy, oldSpec.SuccessPolicy, fldPath.Child("successPolicy"))...)
+
+	// prevent changes to parallelism for gang-scheduled Jobs.
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+		if isGangSchedulingCandidate(oldSpec) && !ptr.Equal(spec.Parallelism, oldSpec.Parallelism) {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("parallelism"),
+				"cannot change parallelism for a gang-scheduled Job (completionMode=Indexed, completions=parallelism)"))
+		}
+	}
+
 	return allErrs
+}
+
+// isGangSchedulingCandidate returns true if the job spec meets gang scheduling criteria.
+// This is used during validation to determine if parallelism changes should be blocked.
+func isGangSchedulingCandidate(spec batch.JobSpec) bool {
+	if spec.Parallelism == nil || *spec.Parallelism <= 1 {
+		return false
+	}
+	if spec.CompletionMode == nil || *spec.CompletionMode != batch.IndexedCompletion {
+		return false
+	}
+	if spec.Completions == nil || *spec.Completions != *spec.Parallelism {
+		return false
+	}
+	// If schedulingGroup is already set, a higher-level controller manages gang scheduling.
+	if spec.Template.Spec.SchedulingGroup != nil {
+		return false
+	}
+	return true
 }
 
 func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {

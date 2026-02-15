@@ -5163,7 +5163,7 @@ func createJobControllerWithSharedInformers(tb testing.TB, restConfig *restclien
 	clientSet := clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-controller"))
 	_, ctx := ktesting.NewTestContext(tb)
 	ctx, cancel := context.WithCancel(ctx)
-	jc, err := jobcontroller.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+	jc, err := jobcontroller.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet, nil, nil)
 	if err != nil {
 		tb.Fatalf("Error creating Job controller: %v", err)
 	}
