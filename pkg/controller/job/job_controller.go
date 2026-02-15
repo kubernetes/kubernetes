@@ -27,6 +27,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,11 +39,13 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -112,6 +115,13 @@ type Controller struct {
 	// podIndexer allows looking up pods by ControllerRef UID
 	podIndexer cache.Indexer
 
+	// Workload/PodGroup listers and synced checks for workload APIs.
+	// These are nil when the feature gate is disabled.
+	workloadLister     schedulinglisters.WorkloadLister
+	podGroupLister     schedulinglisters.PodGroupLister
+	workloadStoreSynced cache.InformerSynced
+	podGroupStoreSynced cache.InformerSynced
+
 	// Jobs that need to be updated
 	queue workqueue.TypedRateLimitingInterface[string]
 
@@ -148,6 +158,9 @@ type syncJobCtx struct {
 	podsWithDelayedDeletionPerIndex map[int]*v1.Pod
 	terminating                     *int32
 	ready                           int32
+
+	// nil when the Job does not qualify or the feature is disabled.
+	podGroup *schedulingv1alpha2.PodGroup
 }
 
 type orphanPodKeyKind int
@@ -169,11 +182,16 @@ type orphanPodKey struct {
 
 // NewController creates a new Job controller that keeps the relevant pods
 // in sync with their corresponding Job objects.
-func NewController(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) (*Controller, error) {
-	return newControllerWithClock(ctx, podInformer, jobInformer, kubeClient, &clock.RealClock{})
+// workloadInformer and podGroupInformer are optional and should be provided when
+// the EnableWorkloadWithJob feature gate is enabled.
+func NewController(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, workloadInformer schedulinginformers.WorkloadInformer, podGroupInformer schedulinginformers.PodGroupInformer) (*Controller, error) {
+	return newControllerWithClock(ctx, podInformer, jobInformer, kubeClient, &clock.RealClock{}, workloadInformer, podGroupInformer)
 }
 
-func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, clock clock.WithTicker) (*Controller, error) {
+func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodInformer, 
+	jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, clock clock.WithTicker, 
+	workloadInformer schedulinginformers.WorkloadInformer, podGroupInformer schedulinginformers.PodGroupInformer,
+	) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 
@@ -236,6 +254,13 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 	jm.patchJobHandler = jm.patchJob
 	jm.syncHandler = jm.syncJob
 
+	// setup Workload and PodGroup informers.
+	if workloadInformer != nil && podGroupInformer != nil {
+		if err := jm.addSchedulingInformers(logger, workloadInformer, podGroupInformer); err != nil {
+			return nil, err
+		}
+	}
+
 	metrics.Register()
 
 	return jm, nil
@@ -261,7 +286,14 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 		wg.Wait()
 	}()
 
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, jm.podStoreSynced, jm.jobStoreSynced) {
+	syncFuncs := []cache.InformerSynced{jm.podStoreSynced, jm.jobStoreSynced}
+	if jm.workloadStoreSynced != nil {
+		syncFuncs = append(syncFuncs, jm.workloadStoreSynced)
+	}
+	if jm.podGroupStoreSynced != nil {
+		syncFuncs = append(syncFuncs, jm.podGroupStoreSynced)
+	}
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, syncFuncs...) {
 		return
 	}
 
@@ -908,6 +940,17 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	if err != nil {
 		return err
 	}
+
+	// ensure Workload and PodGroup exist for eligible Jobs.
+	// This must happen before pod management so that pods can reference the PodGroup.
+	var podGroup *schedulingv1alpha2.PodGroup
+	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) && jm.workloadLister != nil {
+		podGroup, err = jm.ensureWorkloadAndPodGroup(ctx, &job, pods)
+		if err != nil {
+			return fmt.Errorf("ensuring Workload and PodGroup for Job %s/%s: %w", job.Namespace, job.Name, err)
+		}
+	}
+
 	activePods := controller.FilterActivePods(logger, pods)
 	jobCtx := &syncJobCtx{
 		job:                  &job,
@@ -916,6 +959,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		ready:                countReadyPods(activePods),
 		uncounted:            newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods),
 		expectedRmFinalizers: jm.finalizerExpectations.getExpectedUIDs(key),
+		podGroup:             podGroup,
 	}
 	if trackTerminatingPods(&job) {
 		jobCtx.terminating = ptr.To(controller.CountTerminatingPods(pods))
@@ -1765,6 +1809,21 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 			addCompletionIndexEnvVariables(podTemplate)
 		}
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
+
+		// set schedulingGroup and PodGroup ownerRef for eligible Jobs.
+		if jobCtx.podGroup != nil {
+			pg := jobCtx.podGroup
+			podTemplate.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+				PodGroupName: &pg.Name,
+			}
+			podTemplate.OwnerReferences = append(podTemplate.OwnerReferences,
+				metav1.OwnerReference{
+					APIVersion: pg.APIVersion,
+					Kind:       pg.Kind,
+					Name:       pg.Name,
+					UID:        pg.UID,
+				})
+		}
 
 		// Counters for pod creation status (used by the job_pods_creation_total metric)
 		var creationsSucceeded, creationsFailed int32 = 0, 0

@@ -743,6 +743,13 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(workloadColumnDefinitions, printWorkload)
 	_ = h.TableHandler(workloadColumnDefinitions, printWorkloadList)
+
+	podGroupColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroup)
+	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroupList)
 }
 
 // Pass ports=nil for all ports.
@@ -3342,6 +3349,29 @@ func printWorkloadList(list *scheduling.WorkloadList, options printers.GenerateO
 	}
 	return rows, nil
 }
+
+func printPodGroup(obj *scheduling.PodGroup, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printPodGroupList(list *scheduling.PodGroupList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPodGroup(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
 func printBoolPtr(value *bool) string {
 	if value != nil {
 		return printBool(*value)

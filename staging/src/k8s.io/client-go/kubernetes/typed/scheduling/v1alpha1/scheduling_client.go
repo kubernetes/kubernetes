@@ -29,7 +29,6 @@ import (
 type SchedulingV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	PriorityClassesGetter
-	WorkloadsGetter
 }
 
 // SchedulingV1alpha1Client is used to interact with features provided by the scheduling.k8s.io group.
@@ -39,10 +38,6 @@ type SchedulingV1alpha1Client struct {
 
 func (c *SchedulingV1alpha1Client) PriorityClasses() PriorityClassInterface {
 	return newPriorityClasses(c)
-}
-
-func (c *SchedulingV1alpha1Client) Workloads(namespace string) WorkloadInterface {
-	return newWorkloads(c, namespace)
 }
 
 // NewForConfig creates a new SchedulingV1alpha1Client for the given config.

@@ -30,7 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -532,9 +532,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "Workload events disabled",
+			name: "PodGroup events disabled",
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
-				fwk.Workload: fwk.Add,
+				fwk.PodGroup: fwk.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -544,9 +544,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "Workload events enabled",
+			name: "PodGroup events enabled",
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
-				fwk.Workload: fwk.Add,
+				fwk.PodGroup: fwk.Add,
 			},
 			enableDRA:             true,
 			enableGenericWorkload: true,
@@ -556,7 +556,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Namespace{}):              true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
 				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-				reflect.TypeOf(&schedulingapi.Workload{}):    true,
+				reflect.TypeOf(&schedulingapi.PodGroup{}):    true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},

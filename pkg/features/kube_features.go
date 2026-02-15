@@ -331,6 +331,12 @@ const (
 	// Enables support for generic Workload API.
 	GenericWorkload featuregate.Feature = "GenericWorkload"
 
+	// owner: @helayoty @mm4tt @wojtek-t
+	//
+	// Enables the Job controller to automatically create Workload and PodGroup
+	// objects for Jobs that qualify for gang scheduling.
+	EnableWorkloadWithJob featuregate.Feature = "EnableWorkloadWithJob"
+
 	// owner: @vinayakankugoyal @thockin
 	//
 	// Controls if the gitRepo volume plugin is supported or not.
@@ -1292,6 +1298,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	EnableWorkloadWithJob: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	GitRepoVolumeDriver: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
@@ -2193,6 +2203,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	GangScheduling: {GenericWorkload},
 
 	GenericWorkload: {},
+
+	EnableWorkloadWithJob: {GenericWorkload},
 
 	GitRepoVolumeDriver: {},
 

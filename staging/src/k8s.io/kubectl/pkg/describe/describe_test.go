@@ -620,7 +620,7 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 	}
 }
 
-func TestDescribePodWorkloadReference(t *testing.T) {
+func TestDescribePodSchedulingGroup(t *testing.T) {
 	testCases := []struct {
 		name     string
 		pod      *corev1.Pod
@@ -633,15 +633,13 @@ func TestDescribePodWorkloadReference(t *testing.T) {
 					Name: "bar",
 				},
 				Spec: corev1.PodSpec{
-					WorkloadRef: &corev1.WorkloadReference{
-						Name:     "workload",
-						PodGroup: "pg",
+					SchedulingGroup: &corev1.PodSchedulingGroup{
+						PodGroupName: ptr.To("pg"),
 					},
 				},
 			},
-			expected: `WorkloadRef:
-  Name:      workload
-  PodGroup:  pg`,
+			expected: `SchedulingGroup:
+  PodGroupName:  pg`,
 		},
 		{
 			name: "test2",
@@ -650,17 +648,13 @@ func TestDescribePodWorkloadReference(t *testing.T) {
 					Name: "bar",
 				},
 				Spec: corev1.PodSpec{
-					WorkloadRef: &corev1.WorkloadReference{
-						Name:               "workload",
-						PodGroup:           "pg",
-						PodGroupReplicaKey: "pg1",
+					SchedulingGroup: &corev1.PodSchedulingGroup{
+						PodGroupName: ptr.To("pg"),
 					},
 				},
 			},
-			expected: `WorkloadRef:
-  Name:                workload
-  PodGroup:            pg
-  PodGroupReplicaKey:  pg1`,
+			expected: `SchedulingGroup:
+  PodGroupName:  pg`,
 		},
 	}
 	for _, tc := range testCases {

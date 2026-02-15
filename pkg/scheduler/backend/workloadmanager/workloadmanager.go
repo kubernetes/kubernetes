@@ -62,13 +62,13 @@ func New(logger klog.Logger) *workloadManager {
 // AddPod adds a pod to the workload manager if it has a workload reference.
 // Pod is added to the available pods set for its corresponding pod group.
 func (wm *workloadManager) AddPod(pod *v1.Pod) {
-	if pod.Spec.WorkloadRef == nil {
+	if pod.Spec.SchedulingGroup == nil {
 		return
 	}
 	wm.lock.Lock()
 	defer wm.lock.Unlock()
 
-	key := newPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
+	key := newPodGroupKey(pod.Namespace, pod.Spec.SchedulingGroup)
 	state, ok := wm.podGroupStates[key]
 	if !ok {
 		state = newPodGroupState()
@@ -80,13 +80,13 @@ func (wm *workloadManager) AddPod(pod *v1.Pod) {
 // UpdatePod updates a pod in the workload manager if it has a workload reference.
 // Note: The current implementation assumes that newPod.Spec.Workload is immutable.
 func (wm *workloadManager) UpdatePod(oldPod, newPod *v1.Pod) {
-	if newPod.Spec.WorkloadRef == nil {
+	if newPod.Spec.SchedulingGroup == nil {
 		return
 	}
 	wm.lock.Lock()
 	defer wm.lock.Unlock()
 
-	key := newPodGroupKey(newPod.Namespace, newPod.Spec.WorkloadRef)
+	key := newPodGroupKey(newPod.Namespace, newPod.Spec.SchedulingGroup)
 	state, ok := wm.podGroupStates[key]
 	if !ok {
 		// Shouldn't happen, but handling this case gracefully.
@@ -102,13 +102,13 @@ func (wm *workloadManager) UpdatePod(oldPod, newPod *v1.Pod) {
 // DeletePod removes a pod from the workload manager if it has a workload reference.
 // Pod is removed from the pods sets for its corresponding pod group.
 func (wm *workloadManager) DeletePod(pod *v1.Pod) {
-	if pod.Spec.WorkloadRef == nil {
+	if pod.Spec.SchedulingGroup == nil {
 		return
 	}
 	wm.lock.Lock()
 	defer wm.lock.Unlock()
 
-	key := newPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
+	key := newPodGroupKey(pod.Namespace, pod.Spec.SchedulingGroup)
 	state, ok := wm.podGroupStates[key]
 	if !ok {
 		// The pod group may have already been cleaned up, or the pod was never added.
@@ -122,11 +122,11 @@ func (wm *workloadManager) DeletePod(pod *v1.Pod) {
 }
 
 // PodGroupState returns the runtime state of a pod group.
-func (wm *workloadManager) PodGroupState(namespace string, workloadRef *v1.WorkloadReference) (fwk.PodGroupState, error) {
+func (wm *workloadManager) PodGroupState(namespace string, schedulingGroup *v1.PodSchedulingGroup) (fwk.PodGroupState, error) {
 	wm.lock.RLock()
 	defer wm.lock.RUnlock()
 
-	state, ok := wm.podGroupStates[newPodGroupKey(namespace, workloadRef)]
+	state, ok := wm.podGroupStates[newPodGroupKey(namespace, schedulingGroup)]
 	if !ok {
 		return nil, fmt.Errorf("internal pod group state doesn't exist for a pod's workload")
 	}

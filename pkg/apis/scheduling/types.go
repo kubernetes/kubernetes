@@ -122,8 +122,8 @@ type WorkloadList struct {
 	Items []Workload
 }
 
-// WorkloadMaxPodGroups is the maximum number of pod groups per Workload.
-const WorkloadMaxPodGroups = 8
+// WorkloadMaxPodGroupTemplates is the maximum number of pod group templates per Workload.
+const WorkloadMaxPodGroupTemplates = 8
 
 // WorkloadSpec defines the desired state of a Workload.
 type WorkloadSpec struct {
@@ -135,13 +135,13 @@ type WorkloadSpec struct {
 	// +optional
 	ControllerRef *TypedLocalObjectReference
 
-	// PodGroups is the list of pod groups that make up the Workload.
-	// The maximum number of pod groups is 8. This field is immutable.
+	// PodGroupTemplates is the list of templates that make up the Workload.
+	// The maximum number of templates is 8. This field is immutable.
 	//
 	// +required
 	// +listType=map
 	// +listMapKey=name
-	PodGroups []PodGroup
+	PodGroupTemplates []PodGroupTemplate
 }
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.
@@ -165,22 +165,23 @@ type TypedLocalObjectReference struct {
 	Name string
 }
 
-// PodGroup represents a set of pods with a common scheduling policy.
-type PodGroup struct {
+// PodGroupTemplate represents a template for a set of pods with a common policy.
+type PodGroupTemplate struct {
 	// Name is a unique identifier for the PodGroup within the Workload.
 	// It must be a DNS label. This field is immutable.
 	//
 	// +required
 	Name string
 
-	// Policy defines the scheduling policy for this PodGroup.
+	// SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.
 	//
 	// +required
-	Policy PodGroupPolicy
+	SchedulingPolicy PodGroupSchedulingPolicy
 }
 
-// PodGroupPolicy defines the scheduling configuration for a PodGroup.
-type PodGroupPolicy struct {
+// PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
+// +union
+type PodGroupSchedulingPolicy struct {
 	// Basic specifies that the pods in this group should be scheduled using
 	// standard Kubernetes scheduling behavior.
 	//
@@ -213,4 +214,94 @@ type GangSchedulingPolicy struct {
 	//
 	// +required
 	MinCount int32
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodGroup represents a runtime instance of pods grouped for gang scheduling.
+// PodGroups are created by workload controllers (Job, LWS, JobSet, etc...) from
+// Workload.podGroupTemplates. Each PodGroup corresponds to one replica of the Workload.
+type PodGroup struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// Name must be a DNS subdomain.
+	//
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec defines the desired state of the PodGroup.
+	//
+	// +required
+	Spec PodGroupSpec
+
+	// Status represents the current observed state of the PodGroup.
+	//
+	// +optional
+	Status PodGroupStatus
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodGroupList contains a list of PodGroup resources.
+type PodGroupList struct {
+	metav1.TypeMeta
+	// Standard list metadata.
+	//
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of PodGroups.
+	Items []PodGroup
+}
+
+// PodGroupSpec defines the desired state of a PodGroup.
+type PodGroupSpec struct {
+	// PodGroupTemplateRef references the PodGroupTemplate within the Workload object that was used to create
+	// the PodGroup.
+	//
+	// +optional
+	PodGroupTemplateRef *PodGroupTemplateReference
+
+	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
+	// It is copied from the template on PodGroup creation.
+	//
+	// +required
+	SchedulingPolicy PodGroupSchedulingPolicy
+}
+
+// PodGroupStatus represents information about the status of a pod group.
+type PodGroupStatus struct {
+	// Conditions represent the latest observations of the PodGroup's state.
+	//
+	// Known condition types:
+	// - "PodGroupScheduled": Indicates whether the scheduling requirement has been satisfied.
+	//   - Status=True: All required pods have been assigned to nodes.
+	//   - Status=False: Scheduling failed (i.e., timeout, unschedulable, etc.).
+	//
+	// Known reasons for PodGroupScheduled condition:
+	// - "Scheduled": All required pods have been successfully scheduled.
+	// - "Unschedulable": The PodGroup cannot be scheduled due to resource constraints,
+	//   affinity/anti-affinity rules, or insufficient capacity for the gang.
+	// - "Preempted": The PodGroup was preempted to make room for higher-priority workloads.
+	// - "Timeout": The PodGroup failed to schedule within the configured timeout.
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition
+}
+
+// PodGroupTemplateReference references the PodGroupTemplate within the Workload object.
+type PodGroupTemplateReference struct {
+	// WorkloadName defines the name of the Workload object.
+	//
+	// +optional
+	WorkloadName string
+
+	// PodGroupTemplateName defines the PodGroupTemplate name within the Workload object.
+	//
+	// +optional
+	PodGroupTemplateName string
 }

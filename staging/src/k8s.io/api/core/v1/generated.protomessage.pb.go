@@ -333,6 +333,8 @@ func (*PodResourceClaimStatus) ProtoMessage() {}
 
 func (*PodSchedulingGate) ProtoMessage() {}
 
+func (*PodSchedulingGroup) ProtoMessage() {}
+
 func (*PodSecurityContext) ProtoMessage() {}
 
 func (*PodSignature) ProtoMessage() {}
@@ -498,5 +500,3 @@ func (*VsphereVirtualDiskVolumeSource) ProtoMessage() {}
 func (*WeightedPodAffinityTerm) ProtoMessage() {}
 
 func (*WindowsSecurityContextOptions) ProtoMessage() {}
-
-func (*WorkloadReference) ProtoMessage() {}
