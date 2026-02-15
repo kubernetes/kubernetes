@@ -123,6 +123,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "token"
+        ],
         "type": "object"
       },
       "io.k8s.api.authentication.v1.TokenReviewStatus": {

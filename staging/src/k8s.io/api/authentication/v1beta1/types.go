@@ -42,6 +42,7 @@ type TokenReview struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated
+	// +required
 	Spec TokenReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the token can be authenticated.
@@ -52,7 +53,7 @@ type TokenReview struct {
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
 	// token is the opaque bearer token.
-	// +optional
+	// +required
 	Token string `json:"token,omitempty" protobuf:"bytes,1,opt,name=token"`
 	// audiences is a list of the identifiers that the resource server presented
 	// with the token identifies as. Audience-aware token authenticators will
@@ -134,6 +135,7 @@ type SelfSubjectReview struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// status is filled in by the server with the user attributes.
+	// +optional
 	Status SelfSubjectReviewStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 }
 

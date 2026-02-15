@@ -11996,7 +11996,6 @@ func schema_k8sio_api_authentication_v1_TokenRequest(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -12045,7 +12044,6 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"audiences"},
 			},
 		},
 		Dependencies: []string{
@@ -12075,7 +12073,6 @@ func schema_k8sio_api_authentication_v1_TokenRequestStatus(ref common.ReferenceC
 						},
 					},
 				},
-				Required: []string{"token", "expirationTimestamp"},
 			},
 		},
 		Dependencies: []string{
@@ -12169,6 +12166,7 @@ func schema_k8sio_api_authentication_v1_TokenReviewSpec(ref common.ReferenceCall
 						},
 					},
 				},
+				Required: []string{"token"},
 			},
 		},
 	}
@@ -12516,6 +12514,7 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref common.Referenc
 						},
 					},
 				},
+				Required: []string{"token"},
 			},
 		},
 	}
