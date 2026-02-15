@@ -251,3 +251,20 @@ func TestLatency(t *testing.T) {
 		})
 	}
 }
+
+func TestDataKeyGenerationFailure(t *testing.T) {
+	RegisterMetrics()
+	dataKeyGenerationFailuresTotal.Reset()
+
+	RecordDataKeyGeneration(time.Unix(0, 0), errors.New("data key generation failed"))
+	defer dataKeyGenerationFailuresTotal.Reset()
+
+	want := `
+		# HELP apiserver_storage_data_key_generation_failures_total [BETA] Total number of failed data encryption key(DEK) generation operations.
+		# TYPE apiserver_storage_data_key_generation_failures_total counter
+		apiserver_storage_data_key_generation_failures_total 1
+	`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "apiserver_storage_data_key_generation_failures_total"); err != nil {
+		t.Fatal(err)
+	}
+}
