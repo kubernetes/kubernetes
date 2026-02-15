@@ -3566,7 +3566,8 @@
         }
       },
       "required": [
-        "spec"
+        "spec",
+        "status"
       ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
@@ -3699,6 +3700,9 @@
           "description": "status is the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only."
         }
       },
+      "required": [
+        "status"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -3778,7 +3782,6 @@
       },
       "required": [
         "name",
-        "current",
         "container"
       ],
       "type": "object"
@@ -3836,8 +3839,7 @@
         }
       },
       "required": [
-        "metric",
-        "current"
+        "metric"
       ],
       "type": "object"
     },
@@ -4262,7 +4264,6 @@
       },
       "required": [
         "metric",
-        "current",
         "describedObject"
       ],
       "type": "object"
@@ -4298,8 +4299,7 @@
         }
       },
       "required": [
-        "metric",
-        "current"
+        "metric"
       ],
       "type": "object"
     },
@@ -4334,8 +4334,7 @@
         }
       },
       "required": [
-        "name",
-        "current"
+        "name"
       ],
       "type": "object"
     },

@@ -56,7 +56,6 @@
         },
         "required": [
           "name",
-          "current",
           "container"
         ],
         "type": "object"
@@ -136,8 +135,7 @@
           }
         },
         "required": [
-          "metric",
-          "current"
+          "metric"
         ],
         "type": "object"
       },
@@ -737,7 +735,6 @@
         },
         "required": [
           "metric",
-          "current",
           "describedObject"
         ],
         "type": "object"
@@ -793,8 +790,7 @@
           }
         },
         "required": [
-          "metric",
-          "current"
+          "metric"
         ],
         "type": "object"
       },
@@ -841,8 +837,7 @@
           }
         },
         "required": [
-          "name",
-          "current"
+          "name"
         ],
         "type": "object"
       },
