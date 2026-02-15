@@ -601,6 +601,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.26"
+- name: EvictionRequestAPI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: ExecProbeTimeout
   versionedSpecs:
   - default: true
