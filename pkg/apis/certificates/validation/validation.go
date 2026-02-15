@@ -188,7 +188,7 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 		allErrs = append(allErrs, field.Invalid(specPath.Child("request"), csr.Spec.Request, fmt.Sprintf("%v", err)))
 	}
 	if len(csr.Spec.Usages) == 0 {
-		allErrs = append(allErrs, field.Required(specPath.Child("usages"), ""))
+		allErrs = append(allErrs, field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative())
 	}
 	if !opts.allowUnknownUsages {
 		for i, usage := range csr.Spec.Usages {
@@ -209,7 +209,13 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	if !opts.allowLegacySignerName && csr.Spec.SignerName == certificates.LegacyUnknownSignerName {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("signerName"), csr.Spec.SignerName, "the legacy signerName is not allowed via this API version"))
 	} else {
-		allErrs = append(allErrs, apivalidation.ValidateSignerName(specPath.Child("signerName"), csr.Spec.SignerName)...)
+		for _, err := range apivalidation.ValidateSignerName(specPath.Child("signerName"), csr.Spec.SignerName) {
+			if err.Type == field.ErrorTypeRequired {
+				allErrs = append(allErrs, err.MarkCoveredByDeclarative())
+			} else {
+				allErrs = append(allErrs, err)
+			}
+		}
 	}
 	if csr.Spec.ExpirationSeconds != nil && *csr.Spec.ExpirationSeconds < 600 {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), *csr.Spec.ExpirationSeconds, "may not specify a duration less than 600 seconds (10 minutes)"))
