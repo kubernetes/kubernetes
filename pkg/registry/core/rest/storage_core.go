@@ -534,7 +534,7 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		}()
 		select {
 		case <-done:
-		case <-time.After(time.Minute):
+		case <-context.Done():
 			return goerrors.New("unable to perform initial IP and Port allocation check")
 		}
 
