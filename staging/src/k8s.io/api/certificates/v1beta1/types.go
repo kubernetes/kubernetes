@@ -42,6 +42,7 @@ type CertificateSigningRequest struct {
 	// spec contains the certificate request, and is immutable after creation.
 	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
 	// Other fields are derived by Kubernetes and cannot be modified by users.
+	// +required
 	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Derived information about the request.
@@ -52,6 +53,7 @@ type CertificateSigningRequest struct {
 // CertificateSigningRequestSpec contains the certificate request.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
+	// +required
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// Requested signer for the request. It is a qualified name in the form:
@@ -119,6 +121,7 @@ type CertificateSigningRequestSpec struct {
 	//  "ocsp signing",
 	//  "microsoft sgc",
 	//  "netscape sgc"
+	// +optional
 	// +listType=atomic
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
@@ -201,6 +204,7 @@ const (
 
 type CertificateSigningRequestCondition struct {
 	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
+	// +required
 	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
 	// Status of the condition, one of True, False, Unknown.
 	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
@@ -299,6 +303,7 @@ type ClusterTrustBundle struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec contains the signer (if any) and trust anchors.
+	// +required
 	Spec ClusterTrustBundleSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -337,6 +342,7 @@ type ClusterTrustBundleSpec struct {
 	// Users of ClusterTrustBundles, including Kubelet, are free to reorder and
 	// deduplicate certificate blocks in this file according to their own logic,
 	// as well as to drop PEM block headers and inter-block data.
+	// +required
 	TrustBundle string `json:"trustBundle" protobuf:"bytes,2,opt,name=trustBundle"`
 }
 
@@ -506,6 +512,7 @@ type PodCertificateRequestSpec struct {
 	// setting a status.conditions entry with a type of "Denied" and a reason of
 	// "UnsupportedKeyType". It may also suggest a key type that it does support
 	// in the message field.
+	// +required
 	StubPKCS10Request []byte `json:"stubPKCS10Request" protobuf:"bytes,12,opt,name=stubPKCS10Request"`
 
 	// unverifiedUserAnnotations allow pod authors to pass additional information to
@@ -518,6 +525,7 @@ type PodCertificateRequestSpec struct {
 	//
 	// Signers should document the keys and values they support.  Signers should
 	// deny requests that contain keys they do not recognize.
+	// +optional
 	UnverifiedUserAnnotations map[string]string `json:"unverifiedUserAnnotations,omitempty" protobuf:"bytes,11,opt,name=unverifiedUserAnnotations"`
 }
 

@@ -39,6 +39,7 @@ message CertificateSigningRequest {
   // spec contains the certificate request, and is immutable after creation.
   // Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
   // Other fields are derived by Kubernetes and cannot be modified by users.
+  // +required
   optional CertificateSigningRequestSpec spec = 2;
 
   // Derived information about the request.
@@ -48,6 +49,7 @@ message CertificateSigningRequest {
 
 message CertificateSigningRequestCondition {
   // type of the condition. Known conditions include "Approved", "Denied", and "Failed".
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
@@ -86,6 +88,7 @@ message CertificateSigningRequestList {
 // CertificateSigningRequestSpec contains the certificate request.
 message CertificateSigningRequestSpec {
   // Base64-encoded PKCS#10 CSR data
+  // +required
   optional bytes request = 1;
 
   // Requested signer for the request. It is a qualified name in the form:
@@ -153,6 +156,7 @@ message CertificateSigningRequestSpec {
   //  "ocsp signing",
   //  "microsoft sgc",
   //  "netscape sgc"
+  // +optional
   // +listType=atomic
   repeated string usages = 5;
 
@@ -217,6 +221,7 @@ message ClusterTrustBundle {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec contains the signer (if any) and trust anchors.
+  // +required
   optional ClusterTrustBundleSpec spec = 2;
 }
 
@@ -266,6 +271,7 @@ message ClusterTrustBundleSpec {
   // Users of ClusterTrustBundles, including Kubelet, are free to reorder and
   // deduplicate certificate blocks in this file according to their own logic,
   // as well as to drop PEM block headers and inter-block data.
+  // +required
   optional string trustBundle = 2;
 }
 
@@ -435,6 +441,7 @@ message PodCertificateRequestSpec {
   // setting a status.conditions entry with a type of "Denied" and a reason of
   // "UnsupportedKeyType". It may also suggest a key type that it does support
   // in the message field.
+  // +required
   optional bytes stubPKCS10Request = 12;
 
   // unverifiedUserAnnotations allow pod authors to pass additional information to
@@ -447,6 +454,7 @@ message PodCertificateRequestSpec {
   //
   // Signers should document the keys and values they support.  Signers should
   // deny requests that contain keys they do not recognize.
+  // +optional
   map<string, string> unverifiedUserAnnotations = 11;
 }
 
