@@ -6734,3 +6734,97 @@ func TestDropDisabledPodStatusFields_InPlacePodLevelResourcesVerticalScaling(t *
 		})
 	}
 }
+
+func TestDisableEvictionInterceptors(t *testing.T) {
+	podWithInterceptors := &api.Pod{
+		Spec: api.PodSpec{
+			EvictionInterceptors: []api.EvictionInterceptor{
+				{Name: "graceful-eviction.raspberry.io"},
+			},
+		},
+	}
+	podWithoutInterceptors := &api.Pod{
+		Spec: api.PodSpec{},
+	}
+
+	tests := []struct {
+		name    string
+		enabled bool
+		oldPod  *api.Pod
+		newPod  *api.Pod
+		wantPod *api.Pod
+	}{
+		{
+			name:    "old with interceptors / new with interceptors / disabled",
+			oldPod:  podWithInterceptors,
+			newPod:  podWithInterceptors,
+			wantPod: podWithInterceptors,
+		},
+		{
+			name:    "old without interceptors / new with interceptors / disabled",
+			oldPod:  podWithoutInterceptors,
+			newPod:  podWithInterceptors,
+			wantPod: podWithoutInterceptors,
+		},
+		{
+			name:    "old with interceptors / new without interceptors / disabled",
+			oldPod:  podWithInterceptors,
+			newPod:  podWithoutInterceptors,
+			wantPod: podWithoutInterceptors,
+		},
+		{
+			name:    "old without interceptors / new without interceptors / disabled",
+			oldPod:  podWithoutInterceptors,
+			newPod:  podWithoutInterceptors,
+			wantPod: podWithoutInterceptors,
+		},
+		{
+			name:    "old with interceptors / new with interceptors / enabled",
+			enabled: true,
+			oldPod:  podWithInterceptors,
+			newPod:  podWithInterceptors,
+			wantPod: podWithInterceptors,
+		},
+		{
+			name:    "old without interceptors / new with interceptors / enabled",
+			enabled: true,
+			oldPod:  podWithoutInterceptors,
+			newPod:  podWithInterceptors,
+			wantPod: podWithInterceptors,
+		},
+		{
+			name:    "old with interceptors / new without interceptors / enabled",
+			enabled: true,
+			oldPod:  podWithInterceptors,
+			newPod:  podWithoutInterceptors,
+			wantPod: podWithoutInterceptors,
+		},
+		{
+			name:    "old without interceptors / new without interceptors / enabled",
+			enabled: true,
+			oldPod:  podWithoutInterceptors,
+			newPod:  podWithoutInterceptors,
+			wantPod: podWithoutInterceptors,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvictionRequestAPI, tc.enabled)
+
+			oldPod := tc.oldPod.DeepCopy()
+			newPod := tc.newPod.DeepCopy()
+			wantPod := tc.wantPod
+			DropDisabledPodFields(newPod, oldPod)
+
+			// Old pod should be never changed
+			if diff := cmp.Diff(oldPod, tc.oldPod); diff != "" {
+				t.Errorf("Old pod changed (-want,+got): %s", diff)
+			}
+
+			if diff := cmp.Diff(wantPod, newPod); diff != "" {
+				t.Errorf("New pod changed (-want,+got): %s", diff)
+			}
+		})
+	}
+}
