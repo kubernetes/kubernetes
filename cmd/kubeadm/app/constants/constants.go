@@ -210,6 +210,11 @@ const (
 	// built-in ClusterRole.
 	ClusterAdminsGroupAndClusterRoleBinding = "kubeadm:cluster-admins"
 
+	// KubeletAPIAdminClusterRoleBindingName is the name of the ClusterRoleBinding for the apiserver kubelet client
+	KubeletAPIAdminClusterRoleBindingName = "kubeadm:apiserver-kubelet-client"
+	// KubeletAPIAdminClusterRoleName is the name of the built-in ClusterRole for kubelet API access
+	KubeletAPIAdminClusterRoleName = "system:kubelet-api-admin"
+
 	// KubernetesAPICallTimeout specifies how long kubeadm should wait for API calls
 	KubernetesAPICallTimeout = 1 * time.Minute
 	// KubernetesAPICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
