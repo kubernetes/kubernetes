@@ -663,6 +663,8 @@ spec:
           subPath: subPathValue
           subPathExpr: subPathExprValue
         workingDir: workingDirValue
+      evictionInterceptors:
+      - name: nameValue
       hostAliases:
       - hostnames:
         - hostnamesValue

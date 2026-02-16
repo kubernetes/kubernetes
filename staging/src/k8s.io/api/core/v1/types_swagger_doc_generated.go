@@ -766,6 +766,15 @@ func (EventSource) SwaggerDoc() map[string]string {
 	return map_EventSource
 }
 
+var map_EvictionInterceptor = map[string]string{
+	"":     "EvictionInterceptor allows you to identify the interceptor responding to the EvictionRequest. Interceptors should observe and communicate through the EvictionRequest API to help with the graceful eviction of a target (e.g. termination of a pod).",
+	"name": "Name must be a fully qualified domain name of at most 253 characters in length, consisting only of lowercase alphanumeric characters, periods and hyphens (e.g. bar.example.com). This field must be unique for each interceptor. This field is required.",
+}
+
+func (EvictionInterceptor) SwaggerDoc() map[string]string {
+	return map_EvictionInterceptor
+}
+
 var map_ExecAction = map[string]string{
 	"":        "ExecAction describes a \"run in container\" action.",
 	"command": "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.",
@@ -1934,6 +1943,7 @@ var map_PodSpec = map[string]string{
 	"resources":                     "Resources is the total amount of CPU and Memory resources required by all containers in the pod. It supports specifying Requests and Limits for \"cpu\", \"memory\" and \"hugepages-\" resource names only. ResourceClaims are not supported.\n\nThis field enables fine-grained control over resource allocation for the entire pod, allowing resource sharing among containers in a pod.\n\nThis is an alpha field and requires enabling the PodLevelResources feature gate.",
 	"hostnameOverride":              "HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod. This field only specifies the pod's hostname and does not affect its DNS records. When this field is set to a non-empty string: - It takes precedence over the values set in `hostname` and `subdomain`. - The Pod's hostname will be set to this value. - `setHostnameAsFQDN` must be nil or set to false. - `hostNetwork` must be set to false.\n\nThis field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters. Requires the HostnameOverride feature gate to be enabled.",
 	"workloadRef":                   "WorkloadRef provides a reference to the Workload object that this Pod belongs to. This field is used by the scheduler to identify the PodGroup and apply the correct group scheduling policies. The Workload object referenced by this field may not exist at the time the Pod is created. This field is immutable, but a Workload object with the same name may be recreated with different policies. Doing this during pod scheduling may result in the placement not conforming to the expected policies.",
+	"evictionInterceptors":          "EvictionInterceptors reference interceptors that respond to EvictionRequests. Interceptors should observe and communicate through the EvictionRequest API to help with the graceful termination of a pod. The interceptors are selected sequentially, in the order in which they appear in the list.\n\nInterceptors should periodically report on an eviction progress by updating the .status.interceptors[].heartbeatTime field of the EvictionRequest object. If this field is not updated within 20 minutes, the eviction request is passed over to the next interceptor at a higher index. If there is no other interceptor, the last default imperative-eviction.k8s.io interceptor will evict the pod using the imperative Eviction API (/evict endpoint).\n\nThe maximum length of the interceptors list is 15. Interceptors are not supported when the pod is part of a workload (.spec.workloadRef is set). This field is immutable.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {

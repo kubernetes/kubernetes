@@ -7818,6 +7818,20 @@
       },
       "type": "object"
     },
+    "io.k8s.api.core.v1.EvictionInterceptor": {
+      "description": "EvictionInterceptor allows you to identify the interceptor responding to the EvictionRequest. Interceptors should observe and communicate through the EvictionRequest API to help with the graceful eviction of a target (e.g. termination of a pod).",
+      "properties": {
+        "name": {
+          "description": "Name must be a fully qualified domain name of at most 253 characters in length, consisting only of lowercase alphanumeric characters, periods and hyphens (e.g. bar.example.com). This field must be unique for each interceptor. This field is required.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object",
+      "x-kubernetes-map-type": "atomic"
+    },
     "io.k8s.api.core.v1.ExecAction": {
       "description": "ExecAction describes a \"run in container\" action.",
       "properties": {
@@ -10359,6 +10373,19 @@
           "description": "List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing pod to perform user-initiated actions such as debugging. This list cannot be specified when creating a pod, and it cannot be modified by updating the pod spec. In order to add an ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.core.v1.EphemeralContainer"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "evictionInterceptors": {
+          "description": "EvictionInterceptors reference interceptors that respond to EvictionRequests. Interceptors should observe and communicate through the EvictionRequest API to help with the graceful termination of a pod. The interceptors are selected sequentially, in the order in which they appear in the list.\n\nInterceptors should periodically report on an eviction progress by updating the .status.interceptors[].heartbeatTime field of the EvictionRequest object. If this field is not updated within 20 minutes, the eviction request is passed over to the next interceptor at a higher index. If there is no other interceptor, the last default imperative-eviction.k8s.io interceptor will evict the pod using the imperative Eviction API (/evict endpoint).\n\nThe maximum length of the interceptors list is 15. Interceptors are not supported when the pod is part of a workload (.spec.workloadRef is set). This field is immutable.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.EvictionInterceptor"
           },
           "type": "array",
           "x-kubernetes-list-map-keys": [
