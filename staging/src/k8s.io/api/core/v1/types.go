@@ -4499,6 +4499,28 @@ type PodSpec struct {
 	// +featureGate=GenericWorkload
 	// +optional
 	SchedulingGroup *PodSchedulingGroup `json:"schedulingGroup,omitempty" protobuf:"bytes,43,opt,name=schedulingGroup"`
+	// evictionResponders reference responders that react to EvictionRequests.
+	// Responders should observe and communicate through the EvictionRequest API to help with
+	// the graceful termination of a pod. The responders are selected sequentially, in the order
+	// in which they appear in the list.
+	//
+	// Responders should periodically report on an eviction progress by updating the
+	// .status.responders[].heartbeatTime field of the EvictionRequest object. If this field is
+	// not updated within 20 minutes, the eviction request is passed over to the next responder at
+	// a higher index. If there is no other responder, the last default
+	// imperative-eviction.k8s.io/evictor responder will evict the pod using the imperative
+	// Eviction API (/evict endpoint).
+	//
+	// The maximum length of the responders list is 16.
+	// Responders are not supported when the pod is part of a workload (.spec.workloadRef is set).
+	// This field can only be set on creation and is immutable afterwards.
+	// +featureGate=EvictionRequestAPI
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
@@ -5300,6 +5322,21 @@ type EphemeralContainer struct {
 	// support namespace targeting then the result of setting this field is undefined.
 	// +optional
 	TargetContainerName string `json:"targetContainerName,omitempty" protobuf:"bytes,2,opt,name=targetContainerName"`
+}
+
+// EvictionResponder allows you to specify the responder reacting to the EvictionRequest.
+// Responders should observe and communicate through the EvictionRequest API to help with
+// the graceful eviction of a target (e.g. termination of a pod).
+// +structType=atomic
+type EvictionResponder struct {
+	// name allows you to identify the responder responding to the EvictionRequest.
+	//
+	// It must be a valid domain-prefixed path (such as "acme.io/foo").
+	// Domain names *.k8s.io and *.kubernetes.io are reserved.
+	// This field must be unique for each responder.
+	// This field is required.
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

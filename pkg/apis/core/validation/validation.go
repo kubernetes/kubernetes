@@ -122,6 +122,8 @@ var allowedEphemeralContainerFields = map[string]bool{
 // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 var validOS = sets.New(core.Linux, core.Windows)
 
+const MaxPodEvictionResponders = 16
+
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -4493,6 +4495,8 @@ type PodValidationOptions struct {
 	AllowImageVolumeWithDigest bool
 	// Allow empty image volume reference for backward compatibility
 	AllowEmptyImageVolumeReference bool
+	// Forbids the use of evictionResponders if scheduling group is used
+	SchedulingGroupInUse bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4727,6 +4731,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	if spec.SchedulingGroup != nil {
 		allErrs = append(allErrs, validateSchedulingGroup(spec.SchedulingGroup, fldPath.Child("schedulingGroup"))...)
+	}
+
+	if len(spec.EvictionResponders) > 0 {
+		allErrs = append(allErrs, ValidateEvictionResponders(spec.EvictionResponders, fldPath.Child("evictionResponders"), opts)...)
 	}
 
 	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)
@@ -9745,4 +9753,31 @@ func validateVolumeStatus(volumeStatus *core.VolumeStatus, fldPath *field.Path) 
 	}
 
 	return allErrors
+}
+
+func ValidateEvictionResponders(evictionResponders []core.EvictionResponder, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if opts.SchedulingGroupInUse {
+		return append(allErrs, field.Forbidden(fldPath, "eviction responders are not supported when spec.schedulingGroup is set"))
+	}
+
+	if len(evictionResponders) > MaxPodEvictionResponders {
+		return append(allErrs, field.TooMany(fldPath, len(evictionResponders), MaxPodEvictionResponders).WithOrigin("maxItems"))
+	}
+	uniqueErrors := validate.Unique(context.TODO(), operation.Operation{}, fldPath, evictionResponders, nil,
+		func(a core.EvictionResponder, b core.EvictionResponder) bool { return a.Name == b.Name })
+
+	allErrs = append(allErrs, uniqueErrors...)
+
+	for i, responder := range evictionResponders {
+		namePath := fldPath.Index(i).Child("name")
+		if len(responder.Name) == 0 {
+			// TODO: EvictionResponder.Name should have +k8s:required once Pod moves to declarative validation
+			allErrs = append(allErrs, field.Required(namePath, ""))
+		} else {
+			allErrs = append(allErrs, validation.IsDomainPrefixedKey(namePath, responder.Name)...)
+		}
+	}
+	return allErrs
 }

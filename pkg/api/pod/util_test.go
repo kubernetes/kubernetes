@@ -7459,3 +7459,97 @@ func TestHasRestartContainerForNonSidecarInitContainer(t *testing.T) {
 		})
 	}
 }
+
+func TestDisableEvictionResponders(t *testing.T) {
+	podWithResponders := &api.Pod{
+		Spec: api.PodSpec{
+			EvictionResponders: []api.EvictionResponder{
+				{Name: "graceful-eviction.raspberry.io"},
+			},
+		},
+	}
+	podWithoutResponders := &api.Pod{
+		Spec: api.PodSpec{},
+	}
+
+	tests := []struct {
+		name    string
+		enabled bool
+		oldPod  *api.Pod
+		newPod  *api.Pod
+		wantPod *api.Pod
+	}{
+		{
+			name:    "old with responders / new with responders / disabled",
+			oldPod:  podWithResponders,
+			newPod:  podWithResponders,
+			wantPod: podWithResponders,
+		},
+		{
+			name:    "old without responders / new with responders / disabled",
+			oldPod:  podWithoutResponders,
+			newPod:  podWithResponders,
+			wantPod: podWithoutResponders,
+		},
+		{
+			name:    "old with responders / new without responders / disabled",
+			oldPod:  podWithResponders,
+			newPod:  podWithoutResponders,
+			wantPod: podWithoutResponders,
+		},
+		{
+			name:    "old without responders / new without responders / disabled",
+			oldPod:  podWithoutResponders,
+			newPod:  podWithoutResponders,
+			wantPod: podWithoutResponders,
+		},
+		{
+			name:    "old with responders / new with responders / enabled",
+			enabled: true,
+			oldPod:  podWithResponders,
+			newPod:  podWithResponders,
+			wantPod: podWithResponders,
+		},
+		{
+			name:    "old without responders / new with responders / enabled",
+			enabled: true,
+			oldPod:  podWithoutResponders,
+			newPod:  podWithResponders,
+			wantPod: podWithResponders,
+		},
+		{
+			name:    "old with responders / new without responders / enabled",
+			enabled: true,
+			oldPod:  podWithResponders,
+			newPod:  podWithoutResponders,
+			wantPod: podWithoutResponders,
+		},
+		{
+			name:    "old without responders / new without responders / enabled",
+			enabled: true,
+			oldPod:  podWithoutResponders,
+			newPod:  podWithoutResponders,
+			wantPod: podWithoutResponders,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvictionRequestAPI, tc.enabled)
+
+			oldPod := tc.oldPod.DeepCopy()
+			newPod := tc.newPod.DeepCopy()
+			wantPod := tc.wantPod
+			DropDisabledPodFields(newPod, oldPod)
+
+			// Old pod should be never changed
+			if diff := cmp.Diff(oldPod, tc.oldPod); diff != "" {
+				t.Errorf("Old pod changed (-want,+got): %s", diff)
+			}
+
+			if diff := cmp.Diff(wantPod, newPod); diff != "" {
+				t.Errorf("New pod changed (-want,+got): %s", diff)
+			}
+		})
+	}
+}

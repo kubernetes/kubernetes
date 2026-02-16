@@ -14681,6 +14681,23 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "updated restartPolicyRules",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetEvictionResponders(core.EvictionResponder{
+					Name: "foo.example.com",
+				}, core.EvictionResponder{
+					Name: "bar.example.com",
+				}),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetEvictionResponders(core.EvictionResponder{
+					Name: "foo.example.com",
+				}, core.EvictionResponder{
+					Name: "new.example.com",
+				}),
+			),
+			err:  "pod updates may not change fields other than",
+			test: "updated eviction responders",
 		},
 	}
 
@@ -23454,6 +23471,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.StartupProbe",
 		"EphemeralContainers[*].EphemeralContainerCommon.VolumeDevices[*]",
 		"EphemeralContainers[*].EphemeralContainerCommon.VolumeMounts[*]",
+		"EvictionResponders[*].Name",
 		"HostAliases",
 		"Hostname",
 		"HostnameOverride",
@@ -31025,5 +31043,170 @@ func TestValidatePodSchedulingGroup(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("Expected failure for %q", name)
 		}
+	}
+}
+
+func TestValidateEvictionResponders(t *testing.T) {
+	successCases := map[string]*core.Pod{
+		"none": podtest.MakePod("", podtest.SetEvictionResponders()),
+		"correct": podtest.MakePod("", podtest.SetEvictionResponders(
+			core.EvictionResponder{
+				Name: "foo.example.com/bar",
+			},
+		)),
+		"long": podtest.MakePod("", podtest.SetEvictionResponders(
+			core.EvictionResponder{
+				Name: "a.b.c.d.e.f.g.h.i.foo.example.com/bar",
+			},
+		)),
+		"long subdomains": podtest.MakePod("", podtest.SetEvictionResponders(
+			core.EvictionResponder{
+				Name: strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 54) + ".foo.io/bar",
+			},
+		)),
+		"numbers": podtest.MakePod("", podtest.SetEvictionResponders(
+			core.EvictionResponder{
+				Name: "5.3.5.9/bar",
+			},
+		)),
+		"multiple": podtest.MakePod("", podtest.SetEvictionResponders(
+			core.EvictionResponder{
+				Name: "foo.example.com/test",
+			}, core.EvictionResponder{
+				Name: "bar.example.com/baz",
+			},
+		)),
+	}
+	for name, pod := range successCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("field"), PodValidationOptions{})
+			if len(errs) != 0 {
+				t.Errorf("Expected success for %q: %v", name, errs)
+			}
+		})
+	}
+
+	var maxLimitResponders []core.EvictionResponder
+	for i := range 17 {
+		maxLimitResponders = append(maxLimitResponders, core.EvictionResponder{
+			Name: fmt.Sprintf("%d-foo.example.com", i),
+		})
+	}
+
+	failureCases := map[string]struct {
+		pod    *core.Pod
+		errors field.ErrorList
+	}{
+		"workload not supported": {
+			pod: podtest.MakePod("", podtest.SetEvictionResponders(
+				core.EvictionResponder{
+					Name: "foo.example.com",
+				},
+			), podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+				PodGroupName: ptr.To("blue"),
+			})),
+			errors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "evictionResponders"), "not supported"),
+			},
+		},
+		"max items": {
+			pod: podtest.MakePod("", podtest.SetEvictionResponders(maxLimitResponders...)),
+			errors: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "evictionResponders"), 17, 16),
+			},
+		},
+		"duplicate": {
+			pod: podtest.MakePod("", podtest.SetEvictionResponders(
+				core.EvictionResponder{
+					Name: "foo.example.com/test",
+				}, core.EvictionResponder{
+					Name: "bar.example.com/test",
+				}, core.EvictionResponder{
+					Name: "foo.example.com/test",
+				},
+			)),
+			errors: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "evictionResponders").Index(2), ""),
+			},
+		},
+		"empty name": {
+			pod: podtest.MakePod("", podtest.SetEvictionResponders(
+				core.EvictionResponder{
+					Name: "",
+				}, core.EvictionResponder{
+					Name: "foo.example.com/test",
+				},
+			)),
+			errors: field.ErrorList{
+				field.Required(field.NewPath("spec", "evictionResponders").Index(0).Child("name"), ""),
+			},
+		},
+		"invalid - one segment": {
+			pod: podtest.MakePod("", podtest.SetEvictionResponders(
+				core.EvictionResponder{
+					Name: "invalid",
+				},
+			)),
+			errors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "evictionResponders").Index(0).Child("name"), "", "must be a domain-prefixed key"),
+			},
+		},
+		"invalid - ends with slash": {
+			pod: podtest.MakePod("", podtest.SetEvictionResponders(
+				core.EvictionResponder{
+					Name: "invalid/",
+				},
+			)),
+			errors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "evictionResponders").Index(0).Child("name"), "", "name part must be non-empty"),
+				field.Invalid(field.NewPath("spec", "evictionResponders").Index(0).Child("name"), "", "name part must consist of alphanumeric characters"),
+			},
+		},
+
+		"invalid - starts with slash": {
+			pod: podtest.MakePod("", podtest.SetEvictionResponders(
+				core.EvictionResponder{
+					Name: "/invalid",
+				},
+			)),
+			errors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "evictionResponders").Index(0).Child("name"), "", "prefix part must be non-empty"),
+			},
+		},
+		"invalid space": {
+			pod: podtest.MakePod("", podtest.SetEvictionResponders(
+				core.EvictionResponder{
+					Name: "invalid/aa ",
+				},
+			)),
+			errors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "evictionResponders").Index(0).Child("name"), "", "name part must consist of alphanumeric characters"),
+			},
+		},
+		"invalid underscores": {
+			pod: podtest.MakePod("", podtest.SetEvictionResponders(
+				core.EvictionResponder{
+					Name: "underscores_are_bad.k8s.io/bar",
+				},
+			)),
+			errors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "evictionResponders").Index(0).Child("name"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and "),
+			},
+		},
+	}
+	for name, tc := range failureCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidatePodSpec(&tc.pod.Spec, &tc.pod.ObjectMeta, field.NewPath("spec"), PodValidationOptions{SchedulingGroupInUse: tc.pod.Spec.SchedulingGroup != nil})
+			if len(errs) == 0 {
+				t.Errorf("Expected failure")
+				return
+			}
+			if len(errs) != len(tc.errors) {
+				t.Errorf("Expected %d errors, got %d: %v", len(tc.errors), len(errs), errs)
+				return
+			}
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring()
+			matcher.Test(t, tc.errors, errs)
+		})
 	}
 }
