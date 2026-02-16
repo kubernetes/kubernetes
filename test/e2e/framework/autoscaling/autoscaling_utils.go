@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -47,6 +48,8 @@ import (
 	"k8s.io/client-go/transport/spdy"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	portforwardcmd "k8s.io/kubectl/pkg/cmd/portforward"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
@@ -205,7 +208,6 @@ func (emc *ExternalMetricsController) sendMetricRequest(ctx context.Context, act
 }
 
 func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Context, action, metricName string, params url.Values) error {
-	// Find the pod
 	pods, err := emc.clientSet.CoreV1().Pods(emc.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "name=" + emc.serviceName,
 	})
@@ -217,42 +219,35 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 	podName := pods.Items[0].Name
 
-	// Set up port-forward
 	config, err := framework.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	transport, upgrader, err := spdy.RoundTripperFor(config)
-	if err != nil {
-		return fmt.Errorf("failed to create round tripper: %w", err)
-	}
-
-	reqURL := emc.clientSet.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Namespace(emc.namespace).
-		Name(podName).
-		SubResource("portforward").
-		URL()
-
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, reqURL)
-
 	stopChan := make(chan struct{})
 	readyChan := make(chan struct{})
 
-	fw, err := portforward.New(dialer, []string{"0:6443"}, stopChan, readyChan, io.Discard, io.Discard)
-	if err != nil {
-		return fmt.Errorf("failed to create port forwarder: %w", err)
+	pf := &capturingPortForwarder{}
+	opts := portforwardcmd.PortForwardOptions{
+		Namespace:     emc.namespace,
+		PodName:       podName,
+		Config:        config,
+		PodClient:     emc.clientSet.CoreV1(),
+		RESTClient:    emc.clientSet.CoreV1().RESTClient(),
+		Address:       []string{"localhost"},
+		Ports:         []string{"0:6443"},
+		PortForwarder: pf,
+		StopChannel:   stopChan,
+		ReadyChannel:  readyChan,
 	}
 
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- fw.ForwardPorts()
+		errChan <- opts.RunPortForwardContext(ctx)
 	}()
 
 	select {
 	case <-readyChan:
-		// Ready
 	case err := <-errChan:
 		return fmt.Errorf("port-forward failed: %w", err)
 	case <-ctx.Done():
@@ -260,14 +255,12 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 	defer close(stopChan)
 
-	// Get assigned local port
-	forwardedPorts, err := fw.GetPorts()
+	forwardedPorts, err := pf.GetPorts()
 	if err != nil {
 		return fmt.Errorf("failed to get forwarded ports: %w", err)
 	}
 	localPort := forwardedPorts[0].Local
 
-	// Build URL and make request
 	requestURL := fmt.Sprintf("https://localhost:%d/%s/%s", localPort, action, metricName)
 	if len(params) > 0 {
 		requestURL += "?" + params.Encode()
@@ -292,6 +285,40 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 
 	return nil
+}
+
+type capturingPortForwarder struct {
+	forwarder portforward.PortForwarder
+}
+
+func (f *capturingPortForwarder) ForwardPorts(method string, u *url.URL, opts portforwardcmd.PortForwardOptions) error {
+	transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
+	if err != nil {
+		return err
+	}
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, u)
+	if !cmdutil.PortForwardWebsockets.IsDisabled() {
+		tunnelingDialer, err := portforward.NewSPDYOverWebsocketDialer(u, opts.Config)
+		if err != nil {
+			return err
+		}
+		dialer = portforward.NewFallbackDialer(tunnelingDialer, dialer, func(err error) bool {
+			return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+		})
+	}
+	fw, err := portforward.NewOnAddresses(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, io.Discard, io.Discard)
+	if err != nil {
+		return err
+	}
+	f.forwarder = fw
+	return fw.ForwardPorts()
+}
+
+func (f *capturingPortForwarder) GetPorts() ([]portforward.ForwardedPort, error) {
+	if f.forwarder == nil {
+		return nil, fmt.Errorf("forwarder not initialized")
+	}
+	return f.forwarder.GetPorts()
 }
 
 // RunExternalMetricsServer creates and returns an ExternalMetricsController for controlling the server
