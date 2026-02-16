@@ -526,6 +526,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.EventList{}.OpenAPIModelName():                                                                           schema_k8sio_api_core_v1_EventList(ref),
 		corev1.EventSeries{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_EventSeries(ref),
 		corev1.EventSource{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_EventSource(ref),
+		corev1.EvictionInterceptor{}.OpenAPIModelName():                                                                 schema_k8sio_api_core_v1_EvictionInterceptor(ref),
 		corev1.ExecAction{}.OpenAPIModelName():                                                                          schema_k8sio_api_core_v1_ExecAction(ref),
 		corev1.FCVolumeSource{}.OpenAPIModelName():                                                                      schema_k8sio_api_core_v1_FCVolumeSource(ref),
 		corev1.FileKeySelector{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_FileKeySelector(ref),
@@ -23140,6 +23141,33 @@ func schema_k8sio_api_core_v1_EventSource(ref common.ReferenceCallback) common.O
 	}
 }
 
+func schema_k8sio_api_core_v1_EvictionInterceptor(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionInterceptor allows you to identify the interceptor responding to the EvictionRequest. Interceptors should observe and communicate through the EvictionRequest API to help with the graceful eviction of a target (e.g. termination of a pod).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name must be a fully qualified domain name of at most 253 characters in length, consisting only of lowercase alphanumeric characters, periods and hyphens (e.g. bar.example.com). This field must be unique for each interceptor. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_ExecAction(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -28788,12 +28816,36 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Ref:         ref(corev1.WorkloadReference{}.OpenAPIModelName()),
 						},
 					},
+					"evictionInterceptors": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionInterceptors reference interceptors that respond to EvictionRequests. Interceptors should observe and communicate through the EvictionRequest API to help with the graceful termination of a pod. The interceptors are selected sequentially, in the order in which they appear in the list.\n\nInterceptors should periodically report on an eviction progress by updating the .status.interceptors[].heartbeatTime field of the EvictionRequest object. If this field is not updated within 20 minutes, the eviction request is passed over to the next interceptor at a higher index. If there is no other interceptor, the last default imperative-eviction.k8s.io interceptor will evict the pod using the imperative Eviction API (/evict endpoint).\n\nThe maximum length of the interceptors list is 15. Interceptors are not supported when the pod is part of a workload (.spec.workloadRef is set). This field is immutable.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(corev1.EvictionInterceptor{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
 		},
 		Dependencies: []string{
-			corev1.Affinity{}.OpenAPIModelName(), corev1.Container{}.OpenAPIModelName(), corev1.EphemeralContainer{}.OpenAPIModelName(), corev1.HostAlias{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName(), corev1.PodDNSConfig{}.OpenAPIModelName(), corev1.PodOS{}.OpenAPIModelName(), corev1.PodReadinessGate{}.OpenAPIModelName(), corev1.PodResourceClaim{}.OpenAPIModelName(), corev1.PodSchedulingGate{}.OpenAPIModelName(), corev1.PodSecurityContext{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.Toleration{}.OpenAPIModelName(), corev1.TopologySpreadConstraint{}.OpenAPIModelName(), corev1.Volume{}.OpenAPIModelName(), corev1.WorkloadReference{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			corev1.Affinity{}.OpenAPIModelName(), corev1.Container{}.OpenAPIModelName(), corev1.EphemeralContainer{}.OpenAPIModelName(), corev1.EvictionInterceptor{}.OpenAPIModelName(), corev1.HostAlias{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName(), corev1.PodDNSConfig{}.OpenAPIModelName(), corev1.PodOS{}.OpenAPIModelName(), corev1.PodReadinessGate{}.OpenAPIModelName(), corev1.PodResourceClaim{}.OpenAPIModelName(), corev1.PodSchedulingGate{}.OpenAPIModelName(), corev1.PodSecurityContext{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.Toleration{}.OpenAPIModelName(), corev1.TopologySpreadConstraint{}.OpenAPIModelName(), corev1.Volume{}.OpenAPIModelName(), corev1.WorkloadReference{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 

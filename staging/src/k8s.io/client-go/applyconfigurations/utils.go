@@ -710,6 +710,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.EventSeriesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("EventSource"):
 		return &applyconfigurationscorev1.EventSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("EvictionInterceptor"):
+		return &applyconfigurationscorev1.EvictionInterceptorApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ExecAction"):
 		return &applyconfigurationscorev1.ExecActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FCVolumeSource"):

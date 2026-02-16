@@ -1836,7 +1836,12 @@
         "name": "nameValue",
         "podGroup": "podGroupValue",
         "podGroupReplicaKey": "podGroupReplicaKeyValue"
-      }
+      },
+      "evictionInterceptors": [
+        {
+          "name": "nameValue"
+        }
+      ]
     }
   }
 }
