@@ -387,6 +387,90 @@ func Validate_Event(
 	return errs
 }
 
+// Validate_EvictionResponder validates an instance of EvictionResponder according
+// to declarative validation rules in the API schema.
+func Validate_EvictionResponder(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.EvictionResponder) (errs field.ErrorList) {
+
+	{ // field corev1.EvictionResponder.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// custom validation
+			if e := ValidateCustom_EvictionResponder_Name(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.PrefixedLabelKey(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.EvictionResponder) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.EvictionResponder.Priority
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// custom validation
+			if e := ValidateCustom_EvictionResponder_Priority(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.Maximum(ctx, op, fldPath, obj, oldObj, 100000); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.EvictionResponder) *int32 {
+				return oldObj.Priority
+			})
+		errs = append(errs, fn(fldPath.Child("priority"), obj.Priority, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_LimitRange validates an instance of LimitRange according
 // to declarative validation rules in the API schema.
 func Validate_LimitRange(
@@ -869,6 +953,22 @@ func Validate_PodSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.PodSpec) (errs field.ErrorList) {
 
+	if e := validate.DependentForbidden(ctx, op, fldPath, obj, oldObj, "evictionResponders",
+		func(obj *corev1.PodSpec) bool {
+			if obj == nil {
+				return false
+			}
+			return len(obj.EvictionResponders) != 0
+		}, "schedulingGroup",
+		func(obj *corev1.PodSpec) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.SchedulingGroup != nil
+		}).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
 	// field corev1.PodSpec.Volumes has no validation
 	// field corev1.PodSpec.InitContainers has no validation
 	// field corev1.PodSpec.Containers has no validation
@@ -943,6 +1043,49 @@ func Validate_PodSpec(
 	// field corev1.PodSpec.Resources has no validation
 	// field corev1.PodSpec.HostnameOverride has no validation
 	// field corev1.PodSpec.SchedulingGroup has no validation
+
+	{ // field corev1.PodSpec.EvictionResponders
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.EvictionResponder,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.EvictionResponder, b *corev1.EvictionResponder) bool { return a.Name == b.Name }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.EvictionResponder, b *corev1.EvictionResponder) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_EvictionResponder); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) []corev1.EvictionResponder {
+				return oldObj.EvictionResponders
+			})
+		errs = append(errs, fn(fldPath.Child("evictionResponders"), obj.EvictionResponders, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
