@@ -756,6 +756,7 @@ func dropDisabledFields(
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
 	dropDisabledWorkloadRef(podSpec, oldPodSpec)
+	dropDisableEvictionInterceptors(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -2005,4 +2006,20 @@ func dropImageVolumeWithDigest(podStatus *api.PodStatus) {
 			podStatus.EphemeralContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
 		}
 	}
+}
+
+// dropDisableEvictionInterceptors removes eviction interceptors from its spec
+// unless it is already used by the old pod spec.
+func dropDisableEvictionInterceptors(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) && !evictionInterceptorsInUse(oldPodSpec) {
+		podSpec.EvictionInterceptors = nil
+	}
+}
+
+func evictionInterceptorsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	return len(podSpec.EvictionInterceptors) > 0
 }
