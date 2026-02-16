@@ -17,6 +17,8 @@ limitations under the License.
 package workqueue
 
 import (
+	"sync"
+
 	"k8s.io/client-go/util/workqueue"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -101,11 +103,16 @@ var (
 type prometheusMetricsProvider struct {
 }
 
-func init() {
-	for _, m := range metrics {
-		legacyregistry.MustRegister(m)
-	}
-	workqueue.SetProvider(prometheusMetricsProvider{})
+var registerOnce sync.Once
+
+// Register registers workqueue metrics to the legacy registry.
+func Register() {
+	registerOnce.Do(func() {
+		for _, m := range metrics {
+			legacyregistry.MustRegister(m)
+		}
+		workqueue.SetProvider(prometheusMetricsProvider{})
+	})
 }
 
 func (prometheusMetricsProvider) NewDepthMetric(name string) workqueue.GaugeMetric {

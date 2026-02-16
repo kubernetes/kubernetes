@@ -84,6 +84,10 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	leaderelectionmetrics "k8s.io/component-base/metrics/prometheus/clientgo/leaderelection"
+	restclientmetrics "k8s.io/component-base/metrics/prometheus/restclient"
+	workqueuemetrics "k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -537,6 +541,11 @@ func UnsecuredDependencies(ctx context.Context, s *options.KubeletServer, featur
 // Otherwise, the caller is assumed to have set up the Dependencies object and a default one will
 // not be generated.
 func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) error {
+	restclientmetrics.Register()
+	workqueuemetrics.Register()
+	fifo.Register()
+	leaderelectionmetrics.Register()
+
 	logger := klog.FromContext(ctx)
 	// To help debugging, immediately log version
 	logger.Info("Kubelet version", "kubeletVersion", version.Get())

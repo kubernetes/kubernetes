@@ -59,7 +59,11 @@ import (
 	"k8s.io/component-base/metrics"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	"k8s.io/component-base/metrics/prometheus/clientgo/leaderelection"
+	"k8s.io/component-base/metrics/prometheus/restclient"
 	"k8s.io/component-base/metrics/prometheus/slis"
+	"k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
@@ -531,6 +535,10 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	proxymetrics.RegisterMetrics(s.Config.Mode)
+	restclient.Register()
+	workqueue.Register()
+	fifo.Register()
+	leaderelection.Register()
 
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster

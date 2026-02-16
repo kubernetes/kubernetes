@@ -37,11 +37,9 @@ var (
 	registerOnce sync.Once
 )
 
-func init() {
-	Register()
-}
-
 // Register registers FIFO metrics and sets the metrics provider.
+// This should be called after feature gates have been parsed to support
+// native histogram options.
 func Register() {
 	registerOnce.Do(func() {
 		legacyregistry.MustRegister(fifoQueuedItems)

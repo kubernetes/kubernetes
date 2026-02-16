@@ -14,11 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package clientgo provides client-go metrics registration.
+// All metrics packages (fifo, leaderelection, restclient, workqueue) now require
+// explicit Register() calls after feature gates are parsed to support native histogram options.
 package clientgo
-
-import (
-	_ "k8s.io/component-base/metrics/prometheus/clientgo/fifo"           // load fifo metrics
-	_ "k8s.io/component-base/metrics/prometheus/clientgo/leaderelection" // load leaderelection metrics
-	_ "k8s.io/component-base/metrics/prometheus/restclient"              // load restclient metrics
-	_ "k8s.io/component-base/metrics/prometheus/workqueue"               // load the workqueue metrics
-)

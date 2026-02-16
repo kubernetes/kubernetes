@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"sync"
 	"time"
 
 	"k8s.io/client-go/tools/metrics"
@@ -195,33 +196,39 @@ var (
 	)
 )
 
-func init() {
+var registerOnce sync.Once
 
-	legacyregistry.MustRegister(requestLatency)
-	legacyregistry.MustRegister(requestSize)
-	legacyregistry.MustRegister(responseSize)
-	legacyregistry.MustRegister(rateLimiterLatency)
-	legacyregistry.MustRegister(requestResult)
-	legacyregistry.MustRegister(requestRetry)
-	legacyregistry.RawMustRegister(execPluginCertTTL)
-	legacyregistry.MustRegister(execPluginCertRotation)
-	legacyregistry.MustRegister(execPluginCalls)
-	legacyregistry.MustRegister(transportCacheEntries)
-	legacyregistry.MustRegister(transportCacheCalls)
-	metrics.Register(metrics.RegisterOpts{
-		ClientCertExpiry:      execPluginCertTTLAdapter,
-		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
-		RequestLatency:        &latencyAdapter{m: requestLatency},
-		ResolverLatency:       &resolverLatencyAdapter{m: resolverLatency},
-		RequestSize:           &sizeAdapter{m: requestSize},
-		ResponseSize:          &sizeAdapter{m: responseSize},
-		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
-		RequestResult:         &resultAdapter{requestResult},
-		RequestRetry:          &retryAdapter{requestRetry},
-		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
-		ExecPluginPolicyCalls: &policyAdapter{m: execPluginPolicyCalls},
-		TransportCacheEntries: &transportCacheAdapter{m: transportCacheEntries},
-		TransportCreateCalls:  &transportCacheCallsAdapter{m: transportCacheCalls},
+// Register registers restclient metrics to the legacy registry.
+// This is typically called from component Run() functions after feature gates are parsed,
+// to support native histogram options.
+func Register() {
+	registerOnce.Do(func() {
+		legacyregistry.MustRegister(requestLatency)
+		legacyregistry.MustRegister(requestSize)
+		legacyregistry.MustRegister(responseSize)
+		legacyregistry.MustRegister(rateLimiterLatency)
+		legacyregistry.MustRegister(requestResult)
+		legacyregistry.MustRegister(requestRetry)
+		legacyregistry.RawMustRegister(execPluginCertTTL)
+		legacyregistry.MustRegister(execPluginCertRotation)
+		legacyregistry.MustRegister(execPluginCalls)
+		legacyregistry.MustRegister(transportCacheEntries)
+		legacyregistry.MustRegister(transportCacheCalls)
+		metrics.Register(metrics.RegisterOpts{
+			ClientCertExpiry:      execPluginCertTTLAdapter,
+			ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
+			RequestLatency:        &latencyAdapter{m: requestLatency},
+			ResolverLatency:       &resolverLatencyAdapter{m: resolverLatency},
+			RequestSize:           &sizeAdapter{m: requestSize},
+			ResponseSize:          &sizeAdapter{m: responseSize},
+			RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
+			RequestResult:         &resultAdapter{requestResult},
+			RequestRetry:          &retryAdapter{requestRetry},
+			ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
+			ExecPluginPolicyCalls: &policyAdapter{m: execPluginPolicyCalls},
+			TransportCacheEntries: &transportCacheAdapter{m: transportCacheEntries},
+			TransportCreateCalls:  &transportCacheCallsAdapter{m: transportCacheCalls},
+		})
 	})
 }
 
