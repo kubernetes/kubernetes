@@ -641,17 +641,17 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of pods that belong to the pod group.
 // Typically used as an input to workload scheduling cycle plugins.
-type PodGroupInfo struct {
-	// UnscheduledPods are pods that are currently being considered for scheduling.
+type PodGroupInfo interface {
+	// GetUnscheduledPods are pods that are currently being considered for scheduling.
 	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
 	// WorkloadManager.PodGroupState can be used for that.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
-	UnscheduledPods []*v1.Pod
+	GetUnscheduledPods() []*v1.Pod
 
-	// PodGroup is the API object that contains spec of the pod group, such as policy.
+	// GetPodGroup is the API object that contains spec of the pod group, such as policy.
 	// Plugins will typically use it to determine what to do with the pods in the pod group.
 	// If needed, Workload API object can also be retrieved by passing one of the pod's WorkloadRef to WorkloadLister.
-	PodGroup *schedulingapi.PodGroup
+	GetPodGroup() *schedulingapi.PodGroup
 }
 
 // Placement determines the nodes to be considered when scheduling a pod group.
