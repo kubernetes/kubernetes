@@ -33,6 +33,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/batch/job"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
@@ -248,6 +249,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		job := mkJob()
 		meta.RunObjectMetaTestCases(t, ctx, &job, registry.Strategy, meta.WithStringentFinalizerValidation())
 	}
+	poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "template", "spec"), new(mkJob()), func(baseObj *batch.Job, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+		baseObj.Spec.Template.Spec.EvictionResponders = responders
+		baseObj.Spec.Template.Spec.SchedulingGroup = schedulingGroup
+	})
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {

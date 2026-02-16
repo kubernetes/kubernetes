@@ -123,6 +123,11 @@ var allowedEphemeralContainerFields = map[string]bool{
 // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 var validOS = sets.New(core.Linux, core.Windows)
 
+// MaxPodEvictionResponders specifies the maximum number of EvictionResponders that can be present in a Pod's
+// .spec.evictionResponders field. Other consumers of responders might add to the number to make room for
+// additional responders.
+const MaxPodEvictionResponders = 10
+
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -4845,6 +4850,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	if spec.SchedulingGroup != nil {
 		allErrs = append(allErrs, validateSchedulingGroup(spec.SchedulingGroup, fldPath.Child("schedulingGroup"))...)
+		if len(spec.EvictionResponders) > 0 {
+			// covered by alpha DV dependentForbidden
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("schedulingGroup"), "may not be set when evictionResponders is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative())
+		}
 	}
 
 	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)
