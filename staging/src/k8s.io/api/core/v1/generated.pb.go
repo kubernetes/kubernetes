@@ -158,6 +158,8 @@ func (m *EventSeries) Reset() { *m = EventSeries{} }
 
 func (m *EventSource) Reset() { *m = EventSource{} }
 
+func (m *EvictionResponder) Reset() { *m = EvictionResponder{} }
+
 func (m *ExecAction) Reset() { *m = ExecAction{} }
 
 func (m *FCVolumeSource) Reset() { *m = FCVolumeSource{} }
@@ -4200,6 +4202,34 @@ func (m *EventSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i -= len(m.Component)
 	copy(dAtA[i:], m.Component)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Component)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *EvictionResponder) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *EvictionResponder) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *EvictionResponder) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -9767,6 +9797,22 @@ func (m *PodSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.EvictionResponders) > 0 {
+		for iNdEx := len(m.EvictionResponders) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.EvictionResponders[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x2
+			i--
+			dAtA[i] = 0xe2
+		}
+	}
 	if m.SchedulingGroup != nil {
 		{
 			size, err := m.SchedulingGroup.MarshalToSizedBuffer(dAtA[:i])
@@ -16460,6 +16506,17 @@ func (m *EventSource) Size() (n int) {
 	return n
 }
 
+func (m *EvictionResponder) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *ExecAction) Size() (n int) {
 	if m == nil {
 		return 0
@@ -18705,6 +18762,12 @@ func (m *PodSpec) Size() (n int) {
 	if m.SchedulingGroup != nil {
 		l = m.SchedulingGroup.Size()
 		n += 2 + l + sovGenerated(uint64(l))
+	}
+	if len(m.EvictionResponders) > 0 {
+		for _, e := range m.EvictionResponders {
+			l = e.Size()
+			n += 2 + l + sovGenerated(uint64(l))
+		}
 	}
 	return n
 }
@@ -21491,6 +21554,16 @@ func (this *EventSource) String() string {
 	}, "")
 	return s
 }
+func (this *EvictionResponder) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&EvictionResponder{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *ExecAction) String() string {
 	if this == nil {
 		return "nil"
@@ -23104,6 +23177,11 @@ func (this *PodSpec) String() string {
 		repeatedStringForResourceClaims += strings.Replace(strings.Replace(f.String(), "PodResourceClaim", "PodResourceClaim", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForResourceClaims += "}"
+	repeatedStringForEvictionResponders := "[]EvictionResponder{"
+	for _, f := range this.EvictionResponders {
+		repeatedStringForEvictionResponders += strings.Replace(strings.Replace(f.String(), "EvictionResponder", "EvictionResponder", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForEvictionResponders += "}"
 	keysForNodeSelector := make([]string, 0, len(this.NodeSelector))
 	for k := range this.NodeSelector {
 		keysForNodeSelector = append(keysForNodeSelector, k)
@@ -23167,6 +23245,7 @@ func (this *PodSpec) String() string {
 		`Resources:` + strings.Replace(this.Resources.String(), "ResourceRequirements", "ResourceRequirements", 1) + `,`,
 		`HostnameOverride:` + valueToStringGenerated(this.HostnameOverride) + `,`,
 		`SchedulingGroup:` + strings.Replace(this.SchedulingGroup.String(), "PodSchedulingGroup", "PodSchedulingGroup", 1) + `,`,
+		`EvictionResponders:` + repeatedStringForEvictionResponders + `,`,
 		`}`,
 	}, "")
 	return s
@@ -36034,6 +36113,88 @@ func (m *EventSource) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Host = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *EvictionResponder) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: EvictionResponder: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: EvictionResponder: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -55445,6 +55606,40 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 				m.SchedulingGroup = &PodSchedulingGroup{}
 			}
 			if err := m.SchedulingGroup.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 44:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvictionResponders", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvictionResponders = append(m.EvictionResponders, EvictionResponder{})
+			if err := m.EvictionResponders[len(m.EvictionResponders)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

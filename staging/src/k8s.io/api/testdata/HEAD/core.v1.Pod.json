@@ -1791,7 +1791,12 @@
     "hostnameOverride": "hostnameOverrideValue",
     "schedulingGroup": {
       "podGroupName": "podGroupNameValue"
-    }
+    },
+    "evictionResponders": [
+      {
+        "name": "nameValue"
+      }
+    ]
   },
   "status": {
     "observedGeneration": 17,
