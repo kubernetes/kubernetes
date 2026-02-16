@@ -25,9 +25,11 @@ import (
 	context "context"
 	fmt "fmt"
 
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -37,6 +39,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type Deployment
+	scheme.AddValidationFunc((*Deployment)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_Deployment(ctx, op, nil /* fldPath */, obj.(*Deployment), safe.Cast[*Deployment](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type Scale
 	scheme.AddValidationFunc((*Scale)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -46,6 +56,62 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_Deployment validates an instance of Deployment according
+// to declarative validation rules in the API schema.
+func Validate_Deployment(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Deployment) (errs field.ErrorList) {
+	// field Deployment.TypeMeta has no validation
+	// field Deployment.ObjectMeta has no validation
+
+	// field Deployment.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *DeploymentSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeploymentSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *Deployment) *DeploymentSpec { return &oldObj.Spec }), oldObj != nil)...)
+
+	// field Deployment.Status has no validation
+	return errs
+}
+
+// Validate_DeploymentSpec validates an instance of DeploymentSpec according
+// to declarative validation rules in the API schema.
+func Validate_DeploymentSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DeploymentSpec) (errs field.ErrorList) {
+	// field DeploymentSpec.Replicas has no validation
+
+	// field DeploymentSpec.Selector
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *v1.LabelSelector, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("selector"), obj.Selector, safe.Field(oldObj, func(oldObj *DeploymentSpec) *v1.LabelSelector { return oldObj.Selector }), oldObj != nil)...)
+
+	// field DeploymentSpec.Template has no validation
+	// field DeploymentSpec.Strategy has no validation
+	// field DeploymentSpec.MinReadySeconds has no validation
+	// field DeploymentSpec.RevisionHistoryLimit has no validation
+	// field DeploymentSpec.Paused has no validation
+	// field DeploymentSpec.RollbackTo has no validation
+	// field DeploymentSpec.ProgressDeadlineSeconds has no validation
+	return errs
 }
 
 // Validate_Scale validates an instance of Scale according
