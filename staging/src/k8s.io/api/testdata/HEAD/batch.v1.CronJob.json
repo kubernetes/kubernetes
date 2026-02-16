@@ -1933,7 +1933,12 @@
             "hostnameOverride": "hostnameOverrideValue",
             "schedulingGroup": {
               "podGroupName": "podGroupNameValue"
-            }
+            },
+            "evictionResponders": [
+              {
+                "name": "nameValue"
+              }
+            ]
           }
         },
         "ttlSecondsAfterFinished": 8,

@@ -1730,6 +1730,21 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.EvictionResponder": {
+        "description": "EvictionResponder allows you to specify the responder reacting to the EvictionRequest. Responders should observe and communicate through the EvictionRequest API to help with the graceful eviction of a target (e.g. termination of a pod).",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "name allows you to identify the responder responding to the EvictionRequest.\n\nIt must be a valid domain-prefixed path (such as \"acme.io/foo\"). Domain names *.k8s.io and *.kubernetes.io are reserved. This field must be unique for each responder. This field is required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "x-kubernetes-map-type": "atomic"
+      },
       "io.k8s.api.core.v1.ExecAction": {
         "description": "ExecAction describes a \"run in container\" action.",
         "properties": {
@@ -2934,6 +2949,24 @@
             "description": "List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing pod to perform user-initiated actions such as debugging. This list cannot be specified when creating a pod, and it cannot be modified by updating the pod spec. In order to add an ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.EphemeralContainer"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
+          },
+          "evictionResponders": {
+            "description": "evictionResponders reference responders that react to EvictionRequests. Responders should observe and communicate through the EvictionRequest API to help with the graceful termination of a pod. The responders are selected sequentially, in the order in which they appear in the list.\n\nResponders should periodically report on an eviction progress by updating the .status.responders[].heartbeatTime field of the EvictionRequest object. If this field is not updated within 20 minutes, the eviction request is passed over to the next responder at a higher index. If there is no other responder, the last default imperative-eviction.k8s.io/evictor responder will evict the pod using the imperative Eviction API (/evict endpoint).\n\nThe maximum length of the responders list is 16. Responders are not supported when the pod is part of a workload (.spec.workloadRef is set). This field can only be set on creation and is immutable afterwards.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.EvictionResponder"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [

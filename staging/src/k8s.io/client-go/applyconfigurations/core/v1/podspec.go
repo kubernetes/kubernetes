@@ -285,6 +285,22 @@ type PodSpecApplyConfiguration struct {
 	// recreated with different policies. Doing this during pod scheduling
 	// may result in the placement not conforming to the expected policies.
 	SchedulingGroup *PodSchedulingGroupApplyConfiguration `json:"schedulingGroup,omitempty"`
+	// evictionResponders reference responders that react to EvictionRequests.
+	// Responders should observe and communicate through the EvictionRequest API to help with
+	// the graceful termination of a pod. The responders are selected sequentially, in the order
+	// in which they appear in the list.
+	//
+	// Responders should periodically report on an eviction progress by updating the
+	// .status.responders[].heartbeatTime field of the EvictionRequest object. If this field is
+	// not updated within 20 minutes, the eviction request is passed over to the next responder at
+	// a higher index. If there is no other responder, the last default
+	// imperative-eviction.k8s.io/evictor responder will evict the pod using the imperative
+	// Eviction API (/evict endpoint).
+	//
+	// The maximum length of the responders list is 16.
+	// Responders are not supported when the pod is part of a workload (.spec.workloadRef is set).
+	// This field can only be set on creation and is immutable afterwards.
+	EvictionResponders []EvictionResponderApplyConfiguration `json:"evictionResponders,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -687,5 +703,18 @@ func (b *PodSpecApplyConfiguration) WithHostnameOverride(value string) *PodSpecA
 // If called multiple times, the SchedulingGroup field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithSchedulingGroup(value *PodSchedulingGroupApplyConfiguration) *PodSpecApplyConfiguration {
 	b.SchedulingGroup = value
+	return b
+}
+
+// WithEvictionResponders adds the given value to the EvictionResponders field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the EvictionResponders field.
+func (b *PodSpecApplyConfiguration) WithEvictionResponders(values ...*EvictionResponderApplyConfiguration) *PodSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithEvictionResponders")
+		}
+		b.EvictionResponders = append(b.EvictionResponders, *values[i])
+	}
 	return b
 }
