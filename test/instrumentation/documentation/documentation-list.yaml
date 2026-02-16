@@ -4441,7 +4441,7 @@
   namespace: apiserver
   help: Latencies in seconds of data encryption key(DEK) generation operations.
   type: Histogram
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
   buckets:
   - 5e-06
   - 1e-05
@@ -4462,7 +4462,7 @@
   namespace: apiserver
   help: Total number of failed data encryption key(DEK) generation operations.
   type: Counter
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
 - name: storage_db_total_size_in_bytes
   subsystem: apiserver
   help: Total size of the storage database file physically allocated in bytes.
@@ -4484,7 +4484,7 @@
   namespace: apiserver
   help: Total number of cache misses while accessing key decryption key(KEK).
   type: Counter
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
 - name: storage_events_received_total
   subsystem: apiserver
   help: Number of etcd events received split by kind.
@@ -4526,7 +4526,7 @@
   namespace: apiserver
   help: Latencies in seconds of value transformation operations.
   type: Histogram
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
   labels:
   - transformation_type
   - transformer_prefix
@@ -4567,7 +4567,7 @@
     these fields can be used to ensure that the correct transformers are applied to
     each resource.
   type: Counter
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
   labels:
   - resource
   - status

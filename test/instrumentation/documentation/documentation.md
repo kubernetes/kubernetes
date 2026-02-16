@@ -1340,18 +1340,18 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span><span class="metric_label">status</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">apiserver_storage_data_key_generation_duration_seconds</div>
 	<div class="metric_help">Latencies in seconds of data encryption key(DEK) generation operations.</div>
 	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	</ul>
-	</div><div class="metric" data-stability="alpha">
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">apiserver_storage_data_key_generation_failures_total</div>
 	<div class="metric_help">Total number of failed data encryption key(DEK) generation operations.</div>
 	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
 	</div><div class="metric" data-stability="alpha">
@@ -1368,11 +1368,11 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">apiserver_storage_envelope_transformation_cache_misses_total</div>
 	<div class="metric_help">Total number of cache misses while accessing key decryption key(KEK).</div>
 	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	</ul>
 	</div><div class="metric" data-stability="alpha">
@@ -1410,18 +1410,18 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">apiserver_storage_transformation_duration_seconds</div>
 	<div class="metric_help">Latencies in seconds of value transformation operations.</div>
 	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">transformation_type</span><span class="metric_label">transformer_prefix</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">apiserver_storage_transformation_operations_total</div>
 	<div class="metric_help">Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. The status, resource, and transformation_type fields can be used for alerting purposes. For example, you can monitor for encryption/decryption failures using the transformation_type (e.g., from_storage for decryption and to_storage for encryption). Additionally, these fields can be used to ensure that the correct transformers are applied to each resource.</div>
 	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">resource</span><span class="metric_label">status</span><span class="metric_label">transformation_type</span><span class="metric_label">transformer_prefix</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
