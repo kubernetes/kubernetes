@@ -5409,6 +5409,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: host
       type:
         scalar: string
+- name: io.k8s.api.core.v1.EvictionResponder
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.ExecAction
   map:
     fields:
@@ -6983,6 +6991,14 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.EphemeralContainer
+          elementRelationship: associative
+          keys:
+          - name
+    - name: evictionResponders
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.EvictionResponder
           elementRelationship: associative
           keys:
           - name

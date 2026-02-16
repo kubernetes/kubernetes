@@ -1834,7 +1834,12 @@
       "hostnameOverride": "hostnameOverrideValue",
       "schedulingGroup": {
         "podGroupName": "podGroupNameValue"
-      }
+      },
+      "evictionResponders": [
+        {
+          "name": "nameValue"
+        }
+      ]
     }
   }
 }
