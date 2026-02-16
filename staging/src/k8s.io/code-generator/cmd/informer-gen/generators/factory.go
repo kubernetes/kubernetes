@@ -75,6 +75,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 	m := map[string]interface{}{
 		"cacheDoneChecker":               c.Universe.Type(cacheDoneChecker),
+		"cacheDoneCheckerForInformer":    c.Universe.Type(cacheDoneCheckerForInformer),
 		"cacheInformerName":              c.Universe.Type(cacheInformerName),
 		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
 		"cacheSyncResult":                c.Universe.Type(cacheSyncResult),
@@ -270,7 +271,7 @@ func (f *sharedInformerFactory) WaitForCacheSyncWithContext(ctx context.Context)
 	// Wait for informers to sync, without polling.
 	cacheSyncs := make([]{{.cacheDoneChecker|raw}}, 0, len(informers))
 	for _, informer := range informers {
-		cacheSyncs = append(cacheSyncs, informer.HasSyncedChecker())
+		cacheSyncs = append(cacheSyncs, {{.cacheDoneCheckerForInformer|raw}}(ctx, informer))
 	}
 	{{.cacheWaitFor|raw}}(ctx, "" /* no logging */, cacheSyncs...)
 

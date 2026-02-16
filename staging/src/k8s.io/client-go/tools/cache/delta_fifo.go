@@ -304,6 +304,7 @@ var (
 	_ = Queue(&DeltaFIFO{})             // DeltaFIFO is a Queue
 	_ = TransformingStore(&DeltaFIFO{}) // DeltaFIFO implements TransformingStore to allow memory optimizations
 	_ = DoneChecker(&DeltaFIFO{})       // DeltaFIFO implements DoneChecker.
+	_ = HasSyncedChecker(&DeltaFIFO{})  // DeltaFIFO implements HasSyncedChecker, returning itself as the DoneChecker.
 )
 
 var (

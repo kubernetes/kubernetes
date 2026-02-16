@@ -197,14 +197,6 @@ type SharedInformer interface {
 	// For that, please call HasSynced on the handle returned by
 	// AddEventHandler.
 	HasSynced() bool
-	// HasSyncedChecker completes if the shared informer's store has been
-	// informed by at least one full LIST of the authoritative state
-	// of the informer's object collection.  This is unrelated to "resync".
-	//
-	// Note that this doesn't tell you if an individual handler is synced!!
-	// For that, please use HasSyncedChecker on the handle returned by
-	// AddEventHandler.
-	HasSyncedChecker() DoneChecker
 	// LastSyncResourceVersion is the resource version observed when last synced with the underlying
 	// store. The value returned is not synchronized with access to the underlying store and is not
 	// thread-safe.
@@ -247,6 +239,74 @@ type SharedInformer interface {
 	// An informer already stopped will never be started again.
 	IsStopped() bool
 }
+
+// ^^^
+// SharedInformer *is* implemented widely out-of-tree and therefore has to
+// be considered frozen for practical reasons. Consider using an approach as with
+// HasSyncedChecker below instead of adding methods.
+
+// HasSyncedChecker defines an additional method that SharedInformer implementations
+// may provide to support waiting for cache sync without polling. All SharedInformer
+// instances created by client-go itself implement this interface.
+//
+// It is not a required method in SharedInformer to avoid breaking downstream consumers
+// of client-go. DoneCheckerForInformer can be used to get a DoneChecker for
+// any SharedInformer implementation.
+type HasSyncedChecker interface {
+	// HasSyncedChecker completes if the shared informer's store has been
+	// informed by at least one full LIST of the authoritative state
+	// of the informer's object collection.  This is unrelated to "resync".
+	//
+	// Note that this doesn't tell you if an individual handler is synced!!
+	// For that, please use HasSyncedChecker on the handle returned by
+	// AddEventHandler.
+	HasSyncedChecker() DoneChecker
+}
+
+// DoneCheckerForInformer returns a DoneChecker for the given
+// SharedInformer. If the SharedInformer implements HasSyncedChecker,
+// then the DoneChecker provided via that interface is returned. If not,
+// then a DoneChecker gets created which polls HasSynced. That polling
+// stops when the given context is canceled (DoneChecker remains in
+// the "not done" state) or when HasSynced returns true (DoneChecker is done).
+func DoneCheckerForInformer(ctx context.Context, informer SharedInformer) DoneChecker {
+	if hasSyncedChecker, ok := informer.(HasSyncedChecker); ok {
+		// This is the common case because sharedIndexInformer implements HasSyncedChecker.
+		return hasSyncedChecker.HasSyncedChecker()
+	}
+
+	// This is the fallback for out-of-tree SharedInformer implementations.
+	// There's no way for unit tests to wait for completion of the additional
+	// goroutine. If that's a problem then the code under test should
+	// be enhanced to support HasSyncedChecker.
+	done := make(chan struct{})
+	d := &doneCheckerForHasSynced{
+		name: fmt.Sprintf("%T SharedInformer implementation", informer),
+		done: done,
+	}
+	go func() {
+		err := wait.PollUntilContextCancel(ctx, syncedPollPeriod, true /* immediate */, func(ctx context.Context) (bool, error) {
+			if informer.HasSynced() {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err == nil {
+			close(done)
+		}
+	}()
+	return d
+}
+
+type doneCheckerForHasSynced struct {
+	name string
+	done <-chan struct{}
+}
+
+var _ DoneChecker = &doneCheckerForHasSynced{}
+
+func (d *doneCheckerForHasSynced) Name() string          { return d.name }
+func (d *doneCheckerForHasSynced) Done() <-chan struct{} { return d.done }
 
 // Opaque interface representing the registration of ResourceEventHandler for
 // a SharedInformer. Must be supplied back to the same SharedInformer's
@@ -571,7 +631,7 @@ func (c SyncResult) AsError() error {
 	return fmt.Errorf("failed to sync all caches: %s: %w", strings.Join(unsynced, ", "), c.Err)
 }
 
-// `*sharedIndexInformer` implements SharedIndexInformer and has three
+// `*sharedIndexInformer` implements SharedIndexInformer and HasSyncedChecker and has three
 // main components.  One is an indexed local cache, `indexer Indexer`.
 // The second main component is a Controller that pulls
 // objects/notifications using the ListerWatcher and pushes them into
@@ -635,6 +695,11 @@ type sharedIndexInformer struct {
 	// keyFunc is called when processing deltas by the underlying process function.
 	keyFunc KeyFunc
 }
+
+var (
+	_ SharedIndexInformer = &sharedIndexInformer{}
+	_ HasSyncedChecker    = &sharedIndexInformer{}
+)
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
 // where a caller can `Run`.  The run method is disconnected in this case, because higher

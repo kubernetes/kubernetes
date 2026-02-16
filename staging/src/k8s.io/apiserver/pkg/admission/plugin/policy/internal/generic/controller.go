@@ -161,7 +161,7 @@ func (c *controller[T]) Run(ctx context.Context) error {
 
 	// Wait for initial cache list to complete before beginning to reconcile
 	// objects.
-	if !cache.WaitFor(ctx, "caches", c.informer.HasSyncedChecker(), registration.HasSyncedChecker()) {
+	if !cache.WaitFor(ctx, "caches", cache.DoneCheckerForInformer(ctx, c.informer), registration.HasSyncedChecker()) {
 		// TODO: should cache.WaitFor return an error?
 		// ctx.Err() or context.Cause(ctx)?
 		// Either of them would make dead code like the "if err == nil"

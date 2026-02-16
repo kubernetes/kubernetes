@@ -213,7 +213,7 @@ func (f *sharedInformerFactory) WaitForCacheSyncWithContext(ctx context.Context)
 	// Wait for informers to sync, without polling.
 	cacheSyncs := make([]cache.DoneChecker, 0, len(informers))
 	for _, informer := range informers {
-		cacheSyncs = append(cacheSyncs, informer.HasSyncedChecker())
+		cacheSyncs = append(cacheSyncs, cache.DoneCheckerForInformer(ctx, informer))
 	}
 	cache.WaitFor(ctx, "" /* no logging */, cacheSyncs...)
 

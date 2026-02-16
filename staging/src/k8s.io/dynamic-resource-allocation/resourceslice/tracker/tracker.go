@@ -256,7 +256,9 @@ func (t *Tracker) HasSynced() bool {
 
 func (t *Tracker) HasSyncedChecker() cache.DoneChecker {
 	if !t.enableDeviceTaintRules {
-		return t.resourceSlices.HasSyncedChecker()
+		// t.resourceSlices is a SharedInformer created by client-go,
+		// so we can do an unchecked type cast.
+		return t.resourceSlices.(cache.HasSyncedChecker).HasSyncedChecker()
 	}
 
 	return trackerHasSynced{t}

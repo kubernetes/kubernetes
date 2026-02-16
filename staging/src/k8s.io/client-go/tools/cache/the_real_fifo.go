@@ -181,7 +181,8 @@ type SyncAllInfo struct{}
 var (
 	_ = Queue(&RealFIFO{})             // RealFIFO is a Queue
 	_ = TransformingStore(&RealFIFO{}) // RealFIFO implements TransformingStore to allow memory optimizations
-	_ = DoneChecker(&RealFIFO{})       // RealFIFO and implements DoneChecker.
+	_ = DoneChecker(&RealFIFO{})       // RealFIFO implements DoneChecker.
+	_ = HasSyncedChecker(&RealFIFO{})  // RealFIFO implements HasSyncedChecker, returning itself as the DoneChecker.
 )
 
 // Close the queue.
