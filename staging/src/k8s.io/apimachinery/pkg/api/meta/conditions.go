@@ -75,14 +75,18 @@ func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string)
 		return false
 	}
 
-	for i, condition := range *conditions {
-		if condition.Type == conditionType {
-			(*conditions) = append((*conditions)[:i], (*conditions)[i+1:]...)
-			return true
+	var i, j int
+	for i = 0; i < len(*conditions); i++ {
+		if (*conditions)[i].Type == conditionType {
+			continue
 		}
+
+		(*conditions)[j] = (*conditions)[i]
+		j++
 	}
 
-	return false
+	*conditions = (*conditions)[:j]
+	return i != j
 }
 
 // FindStatusCondition finds the conditionType in conditions.
