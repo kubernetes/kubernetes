@@ -56,7 +56,7 @@ var (
 			"Source can be 'resource_claim_template' (created from a template), "+
 			"'extended_resource' (extended resources), or empty (manually created by a user).",
 		[]string{"allocated", "admin_access", "source"}, nil,
-		metrics.ALPHA, "")
+		metrics.BETA, "")
 )
 
 var registerMetrics sync.Once
