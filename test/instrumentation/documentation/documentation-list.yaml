@@ -891,6 +891,17 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: stale_sync_skips_total
+  subsystem: statefulset_controller
+  help: Total number of StatefulSet syncs skipped due to a stale watch cache.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: statefulset_max_unavailable
   subsystem: statefulset_controller
   help: Maximum number of unavailable pods allowed during StatefulSet rolling updates
@@ -4123,30 +4134,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: legacy_tokens_total
-  subsystem: serviceaccount
-  help: Cumulative legacy service account tokens used
-  type: Counter
-  stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: stale_tokens_total
-  subsystem: serviceaccount
-  help: Cumulative stale projected service account tokens used
-  type: Counter
-  stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: valid_tokens_total
-  subsystem: serviceaccount
-  help: Cumulative valid projected service account tokens used
-  type: Counter
-  stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: storage_operation_duration_seconds
   help: Storage operation duration
   type: Histogram
@@ -4196,6 +4183,30 @@
   - 600
   componentEndpoints:
   - component: kubelet
+    endpoint: /metrics
+- name: legacy_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative legacy service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: stale_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative stale projected service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: valid_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative valid projected service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
     endpoint: /metrics
 - name: graph_actions_duration_seconds
   subsystem: node_authorizer
