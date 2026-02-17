@@ -123,7 +123,14 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleStat
 		metrics.PreemptionAttempts.Inc()
 	}()
 
-	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)
+	result, status := pl.Evaluator.EarlyNominate(ctx, state, pod)
+	if status.IsSuccess() && result != nil && len(result.NominatedNodeName) > 0 {
+		// If early nomination is successful, we can use the nominated node directly.
+		msg := status.Message()
+		return result, fwk.NewStatus(status.Code(), "preemption: "+msg)
+	}
+
+	result, status = pl.Evaluator.Preempt(ctx, state, pod, m)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return result, fwk.NewStatus(status.Code(), "preemption: "+msg)
