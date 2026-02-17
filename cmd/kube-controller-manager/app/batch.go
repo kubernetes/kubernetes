@@ -23,9 +23,13 @@ import (
 	"context"
 	"fmt"
 
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func newJobControllerDescriptor() *ControllerDescriptor {
@@ -42,11 +46,20 @@ func newJobController(ctx context.Context, controllerContext ControllerContext, 
 		return nil, err
 	}
 
+	var workloadInformer schedulinginformers.WorkloadInformer
+	var podGroupInformer schedulinginformers.PodGroupInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+		workloadInformer = controllerContext.InformerFactory.Scheduling().V1alpha2().Workloads()
+		podGroupInformer = controllerContext.InformerFactory.Scheduling().V1alpha2().PodGroups()
+	}
+
 	jc, err := job.NewController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		client,
+		workloadInformer,
+		podGroupInformer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating Job controller: %w", err)

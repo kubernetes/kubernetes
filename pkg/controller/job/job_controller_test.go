@@ -134,7 +134,7 @@ func newControllerFromClient(ctx context.Context, t *testing.T, kubeClient clien
 func newControllerFromClientWithClock(ctx context.Context, t *testing.T, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, clock clock.WithTicker) (*Controller, informers.SharedInformerFactory) {
 	t.Helper()
 	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
-	jm, err := newControllerWithClock(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient, clock)
+	jm, err := newControllerWithClock(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient, clock, nil, nil)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -6695,7 +6695,7 @@ func TestWatchOrphanPods(t *testing.T) {
 	t.Cleanup(cancel)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset, nil, nil)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -6766,7 +6766,7 @@ func TestSyncOrphanPod(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset, nil, nil)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -7688,7 +7688,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset, nil, nil)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -7792,7 +7792,7 @@ func TestFinalizerCleanup(t *testing.T) {
 
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset, nil, nil)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}

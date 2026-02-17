@@ -30,10 +30,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -2574,6 +2578,130 @@ func TestValidateJobUpdate(t *testing.T) {
 			var wantErrs field.ErrorList
 			if tc.err != nil {
 				wantErrs = append(wantErrs, tc.err)
+			}
+			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateJobUpdate_GangSchedulingParallelism(t *testing.T) {
+	validGeneratedSelector := getValidGeneratedSelector()
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	indexedMode := batch.IndexedCompletion
+	nonIndexedMode := batch.NonIndexedCompletion
+
+	gangCandidateJob := func() batch.Job {
+		return batch.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "myjob",
+				Namespace:       metav1.NamespaceDefault,
+				ResourceVersion: "1",
+			},
+			Spec: batch.JobSpec{
+				Selector:       validGeneratedSelector,
+				Template:       validPodTemplateSpec,
+				CompletionMode: &indexedMode,
+				Completions:    ptr.To[int32](4),
+				Parallelism:    ptr.To[int32](4),
+			},
+		}
+	}
+
+	cases := map[string]struct {
+		old               batch.Job
+		update            func(*batch.Job)
+		enableFeatureGate bool
+		wantErr           *field.Error
+	}{
+		"gang candidate with parallelism change is forbidden": {
+			old:               gangCandidateJob(),
+			enableFeatureGate: true,
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+			wantErr: &field.Error{
+				Type:  field.ErrorTypeForbidden,
+				Field: "spec.parallelism",
+			},
+		},
+		"gang candidate with parallelism unchanged is allowed": {
+			old:               gangCandidateJob(),
+			enableFeatureGate: true,
+			update:            func(job *batch.Job) {},
+		},
+		"non-candidate completions != parallelism with parallelism change is allowed": {
+			old: func() batch.Job {
+				j := gangCandidateJob()
+				j.Spec.Completions = ptr.To[int32](10)
+				return j
+			}(),
+			enableFeatureGate: true,
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+		},
+		"non-indexed job with parallelism change is allowed": {
+			old: func() batch.Job {
+				j := gangCandidateJob()
+				j.Spec.CompletionMode = &nonIndexedMode
+				j.Spec.Completions = nil
+				return j
+			}(),
+			enableFeatureGate: true,
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+		},
+		"feature gate disabled allows parallelism change": {
+			old:               gangCandidateJob(),
+			enableFeatureGate: false,
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+		},
+		"parallelism=1 is not a candidate, change allowed": {
+			old: func() batch.Job {
+				j := gangCandidateJob()
+				j.Spec.Parallelism = ptr.To[int32](1)
+				j.Spec.Completions = ptr.To[int32](1)
+				return j
+			}(),
+			enableFeatureGate: true,
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](3)
+			},
+		},
+		"schedulingGroup already set (opt-out) allows parallelism change": {
+			old: func() batch.Job {
+				j := gangCandidateJob()
+				j.Spec.Template.Spec.SchedulingGroup = &api.PodSchedulingGroup{
+					PodGroupName: ptr.To("my-pod-group"),
+				}
+				return j
+			}(),
+			enableFeatureGate: true,
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = ptr.To[int32](2)
+			},
+		},
+	}
+
+	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if tc.enableFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnableWorkloadWithJob, true)
+			}
+			update := tc.old.DeepCopy()
+			tc.update(update)
+			errs := ValidateJobUpdate(update, &tc.old, JobValidationOptions{})
+			var wantErrs field.ErrorList
+			if tc.wantErr != nil {
+				wantErrs = append(wantErrs, tc.wantErr)
 			}
 			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
