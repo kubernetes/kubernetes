@@ -308,6 +308,21 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: legacy_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative legacy service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+- name: stale_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative stale projected service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+- name: valid_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative valid projected service account tokens used
+  type: Counter
+  stabilityLevel: BETA
 - name: adds_total
   subsystem: workqueue
   help: Total number of adds handled by workqueue
