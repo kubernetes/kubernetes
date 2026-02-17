@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"math"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -35,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
@@ -123,6 +125,7 @@ func TestAttacherAttach(t *testing.T) {
 		injectAttacherError bool
 		shouldFail          bool
 		watchTimeout        time.Duration
+		backoff             *wait.Backoff
 	}{
 		{
 			name:       "test ok 1",
@@ -131,6 +134,21 @@ func TestAttacherAttach(t *testing.T) {
 			volumeName: "testvol-01",
 			attachID:   getAttachmentName("testvol-01", "testdriver-01", "testnode-01"),
 			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("pv01", 10, "testdriver-01", "testvol-01"), false),
+		},
+		{
+			name:       "test ok with custom backoff",
+			nodeName:   "testnode-01",
+			driverName: "testdriver-01",
+			volumeName: "testvol-01",
+			attachID:   getAttachmentName("testvol-01", "testdriver-01", "testnode-01"),
+			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("pv01", 10, "testdriver-01", "testvol-01"), false),
+			backoff: &wait.Backoff{
+				Duration: 10 * time.Millisecond,
+				Factor:   2.0,
+				Jitter:   0,
+				Steps:    math.MaxInt32,
+				Cap:      100 * time.Millisecond,
+			},
 		},
 		{
 			name:       "test ok 2",
@@ -213,6 +231,9 @@ func TestAttacherAttach(t *testing.T) {
 			}
 
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, tc.watchTimeout)
+			if tc.backoff != nil {
+				csiAttacher.backoff = tc.backoff
+			}
 
 			var wg sync.WaitGroup
 			wg.Add(1)
