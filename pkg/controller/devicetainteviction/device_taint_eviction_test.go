@@ -25,7 +25,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,7 +43,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -2106,38 +2104,8 @@ func trimRules(objs []resourcealpha.DeviceTaintRule) (trimmed []*resourcealpha.D
 	return trimmed
 }
 
-func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Controller {
-	// fake.Clientset suffers from a race condition related to informers:
-	// it does not implement resource version support in its Watch
-	// implementation and instead assumes that watches are set up
-	// before further changes are made.
-	//
-	// If a test waits for caches to be synced and then immediately
-	// adds an object, that new object will never be seen by event handlers
-	// if the race goes wrong and the Watch call hadn't completed yet
-	// (can be triggered by adding a sleep before https://github.com/kubernetes/kubernetes/blob/b53b9fb5573323484af9a19cf3f5bfe80760abba/staging/src/k8s.io/client-go/tools/cache/reflector.go#L431).
-	//
-	// To work around this, we count all watches and only proceed when
-	// all of them are in place. This replaces the normal watch reactor
-	// (https://github.com/kubernetes/kubernetes/blob/b53b9fb5573323484af9a19cf3f5bfe80760abba/staging/src/k8s.io/client-go/kubernetes/fake/clientset_generated.go#L161-L173).
-	var numWatches atomic.Int32
-	clientSet.PrependWatchReactor("*", func(action core.Action) (handled bool, ret watch.Interface, err error) {
-		var opts metav1.ListOptions
-		if watchActcion, ok := action.(core.WatchActionImpl); ok {
-			opts = watchActcion.ListOptions
-		}
-		gvr := action.GetResource()
-		ns := action.GetNamespace()
-		watch, err := clientSet.Tracker().Watch(gvr, ns, opts)
-		if err != nil {
-			return false, nil, err
-		}
-		numWatches.Add(1)
-		return true, watch, nil
-	})
-
-	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
-
+func newTestController(tCtx ktesting.TContext) *Controller {
+	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	controller := New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1().ResourceClaims(),
@@ -2153,11 +2121,6 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 
 	informerFactory.StartWithContext(tCtx)
 	tCtx.Cleanup(informerFactory.Shutdown)
-
-	tCtx.Log("starting to wait for watches")
-	tCtx.Wait()
-	tCtx.Expect(numWatches.Load()).To(gomega.Equal(int32(5)), "All watches should be registered.")
-	tCtx.Log("done waiting for watches")
 
 	return controller
 }
@@ -2332,7 +2295,7 @@ func testEviction(tCtx ktesting.TContext) {
 				updatedPod = obj.(*v1.Pod)
 				return false, nil, nil
 			})
-			controller := newTestController(tCtx, fakeClientset)
+			controller := newTestController(tCtx)
 
 			var wg sync.WaitGroup
 			defer func() {
@@ -2421,7 +2384,7 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, delayed bool) {
 	}
 	fakeClientset := fake.NewClientset(podWithClaimName, claim, rule)
 	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
-	controller := newTestController(tCtx, fakeClientset)
+	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
 	defer func() {
@@ -2574,7 +2537,7 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	})
 
 	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
-	controller := newTestController(tCtx, fakeClientset)
+	controller := newTestController(tCtx)
 
 	var mutex sync.Mutex
 	podEvicting := false
@@ -2702,7 +2665,7 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of deleted pod")
 		return false, nil, nil
 	})
-	controller := newTestController(tCtx, fakeClientset)
+	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
 	defer func() {
@@ -2778,7 +2741,7 @@ func synctestRetry(tCtx ktesting.TContext) {
 		assert.Equal(tCtx, podWithClaimName.Name, podName, "name of deleted pod")
 		return false, nil, nil
 	})
-	controller := newTestController(tCtx, fakeClientset)
+	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
 	defer func() {
