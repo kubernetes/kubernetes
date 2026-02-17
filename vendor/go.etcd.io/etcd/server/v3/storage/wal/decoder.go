@@ -22,6 +22,8 @@ import (
 	"io"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
+
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
 	"go.etcd.io/etcd/pkg/v3/crc"
 	"go.etcd.io/etcd/pkg/v3/pbutil"
@@ -120,7 +122,7 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 		}
 		return err
 	}
-	if err := rec.Unmarshal(data[:recBytes]); err != nil {
+	if err := proto.Unmarshal(data[:recBytes], rec); err != nil {
 		if d.isTornEntry(data) {
 			return io.ErrUnexpectedEOF
 		}
@@ -128,7 +130,7 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 	}
 
 	// skip crc checking if the record type is CrcType
-	if rec.Type != CrcType {
+	if rec.GetType() != CrcType {
 		_, err := d.crc.Write(rec.Data)
 		if err != nil {
 			return err

@@ -60,6 +60,7 @@ var (
 		"3.4.0": {streamTypeMsgAppV2, streamTypeMessage},
 		"3.5.0": {streamTypeMsgAppV2, streamTypeMessage},
 		"3.6.0": {streamTypeMsgAppV2, streamTypeMessage},
+		"3.7.0": {streamTypeMsgAppV2, streamTypeMessage},
 	}
 )
 
@@ -497,7 +498,7 @@ func (cr *streamReader) decodeLoop(rc io.ReadCloser, t streamType) error {
 			return err
 		}
 
-		// gofail-go: var raftDropHeartbeat struct{}
+		// gofail: var raftDropHeartbeat struct{}
 		// continue labelRaftDropHeartbeat
 		receivedBytes.WithLabelValues(types.ID(m.From).String()).Add(float64(m.Size()))
 

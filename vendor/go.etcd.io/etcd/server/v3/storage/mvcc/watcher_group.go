@@ -29,14 +29,14 @@ var watchBatchMaxRevs = 1000
 
 type eventBatch struct {
 	// evs is a batch of revision-ordered events
-	evs []mvccpb.Event
+	evs []*mvccpb.Event
 	// revs is the minimum unique revisions observed for this batch
 	revs int
 	// moreRev is first revision with more events following this batch
 	moreRev int64
 }
 
-func (eb *eventBatch) add(ev mvccpb.Event) {
+func (eb *eventBatch) add(ev *mvccpb.Event) {
 	if eb.revs > watchBatchMaxRevs {
 		// maxed out batch size
 		return
@@ -65,7 +65,7 @@ func (eb *eventBatch) add(ev mvccpb.Event) {
 
 type watcherBatch map[*watcher]*eventBatch
 
-func (wb watcherBatch) add(w *watcher, ev mvccpb.Event) {
+func (wb watcherBatch) add(w *watcher, ev *mvccpb.Event) {
 	eb := wb[w]
 	if eb == nil {
 		eb = &eventBatch{}
@@ -76,7 +76,7 @@ func (wb watcherBatch) add(w *watcher, ev mvccpb.Event) {
 
 // newWatcherBatch maps watchers to their matched events. It enables quick
 // events look up by watcher.
-func newWatcherBatch(wg *watcherGroup, evs []mvccpb.Event) watcherBatch {
+func newWatcherBatch(wg *watcherGroup, evs []*mvccpb.Event) watcherBatch {
 	if len(wg.watchers) == 0 {
 		return nil
 	}

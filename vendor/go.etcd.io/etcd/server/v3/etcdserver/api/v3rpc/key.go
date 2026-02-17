@@ -32,6 +32,8 @@ type kvServer struct {
 	// Txn.Success can have at most 128 operations,
 	// and Txn.Failure can have at most 128 operations.
 	maxTxnOps uint
+	// we want compile errors if new methods are added
+	pb.UnsafeKVServer
 }
 
 func NewKVServer(s *etcdserver.EtcdServer) pb.KVServer {

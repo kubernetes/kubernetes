@@ -16,11 +16,14 @@ package wal
 
 import (
 	"encoding/binary"
+	"errors"
 	"hash"
 	"io"
 	"os"
 	"sync"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/pkg/v3/crc"
 	"go.etcd.io/etcd/pkg/v3/ioutil"
@@ -61,28 +64,32 @@ func newFileEncoder(f *os.File, prevCrc uint32) (*encoder, error) {
 }
 
 func (e *encoder) encode(rec *walpb.Record) error {
+	if rec.Type == nil {
+		return errors.New("record is missing type")
+	}
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	e.crc.Write(rec.Data)
-	rec.Crc = e.crc.Sum32()
+	rec.Crc = new(e.crc.Sum32())
 	var (
 		data []byte
 		err  error
-		n    int
 	)
 
-	if rec.Size() > len(e.buf) {
-		data, err = rec.Marshal()
+	size := proto.Size(rec)
+	opts := proto.MarshalOptions{UseCachedSize: true}
+	if size > len(e.buf) {
+		data, err = opts.Marshal(rec)
 		if err != nil {
 			return err
 		}
 	} else {
-		n, err = rec.MarshalTo(e.buf)
+		data, err = opts.MarshalAppend(e.buf[:0], rec)
 		if err != nil {
 			return err
 		}
-		data = e.buf[:n]
 	}
 
 	data, lenField := prepareDataWithPadding(data)

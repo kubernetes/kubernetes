@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/client/pkg/v3/verify"
@@ -426,7 +427,7 @@ func (s *store) restore() error {
 
 type revKeyValue struct {
 	key  []byte
-	kv   mvccpb.KeyValue
+	kv   *mvccpb.KeyValue
 	kstr string
 }
 
@@ -459,9 +460,10 @@ func restoreIntoIndex(lg *zap.Logger, idx index) (chan<- revKeyValue, <-chan int
 			}
 
 			rev := BytesToRev(rkv.key)
-			verify.Verify(func() {
-				if rev.Main < currentRev {
-					panic(fmt.Errorf("revision %d shouldn't be less than the previous revision %d", rev.Main, currentRev))
+			verify.Verify("revision shouldn't be less than the previous revision", func() (bool, map[string]any) {
+				return rev.Main >= currentRev, map[string]any{
+					"revision":          rev.Main,
+					"previous revision": currentRev,
 				}
 			})
 			currentRev = rev.Main
@@ -490,10 +492,11 @@ func restoreIntoIndex(lg *zap.Logger, idx index) (chan<- revKeyValue, <-chan int
 
 func restoreChunk(lg *zap.Logger, kvc chan<- revKeyValue, keys, vals [][]byte, keyToLease map[string]lease.LeaseID) {
 	for i, key := range keys {
-		rkv := revKeyValue{key: key}
-		if err := rkv.kv.Unmarshal(vals[i]); err != nil {
+		var kv mvccpb.KeyValue
+		if err := proto.Unmarshal(vals[i], &kv); err != nil {
 			lg.Fatal("failed to unmarshal mvccpb.KeyValue", zap.Error(err))
 		}
+		rkv := revKeyValue{key: key, kv: &kv}
 		rkv.kstr = string(rkv.kv.Key)
 		if isTombstone(key) {
 			delete(keyToLease, rkv.kstr)

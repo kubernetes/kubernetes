@@ -46,9 +46,9 @@ func (ss *chanServerStream) SendHeader(md metadata.MD) error {
 		ss.headerc = nil
 		ss.headers = nil
 		return nil
-	case <-ss.Context().Done():
+	case <-ss.Context().Done(): //nolint:staticcheck // TODO: remove for a supported version
 	}
-	return ss.Context().Err()
+	return ss.Context().Err() //nolint:staticcheck // TODO: remove for a supported version
 }
 
 func (ss *chanServerStream) SetHeader(md metadata.MD) error {

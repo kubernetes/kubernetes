@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto" //nolint:staticcheck // TODO: remove for a supported version
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
@@ -107,15 +107,8 @@ func visitEntryData(entryType raftpb.EntryType, data []byte, visitor Visitor) er
 	switch entryType {
 	case raftpb.EntryNormal:
 		var raftReq etcdserverpb.InternalRaftRequest
-		if err := pbutil.Unmarshaler(&raftReq).Unmarshal(data); err != nil {
-			// try V2 Request
-			var r etcdserverpb.Request
-			if pbutil.Unmarshaler(&r).Unmarshal(data) != nil {
-				// return original error
-				return err
-			}
-			msg = proto.MessageReflect(&r)
-			break
+		if err := proto.Unmarshal(data, &raftReq); err != nil {
+			return err
 		}
 		msg = proto.MessageReflect(&raftReq)
 		if raftReq.DowngradeVersionTest != nil {

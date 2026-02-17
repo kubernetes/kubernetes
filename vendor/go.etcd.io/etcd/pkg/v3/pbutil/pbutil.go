@@ -15,7 +15,11 @@
 // Package pbutil defines interfaces for handling Protocol Buffer objects.
 package pbutil
 
-import "fmt"
+import (
+	"fmt"
+
+	"google.golang.org/protobuf/proto"
+)
 
 type Marshaler interface {
 	Marshal() (data []byte, err error)
@@ -23,6 +27,27 @@ type Marshaler interface {
 
 type Unmarshaler interface {
 	Unmarshal(data []byte) error
+}
+
+func MustMarshalMessage(m proto.Message) []byte {
+	d, err := proto.Marshal(m)
+	if err != nil {
+		panic(fmt.Sprintf("marshal should never fail (%v)", err))
+	}
+	return d
+}
+
+func MustUnmarshalMessage(m proto.Message, b []byte) {
+	if err := proto.Unmarshal(b, m); err != nil {
+		panic(fmt.Sprintf("unmarshal should never fail (%v)", err))
+	}
+}
+
+func MaybeUnmarshalMessage(m proto.Message, data []byte) bool {
+	if err := proto.Unmarshal(data, m); err != nil {
+		return false
+	}
+	return true
 }
 
 func MustMarshal(m Marshaler) []byte {

@@ -24,6 +24,8 @@ import (
 
 type AuthServer struct {
 	authenticator etcdserver.Authenticator
+	// we want compile errors if new methods are added
+	pb.UnsafeAuthServer
 }
 
 func NewAuthServer(s *etcdserver.EtcdServer) *AuthServer {

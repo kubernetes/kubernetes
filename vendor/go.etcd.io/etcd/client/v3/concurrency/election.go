@@ -164,13 +164,13 @@ func (e *Election) Leader(ctx context.Context) (*v3.GetResponse, error) {
 //
 // The channel closes when the context is canceled or the underlying watcher
 // is otherwise disrupted.
-func (e *Election) Observe(ctx context.Context) <-chan v3.GetResponse {
-	retc := make(chan v3.GetResponse)
+func (e *Election) Observe(ctx context.Context) <-chan *v3.GetResponse {
+	retc := make(chan *v3.GetResponse)
 	go e.observe(ctx, retc)
 	return retc
 }
 
-func (e *Election) observe(ctx context.Context, ch chan<- v3.GetResponse) {
+func (e *Election) observe(ctx context.Context, ch chan<- *v3.GetResponse) {
 	client := e.session.Client()
 
 	defer close(ch)
@@ -196,8 +196,8 @@ func (e *Election) observe(ctx context.Context, ch chan<- v3.GetResponse) {
 				}
 				// only accept puts; a delete will make observe() spin
 				for _, ev := range wr.Events {
-					if ev.Type == mvccpb.PUT {
-						hdr, kv = &wr.Header, ev.Kv
+					if ev.Type == mvccpb.Event_PUT {
+						hdr, kv = wr.Header, ev.Kv
 						// may have multiple revs; hdr.rev = the last rev
 						// set to kv's rev in case batch has multiple Puts
 						hdr.Revision = kv.ModRevision
@@ -210,8 +210,12 @@ func (e *Election) observe(ctx context.Context, ch chan<- v3.GetResponse) {
 			hdr, kv = resp.Header, resp.Kvs[0]
 		}
 
+		if hdr == nil {
+			hdr = &pb.ResponseHeader{}
+		}
+
 		select {
-		case ch <- v3.GetResponse{Header: hdr, Kvs: []*mvccpb.KeyValue{kv}}:
+		case ch <- &v3.GetResponse{Header: hdr, Kvs: []*mvccpb.KeyValue{kv}}:
 		case <-ctx.Done():
 			return
 		}
@@ -226,14 +230,14 @@ func (e *Election) observe(ctx context.Context, ch chan<- v3.GetResponse) {
 				return
 			}
 			for _, ev := range wr.Events {
-				if ev.Type == mvccpb.DELETE {
+				if ev.Type == mvccpb.Event_DELETE {
 					keyDeleted = true
 					break
 				}
-				resp.Header = &wr.Header
+				resp.Header = wr.Header
 				resp.Kvs = []*mvccpb.KeyValue{ev.Kv}
 				select {
-				case ch <- *resp:
+				case ch <- resp:
 				case <-cctx.Done():
 					cancel()
 					return

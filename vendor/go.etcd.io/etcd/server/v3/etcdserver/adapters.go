@@ -51,13 +51,13 @@ func (s *serverVersionAdapter) LinearizableReadNotify(ctx context.Context) error
 
 func (s *serverVersionAdapter) DowngradeEnable(ctx context.Context, targetVersion *semver.Version) error {
 	raftRequest := membershippb.DowngradeInfoSetRequest{Enabled: true, Ver: targetVersion.String()}
-	_, err := s.raftRequest(ctx, pb.InternalRaftRequest{DowngradeInfoSet: &raftRequest})
+	_, err := s.raftRequest(ctx, &pb.InternalRaftRequest{DowngradeInfoSet: &raftRequest})
 	return err
 }
 
 func (s *serverVersionAdapter) DowngradeCancel(ctx context.Context) error {
 	raftRequest := membershippb.DowngradeInfoSetRequest{Enabled: false}
-	_, err := s.raftRequest(ctx, pb.InternalRaftRequest{DowngradeInfoSet: &raftRequest})
+	_, err := s.raftRequest(ctx, &pb.InternalRaftRequest{DowngradeInfoSet: &raftRequest})
 	return err
 }
 

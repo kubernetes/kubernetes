@@ -27,14 +27,14 @@ func (tw *watchableStoreTxnWrite) End() {
 	}
 
 	rev := tw.Rev() + 1
-	evs := make([]mvccpb.Event, len(changes))
+	evs := make([]*mvccpb.Event, len(changes))
 	for i, change := range changes {
-		evs[i].Kv = &changes[i]
-		if change.CreateRevision == 0 {
-			evs[i].Type = mvccpb.DELETE
+		evs[i] = &mvccpb.Event{Kv: changes[i]}
+		if change.GetCreateRevision() == 0 {
+			evs[i].Type = mvccpb.Event_DELETE
 			evs[i].Kv.ModRevision = rev
 		} else {
-			evs[i].Type = mvccpb.PUT
+			evs[i].Type = mvccpb.Event_PUT
 		}
 	}
 
