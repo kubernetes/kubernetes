@@ -2,9 +2,9 @@
 
 module k8s.io/cri-client
 
-go 1.25.0
+go 1.26.0
 
-godebug default=go1.25
+godebug default=go1.26
 
 require (
 	github.com/Microsoft/go-winio v0.6.2

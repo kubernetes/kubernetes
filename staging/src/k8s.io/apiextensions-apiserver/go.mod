@@ -2,9 +2,9 @@
 
 module k8s.io/apiextensions-apiserver
 
-go 1.25.0
+go 1.26.0
 
-godebug default=go1.25
+godebug default=go1.26
 
 require (
 	github.com/emicklei/go-restful/v3 v3.13.0
