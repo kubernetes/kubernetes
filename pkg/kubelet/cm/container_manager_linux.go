@@ -785,7 +785,7 @@ func isProcessRunningInHost(logger klog.Logger, pid int) (bool, error) {
 	logger.V(10).Info("Found init PID namespace", "namespace", initPidNs)
 	processPidNs, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/pid", pid))
 	if err != nil {
-		return false, fmt.Errorf("failed to find pid namespace of process %q", pid)
+		return false, fmt.Errorf("failed to find pid namespace of process %d", pid)
 	}
 	logger.V(10).Info("Process info", "pid", pid, "namespace", processPidNs)
 	return initPidNs == processPidNs, nil

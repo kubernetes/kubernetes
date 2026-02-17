@@ -209,8 +209,8 @@ func (ne *NodeExpander) expandOnPlugin() (bool, resource.Quantity, error) {
 		return false, ne.pluginResizeOpts.OldSize, resizeErr
 	}
 	simpleMsg, detailedMsg := ne.vmt.GenerateMsg("MountVolume.NodeExpandVolume succeeded", nodeName)
-	ne.recorder.Eventf(ne.vmt.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
-	ne.recorder.Eventf(ne.pvc, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
+	ne.recorder.Eventf(ne.vmt.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, "%s", simpleMsg)
+	ne.recorder.Eventf(ne.pvc, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, "%s", simpleMsg)
 	klog.InfoS(detailedMsg, "pod", klog.KObj(ne.vmt.Pod))
 
 	ne.testStatus = testResponseData{true /*resizeCalledOnPlugin */, true /* assumeResizeFinished */}

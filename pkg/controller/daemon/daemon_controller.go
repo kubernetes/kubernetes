@@ -886,13 +886,13 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 				msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, pod.Name, node.Name)
 				logger.V(2).Info("Found failed daemon pod on node, will try to kill it", "pod", klog.KObj(pod), "node", klog.KObj(node))
 				// Emit an event so that it's discoverable to users.
-				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
+				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, "%s", msg)
 				podsToDelete = append(podsToDelete, pod.Name)
 			} else if pod.Status.Phase == v1.PodSucceeded {
 				msg := fmt.Sprintf("Found succeeded daemon pod %s/%s on node %s, will try to delete it", pod.Namespace, pod.Name, node.Name)
 				logger.V(2).Info("Found succeeded daemon pod on node, will try to delete it", "pod", klog.KObj(pod), "node", klog.KObj(node))
 				// Emit an event so that it's discoverable to users.
-				dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, SucceededDaemonPodReason, msg)
+				dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, SucceededDaemonPodReason, "%s", msg)
 				podsToDelete = append(podsToDelete, pod.Name)
 			} else {
 				daemonPodsRunning = append(daemonPodsRunning, pod)

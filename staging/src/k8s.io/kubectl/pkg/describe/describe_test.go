@@ -1502,10 +1502,10 @@ func TestDescribeResources(t *testing.T) {
 			describeResources(testCase.resources, writer, LEVEL_1)
 			output := out.String()
 			gotElements := make(map[string]int)
-			for key, val := range testCase.expectedElements {
+			for key := range testCase.expectedElements {
 				count := strings.Count(output, key)
 				if count == 0 {
-					t.Errorf("expected to find %q in output: %q", val, output)
+					t.Errorf("expected to find %q in output: %q", key, output)
 					continue
 				}
 				gotElements[key] = count

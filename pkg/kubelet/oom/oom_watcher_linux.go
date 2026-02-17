@@ -86,7 +86,7 @@ func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error
 				if event.ProcessName != "" && event.Pid != 0 {
 					eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
 				}
-				ow.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
+				ow.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, systemOOMEvent, "%s", eventMsg)
 			}
 		}
 		logger.Error(nil, "Unexpectedly stopped receiving OOM notifications")

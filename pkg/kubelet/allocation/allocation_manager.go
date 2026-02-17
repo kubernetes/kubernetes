@@ -587,7 +587,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
 		msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
-		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, msg)
+		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
 		return true, nil
 	}
 
@@ -598,7 +598,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 				eventType = events.ResizeInfeasible
 			}
 			msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, msg)
+			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
 		}
 	}
 
