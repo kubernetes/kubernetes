@@ -34,6 +34,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/lifecycle"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -88,6 +89,8 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		scheduling.Resource("workloads").WithVersion("v1beta1"),
 		scheduling.Resource("podgroups").WithVersion("v1beta1"),
 		scheduling.Resource("compositepodgroups").WithVersion("v1alpha3"),
+		lifecycle.Resource("evictions").WithVersion("v1alpha1"),
+		lifecycle.Resource("evictionrequests").WithVersion("v1alpha1"),
 	}
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,
