@@ -52,7 +52,7 @@ func newTestPod(namespace string) *v1.Pod {
 	}
 }
 
-var _ = SIGDescribe("Override hostname of Pod", framework.WithFeatureGate(features.HostnameOverride), func() {
+var _ = SIGDescribe("Override hostname of Pod", framework.WithNodeConformance(), framework.WithFeatureGate(features.HostnameOverride), func() {
 	f := framework.NewDefaultFramework("hostfqdn")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

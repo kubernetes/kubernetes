@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -80,7 +81,7 @@ func offsetMemory(index int64, value string) string {
 }
 
 func doGuaranteedPodResizeTests(f *framework.Framework) {
-	ginkgo.DescribeTableSubtree("guaranteed qos - 1 container with resize policy", func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy, resizeInitCtrs bool) {
+	ginkgo.DescribeTableSubtree("guaranteed qos - 1 container with resize policy", feature.InPlacePodVerticalScaling, func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy, resizeInitCtrs bool) {
 		ginkgo.DescribeTable("resizing", func(ctx context.Context, desiredCPU, desiredMem string) {
 
 			// The tests for guaranteed pods include extended resources.
@@ -237,7 +238,7 @@ type resourceRequestsLimits struct {
 }
 
 func doBurstablePodResizeTests(f *framework.Framework) {
-	ginkgo.DescribeTableSubtree("burstable pods - 1 container with all requests & limits set and resize policy", func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy) {
+	ginkgo.DescribeTableSubtree("burstable pods - 1 container with all requests & limits set and resize policy", feature.InPlacePodVerticalScaling, func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy) {
 		ginkgo.DescribeTable("resizing", func(ctx context.Context, desiredContainerResources resourceRequestsLimits) {
 			originalContainers := makeBurstableContainers(1, cpuPolicy, memPolicy, originalCPU, originalCPULimit, originalMem, originalMemLimit)
 			expectedContainers := makeBurstableContainers(1, cpuPolicy, memPolicy, desiredContainerResources.cpuReq, desiredContainerResources.cpuLim, desiredContainerResources.memReq, desiredContainerResources.memLim)
@@ -366,7 +367,7 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 }
 
 func doPodResizePatchErrorTests(f *framework.Framework) {
-	ginkgo.DescribeTable("apply invalid resize patch requests", func(ctx context.Context, originalContainers, desiredContainers []podresize.ResizableContainerInfo, patchError string, waitForStart bool) {
+	ginkgo.DescribeTable("apply invalid resize patch requests", feature.InPlacePodVerticalScaling, func(ctx context.Context, originalContainers, desiredContainers []podresize.ResizableContainerInfo, patchError string, waitForStart bool) {
 		podClient := e2epod.NewPodClient(f)
 		var newPod *v1.Pod
 
@@ -611,7 +612,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 	// 1. Decrease the limit a little bit - should succeed
 	// 2. Decrease the limit down to a tiny amount - should fail
 	// 3. Revert the limit back to the original value - should succeed
-	ginkgo.It("decrease memory limit below usage", func(ctx context.Context) {
+	ginkgo.It("decrease memory limit below usage", feature.InPlacePodVerticalScaling, func(ctx context.Context) {
 		podClient := e2epod.NewPodClient(f)
 		original := []podresize.ResizableContainerInfo{{
 			Name:      "c1",

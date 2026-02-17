@@ -129,6 +129,10 @@ var (
 	// their dependency on specific feature gates and the corresponding API groups.
 	DynamicResourceAllocation = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
 
+	// Owner: sig-node
+	// EnvFiles is used for testing the EnvFiles feature (file-based environment variables).
+	EnvFiles = framework.WithFeature(framework.ValidFeatures.Add("EnvFiles"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	EphemeralStorage = framework.WithFeature(framework.ValidFeatures.Add("EphemeralStorage"))
 
@@ -201,6 +205,10 @@ var (
 	// Owner: sig-node
 	// ImageVolume is used for testing the image volume source feature (https://kep.k8s.io/4639).
 	ImageVolume = framework.WithFeature(framework.ValidFeatures.Add("ImageVolume"))
+
+	// Owner: sig-node
+	// InPlacePodVerticalScaling is used for testing in-place pod vertical scaling (https://kep.k8s.io/1287).
+	InPlacePodVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
 
 	// Owner: sig-network
 	// Marks tests that require a conforming implementation of
@@ -444,6 +452,10 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StorageVersionAPI = framework.WithFeature(framework.ValidFeatures.Add("StorageVersionAPI"))
+
+	// Owner: sig-node
+	// SupplementalGroupsPolicy is used for testing the SupplementalGroupsPolicy feature.
+	SupplementalGroupsPolicy = framework.WithFeature(framework.ValidFeatures.Add("SupplementalGroupsPolicy"))
 
 	// The Swap feature tests must run on nodes with the swap memory allocated and kubelet swap enabled. KEP-2400 (Node Swap Support)
 	Swap = framework.WithFeature(framework.ValidFeatures.Add("NodeSwap"))
