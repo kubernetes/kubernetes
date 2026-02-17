@@ -421,7 +421,7 @@ linters:
               - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
               - "ssatags" # Ensure lists have a listType tag.
-              # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
+              - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
               - "duplicatemarkers" #Prevent identical markers from being present on types and fields
               - "dependenttags" # Ensure markers dependent on other markers are present.
               - "nodurations" # Ensure duration types are not used.
