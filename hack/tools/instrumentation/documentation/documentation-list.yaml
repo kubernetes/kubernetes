@@ -6775,30 +6775,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: legacy_tokens_total
-  subsystem: serviceaccount
-  help: Cumulative legacy service account tokens used
-  type: Counter
-  stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: stale_tokens_total
-  subsystem: serviceaccount
-  help: Cumulative stale projected service account tokens used
-  type: Counter
-  stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: valid_tokens_total
-  subsystem: serviceaccount
-  help: Cumulative valid projected service account tokens used
-  type: Counter
-  stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: stale_sync_skips_total
   subsystem: statefulset_controller
   help: Total number of StatefulSet syncs skipped due to a stale watch cache.
@@ -7793,6 +7769,30 @@
   - profile
   componentEndpoints:
   - component: kube-scheduler
+    endpoint: /metrics
+- name: legacy_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative legacy service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: stale_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative stale projected service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: valid_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative valid projected service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
     endpoint: /metrics
 - name: storage_operation_duration_seconds
   help: Storage operation duration
