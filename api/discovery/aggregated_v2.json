@@ -1620,91 +1620,6 @@
     },
     {
       "metadata": {
-        "name": "coordination.k8s.io"
-      },
-      "versions": [
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "leases",
-              "responseKind": {
-                "group": "",
-                "kind": "Lease",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "lease",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "leasecandidates",
-              "responseKind": {
-                "group": "",
-                "kind": "LeaseCandidate",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "leasecandidate",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "leasecandidates",
-              "responseKind": {
-                "group": "",
-                "kind": "LeaseCandidate",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "leasecandidate",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1alpha2"
-        }
-      ]
-    },
-    {
-      "metadata": {
         "name": "node.k8s.io"
       },
       "versions": [
@@ -2187,6 +2102,167 @@
             }
           ],
           "version": "v1alpha3"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "name": "coordination.k8s.io"
+      },
+      "versions": [
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "leases",
+              "responseKind": {
+                "group": "",
+                "kind": "Lease",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "lease",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "leasecandidates",
+              "responseKind": {
+                "group": "",
+                "kind": "LeaseCandidate",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "leasecandidate",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "leasecandidates",
+              "responseKind": {
+                "group": "",
+                "kind": "LeaseCandidate",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "leasecandidate",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha2"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "evictionrequests",
+              "responseKind": {
+                "group": "",
+                "kind": "EvictionRequest",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "evictionrequest",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "EvictionRequest",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "evictions",
+              "responseKind": {
+                "group": "",
+                "kind": "Eviction",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "eviction",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "Eviction",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     },
