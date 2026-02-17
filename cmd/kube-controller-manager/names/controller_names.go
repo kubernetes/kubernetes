@@ -76,6 +76,7 @@ const (
 	ClusterRoleAggregationController                   = "clusterrole-aggregation-controller"
 	PersistentVolumeClaimProtectionController          = "persistentvolumeclaim-protection-controller"
 	PersistentVolumeProtectionController               = "persistentvolume-protection-controller"
+	PodGroupProtectionController                       = "podgroup-protection-controller"
 	TTLAfterFinishedController                         = "ttl-after-finished-controller"
 	RootCACertificatePublisherController               = "root-ca-certificate-publisher-controller"
 	KubeAPIServerClusterTrustBundlePublisherController = "kube-apiserver-serving-clustertrustbundle-publisher-controller"
