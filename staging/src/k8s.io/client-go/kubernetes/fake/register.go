@@ -39,7 +39,6 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -52,6 +51,7 @@ import (
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -104,7 +104,6 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	certificatesv1.AddToScheme,
 	certificatesv1beta1.AddToScheme,
 	certificatesv1alpha1.AddToScheme,
-	coordinationv1alpha1.AddToScheme,
 	coordinationv1alpha2.AddToScheme,
 	coordinationv1beta1.AddToScheme,
 	coordinationv1.AddToScheme,
@@ -118,6 +117,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	flowcontrolv1beta1.AddToScheme,
 	flowcontrolv1beta2.AddToScheme,
 	flowcontrolv1beta3.AddToScheme,
+	lifecyclev1alpha1.AddToScheme,
 	networkingv1.AddToScheme,
 	networkingv1beta1.AddToScheme,
 	nodev1.AddToScheme,
