@@ -33,6 +33,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -5122,7 +5123,11 @@ func createJobWithDefaults(ctx context.Context, clientSet clientset.Interface, n
 
 func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient.Config, clientset.Interface, *v1.Namespace) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	flags := framework.DefaultTestServerFlags()
+	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1alpha2=true")
+	}
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	config.QPS = restConfigQPS
@@ -5171,7 +5176,17 @@ func createJobControllerWithSharedInformers(tb testing.TB, restConfig *restclien
 	clientSet := clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-controller"))
 	_, ctx := ktesting.NewTestContext(tb)
 	ctx, cancel := context.WithCancel(ctx)
-	jc, err := jobcontroller.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+
+	var jc *jobcontroller.Controller
+	var err error
+	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+		jc, err = jobcontroller.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet,
+			informerSet.Scheduling().V1alpha2().Workloads(),
+			informerSet.Scheduling().V1alpha2().PodGroups(),
+		)
+	} else {
+		jc, err = jobcontroller.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet, nil, nil)
+	}
 	if err != nil {
 		tb.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -5229,6 +5244,64 @@ func waitForPodsToBeActive(ctx context.Context, t *testing.T, jobClient typedv1.
 	if err != nil {
 		t.Fatalf("Error waiting for Job pods to become active: %v", err)
 	}
+}
+
+// waitForWorkload waits for a Workload owned by the given Job to appear
+// (expectAbsent=false) or to not exist (expectAbsent=true).
+func waitForWorkload(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1alpha2.Workload {
+	t.Helper()
+	var workload *schedulingv1alpha2.Workload
+	err := wait.PollUntilContextTimeout(ctx, waitInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		workloads, listErr := clientSet.SchedulingV1alpha2().Workloads(job.Namespace).List(ctx, metav1.ListOptions{})
+		if listErr != nil {
+			return false, listErr
+		}
+		for i := range workloads.Items {
+			for _, ref := range workloads.Items[i].OwnerReferences {
+				if ref.UID == job.UID {
+					if expectAbsent {
+						return false, nil
+					}
+					workload = &workloads.Items[i]
+					return true, nil
+				}
+			}
+		}
+		return expectAbsent, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for Workload owned by Job %q (expectAbsent=%v): %v", job.Name, expectAbsent, err)
+	}
+	return workload
+}
+
+// waitForPodGroup waits for a PodGroup owned by the given Job to appear
+// (expectAbsent=false) or to not exist (expectAbsent=true).
+func waitForPodGroup(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1alpha2.PodGroup {
+	t.Helper()
+	var podGroup *schedulingv1alpha2.PodGroup
+	err := wait.PollUntilContextTimeout(ctx, waitInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		podGroups, listErr := clientSet.SchedulingV1alpha2().PodGroups(job.Namespace).List(ctx, metav1.ListOptions{})
+		if listErr != nil {
+			return false, listErr
+		}
+		for i := range podGroups.Items {
+			for _, ref := range podGroups.Items[i].OwnerReferences {
+				if ref.UID == job.UID {
+					if expectAbsent {
+						return false, nil
+					}
+					podGroup = &podGroups.Items[i]
+					return true, nil
+				}
+			}
+		}
+		return expectAbsent, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for PodGroup owned by Job %q (expectAbsent=%v): %v", job.Name, expectAbsent, err)
+	}
+	return podGroup
 }
 
 func deletePods(ctx context.Context, t *testing.T, clientSet clientset.Interface, namespace string) {
@@ -5487,4 +5560,318 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 		}
 	}
 	t.Log("Verified: New pods have the updated resources")
+}
+
+func TestJobGangSchedulingWithWorkloadPodGroupCreation(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:       true,
+		features.EnableWorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "gang-scheduling-creation")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	parallelism := int32(4)
+	completionMode := batchv1.IndexedCompletion
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism:    &parallelism,
+			Completions:    &parallelism,
+			CompletionMode: &completionMode,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	workload := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+	podGroup := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+
+	// verify PodGroup ownerReferences: Job (controller) and Workload (non-controller).
+	expectedOwnerRefs := map[types.UID]string{
+		jobObj.UID:   "Job",
+		workload.UID: "Workload",
+	}
+	for _, ref := range podGroup.OwnerReferences {
+		delete(expectedOwnerRefs, ref.UID)
+	}
+	for uid, kind := range expectedOwnerRefs {
+		t.Errorf("PodGroup missing %s ownerReference (UID %v)", kind, uid)
+	}
+
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      int(parallelism),
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	// verify all job pods have the correct schedulingGroup.
+	pods, err := getJobPods(ctx, t, clientSet, jobObj, func(v1.PodStatus) bool { return true })
+	if err != nil {
+		t.Fatalf("Failed to get job pods: %v", err)
+	}
+	for _, pod := range pods {
+		if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+			t.Errorf("Pod %s missing schedulingGroup", pod.Name)
+			continue
+		}
+		if *pod.Spec.SchedulingGroup.PodGroupName != podGroup.Name {
+			t.Errorf("Pod %s schedulingGroup = %q, want %q", pod.Name, *pod.Spec.SchedulingGroup.PodGroupName, podGroup.Name)
+		}
+	}
+}
+
+func TestJobGangSchedulingWithNonEligibleJob(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:       true,
+		features.EnableWorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "gang-scheduling-noneligible")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	cases := map[string]batchv1.JobSpec{
+		"non-indexed job": {
+			Parallelism: ptr.To[int32](3),
+		},
+		"parallelism=1": {
+			Parallelism:    ptr.To[int32](1),
+			Completions:    ptr.To[int32](1),
+			CompletionMode: ptr.To(batchv1.IndexedCompletion),
+		},
+		"completions != parallelism": {
+			Parallelism:    ptr.To[int32](2),
+			Completions:    ptr.To[int32](5),
+			CompletionMode: ptr.To(batchv1.IndexedCompletion),
+		},
+	}
+
+	for name, spec := range cases {
+		t.Run(name, func(t *testing.T) {
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: spec,
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+				Active:      int(*spec.Parallelism),
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](0),
+			})
+
+			// verify no Workload or PodGroup was created for this job.
+			waitForWorkload(ctx, t, clientSet, jobObj, true, 10*time.Second)
+			waitForPodGroup(ctx, t, clientSet, jobObj, true, 10*time.Second)
+		})
+	}
+}
+
+func TestJobGangSchedulingWithOptOut(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:       true,
+		features.EnableWorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "gang-scheduling-optout")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	parallelism := int32(4)
+	completionMode := batchv1.IndexedCompletion
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism:    &parallelism,
+			Completions:    &parallelism,
+			CompletionMode: &completionMode,
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					SchedulingGroup: &v1.PodSchedulingGroup{
+						PodGroupName: ptr.To("external-pod-group"),
+					},
+					Containers:    []v1.Container{{Name: "foo", Image: "bar"}},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      int(parallelism),
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	// Verify no Workload or PodGroup was created for this opted-out job.
+	waitForWorkload(ctx, t, clientSet, jobObj, true, 10*time.Second)
+	waitForPodGroup(ctx, t, clientSet, jobObj, true, 10*time.Second)
+}
+
+func TestJobGangSchedulingWithControllerRestart(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:       true,
+		features.EnableWorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "gang-scheduling-restart")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+
+	parallelism := int32(4)
+	completionMode := batchv1.IndexedCompletion
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism:    &parallelism,
+			Completions:    &parallelism,
+			CompletionMode: &completionMode,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	originalWorkloadUID := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout).UID
+
+	// restart the controller.
+	cancel()
+	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+	// trigger a re-sync by updating the job (e.g., add an annotation).
+	_, err = updateJob(ctx, jobClient, jobObj.Name, func(j *batchv1.Job) {
+		if j.Annotations == nil {
+			j.Annotations = make(map[string]string)
+		}
+		j.Annotations["test-resync"] = "true"
+	})
+	if err != nil {
+		t.Fatalf("Failed to update job: %v", err)
+	}
+
+	// Wait for the controller to have processed the job after restart (pods still
+	// exist), then verify no duplicate Workload was created.
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      int(parallelism),
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	workload := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+	if workload.UID != originalWorkloadUID {
+		t.Errorf("Workload UID changed after restart: got %v, want %v", workload.UID, originalWorkloadUID)
+	}
+}
+
+func TestJobGangSchedulingWithSuspendedJob(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:       true,
+		features.EnableWorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "gang-scheduling-suspended")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	parallelism := int32(4)
+	completionMode := batchv1.IndexedCompletion
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism:    &parallelism,
+			Completions:    &parallelism,
+			CompletionMode: &completionMode,
+			Suspend:        ptr.To(true),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	// even suspended, the controller should create Workload and PodGroup.
+	waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+
+	// verify no pods are created while suspended.
+	jobPods, err := getJobPods(ctx, t, clientSet, jobObj, func(v1.PodStatus) bool { return true })
+	if err != nil {
+		t.Fatalf("Failed to get job pods: %v", err)
+	}
+	if len(jobPods) != 0 {
+		t.Errorf("Expected 0 pods for suspended job, got %d", len(jobPods))
+	}
+
+	// unsuspend the job.
+	_, err = updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
+		j.Spec.Suspend = ptr.To(false)
+	})
+	if err != nil {
+		t.Fatalf("Failed to unsuspend job: %v", err)
+	}
+
+	// wait for PodGroup and pods to be created after unsuspend.
+	podGroup := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      int(parallelism),
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	// verify all job pods have the correct schedulingGroup.
+	pods, err := getJobPods(ctx, t, clientSet, jobObj, func(v1.PodStatus) bool { return true })
+	if err != nil {
+		t.Fatalf("Failed to get job pods: %v", err)
+	}
+	for _, pod := range pods {
+		if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+			t.Errorf("Pod %s missing schedulingGroup", pod.Name)
+			continue
+		}
+		if *pod.Spec.SchedulingGroup.PodGroupName != podGroup.Name {
+			t.Errorf("Pod %s schedulingGroup = %q, want %q", pod.Name, *pod.Spec.SchedulingGroup.PodGroupName, podGroup.Name)
+		}
+	}
+}
+
+func TestJobGangSchedulingWithParallelismUpdateBlocked(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:       true,
+		features.EnableWorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "gang-scheduling-parallelism")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	parallelism := int32(4)
+	completionMode := batchv1.IndexedCompletion
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism:    &parallelism,
+			Completions:    &parallelism,
+			CompletionMode: &completionMode,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	// attempt to update parallelism.
+	_, err = updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
+		j.Spec.Parallelism = ptr.To[int32](2)
+	})
+	if err == nil {
+		t.Fatal("Expected error when updating parallelism of gang-scheduled job, got nil")
+	}
+	if !apierrors.IsInvalid(err) {
+		t.Errorf("Expected Invalid error, got: %v", err)
+	}
 }
