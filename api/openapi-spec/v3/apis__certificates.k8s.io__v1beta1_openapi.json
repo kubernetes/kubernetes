@@ -675,6 +675,11 @@
           {
             "group": "coordination.k8s.io",
             "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "DeleteOptions",
             "version": "v1alpha2"
           },
           {
@@ -1354,6 +1359,11 @@
             "group": "coordination.k8s.io",
             "kind": "WatchEvent",
             "version": "v1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           },
           {
             "group": "coordination.k8s.io",

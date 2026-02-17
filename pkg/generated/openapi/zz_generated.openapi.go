@@ -44,6 +44,7 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -458,6 +459,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		coordinationv1.Lease{}.OpenAPIModelName():                                                                       schema_k8sio_api_coordination_v1_Lease(ref),
 		coordinationv1.LeaseList{}.OpenAPIModelName():                                                                   schema_k8sio_api_coordination_v1_LeaseList(ref),
 		coordinationv1.LeaseSpec{}.OpenAPIModelName():                                                                   schema_k8sio_api_coordination_v1_LeaseSpec(ref),
+		coordinationv1alpha1.EvictionRequest{}.OpenAPIModelName():                                                       schema_k8sio_api_coordination_v1alpha1_EvictionRequest(ref),
+		coordinationv1alpha1.EvictionRequestList{}.OpenAPIModelName():                                                   schema_k8sio_api_coordination_v1alpha1_EvictionRequestList(ref),
+		coordinationv1alpha1.EvictionRequestSpec{}.OpenAPIModelName():                                                   schema_k8sio_api_coordination_v1alpha1_EvictionRequestSpec(ref),
+		coordinationv1alpha1.EvictionRequestStatus{}.OpenAPIModelName():                                                 schema_k8sio_api_coordination_v1alpha1_EvictionRequestStatus(ref),
+		coordinationv1alpha1.EvictionTarget{}.OpenAPIModelName():                                                        schema_k8sio_api_coordination_v1alpha1_EvictionTarget(ref),
+		coordinationv1alpha1.InterceptorStatus{}.OpenAPIModelName():                                                     schema_k8sio_api_coordination_v1alpha1_InterceptorStatus(ref),
+		coordinationv1alpha1.LocalTargetReference{}.OpenAPIModelName():                                                  schema_k8sio_api_coordination_v1alpha1_LocalTargetReference(ref),
+		coordinationv1alpha1.Requester{}.OpenAPIModelName():                                                             schema_k8sio_api_coordination_v1alpha1_Requester(ref),
 		v1alpha2.LeaseCandidate{}.OpenAPIModelName():                                                                    schema_k8sio_api_coordination_v1alpha2_LeaseCandidate(ref),
 		v1alpha2.LeaseCandidateList{}.OpenAPIModelName():                                                                schema_k8sio_api_coordination_v1alpha2_LeaseCandidateList(ref),
 		v1alpha2.LeaseCandidateSpec{}.OpenAPIModelName():                                                                schema_k8sio_api_coordination_v1alpha2_LeaseCandidateSpec(ref),
@@ -18950,6 +18959,438 @@ func schema_k8sio_api_coordination_v1_LeaseSpec(ref common.ReferenceCallback) co
 		},
 		Dependencies: []string{
 			metav1.MicroTime{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_coordination_v1alpha1_EvictionRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequest defines a request that should ideally result in a graceful eviction of a .spec.target (e.g. termination of a pod).\n\n`.spec.requesters` field should be set and kept updated to preserve the eviction request.\n\nIf the target is a pod, the .status.targetInterceptors is populated from Pod's .spec.evictionInterceptors.\n\nInterceptors should observe and communicate through the .status to help with the eviction of the target when they see their name present in .status.activeInterceptors. InterceptorStatus struct should then be periodically updated to indicate the progress or completion of the eviction process by each interceptor in .status.intercerptors. If .status.interceptors[].heartbeatTime is not updated within 20 minutes, the eviction request is passed over to the next interceptor.\n\nIf there are no other interceptor and the target is a pod, the last default imperative-eviction.k8s.io interceptor will evict the pod using the imperative Eviction API (/evict endpoint).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Object's metadata. .metadata.name should match the .metadata.uid of the pod being evicted. .metadata.generateName is not supported. The labels of the eviction request object are synchronized with .metadata.labels of the eviction request's target. The labels of the target have a preference. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the eviction request specification. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref(coordinationv1alpha1.EvictionRequestSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status represents the most recently observed status of the eviction request. Populated by interceptors and eviction request controller. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref(coordinationv1alpha1.EvictionRequestStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			coordinationv1alpha1.EvictionRequestSpec{}.OpenAPIModelName(), coordinationv1alpha1.EvictionRequestStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_coordination_v1alpha1_EvictionRequestList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequestList contains a list of EvictionRequests resources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of EvictionRequests.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(coordinationv1alpha1.EvictionRequest{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			coordinationv1alpha1.EvictionRequest{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_coordination_v1alpha1_EvictionRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequestSpec is a specification of an EvictionRequest.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Target contains a reference to an object (e.g. a pod) that should be evicted. Target UID must be the same as the EvictionRequest's .metadata.name. This field is immutable.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(coordinationv1alpha1.EvictionTarget{}.OpenAPIModelName()),
+						},
+					},
+					"requesters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Requesters allow you to identify entities, that requested the eviction of the target. At least one requester is required when creating an eviction request. A requester is also required for the eviction request to be processed. Empty list indicates that the eviction request should be canceled.\n\nRequester controllers are expected to reconcile this field and not overwrite any changes made by other controllers (e.g. via Server-Side Apply) in order to prevent conflicts and manage ownership.\n\nThe maximum length of the requesters list is 100.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(coordinationv1alpha1.Requester{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"target"},
+			},
+		},
+		Dependencies: []string{
+			coordinationv1alpha1.EvictionTarget{}.OpenAPIModelName(), coordinationv1alpha1.Requester{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_coordination_v1alpha1_EvictionRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequestStatus represents the last observed status of the eviction request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionRequest's .metadata.generation observed by the eviction request controller. The observed generation value cannot be negative and can only be incremented. This field is managed by Kubernetes.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"targetInterceptors": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "TargetInterceptors reference interceptors that should eventually respond to this eviction request to help with the graceful eviction of a target. These interceptors are selected sequentially, in the order in which they appear in the list and are added to the .status.activeInterceptors in a rolling fashion.\n\nIf the target is a pod, the field is populated from Pod's .spec.evictionInterceptors. Default interceptors may be added to the list according to the target.\n\nDefault interceptors: - imperative-eviction.k8s.io interceptor is appended to the end of the list if the target is\n  a pod. It will call the /evict API endpoint. This call may not succeed due to\n  PodDisruptionBudgets, which may block the pod termination. It will update the interceptor\n  message and try again with a backoff.\n\nThe maximum length of the interceptors list is 16. This field is immutable once set. This field is managed by Kubernetes.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(corev1.EvictionInterceptor{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"activeInterceptors": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ActiveInterceptors store a list of interceptors that should currently interact with the eviction process by updating .status.interceptors[], where .name is the active interceptor name. InterceptorStatus fields should be periodically updated to indicate the progress or completion of the eviction process. If .status.interceptors[].heartbeatTime field is not updated within 20 minutes, the eviction request is passed over to the next interceptor.\n\nThe maximum allowed number of active interceptors is 1. An active interceptor is removed from this list when .status.interceptors[].completionTime is set. This field is managed by Kubernetes.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"processedInterceptors": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ProcessedInterceptors store a list of interceptors that have previously been selected and added to ActiveInterceptors. These interceptors may have reached completion, been canceled, failed to start or failed to update .interceptors[].heartbeatTime` in a timely manner. Please refer to the InterceptorStatus for each interceptor for more details. This field is managed by Kubernetes.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"interceptors": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Interceptors represents the eviction process status of each declared interceptor. Only ActiveInterceptors should update the interceptor statuses.\n\nThe interceptor list should be the same length and have the same .name fields as .status.targetInterceptors. Only interceptors with .name that are included in .status.activeInterceptors can be mutated. First initialization of the list is allowed.\n\nEach InterceptorStatus is managed by the designated interceptor.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(coordinationv1alpha1.InterceptorStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions contain information about the eviction request.\n\nEviction request specific conditions are: Evicted or Canceled (managed by Kubernetes),\n\n- Canceled means that the eviction request is no longer being processed by any eviction\n  interceptor because the eviction request has been canceled.\n- Evicted means that the target has been evicted (e.g. a pod has been terminated or deleted).",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			coordinationv1alpha1.InterceptorStatus{}.OpenAPIModelName(), corev1.EvictionInterceptor{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_coordination_v1alpha1_EvictionTarget(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionTarget contains a reference to an object that should be evicted.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"pod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Pod references a pod that is subject to eviction/termination. Pods that are part of the workload (.spec.workloadRef is set) are not supported.",
+							Ref:         ref(coordinationv1alpha1.LocalTargetReference{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"pod": "Pod",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			coordinationv1alpha1.LocalTargetReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_coordination_v1alpha1_InterceptorStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "InterceptorStatus represents the last observed status of the eviction process of the interceptor. It should be only updated by the designated interceptor whose name is .name field.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name must be a fully qualified domain name of at most 253 characters in length, consisting only of lowercase alphanumeric characters, periods and hyphens (e.g. bar.example.com). This field is initialized by Kubernetes and must be unique for each interceptor. This field is required and immutable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"startTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "StartTime tracks the time at which this interceptor was designated as active and should start processing the eviction request. It should reflect the present time when set. This field is initialized by Kubernetes when this interceptor becomes active. This field becomes immutable once set.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"heartbeatTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "HeartbeatTime is the last time at which the eviction process was reported to be in progress by the interceptor. It should reflect the present time when set. There must be at least 60 second increments during subsequent updates.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"expectedCompletionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ExpectedCompletionTime is the time at which the eviction process step is expected to end for the interceptor. The time cannot be set to the past. May be empty if no estimate can be made.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"completionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CompletionTime tracks the time at which the Interceptor stopped processing the eviction request. Completion means that the interceptors has either fully or partially completed the eviction process, which may have resulted in target eviction (e.g. pod termination). It should reflect the present time when set. This field becomes immutable once set.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Message provides human-readable details about the state of the interceptor and the eviction process. Maximum length is 4000 characters. The string is truncated if it exceeds this limit.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.Time{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_coordination_v1alpha1_LocalTargetReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LocalTargetReference contains enough information to locate the referenced target inside the same namespace.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the target. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UID of the target. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "uid"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_coordination_v1alpha1_Requester(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Requester allows you to identify the entity, that requested the eviction of the target.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name must be a fully qualified domain name of at most 253 characters in length, consisting only of lowercase alphanumeric characters, periods and hyphens (e.g. foo.example.com). This field must be unique for each requester. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
+			},
+		},
 	}
 }
 
