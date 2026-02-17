@@ -185,9 +185,11 @@ type VolumeAttachmentSpec struct {
 	Attacher string `json:"attacher" protobuf:"bytes,1,opt,name=attacher"`
 
 	// source represents the volume that should be attached.
+	// +optional
 	Source VolumeAttachmentSource `json:"source" protobuf:"bytes,2,opt,name=source"`
 
 	// nodeName represents the node that the volume should be attached to.
+	// +required
 	NodeName string `json:"nodeName" protobuf:"bytes,3,opt,name=nodeName"`
 }
 
@@ -215,6 +217,7 @@ type VolumeAttachmentStatus struct {
 	// attached indicates the volume is successfully attached.
 	// This field must only be set by the entity completing the attach
 	// operation, i.e. the external-attacher.
+	// +optional
 	Attached bool `json:"attached" protobuf:"varint,1,opt,name=attached"`
 
 	// attachmentMetadata is populated with any
@@ -285,9 +288,11 @@ type CSIDriver struct {
 	// an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and
 	// alphanumerics between.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec represents the specification of the CSI Driver.
+	// +optional
 	Spec CSIDriverSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -533,6 +538,7 @@ type VolumeLifecycleMode string
 type TokenRequest struct {
 	// audience is the intended audience of the token in "TokenRequestSpec".
 	// It will default to the audiences of kube apiserver.
+	// +optional
 	Audience string `json:"audience" protobuf:"bytes,1,opt,name=audience"`
 
 	// expirationSeconds is the duration of validity of the token in "TokenRequestSpec".
@@ -586,9 +592,11 @@ type CSINode struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// metadata.name must be the Kubernetes node name.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec is the specification of CSINode
+	// +required
 	Spec CSINodeSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -600,6 +608,7 @@ type CSINodeSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +required
 	Drivers []CSINodeDriver `json:"drivers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=drivers"`
 }
 
@@ -608,6 +617,7 @@ type CSINodeDriver struct {
 	// name represents the name of the CSI driver that this object refers to.
 	// This MUST be the same name returned by the CSI GetPluginName() call for
 	// that driver.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// nodeID of the node from the driver point of view.
@@ -618,6 +628,7 @@ type CSINodeDriver struct {
 	// system to attach a volume to a specific node, it can use this field to
 	// refer to the node name using the ID that the storage system will
 	// understand, e.g. "nodeA" instead of "node1". This field is required.
+	// +required
 	NodeID string `json:"nodeID" protobuf:"bytes,2,opt,name=nodeID"`
 
 	// topologyKeys is the list of keys supported by the driver.
@@ -729,6 +740,7 @@ type CSIStorageCapacity struct {
 	// the CSIStorageCapacity object is obsolete and should be removed by its
 	// creator.
 	// This field is immutable.
+	// +required
 	StorageClassName string `json:"storageClassName" protobuf:"bytes,3,name=storageClassName"`
 
 	// capacity is the value reported by the CSI driver in its GetCapacityResponse
@@ -796,6 +808,7 @@ type VolumeAttributesClass struct {
 
 	// Name of the CSI driver
 	// This field is immutable.
+	// +required
 	DriverName string `json:"driverName" protobuf:"bytes,2,opt,name=driverName"`
 
 	// parameters hold volume attributes defined by the CSI driver. These values
@@ -811,6 +824,7 @@ type VolumeAttributesClass struct {
 	// a cumulative max size of 256K. If the CSI driver rejects invalid parameters,
 	// the target PersistentVolumeClaim will be set to an "Infeasible" state in the
 	// modifyVolumeStatus field.
+	// +required
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 }
 

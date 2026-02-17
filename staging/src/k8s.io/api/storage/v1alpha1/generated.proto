@@ -82,6 +82,7 @@ message CSIStorageCapacity {
   // the CSIStorageCapacity object is obsolete and should be removed by its
   // creator.
   // This field is immutable.
+  // +required
   optional string storageClassName = 3;
 
   // capacity is the value reported by the CSI driver in its GetCapacityResponse
@@ -186,9 +187,11 @@ message VolumeAttachmentSpec {
   optional string attacher = 1;
 
   // source represents the volume that should be attached.
+  // +optional
   optional VolumeAttachmentSource source = 2;
 
   // nodeName represents the node that the volume should be attached to.
+  // +required
   optional string nodeName = 3;
 }
 
@@ -197,6 +200,7 @@ message VolumeAttachmentStatus {
   // attached indicates the volume is successfully attached.
   // This field must only be set by the entity completing the attach
   // operation, i.e. the external-attacher.
+  // +optional
   optional bool attached = 1;
 
   // attachmentMetadata is populated with any
@@ -231,6 +235,7 @@ message VolumeAttributesClass {
 
   // Name of the CSI driver
   // This field is immutable.
+  // +required
   optional string driverName = 2;
 
   // parameters hold volume attributes defined by the CSI driver. These values
@@ -246,6 +251,7 @@ message VolumeAttributesClass {
   // a cumulative max size of 256K. If the CSI driver rejects invalid parameters,
   // the target PersistentVolumeClaim will be set to an "Infeasible" state in the
   // modifyVolumeStatus field.
+  // +required
   map<string, string> parameters = 3;
 }
 

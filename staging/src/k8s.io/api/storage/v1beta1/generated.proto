@@ -47,9 +47,11 @@ message CSIDriver {
   // an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and
   // alphanumerics between.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec represents the specification of the CSI Driver.
+  // +optional
   optional CSIDriverSpec spec = 2;
 }
 
@@ -266,9 +268,11 @@ message CSIDriverSpec {
 // CSINode has an OwnerReference that points to the corresponding node object.
 message CSINode {
   // metadata.name must be the Kubernetes node name.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the specification of CSINode
+  // +required
   optional CSINodeSpec spec = 2;
 }
 
@@ -277,6 +281,7 @@ message CSINodeDriver {
   // name represents the name of the CSI driver that this object refers to.
   // This MUST be the same name returned by the CSI GetPluginName() call for
   // that driver.
+  // +required
   optional string name = 1;
 
   // nodeID of the node from the driver point of view.
@@ -287,6 +292,7 @@ message CSINodeDriver {
   // system to attach a volume to a specific node, it can use this field to
   // refer to the node name using the ID that the storage system will
   // understand, e.g. "nodeA" instead of "node1". This field is required.
+  // +required
   optional string nodeID = 2;
 
   // topologyKeys is the list of keys supported by the driver.
@@ -328,6 +334,7 @@ message CSINodeSpec {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
+  // +required
   repeated CSINodeDriver drivers = 1;
 }
 
@@ -383,6 +390,7 @@ message CSIStorageCapacity {
   // the CSIStorageCapacity object is obsolete and should be removed by its
   // creator.
   // This field is immutable.
+  // +required
   optional string storageClassName = 3;
 
   // capacity is the value reported by the CSI driver in its GetCapacityResponse
@@ -497,6 +505,7 @@ message StorageClassList {
 message TokenRequest {
   // audience is the intended audience of the token in "TokenRequestSpec".
   // It will default to the audiences of kube apiserver.
+  // +optional
   optional string audience = 1;
 
   // expirationSeconds is the duration of validity of the token in "TokenRequestSpec".
@@ -570,9 +579,11 @@ message VolumeAttachmentSpec {
   optional string attacher = 1;
 
   // source represents the volume that should be attached.
+  // +optional
   optional VolumeAttachmentSource source = 2;
 
   // nodeName represents the node that the volume should be attached to.
+  // +required
   optional string nodeName = 3;
 }
 
@@ -581,6 +592,7 @@ message VolumeAttachmentStatus {
   // attached indicates the volume is successfully attached.
   // This field must only be set by the entity completing the attach
   // operation, i.e. the external-attacher.
+  // +optional
   optional bool attached = 1;
 
   // attachmentMetadata is populated with any
@@ -615,6 +627,7 @@ message VolumeAttributesClass {
 
   // Name of the CSI driver
   // This field is immutable.
+  // +required
   optional string driverName = 2;
 
   // parameters hold volume attributes defined by the CSI driver. These values
@@ -630,6 +643,7 @@ message VolumeAttributesClass {
   // a cumulative max size of 256K. If the CSI driver rejects invalid parameters,
   // the target PersistentVolumeClaim will be set to an "Infeasible" state in the
   // modifyVolumeStatus field.
+  // +required
   map<string, string> parameters = 3;
 }
 
