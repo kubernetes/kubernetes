@@ -17,6 +17,7 @@ limitations under the License.
 package devicetainteviction
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -44,8 +45,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/component-base/featuregate"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
@@ -66,6 +70,18 @@ func init() {
 		string(features.DRADeviceTaints):     true,
 		string(features.DRADeviceTaintRules): true,
 	}); err != nil {
+		panic(err)
+	}
+
+	// Disabled because we not only use the fake client, we also wrap it:
+	// that prevents auto-detection via IsWatchListSemanticsUnSupported.
+	// This here is simpler than implementing IsWatchListSemanticsUnSupported.
+	//
+	// We cannot use clientfeaturestesting.SetFeatureDuringTest (needs testing.TB),
+	// so here we just do it ourselves.
+	if err := clientfeatures.FeatureGates().(interface {
+		Set(clientfeatures.Feature, bool) error
+	}).Set(clientfeatures.WatchListClient, false); err != nil {
 		panic(err)
 	}
 }
@@ -2367,14 +2383,15 @@ func testEviction(tCtx ktesting.TContext) {
 func TestDeviceTaintRule(t *testing.T) { testDeviceTaintRule(ktesting.Init(t)) }
 func testDeviceTaintRule(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	tCtx.SyncTest("immediate", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, false) })
-	tCtx.SyncTest("delayed", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, true) })
+	tCtx.SyncTest("immediate", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, false, false) })
+	tCtx.SyncTest("delayed", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, true, false) })
+	tCtx.SyncTest("slow", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, true, true) })
 }
-func synctestDeviceTaintRule(tCtx ktesting.TContext, delayed bool) {
+func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool) {
 	rule := ruleNone.DeepCopy()
 	claim := inUseClaim.DeepCopy()
 	tolerationSeconds := int64(0)
-	if delayed {
+	if toleration {
 		tolerationSeconds = 30
 		claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 			Effect:            resourceapi.DeviceTaintEffectNoExecute,
@@ -2383,7 +2400,17 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, delayed bool) {
 		}}
 	}
 	fakeClientset := fake.NewClientset(podWithClaimName, claim, rule)
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	blockDelete := make(chan struct{})
+	client := clientset.Interface(fakeClientset)
+	if slowDelete {
+		client = &myFakeClient{client, func() {
+			// This coordinates with the main goroutine to move forward after a certain delay.
+			tCtx.Logf("Delaying pod deletion")
+			<-blockDelete
+			tCtx.Logf("Proceeding with pod deletion")
+		}}
+	}
+	tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
@@ -2430,9 +2457,16 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, delayed bool) {
 	}
 	check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &updated)), expectedPods)
 
+	var slowDeleteDelay time.Duration
 	if tolerationSeconds > 0 {
-		// Need to move forward in time past the delay.
+		// Need to move forward in time past the delay(s)
 		time.Sleep(time.Duration(tolerationSeconds) * time.Second)
+		if slowDelete {
+			// This is going to show up in the histogram.
+			slowDeleteDelay = 3 * time.Second
+			time.Sleep(slowDeleteDelay)
+			close(blockDelete)
+		}
 		tCtx.Wait()
 		// Now the pod is deleted. Status gets updated later.
 		check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &updated)), nil)
@@ -2458,8 +2492,7 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, delayed bool) {
 
 	tCtx.Assert(controller.workqueue.Len()).Should(gomega.Equal(0), "work queue empty")
 	// There are no delays inside a synctest bubble. The pod always gets deleted "immediately".
-	// TODO: simulate delays?
-	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, 0))
+	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, slowDeleteDelay))
 }
 
 func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.DeviceTaintRule, expectPods []*v1.Pod) {
@@ -2480,6 +2513,40 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcealpha.D
 	rules, err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, prefix+"list rules")
 	assertEqual(tCtx, expectRules, trimRules(rules.Items), prefix+"rules", opts...)
+}
+
+// myFakeClient and it's children have a single purpose: inject a callback into
+// CoreV1().Pods().Delete. We cannot use fakeClientset.PrependReactor for that
+// because it invokes the callback while holding the fake's mutex. If any other
+// goroutine then also makes an API call, a synctest bubble deadlocks because
+// holding the mutex is not considered "durably blocking" even though it is
+// in our case.
+type myFakeClient struct {
+	clientset.Interface
+	deletePodCallback func()
+}
+
+func (mf *myFakeClient) CoreV1() corev1.CoreV1Interface {
+	return &myFakeCoreV1{mf.Interface.CoreV1(), mf.deletePodCallback}
+}
+
+type myFakeCoreV1 struct {
+	corev1.CoreV1Interface
+	deletePodCallback func()
+}
+
+func (mf *myFakeCoreV1) Pods(namespace string) corev1.PodInterface {
+	return &myFakePods{mf.CoreV1Interface.Pods(namespace), mf.deletePodCallback}
+}
+
+type myFakePods struct {
+	corev1.PodInterface
+	deletePodCallback func()
+}
+
+func (mf *myFakePods) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+	mf.deletePodCallback()
+	return mf.PodInterface.Delete(ctx, name, opts)
 }
 
 // TestCancelEviction deletes the pod before the controller deletes it
