@@ -227,3 +227,13 @@ type RequestedToCapacityRatioParam struct {
 	// +listType=atomic
 	Shape []UtilizationShapePoint `json:"shape,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PlacementBinPackingArgs holds arguments used to configure the PlacementBinPacking plugin.
+type PlacementBinPackingArgs struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// ScoringStrategy selects the placement resource scoring strategy.
+	ScoringStrategy *ScoringStrategy `json:"scoringStrategy,omitempty"`
+}
