@@ -21,6 +21,7 @@ package clustertrustbundle
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -51,7 +52,8 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	bundle := obj.(*certificates.ClusterTrustBundle)
-	return certvalidation.ValidateClusterTrustBundle(bundle, certvalidation.ValidateClusterTrustBundleOptions{})
+	allErrs := certvalidation.ValidateClusterTrustBundle(bundle, certvalidation.ValidateClusterTrustBundleOptions{})
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, bundle, nil, allErrs, operation.Create)
 }
 
 func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -69,7 +71,8 @@ func (s strategy) PrepareForUpdate(ctx context.Context, new, old runtime.Object)
 func (s strategy) ValidateUpdate(ctx context.Context, new, old runtime.Object) field.ErrorList {
 	newBundle := new.(*certificates.ClusterTrustBundle)
 	oldBundle := old.(*certificates.ClusterTrustBundle)
-	return certvalidation.ValidateClusterTrustBundleUpdate(newBundle, oldBundle)
+	allErrs := certvalidation.ValidateClusterTrustBundleUpdate(newBundle, oldBundle)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newBundle, oldBundle, allErrs, operation.Update)
 }
 
 func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
