@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,6 +33,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -42,6 +44,7 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -769,6 +772,22 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroup)
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroupList)
+
+	evictionRequestColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Target", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
+		{Name: "Target Type", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
+		{Name: "Status", Type: "string", Description: coordinationv1alpha1.EvictionRequestStatus{}.SwaggerDoc()["conditions"]},
+		{Name: "Active Responder", Type: "string", Description: coordinationv1alpha1.TargetResponder{}.SwaggerDoc()["state"]},
+		{Name: "Responder Status", Type: "string", Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()[""]},
+		{Name: "Responder Expected Finish", Type: "string", Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()["expectedCompletionTime"]},
+		{Name: "Requesters", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["requesters"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Responder Heartbeat", Type: "string", Priority: 1, Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()["heartbeatTime"]},
+		{Name: "Responder Status Message", Type: "string", Priority: 1, Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()["message"]},
+	}
+	_ = h.TableHandler(evictionRequestColumnDefinitions, printEvictionRequest)
+	_ = h.TableHandler(evictionRequestColumnDefinitions, printEvictionRequestList)
 }
 
 // Pass ports=nil for all ports.
@@ -3524,6 +3543,142 @@ func printPodGroupList(list *scheduling.PodGroupList, options printers.GenerateO
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodGroup(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printEvictionRequest(obj *coordination.EvictionRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	var wideCells []interface{}
+	row.Cells = append(row.Cells, obj.Name)
+
+	// resolve target
+	target := "<unset>"
+	targetType := "<unset>"
+	if obj.Spec.Target.Pod != nil {
+		target = obj.Spec.Target.Pod.Name
+		targetType = "Pod"
+	}
+	row.Cells = append(row.Cells, target, targetType)
+
+	// resolve status
+	evictionStatus := "Pending"
+	if ptr.Deref(obj.Status.ObservedGeneration, 0) > 0 {
+		evictionStatus = "Progressing"
+	}
+	evicted := meta.FindStatusCondition(obj.Status.Conditions, string(coordination.EvictionRequestConditionEvicted))
+	failed := meta.FindStatusCondition(obj.Status.Conditions, string(coordination.EvictionRequestConditionFailed))
+	isFailed := failed != nil && failed.Status == metav1.ConditionTrue
+	if isFailed {
+		evictionStatus = fmt.Sprintf("%s (%s)", failed.Type, failed.Reason)
+	}
+	if evicted != nil && evicted.Status == metav1.ConditionTrue {
+		evictionStatus = fmt.Sprintf("%s (%s)", evicted.Type, evicted.Reason)
+	}
+	row.Cells = append(row.Cells, evictionStatus)
+
+	// resolve responder progress and find an active responder
+	totalResponders := len(obj.Status.TargetResponders)
+	processedOrActiveResponders := 0
+	var lastActiveResponder, lastProcessedResponder *coordination.TargetResponder
+	for _, targetResponder := range obj.Status.TargetResponders {
+		switch targetResponder.State {
+		case coordination.ResponderStateCanceled, coordination.ResponderStateInterrupted, coordination.ResponderStateCompleted:
+			processedOrActiveResponders++
+			lastProcessedResponder = &targetResponder
+
+		case coordination.ResponderStateActive:
+			processedOrActiveResponders++
+			lastActiveResponder = &targetResponder
+		}
+	}
+	if lastActiveResponder == nil {
+		// present last completed one if all have been processed
+		lastActiveResponder = lastProcessedResponder
+	}
+	activeResponder := "<unset>"
+	if lastActiveResponder != nil {
+		activeResponder = lastActiveResponder.Name
+	}
+	activeResponderWithCount := fmt.Sprintf("%s (%d/%d)", activeResponder, processedOrActiveResponders, totalResponders)
+	row.Cells = append(row.Cells, activeResponderWithCount)
+
+	// resolve responder status and finish time
+	activeResponderExpectedCompletionTime := "<unknown>"
+	responderStatus := "<unset>"
+	heartbeat := "<unset>"
+	message := "<unset>"
+	if lastActiveResponder != nil {
+		for _, responder := range obj.Status.Responders {
+			if responder.Name != lastActiveResponder.Name {
+				continue
+			}
+
+			responderStatus = string(lastActiveResponder.State)
+			switch lastActiveResponder.State {
+			case coordination.ResponderStateActive:
+				if responder.StartTime != nil {
+					responderStatus = fmt.Sprintf("Started (%s ago)", translateTimestampSince(*responder.StartTime))
+					if responder.ExpectedCompletionTime != nil {
+						if responder.ExpectedCompletionTime.After(time.Now()) {
+							activeResponderExpectedCompletionTime = fmt.Sprintf("in %s", translateTimestampUntil(*responder.ExpectedCompletionTime))
+						} else {
+							// in case the estimate is wrong, or a kubelet is slow
+							activeResponderExpectedCompletionTime = fmt.Sprintf("%s ago", translateTimestampSince(*responder.ExpectedCompletionTime))
+						}
+					}
+				}
+			case coordination.ResponderStateCanceled, coordination.ResponderStateInterrupted:
+				activeResponderExpectedCompletionTime = "-"
+			case coordination.ResponderStateCompleted:
+				if responder.CompletionTime != nil {
+					responderStatus = fmt.Sprintf("%s (%s ago)", lastActiveResponder.State, translateTimestampSince(*responder.CompletionTime))
+				}
+				activeResponderExpectedCompletionTime = "-"
+			}
+			if options.Wide {
+				if responder.HeartbeatTime != nil {
+					heartbeat = fmt.Sprintf("%s ago", translateTimestampSince(*responder.HeartbeatTime))
+				}
+				if msg := strings.TrimSpace(responder.Message); len(msg) > 0 {
+					message = msg
+				}
+			}
+			break
+		}
+	}
+
+	if options.Wide {
+		wideCells = append(wideCells, heartbeat, message)
+	}
+	row.Cells = append(row.Cells, responderStatus, activeResponderExpectedCompletionTime)
+
+	// resolve requesters
+	var requesters []string
+	for _, requester := range obj.Spec.Requesters {
+		requesters = append(requesters, requester.Name)
+	}
+	slices.Sort(requesters)
+	requestersStr := "<none>"
+	if len(requesters) > 0 {
+		requestersStr = listWithMoreString(requesters[:1], len(requesters) > 1, len(requesters), 1)
+	}
+	row.Cells = append(row.Cells, requestersStr, translateTimestampSince(obj.CreationTimestamp))
+
+	row.Cells = append(row.Cells, wideCells...)
+	return []metav1.TableRow{row}, nil
+}
+
+func printEvictionRequestList(list *coordination.EvictionRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printEvictionRequest(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

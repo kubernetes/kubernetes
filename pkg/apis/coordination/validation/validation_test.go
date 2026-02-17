@@ -17,11 +17,17 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
+	"k8s.io/apimachinery/pkg/api/validate"
+	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/coordination"
+	utilsclock "k8s.io/utils/clock"
+	testing2 "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -352,5 +358,1127 @@ func TestValidateCoordinatedLeaseStrategy(t *testing.T) {
 		} else if !tc.err && len(errs) != 0 {
 			t.Errorf("Expected no err, got err %v", errs)
 		}
+	}
+}
+
+const valiUIDName = "bd23f542-ac79-4b44-a628-9735e18b8037"
+
+func TestValidateEvictionRequest(t *testing.T) {
+	successCases := map[string]struct {
+		input *coordination.EvictionRequest
+	}{
+		"valid: simple prefixed path": {
+			input: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentEviction, "example/bar")),
+		},
+		"valid: one requester": {
+			input: mkValidEvictionRequest(1),
+		},
+		"valid: two requesters": {
+			input: mkValidEvictionRequest(2),
+		},
+		"valid: 100 requesters": {
+			input: mkValidEvictionRequest(100),
+		},
+		"valid: at least one eviction intent": {
+			input: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/1", "bar.example.com/2"), addRequesters(coordination.RequesterIntentEviction, "baz.example.com/3"), addRequesters(coordination.RequesterIntentWithdrawn, "bax.example.com/4")),
+		},
+	}
+	for name, tc := range successCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateEvictionRequest(tc.input)
+			if len(errs) != 0 {
+				t.Errorf("Expected success for %q: %v", name, errs)
+			}
+		})
+	}
+
+	failureCases := map[string]struct {
+		input *coordination.EvictionRequest
+
+		errors []*field.Error
+	}{
+		"name target uid mismatch": {
+			input: mkValidEvictionRequest(1, setName("4fa67f6f-da60-4748-bccd-1525dab1bfee", "")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("metadata", "name"), "", "must be the same value as spec.target.pod.uid"),
+			},
+		},
+		"name is not valid": {
+			input: mkValidEvictionRequest(1, setName("invalid-name-test", "")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("metadata", "name"), "", "must be the same value as spec.target.pod.uid"),
+			},
+		},
+		"missing namespace": {
+			input: mkValidEvictionRequest(1, setNamespace("")),
+			errors: []*field.Error{
+				field.Required(field.NewPath("metadata", "namespace"), ""),
+			},
+		},
+		"requesters must not be all withdrawn on creation": {
+			input: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/baz")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("spec", "requesters"), "", "must have at least one requester with an intent that is not \"Withdrawn\" on EvictionRequest creation"),
+			},
+		},
+		"invalid requesters": {
+			input: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentEviction, "test.net", "invalid", "/invalid", "underscores_are_bad.k8s.io/bar", "foo.example.com/bar")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("spec", "requesters").Index(0).Child("name"), "test.net", "must be a domain-prefixed key"),
+				field.Invalid(field.NewPath("spec", "requesters").Index(1).Child("name"), "invalid", "must be a domain-prefixed key"),
+				field.Invalid(field.NewPath("spec", "requesters").Index(2).Child("name"), "/invalid", "prefix part must be non-empty"),
+				field.Invalid(field.NewPath("spec", "requesters").Index(3).Child("name"), "underscores_are_bad.k8s.io/ba", "prefix part a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"),
+			},
+		},
+	}
+
+	for name, tc := range failureCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateEvictionRequest(tc.input)
+			if len(errs) == 0 {
+				t.Errorf("Expected failure")
+				return
+			}
+			if len(errs) != len(tc.errors) {
+				t.Errorf("Expected %d errors, got %d: %v", len(tc.errors), len(errs), errs)
+				return
+			}
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring()
+			matcher.Test(t, tc.errors, errs)
+
+			for i, err := range errs {
+				expectedErr := tc.errors[i]
+				if err.CoveredByDeclarative != expectedErr.CoveredByDeclarative {
+					t.Errorf("Error %d: expected CoveredByDeclarative=%v, got %v for error: %v",
+						i, expectedErr.CoveredByDeclarative, err.CoveredByDeclarative, err)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateEvictionRequestUpdate(t *testing.T) {
+	successCases := map[string]struct {
+		input    *coordination.EvictionRequest
+		oldInput *coordination.EvictionRequest
+	}{
+		"valid: increase to 2 requesters": {
+			oldInput: mkValidEvictionRequest(1),
+			input:    mkValidEvictionRequest(2),
+		},
+		"valid: increase to 100 requesters": {
+			oldInput: mkValidEvictionRequest(1),
+			input:    mkValidEvictionRequest(100),
+		},
+		"can change a requester key order": {
+			oldInput: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "bar.example.com/bay"), addRequesters(coordination.RequesterIntentEviction, "foo.example.com/baz")),
+			input:    mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/baz"), addRequesters(coordination.RequesterIntentEviction, "bar.example.com/bay")),
+		},
+		"add a new requester with an withdrawal intent to a canceled eviction request": {
+			oldInput: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/baz")),
+			input:    mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/baz"), addRequesters(coordination.RequesterIntentWithdrawn, "bar.example.com/bay")),
+		},
+		"cancel eviction": {
+			oldInput: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentEviction, "foo.example.com/baz")),
+			input:    mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/baz")),
+		},
+		"change intent to eviction in functioning eviction request": {
+			oldInput: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentEviction, "bar.example.com/bay"), addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/baz")),
+			input:    mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentEviction, "bar.example.com/bay"), addRequesters(coordination.RequesterIntentEviction, "foo.example.com/baz")),
+		},
+		// This has to be enabled: the real cancellation is done by the controller.
+		// It will send a delete request if it observes all requesters have withdrawn.
+		// It should set a resource version precondition and let apiserver handle the conflict.
+		"change intent to eviction in a canceled eviction request": {
+			oldInput: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/baz")),
+			input:    mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentEviction, "foo.example.com/baz")),
+		},
+		"add a new requester with an eviction intent to a canceled eviction request": {
+			oldInput: mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/baz")),
+			input:    mkValidEvictionRequest(0, addRequesters(coordination.RequesterIntentWithdrawn, "foo.example.com/baz"), addRequesters(coordination.RequesterIntentEviction, "bar.example.com/bay")),
+		},
+	}
+	for name, tc := range successCases {
+		t.Run(name, func(t *testing.T) {
+			tc.oldInput.ResourceVersion = "0"
+			tc.input.ResourceVersion = "1"
+			errs := ValidateEvictionRequestUpdate(tc.input, tc.oldInput)
+			if len(errs) != 0 {
+				t.Errorf("Expected success for %q: %v", name, errs)
+			}
+		})
+	}
+
+	failureCases := map[string]struct {
+		input    *coordination.EvictionRequest
+		oldInput *coordination.EvictionRequest
+
+		errors []*field.Error
+	}{
+		"cannot clear requesters": {
+			oldInput: mkValidEvictionRequest(1),
+			input:    mkValidEvictionRequest(0),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("spec", "requesters"), "", "requesters cannot be removed"),
+			},
+		},
+		"cannot remove requesters": {
+			oldInput: mkValidEvictionRequest(2),
+			input:    mkValidEvictionRequest(1),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("spec", "requesters"), "", "requesters cannot be removed"),
+			},
+		},
+		"cannot replace requesters": {
+			oldInput: mkValidEvictionRequest(2),
+			input:    mkValidEvictionRequest(1, addRequesters(coordination.RequesterIntentWithdrawn, "foo/bar")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("spec", "requesters"), "", "requesters cannot be removed"),
+			},
+		},
+		"add invalid requesters": {
+			oldInput: mkValidEvictionRequest(1),
+			input:    mkValidEvictionRequest(1, addRequesters(coordination.RequesterIntentEviction, "test.net", "invalid", "/invalid", "underscores_are_bad.k8s.io/bar", "foo.example.com/bar")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("spec", "requesters").Index(1).Child("name"), "test.net", "must be a domain-prefixed key"),
+				field.Invalid(field.NewPath("spec", "requesters").Index(2).Child("name"), "invalid", "must be a domain-prefixed key"),
+				field.Invalid(field.NewPath("spec", "requesters").Index(3).Child("name"), "/invalid", "prefix part must be non-empty"),
+				field.Invalid(field.NewPath("spec", "requesters").Index(4).Child("name"), "underscores_are_bad.k8s.io/ba", "prefix part a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"),
+			},
+		},
+	}
+
+	for name, tc := range failureCases {
+		t.Run(name, func(t *testing.T) {
+			tc.oldInput.ResourceVersion = "0"
+			tc.input.ResourceVersion = "1"
+			errs := ValidateEvictionRequestUpdate(tc.input, tc.oldInput)
+			if len(errs) == 0 {
+				t.Errorf("Expected failure")
+				return
+			}
+			if len(errs) != len(tc.errors) {
+				t.Errorf("Expected %d errors, got %d: %v", len(tc.errors), len(errs), errs)
+				return
+			}
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring()
+			matcher.Test(t, tc.errors, errs)
+
+			for i, err := range errs {
+				expectedErr := tc.errors[i]
+				if err.CoveredByDeclarative != expectedErr.CoveredByDeclarative {
+					t.Errorf("Error %d: expected CoveredByDeclarative=%v, got %v for error: %v",
+						i, expectedErr.CoveredByDeclarative, err.CoveredByDeclarative, err)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateEvictionRequestStatusUpdate(t *testing.T) {
+	clock := testing2.NewFakePassiveClock(time.Now())
+	clockBefore := func(duration time.Duration) utilsclock.PassiveClock {
+		return testing2.NewFakePassiveClock(clock.Now().Add(-duration))
+	}
+	clockAfter := func(duration time.Duration) utilsclock.PassiveClock {
+		return testing2.NewFakePassiveClock(clock.Now().Add(duration))
+	}
+	clock2 := clockAfter(5 * time.Second)
+
+	successCases := map[string]struct {
+		clock    utilsclock.PassiveClock
+		input    *coordination.EvictionRequestStatus
+		oldInput *coordination.EvictionRequestStatus
+	}{
+		// conditions
+		"Evicted condition can be set": {
+			oldInput: mkValidEvictionRequestStatus(1),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionEvicted, true)),
+		},
+		"Evicted condition can be changed to true": {
+			oldInput: mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionEvicted, false)),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionEvicted, true)),
+		},
+		"Failed condition can be set": {
+			oldInput: mkValidEvictionRequestStatus(1),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+		},
+		"Failed condition can be changed to true": {
+			oldInput: mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionFailed, false)),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+		},
+		"Non terminal condition can be added when immutable condition exists": {
+			oldInput: mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, "NewCondition", true), addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+		},
+		"Non terminal condition can be changed when immutable condition exists": {
+			oldInput: mkValidEvictionRequestStatus(1, addCondition(clock, "NewCondition", true), addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, "NewCondition", false), addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+		},
+		"A new condition can be added when observedGeneration is nil": {
+			oldInput: mkValidEvictionRequestStatus(0, setObservedGeneration(nil), addCondition(clock, "NewCondition", true), addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+			input:    mkValidEvictionRequestStatus(0, setObservedGeneration(nil), addCondition(clock, "NewCondition", false), addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+		},
+		// observedGeneration
+		"set initial generation": {
+			oldInput: &coordination.EvictionRequestStatus{},
+			input:    mkValidEvictionRequestStatus(0),
+		},
+		"update generation": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input:    mkValidEvictionRequestStatus(0, setObservedGeneration(ptr.To[int64](5))),
+		},
+		// first sync
+		"responders initialization": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input:    mkValidEvictionRequestStatus(3),
+		},
+		"16 responders": { // 1 more than Pod's spec.evictionResponders
+			oldInput: mkValidEvictionRequestStatus(0),
+			input:    mkValidEvictionRequestStatus(16),
+		},
+		// Full EvictionRequest progression/lifecycle
+		"mark active and started": {
+			oldInput: mkValidEvictionRequestStatus(2),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1)),
+		},
+		"responder reports progress": {
+			oldInput: mkValidEvictionRequestStatus(2),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersHeartBeatTime(clockAfter(5*time.Second), 0, 1),
+				setRespondersExpectedCompletionTime(clockAfter(10*time.Minute), 0, 1),
+				setRespondersMessage(0, 1)),
+		},
+		"responder reports next progress": {
+			clock: clockAfter(time.Minute + 5*time.Second),
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersHeartBeatTime(clockAfter(5*time.Second), 0, 1),
+				setRespondersExpectedCompletionTime(clockAfter(10*time.Minute), 0, 1),
+				setRespondersMessage(0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersHeartBeatTime(clockAfter(time.Minute+5*time.Second), 0, 1),
+				setRespondersExpectedCompletionTime(clockAfter(10*time.Minute), 0, 1),
+				setRespondersMessage(0, 1)),
+		},
+		"responder reports complete": {
+			clock: clockAfter(5 * time.Minute),
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersHeartBeatTime(clockAfter(time.Minute+5*time.Second), 0, 1),
+				setRespondersExpectedCompletionTime(clockAfter(10*time.Minute), 0, 1),
+				setRespondersMessage(0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersFullStatus(clock, clockAfter(5*time.Minute+27*time.Second), 0, 1)),
+		},
+		"move active complete to processed and set new active": {
+			clock: clockAfter(5*time.Minute + 27*time.Second),
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersFullStatus(clock, clockAfter(5*time.Minute+27*time.Second), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 1),
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersFullStatus(clock, clockAfter(5*time.Minute+27*time.Second), 0, 1),
+				setRespondersStartTime(clockAfter(5*time.Minute+30*time.Second), 1, 2)),
+		},
+		"next responder reports next progress": {
+			clock: clockAfter(25 * time.Minute),
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 1),
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersFullStatus(clock, clockAfter(5*time.Minute+27*time.Second), 0, 1),
+				setRespondersStartTime(clockAfter(5*time.Minute+30*time.Second), 1, 2)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 1),
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersFullStatus(clock, clockAfter(5*time.Minute+27*time.Second), 0, 1),
+				setRespondersStartTime(clockAfter(5*time.Minute+30*time.Second), 1, 2),
+				setRespondersHeartBeatTime(clockAfter(25*time.Minute), 1, 2)),
+		},
+		"next responder reports complete": {
+			clock: clockAfter(28 * time.Minute),
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 1),
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersFullStatus(clock, clockAfter(5*time.Minute+27*time.Second), 0, 1),
+				setRespondersStartTime(clockAfter(5*time.Minute+30*time.Second), 1, 2),
+				setRespondersHeartBeatTime(clockAfter(25*time.Minute), 1, 2)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 1),
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersFullStatus(clock, clockAfter(5*time.Minute+27*time.Second), 0, 1),
+				setRespondersFullStatus(clockAfter(5*time.Minute+30*time.Second), clockAfter(27*time.Minute+32*time.Second), 1, 2)),
+		},
+		"finalize eviction request active": {
+			clock: clockAfter(35 * time.Minute),
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 1),
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersFullStatus(clock, clockAfter(5*time.Minute+27*time.Second), 0, 1),
+				setRespondersFullStatus(clockAfter(5*time.Minute+30*time.Second), clockAfter(27*time.Minute+32*time.Second), 1, 2)),
+			input: mkValidEvictionRequestStatus(2,
+				setCompletedCount(2),
+				setRespondersFullStatus(clock, clockAfter(5*time.Minute+27*time.Second), 0, 1),
+				setRespondersFullStatus(clockAfter(5*time.Minute+30*time.Second), clockAfter(27*time.Minute+32*time.Second), 1, 2)),
+		},
+		"finalize eviction request active - large number of responders": {
+			clock: clockAfter(5 * time.Minute),
+			oldInput: mkValidEvictionRequestStatus(16,
+				setStateFor(coordination.ResponderStateActive, 15),
+				setCompletedCount(15),
+				setRespondersFullStatus(clockAfter(time.Minute), clockAfter(2*time.Minute), 0, 7),
+				setRespondersFullStatus(clockAfter(3*time.Minute), clockAfter(4*time.Minute), 7, 16)),
+			input: mkValidEvictionRequestStatus(16,
+				setCompletedCount(16),
+				setRespondersFullStatus(clockAfter(time.Minute), clockAfter(2*time.Minute), 0, 7),
+				setRespondersFullStatus(clockAfter(3*time.Minute), clockAfter(4*time.Minute), 7, 16)),
+		},
+		// allowed update after the heartbeat deadline
+		"processedResponders can be updated when the deadline (start time fallback) is reached": {
+			oldInput: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(19*time.Minute+32*time.Second), 0, 1)),
+			input: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersStartTime(clockBefore(19*time.Minute+32*time.Second), 0, 1)),
+		},
+		"processedResponders can be updated when the deadline is reached": {
+			oldInput: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(time.Hour), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(20*time.Minute), 0, 1)),
+			input: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersStartTime(clockBefore(time.Hour), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(20*time.Minute), 0, 1)),
+		},
+		// startTime
+		"startTime can be set to the present time with an allowed skew - slower clock": {
+			oldInput: mkValidEvictionRequestStatus(2),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(29*time.Second), 0, 1)),
+		},
+		"responder startTime can be set to the present time with an allowed skew - faster clock": {
+			oldInput: mkValidEvictionRequestStatus(2),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockAfter(27*time.Second), 0, 1)),
+		},
+		// heartbeatTime
+		"heartbeatTime can be set to the present time with an allowed skew - slower clock": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(19*time.Minute), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(27*time.Second), 0, 1)),
+		},
+		"heartbeatTime can be set to the present time with an allowed skew - faster clock": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(19*time.Minute), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockAfter(27*time.Second), 0, 1)),
+		},
+		"heartbeatTime can be updated after one minute": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(time.Minute), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clock, 0, 1)),
+		},
+		// expectedCompletionTime
+		"expectedCompletionTime can be set to the present time with an allowed skew - slower clock": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(time.Minute), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(time.Minute), 0, 1),
+				setRespondersExpectedCompletionTime(clockBefore(27*time.Second), 0, 1)),
+		},
+		"expectedCompletionTime can be set to the future": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(time.Minute), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(time.Minute), 0, 1),
+				setRespondersExpectedCompletionTime(clockAfter(time.Hour*24*365*10-time.Minute), 0, 1)),
+		},
+		// completionTime
+		"completionTime can be set to the present time with an allowed skew - faster clock": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersCompletionTime(clockAfter(27*time.Second), 0, 1)),
+		},
+		// processedResponders + conditions
+		"processedResponders must allow active responder transition even with an exceeded deadline (start time fallback) - Failed": {
+			oldInput: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(19*time.Minute+29*time.Second), 0, 1)),
+			input: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersStartTime(clockBefore(19*time.Minute+29*time.Second), 0, 1),
+				addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+		},
+		"processedResponders must allow active responder transition even with an exceeded deadline (start time fallback) - Evicted": {
+			oldInput: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(19*time.Minute+29*time.Second), 0, 1)),
+			input: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersStartTime(clockBefore(19*time.Minute+29*time.Second), 0, 1),
+				addCondition(clock, coordination.EvictionRequestConditionEvicted, true)),
+		},
+		"processedResponders must allow active responder transition even with an exceeded deadline - Failed": {
+			oldInput: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(19*time.Minute+29*time.Second), 0, 1)),
+			input: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(19*time.Minute+29*time.Second), 0, 1),
+				addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+		},
+		"processedResponders must allow active responder transition even with an exceeded deadline - Evicted": {
+			oldInput: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(19*time.Minute+29*time.Second), 0, 1)),
+			input: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(19*time.Minute+29*time.Second), 0, 1),
+				addCondition(clock, coordination.EvictionRequestConditionEvicted, true)),
+		},
+	}
+	for name, tc := range successCases {
+		t.Run(name, func(t *testing.T) {
+			if validate.SemanticDeepEqual(tc.oldInput, tc.input) {
+				t.Errorf("Expected oldInput and input to differ")
+			}
+			oldEvictionRequest := mkValidEvictionRequest(2)
+			oldEvictionRequest.ResourceVersion = "0"
+			oldEvictionRequest.Status = *tc.oldInput
+			evictionRequest := mkValidEvictionRequest(2)
+			evictionRequest.ResourceVersion = "1"
+			evictionRequest.Status = *tc.input
+			opts := EvictionRequestStatusValidationOptions{clock}
+			if tc.clock != nil {
+				opts.Clock = tc.clock
+			}
+			errs := ValidateEvictionRequestStatusUpdate(evictionRequest, oldEvictionRequest, opts)
+			if len(errs) != 0 {
+				t.Errorf("Expected success for %q: %v", name, errs)
+			}
+		})
+	}
+
+	failureCases := map[string]struct {
+		input    *coordination.EvictionRequestStatus
+		oldInput *coordination.EvictionRequestStatus
+
+		errors []*field.Error
+	}{
+		// conditions
+		"add invalid condition": {
+			oldInput: mkValidEvictionRequestStatus(1),
+			input: mkValidEvictionRequestStatus(1, func(obj *coordination.EvictionRequestStatus) {
+				obj.Conditions = append(obj.Conditions, metav1.Condition{
+					Type:               "-bad-name",
+					Status:             "invalid",
+					ObservedGeneration: -1,
+					Reason:             "-Reason",
+				})
+			}),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "conditions").Index(0).Child("type"), "", "name part must consist of alphanumeric characters, '-', '_' or '.', and "),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), "", []string{"False", "True", "Unknown"}),
+				field.Invalid(field.NewPath("status", "conditions").Index(0).Child("observedGeneration"), "", "must be greater than or equal to zero"),
+				field.Required(field.NewPath("status", "conditions").Index(0).Child("lastTransitionTime"), ""),
+				field.Invalid(field.NewPath("status", "conditions").Index(0).Child("reason"), "", "a condition reason must start with alphabetic character, optionally followed by a string of alphanumeric characters or '_,:', and "),
+			},
+		},
+		"Evicted condition cannot be removed": {
+			oldInput: mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionEvicted, true)),
+			input:    mkValidEvictionRequestStatus(1),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "conditions"), "", "Evicted condition status cannot be reverted"),
+			},
+		},
+		"Evicted condition cannot be changed": {
+			oldInput: mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionEvicted, true)),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionEvicted, false)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "conditions"), "", "Evicted condition status cannot be reverted"),
+			},
+		},
+		"Failed condition cannot be removed": {
+			oldInput: mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+			input:    mkValidEvictionRequestStatus(1),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "conditions"), "", "Failed condition status cannot be reverted"),
+			},
+		},
+		"Failed condition cannot be changed": {
+			oldInput: mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionFailed, true)),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, coordination.EvictionRequestConditionFailed, false)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "conditions"), "", "Failed condition status cannot be reverted"),
+			},
+		},
+		// observedGeneration
+		"clear generation": {
+			oldInput: mkValidEvictionRequestStatus(0, setObservedGeneration(ptr.To[int64](1))),
+			input:    mkValidEvictionRequestStatus(0, setObservedGeneration(nil)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "observedGeneration"), 0, "cannot decrement, must be greater than or equal to 1"),
+			},
+		},
+		"decrease generation": {
+			oldInput: mkValidEvictionRequestStatus(0, setObservedGeneration(ptr.To[int64](2))),
+			input:    mkValidEvictionRequestStatus(0, setObservedGeneration(ptr.To[int64](1))),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "observedGeneration"), 1, "cannot decrement, must be greater than or equal to 2"),
+			},
+		},
+		// targetResponders and responders
+		"cannot change keys in targetResponders and responders - remove": {
+			oldInput: mkValidEvictionRequestStatus(5),
+			input:    mkValidEvictionRequestStatus(4),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "targetResponders"), "", "must preserve the same length and the same keys in the same order"),
+				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order"),
+			},
+		},
+		"cannot change keys in targetResponders and responders - add": {
+			oldInput: mkValidEvictionRequestStatus(4),
+			input:    mkValidEvictionRequestStatus(5),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "targetResponders"), "", "must preserve the same length and the same keys in the same order"),
+				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order"),
+			},
+		},
+		"invalid targetResponders and responders": { // required and duplicate is tested in the declarative validation test
+			oldInput: mkValidEvictionRequestStatus(0),
+			input:    mkValidEvictionRequestStatus(1, addTargetAndStatusResponders("test.net", "invalid", "/invalid", "underscores_are_bad.k8s.io/bar", "foo.example.com/bar")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "targetResponders").Index(1).Child("name"), "test.net", "must be a domain-prefixed key"),
+				field.Invalid(field.NewPath("status", "targetResponders").Index(2).Child("name"), "invalid", "must be a domain-prefixed key"),
+				field.Invalid(field.NewPath("status", "targetResponders").Index(3).Child("name"), "/invalid", "prefix part must be non-empty"),
+				field.Invalid(field.NewPath("status", "targetResponders").Index(4).Child("name"), "underscores_are_bad.k8s.io/ba", "prefix part a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"),
+				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order"), // triggered by fallback to oldTargetResponders
+			},
+		},
+		// targetResponders
+		"cannot change keys in targetResponders - change": {
+			oldInput: mkValidEvictionRequestStatus(4),
+			input:    mkValidEvictionRequestStatus(3, addTargetResponders("foo/bar"), addStatusResponders(responderName(3))),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "targetResponders"), "", "must preserve the same keys in the same order"),
+			},
+		},
+		"targetResponders must have matching status responder": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input:    mkValidEvictionRequestStatus(0, addTargetResponders("foo/bar")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "targetResponders").Index(0), "", "has to be tracked in status.responders first"),
+			},
+		},
+		"Active responder must exceed the deadline (start time fallback) before it is marked Completed": {
+			oldInput: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(19*time.Minute+29*time.Second), 0, 1)),
+			input: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersStartTime(clockBefore(19*time.Minute+29*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Forbidden(field.NewPath("status", "targetResponders").Index(0).Child("state"), "must stay Active because the responder is in progress"),
+			},
+		},
+		"Active responder must exceed the deadline before it is marked Completed": {
+			oldInput: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(19*time.Minute+29*time.Second), 0, 1)),
+			input: mkValidEvictionRequestStatus(1,
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(19*time.Minute+29*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Forbidden(field.NewPath("status", "targetResponders").Index(0).Child("state"), "must stay Active because the responder is in progress"),
+			},
+		},
+		// responders
+		"responders must be initialized at the same time as targetResponders": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input:    mkValidEvictionRequestStatusWithStatuses(0, 3),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order"),
+			},
+		},
+		"cannot change keys in responders - change": {
+			oldInput: mkValidEvictionRequestStatus(4),
+			input:    mkValidEvictionRequestStatus(3, addTargetResponders(responderName(3)), addStatusResponders("foo/bar")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "targetResponders").Index(3), "", "has to be tracked in status.responders first"),
+				field.Invalid(field.NewPath("status", "responders"), "", "must contain the same keys in the same order as status.targetResponders"),
+			},
+		},
+		"status responders cannot remove an item": {
+			oldInput: mkValidEvictionRequestStatus(5),
+			input:    mkValidEvictionRequestStatusWithStatuses(5, 4),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "targetResponders").Index(4), "", "has to be tracked in status.responders first"),
+				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order"),
+			},
+		},
+		"status responders cannot be mutated unless present in active responders": {
+			oldInput: mkValidEvictionRequestStatus(5),
+			input: mkValidEvictionRequestStatus(5,
+				setRespondersHeartBeatTime(clock, 1, 2)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(1), "", validation.FieldImmutableErrorMsg).WithOrigin("immutable"),
+			},
+		},
+		// status responder name
+		"invalid status responders names - short circuited by targetResponders key order": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input: mkValidEvictionRequestStatusWithStatuses(1, 0,
+				addStatusResponders("foo")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "targetResponders").Index(0), "", "has to be tracked in status.responders first"),
+				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order"),
+			},
+		},
+		// startTime
+		"startTime is required for an active responder": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setRespondersFullStatus(clock, clock2, 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setRespondersFullStatus(clock, clock2, 0, 1),
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setStateFor(coordination.ResponderStateActive, 1)),
+			errors: []*field.Error{
+				field.Required(field.NewPath("status", "responders").Index(1).Child("startTime"), "is required for an active responder"),
+			},
+		},
+		"startTime must be set to the present time with skew; too old": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setRespondersFullStatus(clock, clock2, 0, 1)),
+			input: mkValidEvictionRequestStatus(2, setRespondersFullStatus(clock, clock2, 0, 1),
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setStateFor(coordination.ResponderStateActive, 1),
+				setRespondersStartTime(clockBefore(31*time.Second), 1, 2)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(1).Child("startTime"), "", "must be set to the present time"),
+			},
+		},
+		"startTime must be set to the present time with skew; too new": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setRespondersFullStatus(clock, clock2, 0, 1)),
+			input: mkValidEvictionRequestStatus(2, setRespondersFullStatus(clock, clock2, 0, 1),
+				setStateFor(coordination.ResponderStateCompleted, 0),
+				setStateFor(coordination.ResponderStateActive, 1),
+				setRespondersStartTime(clockAfter(31*time.Second), 1, 2)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(1).Child("startTime"), "", "must be set to the present time"),
+			},
+		},
+		// heartbeatTime
+		"cannot remove heartbeatTime when previously set": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersHeartBeatTime(clock, 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1)),
+			errors: []*field.Error{
+				field.Required(field.NewPath("status", "responders").Index(0).Child("heartbeatTime"), "is required once set"),
+			},
+		},
+		"heartbeatTime cannot be set before startTime is set": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input: mkValidEvictionRequestStatus(0,
+				addTargetAndStatusResponders(responderName(0), responderName(1)),
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersHeartBeatTime(clockBefore(2*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Required(field.NewPath("status", "responders").Index(0).Child("startTime"), "is required for an active responder"),
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("heartbeatTime"), "", "cannot be set before status.responders[0].startTime"),
+			},
+		},
+		"heartbeatTime cannot be decreased": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Second), 0, 1),
+				setRespondersHeartBeatTime(clock, 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Second), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(2*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("heartbeatTime"), "", "cannot be decreased"),
+			},
+		},
+		"heartbeatTime cannot be set before startTime even with a skew": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersHeartBeatTime(clockBefore(2*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("heartbeatTime"), "", "must occur after status.responders[0].startTime"),
+			},
+		},
+		"heartbeatTime must be set to the present time with skew": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockBefore(19*time.Minute), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(20*time.Minute), 0, 1),
+				setRespondersHeartBeatTime(clockAfter(31*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("heartbeatTime"), "", "must be set to the present time"),
+			},
+		},
+		// expectedCompletionTime
+		"expectedCompletionTime cannot be set before startTime is set": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input: mkValidEvictionRequestStatus(0,
+				addTargetAndStatusResponders(responderName(0), responderName(1)),
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersExpectedCompletionTime(clockBefore(2*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Required(field.NewPath("status", "responders").Index(0).Child("startTime"), "is required for an active responder"),
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("expectedCompletionTime"), "", "cannot be set before status.responders[0].startTime"),
+			},
+		},
+		"expectedCompletionTime cannot be set before startTime even with a skew": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersExpectedCompletionTime(clockBefore(2*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("expectedCompletionTime"), "", "must occur after status.responders[0].startTime"),
+			},
+		},
+		"expectedCompletionTime cannot be set to the past with skew": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(32*time.Second), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(32*time.Second), 0, 1),
+				setRespondersExpectedCompletionTime(clockBefore(31*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("expectedCompletionTime"), "", "cannot be set to the past time"),
+			},
+		},
+		"expectedCompletionTime must complete within 10 years": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(time.Minute), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(time.Minute), 0, 1),
+				setRespondersExpectedCompletionTime(clockAfter(time.Hour*24*365*10+time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("expectedCompletionTime"), "", "must complete within 10 years"),
+			},
+		},
+		// completionTime
+		"completionTime cannot be set before startTime is set": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input: mkValidEvictionRequestStatus(0,
+				addTargetAndStatusResponders(responderName(0), responderName(1)),
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersCompletionTime(clockBefore(2*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Required(field.NewPath("status", "responders").Index(0).Child("startTime"), "is required for an active responder"),
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("completionTime"), "", "cannot be set before status.responders[0].startTime"),
+			},
+		},
+		"completionTime cannot be set before startTime even with a skew": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersCompletionTime(clockBefore(2*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("completionTime"), "", "must occur after status.responders[0].startTime"),
+			},
+		},
+		"completionTime must be set to the present time with skew; too new": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clock, 0, 1),
+				setRespondersCompletionTime(clockAfter(31*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("completionTime"), "", "must be set to the present time"),
+			},
+		},
+		"completionTime must be set to the present time with skew; too old": {
+			oldInput: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(1*time.Minute), 0, 1)),
+			input: mkValidEvictionRequestStatus(2,
+				setStateFor(coordination.ResponderStateActive, 0),
+				setRespondersStartTime(clockBefore(1*time.Minute), 0, 1),
+				setRespondersCompletionTime(clockBefore(31*time.Second), 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0).Child("completionTime"), "", "must be set to the present time"),
+			},
+		},
+		// message
+	}
+
+	for name, tc := range failureCases {
+		t.Run(name, func(t *testing.T) {
+			oldEvictionRequest := mkValidEvictionRequest(2)
+			oldEvictionRequest.ResourceVersion = "0"
+			oldEvictionRequest.Status = *tc.oldInput
+			evictionRequest := mkValidEvictionRequest(2)
+			evictionRequest.ResourceVersion = "1"
+			evictionRequest.Status = *tc.input
+			errs := ValidateEvictionRequestStatusUpdate(evictionRequest, oldEvictionRequest, EvictionRequestStatusValidationOptions{clock})
+			if len(errs) == 0 {
+				t.Errorf("Expected failure")
+				return
+			}
+			if len(errs) != len(tc.errors) {
+				errsFormated := "\n"
+				for _, err := range errs {
+					errsFormated += err.Error() + "\n"
+				}
+				t.Errorf("Expected %d errors, got %d: %v", len(tc.errors), len(errs), errsFormated)
+				return
+			}
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring()
+			matcher.Test(t, tc.errors, errs)
+
+			for i, err := range errs {
+				expectedErr := tc.errors[i]
+				if err.CoveredByDeclarative != expectedErr.CoveredByDeclarative {
+					t.Errorf("Error %d: expected CoveredByDeclarative=%v, got %v for error: %v",
+						i, expectedErr.CoveredByDeclarative, err.CoveredByDeclarative, err)
+				}
+			}
+		})
+	}
+}
+
+func mkValidEvictionRequest(requesters int, tweaks ...func(obj *coordination.EvictionRequest)) *coordination.EvictionRequest {
+	obj := coordination.EvictionRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: valiUIDName, Namespace: "foo"},
+		Spec: coordination.EvictionRequestSpec{
+			Target: coordination.EvictionTarget{
+				Pod: &coordination.PodReference{
+					UID:  valiUIDName,
+					Name: "foo.pod",
+				},
+			},
+		},
+	}
+	for i := range requesters {
+		obj.Spec.Requesters = append(obj.Spec.Requesters, coordination.Requester{
+			Name:   responderName(i),
+			Intent: coordination.RequesterIntentEviction,
+		})
+	}
+	for _, tweak := range tweaks {
+		tweak(&obj)
+	}
+	return &obj
+}
+
+func setName(name, generateName string) func(obj *coordination.EvictionRequest) {
+	return func(obj *coordination.EvictionRequest) {
+		obj.Name = name
+		obj.GenerateName = generateName
+	}
+}
+func setNamespace(namespace string) func(obj *coordination.EvictionRequest) {
+	return func(obj *coordination.EvictionRequest) {
+		obj.Namespace = namespace
+	}
+}
+func addRequesters(intent coordination.RequesterIntent, names ...string) func(obj *coordination.EvictionRequest) {
+	return func(obj *coordination.EvictionRequest) {
+		for _, name := range names {
+			obj.Spec.Requesters = append(obj.Spec.Requesters, coordination.Requester{Name: name, Intent: intent})
+		}
+	}
+}
+
+func responderName(i int) string {
+	return fmt.Sprintf("responder.example.com/bar%d", i)
+}
+func mkValidEvictionRequestStatus(responders int, tweaks ...func(obj *coordination.EvictionRequestStatus)) *coordination.EvictionRequestStatus {
+	return mkValidEvictionRequestStatusWithStatuses(responders, responders, tweaks...)
+}
+func mkValidEvictionRequestStatusWithStatuses(responders, statuses int, tweaks ...func(obj *coordination.EvictionRequestStatus)) *coordination.EvictionRequestStatus {
+	obj := coordination.EvictionRequestStatus{
+		ObservedGeneration: ptr.To[int64](1),
+	}
+	for i := range responders {
+		obj.TargetResponders = append(obj.TargetResponders, coordination.TargetResponder{
+			Name:  responderName(i),
+			State: coordination.ResponderStateInactive,
+		})
+		if i == 0 {
+			obj.TargetResponders[i].State = coordination.ResponderStateActive
+		}
+	}
+	for i := range statuses {
+		obj.Responders = append(obj.Responders, coordination.ResponderStatus{
+			Name: responderName(i),
+		})
+		if i == 0 {
+			obj.Responders[i].StartTime = ptr.To(metav1.Now())
+		}
+	}
+	for _, tweak := range tweaks {
+		tweak(&obj)
+	}
+	return &obj
+}
+func addCondition(clock utilsclock.PassiveClock, name coordination.EvictionRequestConditionType, status bool) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		newCond := metav1.Condition{
+			Type:               string(name),
+			Status:             metav1.ConditionFalse,
+			Reason:             string(name) + "Reason",
+			LastTransitionTime: metav1.Time{Time: clock.Now()},
+		}
+		if status {
+			newCond.Status = metav1.ConditionTrue
+		}
+		obj.Conditions = append(obj.Conditions, newCond)
+	}
+}
+
+func setObservedGeneration(generation *int64) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		obj.ObservedGeneration = generation
+	}
+}
+func addTargetResponders(responders ...string) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		for _, responderName := range responders {
+			obj.TargetResponders = append(obj.TargetResponders, coordination.TargetResponder{Name: responderName, State: coordination.ResponderStateInactive})
+		}
+	}
+}
+func addTargetAndStatusResponders(responders ...string) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		addTargetResponders(responders...)(obj)
+		addStatusResponders(responders...)(obj)
+	}
+}
+func setStateFor(state coordination.ResponderStateType, idx int) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		obj.TargetResponders[idx].State = state
+	}
+}
+func setCompletedCount(count int) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		for i := range count {
+			if i < len(obj.TargetResponders) {
+				obj.TargetResponders[i].State = coordination.ResponderStateCompleted
+			}
+		}
+	}
+}
+func addStatusResponders(responders ...string) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		for _, responder := range responders {
+			obj.Responders = append(obj.Responders, coordination.ResponderStatus{Name: responder})
+		}
+	}
+}
+func setRespondersStartTime(clock utilsclock.PassiveClock, from, to int) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		for i := from; i < to; i++ {
+			obj.Responders[i].StartTime = &metav1.Time{Time: clock.Now().Add(time.Duration(i) * time.Second)}
+		}
+	}
+}
+func setRespondersHeartBeatTime(clock utilsclock.PassiveClock, from, to int) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		for i := from; i < to; i++ {
+			obj.Responders[i].HeartbeatTime = &metav1.Time{Time: clock.Now().Add(time.Duration(i) * time.Second)}
+		}
+	}
+}
+func setRespondersExpectedCompletionTime(clock utilsclock.PassiveClock, from, to int) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		for i := from; i < to; i++ {
+			obj.Responders[i].ExpectedCompletionTime = &metav1.Time{Time: clock.Now().Add(time.Duration(i) * time.Second)}
+		}
+	}
+}
+func setRespondersCompletionTime(clock utilsclock.PassiveClock, from, to int) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		for i := from; i < to; i++ {
+			obj.Responders[i].CompletionTime = &metav1.Time{Time: clock.Now().Add(time.Duration(i) * time.Second)}
+		}
+	}
+}
+func setRespondersMessage(from, to int, suffixes ...string) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		for i := from; i < to; i++ {
+			obj.Responders[i].Message = fmt.Sprintf("message %d", i)
+			for _, suffix := range suffixes {
+				obj.Responders[i].Message += suffix
+			}
+		}
+	}
+}
+func setRespondersFullStatus(startTimeClock, clock utilsclock.PassiveClock, from, to int) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		setRespondersStartTime(startTimeClock, from, to)(obj)
+		setRespondersHeartBeatTime(clock, from, to)(obj)
+		setRespondersExpectedCompletionTime(clock, from, to)(obj)
+		setRespondersCompletionTime(clock, from, to)(obj)
+		setRespondersMessage(from, to, clock.Now().String())(obj)
 	}
 }

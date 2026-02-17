@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storagemigration"
 )
 
@@ -88,8 +87,7 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		storagemigration.Resource("storagemigrations").WithVersion("v1beta1"),
 		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
 		resource.Resource("resourcepoolstatusrequests").WithVersion("v1alpha3"),
-		scheduling.Resource("workloads").WithVersion("v1alpha3"),
-		scheduling.Resource("podgroups").WithVersion("v1alpha3"),
+		coordination.Resource("evictionrequests").WithVersion("v1alpha1"),
 	}
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,
@@ -109,7 +107,7 @@ type StorageFactoryConfig struct {
 	EtcdServersOverrides      []string
 }
 
-// Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.
+// Complete completes the StorageFactoryConfig with provided etcdOptionsevictionrequests returning completedStorageFactoryConfig.
 // This method mutates the receiver (StorageFactoryConfig).  It must never mutate the inputs.
 func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) *completedStorageFactoryConfig {
 	c.StorageConfig = etcdOptions.StorageConfig
