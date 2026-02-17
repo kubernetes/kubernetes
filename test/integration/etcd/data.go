@@ -277,6 +277,16 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/coordination/v1alpha1
+		gvr("coordination.k8s.io", "v1alpha1", "evictionrequests"): {
+			Stub:              `{"metadata": {"name": "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6"}, "spec": {"target": {"pod": {"name": "evictionrequestsv1alpha1", "uid": "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6"}}, "requesters": [{"name": "drain.foo.com"}]}}`,
+			ExpectedEtcdPath:  "/registry/evictionrequests/" + namespace + "/3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+			ExpectedGVK:       gvkP("coordination.k8s.io", "v1alpha1", "EvictionRequest"),
+			IntroducedVersion: "1.36",
+			RemovedVersion:    "1.42",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/discovery/v1
 		gvr("discovery.k8s.io", "v1", "endpointslices"): {
 			Stub:              `{"metadata": {"name": "slicev1"}, "addressType": "IPv4", "protocol": "TCP", "ports": [], "endpoints": []}`,
