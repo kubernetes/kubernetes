@@ -271,6 +271,17 @@ items:
     - deletecollection
     - patch
     - update
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - evictionrequests
+    - evictions
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -431,6 +442,15 @@ items:
     - podgroups
     - podgroups/status
     - workloads
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - evictionrequests
+    - evictions
     verbs:
     - get
     - list
