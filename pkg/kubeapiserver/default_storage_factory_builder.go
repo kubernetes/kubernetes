@@ -90,6 +90,7 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		resource.Resource("resourcepoolstatusrequests").WithVersion("v1alpha3"),
 		scheduling.Resource("workloads").WithVersion("v1alpha2"),
 		scheduling.Resource("podgroups").WithVersion("v1alpha2"),
+		coordination.Resource("evictionrequests").WithVersion("v1alpha1"),
 	}
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,
@@ -109,7 +110,7 @@ type StorageFactoryConfig struct {
 	EtcdServersOverrides      []string
 }
 
-// Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.
+// Complete completes the StorageFactoryConfig with provided etcdOptionsevictionrequests returning completedStorageFactoryConfig.
 // This method mutates the receiver (StorageFactoryConfig).  It must never mutate the inputs.
 func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) *completedStorageFactoryConfig {
 	c.StorageConfig = etcdOptions.StorageConfig

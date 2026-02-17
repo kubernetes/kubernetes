@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package coordination
+package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachinerytypes "k8s.io/apimachinery/pkg/types"
-)
-
-type CoordinatedLeaseStrategy string
-
-// CoordinatedLeaseStrategy defines the strategy for picking the leader for coordinated leader election.
-const (
-	// OldestEmulationVersion picks the oldest LeaseCandidate, where "oldest" is defined as follows
-	// 1) Select the candidate(s) with the lowest emulation version
-	// 2) If multiple candidates have the same emulation version, select the candidate(s) with the lowest binary version. (Note that binary version must be greater or equal to emulation version)
-	// 3) If multiple candidates have the same binary version, select the candidate with the oldest creationTimestamp.
-	// If a candidate does not specify the emulationVersion and binaryVersion fields, it will not be considered a candidate for the lease.
-	OldestEmulationVersion CoordinatedLeaseStrategy = "OldestEmulationVersion"
 )
 
 // KubernetesEvictionResponderName is the name identifying a core in-tree responder.
@@ -42,132 +30,10 @@ const (
 	EvictionResponderImperativeEviction KubernetesEvictionResponderName = "imperative-eviction.k8s.io/evictor"
 )
 
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// Lease defines a lease concept.
-type Lease struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ObjectMeta
-
-	// spec contains the specification of the Lease.
-	// +optional
-	Spec LeaseSpec
-}
-
-// LeaseSpec is a specification of a Lease.
-type LeaseSpec struct {
-	// holderIdentity contains the identity of the holder of a current lease.
-	// If Coordinated Leader Election is used, the holder identity must be
-	// equal to the elected LeaseCandidate.metadata.name field.
-	// +optional
-	HolderIdentity *string
-	// leaseDurationSeconds is a duration that candidates for a lease need
-	// to wait to force acquire it. This is measure against time of last
-	// observed renewTime.
-	// +optional
-	LeaseDurationSeconds *int32
-	// acquireTime is a time when the current lease was acquired.
-	// +optional
-	AcquireTime *metav1.MicroTime
-	// renewTime is a time when the current holder of a lease has last
-	// updated the lease.
-	// +optional
-	RenewTime *metav1.MicroTime
-	// leaseTransitions is the number of transitions of a lease between
-	// holders.
-	// +optional
-	LeaseTransitions *int32
-	// Strategy indicates the strategy for picking the leader for coordinated leader election.
-	// If the field is not specified, there is no active coordination for this lease.
-	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
-	// +featureGate=CoordinatedLeaderElection
-	// +optional
-	Strategy *CoordinatedLeaseStrategy
-	// PreferredHolder signals to a lease holder that the lease has a
-	// more optimal holder and should be given up.
-	// This field can only be set if Strategy is also set.
-	// +featureGate=CoordinatedLeaderElection
-	// +optional
-	PreferredHolder *string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// LeaseList is a list of Lease objects.
-type LeaseList struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ListMeta
-
-	// items is a list of schema objects.
-	Items []Lease
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// LeaseCandidate defines a candidate for a Lease object.
-// Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.
-type LeaseCandidate struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ObjectMeta
-	Spec LeaseCandidateSpec
-}
-
-// LeaseCandidateSpec is a specification of a Lease.
-type LeaseCandidateSpec struct {
-	// LeaseName is the name of the lease for which this candidate is contending.
-	// The limits on this field are the same as on Lease.name. Multiple lease candidates
-	// may reference the same Lease.name.
-	// This field is immutable.
-	// +required
-	LeaseName string
-	// PingTime is the last time that the server has requested the LeaseCandidate
-	// to renew. It is only done during leader election to check if any
-	// LeaseCandidates have become ineligible. When PingTime is updated, the
-	// LeaseCandidate will respond by updating RenewTime.
-	// +optional
-	PingTime *metav1.MicroTime
-	// RenewTime is the time that the LeaseCandidate was last updated. Any time
-	// a Lease needs to do leader election, the PingTime field is updated to
-	// signal to the LeaseCandidate that they should update the RenewTime. The
-	// PingTime field is also updated regularly and LeaseCandidates must update
-	// RenewTime to prevent garbage collection for still active LeaseCandidates.
-	// Old LeaseCandidate objects are periodically garbage collected.
-	// +optional
-	RenewTime *metav1.MicroTime
-	// BinaryVersion is the binary version. It must be in a semver format without leading `v`.
-	// This field is required.
-	// +required
-	BinaryVersion string
-	// EmulationVersion is the emulation version. It must be in a semver format without leading `v`.
-	// EmulationVersion must be less than or equal to BinaryVersion.
-	// This field is required when strategy is "OldestEmulationVersion"
-	// +optional
-	EmulationVersion string
-	// Strategy is the strategy that coordinated leader election will use for picking the leader.
-	// If multiple candidates for the same Lease return different strategies, the strategy provided
-	// by the candidate with the latest BinaryVersion will be used. If there is still conflict,
-	// this is a user error and coordinated leader election will not operate the Lease until resolved.
-	// +listType=atomic
-	// +required
-	Strategy CoordinatedLeaseStrategy
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// LeaseCandidateList is a list of LeaseCandidate objects.
-type LeaseCandidateList struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ListMeta
-
-	// items is a list of schema objects.
-	Items []LeaseCandidate
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.36
+// +k8s:supportsSubresource="/status"
 
 // EvictionRequest defines a request that should ideally result in a graceful eviction of a
 // .spec.target (e.g. termination of a pod).
@@ -186,8 +52,9 @@ type LeaseCandidateList struct {
 // If there are no other responders and the target is a pod, the last default
 // imperative-eviction.k8s.io/evictor responder will evict the pod using the imperative Eviction API
 // (/evict endpoint).
+// +k8s:validation-gen-nolint // Note: remove this when the API got GA
 type EvictionRequest struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// .metadata.name is required and should match the .metadata.uid of the pod being evicted.
@@ -195,18 +62,20 @@ type EvictionRequest struct {
 	// The labels of the eviction request object are synchronized with .metadata.labels of the
 	// eviction request's target. The labels of the target have a preference.
 	// +optional
-	metav1.ObjectMeta
+	// +k8s:subfield(name)=+k8s:format=k8s-uuid
+	// +k8s:subfield(generateName)=+k8s:forbidden
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec defines the eviction request specification.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +required
-	Spec EvictionRequestSpec
+	Spec EvictionRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status represents the most recently observed status of the eviction request.
-	// Populated by responders and the evictionrequest-controller.
+	// Populated by responders and evictionrequest-controller.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
-	Status EvictionRequestStatus
+	Status EvictionRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // EvictionRequestSpec is a specification of an EvictionRequest.
@@ -215,7 +84,8 @@ type EvictionRequestSpec struct {
 	// Target UID must be the same as the EvictionRequest's .metadata.name.
 	// This field is required and immutable.
 	// +required
-	Target EvictionTarget
+	// +k8s:immutable
+	Target EvictionTarget `json:"target" protobuf:"bytes,1,opt,name=target"`
 
 	// requesters allow you to identify entities, that requested the eviction of the target.
 	// At least one requester with the eviction intent is required when creating an eviction request.
@@ -230,7 +100,11 @@ type EvictionRequestSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	Requesters []Requester
+	// +k8s:required
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=100
+	Requesters []Requester `json:"requesters,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=requesters"`
 }
 
 // EvictionTarget contains a reference to an object that should be evicted.
@@ -239,7 +113,9 @@ type EvictionTarget struct {
 	// pod references a pod that is subject to eviction/termination.
 	// Pods that are part of a PodGroup (.spec.schedulingGroup is set) are not supported.
 	// +optional
-	Pod *PodReference
+	// +k8s:optional
+	// +k8s:unionMember
+	Pod *PodReference `json:"pod,omitempty" protobuf:"bytes,1,opt,name=pod"`
 }
 
 // PodReference contains enough information to locate the referenced pod inside the same namespace.
@@ -247,12 +123,16 @@ type PodReference struct {
 	// name of the target.
 	// This field is required.
 	// +required
-	Name string
+	// +k8s:required
+	// +k8s:format=k8s-long-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// uid of the target.
 	// It can be found in .spec.metadata.uid of the target and is a lowercase UUID in 8-4-4-4-12 format.
 	// This field is required.
 	// +required
-	UID apimachinerytypes.UID
+	// +k8s:required
+	// +k8s:format=k8s-uuid
+	UID apimachinerytypes.UID `json:"uid" protobuf:"bytes,2,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID"`
 }
 
 // Requester allows you to identify the entity, that requested the eviction of the target.
@@ -265,7 +145,8 @@ type Requester struct {
 	// This field must be unique for each requester.
 	// This field is required.
 	// +required
-	Name string
+	// +k8s:required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// intent specifies the action that should be taken for the specified target.
 	//
@@ -278,9 +159,11 @@ type Requester struct {
 	//   - Completed or Interrupted responders should not take any action.
 	// +required
 	// +k8s:required
-	Intent RequesterIntent
+	Intent RequesterIntent `json:"intent" protobuf:"bytes,2,opt,name=intent,casttype=RequesterIntentEviction"`
 }
 
+// RequesterIntent specifies a requester intent.
+// +k8s:enum
 type RequesterIntent string
 
 // These are intents that can be set by each requester.
@@ -314,14 +197,20 @@ type EvictionRequestStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	Conditions []metav1.Condition
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=type
+	// +k8s:maxItems=500
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// observedGeneration is EvictionRequest's .metadata.generation observed by the evictionrequest-controller.
 	// The observed generation value cannot be negative and can only be incremented.
 	// The minimum value is 1.
 	// This field is managed by evictionrequest-controller.
 	// +optional
-	ObservedGeneration *int64
+	// +k8s:optional
+	// +k8s:minimum=1
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty" protobuf:"varint,2,opt,name=observedGeneration"`
 
 	// targetResponders reference responders that should eventually respond to this eviction
 	// request to help with the graceful eviction of a target. These responders are selected
@@ -347,7 +236,11 @@ type EvictionRequestStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	TargetResponders []TargetResponder
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=17
+	TargetResponders []TargetResponder `json:"targetResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,3,rep,name=targetResponders"`
 
 	// responders represents the eviction process status of each declared responder.
 	//
@@ -363,7 +256,11 @@ type EvictionRequestStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	Responders []ResponderStatus
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=17
+	Responders []ResponderStatus `json:"responders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=responders"`
 }
 
 type EvictionRequestConditionType string
@@ -426,7 +323,7 @@ type TargetResponder struct {
 	// This field is required.
 	// +required
 	// +k8s:required
-	Name string
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// state specifies a state that is assigned by the evictionrequest-controller. Responders should observe
 	// this state in order to navigate their lifecycle.
@@ -449,7 +346,7 @@ type TargetResponder struct {
 	// Please refer to the ResponderStatus in .status.responders for more details on each responder.
 	// +required
 	// +k8s:required
-	State ResponderStateType
+	State ResponderStateType `json:"state" protobuf:"bytes,2,opt,name=state,casttype=ResponderStateType"`
 }
 
 // ResponderStateType specifies a state that is assigned by the evictionrequest-controller.
@@ -493,7 +390,8 @@ type ResponderStatus struct {
 	// This field is initialized by Kubernetes and must be unique for each responder.
 	// This field is required.
 	// +required
-	Name string
+	// +k8s:required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// startTime tracks the time at which this responder was designated as active and should start
 	// processing the eviction request.
@@ -501,7 +399,10 @@ type ResponderStatus struct {
 	// This field is initialized by Kubernetes when this responder becomes active.
 	// This field becomes immutable once set.
 	// +optional
-	StartTime *metav1.Time
+	// +k8s:optional
+	// +k8s:update=NoModify
+	// +k8s:update=NoUnset
+	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,2,opt,name=startTime"`
 
 	// heartbeatTime is the last time at which the eviction process was reported to be in progress
 	// by the responder.
@@ -509,14 +410,16 @@ type ResponderStatus struct {
 	// Responders should avoid heartbeats more frequent than 20 seconds to avoid overloading the
 	// control-plane.
 	// +optional
-	HeartbeatTime *metav1.Time
+	// +k8s:optional
+	HeartbeatTime *metav1.Time `json:"heartbeatTime,omitempty" protobuf:"bytes,3,opt,name=heartbeatTime"`
 
 	// expectedCompletionTime is the time at which the eviction process step is expected to end for the
 	// responder.
 	// The time cannot be set to the past.
 	// May be omitted if no estimate can be made.
 	// +optional
-	ExpectedCompletionTime *metav1.Time
+	// +k8s:optional
+	ExpectedCompletionTime *metav1.Time `json:"expectedCompletionTime,omitempty" protobuf:"bytes,4,opt,name=expectedCompletionTime"`
 
 	// completionTime tracks the time at which the Responder stopped processing the eviction request.
 	// Completion means that the responders has either fully or partially completed the
@@ -524,13 +427,18 @@ type ResponderStatus struct {
 	// It should reflect the present time when set.
 	// This field becomes immutable once set.
 	// +optional
-	CompletionTime *metav1.Time
+	// +k8s:optional
+	// +k8s:update=NoModify
+	// +k8s:update=NoUnset
+	CompletionTime *metav1.Time `json:"completionTime,omitempty" protobuf:"bytes,5,opt,name=completionTime"`
 
 	// message provides human-readable details about the state of the responder and the eviction
 	// process.
 	// Maximum length is 4000 characters.
 	// +optional
-	Message string
+	// +k8s:optional
+	// +k8s:maxLength=4000
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -538,12 +446,12 @@ type ResponderStatus struct {
 
 // EvictionRequestList contains a list of EvictionRequests resources.
 type EvictionRequestList struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
-	metav1.ListMeta
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items is the list of EvictionRequests.
-	Items []EvictionRequest
+	Items []EvictionRequest `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
