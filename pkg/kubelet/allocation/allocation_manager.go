@@ -771,7 +771,7 @@ func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kube
 		// Generate Pod resize completed event
 		podResizeCompletedEventMsg := m.podResizeCompletionMsg(allocatedPod)
 		if m.recorder != nil {
-			m.recorder.Eventf(allocatedPod, v1.EventTypeNormal, events.ResizeCompleted, podResizeCompletedEventMsg)
+			m.recorder.Eventf(allocatedPod, v1.EventTypeNormal, events.ResizeCompleted, "%s", podResizeCompletedEventMsg)
 		}
 	}
 }

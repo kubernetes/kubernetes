@@ -311,7 +311,7 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 									Name:      string(nodeName),
 									UID:       types.UID(nodeName),
 									Namespace: "",
-								}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
+								}, v1.EventTypeWarning, "FailedToCreateRoute", "%s", msg)
 							klog.V(4).Info(msg)
 							return err
 						}
