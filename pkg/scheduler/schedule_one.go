@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -578,6 +579,16 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	if err != nil {
 		return result, err
 	}
+
+	if resource.IsPodResizeDeferred(pod) {
+		// TODO (natasha41575): Make sure this error doesn't show up in the schedule error status
+		return result, &framework.FitError{
+			Pod:         pod,
+			NumAllNodes: sched.nodeInfoSnapshot.NumNodes(),
+			Diagnosis:   diagnosis,
+		}
+	}
+
 	trace.Step("Computing predicates done")
 
 	if len(feasibleNodes) == 0 {
@@ -632,9 +643,15 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 	if err != nil {
 		return nil, diagnosis, "", nil, err
 	}
+
 	// Run "prefilter" plugins.
 	preRes, s, unscheduledPlugins := schedFramework.RunPreFilterPlugins(ctx, state, pod)
 	diagnosis.UnschedulablePlugins = unscheduledPlugins
+
+	if resource.IsPodResizeDeferred(pod) {
+		return nil, diagnosis, "", nil, nil
+	}
+
 	if !s.IsSuccess() {
 		if !s.IsRejected() {
 			return nil, diagnosis, "", nil, s.AsError()
@@ -1179,6 +1196,21 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
 func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
+	if resource.IsPodResizeDeferred(podInfo.GetPod()) {
+		// We don't want to treat a deferred pod resize as a scheduling failure, since
+		// the pod is already scheduled. Just add it back to the scheduling queue to retry
+		// preemption in the future.
+
+		// TODO (natasha41575): Figure out what to do with deferred pods that cannot benefit
+		// from preemption. Align with scheduling. Should they just stay in the queue
+		// and try again indefinitely?
+
+		// TODO (natasha41575): We need to add the 'Unresizable' condition here if preemption
+		// failed to make the pod fit.
+		sched.SchedulingQueue.Done(podInfo.Pod.UID)
+		return
+	}
+
 	calledDone := false
 	defer func() {
 		if !calledDone {

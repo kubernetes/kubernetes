@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -235,6 +236,15 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	for _, pi := range nodeInfo.GetPods() {
 		if pl.isPreemptionAllowed(nodeInfo, pi, pod) {
 			potentialVictims = append(potentialVictims, pi)
+		}
+		if pi.GetPod().UID == pod.UID && resource.IsPodResizeDeferred(pod) {
+			// If the pod has a deferred resize, we should temporarily remove it from the nodeInfo
+			// since its current resources should not be considered when calculating the preemption victims.
+			// We will add it back to the nodeInfo after the preemption victim selection is done.
+			nodeInfo.RemovePod(logger, pi.GetPod())
+			defer func() {
+				nodeInfo.AddPodInfo(pi)
+			}()
 		}
 	}
 	for _, pi := range potentialVictims {
