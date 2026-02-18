@@ -4495,6 +4495,8 @@ type PodValidationOptions struct {
 	AllowRestartAllContainers bool
 	// Allows container statuses to contain image volume digest
 	AllowImageVolumeWithDigest bool
+	//  Indicates whether DRANativeResources feature is enabled
+	DRANativeResourcesEnabled bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -6286,7 +6288,15 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, validatePodLevelResourcesResize(newPod, oldPod, &newPodSpecCopy, specPath, opts)...)
 	}
 
-	// Part 3: Validate that the changes between oldPod.Spec.Containers[].Resources and
+	// Part 3: Disable InPlaceResize if a pod is using DRA resource claims for native resources.
+	// TODO(KEP-5517) - Handle in place resize with native resource claims.
+	// Currently, the presence of any native resource claim blocks resizing for all resources, irrespective of whether
+	// ResourceClaim is used for the same resource.
+	if opts.DRANativeResourcesEnabled && len(oldPod.Status.NativeResourceClaimStatus) > 0 {
+		allErrs = append(allErrs, field.Forbidden(specPath, "pods with native resource claims cannot be resized"))
+	}
+
+	// Part 4: Validate that the changes between oldPod.Spec.Containers[].Resources and
 	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
 	// newPod.Spec.InitContainers[].Resources are allowed.
 

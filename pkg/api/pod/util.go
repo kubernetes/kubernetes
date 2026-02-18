@@ -432,6 +432,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// This also allows restart rules on sidecar containers.
 		AllowRestartAllContainers:  utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
 		AllowImageVolumeWithDigest: utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
+		DRANativeResourcesEnabled:  utilfeature.DefaultFeatureGate.Enabled(features.DRANativeResources),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
