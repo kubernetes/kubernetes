@@ -48,9 +48,11 @@ message ControllerRevision {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Data is the serialized representation of the state.
+  // +optional
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
 
   // Revision indicates the revision of the state represented by Data.
+  // +required
   optional int64 revision = 3;
 }
 
@@ -75,7 +77,7 @@ message DaemonSet {
 
   // The desired behavior of this daemon set.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional DaemonSetSpec spec = 2;
 
   // The current status of this daemon set. This data may be
@@ -90,9 +92,11 @@ message DaemonSet {
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 message DaemonSetCondition {
   // Type of DaemonSet condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // Last time the condition transitioned from one status to another.
@@ -125,6 +129,7 @@ message DaemonSetSpec {
   // Must match in order to be controlled.
   // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
 
   // An object that describes the pod that will be created.
@@ -133,6 +138,7 @@ message DaemonSetSpec {
   // selector is specified).
   // The only allowed template.spec.restartPolicy value is "Always".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+  // +required
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 2;
 
   // An update strategy to replace existing DaemonSet pods with new pods.
@@ -233,7 +239,7 @@ message Deployment {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the Deployment.
-  // +optional
+  // +required
   optional DeploymentSpec spec = 2;
 
   // Most recently observed status of the Deployment.
@@ -244,21 +250,27 @@ message Deployment {
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // Type of deployment condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // The last time this condition was updated.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
 
   // Last time the condition transitioned from one status to another.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
 
   // The reason for the condition's last transition.
+  // +optional
   optional string reason = 4;
 
   // A human readable message indicating details about the transition.
+  // +optional
   optional string message = 5;
 }
 
@@ -282,10 +294,12 @@ message DeploymentSpec {
   // Label selector for pods. Existing ReplicaSets whose pods are
   // selected by this will be the ones affected by this deployment.
   // It must match the pod template's labels.
+  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
   // The only allowed template.spec.restartPolicy value is "Always".
+  // +required
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // The deployment strategy to use to replace existing pods with new ones.
@@ -314,6 +328,7 @@ message DeploymentSpec {
   // process failed deployments and a condition with a ProgressDeadlineExceeded
   // reason will be surfaced in the deployment status. Note that progress will
   // not be estimated during the time a deployment is paused. Defaults to 600s.
+  // +optional
   optional int32 progressDeadlineSeconds = 9;
 }
 
@@ -393,7 +408,7 @@ message ReplicaSet {
 
   // Spec defines the specification of the desired behavior of the ReplicaSet.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional ReplicaSetSpec spec = 2;
 
   // Status is the most recently observed status of the ReplicaSet.
@@ -408,9 +423,11 @@ message ReplicaSet {
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 message ReplicaSetCondition {
   // Type of replica set condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // The last time the condition transitioned from one status to another.
@@ -457,6 +474,7 @@ message ReplicaSetSpec {
   // Label keys and values that must match in order to be controlled by this replica set.
   // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template is the object that describes the pod that will be created if
@@ -608,7 +626,7 @@ message Scale {
   optional ScaleSpec spec = 2;
 
   // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
-  // +optional
+  // +required
   optional ScaleStatus status = 3;
 }
 
@@ -625,6 +643,7 @@ message ScaleSpec {
 // ScaleStatus represents the current status of a scale subresource.
 message ScaleStatus {
   // actual number of observed instances of the scaled object.
+  // +required
   optional int32 replicas = 1;
 
   // selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -656,7 +675,7 @@ message StatefulSet {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the desired identities of pods in this set.
-  // +optional
+  // +required
   optional StatefulSetSpec spec = 2;
 
   // Status is the current status of Pods in this StatefulSet. This data
@@ -668,9 +687,11 @@ message StatefulSet {
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 message StatefulSetCondition {
   // Type of statefulset condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // Last time the condition transitioned from one status to another.
@@ -716,6 +737,7 @@ message StatefulSetPersistentVolumeClaimRetentionPolicy {
   // VolumeClaimTemplates when the StatefulSet is deleted. The default policy
   // of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
   // `Delete` policy causes those PVCs to be deleted.
+  // +optional
   optional string whenDeleted = 1;
 
   // WhenScaled specifies what happens to PVCs created from StatefulSet
@@ -723,6 +745,7 @@ message StatefulSetPersistentVolumeClaimRetentionPolicy {
   // policy of `Retain` causes PVCs to not be affected by a scaledown. The
   // `Delete` policy causes the associated PVCs for any excess pods above
   // the replica count to be deleted.
+  // +optional
   optional string whenScaled = 2;
 }
 
@@ -739,6 +762,7 @@ message StatefulSetSpec {
   // selector is a label query over pods that should match the replica count.
   // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // template is the object that describes the pod that will be created if
@@ -748,6 +772,7 @@ message StatefulSetSpec {
   // <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named
   // "web" with index number "3" would be named "web-3".
   // The only allowed template.spec.restartPolicy value is "Always".
+  // +required
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // volumeClaimTemplates is a list of claims that pods are allowed to reference.
@@ -783,12 +808,14 @@ message StatefulSetSpec {
   // updateStrategy indicates the StatefulSetUpdateStrategy that will be
   // employed to update Pods in the StatefulSet when a revision is made to
   // Template.
+  // +optional
   optional StatefulSetUpdateStrategy updateStrategy = 7;
 
   // revisionHistoryLimit is the maximum number of revisions that will
   // be maintained in the StatefulSet's revision history. The revision history
   // consists of all revisions not represented by a currently applied
   // StatefulSetSpec version. The default value is 10.
+  // +optional
   optional int32 revisionHistoryLimit = 8;
 
   // Minimum number of seconds for which a newly created pod should be ready
