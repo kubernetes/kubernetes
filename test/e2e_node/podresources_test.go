@@ -890,14 +890,33 @@ func demuxCPUsAndDevicesFromGetAllocatableResources(resp *kubeletpodresourcesv1.
 	return cpuset.New(cpus...), devs
 }
 
+func podresourcesGetWithRetry(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient, podNamespace, podName string) *kubeletpodresourcesv1.GetPodResourcesResponse {
+	ginkgo.GinkgoHelper()
+	var err error
+	var resp *kubeletpodresourcesv1.GetPodResourcesResponse
+	gomega.Eventually(func() error {
+		resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: podName, PodNamespace: podNamespace})
+		framework.Logf("Get result: %v, err: %v", resp, err)
+		return err
+	}).WithContext(ctx).WithPolling(2*time.Second).WithTimeout(30*time.Second).Should(gomega.Succeed(), "Expected Get to succeed for %s/%s", podNamespace, podName)
+	return resp
+}
+
 func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sidecarContainersEnabled bool) {
 	ginkgo.GinkgoHelper()
 
 	ginkgo.By("checking the output when no pods are present")
 	expected := []podDesc{}
-	resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
+
+	var err error
+	var resp *kubeletpodresourcesv1.GetPodResourcesResponse
+	gomega.Eventually(func() error {
+		resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
+		framework.Logf("Get result: %v, err: %v", resp, err)
+		return err
+	}).WithContext(ctx).WithPolling(2*time.Second).WithTimeout(30*time.Second).ShouldNot(gomega.Succeed(), "Expected Get to fail for %s/%s", f.Namespace.Name, "test")
+
 	podResourceList := []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
-	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
 	res := convertToMap(podResourceList)
 	err = matchPodDescWithResources(expected, res)
 	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
@@ -925,9 +944,14 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 		},
 	}
 	tpd.createPodsForTest(ctx, f, descs)
-	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-AA", PodNamespace: f.Namespace.Name})
+
+	gomega.Eventually(func() error {
+		resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-AA", PodNamespace: f.Namespace.Name})
+		framework.Logf("Get result: %v, err: %v", res, err)
+		return err
+	}).WithContext(ctx).WithPolling(2*time.Second).WithTimeout(30*time.Second).ShouldNot(gomega.Succeed(), "Expected Get to fail for %s/%s", f.Namespace.Name, "pod-AA")
+
 	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
-	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
 	res = convertToMap(podResourceList)
 	err = matchPodDescWithResources(expected, res)
 	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
@@ -942,8 +966,8 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 		},
 	}
 	tpd.createPodsForTest(ctx, f, expected)
-	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-00", PodNamespace: f.Namespace.Name})
-	framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-00")
+
+	resp = podresourcesGetWithRetry(ctx, cli, f.Namespace.Name, "pod-00")
 	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 	res = convertToMap(podResourceList)
 	err = matchPodDescWithResources(expected, res)
@@ -960,8 +984,8 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 		},
 	}
 	tpd.createPodsForTest(ctx, f, expected)
-	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
-	framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
+
+	resp = podresourcesGetWithRetry(ctx, cli, f.Namespace.Name, "pod-01")
 	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 	res = convertToMap(podResourceList)
 	err = matchPodDescWithResources(expected, res)
@@ -992,8 +1016,8 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 		},
 	}
 	tpd.createPodsForTest(ctx, f, expected)
-	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
-	framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
+
+	resp = podresourcesGetWithRetry(ctx, cli, f.Namespace.Name, "pod-01")
 	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 	res = convertToMap(podResourceList)
 	err = matchPodDescWithResources(expected, res)
@@ -1019,8 +1043,12 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 	err = e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, completedPod.Name, "Pod Succeeded", 2*time.Minute, testutils.PodSucceeded)
 	framework.ExpectNoError(err, "pod did not succeed as expected")
 
-	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: completedDesc.podName, PodNamespace: f.Namespace.Name})
-	gomega.Expect(err).To(gomega.HaveOccurred(), "expected Get() to return an error for a terminated pod")
+	gomega.Eventually(func() error {
+		resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: completedDesc.podName, PodNamespace: f.Namespace.Name})
+		framework.Logf("Get result: %v, err: %v", res, err)
+		return err
+	}).WithContext(ctx).WithPolling(2*time.Second).WithTimeout(30*time.Second).ShouldNot(gomega.Succeed(), "Expected Get to fail for %s/%s", f.Namespace.Name, completedDesc.podName)
+
 	// Returned PodResources for a terminated pod must be empty.
 	pr := resp.GetPodResources()
 	if pr != nil {
@@ -1053,8 +1081,8 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 			},
 		}
 		tpd.createPodsForTest(ctx, f, expected)
-		resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
-		framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
+
+		resp = podresourcesGetWithRetry(ctx, cli, f.Namespace.Name, "pod-01")
 		podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 		res = convertToMap(podResourceList)
 		err = matchPodDescWithResources(expected, res)
@@ -1215,13 +1243,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
 						framework.ExpectNoError(err)
 
-						res, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{
-							PodName:      pod.Name,
-							PodNamespace: pod.Namespace,
-						})
-
-						framework.Logf("Get result: %v, err: %v", res, err)
-						framework.ExpectNoError(err, "Expected Get to succeed with the feature gate enabled")
+						res := podresourcesGetWithRetry(ctx, cli, pod.Namespace, pod.Name)
 						gomega.Expect(res.PodResources.Name).To(gomega.Equal(pod.Name))
 						gomega.Expect(res.PodResources.Containers).To(gomega.HaveLen(1), "expected one container")
 						container := res.PodResources.Containers[0]
@@ -1278,6 +1300,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				defer conn.Close()
 
 				ginkgo.By("checking Get fail if the feature gate is not enabled")
+				// we don't use Eventually here because the call must fail consistently and quickly
 				getRes, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
 				framework.Logf("Get result: %v, err: %v", getRes, err)
 				gomega.Expect(err).To(gomega.HaveOccurred(), "With feature gate disabled, the call must fail")
@@ -1943,8 +1966,8 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			expectPodResources(ctx, cli, []podDesc{desc})
 
 			expected := []podDesc{}
-			resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
-			framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
+
+			resp := podresourcesGetWithRetry(ctx, cli, f.Namespace.Name, "pod-01")
 			podResourceList := []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 			res := convertToMap(podResourceList)
 			err = matchPodDescWithResources(expected, res)
