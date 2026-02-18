@@ -1082,7 +1082,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			})
 
 			// empty context to apply kubelet config changes
-			ginkgo.Context("", func() {
+			ginkgo.Context("with reserved system CPUs", func() {
 				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 					// Set the CPU Manager policy to static.
 					initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
@@ -1093,31 +1093,6 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					cpus := reservedSystemCPUs.String()
 					framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
 					initialConfig.ReservedSystemCPUs = cpus
-				})
-
-				ginkgo.It("should return the expected responses", func(ctx context.Context) {
-					onlineCPUs, err := getOnlineCPUs()
-					framework.ExpectNoError(err, "getOnlineCPUs() failed err: %v", err)
-
-					configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
-					sd := setupSRIOVConfigOrFail(ctx, f, configMap)
-					ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
-
-					waitForSRIOVResources(ctx, f, sd)
-
-					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-					framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
-
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
-					defer conn.Close()
-
-					waitForSRIOVResources(ctx, f, sd)
-
-					ginkgo.By("checking List()")
-					podresourcesListTests(ctx, f, cli, sd, false)
-					ginkgo.By("checking GetAllocatableResources()")
-					podresourcesGetAllocatableResourcesTests(ctx, cli, sd, onlineCPUs, reservedSystemCPUs)
 				})
 
 				framework.It("should return the expected responses", framework.WithNodeConformance(), func(ctx context.Context) {
@@ -1190,8 +1165,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				}
 			})
 
-			// empty context to apply kubelet config changes
-			ginkgo.Context("", func() {
+			ginkgo.Context("with reserved system CPUs", func() {
 				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 					// Set the CPU Manager policy to static.
 					initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
@@ -1248,22 +1222,6 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 						gomega.Expect(container.CpuIds).To(gomega.HaveLen(pd.CPURequestExclusive()), "expected one exclusive CPU")
 						gomega.Expect(container.Devices).To(gomega.BeEmpty(), "expected no devices")
 					})
-				})
-
-				ginkgo.It("should return the expected responses", func(ctx context.Context) {
-					onlineCPUs, err := getOnlineCPUs()
-					framework.ExpectNoError(err, "getOnlineCPUs() failed err: %v", err)
-
-					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-					framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
-
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
-					defer conn.Close()
-
-					podresourcesListTests(ctx, f, cli, nil, false)
-					podresourcesGetAllocatableResourcesTests(ctx, cli, nil, onlineCPUs, reservedSystemCPUs)
-					podresourcesGetTests(ctx, f, cli, false)
 				})
 
 				framework.It("should return the expected responses", framework.WithNodeConformance(), func(ctx context.Context) {
