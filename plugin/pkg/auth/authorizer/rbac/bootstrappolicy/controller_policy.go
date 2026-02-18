@@ -240,6 +240,23 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				Rules:      rules,
 			})
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourcePoolStatus) {
+			addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+				// Same name as in k8s.io/kubernetes/cmd/kube-controller-manager/names.
+				ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resourcepoolstatusrequest-controller"},
+				Rules: []rbacv1.PolicyRule{
+					// Read ResourcePoolStatusRequests to process them
+					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourcepoolstatusrequests").RuleOrDie(),
+					// Update status after processing
+					rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourcepoolstatusrequests/status").RuleOrDie(),
+					// Read ResourceSlices to calculate pool status
+					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
+					// Read ResourceClaims to calculate allocation counts
+					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+					eventsRule(),
+				},
+			})
+		}
 	}
 
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
