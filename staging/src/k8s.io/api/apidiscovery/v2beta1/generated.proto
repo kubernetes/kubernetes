@@ -44,6 +44,7 @@ message APIGroupDiscovery {
   // with the preferred version being the first entry.
   // +listType=map
   // +listMapKey=version
+  // +optional
   repeated APIVersionDiscovery versions = 2;
 }
 
@@ -67,40 +68,48 @@ message APIResourceDiscovery {
   // for this resource across all versions in the API group.
   // Resources with non-empty groups are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>
   // Resources with empty groups are located at /api/v1/<APIResourceDiscovery.Resource>
+  // +required
   optional string resource = 1;
 
   // responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
   // APIs may return other objects types at their discretion, such as error conditions, requests for alternate representations, or other operation specific behavior.
   // This value will be null or empty if an APIService reports subresources but supports no operations on the parent resource
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind responseKind = 2;
 
   // scope indicates the scope of a resource, either Cluster or Namespaced
+  // +required
   optional string scope = 3;
 
   // singularResource is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
   // For many clients the singular form of the resource will be more understandable to users reading messages and should be used when integrating the name of the resource into a sentence.
   // The command line tool kubectl, for example, allows use of the singular resource name in place of plurals.
   // The singular form of a resource should always be an optional element - when in doubt use the canonical resource name.
+  // +required
   optional string singularResource = 4;
 
   // verbs is a list of supported API operation types (this includes
   // but is not limited to get, list, watch, create, update, patch,
   // delete, deletecollection, and proxy).
   // +listType=set
+  // +required
   repeated string verbs = 5;
 
   // shortNames is a list of suggested short names of the resource.
   // +listType=set
+  // +optional
   repeated string shortNames = 6;
 
   // categories is a list of the grouped resources this resource belongs to (e.g. 'all').
   // Clients may use this to simplify acting on multiple resource types at once.
   // +listType=set
+  // +optional
   repeated string categories = 7;
 
   // subresources is a list of subresources provided by this resource. Subresources are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>/name-of-instance/<APIResourceDiscovery.subresources[i].subresource>
   // +listType=map
   // +listMapKey=subresource
+  // +optional
   repeated APISubresourceDiscovery subresources = 8;
 }
 
@@ -108,10 +117,12 @@ message APIResourceDiscovery {
 message APISubresourceDiscovery {
   // subresource is the name of the subresource.  This is used in the URL path and is the unique identifier
   // for this resource across all versions.
+  // +required
   optional string subresource = 1;
 
   // responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
   // Some subresources do not return normal resources, these will have null or empty return types.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind responseKind = 2;
 
   // acceptedTypes describes the kinds that this endpoint accepts.
@@ -122,6 +133,7 @@ message APISubresourceDiscovery {
   // +listMapKey=group
   // +listMapKey=version
   // +listMapKey=kind
+  // +optional
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind acceptedTypes = 3;
 
   // verbs is a list of supported API operation types (this includes
@@ -131,17 +143,20 @@ message APISubresourceDiscovery {
   // should expect the behavior of standard verbs to align with
   // Kubernetes interaction conventions.
   // +listType=set
+  // +required
   repeated string verbs = 4;
 }
 
 // APIVersionDiscovery holds a list of APIResourceDiscovery types that are served for a particular version within an API Group.
 message APIVersionDiscovery {
   // version is the name of the version within a group version.
+  // +required
   optional string version = 1;
 
   // resources is a list of APIResourceDiscovery objects for the corresponding group version.
   // +listType=map
   // +listMapKey=resource
+  // +optional
   repeated APIResourceDiscovery resources = 2;
 
   // freshness marks whether a group version's discovery document is up to date.
@@ -151,6 +166,7 @@ message APIVersionDiscovery {
   // significantly out of date. Clients that require the latest
   // version of the discovery information be retrieved before
   // performing an operation should not use the aggregated document
+  // +optional
   optional string freshness = 3;
 }
 
