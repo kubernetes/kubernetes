@@ -337,6 +337,7 @@ func newTestPodData() *testPodData {
 }
 
 func (tpd *testPodData) createPodsForTest(ctx context.Context, f *framework.Framework, podReqs []podDesc) {
+	ginkgo.GinkgoHelper()
 	for _, podReq := range podReqs {
 		pod := makePodResourcesTestPod(podReq)
 		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
@@ -348,11 +349,13 @@ func (tpd *testPodData) createPodsForTest(ctx context.Context, f *framework.Fram
 
 /* deletePodsForTest clean up all the pods run for a testcase. Must ensure proper cleanup */
 func (tpd *testPodData) deletePodsForTest(ctx context.Context, f *framework.Framework) {
+	ginkgo.GinkgoHelper()
 	deletePodsAsync(ctx, f, tpd.PodMap)
 }
 
 /* deletePod removes pod during a test. Should do a best-effort clean up */
 func (tpd *testPodData) deletePod(ctx context.Context, f *framework.Framework, podName string) {
+	ginkgo.GinkgoHelper()
 	_, ok := tpd.PodMap[podName]
 	if !ok {
 		return

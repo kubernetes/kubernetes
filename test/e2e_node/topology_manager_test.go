@@ -500,6 +500,7 @@ func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework,
 }
 
 func deletePodsAsync(ctx context.Context, f *framework.Framework, podMap map[string]*v1.Pod) {
+	ginkgo.GinkgoHelper()
 	var wg sync.WaitGroup
 	for _, pod := range podMap {
 		wg.Add(1)
