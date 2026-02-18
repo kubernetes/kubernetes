@@ -998,23 +998,31 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 
 	restartNever := v1.RestartPolicyNever
 	tpd = newTestPodData()
-	ginkgo.By("checking the output when only pod require CPU is terminated")
-	expected = []podDesc{
-		{
-			podName:        "pod-01",
-			cntName:        "cnt-00",
-			cpuRequest:     1000,
-			restartPolicy:  &restartNever,
-			mainCntCommand: []string{"sh", "-c", "/bin/true"},
-		},
+	ginkgo.By("checking Get() returns an error for a terminated pod")
+
+	completedDesc := podDesc{
+		podName:        "pod-01",
+		cntName:        "cnt-00",
+		cpuRequest:     1000,
+		restartPolicy:  &restartNever,
+		mainCntCommand: []string{"sh", "-c", "/bin/true"},
 	}
-	tpd.createPodsForTest(ctx, f, expected)
-	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
-	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
-	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
-	res = convertToMap(podResourceList)
-	err = matchPodDescWithResources(expected, res)
-	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+
+	completedPod := e2epod.NewPodClient(f).Create(ctx, makePodResourcesTestPod(completedDesc))
+	framework.Logf("created pod %s", completedDesc.podName)
+	tpd.PodMap[completedDesc.podName] = completedPod
+	// Wait for the pod to complete to avoid races.
+	err = e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, completedPod.Name, "Pod Succeeded", 2*time.Minute, testutils.PodSucceeded)
+	framework.ExpectNoError(err, "pod did not succeed as expected")
+
+	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: completedDesc.podName, PodNamespace: f.Namespace.Name})
+	gomega.Expect(err).To(gomega.HaveOccurred(), "expected Get() to return an error for a terminated pod")
+	// Returned PodResources for a terminated pod must be empty.
+	pr := resp.GetPodResources()
+	if pr != nil {
+		gomega.Expect(pr.GetContainers()).To(gomega.BeEmpty(),
+			"expected no container resources in response for terminated pod; got: %#v", pr.GetContainers())
+	}
 	tpd.deletePodsForTest(ctx, f)
 
 	if sidecarContainersEnabled {
