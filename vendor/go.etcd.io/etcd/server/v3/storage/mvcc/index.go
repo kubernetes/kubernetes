@@ -17,8 +17,8 @@ package mvcc
 import (
 	"sync"
 
-	"github.com/google/btree"
 	"go.uber.org/zap"
+	"k8s.io/utils/third_party/forked/golang/btree"
 )
 
 type index interface {
@@ -38,13 +38,13 @@ type index interface {
 
 type treeIndex struct {
 	sync.RWMutex
-	tree *btree.BTreeG[*keyIndex]
+	tree *btree.BTree[*keyIndex]
 	lg   *zap.Logger
 }
 
 func newTreeIndex(lg *zap.Logger) index {
 	return &treeIndex{
-		tree: btree.NewG(32, func(aki *keyIndex, bki *keyIndex) bool {
+		tree: btree.New(32, func(aki *keyIndex, bki *keyIndex) bool {
 			return aki.Less(bki)
 		}),
 		lg: lg,

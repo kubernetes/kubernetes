@@ -15,6 +15,8 @@
 package clientv3
 
 import (
+	"google.golang.org/protobuf/proto"
+
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 )
 
@@ -30,7 +32,26 @@ const (
 	CompareValue
 )
 
-type Cmp pb.Compare
+type Cmp struct {
+	c *pb.Compare
+}
+
+func FromCompare(c *pb.Compare) Cmp {
+	return Cmp{c: c}
+}
+
+func (cmp *Cmp) GetCompare() *pb.Compare {
+	cmp.ensureCompare()
+	return cmp.c
+}
+
+func (cmp *Cmp) Clone() Cmp {
+	result := Cmp{}
+	if cmp.c != nil {
+		result.c = proto.Clone(cmp.c).(*pb.Compare)
+	}
+	return result
+}
 
 func Compare(cmp Cmp, result string, v any) Cmp {
 	var r pb.Compare_CompareResult
@@ -48,22 +69,24 @@ func Compare(cmp Cmp, result string, v any) Cmp {
 		panic("Unknown result op")
 	}
 
-	cmp.Result = r
-	switch cmp.Target {
+	cmp = cmp.Clone()
+	cmp.ensureCompare()
+	cmp.c.Result = r
+	switch cmp.c.Target {
 	case pb.Compare_VALUE:
 		val, ok := v.(string)
 		if !ok {
 			panic("bad compare value")
 		}
-		cmp.TargetUnion = &pb.Compare_Value{Value: []byte(val)}
+		cmp.c.TargetUnion = &pb.Compare_Value{Value: []byte(val)}
 	case pb.Compare_VERSION:
-		cmp.TargetUnion = &pb.Compare_Version{Version: mustInt64(v)}
+		cmp.c.TargetUnion = &pb.Compare_Version{Version: mustInt64(v)}
 	case pb.Compare_CREATE:
-		cmp.TargetUnion = &pb.Compare_CreateRevision{CreateRevision: mustInt64(v)}
+		cmp.c.TargetUnion = &pb.Compare_CreateRevision{CreateRevision: mustInt64(v)}
 	case pb.Compare_MOD:
-		cmp.TargetUnion = &pb.Compare_ModRevision{ModRevision: mustInt64(v)}
+		cmp.c.TargetUnion = &pb.Compare_ModRevision{ModRevision: mustInt64(v)}
 	case pb.Compare_LEASE:
-		cmp.TargetUnion = &pb.Compare_Lease{Lease: mustInt64orLeaseID(v)}
+		cmp.c.TargetUnion = &pb.Compare_Lease{Lease: mustInt64orLeaseID(v)}
 	default:
 		panic("Unknown compare type")
 	}
@@ -71,53 +94,67 @@ func Compare(cmp Cmp, result string, v any) Cmp {
 }
 
 func Value(key string) Cmp {
-	return Cmp{Key: []byte(key), Target: pb.Compare_VALUE}
+	return Cmp{c: &pb.Compare{Key: []byte(key), Target: pb.Compare_VALUE}}
 }
 
 func Version(key string) Cmp {
-	return Cmp{Key: []byte(key), Target: pb.Compare_VERSION}
+	return Cmp{c: &pb.Compare{Key: []byte(key), Target: pb.Compare_VERSION}}
 }
 
 func CreateRevision(key string) Cmp {
-	return Cmp{Key: []byte(key), Target: pb.Compare_CREATE}
+	return Cmp{c: &pb.Compare{Key: []byte(key), Target: pb.Compare_CREATE}}
 }
 
 func ModRevision(key string) Cmp {
-	return Cmp{Key: []byte(key), Target: pb.Compare_MOD}
+	return Cmp{c: &pb.Compare{Key: []byte(key), Target: pb.Compare_MOD}}
 }
 
 // LeaseValue compares a key's LeaseID to a value of your choosing. The empty
 // LeaseID is 0, otherwise known as `NoLease`.
 func LeaseValue(key string) Cmp {
-	return Cmp{Key: []byte(key), Target: pb.Compare_LEASE}
+	return Cmp{c: &pb.Compare{Key: []byte(key), Target: pb.Compare_LEASE}}
+}
+
+func (cmp *Cmp) ensureCompare() {
+	if cmp.c == nil {
+		cmp.c = &pb.Compare{}
+	}
 }
 
 // KeyBytes returns the byte slice holding with the comparison key.
-func (cmp *Cmp) KeyBytes() []byte { return cmp.Key }
+func (cmp *Cmp) KeyBytes() []byte { return cmp.c.GetKey() }
 
 // WithKeyBytes sets the byte slice for the comparison key.
-func (cmp *Cmp) WithKeyBytes(key []byte) { cmp.Key = key }
+func (cmp *Cmp) WithKeyBytes(key []byte) {
+	cmp.ensureCompare()
+	cmp.c.Key = key
+}
 
 // ValueBytes returns the byte slice holding the comparison value, if any.
 func (cmp *Cmp) ValueBytes() []byte {
-	if tu, ok := cmp.TargetUnion.(*pb.Compare_Value); ok {
+	if tu, ok := cmp.c.GetTargetUnion().(*pb.Compare_Value); ok {
 		return tu.Value
 	}
 	return nil
 }
 
 // WithValueBytes sets the byte slice for the comparison's value.
-func (cmp *Cmp) WithValueBytes(v []byte) { cmp.TargetUnion.(*pb.Compare_Value).Value = v }
+func (cmp *Cmp) WithValueBytes(v []byte) {
+	cmp.ensureCompare()
+	cmp.c.TargetUnion.(*pb.Compare_Value).Value = v
+}
 
 // WithRange sets the comparison to scan the range [key, end).
 func (cmp Cmp) WithRange(end string) Cmp {
-	cmp.RangeEnd = []byte(end)
+	cmp.ensureCompare()
+	cmp.c.RangeEnd = []byte(end)
 	return cmp
 }
 
 // WithPrefix sets the comparison to scan all keys prefixed by the key.
 func (cmp Cmp) WithPrefix() Cmp {
-	cmp.RangeEnd = getPrefix(cmp.Key)
+	cmp.ensureCompare()
+	cmp.c.RangeEnd = getPrefix(cmp.c.GetKey())
 	return cmp
 }
 

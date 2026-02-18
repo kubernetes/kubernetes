@@ -2,9 +2,9 @@
 
 module k8s.io/kube-controller-manager
 
-go 1.25.0
+go 1.26.0
 
-godebug default=go1.25
+godebug default=go1.26
 
 require (
 	k8s.io/apimachinery v0.0.0
@@ -21,8 +21,8 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/net v0.50.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/component-base v0.0.0 // indirect
@@ -35,6 +35,9 @@ require (
 )
 
 replace (
+	go.etcd.io/etcd/api/v3 => github.com/liggitt/etcd/api/v3 v3.6.0-alpha.0.0.20260217204530-004f720483b2
+	go.etcd.io/etcd/client/pkg/v3 => github.com/liggitt/etcd/client/pkg/v3 v3.6.0-alpha.0.0.20260217204530-004f720483b2
+	go.etcd.io/etcd/client/v3 => github.com/liggitt/etcd/client/v3 v3.6.0-alpha.0.0.20260217204530-004f720483b2
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/client/pkg/v3/verify"
 	pioutil "go.etcd.io/etcd/pkg/v3/ioutil"
@@ -78,8 +79,8 @@ func (s *Snapshotter) save(snapshot *raftpb.Snapshot) error {
 	fname := fmt.Sprintf("%016x-%016x%s", snapshot.Metadata.Term, snapshot.Metadata.Index, snapSuffix)
 	b := pbutil.MustMarshal(snapshot)
 	crc := crc32.Update(0, crcTable, b)
-	snap := snappb.Snapshot{Crc: crc, Data: b}
-	d, err := snap.Marshal()
+	snap := &snappb.Snapshot{Crc: &crc, Data: b}
+	d, err := proto.Marshal(snap)
 	if err != nil {
 		return err
 	}
@@ -110,11 +111,11 @@ func (s *Snapshotter) Load() (*raftpb.Snapshot, error) {
 }
 
 // LoadNewestAvailable loads the newest snapshot available that is in walSnaps.
-func (s *Snapshotter) LoadNewestAvailable(walSnaps []walpb.Snapshot) (*raftpb.Snapshot, error) {
+func (s *Snapshotter) LoadNewestAvailable(walSnaps []*walpb.Snapshot) (*raftpb.Snapshot, error) {
 	return s.loadMatching(func(snapshot *raftpb.Snapshot) bool {
 		m := snapshot.Metadata
 		for i := len(walSnaps) - 1; i >= 0; i-- {
-			if m.Term == walSnaps[i].Term && m.Index == walSnaps[i].Index {
+			if m.Term == walSnaps[i].GetTerm() && m.Index == walSnaps[i].GetIndex() {
 				return true
 			}
 		}
@@ -167,21 +168,21 @@ func Read(lg *zap.Logger, snapname string) (*raftpb.Snapshot, error) {
 	}
 
 	var serializedSnap snappb.Snapshot
-	if err = serializedSnap.Unmarshal(b); err != nil {
+	if err = proto.Unmarshal(b, &serializedSnap); err != nil {
 		lg.Warn("failed to unmarshal snappb.Snapshot", zap.String("path", snapname), zap.Error(err))
 		return nil, err
 	}
 
-	if len(serializedSnap.Data) == 0 || serializedSnap.Crc == 0 {
+	if len(serializedSnap.Data) == 0 || serializedSnap.GetCrc() == 0 {
 		lg.Warn("failed to read empty snapshot data", zap.String("path", snapname))
 		return nil, ErrEmptySnapshot
 	}
 
 	crc := crc32.Update(0, crcTable, serializedSnap.Data)
-	if crc != serializedSnap.Crc {
+	if crc != serializedSnap.GetCrc() {
 		lg.Warn("snap file is corrupt",
 			zap.String("path", snapname),
-			zap.Uint32("prev-crc", serializedSnap.Crc),
+			zap.Uint32("prev-crc", serializedSnap.GetCrc()),
 			zap.Uint32("new-crc", crc),
 		)
 		return nil, ErrCRCMismatch

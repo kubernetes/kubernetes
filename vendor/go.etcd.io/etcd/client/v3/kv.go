@@ -134,7 +134,7 @@ func (kv *kv) Compact(ctx context.Context, rev int64, opts ...CompactOption) (*C
 	if err != nil {
 		return nil, ContextError(ctx, err)
 	}
-	return (*CompactResponse)(resp), err
+	return (*CompactResponse)(resp), nil
 }
 
 func (kv *kv) Txn(ctx context.Context) Txn {

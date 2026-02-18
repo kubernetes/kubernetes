@@ -49,12 +49,12 @@ type (
 )
 
 const (
-	PermRead      = authpb.READ
-	PermWrite     = authpb.WRITE
-	PermReadWrite = authpb.READWRITE
+	PermRead      = authpb.Permission_READ
+	PermWrite     = authpb.Permission_WRITE
+	PermReadWrite = authpb.Permission_READWRITE
 )
 
-type UserAddOptions authpb.UserAddOptions
+type UserAddOptions = authpb.UserAddOptions
 
 type Auth interface {
 	// Authenticate login and get token
@@ -159,7 +159,7 @@ func (auth *authClient) UserAdd(ctx context.Context, name string, password strin
 }
 
 func (auth *authClient) UserAddWithOptions(ctx context.Context, name string, password string, options *UserAddOptions) (*AuthUserAddResponse, error) {
-	resp, err := auth.remote.UserAdd(ctx, &pb.AuthUserAddRequest{Name: name, Password: password, Options: (*authpb.UserAddOptions)(options)}, auth.callOpts...)
+	resp, err := auth.remote.UserAdd(ctx, &pb.AuthUserAddRequest{Name: name, Password: password, Options: options}, auth.callOpts...)
 	return (*AuthUserAddResponse)(resp), ContextError(ctx, err)
 }
 

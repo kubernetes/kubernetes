@@ -41,7 +41,7 @@ import (
 var _ AuthStore = (*authStore)(nil)
 
 var (
-	rootPerm = authpb.Permission{PermType: authpb.READWRITE, Key: []byte{}, RangeEnd: []byte{0}}
+	rootPerm = authpb.Permission{PermType: authpb.Permission_READWRITE, Key: []byte{}, RangeEnd: []byte{0}}
 
 	ErrRootUserNotExist     = errors.New("auth: root user does not exist")
 	ErrRootRoleNotExist     = errors.New("auth: root user does not have root role")
@@ -899,15 +899,15 @@ func (as *authStore) isOpPermitted(userName string, revision uint64, key, rangeE
 }
 
 func (as *authStore) IsPutPermitted(authInfo *AuthInfo, key []byte) error {
-	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, nil, authpb.WRITE)
+	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, nil, authpb.Permission_WRITE)
 }
 
 func (as *authStore) IsRangePermitted(authInfo *AuthInfo, key, rangeEnd []byte) error {
-	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, rangeEnd, authpb.READ)
+	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, rangeEnd, authpb.Permission_READ)
 }
 
 func (as *authStore) IsDeleteRangePermitted(authInfo *AuthInfo, key, rangeEnd []byte) error {
-	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, rangeEnd, authpb.WRITE)
+	return as.isOpPermitted(authInfo.Username, authInfo.Revision, key, rangeEnd, authpb.Permission_WRITE)
 }
 
 func (as *authStore) IsAdminPermitted(authInfo *AuthInfo) error {

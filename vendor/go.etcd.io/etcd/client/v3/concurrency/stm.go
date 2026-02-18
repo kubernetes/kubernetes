@@ -47,7 +47,7 @@ const (
 	// for write conflicts.
 	SerializableSnapshot Isolation = iota
 	// Serializable reads within the same transaction attempt return data
-	// from the at the revision of the first read.
+	// from the revision of the first read.
 	Serializable
 	// RepeatableReads reads within the same transaction attempt always
 	// return the same data.

@@ -2,9 +2,9 @@
 
 module k8s.io/code-generator/examples
 
-go 1.25.0
+go 1.26.0
 
-godebug default=go1.25
+godebug default=go1.26
 
 require (
 	k8s.io/api v0.0.0
@@ -34,11 +34,11 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/term v0.39.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/term v0.40.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
@@ -56,3 +56,13 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace go.etcd.io/etcd/api/v3 => github.com/liggitt/etcd/api/v3 v3.6.0-alpha.0.0.20260217204530-004f720483b2
+
+replace go.etcd.io/etcd/client/pkg/v3 => github.com/liggitt/etcd/client/pkg/v3 v3.6.0-alpha.0.0.20260217204530-004f720483b2
+
+replace go.etcd.io/etcd/client/v3 => github.com/liggitt/etcd/client/v3 v3.6.0-alpha.0.0.20260217204530-004f720483b2
+
+replace go.etcd.io/etcd/pkg/v3 => github.com/liggitt/etcd/pkg/v3 v3.6.0-alpha.0.0.20260217204530-004f720483b2
+
+replace go.etcd.io/etcd/server/v3 => github.com/liggitt/etcd/server/v3 v3.6.0-alpha.0.0.20260217204530-004f720483b2
