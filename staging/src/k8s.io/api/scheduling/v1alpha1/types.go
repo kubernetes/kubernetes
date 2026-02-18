@@ -178,6 +178,24 @@ type PodGroup struct {
 	//
 	// +required
 	Policy PodGroupPolicy `json:"policy" protobuf:"bytes,3,opt,name=policy"`
+
+	// Spec defines the scheduling constraints for this PodGroup.
+	Spec PodGroupSpec `json:"spec" protobuf:"bytes,4,opt,name=spec"`
+}
+
+type PodGroupSpec struct {
+	// SchedulingConstraints defines group-level scheduling requirements.
+	SchedulingConstraints *PodGroupSchedulingConstraints
+	// ...
+}
+
+type PodGroupSchedulingConstraints struct {
+	TopologyConstraints []TopologyConstraint
+	// ...
+}
+
+type TopologyConstraint struct {
+	Level string
 }
 
 // PodGroupPolicy defines the scheduling configuration for a PodGroup.
