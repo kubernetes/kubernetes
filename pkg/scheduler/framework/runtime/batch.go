@@ -85,7 +85,7 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 	nodeInfos := b.handle.SnapshotSharedLister().NodeInfos()
 
 	// If we don't have state that we can use, then return an empty hint.
-	if !b.batchStateCompatible(ctx, logger, pod, signature, cycleCount, state, nodeInfos) {
+	if !b.batchStateCompatible(ctx, pod, signature, cycleCount, state, nodeInfos) {
 		metrics.BatchAttemptStats.WithLabelValues(b.handle.ProfileName(), metrics.BatchAttemptNoHint).Inc()
 		logger.V(4).Info("OpportunisticBatch no node hint available for pod",
 			"profile", b.handle.ProfileName(), "pod", klog.KObj(pod), "cycleCount", cycleCount)
@@ -168,11 +168,12 @@ func (b *OpportunisticBatch) logUnusableState(logger klog.Logger, cycleCount int
 }
 
 // Update the batch state based on a the arrival of a new pod and the chosen node from the last pod.
-func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, logger klog.Logger, pod *v1.Pod, signature fwk.PodSignature, cycleCount int64, state fwk.CycleState, nodeInfos fwk.NodeInfoLister) bool {
+func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature, cycleCount int64, state fwk.CycleState, nodeInfos fwk.NodeInfoLister) bool {
 	// Just return if we don't have any state to use.
 	if b.stateEmpty() {
 		return false
 	}
+	logger := klog.FromContext(ctx)
 
 	// In this case, a previous pod was scheduled by another profile, meaning we can't use the state anymore.
 	if cycleCount != b.lastCycle.cycleCount+1 {

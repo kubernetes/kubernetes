@@ -825,7 +825,7 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		// If the special resource claim for extended resource backed by DRA
 		// is reserved or allocated at prior scheduling cycle, then it should be deleted.
 		extendedResourceClaim := extendedResourceClaim.DeepCopy()
-		if err := pl.deleteClaim(ctx, extendedResourceClaim, logger); err != nil {
+		if err := pl.deleteClaim(ctx, extendedResourceClaim); err != nil {
 			return nil, statusError(logger, err)
 		}
 		return nil, fwk.NewStatus(fwk.Unschedulable, "deletion of ResourceClaim completed")
@@ -1043,7 +1043,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 			}
 		}
 	}
-	pl.unreserveExtendedResourceClaim(ctx, logger, pod, state)
+	pl.unreserveExtendedResourceClaim(ctx, pod, state)
 }
 
 // PreBind gets called in a separate goroutine after it has been determined
@@ -1161,7 +1161,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// completed, either successfully or with a failure.
 		if resourceClaimModified {
 			if isExtendedResourceClaim {
-				pl.waitForExtendedClaimInAssumeCache(ctx, logger, claim)
+				pl.waitForExtendedClaimInAssumeCache(ctx, claim)
 			} else {
 				// This can fail, but only for reasons that are okay (concurrent delete or update).
 				// Shouldn't happen in this case.
@@ -1184,7 +1184,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	// Create the special claim for extended resource backed by DRA
 	if isExtendedResourceClaim && isSpecialClaimName(claim.Name) {
 		var err error
-		claim, err = pl.createExtendedResourceClaimInAPI(ctx, logger, pod, nodeName, state)
+		claim, err = pl.createExtendedResourceClaimInAPI(ctx, pod, nodeName, state)
 		if err != nil {
 			return nil, err
 		}
