@@ -163,7 +163,7 @@ type TracingConfiguration struct {
 
 // AuthenticationConfiguration provides versioned configuration for authentication.
 type AuthenticationConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// jwt is a list of authenticator to authenticate Kubernetes users using
 	// JWT compliant tokens. The authenticator will attempt to parse a raw ID token,
