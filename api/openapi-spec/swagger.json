@@ -3145,9 +3145,6 @@
           "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
-      "required": [
-        "spec"
-      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -3191,9 +3188,6 @@
           "x-kubernetes-list-type": "atomic"
         }
       },
-      "required": [
-        "verbs"
-      ],
       "type": "object"
     },
     "io.k8s.api.authorization.v1.ResourceAttributes": {
@@ -3274,9 +3268,6 @@
           "x-kubernetes-list-type": "atomic"
         }
       },
-      "required": [
-        "verbs"
-      ],
       "type": "object"
     },
     "io.k8s.api.authorization.v1.SelfSubjectAccessReview": {
@@ -3303,9 +3294,6 @@
           "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
-      "required": [
-        "spec"
-      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -3373,6 +3361,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "namespace"
+      ],
       "type": "object"
     },
     "io.k8s.api.authorization.v1.SubjectAccessReview": {
@@ -3399,9 +3390,6 @@
           "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
-      "required": [
-        "spec"
-      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -3471,9 +3459,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "allowed"
-      ],
       "type": "object"
     },
     "io.k8s.api.authorization.v1.SubjectRulesReviewStatus": {
@@ -3504,11 +3489,6 @@
           "x-kubernetes-list-type": "atomic"
         }
       },
-      "required": [
-        "resourceRules",
-        "nonResourceRules",
-        "incomplete"
-      ],
       "type": "object"
     },
     "io.k8s.api.autoscaling.v1.CrossVersionObjectReference": {

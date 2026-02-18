@@ -12771,7 +12771,6 @@ func schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -12854,7 +12853,6 @@ func schema_k8sio_api_authorization_v1_NonResourceRule(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"verbs"},
 			},
 		},
 	}
@@ -13024,7 +13022,6 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 						},
 					},
 				},
-				Required: []string{"verbs"},
 			},
 		},
 	}
@@ -13073,7 +13070,6 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReview(ref common.Refere
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -13174,6 +13170,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectRulesReviewSpec(ref common.Ref
 						},
 					},
 				},
+				Required: []string{"namespace"},
 			},
 		},
 	}
@@ -13222,7 +13219,6 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReview(ref common.ReferenceC
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -13351,7 +13347,6 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 						},
 					},
 				},
-				Required: []string{"allowed"},
 			},
 		},
 	}
@@ -13418,7 +13413,6 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"resourceRules", "nonResourceRules", "incomplete"},
 			},
 		},
 		Dependencies: []string{
@@ -13469,7 +13463,6 @@ func schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref common.
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -13552,7 +13545,6 @@ func schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"verbs"},
 			},
 		},
 	}
@@ -13722,7 +13714,6 @@ func schema_k8sio_api_authorization_v1beta1_ResourceRule(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"verbs"},
 			},
 		},
 	}
@@ -13771,7 +13762,6 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReview(ref common.R
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -13872,6 +13862,7 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReviewSpec(ref commo
 						},
 					},
 				},
+				Required: []string{"namespace"},
 			},
 		},
 	}
@@ -13920,7 +13911,6 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReview(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -14049,7 +14039,6 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref common
 						},
 					},
 				},
-				Required: []string{"allowed"},
 			},
 		},
 	}
@@ -14116,7 +14105,6 @@ func schema_k8sio_api_authorization_v1beta1_SubjectRulesReviewStatus(ref common.
 						},
 					},
 				},
-				Required: []string{"resourceRules", "nonResourceRules", "incomplete"},
 			},
 		},
 		Dependencies: []string{

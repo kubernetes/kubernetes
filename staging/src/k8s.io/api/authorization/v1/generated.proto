@@ -102,6 +102,7 @@ message LocalSubjectAccessReview {
 
   // spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
   // you made the request against.  If empty, it is defaulted.
+  // +optional
   optional SubjectAccessReviewSpec spec = 2;
 
   // status is filled in by the server and indicates whether the request is allowed or not
@@ -123,6 +124,7 @@ message NonResourceAttributes {
 // NonResourceRule holds information that describes a rule for the non-resource
 message NonResourceRule {
   // verbs is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  "*" means all.
+  // +optional
   // +listType=atomic
   repeated string verbs = 1;
 
@@ -179,6 +181,7 @@ message ResourceAttributes {
 // may contain duplicates, and possibly be incomplete.
 message ResourceRule {
   // verbs is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  "*" means all.
+  // +optional
   // +listType=atomic
   repeated string verbs = 1;
 
@@ -210,6 +213,7 @@ message SelfSubjectAccessReview {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec holds information about the request being evaluated.  user and groups must be empty
+  // +optional
   optional SelfSubjectAccessReviewSpec spec = 2;
 
   // status is filled in by the server and indicates whether the request is allowed or not
@@ -242,6 +246,7 @@ message SelfSubjectRulesReview {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec holds information about the request being evaluated.
+  // +required
   optional SelfSubjectRulesReviewSpec spec = 2;
 
   // status is filled in by the server and indicates the set of actions a user can perform.
@@ -252,6 +257,7 @@ message SelfSubjectRulesReview {
 // SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.
 message SelfSubjectRulesReviewSpec {
   // namespace to evaluate rules for. Required.
+  // +required
   optional string namespace = 1;
 }
 
@@ -263,6 +269,7 @@ message SubjectAccessReview {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec holds information about the request being evaluated
+  // +optional
   optional SubjectAccessReviewSpec spec = 2;
 
   // status is filled in by the server and indicates whether the request is allowed or not
@@ -304,6 +311,7 @@ message SubjectAccessReviewSpec {
 // SubjectAccessReviewStatus
 message SubjectAccessReviewStatus {
   // allowed is required. True if the action would be allowed, false otherwise.
+  // +optional
   optional bool allowed = 1;
 
   // denied is optional. True if the action would be denied, otherwise
@@ -331,16 +339,19 @@ message SubjectAccessReviewStatus {
 message SubjectRulesReviewStatus {
   // resourceRules is the list of actions the subject is allowed to perform on resources.
   // The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+  // +optional
   // +listType=atomic
   repeated ResourceRule resourceRules = 1;
 
   // nonResourceRules is the list of actions the subject is allowed to perform on non-resources.
   // The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+  // +optional
   // +listType=atomic
   repeated NonResourceRule nonResourceRules = 2;
 
   // incomplete is true when the rules returned by this call are incomplete. This is most commonly
   // encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.
+  // +optional
   optional bool incomplete = 3;
 
   // evaluationError can appear in combination with Rules. It indicates an error occurred during
