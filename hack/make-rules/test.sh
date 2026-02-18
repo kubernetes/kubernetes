@@ -54,6 +54,20 @@ kube::test::find_go_packages() {
             -e '^k8s.io/kubernetes/test/e2e_kubeadm(/.*)?$' \
             -e '^k8s.io/.*/test/integration(/.*)?$'
   )
+
+  # Some modules are not in this workspace. We have to change directories
+  # to find their tests and then add the module path as prefix to the
+  # packages as indicator that we need to do the same when executing those tests.
+  local module
+  for module in $(find hack/tools -name go.mod | sed -e 's;/go.mod;;'); do
+   (
+     cd "${module}"
+     go list -find \
+             -f '{{if or (gt (len .TestGoFiles) 0) (gt (len .XTestGoFiles) 0)}}{{.ImportPath}}{{end}}' \
+             ./... |
+     sed -e "s;^;${module}/;"
+   )
+  done
 }
 
 set -x
