@@ -1272,6 +1272,11 @@
           {
             "group": "resource.k8s.io",
             "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
             "version": "v1alpha3"
           },
           {
@@ -2008,6 +2013,11 @@
             "group": "resource.k8s.io",
             "kind": "WatchEvent",
             "version": "v1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           },
           {
             "group": "resource.k8s.io",

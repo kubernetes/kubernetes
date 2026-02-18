@@ -62,6 +62,7 @@ import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
@@ -129,6 +130,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	resourcev1beta2.AddToScheme,
 	resourcev1beta1.AddToScheme,
 	resourcev1alpha3.AddToScheme,
+	resourcev1alpha1.AddToScheme,
 	schedulingv1alpha1.AddToScheme,
 	schedulingv1beta1.AddToScheme,
 	schedulingv1.AddToScheme,
