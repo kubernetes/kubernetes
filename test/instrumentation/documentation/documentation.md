@@ -8,7 +8,7 @@ description: >-
 
 ## Metrics (v1.36)
 
-<!-- (auto-generated 2026 Feb 27) -->
+<!-- (auto-generated 2026 Feb 28) -->
 <!-- (auto-generated v1.36) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
@@ -375,6 +375,13 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">execute</span><span class="metric_label">flow_schema</span><span class="metric_label">priority_level</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">apiserver_terminated_watchers_total</div>
+	<div class="metric_help">Counter of watchers closed due to unresponsiveness broken by resource type.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">apiserver_validating_admission_policy_check_duration_seconds</div>
 	<div class="metric_help">Validation admission latency for individual validation expressions in seconds, labeled by policy and further including binding and enforcement action taken.</div>
 	<ul>
@@ -402,6 +409,41 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">apiserver_watch_cache_consistent_read_total</div>
+	<div class="metric_help">Counter for consistent reads from cache.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">fallback</span><span class="metric_label">group</span><span class="metric_label">resource</span><span class="metric_label">success</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">apiserver_watch_cache_events_dispatched_total</div>
+	<div class="metric_help">Counter of events dispatched in watch cache broken by resource type.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">apiserver_watch_cache_initializations_total</div>
+	<div class="metric_help">Counter of watch cache initializations broken by resource type.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">apiserver_watch_cache_read_wait_seconds</div>
+	<div class="metric_help">Histogram of time spent waiting for a watch cache to become fresh.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">apiserver_watch_cache_resource_version</div>
+	<div class="metric_help">Current resource version of watch cache broken by resource type.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">apiserver_watch_list_duration_seconds</div>
 	<div class="metric_help">Response latency distribution in seconds for watch list requests broken by group, version, resource and scope.</div>
@@ -486,6 +528,27 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">attempts</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">watch_cache_capacity</div>
+	<div class="metric_help">Total capacity of watch cache broken by resource type.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">watch_cache_capacity_decrease_total</div>
+	<div class="metric_help">Total number of watch cache capacity decrease events broken by resource type.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">watch_cache_capacity_increase_total</div>
+	<div class="metric_help">Total number of watch cache capacity increase events broken by resource type.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">workqueue_adds_total</div>
 	<div class="metric_help">Total number of adds handled by workqueue</div>
@@ -1467,13 +1530,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">code</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_terminated_watchers_total</div>
-	<div class="metric_help">Counter of watchers closed due to unresponsiveness broken by resource type.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_tls_handshake_errors_total</div>
 	<div class="metric_help">Number of requests dropped with 'TLS handshake error from' error</div>
 	<ul>
@@ -1495,46 +1551,11 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">validation_identifier</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_watch_cache_consistent_read_total</div>
-	<div class="metric_help">Counter for consistent reads from cache.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">fallback</span><span class="metric_label">group</span><span class="metric_label">resource</span><span class="metric_label">success</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_watch_cache_events_dispatched_total</div>
-	<div class="metric_help">Counter of events dispatched in watch cache broken by resource type.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_watch_cache_events_received_total</div>
 	<div class="metric_help">Counter of events received in watch cache broken by resource type.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_watch_cache_initializations_total</div>
-	<div class="metric_help">Counter of watch cache initializations broken by resource type.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_watch_cache_read_wait_seconds</div>
-	<div class="metric_help">Histogram of time spent waiting for a watch cache to become fresh.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_watch_cache_resource_version</div>
-	<div class="metric_help">Current resource version of watch cache broken by resource type.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_watch_events_sizes</div>
@@ -3714,6 +3735,13 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">statefulset_controller_stale_sync_skips_total</div>
+	<div class="metric_help">Total number of StatefulSet syncs skipped due to a stale watch cache.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-controller-manager (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">statefulset_controller_statefulset_max_unavailable</div>
 	<div class="metric_help">Maximum number of unavailable pods allowed during StatefulSet rolling updates</div>
 	<ul>
@@ -3839,26 +3867,5 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">operation_name</span><span class="metric_label">plugin_name</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">watch_cache_capacity</div>
-	<div class="metric_help">Total capacity of watch cache broken by resource type.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">watch_cache_capacity_decrease_total</div>
-	<div class="metric_help">Total number of watch cache capacity decrease events broken by resource type.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">watch_cache_capacity_increase_total</div>
-	<div class="metric_help">Total number of watch cache capacity increase events broken by resource type.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div>
 </div>

@@ -389,7 +389,7 @@ func TestConsistentReadFallback(t *testing.T) {
 			expectRV:                "42",
 			expectRequestsToStorage: 1,
 			expectMetric: `
-# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
+# HELP apiserver_watch_cache_consistent_read_total [BETA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
 apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true"} 1
 `,
@@ -403,7 +403,7 @@ apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource
 			expectBlock:             true,
 			expectRequestsToStorage: 2,
 			expectMetric: `
-# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
+# HELP apiserver_watch_cache_consistent_read_total [BETA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
 apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="true"} 1
 `,
@@ -418,7 +418,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 			expectBlock:             true,
 			expectRequestsToStorage: 2,
 			expectMetric: `
-# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
+# HELP apiserver_watch_cache_consistent_read_total [BETA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
 apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="false"} 1
 `,

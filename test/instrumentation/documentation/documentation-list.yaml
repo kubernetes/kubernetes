@@ -891,6 +891,17 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: stale_sync_skips_total
+  subsystem: statefulset_controller
+  help: Total number of StatefulSet syncs skipped due to a stale watch cache.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: statefulset_max_unavailable
   subsystem: statefulset_controller
   help: Maximum number of unavailable pods allowed during StatefulSet rolling updates
@@ -6389,98 +6400,11 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: terminated_watchers_total
-  namespace: apiserver
-  help: Counter of watchers closed due to unresponsiveness broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: consistent_read_total
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Counter for consistent reads from cache.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - fallback
-  - group
-  - resource
-  - success
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: events_dispatched_total
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Counter of events dispatched in watch cache broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: events_received_total
   subsystem: watch_cache
   namespace: apiserver
   help: Counter of events received in watch cache broken by resource type.
   type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: initializations_total
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Counter of watch cache initializations broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: read_wait_seconds
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Histogram of time spent waiting for a watch cache to become fresh.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  buckets:
-  - 0.005
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.2
-  - 0.4
-  - 0.6
-  - 0.8
-  - 1
-  - 1.25
-  - 1.5
-  - 2
-  - 3
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: resource_version
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Current resource version of watch cache broken by resource type.
-  type: Gauge
   stabilityLevel: ALPHA
   labels:
   - group
@@ -6588,39 +6512,6 @@
   labels:
   - group
   - operation
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: capacity
-  subsystem: watch_cache
-  help: Total capacity of watch cache broken by resource type.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: capacity_decrease_total
-  subsystem: watch_cache
-  help: Total number of watch cache capacity decrease events broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: capacity_increase_total
-  subsystem: watch_cache
-  help: Total number of watch cache capacity increase events broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - group
   - resource
   componentEndpoints:
   - component: kube-apiserver
@@ -6777,6 +6668,126 @@
   - 10
   - 15
   - 30
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: terminated_watchers_total
+  namespace: apiserver
+  help: Counter of watchers closed due to unresponsiveness broken by resource type.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: consistent_read_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter for consistent reads from cache.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - fallback
+  - group
+  - resource
+  - success
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: events_dispatched_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of events dispatched in watch cache broken by resource type.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: initializations_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of watch cache initializations broken by resource type.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: read_wait_seconds
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Histogram of time spent waiting for a watch cache to become fresh.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: resource_version
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Current resource version of watch cache broken by resource type.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: capacity
+  subsystem: watch_cache
+  help: Total capacity of watch cache broken by resource type.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: capacity_decrease_total
+  subsystem: watch_cache
+  help: Total number of watch cache capacity decrease events broken by resource type.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: capacity_increase_total
+  subsystem: watch_cache
+  help: Total number of watch cache capacity increase events broken by resource type.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics

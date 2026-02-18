@@ -92,7 +92,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "events_dispatched_total",
 			Help:           "Counter of events dispatched in watch cache broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
@@ -102,7 +102,7 @@ var (
 			Namespace:      namespace,
 			Name:           "terminated_watchers_total",
 			Help:           "Counter of watchers closed due to unresponsiveness broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
@@ -113,7 +113,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "resource_version",
 			Help:           "Current resource version of watch cache broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
@@ -123,7 +123,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "capacity_increase_total",
 			Help:           "Total number of watch cache capacity increase events broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
@@ -133,7 +133,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "capacity_decrease_total",
 			Help:           "Total number of watch cache capacity decrease events broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
@@ -143,7 +143,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "capacity",
 			Help:           "Total capacity of watch cache broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
@@ -154,7 +154,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "initializations_total",
 			Help:           "Counter of watch cache initializations broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
@@ -165,7 +165,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "read_wait_seconds",
 			Help:           "Histogram of time spent waiting for a watch cache to become fresh.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3},
 		}, []string{"group", "resource"})
 
@@ -175,7 +175,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "consistent_read_total",
 			Help:           "Counter for consistent reads from cache.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		}, []string{"group", "resource", "success", "fallback"})
 
 	StorageConsistencyCheckTotal = compbasemetrics.NewCounterVec(
