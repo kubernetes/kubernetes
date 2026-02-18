@@ -64,6 +64,15 @@ type SecureServingOptions struct {
 	// CipherSuites is the list of allowed cipher suites for the server.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	CipherSuites []string
+	// CurvePreferences is the set of allowed key exchange mechanisms for the server.
+	// The order of the list is ignored, and key exchange mechanisms are
+	// chosen by Go from this list using an internal preference order.
+	// If empty, the default Go curves will be used.
+	// Values are the IANA TLS Supported Groups names (https://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-8)
+	// that are available in the Go crypto/tls CurveID constants (https://golang.org/pkg/crypto/tls/#CurveID).
+	// For the full list of supported values, see: cliflag.TLSCurvePossibleValues().
+	// The values are case-insensitive.
+	CurvePreferences []string
 	// MinTLSVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	MinTLSVersion string
@@ -188,6 +197,15 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 			"If omitted, the default Go cipher suites will be used. \n"+
 			"Preferred values: "+strings.Join(tlsCipherPreferredValues, ", ")+". \n"+
 			"Insecure values: "+strings.Join(tlsCipherInsecureValues, ", ")+".")
+
+	tlsCurvePossibleValues := cliflag.TLSCurvePossibleValues()
+	fs.StringSliceVar(&s.CurvePreferences, "tls-curve-preferences", s.CurvePreferences,
+		"Comma-separated list of allowed key exchange mechanisms for the server "+
+			"(IANA TLS Supported Groups names). The order of the list is ignored, "+
+			"and key exchange mechanisms are chosen by Go from this list using an "+
+			"internal preference order. "+
+			"If omitted, the default Go curves will be used. "+
+			"Possible values (case-insensitive): "+strings.Join(tlsCurvePossibleValues, ", "))
 
 	tlsPossibleVersions := cliflag.TLSPossibleVersions()
 	fs.StringVar(&s.MinTLSVersion, "tls-min-version", s.MinTLSVersion,
@@ -315,6 +333,14 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 			return err
 		}
 		c.CipherSuites = cipherSuites
+	}
+
+	if len(s.CurvePreferences) != 0 {
+		curvePreferences, err := cliflag.TLSCurvePreferences(s.CurvePreferences)
+		if err != nil {
+			return err
+		}
+		c.CurvePreferences = curvePreferences
 	}
 
 	var err error
