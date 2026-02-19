@@ -54,6 +54,7 @@ type dbusInhibiter interface {
 	ReloadLogindConf() error
 	MonitorShutdown(klog.Logger) (<-chan bool, error)
 	OverrideInhibitDelay(inhibitDelayMax time.Duration) error
+	Close() error
 }
 
 // managerImpl has functions that can be used to interact with the Node Shutdown Manager.
@@ -65,6 +66,7 @@ type managerImpl struct {
 	getPods        eviction.ActivePodsFunc
 	syncNodeStatus func(context.Context)
 
+	newDBusConn func() (dbusInhibiter, error)
 	dbusCon     dbusInhibiter
 	inhibitLock systemd.InhibitLock
 
@@ -97,6 +99,7 @@ func NewManager(conf *Config) Manager {
 		nodeRef:        conf.NodeRef,
 		getPods:        conf.GetPodsFunc,
 		syncNodeStatus: conf.SyncNodeStatusFunc,
+		newDBusConn:    systemDbus,
 		podManager:     podManager,
 		enableMetrics:  utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority),
 		storage: localStorage{
@@ -179,11 +182,31 @@ func (m *managerImpl) Start(ctx context.Context) error {
 }
 
 func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
-	systemBus, err := systemDbus()
+	systemBus, err := m.newDBusConn()
 	if err != nil {
 		return nil, err
 	}
+
+	// Close any previous dbus connection before replacing it to avoid
+	// leaking goroutines and file descriptors. See #120613.
+	if m.dbusCon != nil {
+		if err := m.dbusCon.Close(); err != nil {
+			m.logger.Error(err, "Failed to close previous dbus connection, ignoring and starting a new one anyway")
+		}
+	}
 	m.dbusCon = systemBus
+
+	// If we fail after this point, close the new connection so we don't
+	// leak dbus goroutines on every retry.
+	startSucceeded := false
+	defer func() {
+		if !startSucceeded {
+			if err := m.dbusCon.Close(); err != nil {
+				m.logger.Error(err, "Failed to close dbus connection after start failure")
+			}
+			m.dbusCon = nil
+		}
+	}()
 
 	currentInhibitDelay, err := m.dbusCon.CurrentInhibitDelay()
 	if err != nil {
@@ -250,6 +273,7 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 		return nil, fmt.Errorf("failed to monitor shutdown: %v", err)
 	}
 
+	startSucceeded = true
 	stop := make(chan struct{})
 	go func() {
 		// Monitor for shutdown events. This follows the logind Inhibit Delay pattern described on https://www.freedesktop.org/wiki/Software/systemd/inhibit/
