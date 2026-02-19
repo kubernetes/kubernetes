@@ -47,10 +47,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -98,6 +100,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	mutatePodAffinity(pod)
 	mutateTopologySpreadConstraints(pod)
 	applyAppArmorVersionSkew(ctx, pod)
+	setPodAllocatedResources(pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -107,6 +110,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newPod.Status = oldPod.Status
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
+	setPodAllocatedResources(newPod)
 }
 
 // Validate validates a new pod.
@@ -230,6 +234,7 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	setPodAllocatedResources(newPod)
 }
 
 // If a client request tries to clear `observedGeneration`, in the pod status or
@@ -419,6 +424,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
+	setPodAllocatedResources(newPod)
 }
 
 func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -1009,5 +1015,32 @@ func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 func updatePodGeneration(newPod, oldPod *api.Pod) {
 	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
 		newPod.Generation++
+	}
+}
+
+func setPodAllocatedResources(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		return
+	}
+
+	if len(pod.Spec.NodeName) != 0 {
+		return
+	}
+
+	v1Pod := &apiv1.Pod{}
+	// TODO(ndixita): Change the methods in k8s.io/component-helpers/resource
+	// to accept both *core.Pod & *v1.Pod to avoid the risky conversion.
+	if err := corev1.Convert_core_Pod_To_v1_Pod(pod, v1Pod, nil); err != nil {
+		return
+	}
+
+	allocated := resourcehelper.PodRequests(v1Pod, resourcehelper.PodResourcesOptions{})
+	if len(allocated) > 0 {
+		pod.Status.AllocatedResources = make(api.ResourceList)
+		for k, v := range allocated {
+			pod.Status.AllocatedResources[api.ResourceName(k)] = v.DeepCopy()
+		}
+	} else {
+		pod.Status.AllocatedResources = nil
 	}
 }

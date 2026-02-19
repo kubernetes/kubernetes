@@ -29,6 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	apiv1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -4213,6 +4214,178 @@ func TestWarningsOnUpdate(t *testing.T) {
 			}
 			if !ok {
 				t.Errorf("Expected warnings for %v, got %v", test.warnings, warnings)
+			}
+		})
+	}
+}
+
+func TestSetPodAllocatedResources(t *testing.T) {
+	tests := []struct {
+		name               string
+		featureGateEnabled bool
+		pod                *api.Pod
+		want               api.ResourceList
+	}{
+		{
+			name:               "feature gate disabled",
+			featureGateEnabled: false,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name:               "feature gate enabled, node name set",
+			featureGateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName: "node1",
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name:               "feature gate enabled, node name not set, container requests",
+			featureGateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("100m"),
+			},
+		},
+		{
+			name:               "feature gate enabled, node name not set, pod level resources",
+			featureGateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU: resource.MustParse("200m"),
+						},
+					},
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("200m"),
+			},
+		},
+		{
+			name:               "feature gate enabled, node name not set, overhead",
+			featureGateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Overhead: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("50m"),
+					},
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("150m"),
+			},
+		},
+		{
+			name:               "feature gate enabled, node name not set, sidecars",
+			featureGateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{
+							Name:          "sidecar",
+							RestartPolicy: ptr.To(api.ContainerRestartPolicyAlways),
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("50m"),
+								},
+							},
+						},
+						{
+							Name: "init",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("200m"),
+								},
+							},
+						},
+					},
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("250m"), // sidecar(50) + max(app(100), init(200)) = 250
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.featureGateEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+			} else {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, false)
+			}
+
+			setPodAllocatedResources(tt.pod)
+
+			if !apiequality.Semantic.DeepEqual(tt.want, tt.pod.Status.AllocatedResources) {
+				t.Errorf("unexpected AllocatedResources: want %v, got %v", tt.want, tt.pod.Status.AllocatedResources)
 			}
 		})
 	}
