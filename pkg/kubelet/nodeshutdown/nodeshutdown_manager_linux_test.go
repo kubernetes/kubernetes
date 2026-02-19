@@ -60,13 +60,31 @@ type fakeDbus struct {
 
 	didInhibitShutdown      bool
 	didOverrideInhibitDelay bool
+	closed                  bool
+	onCloseChan             chan struct{} // if set, receives a signal when Close() is called
+
+	currentInhibitDelayErr error
 }
 
 func (f *fakeDbus) CurrentInhibitDelay() (time.Duration, error) {
+	if f.currentInhibitDelayErr != nil {
+		return 0, f.currentInhibitDelayErr
+	}
 	if f.didOverrideInhibitDelay {
 		return f.overrideSystemInhibitDelay, nil
 	}
 	return f.currentInhibitDelay, nil
+}
+
+func (f *fakeDbus) Close() error {
+	f.closed = true
+	if f.onCloseChan != nil {
+		select {
+		case f.onCloseChan <- struct{}{}:
+		default:
+		}
+	}
+	return nil
 }
 
 func (f *fakeDbus) InhibitShutdown() (systemd.InhibitLock, error) {
@@ -699,4 +717,123 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	log := underlier.GetBuffer().String()
 	expectedLogMessage := "Failed while waiting for all the volumes belonging to Pods in this group to unmount"
 	assert.Contains(t, log, expectedLogMessage, "Expected log message not found")
+}
+
+// TestStartDbusConnectionClosedOnError verifies that when start() fails after
+// creating a dbus connection, the connection is properly closed to avoid
+// leaking goroutines and file descriptors. See #120613.
+func TestStartDbusConnectionClosedOnError(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	systemDbusTmp := systemDbus
+	defer func() {
+		systemDbus = systemDbusTmp
+	}()
+
+	connErr := fmt.Errorf("simulated CurrentInhibitDelay error")
+	var createdConnections []*fakeDbus
+
+	lock.Lock()
+	systemDbus = func() (dbusInhibiter, error) {
+		fd := &fakeDbus{
+			currentInhibitDelayErr: connErr,
+			shutdownChan:           make(chan bool),
+		}
+		createdConnections = append(createdConnections, fd)
+		return fd, nil
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
+
+	fakeRecorder := &record.FakeRecorder{}
+	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	manager := NewManager(&Config{
+		Logger:        logger,
+		VolumeManager: fakeVolumeManager,
+		Recorder:      fakeRecorder,
+		NodeRef:       nodeRef,
+		GetPodsFunc:   func() []*v1.Pod { return nil },
+		KillPodFunc: func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
+			return nil
+		},
+		SyncNodeStatusFunc:              func(context.Context) {},
+		ShutdownGracePeriodRequested:    30 * time.Second,
+		ShutdownGracePeriodCriticalPods: 10 * time.Second,
+		StateDirectory:                  os.TempDir(),
+	})
+
+	err := manager.Start(tCtx)
+	lock.Unlock()
+
+	require.Error(t, err, "expected start to fail due to CurrentInhibitDelay error")
+	require.Len(t, createdConnections, 1, "expected exactly one connection to be created")
+	assert.True(t, createdConnections[0].closed, "expected the dbus connection to be closed after start() failure")
+}
+
+// TestRestartClosesOldConnection verifies that when the retry loop in Start()
+// reconnects, the old dbus connection is closed before a new one is created.
+// See #120613.
+func TestRestartClosesOldConnection(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	systemDbusTmp := systemDbus
+	defer func() {
+		systemDbus = systemDbusTmp
+	}()
+
+	// Use onCloseChan to get a reliable signal when Close() is called on
+	// the first connection. This avoids races with leaked goroutines from
+	// prior tests that share the global systemDbus.
+	firstConnClosedChan := make(chan struct{}, 1)
+	var firstConn *fakeDbus
+
+	lock.Lock()
+	systemDbus = func() (dbusInhibiter, error) {
+		ch := make(chan bool)
+		fd := &fakeDbus{
+			currentInhibitDelay:        40 * time.Second,
+			overrideSystemInhibitDelay: 40 * time.Second,
+			shutdownChan:               ch,
+		}
+		return fd, nil
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
+
+	fakeRecorder := &record.FakeRecorder{}
+	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	manager := NewManager(&Config{
+		Logger:        logger,
+		VolumeManager: fakeVolumeManager,
+		Recorder:      fakeRecorder,
+		NodeRef:       nodeRef,
+		GetPodsFunc:   func() []*v1.Pod { return nil },
+		KillPodFunc: func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
+			return nil
+		},
+		SyncNodeStatusFunc:              func(context.Context) {},
+		ShutdownGracePeriodRequested:    30 * time.Second,
+		ShutdownGracePeriodCriticalPods: 10 * time.Second,
+		StateDirectory:                  os.TempDir(),
+	})
+
+	err := manager.Start(tCtx)
+
+	// Grab a reference to the first connection and arm its close notification.
+	m := manager.(*managerImpl)
+	firstConn = m.dbusCon.(*fakeDbus)
+	firstConn.onCloseChan = firstConnClosedChan
+	lock.Unlock()
+
+	require.NoError(t, err)
+
+	// Trigger reconnect by closing the shutdown channel (simulates dbus disconnect).
+	close(firstConn.shutdownChan)
+
+	// Wait for Close() to be called on the first connection by start().
+	select {
+	case <-firstConnClosedChan:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for first connection to be closed on reconnect")
+	}
+
+	assert.True(t, firstConn.closed, "expected the first dbus connection to be closed after reconnect")
 }
