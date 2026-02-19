@@ -60,6 +60,7 @@ message PriorityClass {
   // One of Never, PreemptLowerPriority.
   // Defaults to PreemptLowerPriority if unset.
   // +optional
+  // +k8s:optional
   // +k8s:immutable
   optional string preemptionPolicy = 5;
 }

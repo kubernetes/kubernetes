@@ -226,6 +226,9 @@ func Validate_PriorityClass(ctx context.Context, op operation.Operation, fldPath
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
