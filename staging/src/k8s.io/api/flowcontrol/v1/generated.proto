@@ -81,7 +81,7 @@ message FlowSchema {
 
   // `spec` is the specification of the desired behavior of a FlowSchema.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional FlowSchemaSpec spec = 2;
 
   // `status` is the current status of a FlowSchema.
@@ -104,12 +104,15 @@ message FlowSchemaCondition {
   optional string status = 2;
 
   // `lastTransitionTime` is the last time the condition transitioned from one status to another.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+  // +optional
   optional string reason = 4;
 
   // `message` is a human-readable message indicating details about last transition.
+  // +optional
   optional string message = 5;
 }
 
@@ -223,6 +226,7 @@ message LimitedPriorityLevelConfiguration {
   optional int32 nominalConcurrencyShares = 1;
 
   // `limitResponse` indicates what to do with requests that can not be executed right now
+  // +required
   optional LimitResponse limitResponse = 2;
 
   // `lendablePercent` prescribes the fraction of the level's NominalCL that
@@ -316,7 +320,7 @@ message PriorityLevelConfiguration {
 
   // `spec` is the specification of the desired behavior of a "request-priority".
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional PriorityLevelConfigurationSpec spec = 2;
 
   // `status` is the current status of a "request-priority".
@@ -339,12 +343,15 @@ message PriorityLevelConfigurationCondition {
   optional string status = 2;
 
   // `lastTransitionTime` is the last time the condition transitioned from one status to another.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+  // +optional
   optional string reason = 4;
 
   // `message` is a human-readable message indicating details about last transition.
+  // +optional
   optional string message = 5;
 }
 

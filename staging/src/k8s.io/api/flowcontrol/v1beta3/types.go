@@ -133,7 +133,7 @@ type FlowSchema struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// `spec` is the specification of the desired behavior of a FlowSchema.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec FlowSchemaSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	// `status` is the current status of a FlowSchema.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -403,10 +403,13 @@ type FlowSchemaCondition struct {
 	// +optional
 	Status ConditionStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 	// `lastTransitionTime` is the last time the condition transitioned from one status to another.
+	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
 	// `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 	// `message` is a human-readable message indicating details about last transition.
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
@@ -428,7 +431,7 @@ type PriorityLevelConfiguration struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// `spec` is the specification of the desired behavior of a "request-priority".
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec PriorityLevelConfigurationSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	// `status` is the current status of a "request-priority".
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -518,6 +521,7 @@ type LimitedPriorityLevelConfiguration struct {
 	NominalConcurrencyShares int32 `json:"nominalConcurrencyShares" protobuf:"varint,1,opt,name=nominalConcurrencyShares"`
 
 	// `limitResponse` indicates what to do with requests that can not be executed right now
+	// +required
 	LimitResponse LimitResponse `json:"limitResponse,omitempty" protobuf:"bytes,2,opt,name=limitResponse"`
 
 	// `lendablePercent` prescribes the fraction of the level's NominalCL that
@@ -678,10 +682,13 @@ type PriorityLevelConfigurationCondition struct {
 	// +optional
 	Status ConditionStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 	// `lastTransitionTime` is the last time the condition transitioned from one status to another.
+	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
 	// `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 	// `message` is a human-readable message indicating details about last transition.
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
