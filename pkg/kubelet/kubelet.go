@@ -1020,7 +1020,7 @@ func NewMainKubelet(ctx context.Context,
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
-		killPodNow(logger, klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
+		killPodNow(ctx, klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
 
 	klet.evictionManager = evictionManager
 
@@ -1061,7 +1061,7 @@ func NewMainKubelet(ctx context.Context,
 
 	handlers = append(handlers, klet.containerManager.GetAllocateResourcesPodAdmitHandler())
 
-	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getAllocatedPods, killPodNow(logger, klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
+	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getAllocatedPods, killPodNow(ctx, klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
 	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(klet.GetCachedNode, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
@@ -1100,7 +1100,7 @@ func NewMainKubelet(ctx context.Context,
 		Recorder:                         kubeDeps.Recorder,
 		NodeRef:                          nodeRef,
 		GetPodsFunc:                      klet.GetActivePods,
-		KillPodFunc:                      killPodNow(logger, klet.podWorkers, kubeDeps.Recorder),
+		KillPodFunc:                      killPodNow(ctx, klet.podWorkers, kubeDeps.Recorder),
 		SyncNodeStatusFunc:               klet.syncNodeStatus,
 		ShutdownGracePeriodRequested:     kubeCfg.ShutdownGracePeriod.Duration,
 		ShutdownGracePeriodCriticalPods:  kubeCfg.ShutdownGracePeriodCriticalPods.Duration,

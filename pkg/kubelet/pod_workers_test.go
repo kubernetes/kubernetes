@@ -2227,9 +2227,9 @@ func TestFakePodWorkers(t *testing.T) {
 // TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
 func TestKillPodNowFunc(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, processed := createPodWorkers(logger)
-	killPodFunc := killPodNow(logger, podWorkers, fakeRecorder)
+	killPodFunc := killPodNow(tCtx, podWorkers, fakeRecorder)
 	pod := newNamedPod("test", "ns", "test", false)
 	gracePeriodOverride := int64(0)
 	err := killPodFunc(pod, false, &gracePeriodOverride, func(status *v1.PodStatus) {

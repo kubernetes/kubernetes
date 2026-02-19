@@ -1673,7 +1673,7 @@ func (p *podWorkers) removeTerminatedWorker(logger klog.Logger, uid types.UID, s
 
 // killPodNow returns a KillPodFunc that can be used to kill a pod.
 // It is intended to be injected into other modules that need to kill a pod.
-func killPodNow(logger klog.Logger, podWorkers PodWorkers, recorder record.EventRecorder) eviction.KillPodFunc {
+func killPodNow(ctx context.Context, podWorkers PodWorkers, recorder record.EventRecorder) eviction.KillPodFunc {
 	return func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, statusFn func(*v1.PodStatus)) error {
 		// determine the grace period to use when killing the pod
 		gracePeriod := int64(0)
@@ -1695,8 +1695,7 @@ func killPodNow(logger klog.Logger, podWorkers PodWorkers, recorder record.Event
 		// open a channel we block against until we get a result
 		ch := make(chan struct{}, 1)
 		podWorkers.UpdatePod(
-			// KillPodFunc interface does not provide a context parameter.
-			klog.NewContext(context.TODO(), logger),
+			ctx,
 			UpdatePodOptions{
 				Pod:        pod,
 				UpdateType: kubetypes.SyncPodKill,
