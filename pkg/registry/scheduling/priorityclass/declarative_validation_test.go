@@ -103,6 +103,20 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("preemptionPolicy"), &preemptNever, "field is immutable").WithOrigin("immutable"),
 			},
 		},
+		"invalid update changing preemptionPolicy from nil to default ": {
+			old:    mkValidPriorityClass(),
+			update: mkValidPriorityClass(tweakPreemptionPolicy(&preemptLowerPriority)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), &preemptLowerPriority, "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update changing preemptionPolicy from default to nil": {
+			old:    mkValidPriorityClass(tweakPreemptionPolicy(&preemptLowerPriority)),
+			update: mkValidPriorityClass(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 
@@ -143,3 +157,4 @@ func tweakPreemptionPolicy(policy *api.PreemptionPolicy) func(*scheduling.Priori
 }
 
 var preemptNever = api.PreemptNever
+var preemptLowerPriority = api.PreemptLowerPriority
