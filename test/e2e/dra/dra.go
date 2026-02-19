@@ -2154,6 +2154,98 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				"Message": gomega.Equal("Device Taint manager: deleting due to NoExecute taint"),
 			}))))
 		})
+
+		f.Context(f.WithFeatureGate(features.DRAWorkloadResourceClaims), f.WithFeatureGate(features.GenericWorkload), f.WithLabel("KubeletMinVersion:1.36"), func() {
+			f.It("NoSchedule keeps pod with PodGroup claim pending", func(ctx context.Context) {
+				tCtx := f.TContext(ctx)
+				workload, template := b.WorkloadInline()
+				podGroupTemplate := workload.Spec.PodGroupTemplates[0]
+				podGroup := b.PodGroup(workload, podGroupTemplate)
+				pod := b.GroupedPodWithClaim(podGroup, podGroupTemplate.ResourceClaims[0].Name)
+				b.Create(tCtx, workload, podGroup, pod, template)
+				framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			})
+
+			f.It("NoSchedule can be tolerated for PodGroup claims", func(ctx context.Context) {
+				tCtx := f.TContext(ctx)
+				workload, template := b.WorkloadInline()
+				podGroupTemplate := workload.Spec.PodGroupTemplates[0]
+				template.Spec.Spec.Devices.Requests[0].Exactly.Tolerations = []resourceapi.DeviceToleration{{
+					Effect:   resourceapi.DeviceTaintEffectNoSchedule,
+					Operator: resourceapi.DeviceTolerationOpExists,
+					// No key: tolerate *all* taints with this effect.
+				}}
+				podGroup := b.PodGroup(workload, podGroupTemplate)
+				pod := b.GroupedPodWithClaim(podGroup, podGroupTemplate.ResourceClaims[0].Name)
+				b.Create(tCtx, workload, podGroup, pod, template)
+				b.TestPod(tCtx, pod)
+			})
+
+			f.It("DeviceTaintRule evicts pod with PodGroup claim", f.WithFeatureGate(features.DRADeviceTaintRules), func(ctx context.Context) {
+				tCtx := f.TContext(ctx)
+				workload, template := b.WorkloadInline()
+				podGroupTemplate := workload.Spec.PodGroupTemplates[0]
+				template.Spec.Spec.Devices.Requests[0].Exactly.Tolerations = []resourceapi.DeviceToleration{{
+					Effect:   resourceapi.DeviceTaintEffectNoSchedule,
+					Operator: resourceapi.DeviceTolerationOpExists,
+					// No key: tolerate *all* taints with this effect.
+				}}
+				podGroup := b.PodGroup(workload, podGroupTemplate)
+				pod := b.GroupedPodWithClaim(podGroup, podGroupTemplate.ResourceClaims[0].Name)
+				// Add a finalizer to ensure that we get a chance to test the pod status after eviction (= deletion).
+				pod.Finalizers = []string{"e2e-test/dont-delete-me"}
+				b.Create(tCtx, workload, podGroup, pod, template)
+				b.TestPod(tCtx, pod)
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					gomega.Eventually(ctx, func(ctx context.Context) error {
+						// Unblock shutdown by removing the finalizer.
+						pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+						if err != nil {
+							return fmt.Errorf("get pod: %w", err)
+						}
+						pod.Finalizers = nil
+						_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(ctx, pod, metav1.UpdateOptions{})
+						if err != nil {
+							return fmt.Errorf("remove finalizers from pod: %w", err)
+						}
+						return nil
+					}).WithTimeout(30*time.Second).WithPolling(1*time.Second).Should(gomega.Succeed(), "Failed to remove finalizers")
+				})
+
+				// Now evict it.
+				ginkgo.By("Evicting pod...")
+				taint := &resourcealphaapi.DeviceTaintRule{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "device-taint-rule-" + f.UniqueName + "-",
+					},
+					Spec: resourcealphaapi.DeviceTaintRuleSpec{
+						// All devices of the current driver instance.
+						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
+							Driver: &driver.Name,
+						},
+						Taint: resourcealphaapi.DeviceTaint{
+							Effect: resourcealphaapi.DeviceTaintEffectNoExecute,
+							Key:    "test.example.com/evict",
+							Value:  "now",
+							// No TimeAdded, gets defaulted.
+						},
+					},
+				}
+				createdTaint := b.Create(tCtx, taint)
+				taint = createdTaint[0].(*resourcealphaapi.DeviceTaintRule)
+				gomega.Expect(*taint).Should(gomega.HaveField("Spec.Taint.TimeAdded.Time", gomega.BeTemporally("~", time.Now(), time.Minute /* allow for some clock drift and delays */)))
+				framework.ExpectNoError(e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart))
+				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get pod")
+				gomega.Expect(pod).Should(gomega.HaveField("Status.Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					// LastTransitionTime is unknown.
+					"Type":    gomega.Equal(v1.DisruptionTarget),
+					"Status":  gomega.Equal(v1.ConditionTrue),
+					"Reason":  gomega.Equal("DeletionByDeviceTaintManager"),
+					"Message": gomega.Equal("Device Taint manager: deleting due to NoExecute taint"),
+				}))))
+			})
+		})
 	})
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {

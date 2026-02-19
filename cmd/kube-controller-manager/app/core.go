@@ -269,6 +269,7 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 	deviceTaintEvictionController := devicetainteviction.New(
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Scheduling().V1alpha2().PodGroups(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
 		controllerContext.InformerFactory.Resource().V1().ResourceSlices(),
 		controllerContext.InformerFactory.Resource().V1alpha3().DeviceTaintRules(),
