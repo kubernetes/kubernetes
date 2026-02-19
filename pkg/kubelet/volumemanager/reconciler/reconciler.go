@@ -27,13 +27,14 @@ func (rc *reconciler) Run(ctx context.Context, stopCh <-chan struct{}) {
 	logger := klog.FromContext(ctx)
 	rc.reconstructVolumes(logger)
 	logger.Info("Reconciler: start to sync state")
+
 	for {
 		rc.reconcile(ctx)
 		select {
 		case <-stopCh:
 			return
-		case <-rc.pokeCh:
-			// Woken up early because new work arrived.
+		case <-rc.wakeUpCh:
+			// Woken up early: either new work arrived in DSW or an operation completed.
 		case <-time.After(rc.loopSleepDuration):
 		}
 	}

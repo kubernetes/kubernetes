@@ -149,6 +149,10 @@ type OperationExecutor interface {
 	ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
 	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, volumePath string, pluginName string) (volume.ReconstructedVolume, error)
+
+	// SetOperationCompletionCallback registers a callback that is invoked whenever any
+	// pending operation completes. The callback must be non-blocking.
+	SetOperationCompletionCallback(fn func())
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -760,6 +764,10 @@ func (oe *operationExecutor) IsOperationSafeToRetry(
 	nodeName types.NodeName,
 	operationName string) bool {
 	return oe.pendingOperations.IsOperationSafeToRetry(volumeName, podName, nodeName, operationName)
+}
+
+func (oe *operationExecutor) SetOperationCompletionCallback(fn func()) {
+	oe.pendingOperations.SetOperationCompletionCallback(fn)
 }
 
 func (oe *operationExecutor) AttachVolume(

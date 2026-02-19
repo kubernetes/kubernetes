@@ -56,10 +56,10 @@ type Reconciler interface {
 	// states at least once after kubelet starts
 	StatesHasBeenSynced() bool
 
-	// Poke wakes up the reconciler loop to process any pending changes
+	// WakeUp wakes up the reconciler loop to process any pending changes
 	// immediately, rather than waiting for the next periodic tick.
 	// This is safe to call from any goroutine and is non-blocking.
-	Poke()
+	WakeUp()
 }
 
 // NewReconciler returns a new instance of Reconciler.
@@ -122,7 +122,7 @@ func NewReconciler(
 		skippedDuringReconstruction:     map[v1.UniqueVolumeName]*globalVolumeInfo{},
 		volumePluginMgr:                 volumePluginMgr,
 		kubeletPodsDir:                  kubeletPodsDir,
-		pokeCh:                          make(chan struct{}, 1),
+		wakeUpCh:                        make(chan struct{}, 1),
 		timeOfLastSync:                  time.Time{},
 		volumesFailedReconstruction:     make([]podVolume, 0),
 		volumesNeedUpdateFromNodeStatus: make([]v1.UniqueVolumeName, 0),
@@ -144,10 +144,10 @@ type reconciler struct {
 	volumePluginMgr               *volumepkg.VolumePluginMgr
 	skippedDuringReconstruction   map[v1.UniqueVolumeName]*globalVolumeInfo
 	kubeletPodsDir                string
-	// pokeCh is a buffered channel (capacity 1) used to wake up the
+	// wakeUpCh is a buffered channel (capacity 1) used to wake up the
 	// reconciler loop immediately when there is new work, rather than
 	// waiting for the next periodic tick.
-	pokeCh chan struct{}
+	wakeUpCh chan struct{}
 	// lock protects timeOfLastSync for updating and checking
 	timeOfLastSyncLock              sync.Mutex
 	timeOfLastSync                  time.Time
@@ -155,9 +155,9 @@ type reconciler struct {
 	volumesNeedUpdateFromNodeStatus []v1.UniqueVolumeName
 }
 
-func (rc *reconciler) Poke() {
+func (rc *reconciler) WakeUp() {
 	select {
-	case rc.pokeCh <- struct{}{}:
+	case rc.wakeUpCh <- struct{}{}:
 	default:
 	}
 }

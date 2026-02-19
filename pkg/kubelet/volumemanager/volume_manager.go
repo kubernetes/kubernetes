@@ -240,12 +240,17 @@ func NewVolumeManager(
 
 	// When a new volume is added to the desired state, immediately wake the
 	// reconciler so it can start the mount without waiting for the next tick.
-	vm.desiredStateOfWorld.SetVolumeAddedNotify(vm.reconciler.Poke)
+	vm.desiredStateOfWorld.SetStateChangedNotify(vm.reconciler.WakeUp)
+
+	// When any volume operation (attach, mount, etc.) completes, immediately
+	// wake the reconciler to chain the next operation without waiting for the
+	// next tick.
+	vm.operationExecutor.SetOperationCompletionCallback(vm.reconciler.WakeUp)
 
 	// When a volume mount/unmount completes, broadcast to all goroutines
 	// waiting in WaitForAttachAndMount / WaitForUnmount so they can return
 	// immediately instead of waiting for the next poll tick.
-	vm.actualStateOfWorld.SetVolumeStateChangedNotify(vm.notifyVolumeStateChange)
+	vm.actualStateOfWorld.SetStateChangedNotify(vm.onActualStateOfWorldChange)
 
 	return vm
 }
@@ -413,19 +418,19 @@ func (vm *volumeManager) MarkVolumesAsReportedInUse(
 	vm.desiredStateOfWorld.MarkVolumesReportedInUse(volumesReportedAsInUse)
 }
 
-// waitForVolumeStateChange returns a channel that will be closed the next
-// time the actual state of world changes (volume mounted/unmounted). Callers
-// should get this channel BEFORE checking any condition to avoid missing
+// actualStateOfWorldChanges returns a channel that will be closed the next
+// time the actual state of world changes.
+// Callers should get this channel BEFORE checking any condition to avoid missing
 // changes that occur between the check and the wait.
-func (vm *volumeManager) waitForVolumeStateChange() <-chan struct{} {
+func (vm *volumeManager) actualStateOfWorldChanges() <-chan struct{} {
 	vm.volumeStateMu.Lock()
 	defer vm.volumeStateMu.Unlock()
 	return vm.volumeStateCh
 }
 
-// notifyVolumeStateChange broadcasts to all goroutines waiting on a volume
+// onActualStateOfWorldChange broadcasts to all goroutines waiting on a volume
 // state change by closing the current channel and creating a new one.
-func (vm *volumeManager) notifyVolumeStateChange() {
+func (vm *volumeManager) onActualStateOfWorldChange() {
 	vm.volumeStateMu.Lock()
 	defer vm.volumeStateMu.Unlock()
 	close(vm.volumeStateCh)
@@ -448,7 +453,7 @@ func (vm *volumeManager) waitForConditionWithNotification(
 	for {
 		// Get notification channel BEFORE checking condition to avoid
 		// missing state changes between check and wait.
-		ch := vm.waitForVolumeStateChange()
+		actualStateOfWorldChanges := vm.actualStateOfWorldChanges()
 
 		done, err := condition(deadlineCtx)
 		if err != nil {
@@ -461,8 +466,8 @@ func (vm *volumeManager) waitForConditionWithNotification(
 		select {
 		case <-deadlineCtx.Done():
 			return deadlineCtx.Err()
-		case <-ch:
-			// Volume state changed, re-check immediately.
+		case <-actualStateOfWorldChanges:
+			// ASW changed, re-check immediately.
 		case <-time.After(interval):
 			// Fallback poll for non-ASW state changes (e.g. DSW errors).
 		}
