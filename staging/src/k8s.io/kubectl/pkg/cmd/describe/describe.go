@@ -154,6 +154,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericiooptions.I
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(parent, args)
 			cmdutil.CheckErr(err)
+			o.ShowEventsChanged = cmd.Flags().Changed("show-events")
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
@@ -193,6 +194,15 @@ func (o *DescribeOptions) Run() error {
 		allErrs = append(allErrs, err)
 	}
 
+	// When describing multiple objects and the user did not explicitly set
+	// --show-events, default to skipping per-object event queries. This avoids
+	// the N+1 API call problem (each Describe issues its own ListEvents).
+	// Users can restore events with --show-events=true.
+	settings := *o.DescriberSettings
+	if !o.ShowEventsChanged && len(infos) > 1 {
+		settings.ShowEvents = false
+	}
+
 	errs := sets.New[string]()
 	first := true
 	for _, info := range infos {
@@ -206,7 +216,7 @@ func (o *DescribeOptions) Run() error {
 			errs.Insert(err.Error())
 			continue
 		}
-		s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
+		s, err := describer.Describe(info.Namespace, info.Name, settings)
 		if err != nil {
 			if errs.Has(err.Error()) {
 				continue
@@ -256,20 +266,32 @@ func (o *DescribeOptions) DescribeMatchingResources(originalError error, resourc
 	if err != nil {
 		return err
 	}
-	isFound := false
+
+	// Collect indices of prefix-matching resources.
+	var matchIdx []int
 	for ix := range infos {
-		info := infos[ix]
-		if strings.HasPrefix(info.Name, prefix) {
-			isFound = true
-			s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(o.Out, "%s\n", s)
+		if strings.HasPrefix(infos[ix].Name, prefix) {
+			matchIdx = append(matchIdx, ix)
 		}
 	}
-	if !isFound {
+	if len(matchIdx) == 0 {
 		return originalError
+	}
+
+	// Skip per-resource event queries when multiple resources match,
+	// unless the user explicitly set --show-events.
+	settings := *o.DescriberSettings
+	if !o.ShowEventsChanged && len(matchIdx) > 1 {
+		settings.ShowEvents = false
+	}
+
+	for _, ix := range matchIdx {
+		info := infos[ix]
+		s, err := describer.Describe(info.Namespace, info.Name, settings)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(o.Out, "%s\n", s)
 	}
 	return nil
 }
@@ -284,8 +306,9 @@ type DescribeOptions struct {
 
 	BuilderArgs []string
 
-	EnforceNamespace bool
-	AllNamespaces    bool
+	EnforceNamespace  bool
+	AllNamespaces     bool
+	ShowEventsChanged bool
 
 	DescriberSettings *describe.DescriberSettings
 	FilenameOptions   *resource.FilenameOptions
