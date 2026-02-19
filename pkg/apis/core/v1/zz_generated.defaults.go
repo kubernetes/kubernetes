@@ -49,7 +49,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&corev1.Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*corev1.Pod)) })
 	scheme.AddTypeDefaultingFunc(&corev1.PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*corev1.PodList)) })
 	scheme.AddTypeDefaultingFunc(&corev1.PodLogOptions{}, func(obj interface{}) { SetObjectDefaults_PodLogOptions(obj.(*corev1.PodLogOptions)) })
-	scheme.AddTypeDefaultingFunc(&corev1.PodStatusResult{}, func(obj interface{}) { SetObjectDefaults_PodStatusResult(obj.(*corev1.PodStatusResult)) })
 	scheme.AddTypeDefaultingFunc(&corev1.PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*corev1.PodTemplate)) })
 	scheme.AddTypeDefaultingFunc(&corev1.PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*corev1.PodTemplateList)) })
 	scheme.AddTypeDefaultingFunc(&corev1.ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*corev1.ReplicationController)) })
@@ -562,38 +561,6 @@ func SetObjectDefaults_PodList(in *corev1.PodList) {
 
 func SetObjectDefaults_PodLogOptions(in *corev1.PodLogOptions) {
 	SetDefaults_PodLogOptions(in)
-}
-
-func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
-	for i := range in.Status.InitContainerStatuses {
-		a := &in.Status.InitContainerStatuses[i]
-		SetDefaults_ResourceList(&a.AllocatedResources)
-		if a.Resources != nil {
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
-		}
-	}
-	for i := range in.Status.ContainerStatuses {
-		a := &in.Status.ContainerStatuses[i]
-		SetDefaults_ResourceList(&a.AllocatedResources)
-		if a.Resources != nil {
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
-		}
-	}
-	for i := range in.Status.EphemeralContainerStatuses {
-		a := &in.Status.EphemeralContainerStatuses[i]
-		SetDefaults_ResourceList(&a.AllocatedResources)
-		if a.Resources != nil {
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
-		}
-	}
-	SetDefaults_ResourceList(&in.Status.AllocatedResources)
-	if in.Status.Resources != nil {
-		SetDefaults_ResourceList(&in.Status.Resources.Limits)
-		SetDefaults_ResourceList(&in.Status.Resources.Requests)
-	}
 }
 
 func SetObjectDefaults_PodTemplate(in *corev1.PodTemplate) {
