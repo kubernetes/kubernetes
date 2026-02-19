@@ -361,26 +361,6 @@ func (j *TestJig) CreateLoadBalancerService(ctx context.Context, timeout time.Du
 	return j.WaitForLoadBalancer(ctx, timeout)
 }
 
-// GetEndpointNodes returns a map of nodenames:external-ip on which the
-// endpoints of the Service are running.
-func (j *TestJig) GetEndpointNodes(ctx context.Context) (map[string][]string, error) {
-	return j.GetEndpointNodesWithIP(ctx, v1.NodeExternalIP)
-}
-
-// GetEndpointNodesWithIP returns a map of nodenames:<ip of given type> on which the
-// endpoints of the Service are running.
-func (j *TestJig) GetEndpointNodesWithIP(ctx context.Context, addressType v1.NodeAddressType) (map[string][]string, error) {
-	nodes, err := j.ListNodesWithEndpoint(ctx)
-	if err != nil {
-		return nil, err
-	}
-	nodeMap := map[string][]string{}
-	for _, node := range nodes {
-		nodeMap[node.Name] = e2enode.GetAddresses(&node, addressType)
-	}
-	return nodeMap, nil
-}
-
 // ListNodesWithEndpoint returns a list of nodes on which the
 // endpoints of the given Service are running.
 func (j *TestJig) ListNodesWithEndpoint(ctx context.Context) ([]v1.Node, error) {

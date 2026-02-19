@@ -698,16 +698,17 @@ func waitForAPIServerUp(ctx context.Context, c clientset.Interface) error {
 // getEndpointNodesWithInternalIP returns a map of nodenames:internal-ip on which the
 // endpoints of the Service are running.
 func getEndpointNodesWithInternalIP(ctx context.Context, jig *e2eservice.TestJig) (map[string]string, error) {
-	nodesWithIPs, err := jig.GetEndpointNodesWithIP(ctx, v1.NodeInternalIP)
+	nodes, err := jig.ListNodesWithEndpoint(ctx)
 	if err != nil {
 		return nil, err
 	}
-	endpointsNodeMap := make(map[string]string, len(nodesWithIPs))
-	for nodeName, internalIPs := range nodesWithIPs {
+	endpointsNodeMap := make(map[string]string, len(nodes))
+	for _, node := range nodes {
+		internalIPs := e2enode.GetAddresses(&node, v1.NodeInternalIP)
 		if len(internalIPs) < 1 {
-			return nil, fmt.Errorf("no internal ip found for node %s", nodeName)
+			return nil, fmt.Errorf("no internal ip found for node %s", node.Name)
 		}
-		endpointsNodeMap[nodeName] = internalIPs[0]
+		endpointsNodeMap[node.Name] = internalIPs[0]
 	}
 	return endpointsNodeMap, nil
 }
