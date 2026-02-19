@@ -1103,7 +1103,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 			// check the cache contains the expected claim info
 			var podClaimName *string
 			if len(test.pod.Spec.ResourceClaims) > 0 {
-				podClaimName, _, err = resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
+				podClaimName, _, err = resourceclaim.Name(test.pod, nil /* TODO */, &test.pod.Spec.ResourceClaims[0])
 				require.NoError(t, err)
 			}
 			if podClaimName == nil {
@@ -1416,7 +1416,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			// Check cache was cleared only on successful unprepare
 			var podClaimName *string
 			if len(test.pod.Spec.ResourceClaims) > 0 {
-				podClaimName, _, err = resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
+				podClaimName, _, err = resourceclaim.Name(test.pod, nil /* TODO */, &test.pod.Spec.ResourceClaims[0])
 				require.NoError(t, err)
 			}
 			claimName := claimName

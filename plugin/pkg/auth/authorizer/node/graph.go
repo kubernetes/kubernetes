@@ -416,7 +416,7 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 	}
 
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, &podResourceClaim)
+		claimName, _, err := resourceclaim.Name(pod, nil /* TODO */, &podResourceClaim)
 		// Do we have a valid claim name? If yes, add an edge that grants
 		// kubelet access to that claim. An error indicates that a claim
 		// still needs to be created, nil that intentionally no claim

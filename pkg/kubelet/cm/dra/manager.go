@@ -272,7 +272,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		podClaim := &podResourceClaims[i]
 		infos[i].podClaim = podClaim
 		logger.V(3).Info("Processing resource", "podClaim", podClaim.Name)
-		claimName, mustCheckOwner, err := resourceclaim.Name(pod, podClaim)
+		claimName, mustCheckOwner, err := resourceclaim.Name(pod, nil /* TODO */, podClaim)
 		if err != nil {
 			return err
 		}
@@ -291,14 +291,14 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		}
 
 		if mustCheckOwner {
-			if err = resourceclaim.IsForPod(pod, resourceClaim); err != nil {
+			if err = resourceclaim.IsForPod(pod, nil /* TODO */, resourceClaim); err != nil {
 				// No wrapping, error is already informative.
 				return err
 			}
 		}
 
 		// Check if pod is in the ReservedFor for the claim
-		if !resourceclaim.IsReservedForPod(pod, resourceClaim) {
+		if !resourceclaim.IsReservedForPod(pod, nil /* TODO */, resourceClaim) {
 			return fmt.Errorf("pod %s (%s) is not allowed to use ResourceClaim %s (%s)",
 				pod.Name, pod.UID, *claimName, resourceClaim.UID)
 		}
@@ -508,7 +508,7 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 			continue
 		}
 
-		claimName, _, err := resourceclaim.Name(pod, podClaim)
+		claimName, _, err := resourceclaim.Name(pod, nil /* TODO */, podClaim)
 		if err != nil {
 			// No wrapping, error is already informative.
 			return nil, err
@@ -588,7 +588,7 @@ func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 func (m *Manager) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) error {
 	var claimNames []string
 	for i := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+		claimName, _, err := resourceclaim.Name(pod, nil /* TODO */, &pod.Spec.ResourceClaims[i])
 		if err != nil {
 			// No wrapping, the error is already informative.
 			return err
@@ -744,7 +744,7 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 			continue
 		}
 
-		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+		claimName, _, err := resourceclaim.Name(pod, nil /* TODO */, &pod.Spec.ResourceClaims[i])
 		if err != nil {
 			// No wrapping, the error is already informative.
 			return nil, err

@@ -1522,7 +1522,7 @@ func (tc *Controller) podEvictionTime(pod *v1.Pod) *evictionAndReason {
 	// the pod needs to be evicted.
 	var eviction *evictionAndReason
 	for i := range pod.Spec.ResourceClaims {
-		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+		claimName, mustCheckOwner, err := resourceclaim.Name(pod, nil /* TODO */, &pod.Spec.ResourceClaims[i])
 		if err != nil {
 			// Not created yet or unsupported. Definitely not tainted.
 			continue
@@ -1536,11 +1536,11 @@ func (tc *Controller) podEvictionTime(pod *v1.Pod) *evictionAndReason {
 			// Referenced, but not found or not allocated. Also not tainted.
 			continue
 		}
-		if mustCheckOwner && resourceclaim.IsForPod(pod, allocatedClaim.ResourceClaim) != nil {
+		if mustCheckOwner && resourceclaim.IsForPod(pod, nil /* TODO */, allocatedClaim.ResourceClaim) != nil {
 			// Claim and pod don't match. Ignore the claim.
 			continue
 		}
-		if !resourceclaim.IsReservedForPod(pod, allocatedClaim.ResourceClaim) {
+		if !resourceclaim.IsReservedForPod(pod, nil /* TODO */, allocatedClaim.ResourceClaim) {
 			// The pod isn't the one which is allowed and/or supposed to use the claim.
 			// Perhaps that pod instance already got deleted and we are looking at its
 			// replacement under the same name. Either way, ignore.

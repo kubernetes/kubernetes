@@ -314,7 +314,7 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 		logger.V(6).Info("Not touching claims", "pod", klog.KObj(pod), "reason", reason)
 	} else {
 		for _, podClaim := range pod.Spec.ResourceClaims {
-			claimName, _, err := resourceclaim.Name(pod, &podClaim)
+			claimName, _, err := resourceclaim.Name(pod, nil /* TODO */, &podClaim)
 			switch {
 			case err != nil:
 				// Either the claim was not created (nothing to do here) or
@@ -377,7 +377,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 	}
 
 	for _, podClaim := range pod.Spec.ResourceClaims {
-		claimName, checkOwner, err := resourceclaim.Name(pod, &podClaim)
+		claimName, checkOwner, err := resourceclaim.Name(pod, nil /* TODO */, &podClaim)
 		if err != nil {
 			return true, err.Error()
 		}
@@ -400,7 +400,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 		}
 
 		if checkOwner {
-			if err := resourceclaim.IsForPod(pod, claim); err != nil {
+			if err := resourceclaim.IsForPod(pod, nil /* TODO */, claim); err != nil {
 				// Cannot proceed with the pod unless that other claim gets deleted.
 				return false, err.Error()
 			}
@@ -414,7 +414,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 		}
 
 		if claim.Status.Allocation != nil &&
-			!resourceclaim.IsReservedForPod(pod, claim) &&
+			!resourceclaim.IsReservedForPod(pod, nil /* TODO */, claim) &&
 			resourceclaim.CanBeReserved(claim) {
 			// Need to reserve it.
 			return true, fmt.Sprintf("need to reserve claim %s for pod", klog.KObj(claim))
@@ -601,7 +601,7 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 	}
 
 	for _, podClaim := range pod.Spec.ResourceClaims {
-		claimName, checkOwner, err := resourceclaim.Name(pod, &podClaim)
+		claimName, checkOwner, err := resourceclaim.Name(pod, nil /* TODO */, &podClaim)
 		if err != nil {
 			return err
 		}
@@ -618,12 +618,12 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 			return fmt.Errorf("retrieve claim: %v", err)
 		}
 		if checkOwner {
-			if err := resourceclaim.IsForPod(pod, claim); err != nil {
+			if err := resourceclaim.IsForPod(pod, nil /* TODO */, claim); err != nil {
 				return err
 			}
 		}
 		if claim.Status.Allocation != nil &&
-			!resourceclaim.IsReservedForPod(pod, claim) &&
+			!resourceclaim.IsReservedForPod(pod, nil /* TODO */, claim) &&
 			resourceclaim.CanBeReserved(claim) {
 			logger.V(5).Info("Reserve claim for pod", "resourceClaim", klog.KObj(claim))
 			if err := ec.reserveForPod(ctx, pod, claim); err != nil {
@@ -646,7 +646,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 	// even if there is no template to work on, because if some new field
 	// gets added, the expectation might be that the controller does
 	// something for it.
-	claimName, mustCheckOwner, err := resourceclaim.Name(pod, &podClaim)
+	claimName, mustCheckOwner, err := resourceclaim.Name(pod, nil /* TODO */, &podClaim)
 	switch {
 	case errors.Is(err, resourceclaim.ErrClaimNotFound):
 		// Continue below.
@@ -666,7 +666,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 		if claim != nil {
 			var err error
 			if mustCheckOwner {
-				err = resourceclaim.IsForPod(pod, claim)
+				err = resourceclaim.IsForPod(pod, nil /* TODO */, claim)
 			}
 			if err == nil {
 				// Already created, nothing more to do.
@@ -1054,7 +1054,7 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	}
 	keys := []string{}
 	for _, podClaim := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, &podClaim)
+		claimName, _, err := resourceclaim.Name(pod, nil /* TODO */, &podClaim)
 		if err != nil || claimName == nil {
 			// Index functions are not supposed to fail, the caller will panic.
 			// For both error reasons (claim not created yet, unknown API)
