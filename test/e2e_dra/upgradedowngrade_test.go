@@ -76,7 +76,7 @@ var subTests = map[string]initialTestFunc{
 	"core DRA":                    coreDRA,
 	"ResourceClaim device status": resourceClaimDeviceStatus,
 	"DeviceTaints":                deviceTaints,
-	"DRA extended resources":      extendedResourcesUpgradeDowngrade,
+	"DRAExtendedResource":         extendedResourceUpgradeDowngrade,
 }
 
 type initialTestFunc func(tCtx ktesting.TContext, builder *drautils.Builder) upgradedTestFunc
