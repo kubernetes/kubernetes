@@ -7939,3 +7939,273 @@ IY5vBsBP6cycvKRL1XZ43uF9e2zE2GiHBw==
 		})
 	}
 }
+
+func TestFilterEventsForObject(t *testing.T) {
+	allEvents := &corev1.EventList{
+		Items: []corev1.Event{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "ev-1"},
+				InvolvedObject: corev1.ObjectReference{
+					Name:      "pod-a",
+					Namespace: "default",
+					Kind:      "Pod",
+				},
+				Message: "pulled image",
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "ev-2"},
+				InvolvedObject: corev1.ObjectReference{
+					Name:      "pod-b",
+					Namespace: "default",
+					Kind:      "Pod",
+				},
+				Message: "started container",
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "ev-3"},
+				InvolvedObject: corev1.ObjectReference{
+					Name:      "pod-a",
+					Namespace: "other",
+					Kind:      "Pod",
+				},
+				Message: "wrong namespace",
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "ev-4"},
+				InvolvedObject: corev1.ObjectReference{
+					Name:      "svc-a",
+					Namespace: "default",
+					Kind:      "Service",
+				},
+				Message: "different resource same namespace",
+			},
+		},
+	}
+
+	testCases := []struct {
+		name          string
+		objName       string
+		objNamespace  string
+		objKind       string
+		expectedCount int
+		expectedNames []string
+	}{
+		{
+			name:          "matches single pod",
+			objName:       "pod-a",
+			objNamespace:  "default",
+			objKind:       "Pod",
+			expectedCount: 1,
+			expectedNames: []string{"ev-1"},
+		},
+		{
+			name:          "matches different pod",
+			objName:       "pod-b",
+			objNamespace:  "default",
+			objKind:       "Pod",
+			expectedCount: 1,
+			expectedNames: []string{"ev-2"},
+		},
+		{
+			name:          "no match wrong namespace",
+			objName:       "pod-a",
+			objNamespace:  "nonexistent",
+			objKind:       "Pod",
+			expectedCount: 0,
+		},
+		{
+			name:          "no match wrong name",
+			objName:       "pod-c",
+			objNamespace:  "default",
+			objKind:       "Pod",
+			expectedCount: 0,
+		},
+		{
+			name:          "no match wrong kind",
+			objName:       "pod-a",
+			objNamespace:  "default",
+			objKind:       "Service",
+			expectedCount: 0,
+		},
+		{
+			name:          "empty kind matches all kinds",
+			objName:       "pod-a",
+			objNamespace:  "default",
+			objKind:       "",
+			expectedCount: 1,
+			expectedNames: []string{"ev-1"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			filtered := FilterEventsForObject(allEvents, tc.objName, tc.objNamespace, tc.objKind)
+			if len(filtered.Items) != tc.expectedCount {
+				t.Errorf("expected %d events, got %d", tc.expectedCount, len(filtered.Items))
+			}
+			for i, name := range tc.expectedNames {
+				if filtered.Items[i].Name != name {
+					t.Errorf("expected event %d to be %q, got %q", i, name, filtered.Items[i].Name)
+				}
+			}
+		})
+	}
+}
+
+func TestFilterEventsForObjectNilInput(t *testing.T) {
+	filtered := FilterEventsForObject(nil, "pod-a", "default", "Pod")
+	if filtered == nil {
+		t.Error("expected non-nil EventList for nil input")
+	}
+	if len(filtered.Items) != 0 {
+		t.Errorf("expected 0 events for nil input, got %d", len(filtered.Items))
+	}
+}
+
+func TestFormatEvents(t *testing.T) {
+	testCases := []struct {
+		name             string
+		events           *corev1.EventList
+		expectedContains []string
+	}{
+		{
+			name:             "empty events",
+			events:           &corev1.EventList{},
+			expectedContains: []string{"Events:", "<none>"},
+		},
+		{
+			name: "single event",
+			events: &corev1.EventList{
+				Items: []corev1.Event{
+					{
+						ObjectMeta:     metav1.ObjectMeta{Name: "ev-1"},
+						Source:         corev1.EventSource{Component: "kubelet"},
+						Message:        "Started container",
+						FirstTimestamp: metav1.NewTime(time.Date(2024, time.January, 15, 0, 0, 0, 0, time.UTC)),
+						LastTimestamp:  metav1.NewTime(time.Date(2024, time.January, 15, 0, 0, 0, 0, time.UTC)),
+						Count:          1,
+						Type:           corev1.EventTypeNormal,
+					},
+				},
+			},
+			expectedContains: []string{"Events:", "Normal", "kubelet", "Started container"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := FormatEvents(tc.events)
+			for _, expected := range tc.expectedContains {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected output to contain %q, got: %s", expected, out)
+				}
+			}
+		})
+	}
+}
+
+func TestFetchNamespaceEvents(t *testing.T) {
+	events := &corev1.EventList{
+		Items: []corev1.Event{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ev-1",
+					Namespace: "test-ns",
+				},
+				InvolvedObject: corev1.ObjectReference{
+					Name:      "pod-a",
+					Namespace: "test-ns",
+				},
+				Message: "pulled image",
+				Type:    corev1.EventTypeNormal,
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ev-2",
+					Namespace: "test-ns",
+				},
+				InvolvedObject: corev1.ObjectReference{
+					Name:      "pod-b",
+					Namespace: "test-ns",
+				},
+				Message: "started container",
+				Type:    corev1.EventTypeNormal,
+			},
+		},
+	}
+
+	clientset := fake.NewClientset(events)
+	fetched, err := FetchNamespaceEvents(clientset.CoreV1(), "test-ns", 500)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fetched.Items) != 2 {
+		t.Errorf("expected 2 events, got %d", len(fetched.Items))
+	}
+}
+
+// TestFilterEventsForObjectKindWildcard verifies that passing kind="" to
+// FilterEventsForObject matches events of any Kind for the same name+namespace.
+// This is important because PodDescriber clears Kind before searching events,
+// and our batch path must reproduce that permissive behavior.
+func TestFilterEventsForObjectKindWildcard(t *testing.T) {
+	allEvents := &corev1.EventList{
+		Items: []corev1.Event{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "ev-pod"},
+				InvolvedObject: corev1.ObjectReference{
+					Name:      "myapp",
+					Namespace: "default",
+					Kind:      "Pod",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "ev-svc"},
+				InvolvedObject: corev1.ObjectReference{
+					Name:      "myapp",
+					Namespace: "default",
+					Kind:      "Service",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "ev-other-ns"},
+				InvolvedObject: corev1.ObjectReference{
+					Name:      "myapp",
+					Namespace: "other",
+					Kind:      "Pod",
+				},
+			},
+		},
+	}
+
+	// kind="" should match both Pod and Service events with same name+namespace.
+	filtered := FilterEventsForObject(allEvents, "myapp", "default", "")
+	if len(filtered.Items) != 2 {
+		t.Errorf("expected 2 events with kind wildcard, got %d", len(filtered.Items))
+	}
+
+	// kind="Pod" should match only the Pod event.
+	filtered = FilterEventsForObject(allEvents, "myapp", "default", "Pod")
+	if len(filtered.Items) != 1 {
+		t.Errorf("expected 1 event with kind=Pod, got %d", len(filtered.Items))
+	}
+	if filtered.Items[0].Name != "ev-pod" {
+		t.Errorf("expected ev-pod, got %s", filtered.Items[0].Name)
+	}
+}
+
+// TestFetchNamespaceEventsEmpty verifies that FetchNamespaceEvents returns
+// an empty list (not nil) when no events exist in the namespace.
+func TestFetchNamespaceEventsEmpty(t *testing.T) {
+	clientset := fake.NewClientset()
+	fetched, err := FetchNamespaceEvents(clientset.CoreV1(), "empty-ns", 500)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched == nil {
+		t.Fatal("expected non-nil EventList, got nil")
+	}
+	if len(fetched.Items) != 0 {
+		t.Errorf("expected 0 events, got %d", len(fetched.Items))
+	}
+}

@@ -5359,3 +5359,51 @@ func searchEvents(client corev1client.EventsGetter, objOrRef runtime.Object, lim
 		})
 	return eventList, err
 }
+
+// FetchNamespaceEvents fetches all events in the given namespace.
+// This is used to batch-fetch events when describing multiple resources,
+// avoiding the N+1 query problem where each resource triggers a separate
+// event list API call.
+func FetchNamespaceEvents(client corev1client.EventsGetter, namespace string, limit int64) (*corev1.EventList, error) {
+	initialOpts := metav1.ListOptions{Limit: limit}
+	eventList := &corev1.EventList{}
+	err := runtimeresource.FollowContinue(&initialOpts,
+		func(options metav1.ListOptions) (runtime.Object, error) {
+			newEvents, err := client.Events(namespace).List(context.TODO(), options)
+			if err != nil {
+				return nil, runtimeresource.EnhanceListError(err, options, "events")
+			}
+			eventList.Items = append(eventList.Items, newEvents.Items...)
+			return newEvents, nil
+		})
+	return eventList, err
+}
+
+// FilterEventsForObject filters a pre-fetched event list to only include
+// events whose InvolvedObject matches the given name, namespace, and kind.
+// Pass kind="" to match all kinds (useful when the describer is permissive,
+// e.g. PodDescriber clears Kind before searching events).
+func FilterEventsForObject(allEvents *corev1.EventList, name, namespace, kind string) *corev1.EventList {
+	if allEvents == nil {
+		return &corev1.EventList{}
+	}
+	filtered := &corev1.EventList{}
+	for i := range allEvents.Items {
+		e := &allEvents.Items[i]
+		if e.InvolvedObject.Name == name && e.InvolvedObject.Namespace == namespace &&
+			(kind == "" || e.InvolvedObject.Kind == kind) {
+			filtered.Items = append(filtered.Items, *e)
+		}
+	}
+	return filtered
+}
+
+// FormatEvents formats an EventList as a describe-style events section string.
+func FormatEvents(events *corev1.EventList) string {
+	s, _ := tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		DescribeEvents(events, w)
+		return nil
+	})
+	return s
+}

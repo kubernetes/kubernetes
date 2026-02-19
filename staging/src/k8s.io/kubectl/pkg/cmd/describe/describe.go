@@ -130,6 +130,7 @@ func (flags *DescribeFlags) ToOptions(parent string, args []string) (*DescribeOp
 		Namespace:         namespace,
 		Describer:         describer,
 		NewBuilder:        flags.Factory.NewBuilder,
+		Factory:           flags.Factory,
 		BuilderArgs:       builderArgs,
 		EnforceNamespace:  enforceNamespace,
 		AllNamespaces:     flags.AllNamespaces,
@@ -235,7 +236,24 @@ func (o *DescribeOptions) Run() error {
 	return utilerrors.NewAggregate(allErrs)
 }
 
+const (
+	// minPrefixLength is the minimum number of characters required for
+	// prefix-based resource matching. Short prefixes can accidentally match
+	// a very large number of resources, causing excessive API calls.
+	minPrefixLength = 3
+
+	// maxPrefixResourcesForEvents is the maximum number of prefix-matched
+	// resources for which events will be fetched. Beyond this threshold,
+	// resources are described without events and a warning is printed.
+	maxPrefixResourcesForEvents = 10
+)
+
 func (o *DescribeOptions) DescribeMatchingResources(originalError error, resource, prefix string) error {
+	// Reject very short prefixes that could match thousands of resources.
+	if len(prefix) < minPrefixLength {
+		return originalError
+	}
+
 	r := o.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().
@@ -256,20 +274,81 @@ func (o *DescribeOptions) DescribeMatchingResources(originalError error, resourc
 	if err != nil {
 		return err
 	}
-	isFound := false
+
+	// Collect indices of prefix-matching resources.
+	// Note: the parameter name "resource" shadows the imported package,
+	// so we use index-based access rather than a typed slice.
+	var matchIdx []int
 	for ix := range infos {
-		info := infos[ix]
-		if strings.HasPrefix(info.Name, prefix) {
-			isFound = true
-			s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
+		if strings.HasPrefix(infos[ix].Name, prefix) {
+			matchIdx = append(matchIdx, ix)
+		}
+	}
+	if len(matchIdx) == 0 {
+		return originalError
+	}
+
+	// If too many resources match, skip events entirely to avoid overloading
+	// the API server. Describe each resource without events and warn the user.
+	if len(matchIdx) > maxPrefixResourcesForEvents && o.DescriberSettings.ShowEvents {
+		fmt.Fprintf(o.ErrOut, "warning: %d resources matched prefix %q; skipping event queries (threshold is %d)\n",
+			len(matchIdx), prefix, maxPrefixResourcesForEvents)
+		settings := *o.DescriberSettings
+		settings.ShowEvents = false
+		for _, ix := range matchIdx {
+			info := infos[ix]
+			s, err := describer.Describe(info.Namespace, info.Name, settings)
 			if err != nil {
 				return err
 			}
 			fmt.Fprintf(o.Out, "%s\n", s)
 		}
+		return nil
 	}
-	if !isFound {
-		return originalError
+
+	// When describing multiple namespaced resources, batch-fetch all events
+	// in the namespace with a single API call to avoid the N+1 query problem.
+	// Each Describe() call would otherwise issue its own ListEvents request.
+	// See https://github.com/kubernetes/kubectl/issues/1769
+	if len(matchIdx) > 1 && o.DescriberSettings.ShowEvents && o.Factory != nil &&
+		mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+		if clientset, csErr := o.Factory.KubernetesClientSet(); csErr == nil {
+			if allEvents, evErr := describe.FetchNamespaceEvents(
+				clientset.CoreV1(), o.Namespace, o.DescriberSettings.ChunkSize,
+			); evErr == nil {
+				// Disable per-resource event fetching; we append events ourselves.
+				settings := *o.DescriberSettings
+				settings.ShowEvents = false
+				for _, ix := range matchIdx {
+					info := infos[ix]
+					s, err := describer.Describe(info.Namespace, info.Name, settings)
+					if err != nil {
+						return err
+					}
+					// Filter without Kind constraint: some describers (e.g. PodDescriber)
+					// deliberately clear Kind before searching events to be more permissive.
+					// Using name+namespace matching is consistent with that behavior.
+					filtered := describe.FilterEventsForObject(allEvents, info.Name, info.Namespace, "")
+					if len(filtered.Items) > 0 {
+						s += describe.FormatEvents(filtered)
+					}
+					fmt.Fprintf(o.Out, "%s\n", s)
+				}
+				return nil
+			}
+		}
+	}
+
+	// Fallback: describe each resource with its own event query (original behavior).
+	// This path is used for single matches, cluster-scoped resources, or when
+	// the batch event fetch fails.
+	for _, ix := range matchIdx {
+		info := infos[ix]
+		s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(o.Out, "%s\n", s)
 	}
 	return nil
 }
@@ -281,6 +360,7 @@ type DescribeOptions struct {
 
 	Describer  func(*meta.RESTMapping) (describe.ResourceDescriber, error)
 	NewBuilder func() *resource.Builder
+	Factory    cmdutil.Factory
 
 	BuilderArgs []string
 
