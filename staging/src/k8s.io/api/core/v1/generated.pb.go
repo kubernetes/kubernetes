@@ -1460,6 +1460,11 @@ func (m *ClusterTrustBundleProjection) MarshalToSizedBuffer(dAtA []byte) (int, e
 	_ = i
 	var l int
 	_ = l
+	if m.User != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.User))
+		i--
+		dAtA[i] = 0x30
+	}
 	if m.Optional != nil {
 		i--
 		if *m.Optional {
@@ -1997,6 +2002,11 @@ func (m *ConfigMapVolumeSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.DefaultUser != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.DefaultUser))
+		i--
+		dAtA[i] = 0x28
+	}
 	if m.Optional != nil {
 		i--
 		if *m.Optional {
@@ -3033,6 +3043,11 @@ func (m *DownwardAPIVolumeFile) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.User != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.User))
+		i--
+		dAtA[i] = 0x28
+	}
 	if m.Mode != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.Mode))
 		i--
@@ -3090,6 +3105,11 @@ func (m *DownwardAPIVolumeSource) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	_ = i
 	var l int
 	_ = l
+	if m.DefaultUser != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.DefaultUser))
+		i--
+		dAtA[i] = 0x18
+	}
 	if m.DefaultMode != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.DefaultMode))
 		i--
@@ -5207,6 +5227,11 @@ func (m *KeyToPath) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.User != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.User))
+		i--
+		dAtA[i] = 0x20
+	}
 	if m.Mode != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.Mode))
 		i--
@@ -8832,6 +8857,11 @@ func (m *PodCertificateProjection) MarshalToSizedBuffer(dAtA []byte) (int, error
 	_ = i
 	var l int
 	_ = l
+	if m.User != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.User))
+		i--
+		dAtA[i] = 0x40
+	}
 	if len(m.UserAnnotations) > 0 {
 		keysForUserAnnotations := make([]string, 0, len(m.UserAnnotations))
 		for k := range m.UserAnnotations {
@@ -10988,6 +11018,11 @@ func (m *ProjectedVolumeSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.DefaultUser != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.DefaultUser))
+		i--
+		dAtA[i] = 0x18
+	}
 	if m.DefaultMode != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.DefaultMode))
 		i--
@@ -12719,6 +12754,11 @@ func (m *SecretVolumeSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.DefaultUser != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.DefaultUser))
+		i--
+		dAtA[i] = 0x28
+	}
 	if m.Optional != nil {
 		i--
 		if *m.Optional {
@@ -13120,6 +13160,11 @@ func (m *ServiceAccountTokenProjection) MarshalToSizedBuffer(dAtA []byte) (int, 
 	_ = i
 	var l int
 	_ = l
+	if m.User != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.User))
+		i--
+		dAtA[i] = 0x20
+	}
 	i -= len(m.Path)
 	copy(dAtA[i:], m.Path)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Path)))
@@ -15470,6 +15515,9 @@ func (m *ClusterTrustBundleProjection) Size() (n int) {
 	if m.Optional != nil {
 		n += 2
 	}
+	if m.User != nil {
+		n += 1 + sovGenerated(uint64(*m.User))
+	}
 	return n
 }
 
@@ -15663,6 +15711,9 @@ func (m *ConfigMapVolumeSource) Size() (n int) {
 	}
 	if m.Optional != nil {
 		n += 2
+	}
+	if m.DefaultUser != nil {
+		n += 1 + sovGenerated(uint64(*m.DefaultUser))
 	}
 	return n
 }
@@ -16045,6 +16096,9 @@ func (m *DownwardAPIVolumeFile) Size() (n int) {
 	if m.Mode != nil {
 		n += 1 + sovGenerated(uint64(*m.Mode))
 	}
+	if m.User != nil {
+		n += 1 + sovGenerated(uint64(*m.User))
+	}
 	return n
 }
 
@@ -16062,6 +16116,9 @@ func (m *DownwardAPIVolumeSource) Size() (n int) {
 	}
 	if m.DefaultMode != nil {
 		n += 1 + sovGenerated(uint64(*m.DefaultMode))
+	}
+	if m.DefaultUser != nil {
+		n += 1 + sovGenerated(uint64(*m.DefaultUser))
 	}
 	return n
 }
@@ -16846,6 +16903,9 @@ func (m *KeyToPath) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	if m.Mode != nil {
 		n += 1 + sovGenerated(uint64(*m.Mode))
+	}
+	if m.User != nil {
+		n += 1 + sovGenerated(uint64(*m.User))
 	}
 	return n
 }
@@ -18193,6 +18253,9 @@ func (m *PodCertificateProjection) Size() (n int) {
 			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
 		}
 	}
+	if m.User != nil {
+		n += 1 + sovGenerated(uint64(*m.User))
+	}
 	return n
 }
 
@@ -18978,6 +19041,9 @@ func (m *ProjectedVolumeSource) Size() (n int) {
 	if m.DefaultMode != nil {
 		n += 1 + sovGenerated(uint64(*m.DefaultMode))
 	}
+	if m.DefaultUser != nil {
+		n += 1 + sovGenerated(uint64(*m.DefaultUser))
+	}
 	return n
 }
 
@@ -19616,6 +19682,9 @@ func (m *SecretVolumeSource) Size() (n int) {
 	if m.Optional != nil {
 		n += 2
 	}
+	if m.DefaultUser != nil {
+		n += 1 + sovGenerated(uint64(*m.DefaultUser))
+	}
 	return n
 }
 
@@ -19752,6 +19821,9 @@ func (m *ServiceAccountTokenProjection) Size() (n int) {
 	}
 	l = len(m.Path)
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.User != nil {
+		n += 1 + sovGenerated(uint64(*m.User))
+	}
 	return n
 }
 
@@ -20739,6 +20811,7 @@ func (this *ClusterTrustBundleProjection) String() string {
 		`LabelSelector:` + strings.Replace(fmt.Sprintf("%v", this.LabelSelector), "LabelSelector", "v1.LabelSelector", 1) + `,`,
 		`Path:` + fmt.Sprintf("%v", this.Path) + `,`,
 		`Optional:` + valueToStringGenerated(this.Optional) + `,`,
+		`User:` + valueToStringGenerated(this.User) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -20905,6 +20978,7 @@ func (this *ConfigMapVolumeSource) String() string {
 		`Items:` + repeatedStringForItems + `,`,
 		`DefaultMode:` + valueToStringGenerated(this.DefaultMode) + `,`,
 		`Optional:` + valueToStringGenerated(this.Optional) + `,`,
+		`DefaultUser:` + valueToStringGenerated(this.DefaultUser) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -21185,6 +21259,7 @@ func (this *DownwardAPIVolumeFile) String() string {
 		`FieldRef:` + strings.Replace(this.FieldRef.String(), "ObjectFieldSelector", "ObjectFieldSelector", 1) + `,`,
 		`ResourceFieldRef:` + strings.Replace(this.ResourceFieldRef.String(), "ResourceFieldSelector", "ResourceFieldSelector", 1) + `,`,
 		`Mode:` + valueToStringGenerated(this.Mode) + `,`,
+		`User:` + valueToStringGenerated(this.User) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -21201,6 +21276,7 @@ func (this *DownwardAPIVolumeSource) String() string {
 	s := strings.Join([]string{`&DownwardAPIVolumeSource{`,
 		`Items:` + repeatedStringForItems + `,`,
 		`DefaultMode:` + valueToStringGenerated(this.DefaultMode) + `,`,
+		`DefaultUser:` + valueToStringGenerated(this.DefaultUser) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -21779,6 +21855,7 @@ func (this *KeyToPath) String() string {
 		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`Path:` + fmt.Sprintf("%v", this.Path) + `,`,
 		`Mode:` + valueToStringGenerated(this.Mode) + `,`,
+		`User:` + valueToStringGenerated(this.User) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -22801,6 +22878,7 @@ func (this *PodCertificateProjection) String() string {
 		`KeyPath:` + fmt.Sprintf("%v", this.KeyPath) + `,`,
 		`CertificateChainPath:` + fmt.Sprintf("%v", this.CertificateChainPath) + `,`,
 		`UserAnnotations:` + mapStringForUserAnnotations + `,`,
+		`User:` + valueToStringGenerated(this.User) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -23388,6 +23466,7 @@ func (this *ProjectedVolumeSource) String() string {
 	s := strings.Join([]string{`&ProjectedVolumeSource{`,
 		`Sources:` + repeatedStringForSources + `,`,
 		`DefaultMode:` + valueToStringGenerated(this.DefaultMode) + `,`,
+		`DefaultUser:` + valueToStringGenerated(this.DefaultUser) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -23911,6 +23990,7 @@ func (this *SecretVolumeSource) String() string {
 		`Items:` + repeatedStringForItems + `,`,
 		`DefaultMode:` + valueToStringGenerated(this.DefaultMode) + `,`,
 		`Optional:` + valueToStringGenerated(this.Optional) + `,`,
+		`DefaultUser:` + valueToStringGenerated(this.DefaultUser) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24005,6 +24085,7 @@ func (this *ServiceAccountTokenProjection) String() string {
 		`Audience:` + fmt.Sprintf("%v", this.Audience) + `,`,
 		`ExpirationSeconds:` + valueToStringGenerated(this.ExpirationSeconds) + `,`,
 		`Path:` + fmt.Sprintf("%v", this.Path) + `,`,
+		`User:` + valueToStringGenerated(this.User) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -27700,6 +27781,26 @@ func (m *ClusterTrustBundleProjection) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.Optional = &b
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field User", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.User = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -29334,6 +29435,26 @@ func (m *ConfigMapVolumeSource) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.Optional = &b
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DefaultUser", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.DefaultUser = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -32629,6 +32750,26 @@ func (m *DownwardAPIVolumeFile) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Mode = &v
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field User", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.User = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -32733,6 +32874,26 @@ func (m *DownwardAPIVolumeSource) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.DefaultMode = &v
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DefaultUser", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.DefaultUser = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -39564,6 +39725,26 @@ func (m *KeyToPath) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Mode = &v
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field User", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.User = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -51244,6 +51425,26 @@ func (m *PodCertificateProjection) Unmarshal(dAtA []byte) error {
 			}
 			m.UserAnnotations[mapkey] = mapvalue
 			iNdEx = postIndex
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field User", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.User = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -57760,6 +57961,26 @@ func (m *ProjectedVolumeSource) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.DefaultMode = &v
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DefaultUser", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.DefaultUser = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -63710,6 +63931,26 @@ func (m *SecretVolumeSource) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.Optional = &b
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DefaultUser", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.DefaultUser = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -64752,6 +64993,26 @@ func (m *ServiceAccountTokenProjection) Unmarshal(dAtA []byte) error {
 			}
 			m.Path = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field User", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.User = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
