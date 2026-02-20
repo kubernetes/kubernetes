@@ -1983,6 +1983,41 @@
               ]
             },
             {
+              "resource": "devicetaintrules",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceTaintRule",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "devicetaintrule",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "DeviceTaintRule",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "resourceclaims",
               "responseKind": {
                 "group": "",

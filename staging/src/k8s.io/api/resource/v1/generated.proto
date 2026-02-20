@@ -405,7 +405,7 @@ message Device {
   // any device in a ResourceSlice, then the maximum number of
   // allowed devices per ResourceSlice is 64 instead of 128.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
@@ -918,7 +918,7 @@ message DeviceRequestAllocationResult {
   //
   // The maximum number of tolerations is 16.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
@@ -1077,7 +1077,7 @@ message DeviceSubRequest {
   //
   // The maximum number of tolerations is 16.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
@@ -1282,7 +1282,7 @@ message ExactDeviceRequest {
   //
   // The maximum number of tolerations is 16.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional

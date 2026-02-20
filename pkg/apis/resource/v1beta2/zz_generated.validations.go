@@ -50,6 +50,14 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type DeviceTaintRule
+	scheme.AddValidationFunc((*resourcev1beta2.DeviceTaintRule)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_DeviceTaintRule(ctx, op, nil /* fldPath */, obj.(*resourcev1beta2.DeviceTaintRule), safe.Cast[*resourcev1beta2.DeviceTaintRule](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ResourceClaim
 	scheme.AddValidationFunc((*resourcev1beta2.ResourceClaim)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -1309,6 +1317,50 @@ var symbolsForDeviceTaintEffect = sets.New(resourcev1beta2.DeviceTaintEffectNoEx
 // to declarative validation rules in the API schema.
 func Validate_DeviceTaintEffect(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTaintEffect) (errs field.ErrorList) {
 	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceTaintEffect, nil).MarkAlpha()...)
+
+	return errs
+}
+
+// Validate_DeviceTaintRule validates an instance of DeviceTaintRule according
+// to declarative validation rules in the API schema.
+func Validate_DeviceTaintRule(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTaintRule) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceTaintRule.TypeMeta has no validation
+	// field resourcev1beta2.DeviceTaintRule.ObjectMeta has no validation
+
+	// field resourcev1beta2.DeviceTaintRule.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTaintRuleSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceTaintRuleSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceTaintRule) *resourcev1beta2.DeviceTaintRuleSpec {
+			return &oldObj.Spec
+		}), oldObj != nil)...)
+
+	// field resourcev1beta2.DeviceTaintRule.Status has no validation
+	return errs
+}
+
+// Validate_DeviceTaintRuleSpec validates an instance of DeviceTaintRuleSpec according
+// to declarative validation rules in the API schema.
+func Validate_DeviceTaintRuleSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTaintRuleSpec) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceTaintRuleSpec.DeviceSelector has no validation
+
+	// field resourcev1beta2.DeviceTaintRuleSpec.Taint
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTaint, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceTaint(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("taint"), &obj.Taint, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceTaintRuleSpec) *resourcev1beta2.DeviceTaint { return &oldObj.Taint }), oldObj != nil)...)
 
 	return errs
 }

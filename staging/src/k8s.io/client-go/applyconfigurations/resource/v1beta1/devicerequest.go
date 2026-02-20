@@ -133,7 +133,7 @@ type DeviceRequestApplyConfiguration struct {
 	// This field can only be set when deviceClassName is set and no subrequests
 	// are specified in the firstAvailable list.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
 	// Capacity define resource requirements against each capacity.

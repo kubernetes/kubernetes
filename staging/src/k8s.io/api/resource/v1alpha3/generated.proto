@@ -120,6 +120,7 @@ message DeviceTaint {
   // Consumers must treat unknown effects like None.
   //
   // +required
+  // +k8s:required
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added or

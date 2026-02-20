@@ -70,7 +70,7 @@ type BasicDeviceApplyConfiguration struct {
 	// any device in a ResourceSlice, then the maximum number of
 	// allowed devices per ResourceSlice is 64 instead of 128.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	Taints []DeviceTaintApplyConfiguration `json:"taints,omitempty"`
 	// BindsToNode indicates if the usage of an allocation involving this device

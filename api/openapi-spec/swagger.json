@@ -15787,7 +15787,7 @@
           "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set."
         },
         "taints": {
-          "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1.DeviceTaint"
           },
@@ -16157,7 +16157,7 @@
           "type": "string"
         },
         "tolerations": {
-          "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1.DeviceToleration"
           },
@@ -16216,7 +16216,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "tolerations": {
-          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1.DeviceToleration"
           },
@@ -16316,7 +16316,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "tolerations": {
-          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1.DeviceToleration"
           },
@@ -17017,7 +17017,7 @@
           "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set."
         },
         "taints": {
-          "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceTaint"
           },
@@ -17473,7 +17473,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "tolerations": {
-          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceToleration"
           },
@@ -17537,7 +17537,7 @@
           "type": "string"
         },
         "tolerations": {
-          "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceToleration"
           },
@@ -17596,7 +17596,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "tolerations": {
-          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceToleration"
           },
@@ -18307,7 +18307,7 @@
           "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set."
         },
         "taints": {
-          "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaint"
           },
@@ -18677,7 +18677,7 @@
           "type": "string"
         },
         "tolerations": {
-          "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceToleration"
           },
@@ -18736,7 +18736,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "tolerations": {
-          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceToleration"
           },
@@ -18774,6 +18774,131 @@
         "key",
         "effect"
       ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta2.DeviceTaintRule": {
+      "description": "DeviceTaintRule adds one taint to all devices which match the selector. This has the same effect as if the taint was specified directly in the ResourceSlice by the DRA driver.",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+          "description": "Standard object metadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRuleSpec",
+          "description": "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number."
+        },
+        "status": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRuleStatus",
+          "description": "Status provides information about what was requested in the spec."
+        }
+      },
+      "required": [
+        "spec"
+      ],
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      ]
+    },
+    "io.k8s.api.resource.v1beta2.DeviceTaintRuleList": {
+      "description": "DeviceTaintRuleList is a collection of DeviceTaintRules.",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "description": "Items is the list of DeviceTaintRules.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+          "description": "Standard list metadata"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRuleList",
+          "version": "v1beta2"
+        }
+      ]
+    },
+    "io.k8s.api.resource.v1beta2.DeviceTaintRuleSpec": {
+      "description": "DeviceTaintRuleSpec specifies the selector and one taint.",
+      "properties": {
+        "deviceSelector": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintSelector",
+          "description": "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satisfied for a device to match. The empty selector matches all devices. Without a selector, no devices are matches."
+        },
+        "taint": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaint",
+          "description": "The taint that gets applied to matching devices."
+        }
+      },
+      "required": [
+        "taint"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta2.DeviceTaintRuleStatus": {
+      "description": "DeviceTaintRuleStatus provides information about an on-going pod eviction.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions provide information about the state of the DeviceTaintRule and the cluster at some point in time, in a machine-readable and human-readable format.\n\nThe following condition is currently defined as part of this API, more may get added: - Type: EvictionInProgress - Status: True if there are currently pods which need to be evicted, False otherwise\n  (includes the effects which don't cause eviction).\n- Reason: not specified, may change - Message: includes information about number of pending pods and already evicted pods\n  in a human-readable format, updated periodically, may change\n\nFor `effect: None`, the condition above gets set once for each change to the spec, with the message containing information about what would happen if the effect was `NoExecute`. This feedback can be used to decide whether changing the effect to `NoExecute` will work as intended. It only gets set once to avoid having to constantly update the status.\n\nMust have 8 or fewer entries.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "type",
+          "x-kubernetes-patch-strategy": "merge"
+        }
+      },
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta2.DeviceTaintSelector": {
+      "description": "DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to. The empty selector matches all devices. Without a selector, no devices are matched.",
+      "properties": {
+        "device": {
+          "description": "If device is set, only devices with that name are selected. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
+          "type": "string"
+        },
+        "driver": {
+          "description": "If driver is set, only devices from that driver are selected. This fields corresponds to slice.spec.driver.",
+          "type": "string"
+        },
+        "pool": {
+          "description": "If pool is set, only devices in that pool are selected.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.resource.v1beta2.DeviceToleration": {
@@ -18836,7 +18961,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "tolerations": {
-          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceToleration"
           },
@@ -87202,6 +87327,691 @@
         }
       }
     },
+    "/apis/resource.k8s.io/v1beta2/devicetaintrules": {
+      "delete": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "delete collection of DeviceTaintRule",
+        "operationId": "deleteResourceV1beta2CollectionDeviceTaintRule",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-2Y1dVQaQ"
+          },
+          {
+            "$ref": "#/parameters/continue-QfD61s0i"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+          },
+          {
+            "$ref": "#/parameters/gracePeriodSeconds--K5HaBOS"
+          },
+          {
+            "$ref": "#/parameters/ignoreStoreReadErrorWithClusterBreakingPotential-QbNkfIqj"
+          },
+          {
+            "$ref": "#/parameters/labelSelector-5Zw57w4C"
+          },
+          {
+            "$ref": "#/parameters/limit-1NfNmdNH"
+          },
+          {
+            "$ref": "#/parameters/orphanDependents-uRB25kX5"
+          },
+          {
+            "$ref": "#/parameters/propagationPolicy-6jk3prlO"
+          },
+          {
+            "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+          },
+          {
+            "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+          },
+          {
+            "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+          },
+          {
+            "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "deletecollection",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      },
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "list or watch objects of kind DeviceTaintRule",
+        "operationId": "listResourceV1beta2DeviceTaintRule",
+        "parameters": [
+          {
+            "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+          },
+          {
+            "$ref": "#/parameters/continue-QfD61s0i"
+          },
+          {
+            "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+          },
+          {
+            "$ref": "#/parameters/labelSelector-5Zw57w4C"
+          },
+          {
+            "$ref": "#/parameters/limit-1NfNmdNH"
+          },
+          {
+            "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+          },
+          {
+            "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+          },
+          {
+            "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+          },
+          {
+            "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+          },
+          {
+            "$ref": "#/parameters/watch-XNNPZGbK"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch",
+          "application/cbor-seq"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRuleList"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "list",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ],
+      "post": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "create a DeviceTaintRule",
+        "operationId": "createResourceV1beta2DeviceTaintRule",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      }
+    },
+    "/apis/resource.k8s.io/v1beta2/devicetaintrules/{name}": {
+      "delete": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "delete a DeviceTaintRule",
+        "operationId": "deleteResourceV1beta2DeviceTaintRule",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-2Y1dVQaQ"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/gracePeriodSeconds--K5HaBOS"
+          },
+          {
+            "$ref": "#/parameters/ignoreStoreReadErrorWithClusterBreakingPotential-QbNkfIqj"
+          },
+          {
+            "$ref": "#/parameters/orphanDependents-uRB25kX5"
+          },
+          {
+            "$ref": "#/parameters/propagationPolicy-6jk3prlO"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "delete",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      },
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "read the specified DeviceTaintRule",
+        "operationId": "readResourceV1beta2DeviceTaintRule",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the DeviceTaintRule",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ],
+      "patch": {
+        "consumes": [
+          "application/json-patch+json",
+          "application/merge-patch+json",
+          "application/strategic-merge-patch+json",
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
+        ],
+        "description": "partially update the specified DeviceTaintRule",
+        "operationId": "patchResourceV1beta2DeviceTaintRule",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-78PwaGsr"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-7c6nTn1T"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/force-tOGGb0Yi"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      },
+      "put": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "replace the specified DeviceTaintRule",
+        "operationId": "replaceResourceV1beta2DeviceTaintRule",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      }
+    },
+    "/apis/resource.k8s.io/v1beta2/devicetaintrules/{name}/status": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "read status of the specified DeviceTaintRule",
+        "operationId": "readResourceV1beta2DeviceTaintRuleStatus",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the DeviceTaintRule",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ],
+      "patch": {
+        "consumes": [
+          "application/json-patch+json",
+          "application/merge-patch+json",
+          "application/strategic-merge-patch+json",
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
+        ],
+        "description": "partially update status of the specified DeviceTaintRule",
+        "operationId": "patchResourceV1beta2DeviceTaintRuleStatus",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-78PwaGsr"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-7c6nTn1T"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/force-tOGGb0Yi"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      },
+      "put": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "replace status of the specified DeviceTaintRule",
+        "operationId": "replaceResourceV1beta2DeviceTaintRuleStatus",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaintRule"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      }
+    },
     "/apis/resource.k8s.io/v1beta2/namespaces/{namespace}/resourceclaims": {
       "delete": {
         "consumes": [
@@ -89176,6 +89986,166 @@
         },
         {
           "description": "name of the DeviceClass",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        },
+        {
+          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+        },
+        {
+          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+        },
+        {
+          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+        },
+        {
+          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+        },
+        {
+          "$ref": "#/parameters/watch-XNNPZGbK"
+        }
+      ]
+    },
+    "/apis/resource.k8s.io/v1beta2/watch/devicetaintrules": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "watch individual changes to a list of DeviceTaintRule. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchResourceV1beta2DeviceTaintRuleList",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch",
+          "application/cbor-seq"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "watchlist",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+        },
+        {
+          "$ref": "#/parameters/continue-QfD61s0i"
+        },
+        {
+          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+        },
+        {
+          "$ref": "#/parameters/labelSelector-5Zw57w4C"
+        },
+        {
+          "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        },
+        {
+          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+        },
+        {
+          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+        },
+        {
+          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+        },
+        {
+          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+        },
+        {
+          "$ref": "#/parameters/watch-XNNPZGbK"
+        }
+      ]
+    },
+    "/apis/resource.k8s.io/v1beta2/watch/devicetaintrules/{name}": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "watch changes to an object of kind DeviceTaintRule. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
+        "operationId": "watchResourceV1beta2DeviceTaintRule",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch",
+          "application/cbor-seq"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1beta2"
+        ],
+        "x-kubernetes-action": "watch",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "DeviceTaintRule",
+          "version": "v1beta2"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+        },
+        {
+          "$ref": "#/parameters/continue-QfD61s0i"
+        },
+        {
+          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+        },
+        {
+          "$ref": "#/parameters/labelSelector-5Zw57w4C"
+        },
+        {
+          "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "description": "name of the DeviceTaintRule",
           "in": "path",
           "name": "name",
           "required": true,
