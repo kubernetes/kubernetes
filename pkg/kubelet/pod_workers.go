@@ -773,6 +773,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 		uid, ns, name = options.Pod.UID, options.Pod.Namespace, options.Pod.Name
 	}
 
+	updateLogger := logger.WithValues("pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 
@@ -781,7 +782,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 	now := p.clock.Now()
 	status, ok := p.podSyncStatuses[uid]
 	if !ok {
-		logger.V(4).Info("Pod is being synced for the first time", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+		updateLogger.V(4).Info("Pod is being synced for the first time")
 		firstTime = true
 		status = &podSyncStatus{
 			syncedAt: now,
@@ -846,14 +847,14 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 	if !firstTime && status.IsTerminationRequested() {
 		if options.UpdateType == kubetypes.SyncPodCreate {
 			status.restartRequested = true
-			logger.V(4).Info("Pod is terminating but has been requested to restart with same UID, will be reconciled later", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+			updateLogger.V(4).Info("Pod is terminating but has been requested to restart with same UID, will be reconciled later")
 			return
 		}
 	}
 
 	// once a pod is terminated by UID, it cannot reenter the pod worker (until the UID is purged by housekeeping)
 	if status.IsFinished() {
-		logger.V(4).Info("Pod is finished processing, no further updates", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+		updateLogger.V(4).Info("Pod is finished processing, no further updates")
 		return
 	}
 
@@ -862,25 +863,25 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 	if !status.IsTerminationRequested() {
 		switch {
 		case isRuntimePod:
-			logger.V(4).Info("Pod is orphaned and must be torn down", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+			updateLogger.V(4).Info("Pod is orphaned and must be torn down")
 			status.deleted = true
 			status.terminatingAt = now
 			becameTerminating = true
 		case pod.DeletionTimestamp != nil:
-			logger.V(4).Info("Pod is marked for graceful deletion, begin teardown", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+			updateLogger.V(4).Info("Pod is marked for graceful deletion, begin teardown")
 			status.deleted = true
 			status.terminatingAt = now
 			becameTerminating = true
 		case pod.Status.Phase == v1.PodFailed, pod.Status.Phase == v1.PodSucceeded:
-			logger.V(4).Info("Pod is in a terminal phase (success/failed), begin teardown", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+			updateLogger.V(4).Info("Pod is in a terminal phase (success/failed), begin teardown")
 			status.terminatingAt = now
 			becameTerminating = true
 		case options.UpdateType == kubetypes.SyncPodKill:
 			if options.KillPodOptions != nil && options.KillPodOptions.Evict {
-				logger.V(4).Info("Pod is being evicted by the kubelet, begin teardown", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+				updateLogger.V(4).Info("Pod is being evicted by the kubelet, begin teardown")
 				status.evicted = true
 			} else {
-				logger.V(4).Info("Pod is being removed by the kubelet, begin teardown", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+				updateLogger.V(4).Info("Pod is being removed by the kubelet, begin teardown")
 			}
 			status.terminatingAt = now
 			becameTerminating = true
@@ -895,7 +896,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 		// due to housekeeping seeing an older cached version of the runtime pod simply ignore it until
 		// after the pod worker completes.
 		if isRuntimePod {
-			logger.V(3).Info("Pod is waiting for termination, ignoring runtime-only kill until after pod worker is fully terminated", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+			updateLogger.V(3).Info("Pod is waiting for termination, ignoring runtime-only kill until after pod worker is fully terminated")
 			return
 		}
 
@@ -979,14 +980,14 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 		status.pendingUpdate.Pod, _ = p.allocationManager.UpdatePodFromAllocation(options.Pod)
 	}
 	status.working = true
-	logger.V(4).Info("Notifying pod of pending update", "pod", klog.KRef(ns, name), "podUID", uid, "workType", status.WorkType())
+	updateLogger.V(4).Info("Notifying pod of pending update", "workType", status.WorkType())
 	select {
 	case podUpdates <- struct{}{}:
 	default:
 	}
 
 	if (becameTerminating || wasGracePeriodShortened) && status.cancelFn != nil {
-		logger.V(3).Info("Cancelling current pod sync", "pod", klog.KRef(ns, name), "podUID", uid, "workType", status.WorkType())
+		updateLogger.V(3).Info("Cancelling current pod sync", "workType", status.WorkType())
 		status.cancelFn()
 		return
 	}
