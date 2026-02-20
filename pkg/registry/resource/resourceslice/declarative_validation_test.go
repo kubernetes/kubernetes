@@ -18,6 +18,8 @@ package resourceslice
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -110,6 +112,18 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid: device attribute version": {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/version", resource.DeviceAttribute{VersionValue: ptr.To("1.2.3")})),
 				},
+				"valid: device attribute list of ints": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_ints", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{IntValue: []int64{1, 2, 3}}})),
+				},
+				"valid: device attribute list of bools": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_bools", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{BoolValue: []bool{true, false, true}}})),
+				},
+				"valid: device attribute list of strings": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{StringValue: []string{"a", "b", "c"}}})),
+				},
+				"valid: device attribute list of versions": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_versions", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{VersionValue: []string{"1.2.3", "2.3.4"}}})),
+				},
 				"invalid: device attribute with multiple values": {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{IntValue: ptr.To[int64](123), BoolValue: ptr.To(true)})),
 					expectedErrs: field.ErrorList{
@@ -120,6 +134,73 @@ func TestDeclarativeValidate(t *testing.T) {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{})),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/multiple"), "", "").WithOrigin("union").MarkAlpha(),
+					},
+				},
+				"invalid: device attribute list of ints with too many items": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_ints", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{IntValue: slices.Repeat([]int64{1}, resource.DeviceAttributeMaxListLength+1)}})),
+					expectedErrs: field.ErrorList{
+						field.TooMany(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_ints").Child("list").Child("ints"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
+						).WithOrigin("maxItems").MarkAlpha(),
+					},
+				},
+				"invalid: device attribute list of bools with too many items": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_bools", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{BoolValue: slices.Repeat([]bool{true}, resource.DeviceAttributeMaxListLength+1)}})),
+					expectedErrs: field.ErrorList{
+						field.TooMany(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_bools").Child("list").Child("bools"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
+						).WithOrigin("maxItems").MarkAlpha(),
+					},
+				},
+				"invalid: device attribute list of strings with too many items": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{StringValue: slices.Repeat([]string{"a"}, resource.DeviceAttributeMaxListLength+1)}})),
+					expectedErrs: field.ErrorList{
+						field.TooMany(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("list").Child("strings"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
+						).WithOrigin("maxItems").MarkAlpha(),
+					},
+				},
+				"invalid: device attribute list of versions with too many items": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_versions", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{VersionValue: slices.Repeat([]string{"1.2.3"}, resource.DeviceAttributeMaxListLength+1)}})),
+					expectedErrs: field.ErrorList{
+						field.TooMany(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_versions").Child("list").Child("versions"), resource.DeviceAttributeMaxListLength+1, resource.DeviceAttributeMaxListLength,
+						).WithOrigin("maxItems").MarkAlpha(),
+					},
+				},
+				"invalid: device attribute list of too long strings": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{StringValue: []string{strings.Repeat("a", resource.DeviceAttributeMaxValueLength+1)}}})),
+					expectedErrs: field.ErrorList{
+						field.TooLong(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("list").Child("strings").Index(0), resource.DeviceAttributeMaxValueLength+1, resource.DeviceAttributeMaxValueLength,
+						).WithOrigin("maxLength").MarkAlpha(),
+					},
+				},
+				"invalid: device attribute list of too long versions": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_versions", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{VersionValue: []string{strings.Repeat("a", resource.DeviceAttributeMaxValueLength+1)}}})),
+					expectedErrs: field.ErrorList{
+						field.TooLong(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_versions").Child("list").Child("versions").Index(0), resource.DeviceAttributeMaxValueLength+1, resource.DeviceAttributeMaxValueLength,
+						).WithOrigin("maxLength").MarkAlpha(),
+						field.Invalid(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_versions").Child("list").Child("versions").Index(0), "", "",
+						).MarkFromImperative(),
+					},
+				},
+				"invalid: device attribute list with multiple value types": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_multiple", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{IntValue: []int64{1, 2}, BoolValue: []bool{true, false}}})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_multiple").Child("list"), "", "",
+						).WithOrigin("union").MarkAlpha(),
+					},
+				},
+				"invalid: device attribute list with no value": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_none", resource.DeviceAttribute{ListValue: &resource.DeviceAttributeListType{}})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(
+							field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_none").Child("list"), "", "",
+						).WithOrigin("union").MarkAlpha(),
 					},
 				},
 				// spec.sharedCounters
@@ -219,7 +300,11 @@ func TestDeclarativeValidate(t *testing.T) {
 
 			for k, tc := range testCases {
 				t.Run(k, func(t *testing.T) {
-					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy.Validate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
+					apitesting.VerifyValidationEquivalence(
+						t, ctx, &tc.input, strategy.Validate, tc.expectedErrs,
+						apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...),
+						apitesting.WithIgnoreObjectConversionErrors(),
+					)
 				})
 			}
 		})

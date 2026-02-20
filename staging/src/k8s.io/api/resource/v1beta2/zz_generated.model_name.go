@@ -82,6 +82,11 @@ func (in DeviceAttribute) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in DeviceAttributeListType) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.DeviceAttributeListType"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceCapacity) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta2.DeviceCapacity"
 }

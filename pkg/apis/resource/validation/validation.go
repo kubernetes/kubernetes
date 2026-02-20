@@ -922,6 +922,10 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 		numFields++
 		allErrs = append(allErrs, validateDeviceAttributeVersionValue(attribute.VersionValue, fldPath.Child("version"))...)
 	}
+	if attribute.ListValue != nil {
+		numFields++
+		allErrs = append(allErrs, validateDeviceAttributeListValue(attribute.ListValue, fldPath.Child("list"))...)
+	}
 
 	switch numFields {
 	case 0:
@@ -950,6 +954,78 @@ func validateDeviceAttributeVersionValue(value *string, fldPath *field.Path) fie
 	if len(*value) > resource.DeviceAttributeMaxValueLength {
 		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceAttributeMaxValueLength))
 	}
+	return allErrs
+}
+
+func validateDeviceAttributeStringValueByDeclarative(value *string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(*value) > resource.DeviceAttributeMaxValueLength {
+		allErrs = append(allErrs,
+			field.TooLong(fldPath, "" /*unused*/, resource.DeviceAttributeMaxValueLength).WithOrigin("maxLength").MarkCoveredByDeclarative(),
+		)
+	}
+	return allErrs
+}
+
+func validateDeviceAttributeVersionValueByDeclarative(value *string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if !semverRe.MatchString(*value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, "must be a string compatible with semver.org spec 2.0.0"))
+	}
+	if len(*value) > resource.DeviceAttributeMaxValueLength {
+		allErrs = append(allErrs,
+			field.TooLong(fldPath, "" /*unused*/, resource.DeviceAttributeMaxValueLength).WithOrigin("maxLength").MarkCoveredByDeclarative(),
+		)
+	}
+	return allErrs
+}
+
+func validateDeviceAttributeListValue(deviceAttributeListType *resource.DeviceAttributeListType, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	numFields := 0
+	tooManyOnField := func(path *field.Path, actual int) *field.Error {
+		return field.TooMany(path, actual, resource.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative()
+	}
+	if deviceAttributeListType.BoolValue != nil {
+		numFields++
+		if len(deviceAttributeListType.BoolValue) > resource.DeviceAttributeMaxListLength {
+			allErrs = append(allErrs, tooManyOnField(fldPath.Child("bools"), len(deviceAttributeListType.BoolValue)))
+		}
+	}
+	if deviceAttributeListType.IntValue != nil {
+		numFields++
+		if len(deviceAttributeListType.IntValue) > resource.DeviceAttributeMaxListLength {
+			allErrs = append(allErrs, tooManyOnField(fldPath.Child("ints"), len(deviceAttributeListType.IntValue)))
+		}
+	}
+	if deviceAttributeListType.StringValue != nil {
+		numFields++
+		if len(deviceAttributeListType.StringValue) > resource.DeviceAttributeMaxListLength {
+			allErrs = append(allErrs, tooManyOnField(fldPath.Child("strings"), len(deviceAttributeListType.StringValue)))
+		}
+		for i, item := range deviceAttributeListType.StringValue {
+			allErrs = append(allErrs, validateDeviceAttributeStringValueByDeclarative(&item, fldPath.Child("strings").Index(i))...)
+		}
+	}
+	if deviceAttributeListType.VersionValue != nil {
+		numFields++
+		if len(deviceAttributeListType.VersionValue) > resource.DeviceAttributeMaxListLength {
+			allErrs = append(allErrs, tooManyOnField(fldPath.Child("versions"), len(deviceAttributeListType.VersionValue)))
+		}
+		for i, item := range deviceAttributeListType.VersionValue {
+			allErrs = append(allErrs, validateDeviceAttributeVersionValueByDeclarative(&item, fldPath.Child("versions").Index(i))...)
+		}
+	}
+
+	switch numFields {
+	case 0:
+		allErrs = append(allErrs, field.Invalid(fldPath, deviceAttributeListType, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative())
+	case 1:
+		// Okay.
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, deviceAttributeListType, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative())
+	}
+
 	return allErrs
 }
 

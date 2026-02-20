@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -116,6 +117,29 @@ func TestValidateResourceSlice(t *testing.T) {
 	driverName := "test.example.com"
 	now := metav1.Now()
 	badValue := "spaces not allowed"
+
+	badEmptyListValue := &resourceapi.DeviceAttributeListType{}
+	badMultipleListValue := &resourceapi.DeviceAttributeListType{
+		IntValue: []int64{1}, BoolValue: []bool{true},
+	}
+	badTooLongListBoolValue := &resourceapi.DeviceAttributeListType{
+		BoolValue: slices.Repeat([]bool{true}, resourceapi.DeviceAttributeMaxListLength+1),
+	}
+	badTooLongListIntValue := &resourceapi.DeviceAttributeListType{
+		IntValue: slices.Repeat([]int64{1}, resourceapi.DeviceAttributeMaxListLength+1),
+	}
+	badTooLongListStringValue := &resourceapi.DeviceAttributeListType{
+		StringValue: slices.Repeat([]string{"x"}, resourceapi.DeviceAttributeMaxListLength+1),
+	}
+	badListStringValueTooLong := &resourceapi.DeviceAttributeListType{
+		StringValue: []string{strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1)},
+	}
+	badTooLongListVersionValue := &resourceapi.DeviceAttributeListType{
+		VersionValue: slices.Repeat([]string{"1.0.0"}, resourceapi.DeviceAttributeMaxListLength+1),
+	}
+	badListVersionValueTooLong := &resourceapi.DeviceAttributeListType{
+		VersionValue: []string{strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1)},
+	}
 
 	scenarios := map[string]struct {
 		slice                         *resourceapi.ResourceSlice
@@ -410,6 +434,76 @@ func TestValidateResourceSlice(t *testing.T) {
 				}
 				slice.Spec.Devices[4].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(goodName): {StringValue: ptr.To(strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1))},
+				}
+				return slice
+			}(),
+		},
+		"good-list-attribute": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 4)
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: ptr.To(resourceapi.DeviceAttributeListType{
+						BoolValue: []bool{true},
+					})},
+				}
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: ptr.To(resourceapi.DeviceAttributeListType{
+						IntValue: []int64{1},
+					})},
+				}
+				slice.Spec.Devices[2].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: ptr.To(resourceapi.DeviceAttributeListType{
+						StringValue: []string{"x"},
+					})},
+				}
+				slice.Spec.Devices[3].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: ptr.To(resourceapi.DeviceAttributeListType{
+						VersionValue: []string{"1.2.3"},
+					})},
+				}
+				return slice
+			}(),
+		},
+		"bad-list-attribute": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key(goodName).Child("list"), badEmptyListValue, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(goodName).Child("list"), badMultipleListValue, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative(),
+				field.TooMany(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName).Child("list", "bools"), len(badTooLongListBoolValue.BoolValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+				field.TooMany(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("list", "ints"), len(badTooLongListIntValue.IntValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+				field.TooMany(field.NewPath("spec", "devices").Index(4).Child("attributes").Key(goodName).Child("list", "strings"), len(badTooLongListStringValue.StringValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+				field.TooLong(field.NewPath("spec", "devices").Index(5).Child("attributes").Key(goodName).Child("list", "strings").Index(0), badListStringValueTooLong.StringValue[0], resourceapi.DeviceAttributeMaxValueLength).WithOrigin("maxLength").MarkCoveredByDeclarative(),
+				field.TooMany(field.NewPath("spec", "devices").Index(6).Child("attributes").Key(goodName).Child("list", "versions"), len(badTooLongListVersionValue.VersionValue), resourceapi.DeviceAttributeMaxListLength).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices").Index(7).Child("attributes").Key(goodName).Child("list", "versions").Index(0), badListVersionValueTooLong.VersionValue[0], "must be a string compatible with semver.org spec 2.0.0"),
+				field.TooLong(field.NewPath("spec", "devices").Index(7).Child("attributes").Key(goodName).Child("list", "versions").Index(0), badListVersionValueTooLong.VersionValue[0], resourceapi.DeviceAttributeMaxValueLength).WithOrigin("maxLength").MarkCoveredByDeclarative(),
+			},
+
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 8)
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: badEmptyListValue},
+				}
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: badMultipleListValue},
+				}
+				slice.Spec.Devices[2].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: badTooLongListBoolValue},
+				}
+				slice.Spec.Devices[3].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: badTooLongListIntValue},
+				}
+				slice.Spec.Devices[4].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: badTooLongListStringValue},
+				}
+				slice.Spec.Devices[5].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: badListStringValueTooLong},
+				}
+				// List of VersionValue(max list length)
+				slice.Spec.Devices[6].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: badTooLongListVersionValue},
+				}
+				// List of VersionValue(max length and invalid)
+				slice.Spec.Devices[7].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {ListValue: badListVersionValueTooLong},
 				}
 				return slice
 			}(),

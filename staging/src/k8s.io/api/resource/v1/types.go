@@ -636,6 +636,62 @@ type DeviceAttribute struct {
 	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +k8s:alpha(since: "1.36")=+k8s:unionMember
 	VersionValue *string `json:"version,omitempty" protobuf:"bytes,5,opt,name=version"`
+
+	// ListValue is a typed-list of attribute values. The list must be homogeneous,
+	// meaning that all entries must have the same type of value (int, bool, string or version).
+	//
+	// +optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +featureGate=DRAListTypeAttributes
+	ListValue *DeviceAttributeListType `json:"list,omitempty" protobuf:"bytes,6,opt,name=list"`
+}
+
+// DeviceAttributeListType is a wrapper type to allow defining a list of attribute values in DeviceAttribute.
+type DeviceAttributeListType struct {
+	// The Go field names below have a Value suffix to avoid a conflict between the
+	// field "String" and the corresponding method. That method is required.
+	// The Kubernetes API is defined without that suffix to keep it more natural.
+
+	// IntValue is a list of numbers.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +k8s:alpha(since: "1.36")=+k8s:maxItems=64
+	IntValue []int64 `json:"ints,omitempty" protobuf:"varint,2,opt,name=ints"`
+
+	// BoolValue is a list of true/false values.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +k8s:alpha(since: "1.36")=+k8s:maxItems=64
+	BoolValue []bool `json:"bools,omitempty" protobuf:"varint,3,opt,name=bools"`
+
+	// StringValue is a list of strings.
+	// Each string must not be longer than 64 characters.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +k8s:alpha(since: "1.36")=+k8s:maxItems=64
+	// +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=64
+	StringValue []string `json:"strings,omitempty" protobuf:"bytes,4,opt,name=strings"`
+
+	// VersionValue is a list of semantic versions according to semver.org spec 2.0.0.
+	// Each version string must not be longer than 64 characters.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +k8s:alpha(since: "1.36")=+k8s:maxItems=64
+	// +k8s:alpha(since: "1.36")=+k8s:eachVal=+k8s:maxLength=64
+	VersionValue []string `json:"versions,omitempty" protobuf:"bytes,5,opt,name=versions"`
 }
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.

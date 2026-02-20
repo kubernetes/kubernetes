@@ -32,6 +32,9 @@ type DeviceAttributeApplyConfiguration struct {
 	// VersionValue is a semantic version according to semver.org spec 2.0.0.
 	// Must not be longer than 64 characters.
 	VersionValue *string `json:"version,omitempty"`
+	// ListValue is a typed-list of attribute values. The list must be homogeneous,
+	// meaning that all entries must have the same type of value (int, bool, string or version).
+	ListValue *DeviceAttributeListTypeApplyConfiguration `json:"list,omitempty"`
 }
 
 // DeviceAttributeApplyConfiguration constructs a declarative configuration of the DeviceAttribute type for use with
@@ -69,5 +72,13 @@ func (b *DeviceAttributeApplyConfiguration) WithStringValue(value string) *Devic
 // If called multiple times, the VersionValue field is set to the value of the last call.
 func (b *DeviceAttributeApplyConfiguration) WithVersionValue(value string) *DeviceAttributeApplyConfiguration {
 	b.VersionValue = &value
+	return b
+}
+
+// WithListValue sets the ListValue field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ListValue field is set to the value of the last call.
+func (b *DeviceAttributeApplyConfiguration) WithListValue(value *DeviceAttributeListTypeApplyConfiguration) *DeviceAttributeApplyConfiguration {
+	b.ListValue = value
 	return b
 }

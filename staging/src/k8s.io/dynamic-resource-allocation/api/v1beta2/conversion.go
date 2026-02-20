@@ -15,3 +15,13 @@ limitations under the License.
 */
 
 package v1beta2
+
+import (
+	resourceapi "k8s.io/api/resource/v1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+)
+
+func Convert_v1_DeviceAttribute_To_v1beta2_DeviceAttribute(in *resourceapi.DeviceAttribute, out *resourcev1beta2.DeviceAttribute, s conversion.Scope) error {
+	return autoConvert_v1_DeviceAttribute_To_v1beta2_DeviceAttribute(in, out, s)
+}

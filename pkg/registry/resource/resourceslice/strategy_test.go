@@ -187,6 +187,18 @@ var sliceWithConsumableCapacity = func() *resource.ResourceSlice {
 	return obj
 }()
 
+var sliceWithListTypeAttributes = func() *resource.ResourceSlice {
+	obj := slice.DeepCopy()
+	obj.Spec.Devices[0].Attributes = map[resource.QualifiedName]resource.DeviceAttribute{
+		resource.QualifiedName("list_attribute"): {
+			ListValue: &resource.DeviceAttributeListType{
+				StringValue: []string{"value1", "value2"},
+			},
+		},
+	}
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -205,6 +217,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		bindingConditions       bool
 		deviceStatus            bool
 		consumableCapacity      bool
+		listTypeAttributes      bool
 		expectedValidationError bool
 		expectObj               *resource.ResourceSlice
 	}{
@@ -351,6 +364,25 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-fields-list-type-attributes": {
+			obj:                sliceWithListTypeAttributes,
+			listTypeAttributes: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-list-type-attributes": {
+			obj:                sliceWithListTypeAttributes,
+			listTypeAttributes: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Spec.Devices[0].Attributes = map[resource.QualifiedName]resource.DeviceAttribute{}
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testCases {
@@ -361,6 +393,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
+				features.DRAListTypeAttributes:        tc.listTypeAttributes,
 			})
 
 			obj := tc.obj.DeepCopy()
@@ -392,6 +425,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 		deviceStatus          bool
 		bindingConditions     bool
 		consumableCapacity    bool
+		listTypeAttributes    bool
 		expectValidationError bool
 		expectObj             *resource.ResourceSlice
 	}{
@@ -747,6 +781,50 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				obj := sliceWithCapacity.DeepCopy()
 				obj.ResourceVersion = "4"
 				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-list-type-attributes": {
+			oldObj: slice.DeepCopy(),
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			listTypeAttributes: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Spec.Devices[0].Attributes = map[resource.QualifiedName]resource.DeviceAttribute{}
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-list-type-attributes": {
+			oldObj: sliceWithListTypeAttributes,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			listTypeAttributes: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-list-type-attributes-without-featuregate-enabled": {
+			oldObj: sliceWithListTypeAttributes,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			listTypeAttributes: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
 				return obj
 			}(),
 		},
