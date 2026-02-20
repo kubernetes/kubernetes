@@ -30476,3 +30476,45 @@ func TestValidateWorkloadReference(t *testing.T) {
 		}
 	}
 }
+func TestValidatePodResourcesEmpty(t *testing.T) {
+	spec := &core.PodSpec{
+		Containers: []core.Container{
+			{Name: "ctr", Image: "image"},
+		},
+		Resources:     &core.ResourceRequirements{},
+		RestartPolicy: core.RestartPolicyAlways,
+		DNSPolicy:     core.DNSDefault,
+	}
+
+	opts := PodValidationOptions{
+		PodLevelResourcesEnabled: true,
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixKubeletQOSClass, true)
+
+	errs := ValidatePodSpec(spec, &metav1.ObjectMeta{}, field.NewPath("spec"), opts)
+	found := false
+	for _, err := range errs {
+		if err.Type == field.ErrorTypeInvalid && err.Field == "spec.resources" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected Invalid error for spec.resources with feature enabled, got: %v", errs)
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixKubeletQOSClass, false)
+
+	errs = ValidatePodSpec(spec, &metav1.ObjectMeta{}, field.NewPath("spec"), opts)
+	found = false
+	for _, err := range errs {
+		if err.Type == field.ErrorTypeInvalid && err.Field == "spec.resources" {
+			found = true
+			break
+		}
+	}
+	if found {
+		t.Errorf("did not expect Invalid error for spec.resources with feature disabled")
+	}
+}

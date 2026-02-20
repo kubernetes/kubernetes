@@ -4754,6 +4754,10 @@ func validatePodResources(spec *core.PodSpec, podClaimNames sets.Set[string], fl
 		allErrs = append(allErrs, field.Forbidden(resourcesFldPath.Child("claims"), "claims may not be set for Resources at pod-level"))
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) && len(spec.Resources.Requests) == 0 && len(spec.Resources.Limits) == 0 {
+		allErrs = append(allErrs, field.Invalid(resourcesFldPath, spec.Resources, "must specify limits or requests"))
+	}
+
 	// validatePodResourceRequirements checks if resource names and quantities are
 	// valid, and requests are less than limits.
 	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, resourcesFldPath, opts)...)

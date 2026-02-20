@@ -19,6 +19,7 @@ package qos
 import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	resourcehelper "k8s.io/component-helpers/resource"
 )
 
 var supportedQoSComputeResources = sets.New[string](string(core.ResourceCPU), string(core.ResourceMemory))
@@ -80,7 +81,7 @@ func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
 	requests := core.ResourceList{}
 	limits := core.ResourceList{}
 	isGuaranteed := true
-	if pod.Spec.Resources != nil {
+	if resourcehelper.IsPodLevelResourcesSet(pod) {
 		if pod.Spec.Resources.Requests != nil {
 			// process requests
 			processResourceList(requests, pod.Spec.Resources.Requests)
