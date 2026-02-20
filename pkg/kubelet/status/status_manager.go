@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/subscription"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
@@ -80,7 +79,6 @@ type manager struct {
 	podDeletionSafety PodDeletionSafetyProvider
 
 	podStartupLatencyHelper PodStartupLatencyStateHelper
-	subscribers             []subscription.StatusUpdateSubscriber
 }
 
 type podResizeConditions struct {
@@ -137,7 +135,7 @@ type Manager interface {
 	Start(ctx context.Context)
 
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
-	SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodStatus)
+	SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodStatus) (v1.PodStatus, bool)
 
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
@@ -191,7 +189,7 @@ type Manager interface {
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper, subscribers []subscription.StatusUpdateSubscriber) Manager {
+func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
 	return &manager{
 		kubeClient:              kubeClient,
 		podManager:              podManager,
@@ -201,7 +199,6 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety:       podDeletionSafety,
 		podStartupLatencyHelper: podStartupLatencyHelper,
-		subscribers:             subscribers,
 	}
 }
 
@@ -435,7 +432,7 @@ func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 	return status.status, ok
 }
 
-func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodStatus) {
+func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodStatus) (v1.PodStatus, bool) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
@@ -448,7 +445,9 @@ func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodSta
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
-	m.updateStatusInternal(logger, pod, status, pod.DeletionTimestamp != nil, false)
+	changed := m.updateStatusInternal(logger, pod, status, pod.DeletionTimestamp != nil, false)
+
+	return m.podStatuses[pod.UID].status, changed
 }
 
 func (m *manager) SetContainerReadiness(logger klog.Logger, podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
@@ -789,7 +788,7 @@ func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSp
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
 // necessary.
 // This method IS NOT THREAD SAFE and must be called from a locked function.
-func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v1.PodStatus, forceUpdate, podIsFinished bool) {
+func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v1.PodStatus, forceUpdate, podIsFinished bool) bool {
 	var oldStatus v1.PodStatus
 	cachedStatus, isCached := m.podStatuses[pod.UID]
 	if isCached {
@@ -810,7 +809,7 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	// Check for illegal state transition in containers
 	if err := checkContainerStateTransition(&oldStatus, &status, &pod.Spec); err != nil {
 		logger.Error(err, "Status update on pod aborted", "pod", klog.KObj(pod))
-		return
+		return false
 	}
 
 	// Set ContainersReadyCondition.LastTransitionTime.
@@ -886,7 +885,7 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	// clobbering each other so the phase of a pod progresses monotonically.
 	if isCached && isPodStatusByKubeletEqual(&cachedStatus.status, &status) && !forceUpdate {
 		logger.V(3).Info("Ignoring same status for pod", "pod", klog.KObj(pod), "status", status)
-		return
+		return false
 	}
 
 	newStatus := versionedPodStatus{
@@ -908,21 +907,13 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 
 	m.podStatuses[pod.UID] = newStatus
 
-	if podIsFinished {
-		for _, s := range m.subscribers {
-			s.OnPodRemoved(pod)
-		}
-	} else if !forceUpdate {
-		for _, s := range m.subscribers {
-			s.OnPodStatusUpdated(pod, status)
-		}
-	}
-
 	select {
 	case m.podStatusChannel <- struct{}{}:
 	default:
 		// there's already a status update pending
 	}
+
+	return true
 }
 
 // updateLastTransitionTime updates the LastTransitionTime of a pod condition.

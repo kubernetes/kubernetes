@@ -304,7 +304,7 @@ func newTestKubeletWithImageList(
 	kubelet.mirrorPodClient = fakeMirrorClient
 	kubelet.podManager = kubepod.NewBasicPodManager()
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
-	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, nil)
+	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker)
 	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
 	kubelet.podCertificateManager = &podcertificate.NoOpManager{}
 
@@ -781,7 +781,6 @@ func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
 		kl, kl.recorder, kl.workQueue,
 		kl.resyncInterval, backOffPeriod,
 		kl.podCache, kl.allocationManager,
-		nil,
 	)
 
 	kl.volumeManager = kubeletvolume.NewFakeVolumeManager(nil, 0, nil, true /* volumeAttachLimitExceededError  */)

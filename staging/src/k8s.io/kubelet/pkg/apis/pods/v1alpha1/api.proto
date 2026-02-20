@@ -17,10 +17,11 @@ service Pods {
 }
 
 enum EventType {
-    ADDED = 0;
-    MODIFIED = 1;
-    DELETED = 2;
-    INITIAL_SYNC_COMPLETE = 3;
+    UNSPECIFIED = 0;
+    ADDED = 1;
+    MODIFIED = 2;
+    DELETED = 3;
+    INITIAL_SYNC_COMPLETE = 4;
 }
 
 
@@ -30,6 +31,7 @@ enum EventType {
 message WatchPodsEvent {
     // ADDED, MODIFIED, DELETED, INITIAL_SYNC_COMPLETE
     EventType type = 1;
+    // pod is nil for INITIAL_SYNC_COMPLETE
     bytes pod = 2;
 }
 

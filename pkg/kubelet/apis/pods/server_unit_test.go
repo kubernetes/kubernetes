@@ -18,13 +18,13 @@ package pods_test
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -34,6 +34,8 @@ import (
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/component-base/metrics/testutil"
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -53,24 +55,22 @@ func TestStartEventLoop(t *testing.T) {
 	broadcaster.Register(clientChannel)
 	defer broadcaster.Unregister(clientChannel)
 
-	server.OnPodAdded(pod1)
-	server.OnPodStatusUpdated(pod1, v1.PodStatus{Phase: v1.PodSucceeded})
+	server.OnPodUpdated(pod1, v1.PodStatus{Phase: v1.PodPending}, watch.Added)
+	server.OnPodUpdated(pod1, v1.PodStatus{Phase: v1.PodSucceeded}, watch.Modified)
 	server.OnPodRemoved(pod1)
 
 	event := <-clientChannel
-	assert.Equal(t, "ADDED", string(event.Type))
+	assert.Equal(t, watch.Added, event.Type)
 	assert.Equal(t, pod1.UID, event.UID)
-	assert.Equal(t, pod1, event.Pod)
+	assert.Equal(t, v1.PodPending, event.Pod.Status.Phase)
 
 	event = <-clientChannel
-	assert.Equal(t, "MODIFIED", string(event.Type))
+	assert.Equal(t, watch.Modified, event.Type)
 	assert.Equal(t, pod1.UID, event.UID)
-	expectedPod := *pod1
-	expectedPod.Status = v1.PodStatus{Phase: v1.PodSucceeded}
-	assert.Equal(t, &expectedPod, event.Pod)
+	assert.Equal(t, v1.PodSucceeded, event.Pod.Status.Phase)
 
 	event = <-clientChannel
-	assert.Equal(t, "DELETED", string(event.Type))
+	assert.Equal(t, watch.Deleted, event.Type)
 	assert.Equal(t, pod1.UID, event.UID)
 	assert.Equal(t, pod1, event.Pod)
 
@@ -135,7 +135,7 @@ func TestWatchPods(t *testing.T) {
 	assert.Empty(t, event.Pod)
 
 	// Trigger an update
-	server.OnPodUpdated(pod1)
+	server.OnPodUpdated(pod1, pod1.Status, watch.Modified)
 
 	// Verify MODIFIED event
 	event = <-mockStream.EventCh
@@ -144,47 +144,6 @@ func TestWatchPods(t *testing.T) {
 	err = podOut.Unmarshal(event.Pod)
 	require.NoError(t, err)
 	assert.Equal(t, "pod1", podOut.Name)
-}
-
-func TestOnPodStatusUpdatedOverlaysStatus(t *testing.T) {
-	broadcaster := podsapi.NewBroadcaster()
-	mockManager := new(kubepodtest.MockManager)
-	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
-
-	// The pod object as it might exist in the manager (or passed by caller)
-	// It has Stale status.
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{UID: "pod-1", Name: "pod-1", Namespace: "ns"},
-		Spec:       v1.PodSpec{NodeName: "worker-node"},
-		Status:     v1.PodStatus{Phase: v1.PodPending},
-	}
-
-	// The new status that is being reported
-	newStatus := v1.PodStatus{Phase: v1.PodRunning, Message: "Pod is running"}
-
-	clientChannel := make(chan podsapi.PodWatchEvent, 1)
-	broadcaster.Register(clientChannel)
-	defer broadcaster.Unregister(clientChannel)
-
-	// Trigger the status update
-	server.OnPodStatusUpdated(pod, newStatus)
-
-	select {
-	case event := <-clientChannel:
-		assert.Equal(t, "MODIFIED", string(event.Type))
-		assert.Equal(t, "pod-1", event.Pod.Name)
-
-		// The status in the event should be the New Status (Running)
-		// NOT the status from the pod object (Pending)
-		assert.Equal(t, v1.PodRunning, event.Pod.Status.Phase)
-		assert.Equal(t, "Pod is running", event.Pod.Status.Message)
-
-		// Verify we didn't mutate the original pod
-		assert.Equal(t, v1.PodPending, pod.Status.Phase, "Original pod object should not be mutated")
-
-	case <-time.After(1 * time.Second):
-		t.Fatal("Timeout waiting for event")
-	}
 }
 
 func TestListPods(t *testing.T) {
@@ -279,7 +238,7 @@ func TestErrorsAndMetrics(t *testing.T) {
 		mockManager := new(kubepodtest.MockManager)
 		server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
 		pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Name: "pod1", Namespace: "ns1"}}
-		server.OnPodAdded(pod1)
+		server.OnPodUpdated(pod1, pod1.Status, watch.Added)
 
 		// Reset the metric before the test
 		metrics.PodWatchEventsDroppedTotal.Reset()
@@ -292,7 +251,17 @@ func TestErrorsAndMetrics(t *testing.T) {
 		// The second one should be dropped and increment the metric.
 		broadcaster.Broadcast(podsapi.PodWatchEvent{UID: "2"})
 
-		err := testutil.CollectAndCompare(metrics.PodWatchEventsDroppedTotal, strings.NewReader(`
+		// Wait for the background goroutine to process the events and update metrics
+		err := wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
+			count, err := testutil.GetCounterMetricValue(metrics.PodWatchEventsDroppedTotal)
+			if err != nil {
+				return false, err
+			}
+			return count == 1, nil
+		})
+		require.NoError(t, err, "Metric PodWatchEventsDroppedTotal should be 1")
+
+		err = testutil.CollectAndCompare(metrics.PodWatchEventsDroppedTotal, strings.NewReader(`
 			# HELP kubelet_pod_watch_events_dropped_total [ALPHA] Cumulative number of pod watch events dropped.
 			# TYPE kubelet_pod_watch_events_dropped_total counter
 			kubelet_pod_watch_events_dropped_total 1
@@ -335,45 +304,47 @@ func TestSerialize(t *testing.T) {
 	}
 }
 
-type MockStatusProvider struct {
-	mock.Mock
-}
-
-func (m *MockStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
-	args := m.Called(uid)
-	return args.Get(0).(v1.PodStatus), args.Bool(1)
-}
-
-func TestOnPodUpdatedUsesStatusProvider(t *testing.T) {
+func TestBroadcaster_SlowClient(t *testing.T) {
 	broadcaster := podsapi.NewBroadcaster()
-	mockManager := new(kubepodtest.MockManager)
-	server := podsapi.NewPodsServerForTest(broadcaster, mockManager)
-	mockStatusProvider := new(MockStatusProvider)
-	server.SetStatusProvider(mockStatusProvider)
 
-	// Pod with "Stale" status
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{UID: "pod-1", Name: "pod-1", Namespace: "ns"},
-		Status:     v1.PodStatus{Phase: v1.PodPending},
+	numFastClients := 3
+	numEvents := 10
+	fastClients := make([]chan podsapi.PodWatchEvent, numFastClients)
+	for i := 0; i < numFastClients; i++ {
+		fastClients[i] = make(chan podsapi.PodWatchEvent, numEvents)
+		broadcaster.Register(fastClients[i])
 	}
 
-	// Status provider has "Fresh" status
-	freshStatus := v1.PodStatus{Phase: v1.PodRunning}
-	mockStatusProvider.On("GetPodStatus", pod.UID).Return(freshStatus, true)
+	slowClient := make(chan podsapi.PodWatchEvent)
+	broadcaster.Register(slowClient)
 
-	clientChannel := make(chan podsapi.PodWatchEvent, 1)
-	broadcaster.Register(clientChannel)
-	defer broadcaster.Unregister(clientChannel)
-
-	server.OnPodUpdated(pod)
-
-	select {
-	case event := <-clientChannel:
-		assert.Equal(t, "MODIFIED", string(event.Type))
-		assert.Equal(t, v1.PodRunning, event.Pod.Status.Phase)
-	case <-time.After(1 * time.Second):
-		t.Fatal("Timeout waiting for event")
+	for i := 0; i < numEvents; i++ {
+		broadcaster.Broadcast(podsapi.PodWatchEvent{UID: types.UID(fmt.Sprintf("event-%d", i))})
 	}
 
-	mockStatusProvider.AssertExpectations(t)
+	for i := 0; i < numFastClients; i++ {
+		for j := 0; j < numEvents; j++ {
+			select {
+			case event := <-fastClients[i]:
+				expectedUID := types.UID(fmt.Sprintf("event-%d", j))
+				assert.Equal(t, expectedUID, event.UID, "Fast client %d missed or got wrong event", i)
+			case <-time.After(2 * time.Second):
+				t.Fatalf("Fast client %d timed out waiting for event %d", i, j)
+			}
+		}
+	}
+
+	err := wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
+		select {
+		case _, ok := <-slowClient:
+			if !ok {
+				return true, nil
+			}
+			return false, nil
+		default:
+			count, _ := testutil.GetCounterMetricValue(metrics.PodWatchEventsDroppedTotal)
+			return count >= 1, nil
+		}
+	})
+	assert.NoError(t, err, "Slow client should have been dropped")
 }

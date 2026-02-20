@@ -64,6 +64,7 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/server/flagz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
@@ -127,7 +128,6 @@ import (
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/subscription"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -692,20 +692,12 @@ func NewMainKubelet(ctx context.Context,
 	klet.mirrorPodClient = kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager()
 
-	var podSubscribers []subscription.PodUpdateSubscriber
-	var statusSubscribers []subscription.StatusUpdateSubscriber
-
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
 		broadcaster := pods.NewBroadcaster()
 		klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager)
-		podSubscribers = append(podSubscribers, klet.podsServer)
-		statusSubscribers = append(statusSubscribers, klet.podsServer)
 	}
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker, statusSubscribers)
-	if klet.podsServer != nil {
-		klet.podsServer.SetStatusProvider(klet.statusManager)
-	}
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
 		klet.statusManager,
@@ -747,7 +739,6 @@ func NewMainKubelet(ctx context.Context,
 		backOffPeriod,
 		klet.podCache,
 		klet.allocationManager,
-		podSubscribers,
 	)
 
 	var singleProcessOOMKill *bool
@@ -2095,7 +2086,17 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		metrics.PodStartDuration.Observe(metrics.SinceInSeconds(firstSeenTime))
 	}
 
-	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	finalStatus, changed := kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	if changed && kl.podsServer != nil {
+		eventType := watch.Modified
+		// If the status manager doesn't yet have a status for this pod (ok == false),
+		// it indicates this is the first time the pod is being synced and should
+		// be broadcast as an Added event.
+		if !ok {
+			eventType = watch.Added
+		}
+		kl.podsServer.OnPodUpdated(pod, finalStatus, eventType)
+	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
@@ -2278,7 +2279,10 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)
 	}
-	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	finalStatus, changed := kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	if changed && kl.podsServer != nil {
+		kl.podsServer.OnPodUpdated(pod, finalStatus, watch.Modified)
+	}
 
 	if gracePeriod != nil {
 		logger.V(4).Info("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
@@ -2353,7 +2357,10 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	// information about the container end states (including exit codes) - when
 	// SyncTerminatedPod is called the containers may already be removed.
 	apiPodStatus = kl.generateAPIPodStatus(ctx, pod, stoppedPodStatus, true)
-	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	finalStatus, changed = kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+	if changed && kl.podsServer != nil {
+		kl.podsServer.OnPodUpdated(pod, finalStatus, watch.Modified)
+	}
 
 	// we have successfully stopped all containers, the pod is terminating, our status is "done"
 	logger.V(4).Info("Pod termination stopped all running containers", "pod", klog.KObj(pod), "podUID", pod.UID)
@@ -2473,6 +2480,9 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 
 	// mark the final pod status
 	kl.statusManager.TerminatePod(logger, pod)
+	if kl.podsServer != nil {
+		kl.podsServer.OnPodRemoved(pod)
+	}
 	logger.V(4).Info("Pod is terminated and will need no more status updates", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	return nil
@@ -2543,11 +2553,15 @@ func (kl *Kubelet) deletePod(ctx context.Context, pod *v1.Pod) error {
 func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message string) {
 	logger := klog.FromContext(ctx)
 	kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, reason, "%s", message)
-	kl.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+	status := v1.PodStatus{
 		QOSClass: v1qos.GetPodQOS(pod), // keep it as is
 		Phase:    v1.PodFailed,
 		Reason:   reason,
-		Message:  "Pod was rejected: " + message})
+		Message:  "Pod was rejected: " + message}
+	finalStatus, changed := kl.statusManager.SetPodStatus(logger, pod, status)
+	if changed && kl.podsServer != nil {
+		kl.podsServer.OnPodUpdated(pod, finalStatus, watch.Modified)
+	}
 }
 
 func recordAdmissionRejection(reason string) {

@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/subscription"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/utils/clock"
@@ -609,9 +608,6 @@ type podWorkers struct {
 
 	// clock is used for testing timing
 	clock clock.PassiveClock
-
-	// subscribers are notified of pod updates.
-	subscribers []subscription.PodUpdateSubscriber
 }
 
 func newPodWorkers(
@@ -621,7 +617,6 @@ func newPodWorkers(
 	resyncInterval, backOffPeriod time.Duration,
 	podCache kubecontainer.Cache,
 	allocationManager allocation.Manager,
-	subscribers []subscription.PodUpdateSubscriber,
 ) PodWorkers {
 	return &podWorkers{
 		podSyncStatuses:                    map[types.UID]*podSyncStatus{},
@@ -636,7 +631,6 @@ func newPodWorkers(
 		podCache:                           podCache,
 		allocationManager:                  allocationManager,
 		clock:                              clock.RealClock{},
-		subscribers:                        subscribers,
 	}
 }
 
@@ -782,7 +776,6 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 	updateLogger := logger.WithValues("pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-
 	// decide what to do with this pod - we are either setting it up, tearing it down, or ignoring it
 	var firstTime bool
 	now := p.clock.Now()
@@ -986,19 +979,10 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 		status.pendingUpdate.Pod, _ = p.allocationManager.UpdatePodFromAllocation(options.Pod)
 	}
 	status.working = true
-	updateLogger.V(4).Info("Notifying pod of pending update", "workType", status.WorkType())
-	switch options.UpdateType {
-	case kubetypes.SyncPodCreate:
-		pod := status.pendingUpdate.Pod
-		for _, s := range p.subscribers {
-			s.OnPodAdded(pod)
-		}
-	case kubetypes.SyncPodUpdate:
-		pod := status.pendingUpdate.Pod
-		for _, s := range p.subscribers {
-			s.OnPodUpdated(pod)
 		}
 	}
+	klog.V(4).InfoS("Notifying pod of pending update", "pod", klog.KRef(ns, name), "podUID", uid, "workType", status.WorkType())
+
 	select {
 	case podUpdates <- struct{}{}:
 	default:
