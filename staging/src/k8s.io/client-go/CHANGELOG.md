@@ -4,6 +4,24 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### cache.Controller: mark as private interface
+
+The cache.Controller interface does not need to be implemented outside of
+Kubernetes because there are no Kubernetes APIs which accept a parameter of
+that type. If some downstream consumer is using it for that purpose, then they
+can define their own interface for that parameter.
+
+Adding the private method documents that this interface can be
+changed at any time time without breaking someone. This is a one-time Go API
+break, future changes to it then will be no API breaks.
+
+```
+- ./tools/cache.Controller.private: added unexported method
+- ./tools/cache.SharedIndexInformer: no longer implements ./tools/cache.Controller
+- ./tools/cache.SharedInformer: no longer implements ./tools/cache.Controller
+- ./tools/cache.TypedSharedIndexInformer: no longer implements ./tools/cache.Controller
+```
+
 ### Type-safe informers
 
 All code using the result of the generated client-go Informer() methods (a
