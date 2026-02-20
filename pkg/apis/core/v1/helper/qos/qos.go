@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -42,7 +43,7 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 	// When pod-level resources are specified, we use them to determine QoS class.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		pod.Spec.Resources != nil {
+		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) || resourcehelper.IsPodLevelResourcesSet(pod))) {
 		return requirementsQOS(pod.Spec.Resources)
 	}
 
