@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,81 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package v1alpha2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-const (
-	// DefaultPriorityWhenNoDefaultClassExists is used to set priority of pods
-	// that do not specify any priority class and there is no priority class
-	// marked as default.
-	DefaultPriorityWhenNoDefaultClassExists = 0
-	// HighestUserDefinablePriority is the highest priority for user defined priority classes. Priority values larger than 1 billion are reserved for Kubernetes system use.
-	HighestUserDefinablePriority = int32(1000000000)
-	// SystemCriticalPriority is the beginning of the range of priority values for critical system components.
-	SystemCriticalPriority = 2 * HighestUserDefinablePriority
-	// SystemPriorityClassPrefix is the prefix reserved for system priority class names. Other priority
-	// classes are not allowed to start with this prefix.
-	// NOTE: In order to avoid conflict of names with user-defined priority classes, all the names must
-	// start with SystemPriorityClassPrefix.
-	SystemPriorityClassPrefix = "system-"
-	// SystemClusterCritical is the system priority class name that represents cluster-critical.
-	SystemClusterCritical = SystemPriorityClassPrefix + "cluster-critical"
-	// SystemNodeCritical is the system priority class name that represents node-critical.
-	SystemNodeCritical = SystemPriorityClassPrefix + "node-critical"
-)
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PriorityClass defines the mapping from a priority class name to the priority
-// integer value. The value can be any valid integer.
-type PriorityClass struct {
-	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
-	// +optional
-	metav1.ObjectMeta
-
-	// value represents the integer value of this priority class. This is the actual priority that pods
-	// receive when they have the name of this class in their pod spec.
-	Value int32
-
-	// globalDefault specifies whether this PriorityClass should be considered as
-	// the default priority for pods that do not have any priority class.
-	// Only one PriorityClass can be marked as `globalDefault`. However, if more than
-	// one PriorityClasses exists with their `globalDefault` field set to true,
-	// the smallest value of such global default PriorityClasses will be used as the default priority.
-	// +optional
-	GlobalDefault bool
-
-	// description is an arbitrary string that usually provides guidelines on
-	// when this priority class should be used.
-	// +optional
-	Description string
-
-	// preemptionPolicy it the Policy for preempting pods with lower priority.
-	// One of Never, PreemptLowerPriority.
-	// Defaults to PreemptLowerPriority if unset.
-	// +optional
-	PreemptionPolicy *core.PreemptionPolicy
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PriorityClassList is a collection of priority classes.
-type PriorityClassList struct {
-	metav1.TypeMeta
-	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-	// +optional
-	metav1.ListMeta
-
-	// items is the list of PriorityClasses.
-	Items []PriorityClass
-}
-
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Workload allows for expressing scheduling constraints that should be used
@@ -96,31 +28,31 @@ type PriorityClassList struct {
 // including scheduling, preemption, eviction and other phases.
 // Workload API enablement is toggled by the GenericWorkload feature gate.
 type Workload struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	//
 	// +optional
-	metav1.ObjectMeta
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines the desired behavior of a Workload.
 	//
 	// +required
-	Spec WorkloadSpec
+	Spec WorkloadSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // WorkloadList contains a list of Workload resources.
 type WorkloadList struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	//
 	// +optional
-	metav1.ListMeta
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of Workloads.
-	Items []Workload
+	Items []Workload `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // WorkloadMaxPodGroupTemplates is the maximum number of pod group templates per Workload.
@@ -134,7 +66,9 @@ type WorkloadSpec struct {
 	// When set, it cannot be changed.
 	//
 	// +optional
-	ControllerRef *TypedLocalObjectReference
+	// +k8s:alpha(since:"1.36")=+k8s:optional
+	// +k8s:alpha(since:"1.36")=+k8s:update=NoModify
+	ControllerRef *TypedLocalObjectReference `json:"controllerRef,omitempty" protobuf:"bytes,1,opt,name=controllerRef"`
 
 	// PodGroupTemplates is the list of templates that make up the Workload.
 	// The maximum number of templates is 8. This field is immutable.
@@ -142,7 +76,12 @@ type WorkloadSpec struct {
 	// +required
 	// +listType=map
 	// +listMapKey=name
-	PodGroupTemplates []PodGroupTemplate
+	// +k8s:alpha(since:"1.36")=+k8s:required
+	// +k8s:alpha(since:"1.36")=+k8s:listType=map
+	// +k8s:alpha(since:"1.36")=+k8s:listMapKey=name
+	// +k8s:alpha(since:"1.36")=+k8s:maxItems=8
+	// +k8s:alpha(since:"1.36")=+k8s:immutable
+	PodGroupTemplates []PodGroupTemplate `json:"podGroupTemplates" protobuf:"bytes,2,rep,name=podGroupTemplates"`
 }
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.
@@ -153,17 +92,23 @@ type TypedLocalObjectReference struct {
 	// It must be a DNS subdomain.
 	//
 	// +optional
-	APIGroup string
+	// +k8s:alpha(since:"1.36")=+k8s:optional
+	// +k8s:alpha(since:"1.36")=+k8s:format=k8s-long-name
+	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced.
 	// It must be a path segment name.
 	//
 	// +required
-	Kind string
+	// +k8s:alpha(since:"1.36")=+k8s:required
+	// +k8s:alpha(since:"1.36")=+k8s:format=k8s-path-segment-name
+	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 	// Name is the name of resource being referenced.
 	// It must be a path segment name.
 	//
 	// +required
-	Name string
+	// +k8s:alpha(since:"1.36")=+k8s:required
+	// +k8s:alpha(since:"1.36")=+k8s:format=k8s-path-segment-name
+	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 }
 
 // PodGroupTemplate represents a template for a set of pods with a scheduling policy.
@@ -172,12 +117,14 @@ type PodGroupTemplate struct {
 	// It must be a DNS label. This field is immutable.
 	//
 	// +required
-	Name string
+	// +k8s:alpha(since:"1.36")=+k8s:required
+	// +k8s:alpha(since:"1.36")=+k8s:format=k8s-short-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.
 	//
 	// +required
-	SchedulingPolicy PodGroupSchedulingPolicy
+	SchedulingPolicy PodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,2,opt,name=schedulingPolicy"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -187,15 +134,19 @@ type PodGroupSchedulingPolicy struct {
 	// standard Kubernetes scheduling behavior.
 	//
 	// +optional
+	// +k8s:alpha(since:"1.36")=+k8s:optional
 	// +oneOf=PolicySelection
-	Basic *BasicSchedulingPolicy
+	// +k8s:alpha(since:"1.36")=+k8s:unionMember
+	Basic *BasicSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,1,opt,name=basic"`
 
 	// Gang specifies that the pods in this group should be scheduled using
 	// all-or-nothing semantics.
 	//
 	// +optional
+	// +k8s:alpha(since:"1.36")=+k8s:optional
 	// +oneOf=PolicySelection
-	Gang *GangSchedulingPolicy
+	// +k8s:alpha(since:"1.36")=+k8s:unionMember
+	Gang *GangSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,2,opt,name=gang"`
 }
 
 // BasicSchedulingPolicy indicates that standard Kubernetes
@@ -214,46 +165,50 @@ type GangSchedulingPolicy struct {
 	// It must be a positive integer.
 	//
 	// +required
-	MinCount int32
+	// +k8s:alpha(since:"1.36")=+k8s:required
+	// +k8s:alpha(since:"1.36")=+k8s:minimum=1
+	MinCount int32 `json:"minCount" protobuf:"varint,1,opt,name=minCount"`
 }
 
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:supportsSubresource=/status
 
 // PodGroup represents a runtime instance of pods grouped together.
 // PodGroups are created by workload controllers (Job, LWS, JobSet, etc...) from
 // Workload.podGroupTemplates.
 // PodGroup API enablement is toggled by the GenericWorkload feature gate.
 type PodGroup struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	//
 	// +optional
-	metav1.ObjectMeta
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines the desired state of the PodGroup.
 	//
 	// +required
-	Spec PodGroupSpec
+	Spec PodGroupSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status represents the current observed state of the PodGroup.
 	//
 	// +optional
-	Status PodGroupStatus
+	Status PodGroupStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodGroupList contains a list of PodGroup resources.
 type PodGroupList struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	//
 	// +optional
-	metav1.ListMeta
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of PodGroups.
-	Items []PodGroup
+	Items []PodGroup `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // PodGroupSpec defines the desired state of a PodGroup.
@@ -264,14 +219,17 @@ type PodGroupSpec struct {
 	// if a need for standalone, template-less Pod groups arises.
 	//
 	// +optional
-	PodGroupTemplateRef *PodGroupTemplateReference
+	// +k8s:alpha(since:"1.36")=+k8s:required
+	// +k8s:alpha(since:"1.36")=+k8s:immutable
+	PodGroupTemplateRef *PodGroupTemplateReference `json:"podGroupTemplateRef" protobuf:"bytes,1,opt,name=podGroupTemplateRef"`
 
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// It is copied from the template on PodGroup creation.
 	// This field is immutable.
 	//
 	// +required
-	SchedulingPolicy PodGroupSchedulingPolicy
+	// +k8s:alpha(since:"1.36")=+k8s:immutable
+	SchedulingPolicy PodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,2,opt,name=schedulingPolicy"`
 }
 
 // PodGroupStatus represents information about the status of a pod group.
@@ -294,7 +252,7 @@ type PodGroupStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	Conditions []metav1.Condition
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // Well-known condition types for PodGroups.
@@ -321,8 +279,10 @@ type PodGroupTemplateReference struct {
 	// the PodGroup.
 	//
 	// +optional
+	// +k8s:alpha(since:"1.36")=+k8s:optional
 	// +oneOf=TemplateReference
-	Workload *WorkloadPodGroupTemplateReference
+	// +k8s:alpha(since:"1.36")=+k8s:unionMember
+	Workload *WorkloadPodGroupTemplateReference `json:"workload" protobuf:"bytes,1,opt,name=workload"`
 }
 
 // WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.
@@ -330,10 +290,14 @@ type WorkloadPodGroupTemplateReference struct {
 	// WorkloadName defines the name of the Workload object.
 	//
 	// +required
-	WorkloadName string
+	// +k8s:alpha(since:"1.36")=+k8s:required
+	// +k8s:alpha(since:"1.36")=+k8s:format=k8s-short-name
+	WorkloadName string `json:"workloadName" protobuf:"bytes,1,opt,name=workloadName"`
 
 	// PodGroupTemplateName defines the PodGroupTemplate name within the Workload object.
 	//
 	// +required
-	PodGroupTemplateName string
+	// +k8s:alpha(since:"1.36")=+k8s:required
+	// +k8s:alpha(since:"1.36")=+k8s:format=k8s-short-name
+	PodGroupTemplateName string `json:"podGroupTemplateName" protobuf:"bytes,2,opt,name=podGroupTemplateName"`
 }

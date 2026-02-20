@@ -55,6 +55,7 @@ import (
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
 	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
@@ -502,6 +503,7 @@ var (
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		resourcev1alpha3.SchemeGroupVersion,
 		schedulingapiv1alpha1.SchemeGroupVersion,
+		schedulingapiv1alpha2.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 	}
 )

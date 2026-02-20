@@ -342,10 +342,6 @@ var ValidateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
 // name for a ResourceClaimTemplate is valid.
 var ValidateResourceClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
 
-// ValidateWorkloadName can be used to check whether the given
-// name for a Workload is valid.
-var ValidateWorkloadName = apimachineryvalidation.NameIsDNSSubdomain
-
 // ValidatePodGroupName can be used to check whether the given
 // name for a PodGroup is valid.
 var ValidatePodGroupName = apimachineryvalidation.NameIsDNSSubdomain
