@@ -101,7 +101,7 @@ func BenchmarkGPUShareFilter(b *testing.B) {
 func TestGPUShareConcurrency(t *testing.T) {
 	// Simulate multiple scheduler threads calling Filter and Score concurrently
 	// to test for any race conditions in the plugin. Notice that the kubernetes
-	// scheduler framework manages state, but we want to ensure our plugin is statless
+	// scheduler framework manages state, but we want to ensure our plugin is stateless
 	// and thread-safe.
 
 	p := &GPUShare{}
