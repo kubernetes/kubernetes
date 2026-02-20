@@ -470,13 +470,12 @@ func TestPublicEqualities(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range table {
-		func(tc *Case) {
-
+	for _, tc := range table {
+		t.Run(tc.name, func(t *testing.T) {
 			defer func() {
 				r := recover()
 				if r == nil && tc.shouldPanic {
-					t.Errorf("%s: did not panic but should have", tc.name)
+					t.Errorf("did not panic but should have")
 				}
 
 				if r != nil && !tc.shouldPanic {
@@ -487,13 +486,13 @@ func TestPublicEqualities(t *testing.T) {
 			eq := e.DeepEqualWithOptions(tc.a, tc.b, tc.options)
 
 			if eq && !tc.shouldBeEqual {
-				t.Errorf("%s: expected inequality but got equality for %v and %v", tc.name, tc.a, tc.b)
+				t.Errorf("expected inequality but got equality for %v and %v", tc.a, tc.b)
 			}
 
 			if !eq && tc.shouldBeEqual {
-				t.Errorf("%s: expected equality but got inequality for %v and %v", tc.name, tc.a, tc.b)
+				t.Errorf("expected equality but got inequality for %v and %v", tc.a, tc.b)
 			}
-		}(&testCase)
+		})
 	}
 }
 
