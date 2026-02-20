@@ -348,7 +348,7 @@ type Device struct {
 	// any device in a ResourceSlice, then the maximum number of
 	// allowed devices per ResourceSlice is 64 instead of 128.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -914,7 +914,7 @@ type ExactDeviceRequest struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -1025,7 +1025,7 @@ type DeviceSubRequest struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -1546,7 +1546,7 @@ type DeviceRequestAllocationResult struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional

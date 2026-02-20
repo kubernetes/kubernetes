@@ -646,6 +646,13 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
 		},
+		gvr("resource.k8s.io", "v1beta2", "devicetaintrules"): {
+			Stub:              `{"metadata": {"name": "taint2name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
+			ExpectedEtcdPath:  "/registry/devicetaintrules/taint2name",
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1alpha3", "DeviceTaintRule"), // v1beta2 has higher priority, but to support downgrades v1alpha3 is picked automatically.
+			IntroducedVersion: "1.36",
+			RemovedVersion:    "1.42",
+		},
 		gvr("resource.k8s.io", "v1beta2", "resourceclaims"): {
 			Stub:              `{"metadata": {"name": "claim3name"}, "spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}}]}}}`,
 			ExpectedEtcdPath:  "/registry/resourceclaims/" + namespace + "/claim3name",

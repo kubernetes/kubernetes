@@ -34,7 +34,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -2092,17 +2091,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// Now evict it.
 			ginkgo.By("Evicting pod...")
-			taint := &resourcealphaapi.DeviceTaintRule{
+			taint := &resourcev1beta2.DeviceTaintRule{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "device-taint-rule-" + f.UniqueName + "-",
 				},
-				Spec: resourcealphaapi.DeviceTaintRuleSpec{
+				Spec: resourcev1beta2.DeviceTaintRuleSpec{
 					// All devices of the current driver instance.
-					DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
+					DeviceSelector: &resourcev1beta2.DeviceTaintSelector{
 						Driver: &driver.Name,
 					},
-					Taint: resourcealphaapi.DeviceTaint{
-						Effect: resourcealphaapi.DeviceTaintEffectNoExecute,
+					Taint: resourcev1beta2.DeviceTaint{
+						Effect: resourcev1beta2.DeviceTaintEffectNoExecute,
 						Key:    "test.example.com/evict",
 						Value:  "now",
 						// No TimeAdded, gets defaulted.
@@ -2110,7 +2109,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				},
 			}
 			createdTaint := b.Create(tCtx, taint)
-			taint = createdTaint[0].(*resourcealphaapi.DeviceTaintRule)
+			taint = createdTaint[0].(*resourcev1beta2.DeviceTaintRule)
 			gomega.Expect(*taint).Should(gomega.HaveField("Spec.Taint.TimeAdded.Time", gomega.BeTemporally("~", time.Now(), time.Minute /* allow for some clock drift and delays */)))
 			framework.ExpectNoError(e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart))
 			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})

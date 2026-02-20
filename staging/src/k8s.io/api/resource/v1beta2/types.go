@@ -369,7 +369,7 @@ type Device struct {
 	// any device in a ResourceSlice, then the maximum number of
 	// allowed devices per ResourceSlice is 64 instead of 128.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -728,6 +728,156 @@ const (
 	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
 )
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.36
+
+// DeviceTaintRule adds one taint to all devices which match the selector.
+// This has the same effect as if the taint was specified directly
+// in the ResourceSlice by the DRA driver.
+type DeviceTaintRule struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec specifies the selector and one taint.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	// +required
+	Spec DeviceTaintRuleSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+
+	// Status provides information about what was requested in the spec.
+	//
+	// +optional
+	Status DeviceTaintRuleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// DeviceTaintRuleSpec specifies the selector and one taint.
+type DeviceTaintRuleSpec struct {
+	// DeviceSelector defines which device(s) the taint is applied to.
+	// All selector criteria must be satisfied for a device to
+	// match. The empty selector matches all devices. Without
+	// a selector, no devices are matches.
+	//
+	// +optional
+	DeviceSelector *DeviceTaintSelector `json:"deviceSelector,omitempty" protobuf:"bytes,1,opt,name=deviceSelector"`
+
+	// The taint that gets applied to matching devices.
+	//
+	// +required
+	Taint DeviceTaint `json:"taint,omitempty" protobuf:"bytes,2,rep,name=taint"`
+}
+
+// DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to.
+// The empty selector matches all devices. Without a selector, no devices
+// are matched.
+type DeviceTaintSelector struct {
+	// If DeviceClassName is set, the selectors defined there must be
+	// satisfied by a device to be selected. This field corresponds
+	// to class.metadata.name.
+	//
+	// +optional
+	//
+	// Tombstoned since 1.35 because it turned out that supporting this in all cases
+	// would depend on copying the device attributes into the ResourceClaim allocation
+	// result. Without that the eviction controller cannot evaluate these CEL expressions.
+	//
+	// DeviceClassName *string `json:"deviceClassName,omitempty" protobuf:"bytes,1,opt,name=deviceClassName"`
+
+	// If driver is set, only devices from that driver are selected.
+	// This fields corresponds to slice.spec.driver.
+	//
+	// +optional
+	Driver *string `json:"driver,omitempty" protobuf:"bytes,2,opt,name=driver"`
+
+	// If pool is set, only devices in that pool are selected.
+	//
+	// Also setting the driver name may be useful to avoid
+	// ambiguity when different drivers use the same pool name,
+	// but this is not required because selecting pools from
+	// different drivers may also be useful, for example when
+	// drivers with node-local devices use the node name as
+	// their pool name.
+	//
+	// +optional
+	Pool *string `json:"pool,omitempty" protobuf:"bytes,3,opt,name=pool"`
+
+	// If device is set, only devices with that name are selected.
+	// This field corresponds to slice.spec.devices[].name.
+	//
+	// Setting also driver and pool may be required to avoid ambiguity,
+	// but is not required.
+	//
+	// +optional
+	Device *string `json:"device,omitempty" protobuf:"bytes,4,opt,name=device"`
+
+	// Selectors contains the same selection criteria as a ResourceClaim.
+	// Currently, CEL expressions are supported. All of these selectors
+	// must be satisfied.
+	//
+	// +optional
+	// +listType=atomic
+	//
+	// Tombstoned since 1.35 because it turned out that supporting this in all cases
+	// would depend on copying the device attributes into the ResourceClaim allocation
+	// result. Without that the eviction controller cannot evaluate these CEL expressions.
+	//
+	// Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+}
+
+// DeviceTaintRuleStatus provides information about an on-going pod eviction.
+type DeviceTaintRuleStatus struct {
+	// Conditions provide information about the state of the DeviceTaintRule
+	// and the cluster at some point in time,
+	// in a machine-readable and human-readable format.
+	//
+	// The following condition is currently defined as part of this API, more may
+	// get added:
+	// - Type: EvictionInProgress
+	// - Status: True if there are currently pods which need to be evicted, False otherwise
+	//   (includes the effects which don't cause eviction).
+	// - Reason: not specified, may change
+	// - Message: includes information about number of pending pods and already evicted pods
+	//   in a human-readable format, updated periodically, may change
+	//
+	// For `effect: None`, the condition above gets set once for each change to
+	// the spec, with the message containing information about what would happen
+	// if the effect was `NoExecute`. This feedback can be used to decide whether
+	// changing the effect to `NoExecute` will work as intended. It only gets
+	// set once to avoid having to constantly update the status.
+	//
+	// Must have 8 or fewer entries.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// DeviceTaintRuleStatusMaxConditions is the maximum number of conditions in DeviceTaintRuleStatus.
+const DeviceTaintRuleStatusMaxConditions = 8
+
+// DeviceTaintConditionEvictionInProgress is the publicly documented condition type for the DeviceTaintRuleStatus.
+const DeviceTaintConditionEvictionInProgress = "EvictionInProgress"
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.36
+
+// DeviceTaintRuleList is a collection of DeviceTaintRules.
+type DeviceTaintRuleList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of DeviceTaintRules.
+	Items []DeviceTaintRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
 
@@ -981,7 +1131,7 @@ type ExactDeviceRequest struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -1098,7 +1248,7 @@ type DeviceSubRequest struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -1663,7 +1813,7 @@ type DeviceRequestAllocationResult struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
