@@ -23,72 +23,116 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func TestMaxWithNilResourceList(t *testing.T) {
+func TestPodRequestsAndLimits(t *testing.T) {
 	tests := []struct {
-		name string
-		a    corev1.ResourceList
-		b    []corev1.ResourceList
-		want corev1.ResourceList
+		name         string
+		pod          *corev1.Pod
+		wantRequests corev1.ResourceList
+		wantLimits   corev1.ResourceList
 	}{
 		{
-			name: "nil first argument with non-nil second",
-			a:    nil,
-			b:    []corev1.ResourceList{{corev1.ResourceCPU: resource.MustParse("100m")}},
-			want: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+			name: "pod with container resources only",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "c1",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU: resource.MustParse("100m"),
+								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU: resource.MustParse("200m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantRequests: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("100m"),
+			},
+			wantLimits: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("200m"),
+			},
 		},
 		{
-			name: "nil first argument with nil second",
-			a:    nil,
-			b:    []corev1.ResourceList{nil},
-			want: corev1.ResourceList{},
+			name: "pod with pod-level resources",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "c1",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("200m"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("300m"),
+						},
+					},
+				},
+			},
+			wantRequests: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("200m"),
+			},
+			wantLimits: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("300m"),
+			},
 		},
 		{
-			name: "nil first argument with empty second",
-			a:    nil,
-			b:    []corev1.ResourceList{{}},
-			want: corev1.ResourceList{},
-		},
-		{
-			name: "nil first argument with no second arguments",
-			a:    nil,
-			b:    nil,
-			want: corev1.ResourceList{},
-		},
-		{
-			name: "empty first argument with non-nil second",
-			a:    corev1.ResourceList{},
-			b:    []corev1.ResourceList{{corev1.ResourceCPU: resource.MustParse("100m")}},
-			want: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
-		},
-		{
-			name: "non-nil first argument takes max",
-			a:    corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m")},
-			b:    []corev1.ResourceList{{corev1.ResourceCPU: resource.MustParse("100m")}},
-			want: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m")},
-		},
-		{
-			name: "second argument larger takes max",
-			a:    corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
-			b:    []corev1.ResourceList{{corev1.ResourceCPU: resource.MustParse("200m")}},
-			want: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m")},
+			name: "pod with only pod-level resources",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "c1",
+						},
+					},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("200m"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("300m"),
+						},
+					},
+				},
+			},
+			wantRequests: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("200m"),
+			},
+			wantLimits: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("300m"),
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := max(tt.a, tt.b...)
-			if len(got) != len(tt.want) {
-				t.Errorf("case %q, expected %d resources but got %d", tt.name, len(tt.want), len(got))
-				return
+			reqs, limits := PodRequestsAndLimits(tt.pod)
+			// DeepEqual might fail on nil vs empty map, so we check content
+			if len(reqs) != len(tt.wantRequests) {
+				t.Errorf("%s: Requests length = %d, want %d", tt.name, len(reqs), len(tt.wantRequests))
 			}
-			for name, wantQty := range tt.want {
-				gotQty, ok := got[name]
-				if !ok {
-					t.Errorf("case %q, expected resource %s but it was missing", tt.name, name)
-					continue
+			for k, v := range tt.wantRequests {
+				if q, ok := reqs[k]; !ok || q.Cmp(v) != 0 {
+					t.Errorf("%s: Request %s = %v, want %v", tt.name, k, q, v)
 				}
-				if gotQty.Cmp(wantQty) != 0 {
-					t.Errorf("case %q, expected resource %s to be %s but got %s", tt.name, name, wantQty.String(), gotQty.String())
+			}
+			if len(limits) != len(tt.wantLimits) {
+				t.Errorf("%s: Limits length = %d, want %d", tt.name, len(limits), len(tt.wantLimits))
+			}
+			for k, v := range tt.wantLimits {
+				if q, ok := limits[k]; !ok || q.Cmp(v) != 0 {
+					t.Errorf("%s: Limit %s = %v, want %v", tt.name, k, q, v)
 				}
 			}
 		})
