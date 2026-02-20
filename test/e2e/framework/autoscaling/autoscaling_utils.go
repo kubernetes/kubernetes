@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -40,13 +41,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	kubectlportforward "k8s.io/kubectl/pkg/cmd/portforward"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
@@ -214,58 +215,59 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 	podName := pods.Items[0].Name
 
-	// Set up port-forward
+	// Set up port-forward using kubectl's PortForwardOptions
 	config, err := framework.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	transport, upgrader, err := spdy.RoundTripperFor(config)
-	if err != nil {
-		return fmt.Errorf("failed to create round tripper: %w", err)
+	var outBuf syncBuffer
+	streams := genericiooptions.IOStreams{
+		In:     strings.NewReader(""),
+		Out:    &outBuf,
+		ErrOut: io.Discard,
 	}
 
-	reqURL := emc.clientSet.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Namespace(emc.namespace).
-		Name(podName).
-		SubResource("portforward").
-		URL()
+	pfOpts := kubectlportforward.NewDefaultPortForwardOptions(streams)
+	pfOpts.Namespace = emc.namespace
+	pfOpts.PodName = podName
+	pfOpts.RESTClient = emc.clientSet.CoreV1().RESTClient()
+	pfOpts.Config = config
+	pfOpts.PodClient = emc.clientSet.CoreV1()
+	pfOpts.Address = []string{"localhost"}
+	pfOpts.Ports = []string{":6443"}
+	pfOpts.StopChannel = make(chan struct{}, 1)
+	pfOpts.ReadyChannel = make(chan struct{})
 
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, reqURL)
-
-	stopChan := make(chan struct{})
-	readyChan := make(chan struct{})
-
-	fw, err := portforward.New(dialer, []string{"0:6443"}, stopChan, readyChan, io.Discard, io.Discard)
-	if err != nil {
-		return fmt.Errorf("failed to create port forwarder: %w", err)
+	if err := pfOpts.Validate(); err != nil {
+		return fmt.Errorf("port-forward options validation failed: %w", err)
 	}
+
+	pfCtx, pfCancel := context.WithCancel(ctx)
+	defer pfCancel()
 
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- fw.ForwardPorts()
+		errChan <- pfOpts.RunPortForwardContext(pfCtx)
 	}()
 
 	select {
-	case <-readyChan:
+	case <-pfOpts.ReadyChannel:
 		// Ready
 	case err := <-errChan:
 		return fmt.Errorf("port-forward failed: %w", err)
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	defer close(stopChan)
 
-	// Get assigned local port
-	forwardedPorts, err := fw.GetPorts()
+	// Parse assigned local port from stdout output (format: "Forwarding from 127.0.0.1:<port> -> 6443")
+	localPort, err := parseLocalPort(outBuf.String())
 	if err != nil {
-		return fmt.Errorf("failed to get forwarded ports: %w", err)
+		return fmt.Errorf("failed to parse local port: %w", err)
 	}
-	localPort := forwardedPorts[0].Local
 
 	// Build URL and make request
-	requestURL := fmt.Sprintf("https://localhost:%d/%s/%s", localPort, action, metricName)
+	requestURL := fmt.Sprintf("https://localhost:%s/%s/%s", localPort, action, metricName)
 	if len(params) > 0 {
 		requestURL += "?" + params.Encode()
 	}
@@ -289,6 +291,46 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	}
 
 	return nil
+}
+
+// syncBuffer is a thread-safe buffer for capturing port-forward output.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (s *syncBuffer) Write(p []byte) (n int, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
+}
+
+// parseLocalPort extracts the local port from port-forward output.
+// The output format is: "Forwarding from 127.0.0.1:<port> -> <remotePort>"
+func parseLocalPort(output string) (string, error) {
+	// Example output: "Forwarding from 127.0.0.1:12345 -> 6443\n"
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "Forwarding from") {
+			// "Forwarding from 127.0.0.1:12345 -> 6443"
+			parts := strings.Fields(line)
+			if len(parts) < 3 {
+				continue
+			}
+			// parts[2] = "127.0.0.1:12345" or "[::1]:12345"
+			_, port, err := net.SplitHostPort(parts[2])
+			if err == nil {
+				return port, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("unable to parse local port from port-forward output: %q", output)
 }
 
 // RunExternalMetricsServer creates and returns an ExternalMetricsController for controlling the server
