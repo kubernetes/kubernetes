@@ -995,10 +995,12 @@ template:
         volumeID: volumeIDValue
       configMap:
         defaultMode: 3
+        defaultUser: 5
         items:
         - key: keyValue
           mode: 3
           path: pathValue
+          user: 4
         name: nameValue
         optional: true
       csi:
@@ -1011,6 +1013,7 @@ template:
           volumeAttributesKey: volumeAttributesValue
       downwardAPI:
         defaultMode: 2
+        defaultUser: 3
         items:
         - fieldRef:
             apiVersion: apiVersionValue
@@ -1021,6 +1024,7 @@ template:
             containerName: containerNameValue
             divisor: "0"
             resource: resourceValue
+          user: 5
       emptyDir:
         medium: mediumValue
         sizeLimit: "0"
@@ -1156,6 +1160,7 @@ template:
         volumeID: volumeIDValue
       projected:
         defaultMode: 2
+        defaultUser: 3
         sources:
         - clusterTrustBundle:
             labelSelector:
@@ -1170,11 +1175,13 @@ template:
             optional: true
             path: pathValue
             signerName: signerNameValue
+            user: 6
           configMap:
             items:
             - key: keyValue
               mode: 3
               path: pathValue
+              user: 4
             name: nameValue
             optional: true
           downwardAPI:
@@ -1188,6 +1195,7 @@ template:
                 containerName: containerNameValue
                 divisor: "0"
                 resource: resourceValue
+              user: 5
           podCertificate:
             certificateChainPath: certificateChainPathValue
             credentialBundlePath: credentialBundlePathValue
@@ -1195,6 +1203,7 @@ template:
             keyType: keyTypeValue
             maxExpirationSeconds: 3
             signerName: signerNameValue
+            user: 8
             userAnnotations:
               userAnnotationsKey: userAnnotationsValue
           secret:
@@ -1202,12 +1211,14 @@ template:
             - key: keyValue
               mode: 3
               path: pathValue
+              user: 4
             name: nameValue
             optional: true
           serviceAccountToken:
             audience: audienceValue
             expirationSeconds: 2
             path: pathValue
+            user: 4
       quobyte:
         group: groupValue
         readOnly: true
@@ -1240,10 +1251,12 @@ template:
         volumeName: volumeNameValue
       secret:
         defaultMode: 3
+        defaultUser: 5
         items:
         - key: keyValue
           mode: 3
           path: pathValue
+          user: 4
         optional: true
         secretName: secretNameValue
       storageos:
