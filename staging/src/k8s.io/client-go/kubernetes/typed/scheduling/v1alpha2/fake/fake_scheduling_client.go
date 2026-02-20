@@ -19,22 +19,26 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
+	v1alpha2 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha2"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeSchedulingV1alpha1 struct {
+type FakeSchedulingV1alpha2 struct {
 	*testing.Fake
 }
 
-func (c *FakeSchedulingV1alpha1) PriorityClasses() v1alpha1.PriorityClassInterface {
-	return newFakePriorityClasses(c)
+func (c *FakeSchedulingV1alpha2) PodGroups(namespace string) v1alpha2.PodGroupInterface {
+	return newFakePodGroups(c, namespace)
+}
+
+func (c *FakeSchedulingV1alpha2) Workloads(namespace string) v1alpha2.WorkloadInterface {
+	return newFakeWorkloads(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeSchedulingV1alpha1) RESTClient() rest.Interface {
+func (c *FakeSchedulingV1alpha2) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }
