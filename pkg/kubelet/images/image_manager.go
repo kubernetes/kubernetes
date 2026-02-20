@@ -105,7 +105,7 @@ func NewImageManager(
 }
 
 // imagePullPrecheck inspects the pull policy and checks for image presence accordingly,
-// returning (imageRef, error msg, err) and logging any errors.
+// returning (imageID, error msg, err) and logging any errors.
 func (m *imageManager) imagePullPrecheck(
 	ctx context.Context,
 	objRef *v1.ObjectReference,
@@ -113,26 +113,26 @@ func (m *imageManager) imagePullPrecheck(
 	pullPolicy v1.PullPolicy,
 	spec *kubecontainer.ImageSpec,
 	requestedImage string,
-) (imageRef string, imageFound *bool, msg string, err error) {
+) (imageID string, imageFound *bool, msg string, err error) {
 	switch pullPolicy {
 	case v1.PullAlways:
 		return "", nil, msg, nil
 	case v1.PullIfNotPresent, v1.PullNever:
-		imageRef, err = m.imageService.GetImageRef(ctx, *spec)
+		imageID, err = m.imageService.GetImageRef(ctx, *spec)
 		if err != nil {
-			msg = fmt.Sprintf("Failed to inspect image %q: %v", imageRef, err)
+			msg = fmt.Sprintf("Failed to inspect image %q: %v", imageID, err)
 			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
 			return "", nil, msg, ErrImageInspect
 		}
 	}
 
-	imageFound = ptr.To(len(imageRef) > 0)
+	imageFound = ptr.To(len(imageID) > 0)
 	if !*imageFound && pullPolicy == v1.PullNever {
 		msg, err = m.imageNotPresentOnNeverPolicyError(logPrefix, objRef, requestedImage)
 		return "", ptr.To(false), msg, err
 	}
 
-	return imageRef, imageFound, msg, nil
+	return imageID, imageFound, msg, nil
 }
 
 // records an event using ref, event msg.  log to glog using prefix, msg, logFn
@@ -194,7 +194,8 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		RuntimeHandler: podRuntimeHandler,
 	}
 
-	imageRef, imagePresentLocally, message, err = m.imagePullPrecheck(ctx, objRef, logPrefix, pullPolicy, &spec, requestedImage)
+	var imageID string
+	imageID, imagePresentLocally, message, err = m.imagePullPrecheck(ctx, objRef, logPrefix, pullPolicy, &spec, requestedImage)
 	if err != nil {
 		return "", message, err
 	}
@@ -237,7 +238,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		return imagePullSecrets, imagePullServiceAccount, nil
 	}
 
-	if imageRef != "" {
+	if imageID != "" {
 		imagePullRequired = ptr.To(false) // should be overridden right after this if-block in case pull was required
 
 		if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
@@ -248,9 +249,9 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 			// has already been pulled by another pod.
 			m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
 
-			return imageRef, msg, nil
+			return imageID, msg, nil
 		}
-		if pullRequired, err := m.imagePullManager.MustAttemptImagePull(ctx, requestedImage, imageRef, getPodCredentials); err != nil {
+		if pullRequired, err := m.imagePullManager.MustAttemptImagePull(ctx, requestedImage, imageID, getPodCredentials); err != nil {
 			imagePullRequired = nil
 			return "", err.Error(), err
 		} else if !pullRequired {
@@ -261,7 +262,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 			// has already been pulled by another pod.
 			m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
 
-			return imageRef, msg, nil
+			return imageID, msg, nil
 		}
 	}
 	imagePullRequired = ptr.To(true)

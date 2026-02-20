@@ -2317,7 +2317,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 					continue
 				}
 
-				imageRef, err := kl.containerRuntime.GetImageRef(ctx, imageSpec)
+				imageID, err := kl.containerRuntime.GetImageRef(ctx, imageSpec)
 				if err != nil {
 					logger.Error(err, "error getting image volume digest", "volume", volumeName)
 					continue
@@ -2326,7 +2326,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				if status.VolumeMounts[i].VolumeStatus.Image == nil {
 					status.VolumeMounts[i].VolumeStatus.Image = &v1.ImageVolumeStatus{}
 				}
-				status.VolumeMounts[i].VolumeStatus.Image.ImageRef = imageRef
+				status.VolumeMounts[i].VolumeStatus.Image.ImageRef = imageID
 			}
 		}
 

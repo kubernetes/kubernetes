@@ -4205,23 +4205,23 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 	}
 }
 
-// imageDigestRuntime is a simple wrapper that returns a fixed digest for image volumes
-type imageDigestRuntime struct {
+// imageIDRuntime is a simple wrapper that returns a fixed imageID for image volumes
+type imageIDRuntime struct {
 	*containertest.FakeRuntime
-	digest string
+	imageID string
 }
 
-func (r *imageDigestRuntime) GetImageRef(ctx context.Context, image kubecontainer.ImageSpec) (string, error) {
-	return r.digest, nil
+func (r *imageIDRuntime) GetImageRef(ctx context.Context, image kubecontainer.ImageSpec) (string, error) {
+	return r.imageID, nil
 }
 
-func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
+func TestConvertToAPIContainerStatusesWithImageVolumeID(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	const (
 		imageVolumeName      = "image-volume"
 		imageVolumeMountPath = "/mock/path"
 		imageVolumeRef       = "registry.k8s.io/example:1.2.3"
-		imageDigest          = "sha256:abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd"
+		imageID              = "sha256:abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd"
 	)
 
 	now := metav1.Now()
@@ -4306,7 +4306,7 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 						{
 							Name:         imageVolumeName,
 							MountPath:    imageVolumeMountPath,
-							VolumeStatus: v1.VolumeStatus{Image: &v1.ImageVolumeStatus{ImageRef: imageDigest}},
+							VolumeStatus: v1.VolumeStatus{Image: &v1.ImageVolumeStatus{ImageRef: imageID}},
 						},
 					}
 					return containerStatus
@@ -4363,9 +4363,9 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 			kl := testKubelet.kubelet
 
 			// Mock the container runtime to return the expected image digest
-			kl.containerRuntime = &imageDigestRuntime{
+			kl.containerRuntime = &imageIDRuntime{
 				FakeRuntime: &containertest.FakeRuntime{},
-				digest:      imageDigest,
+				imageID:     imageID,
 			}
 
 			containerStatuses := kl.convertToAPIContainerStatuses(
