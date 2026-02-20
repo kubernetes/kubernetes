@@ -72,6 +72,7 @@ import (
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
@@ -137,6 +138,7 @@ var groups = []runtime.SchemeBuilder{
 	resourcev1beta2.SchemeBuilder,
 	resourcev1.SchemeBuilder,
 	schedulingv1alpha1.SchemeBuilder,
+	schedulingv1alpha2.SchemeBuilder,
 	schedulingv1beta1.SchemeBuilder,
 	schedulingv1.SchemeBuilder,
 	storagev1alpha1.SchemeBuilder,
