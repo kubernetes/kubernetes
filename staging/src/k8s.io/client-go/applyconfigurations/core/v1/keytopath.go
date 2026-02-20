@@ -37,6 +37,9 @@ type KeyToPathApplyConfiguration struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	Mode *int32 `json:"mode,omitempty"`
+	// user is Optional: The owner UID of the created file.
+	// Default is implementation-defined.
+	User *int64 `json:"user,omitempty"`
 }
 
 // KeyToPathApplyConfiguration constructs a declarative configuration of the KeyToPath type for use with
@@ -66,5 +69,13 @@ func (b *KeyToPathApplyConfiguration) WithPath(value string) *KeyToPathApplyConf
 // If called multiple times, the Mode field is set to the value of the last call.
 func (b *KeyToPathApplyConfiguration) WithMode(value int32) *KeyToPathApplyConfiguration {
 	b.Mode = &value
+	return b
+}
+
+// WithUser sets the User field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the User field is set to the value of the last call.
+func (b *KeyToPathApplyConfiguration) WithUser(value int64) *KeyToPathApplyConfiguration {
+	b.User = &value
 	return b
 }
