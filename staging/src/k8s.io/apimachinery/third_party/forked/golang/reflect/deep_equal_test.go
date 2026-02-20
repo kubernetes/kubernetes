@@ -468,6 +468,30 @@ func TestPublicEqualities(t *testing.T) {
 			TimeTest{1, time.Time{}.Add(time.Hour)},
 			&DeepEqualOptions{IgnoreUnexportedFields: true}, true, false,
 		},
+		{
+			"default equates nil and empty map",
+			map[string]int(nil),
+			map[string]int{},
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"DoNotEquateNilAndEmpty does not equate nil and empty map",
+			map[string]int(nil),
+			map[string]int{},
+			&DeepEqualOptions{DoNotEquateNilAndEmpty: true}, false, false,
+		},
+		{
+			"default equates nil and empty slice",
+			[]string(nil),
+			[]string{},
+			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"DoNotEquateNilAndEmpty does not equate nil and empty slice",
+			[]string(nil),
+			[]string{},
+			&DeepEqualOptions{DoNotEquateNilAndEmpty: true}, false, false,
+		},
 	}
 
 	for _, tc := range table {

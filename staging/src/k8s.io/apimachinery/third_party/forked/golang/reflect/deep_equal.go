@@ -282,12 +282,12 @@ func (e Equalities) DeepEqualWithNilDifferentFromEmpty(a1, a2 interface{}) bool 
 }
 
 type DeepEqualOptions struct {
-	EquateNilAndEmpty      bool
+	DoNotEquateNilAndEmpty bool
 	IgnoreUnexportedFields bool
 }
 
 func (e Equalities) DeepEqualWithOptions(a1, a2 interface{}, opts *DeepEqualOptions) bool {
-	return e.deepEqual(a1, a2, opts.EquateNilAndEmpty, opts.IgnoreUnexportedFields)
+	return e.deepEqual(a1, a2, !opts.DoNotEquateNilAndEmpty, opts.IgnoreUnexportedFields)
 }
 
 func (e Equalities) deepEqual(a1, a2 interface{}, equateNilAndEmpty, ignoreUnexportedFields bool) bool {
