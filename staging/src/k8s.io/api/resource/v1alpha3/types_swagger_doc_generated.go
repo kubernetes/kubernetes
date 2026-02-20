@@ -50,7 +50,7 @@ var map_DeviceTaint = map[string]string{
 	"key":       "The taint key to be applied to a device. Must be a label name.",
 	"value":     "The taint value corresponding to the taint key. Must be a label value.",
 	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them.\n\nValid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here. More effects may get added in the future. Consumers must treat unknown effects like None.",
-	"timeAdded": "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+	"timeAdded": "TimeAdded represents the time at which the taint was added or (only in a DeviceTaintRule) the effect was modified. Added automatically during create or update if not set.\n\nIn addition, in a DeviceTaintRule a value provided during an update gets replaced with the current time if the provided value is the same as the old one and the new effect is different. Changing the key and/or value while keeping the effect unchanged is possible and does not update the time stamp because the eviction which uses it is either already started (NoExecute) or not started yet (NoEffect, NoSchedule).",
 }
 
 func (DeviceTaint) SwaggerDoc() map[string]string {
