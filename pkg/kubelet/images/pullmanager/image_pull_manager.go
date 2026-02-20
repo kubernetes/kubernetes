@@ -89,19 +89,21 @@ func (f *PullManager) RecordPullIntent(logger klog.Logger, image string) error {
 	return nil
 }
 
-func (f *PullManager) RecordImagePulled(ctx context.Context, image, imageID string, credentials *kubeletconfiginternal.ImagePullCredentials) {
+func (f *PullManager) RecordImagePulled(ctx context.Context, image, imageID string, credentials *kubeletconfiginternal.ImagePullCredentials, keepDanglingPullingRecord bool) {
 	logger := klog.FromContext(ctx)
 	if err := f.writePulledRecordIfChanged(ctx, image, imageID, credentials); err != nil {
 		logger.Error(err, "failed to write image pulled record", "imageID", imageID)
 		return
 	}
 
-	// Notice we don't decrement in case of record write error, which leaves dangling
-	// imagePullIntents and refCount in the intentCounters map.
-	// This is done so that the successfully pulled image is still considered as pulled by the kubelet.
-	// The kubelet will attempt to turn the imagePullIntent into a pulled record again when
-	// it's restarted.
-	f.decrementImagePullIntent(ctx, image)
+	if !keepDanglingPullingRecord {
+		// Notice we don't decrement in case of record write error, which leaves dangling
+		// imagePullIntents and refCount in the intentCounters map.
+		// This is done so that the successfully pulled image is still considered as pulled by the kubelet.
+		// The kubelet will attempt to turn the imagePullIntent into a pulled record again when
+		// it's restarted.
+		f.decrementImagePullIntent(ctx, image)
+	}
 }
 
 // writePulledRecordIfChanged writes an ImagePulledRecord into the f.pulledDir directory.

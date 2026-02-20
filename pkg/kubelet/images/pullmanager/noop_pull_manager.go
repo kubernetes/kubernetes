@@ -29,7 +29,7 @@ var _ ImagePullManager = &NoopImagePullManager{}
 type NoopImagePullManager struct{}
 
 func (m *NoopImagePullManager) RecordPullIntent(klog.Logger, string) error { return nil }
-func (m *NoopImagePullManager) RecordImagePulled(context.Context, string, string, *kubeletconfiginternal.ImagePullCredentials) {
+func (m *NoopImagePullManager) RecordImagePulled(context.Context, string, string, *kubeletconfiginternal.ImagePullCredentials, bool) {
 }
 func (m *NoopImagePullManager) RecordImagePullFailed(context.Context, string) {}
 func (m *NoopImagePullManager) MustAttemptImagePull(context.Context, string, string, GetPodCredentials) (bool, error) {

@@ -49,7 +49,15 @@ type ImagePullManager interface {
 	// to `true`.
 	//
 	// `image` is the content of the pod's container `image` field.
-	RecordImagePulled(ctx context.Context, image, imageID string, credentials *kubeletconfiginternal.ImagePullCredentials)
+	//
+	// `keepDanglingPullingRecord` is useful in cases we need to keep the pulling
+	// record dangling in case where we were unable to resolve the ImageRef we
+	// got from PullImageResponse to an image ID so that we fail closed in
+	// MustAttemmptImagePull (image ID will be missing in cache but the image is
+	// recorded as pulling => must Pull).
+	// `keepDanglingPullingRecord` will be removed when Ensure Secret Pulled Images
+	// goes GA.
+	RecordImagePulled(ctx context.Context, image, imageID string, credentials *kubeletconfiginternal.ImagePullCredentials, keepDanglingPullingRecord bool)
 	// RecordImagePullFailed should be called if an image failed to pull.
 	//
 	// Internally, it lowers its reference counter for the given image. If the
