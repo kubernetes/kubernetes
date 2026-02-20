@@ -253,16 +253,16 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			runtime.AllocatorPool.Put(s.MemoryAllocator)
 		}
 	}()
-
-	flusher, ok := w.(http.Flusher)
+	_, ok := w.(http.Flusher)
 	if !ok {
 		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
 		utilruntime.HandleErrorWithContext(req.Context(), err, "Unable to start watch")
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
+	tracedNetwork := span.WrapWriter(w, "Network")
 
-	framer := s.Framer.NewFrameWriter(w)
+	framer := s.Framer.NewFrameWriter(tracedNetwork)
 	if framer == nil {
 		// programmer error
 		err := fmt.Errorf("no stream framing support is available for media type %q", s.MediaType)
@@ -270,6 +270,8 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		s.Scope.err(errors.NewBadRequest(err.Error()), w, req)
 		return
 	}
+
+	tracedFramer := span.WrapWriter(framer, "Framer")
 
 	// ensure the connection times out
 	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
@@ -279,12 +281,12 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", s.MediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
+	tracedNetwork.Flush()
 
 	gvr := s.Scope.Resource
 
 	recorder := &watchEventMetricsRecorder{
-		writer:      framer,
+		writer:      tracedFramer,
 		countMetric: metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
 		sizeMetric:  metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
 	}
@@ -322,9 +324,8 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 			recorder.RecordEvent()
-
 			if len(ch) == 0 {
-				flusher.Flush()
+				tracedNetwork.Flush()
 			}
 			if isWatchListLatencyRecordingRequired {
 				// Record completion of initial listing phase for WatchList
@@ -337,7 +338,6 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					auditID := audit.GetAuditIDTruncated(req.Context())
 					klog.V(3).InfoS("WatchList initial events sent", "path", req.URL.Path, "auditID", auditID, "initLatency", initLatency)
 					httplog.AddKeyValue(req.Context(), "watchlist_init_latency", initLatency)
-					span.AddEvent("Writing initial events done")
 					span.End(5 * time.Second)
 					s.watchListCompleteHook()
 				}
