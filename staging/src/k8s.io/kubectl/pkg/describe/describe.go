@@ -867,8 +867,8 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
 		describeTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, w, "")
-		if pod.Spec.WorkloadRef != nil {
-			describeWorkloadReference(pod.Spec.WorkloadRef, w, "")
+		if pod.Spec.SchedulingGroup != nil {
+			describeSchedulingGroup(pod.Spec.SchedulingGroup, w, "")
 		}
 		if events != nil {
 			DescribeEvents(events, w)
@@ -1001,13 +1001,9 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 	}
 }
 
-func describeWorkloadReference(workloadRef *corev1.WorkloadReference, w PrefixWriter, space string) {
-	w.Write(LEVEL_0, "%sWorkloadRef:\n", space)
-	w.Write(LEVEL_1, "Name:\t%s\n", workloadRef.Name)
-	w.Write(LEVEL_1, "PodGroup:\t%s\n", workloadRef.PodGroup)
-	if workloadRef.PodGroupReplicaKey != "" {
-		w.Write(LEVEL_1, "PodGroupReplicaKey:\t%s\n", workloadRef.PodGroupReplicaKey)
-	}
+func describeSchedulingGroup(schedulingGroup *corev1.PodSchedulingGroup, w PrefixWriter, space string) {
+	w.Write(LEVEL_0, "%sSchedulingGroup:\n", space)
+	w.Write(LEVEL_1, "PodGroupName:\t%s\n", *schedulingGroup.PodGroupName)
 }
 
 func printHostPathVolumeSource(hostPath *corev1.HostPathVolumeSource, w PrefixWriter) {
@@ -2234,8 +2230,8 @@ func DescribePodTemplate(template *corev1.PodTemplateSpec, w PrefixWriter) {
 	}
 	printLabelsMultiline(w, "  Node-Selectors", template.Spec.NodeSelector)
 	printPodTolerationsMultiline(w, "  Tolerations", template.Spec.Tolerations)
-	if template.Spec.WorkloadRef != nil {
-		describeWorkloadReference(template.Spec.WorkloadRef, w, "  ")
+	if template.Spec.SchedulingGroup != nil {
+		describeSchedulingGroup(template.Spec.SchedulingGroup, w, "  ")
 	}
 }
 
