@@ -1,0 +1,25 @@
+name: GPUShare Tests
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  test:
+    name: Run GPUShare Scheduler Logic Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run GPUShare Tests
+        run: |
+          cd pkg/scheduler/framework/plugins/gpushare
+          go test -v ./...
