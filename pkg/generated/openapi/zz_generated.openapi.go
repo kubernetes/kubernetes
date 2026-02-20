@@ -35341,6 +35341,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentStatus(ref common.ReferenceCa
 						},
 					},
 				},
+				Required: []string{"conditions"},
 			},
 		},
 		Dependencies: []string{
@@ -35853,6 +35854,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressSpec(ref common.ReferenceCallbac
 						},
 					},
 				},
+				Required: []string{"ingressClassName", "backend"},
 			},
 		},
 		Dependencies: []string{

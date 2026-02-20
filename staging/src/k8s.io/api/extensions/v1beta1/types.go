@@ -36,6 +36,7 @@ type ScaleSpec struct {
 // represents the current status of a scale subresource.
 type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
+	// +required
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
 	// selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -116,6 +117,7 @@ type DeploymentSpec struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template describes the pods that will be created.
+	// +required
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
 
 	// The deployment strategy to use to replace existing pods with new ones.
@@ -166,11 +168,13 @@ type DeploymentSpec struct {
 type DeploymentRollback struct {
 	metav1.TypeMeta `json:",inline"`
 	// Required: This must match the Name of a deployment.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// The annotations to be updated to a deployment
 	// +optional
 	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty" protobuf:"bytes,2,rep,name=updatedAnnotations"`
 	// The config of this deployment rollback.
+	// +required
 	RollbackTo RollbackConfig `json:"rollbackTo" protobuf:"bytes,3,opt,name=rollbackTo"`
 }
 
@@ -283,6 +287,7 @@ type DeploymentStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
+	// +required
 	Conditions []DeploymentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
 
 	// Count of hash collisions for the Deployment. The Deployment controller uses this
@@ -312,16 +317,22 @@ const (
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
 	// Type of deployment condition.
+	// +required
 	Type DeploymentConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DeploymentConditionType"`
 	// Status of the condition, one of True, False, Unknown.
+	// +required
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// The last time this condition was updated.
+	// +optional
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,6,opt,name=lastUpdateTime"`
 	// Last time the condition transitioned from one status to another.
+	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,7,opt,name=lastTransitionTime"`
 	// The reason for the condition's last transition.
+	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 	// A human readable message indicating details about the transition.
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
@@ -339,6 +350,7 @@ type DeploymentList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of Deployments.
+	// + required
 	Items []Deployment `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -426,6 +438,7 @@ type DaemonSetSpec struct {
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+	// +required
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
 	// An update strategy to replace existing DaemonSet pods with new pods.
@@ -457,20 +470,24 @@ type DaemonSetStatus struct {
 	// The number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+	// +required
 	CurrentNumberScheduled int32 `json:"currentNumberScheduled" protobuf:"varint,1,opt,name=currentNumberScheduled"`
 
 	// The number of nodes that are running the daemon pod, but are
 	// not supposed to run the daemon pod.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+	// +required
 	NumberMisscheduled int32 `json:"numberMisscheduled" protobuf:"varint,2,opt,name=numberMisscheduled"`
 
 	// The total number of nodes that should be running the daemon
 	// pod (including nodes correctly running the daemon pod).
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+	// +required
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled" protobuf:"varint,3,opt,name=desiredNumberScheduled"`
 
 	// The number of nodes that should be running the daemon pod and have one
 	// or more of the daemon pod running and ready.
+	// +required
 	NumberReady int32 `json:"numberReady" protobuf:"varint,4,opt,name=numberReady"`
 
 	// The most recent generation observed by the daemon set controller.
@@ -517,6 +534,7 @@ type DaemonSetCondition struct {
 	// Type of DaemonSet condition.
 	Type DaemonSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DaemonSetConditionType"`
 	// Status of the condition, one of True, False, Unknown.
+	// +required
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition transitioned from one status to another.
 	// +optional
@@ -651,14 +669,14 @@ type IngressSpec struct {
 	// specified. An IngressClass resource may be marked as default, which can
 	// be used to set a default value for this field. For more information,
 	// refer to the IngressClass documentation.
-	// +optional
+	// +required
 	IngressClassName *string `json:"ingressClassName,omitempty" protobuf:"bytes,4,opt,name=ingressClassName"`
 
 	// A default backend capable of servicing requests that don't match any
 	// rule. At least one of 'backend' or 'rules' must be specified. This field
 	// is optional to allow the loadbalancer controller or defaulting logic to
 	// specify a global default.
-	// +optional
+	// +required
 	Backend *IngressBackend `json:"backend,omitempty" protobuf:"bytes,1,opt,name=backend"`
 
 	// TLS configuration. Currently the Ingress only supports a single TLS
@@ -731,10 +749,12 @@ type IngressLoadBalancerIngress struct {
 // IngressPortStatus represents the error condition of a service port
 type IngressPortStatus struct {
 	// Port is the port number of the ingress port.
+	// +required
 	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
 
 	// Protocol is the protocol of the ingress port.
 	// The supported values are: "TCP", "UDP", "SCTP"
+	// +required
 	Protocol v1.Protocol `json:"protocol" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
 	// Error is to record the problem with the service port
@@ -806,6 +826,7 @@ type IngressRuleValue struct {
 	// as defined by RFC 3986. Paths must begin with a '/'.
 	// A backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
+	// +optional
 	HTTP *HTTPIngressRuleValue `json:"http,omitempty" protobuf:"bytes,1,opt,name=http"`
 }
 
@@ -817,6 +838,7 @@ type IngressRuleValue struct {
 type HTTPIngressRuleValue struct {
 	// A collection of paths that map requests to backends.
 	// +listType=atomic
+	// +required
 	Paths []HTTPIngressPath `json:"paths" protobuf:"bytes,1,rep,name=paths"`
 	// TODO: Consider adding fields for ingress-type specific global
 	// options usable by a loadbalancer, like http keep-alive.
@@ -881,6 +903,7 @@ type HTTPIngressPath struct {
 
 	// Backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
+	// +required
 	Backend IngressBackend `json:"backend" protobuf:"bytes,2,opt,name=backend"`
 }
 
@@ -989,6 +1012,7 @@ type ReplicaSetSpec struct {
 type ReplicaSetStatus struct {
 	// Replicas is the most recently observed number of non-terminating pods.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
+	// +required
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
 	// The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.
@@ -1038,6 +1062,7 @@ type ReplicaSetCondition struct {
 	// Type of replica set condition.
 	Type ReplicaSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ReplicaSetConditionType"`
 	// Status of the condition, one of True, False, Unknown.
+	// +required
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// The last time the condition transitioned from one status to another.
 	// +optional
