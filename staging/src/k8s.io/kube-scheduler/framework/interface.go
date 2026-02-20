@@ -326,7 +326,23 @@ type WaitingPod interface {
 	// to unblock the pod.
 	Allow(pluginName string)
 	// Reject declares the waiting pod unschedulable.
-	Reject(pluginName, msg string)
+	Reject(pluginName, msg string) bool
+	// Preempt preempts the waiting pod. Compared to reject it does not mark the pod as unschedulable,
+	// allowing it to be rescheduled.
+	Preempt(pluginName, msg string) bool
+}
+
+// PodInPreBind represents a pod currently in preBind phase.
+type PodInPreBind interface {
+	// CancelPod cancels the context attached to a goroutine running binding cycle of this pod
+	// if the pod is not marked as prebound.
+	// Returns true if the cancel was successfully run.
+	CancelPod(reason string) bool
+
+	// MarkPrebound marks the pod as prebound, making it impossible to cancel the context of binding cycle
+	// via PodInPreBind
+	// Returns false if the context was already canceled.
+	MarkPrebound() bool
 }
 
 // PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
@@ -362,6 +378,23 @@ func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
 // PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.
 type PostFilterResult struct {
 	*NominatingInfo
+	// Victims are the pods that need to be preempted to make room for the preemptor pod.
+	// For a preemptor that is a member of a pod group, this field skips the pods that were
+	// identified as victims for other members of the pod group.
+	Victims []*v1.Pod
+}
+
+// PreBindPreFlightResult wraps needed info for scheduler framework to act upon PreBindPreFlight phase.
+type PreBindPreFlightResult struct {
+	// AllowParallel indicates whether this plugin's PreBind method can be run
+	// in parallel with other plugins during PreBind phase.
+	// The scheduler groups consecutive plugins that return AllowParallel: true
+	// and runs them in parallel.
+	// A plugin that returns AllowParallel: false breaks the parallel group
+	// and runs sequentially.
+	// Note: skipped plugins are effectively ignored, but if a skipped plugin returns
+	// AllowParallel: false, it still breaks the parallel group of adjacent plugins.
+	AllowParallel bool
 }
 
 // Plugin is the parent type for all the scheduling framework plugins.
@@ -581,11 +614,13 @@ type ReservePlugin interface {
 // These plugins are called before a pod being scheduled.
 type PreBindPlugin interface {
 	Plugin
-	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return Success, Skip, or Error status.
+	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return two values:
+	// - PreBindPreFlightResult (nil is valid, and means results with the zero values on all fields).
+	// - Success, Skip, or Error status.
 	// If it returns Success, it means this PreBind plugin will handle this pod.
 	// If it returns Skip, it means this PreBind plugin has nothing to do with the pod, and PreBind will be skipped.
 	// This function should be lightweight, and shouldn't do any actual operation, e.g., creating a volume etc.
-	PreBindPreFlight(ctx context.Context, state CycleState, p *v1.Pod, nodeName string) *Status
+	PreBindPreFlight(ctx context.Context, state CycleState, p *v1.Pod, nodeName string) (*PreBindPreFlightResult, *Status)
 
 	// PreBind is called before binding a pod. All prebind plugins must return
 	// success or the pod will be rejected and won't be sent for binding.
@@ -716,6 +751,15 @@ type Handle interface {
 	// RejectWaitingPod rejects a waiting pod given its UID.
 	// The return value indicates if the pod is waiting or not.
 	RejectWaitingPod(uid types.UID) bool
+
+	// AddPodInPreBind adds a pod to the pods in preBind list.
+	AddPodInPreBind(uid types.UID, cancel context.CancelCauseFunc)
+
+	// GetPodInPreBind returns a pod that is in the binding cycle but before it is bound given its UID.
+	GetPodInPreBind(uid types.UID) PodInPreBind
+
+	// RemovePodInPreBind removes a pod from the pods in preBind list.
+	RemovePodInPreBind(uid types.UID)
 
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface

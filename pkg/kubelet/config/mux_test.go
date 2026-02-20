@@ -29,25 +29,23 @@ import (
 )
 
 func TestConfigurationChannels(t *testing.T) {
-	ctx := ktesting.Init(t)
-	ctx = ktesting.WithCancel(ctx)
-	defer ctx.Cancel("TestConfigurationChannels completed")
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("TestConfigurationChannels completed")
 
 	mux := newMux(nil)
-	channelOne := mux.ChannelWithContext(ctx, "one")
-	if channelOne != mux.ChannelWithContext(ctx, "one") {
+	channelOne := mux.ChannelWithContext(tCtx, "one")
+	if channelOne != mux.ChannelWithContext(tCtx, "one") {
 		t.Error("Didn't get the same muxuration channel back with the same name")
 	}
-	channelTwo := mux.ChannelWithContext(ctx, "two")
+	channelTwo := mux.ChannelWithContext(tCtx, "two")
 	if channelOne == channelTwo {
 		t.Error("Got back the same muxuration channel for different names")
 	}
 }
 
 func TestMergeInvoked(t *testing.T) {
-	ctx := ktesting.Init(t)
-	ctx = ktesting.WithCancel(ctx)
-	defer ctx.Cancel("TestMergeInvoked completed")
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("TestMergeInvoked completed")
 
 	const expectedSource = "one"
 	done := make(chan interface{})
@@ -65,13 +63,13 @@ func TestMergeInvoked(t *testing.T) {
 
 	mux := newMux(&merger)
 
-	mux.ChannelWithContext(ctx, expectedSource) <- fakeUpdate(expectedSource)
+	mux.ChannelWithContext(tCtx, expectedSource) <- fakeUpdate(expectedSource)
 
 	// Wait for Merge call.
 	select {
 	case <-done:
 		// Test complete.
-	case <-ctx.Done():
+	case <-tCtx.Done():
 		t.Fatal("Test context canceled before completion")
 	}
 }
@@ -84,9 +82,8 @@ func (f mergeFunc) Merge(ctx context.Context, source string, update sourceUpdate
 }
 
 func TestSimultaneousMerge(t *testing.T) {
-	ctx := ktesting.Init(t)
-	ctx = ktesting.WithCancel(ctx)
-	defer ctx.Cancel("TestSimultaneousMerge completed")
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("TestSimultaneousMerge completed")
 
 	ch := make(chan bool, 2)
 	mux := newMux(mergeFunc(func(ctx context.Context, source string, update sourceUpdate) error {
@@ -96,8 +93,8 @@ func TestSimultaneousMerge(t *testing.T) {
 		ch <- true
 		return nil
 	}))
-	source := mux.ChannelWithContext(ctx, "one")
-	source2 := mux.ChannelWithContext(ctx, "two")
+	source := mux.ChannelWithContext(tCtx, "one")
+	source2 := mux.ChannelWithContext(tCtx, "two")
 	source <- fakeUpdate("one")
 	source2 <- fakeUpdate("two")
 	<-ch

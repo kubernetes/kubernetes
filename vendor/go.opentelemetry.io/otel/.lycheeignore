@@ -1,4 +1,5 @@
 http://localhost
+https://localhost
 http://jaeger-collector
 https://github.com/open-telemetry/opentelemetry-go/milestone/
 https://github.com/open-telemetry/opentelemetry-go/projects
@@ -7,3 +8,6 @@ https?:\/\/github\.com\/open-telemetry\/semantic-conventions\/archive\/refs\/tag
 file:///home/runner/work/opentelemetry-go/opentelemetry-go/libraries
 file:///home/runner/work/opentelemetry-go/opentelemetry-go/manual
 http://4.3.2.1:78/user/123
+file:///home/runner/work/opentelemetry-go/opentelemetry-go/exporters/otlp/otlptrace/otlptracegrpc/internal/observ/dns:/:4317
+# URL works, but it has blocked link checkers.
+https://dl.acm.org/doi/10.1145/198429.198435

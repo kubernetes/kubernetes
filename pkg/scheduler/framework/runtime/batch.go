@@ -106,9 +106,7 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
 	logger := klog.FromContext(ctx)
 
-	startTime := time.Now()
-	defer metrics.StoreScheduleResultsDuration.WithLabelValues(b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
-
+	defer metrics.StoreScheduleResultsDuration.ObserveSince(time.Now(), b.handle.ProfileName())()
 	// Set our cycle information for next time.
 	b.lastCycle = schedulingCycle{
 		cycleCount: cycleCount,

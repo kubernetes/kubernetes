@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2/ktesting"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -76,31 +77,33 @@ func TestWorkloadManager_AddPod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := New()
+			logger, _ := ktesting.NewTestContext(t)
+
+			manager := New(logger)
 			for _, p := range tt.initPods {
 				manager.AddPod(p)
 			}
 
 			manager.AddPod(tt.podToAdd)
 
-			gotPodGroups := len(manager.podGroupInfos)
+			gotPodGroups := len(manager.podGroupStates)
 			if gotPodGroups != tt.expectedPodGroups {
 				t.Fatalf("Expected %v pod group(s), got %v", tt.expectedPodGroups, gotPodGroups)
 			}
 			if gotPodGroups == 0 {
 				return
 			}
-			info, err := manager.PodGroupInfo(tt.podToAdd.Namespace, tt.podToAdd.Spec.WorkloadRef)
+			state, err := manager.PodGroupState(tt.podToAdd.Namespace, tt.podToAdd.Spec.WorkloadRef)
 			if err != nil {
-				t.Fatalf("Unexpected error getting pod group info: %v", err)
+				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
-			if inAll := info.AllPods().Has(tt.podToAdd.UID); inAll != tt.expectInAllPods {
+			if inAll := state.AllPods().Has(tt.podToAdd.UID); inAll != tt.expectInAllPods {
 				t.Errorf("Unexpected AllPods state, want: %v, got: %v", tt.expectInAllPods, inAll)
 			}
-			if inAssumed := info.AssumedPods().Has(tt.podToAdd.UID); inAssumed != tt.expectInAssumedPods {
+			if inAssumed := state.AssumedPods().Has(tt.podToAdd.UID); inAssumed != tt.expectInAssumedPods {
 				t.Errorf("Unexpected AssumedPods state, want: %v, got: %v", tt.expectInAssumedPods, inAssumed)
 			}
-			if inAssigned := info.AssignedPods().Has(tt.podToAdd.UID); inAssigned != tt.expectInAssignedPods {
+			if inAssigned := state.AssignedPods().Has(tt.podToAdd.UID); inAssigned != tt.expectInAssignedPods {
 				t.Errorf("Unexpected AssignedPods state, want: %v, got: %v", tt.expectInAssignedPods, inAssigned)
 			}
 		})
@@ -178,20 +181,22 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := New()
+			logger, _ := ktesting.NewTestContext(t)
+
+			manager := New(logger)
 
 			manager.AddPod(tt.oldPod)
 			if tt.assumePod {
-				info, err := manager.PodGroupInfo(tt.oldPod.Namespace, tt.oldPod.Spec.WorkloadRef)
+				state, err := manager.PodGroupState(tt.oldPod.Namespace, tt.oldPod.Spec.WorkloadRef)
 				if err != nil {
-					t.Fatalf("Unexpected error getting pod group info: %v", err)
+					t.Fatalf("Unexpected error getting pod group state: %v", err)
 				}
-				info.AssumePod(tt.oldPod.UID)
+				state.AssumePod(tt.oldPod.UID)
 			}
 
 			manager.UpdatePod(tt.oldPod, tt.newPod)
 
-			gotPodGroups := len(manager.podGroupInfos)
+			gotPodGroups := len(manager.podGroupStates)
 			if gotPodGroups == 0 {
 				if tt.expectInAllPods {
 					t.Fatalf("Expected pod group, but got none")
@@ -201,17 +206,17 @@ func TestWorkloadManager_UpdatePod(t *testing.T) {
 			if !tt.expectInAllPods {
 				t.Fatalf("Expected no pod groups, but got %v", gotPodGroups)
 			}
-			info, err := manager.PodGroupInfo(tt.newPod.Namespace, tt.newPod.Spec.WorkloadRef)
+			state, err := manager.PodGroupState(tt.newPod.Namespace, tt.newPod.Spec.WorkloadRef)
 			if err != nil {
-				t.Fatalf("Unexpected error getting pod group info: %v", err)
+				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
-			if inAll := info.AllPods().Has(tt.newPod.UID); inAll != tt.expectInAllPods {
+			if inAll := state.AllPods().Has(tt.newPod.UID); inAll != tt.expectInAllPods {
 				t.Errorf("Unexpected AllPods state, want: %v, got: %v", tt.expectInAllPods, inAll)
 			}
-			if inAssumed := info.AssumedPods().Has(tt.newPod.UID); inAssumed != tt.expectInAssumedPods {
+			if inAssumed := state.AssumedPods().Has(tt.newPod.UID); inAssumed != tt.expectInAssumedPods {
 				t.Errorf("Unexpected AssumedPods state, want: %v, got: %v", tt.expectInAssumedPods, inAssumed)
 			}
-			if inAssigned := info.AssignedPods().Has(tt.newPod.UID); inAssigned != tt.expectInAssignedPods {
+			if inAssigned := state.AssignedPods().Has(tt.newPod.UID); inAssigned != tt.expectInAssignedPods {
 				t.Errorf("Unexpected AssignedPods state, want: %v, got: %v", tt.expectInAssignedPods, inAssigned)
 			}
 		})
@@ -238,7 +243,7 @@ func TestWorkloadManager_DeletePod(t *testing.T) {
 			expectedPodGroups: 1,
 		},
 		{
-			name:        "deleting the last pod cleans up the info",
+			name:        "deleting the last pod cleans up the state",
 			initPods:    []*v1.Pod{p1},
 			podToDelete: p1,
 		},
@@ -250,27 +255,29 @@ func TestWorkloadManager_DeletePod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := New()
+			logger, _ := ktesting.NewTestContext(t)
+
+			manager := New(logger)
 			for _, p := range tt.initPods {
 				manager.AddPod(p)
 			}
 			manager.DeletePod(tt.podToDelete)
 
-			gotPodGroups := len(manager.podGroupInfos)
+			gotPodGroups := len(manager.podGroupStates)
 			if gotPodGroups != tt.expectedPodGroups {
 				t.Fatalf("Expected %v pod group(s), got %v", tt.expectedPodGroups, gotPodGroups)
 			}
 			if gotPodGroups == 0 {
 				return
 			}
-			info, err := manager.PodGroupInfo(tt.podToDelete.Namespace, tt.podToDelete.Spec.WorkloadRef)
+			state, err := manager.PodGroupState(tt.podToDelete.Namespace, tt.podToDelete.Spec.WorkloadRef)
 			if err != nil {
-				t.Fatalf("Unexpected error getting pod group info: %v", err)
+				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
-			if len(info.AllPods()) == 0 {
+			if len(state.AllPods()) == 0 {
 				t.Errorf("Expected AllPods to be non-empty")
 			}
-			if info.AllPods().Has(p1.UID) {
+			if state.AllPods().Has(p1.UID) {
 				t.Errorf("Expected pod to be deleted")
 			}
 		})

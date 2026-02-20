@@ -131,10 +131,11 @@ func (t *tokenSimple) assignSimpleTokenToUser(username, token string) {
 
 	_, ok := t.simpleTokens[token]
 	if ok {
+		tokenFingerprint := redactToken(token)
 		t.lg.Panic(
 			"failed to assign already-used simple token to a user",
 			zap.String("user-name", username),
-			zap.String("token", token),
+			zap.String("token-fingerprint", tokenFingerprint),
 		)
 	}
 

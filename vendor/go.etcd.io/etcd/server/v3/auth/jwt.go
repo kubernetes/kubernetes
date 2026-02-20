@@ -115,12 +115,12 @@ func (t *tokenJWT) assign(ctx context.Context, username string, revision uint64)
 		return "", err
 	}
 
-	t.lg.Debug(
-		"created/assigned a new JWT token",
-		zap.String("user-name", username),
-		zap.Uint64("revision", revision),
-		zap.String("token", token),
-	)
+	if ce := t.lg.Check(zap.DebugLevel, "created/assigned a new JWT token"); ce != nil {
+		tokenFingerprint := redactToken(token)
+		ce.Write(zap.String("user-name", username),
+			zap.Uint64("revision", revision),
+			zap.String("token-fingerprint", tokenFingerprint))
+	}
 	return token, err
 }
 

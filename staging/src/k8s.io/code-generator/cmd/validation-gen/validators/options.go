@@ -36,11 +36,11 @@ func init() {
 
 type ifTagValidator struct {
 	enabled   bool
-	validator Validator
+	validator TagValidationExtractor
 }
 
 func (itv *ifTagValidator) Init(cfg Config) {
-	itv.validator = cfg.Validator
+	itv.validator = cfg.TagValidator
 }
 
 func (itv ifTagValidator) TagName() string {
@@ -66,7 +66,7 @@ func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Val
 		return Validations{}, fmt.Errorf("missing required option name positional argument")
 	}
 	result := Validations{}
-	if validations, err := itv.validator.ExtractValidations(context, *tag.ValueTag); err != nil {
+	if validations, err := itv.validator.ExtractTagValidations(context, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		for _, fn := range validations.Functions {
@@ -81,7 +81,7 @@ func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Val
 func (itv ifTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            itv.TagName(),
-		StabilityLevel: Alpha,
+		StabilityLevel: TagStabilityLevelAlpha,
 		Args: []TagArgDoc{{
 			Description: "<option>",
 			Type:        codetags.ArgTypeString,

@@ -414,7 +414,6 @@ var _ = SIGDescribe("kubelet", func() {
 
 			// execute It blocks from above table of tests
 			for _, t := range testTbl {
-				t := t
 				ginkgo.It(t.itDescr, func(ctx context.Context) {
 					pod = createPodUsingNfs(ctx, f, c, ns, nfsIP, t.podCmd)
 

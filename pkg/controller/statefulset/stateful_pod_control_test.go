@@ -479,6 +479,26 @@ func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
 	}
 }
 
+func TestStatefulPodControlDeleteStatefulPodNotFound(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	fakeClient := &fake.Clientset{}
+	control := NewStatefulPodControl(fakeClient, nil, nil, recorder)
+	fakeClient.AddReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), pod.Name)
+	})
+	if err := control.DeleteStatefulPod(set, pod); err != nil {
+		t.Errorf("DeleteStatefulPod returned error for NotFound pod: %s", err)
+	}
+	events := collectEvents(recorder.Events)
+	if eventCount := len(events); eventCount != 1 {
+		t.Errorf("delete not-found: got %d events, but want 1", eventCount)
+	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
+		t.Errorf("Found unexpected non-normal event %s", events[0])
+	}
+}
+
 func TestStatefulPodControlDeleteFailure(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)

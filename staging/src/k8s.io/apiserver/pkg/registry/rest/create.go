@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -89,6 +89,13 @@ type RESTCreateStrategy interface {
 	Canonicalize(obj runtime.Object)
 }
 
+func validatePathSegment(name string, prefix bool) []string {
+	if prefix {
+		return content.IsPathSegmentPrefix(name)
+	}
+	return content.IsPathSegmentName(name)
+}
+
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns
 // errors that can be converted to api.Status. It invokes PrepareForCreate, then Validate.
 // It returns nil if the object should be created.
@@ -126,7 +133,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 	// Custom validation (including name validation) passed
 	// Now run common validation on object meta
 	// Do this *after* custom validation so that specific error messages are shown whenever possible
-	if errs := genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), path.ValidatePathSegmentName, field.NewPath("metadata")); len(errs) > 0 {
+	if errs := genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), validatePathSegment, field.NewPath("metadata")); len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
 	}
 

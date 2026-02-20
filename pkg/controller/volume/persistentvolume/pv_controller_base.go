@@ -19,6 +19,7 @@ package persistentvolume
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/slice"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -141,7 +140,7 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 
 	csiTranslator := csitrans.New()
 	controller.translator = csiTranslator
-	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
+	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
 
 	return controller, nil
 }
@@ -402,9 +401,6 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotationsAndFinal
 func modifyDeletionFinalizers(logger klog.Logger, cmpm CSIMigratedPluginManager, volume *v1.PersistentVolume) ([]string, bool) {
 	modified := false
 	var outFinalizers []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-		return volume.Finalizers, false
-	}
 	if !metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned) {
 		// PV deletion protection finalizer is currently supported only for dynamically
 		// provisioned volumes.
@@ -416,7 +412,7 @@ func modifyDeletionFinalizers(logger klog.Logger, cmpm CSIMigratedPluginManager,
 	provisioner := volume.Annotations[storagehelpers.AnnDynamicallyProvisioned]
 	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
 		// Remove in-tree delete finalizer on the PV as migration is enabled.
-		if slice.ContainsString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+		if slices.Contains(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer) {
 			outFinalizers = slice.RemoveString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
 			modified = true
 		}
@@ -429,18 +425,18 @@ func modifyDeletionFinalizers(logger klog.Logger, cmpm CSIMigratedPluginManager,
 	}
 	reclaimPolicy := volume.Spec.PersistentVolumeReclaimPolicy
 	// Add back the in-tree PV deletion protection finalizer if does not already exists
-	if reclaimPolicy == v1.PersistentVolumeReclaimDelete && !slice.ContainsString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+	if reclaimPolicy == v1.PersistentVolumeReclaimDelete && !slices.Contains(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer) {
 		logger.V(4).Info("Adding in-tree pv deletion protection finalizer on volume", "volumeName", volume.Name)
 		outFinalizers = append(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer)
 		modified = true
-	} else if (reclaimPolicy == v1.PersistentVolumeReclaimRetain || reclaimPolicy == v1.PersistentVolumeReclaimRecycle) && slice.ContainsString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+	} else if (reclaimPolicy == v1.PersistentVolumeReclaimRetain || reclaimPolicy == v1.PersistentVolumeReclaimRecycle) && slices.Contains(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer) {
 		// Remove the in-tree PV deletion protection finalizer if the reclaim policy is 'Retain' or 'Recycle'
 		logger.V(4).Info("Removing in-tree pv deletion protection finalizer on volume", "volumeName", volume.Name)
 		outFinalizers = slice.RemoveString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
 		modified = true
 	}
 	// Remove the external PV deletion protection finalizer
-	if slice.ContainsString(outFinalizers, storagehelpers.PVDeletionProtectionFinalizer, nil) {
+	if slices.Contains(outFinalizers, storagehelpers.PVDeletionProtectionFinalizer) {
 		logger.V(4).Info("Removing external pv deletion protection finalizer on volume", "volumeName", volume.Name)
 		outFinalizers = slice.RemoveString(outFinalizers, storagehelpers.PVDeletionProtectionFinalizer, nil)
 		modified = true

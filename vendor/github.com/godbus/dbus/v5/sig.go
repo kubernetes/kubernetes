@@ -89,9 +89,10 @@ func getSignature(t reflect.Type, depth *depthCounter) (sig string) {
 		}
 		return "s"
 	case reflect.Struct:
-		if t == variantType {
+		switch t {
+		case variantType:
 			return "v"
-		} else if t == signatureType {
+		case signatureType:
 			return "g"
 		}
 		var s string
@@ -183,26 +184,26 @@ func (cnt *depthCounter) Valid() bool {
 	return cnt.arrayDepth <= 32 && cnt.structDepth <= 32 && cnt.dictEntryDepth <= 32
 }
 
-func (cnt *depthCounter) EnterArray() *depthCounter {
+func (cnt depthCounter) EnterArray() *depthCounter {
 	cnt.arrayDepth++
-	return cnt
+	return &cnt
 }
 
-func (cnt *depthCounter) EnterStruct() *depthCounter {
+func (cnt depthCounter) EnterStruct() *depthCounter {
 	cnt.structDepth++
-	return cnt
+	return &cnt
 }
 
-func (cnt *depthCounter) EnterDictEntry() *depthCounter {
+func (cnt depthCounter) EnterDictEntry() *depthCounter {
 	cnt.dictEntryDepth++
-	return cnt
+	return &cnt
 }
 
 // Try to read a single type from this string. If it was successful, err is nil
 // and rem is the remaining unparsed part. Otherwise, err is a non-nil
 // SignatureError and rem is "". depth is the current recursion depth which may
 // not be greater than 64 and should be given as 0 on the first call.
-func validSingle(s string, depth *depthCounter) (err error, rem string) {
+func validSingle(s string, depth *depthCounter) (err error, rem string) { //nolint:staticcheck // Ignore "ST1008: error should be returned as the last argument".
 	if s == "" {
 		return SignatureError{Sig: s, Reason: "empty signature"}, ""
 	}
@@ -258,9 +259,10 @@ func validSingle(s string, depth *depthCounter) (err error, rem string) {
 func findMatching(s string, left, right rune) int {
 	n := 0
 	for i, v := range s {
-		if v == left {
+		switch v {
+		case left:
 			n++
-		} else if v == right {
+		case right:
 			n--
 		}
 		if n == 0 {

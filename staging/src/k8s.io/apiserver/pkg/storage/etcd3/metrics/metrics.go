@@ -286,7 +286,7 @@ func UpdateLeaseObjectCount(count int64) {
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
 }
 
-// RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
+// RecordStorageListMetrics notes various metrics of the cost to serve a LIST request
 func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, numEvald, numReturned int) {
 	listStorageCount.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
 	listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numFetched))

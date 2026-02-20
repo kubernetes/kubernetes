@@ -289,7 +289,7 @@ var (
 			Name:           "watch_list_duration_seconds",
 			Help:           "Response latency distribution in seconds for watch list requests broken by group, version, resource and scope.",
 			Buckets:        []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 2, 4, 6, 8, 10, 15, 20, 30, 45, 60},
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "version", "resource", "scope"},
 	)

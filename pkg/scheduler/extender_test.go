@@ -19,7 +19,6 @@ package scheduler
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -333,7 +332,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, time.Duration(0), nil)
+			cache := internalcache.New(ctx, nil)
 			for _, name := range test.nodes {
 				cache.AddNode(logger, createNode(name))
 			}
@@ -359,8 +358,8 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			}
 			sched.applyDefaultHandlers()
 
-			podIgnored := &v1.Pod{}
-			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
+			podInfoIgnored := queuedPodInfoForPod(&v1.Pod{})
+			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfoIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

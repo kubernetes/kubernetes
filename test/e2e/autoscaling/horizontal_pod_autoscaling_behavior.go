@@ -499,7 +499,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 	})
 })
 
-var _ = SIGDescribe(feature.HPAConfigurableTolerance, framework.WithFeatureGate(features.HPAConfigurableTolerance),
+var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithFeatureGate(features.HPAConfigurableTolerance),
 	"Horizontal pod autoscaling (configurable tolerance)", func() {
 		f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

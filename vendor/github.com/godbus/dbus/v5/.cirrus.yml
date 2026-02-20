@@ -1,11 +1,11 @@
 # See https://cirrus-ci.org/guide/FreeBSD/
 freebsd_instance:
-  image_family: freebsd-14-2
+  image_family: freebsd-14-3
 
 task:
   name: Test on FreeBSD
-  install_script: pkg install -y go122 dbus
+  install_script: pkg install -y go125 dbus
   test_script: |
     /usr/local/etc/rc.d/dbus onestart && \
     eval `dbus-launch --sh-syntax` && \
-    go122 test -v ./...
+    go125 test -v ./...

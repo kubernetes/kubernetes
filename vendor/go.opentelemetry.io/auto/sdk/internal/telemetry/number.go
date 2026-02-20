@@ -41,7 +41,7 @@ func (i *protoInt64) UnmarshalJSON(data []byte) error {
 // strings or integers.
 type protoUint64 uint64
 
-// Int64 returns the protoUint64 as a uint64.
+// Uint64 returns the protoUint64 as a uint64.
 func (i *protoUint64) Uint64() uint64 { return uint64(*i) }
 
 // UnmarshalJSON decodes both strings and integers.

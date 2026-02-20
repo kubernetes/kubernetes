@@ -573,6 +573,18 @@ func (c *Config) AddHealthChecks(healthChecks ...healthz.HealthChecker) {
 	c.ReadyzChecks = append(c.ReadyzChecks, healthChecks...)
 }
 
+// AddHealthzChecks adds the provided health checks to our config to be exposed by the
+// healthz endpoint of our configured apiserver.
+func (c *Config) AddHealthzChecks(healthChecks ...healthz.HealthChecker) {
+	c.HealthzChecks = append(c.HealthzChecks, healthChecks...)
+}
+
+// AddLivezChecks adds the provided health checks to our config to be exposed by the
+// livez endpoint of our configured apiserver.
+func (c *Config) AddLivezChecks(healthChecks ...healthz.HealthChecker) {
+	c.LivezChecks = append(c.LivezChecks, healthChecks...)
+}
+
 // AddReadyzChecks adds a health check to our config to be exposed by the readyz endpoint
 // of our configured apiserver.
 func (c *Config) AddReadyzChecks(healthChecks ...healthz.HealthChecker) {
@@ -818,6 +830,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		UnprotectedDebugSocket:         debugSocket,
 
 		listedPathProvider: apiServerHandler,
+		Flagz:              c.Flagz,
 
 		minRequestTimeout:                   time.Duration(c.MinRequestTimeout) * time.Second,
 		ShutdownTimeout:                     c.RequestTimeout,

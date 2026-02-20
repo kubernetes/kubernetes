@@ -37,6 +37,15 @@ type priorityWriteSchedulerRFC9218 struct {
 	// incremental streams or not, when urgency is the same in a given Pop()
 	// call.
 	prioritizeIncremental bool
+
+	// priorityUpdateBuf is used to buffer the most recent PRIORITY_UPDATE we
+	// receive per https://www.rfc-editor.org/rfc/rfc9218.html#name-the-priority_update-frame.
+	priorityUpdateBuf struct {
+		// streamID being 0 means that the buffer is empty. This is a safe
+		// assumption as PRIORITY_UPDATE for stream 0 is a PROTOCOL_ERROR.
+		streamID uint32
+		priority PriorityParam
+	}
 }
 
 func newPriorityWriteSchedulerRFC9218() WriteScheduler {
@@ -49,6 +58,10 @@ func newPriorityWriteSchedulerRFC9218() WriteScheduler {
 func (ws *priorityWriteSchedulerRFC9218) OpenStream(streamID uint32, opt OpenStreamOptions) {
 	if ws.streams[streamID].location != nil {
 		panic(fmt.Errorf("stream %d already opened", streamID))
+	}
+	if streamID == ws.priorityUpdateBuf.streamID {
+		ws.priorityUpdateBuf.streamID = 0
+		opt.priority = ws.priorityUpdateBuf.priority
 	}
 	q := ws.queuePool.get()
 	ws.streams[streamID] = streamMetadata{
@@ -95,6 +108,8 @@ func (ws *priorityWriteSchedulerRFC9218) AdjustStream(streamID uint32, priority 
 	metadata := ws.streams[streamID]
 	q, u, i := metadata.location, metadata.priority.urgency, metadata.priority.incremental
 	if q == nil {
+		ws.priorityUpdateBuf.streamID = streamID
+		ws.priorityUpdateBuf.priority = priority
 		return
 	}
 

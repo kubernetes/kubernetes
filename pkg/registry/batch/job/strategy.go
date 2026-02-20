@@ -192,7 +192,7 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		notStarted := oldJob.Status.StartTime == nil
 		opts.AllowMutableSchedulingDirectives = suspended && notStarted
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutablePodResourcesForSuspendedJobs) {
-			opts.AllowMutablePodResources = batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
+			opts.AllowMutablePodResources = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutableSchedulingDirectivesForSuspendedJobs) {
 			opts.AllowMutableSchedulingDirectives = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0

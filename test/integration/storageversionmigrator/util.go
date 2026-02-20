@@ -1173,7 +1173,6 @@ func (svm *svmTest) createChaos(ctx context.Context, t *testing.T) {
 	const workers = 10
 	wg.Add(workers)
 	for i := range workers {
-		i := i
 		go func() {
 			defer wg.Done()
 

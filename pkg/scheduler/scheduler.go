@@ -60,12 +60,6 @@ import (
 	"k8s.io/utils/clock"
 )
 
-const (
-	// Duration the scheduler will wait before expiring an assumed pod.
-	// See issue #106361 for more details about this parameter and its value.
-	durationToExpireAssumedPod time.Duration = 0
-)
-
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
@@ -90,7 +84,7 @@ type Scheduler struct {
 	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
 	// Return a struct of ScheduleResult with the name of suggested host on success,
 	// otherwise will return a FitError with reasons.
-	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error)
+	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error)
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
@@ -324,6 +318,9 @@ func New(ctx context.Context,
 	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
+	// podsInPreBind holds all the pods that are in the scheduler in the preBind phase
+	podsInPreBind := frameworkruntime.NewPodsInPreBindMap()
+
 	var resourceClaimCache *assumecache.AssumeCache
 	var resourceSliceTracker *resourceslicetracker.Tracker
 	var draManager fwk.SharedDRAManager
@@ -356,7 +353,7 @@ func New(ctx context.Context,
 	}
 	var workloadManager internalworkloadmanager.WorkloadManager
 	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		workloadManager = internalworkloadmanager.New()
+		workloadManager = internalworkloadmanager.New(logger)
 	}
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
@@ -371,6 +368,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithExtenders(extenders),
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
 		frameworkruntime.WithWaitingPods(waitingPods),
+		frameworkruntime.WithPodsInPreBind(podsInPreBind),
 		frameworkruntime.WithAPIDispatcher(apiDispatcher),
 		frameworkruntime.WithSharedCSIManager(sharedCSIManager),
 		frameworkruntime.WithWorkloadManager(workloadManager),
@@ -418,7 +416,7 @@ func New(ctx context.Context,
 		internalqueue.WithAPIDispatcher(apiDispatcher),
 	)
 
-	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod, apiDispatcher)
+	schedulerCache := internalcache.New(ctx, apiDispatcher)
 
 	var apiCache fwk.APICacher
 	if apiDispatcher != nil {

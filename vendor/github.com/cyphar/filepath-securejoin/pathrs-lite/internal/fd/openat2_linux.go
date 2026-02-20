@@ -39,7 +39,9 @@ const scopedLookupMaxRetries = 128
 
 // Openat2 is an [Fd]-based wrapper around unix.Openat2, but with some retry
 // logic in case of EAGAIN errors.
-func Openat2(dir Fd, path string, how *unix.OpenHow) (*os.File, error) {
+//
+// NOTE: This is a variable so that the lookup tests can force openat2 to fail.
+var Openat2 = func(dir Fd, path string, how *unix.OpenHow) (*os.File, error) {
 	dirFd, fullPath := prepareAt(dir, path)
 	// Make sure we always set O_CLOEXEC.
 	how.Flags |= unix.O_CLOEXEC

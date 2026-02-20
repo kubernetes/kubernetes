@@ -131,6 +131,8 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		NumCores:         numCores,
 		NumPhysicalCores: GetPhysicalCores(cpuinfo),
 		NumSockets:       GetSockets(cpuinfo),
+		NumBooks:         GetBooks(cpuinfo),
+		NumDrawers:       GetDrawers(cpuinfo),
 		CpuFrequency:     clockSpeed,
 		MemoryCapacity:   memoryCapacity,
 		MemoryByType:     memoryByType,

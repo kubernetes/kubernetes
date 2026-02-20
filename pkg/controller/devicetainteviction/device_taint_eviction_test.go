@@ -1995,7 +1995,6 @@ func testHandlers(tContext *testContext, tc testCase) {
 		assertEqual(tContext, state.queuedProcessed, tContext.mockQueue.State(), prefix+"work queue after processing", queueCmpOpts...)
 		time.Sleep(state.advance)
 		for _, item := range tContext.mockQueue.State().Later {
-			fmt.Println(item.Item, item.Duration)
 			tContext.mockQueue.CancelAfter(item.Item)
 			tContext.mockQueue.AddAfter(item.Item, item.Duration-state.advance)
 		}

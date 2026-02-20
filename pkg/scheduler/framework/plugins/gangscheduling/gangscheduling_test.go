@@ -17,7 +17,6 @@ limitations under the License.
 package gangscheduling
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -244,7 +243,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			wantPreEnqueueStatus: nil,
 			wantActivatedPods:    []*v1.Pod{p3},
 			// At Permit, p1 will be assumed, but the count (2) is less than the quorum (3), so it must wait.
-			wantPermitStatus: fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be waiting on permit"),
+			wantPermitStatus: fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be scheduled"),
 		},
 		{
 			name:                 "final gang pod arrives at Permit and allows all waiting pods from a gang",
@@ -260,11 +259,8 @@ func TestGangSchedulingFlow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-
-			manager := workloadmanager.New()
+			logger, ctx := ktesting.NewTestContext(t)
+			manager := workloadmanager.New(logger)
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
 			workloadInformer := informerFactory.Scheduling().V1alpha1().Workloads()

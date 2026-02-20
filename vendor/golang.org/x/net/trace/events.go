@@ -58,8 +58,8 @@ func RenderEvents(w http.ResponseWriter, req *http.Request, sensitive bool) {
 		Buckets: buckets,
 	}
 
-	data.Families = make([]string, 0, len(families))
 	famMu.RLock()
+	data.Families = make([]string, 0, len(families))
 	for name := range families {
 		data.Families = append(data.Families, name)
 	}

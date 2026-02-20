@@ -116,7 +116,7 @@ func TestUpdateOrCreateTokens(t *testing.T) {
 }
 
 func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
-	client := clientsetfake.NewClientset()
+	client := clientsetfake.NewSimpleClientset()
 	_, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), &v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",

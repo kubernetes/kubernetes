@@ -21,7 +21,10 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	internal "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/internal"
 )
 
 // FischerApplyConfiguration represents a declarative configuration of the Fischer type for use
@@ -41,6 +44,40 @@ func Fischer(name string) *FischerApplyConfiguration {
 	b.WithKind("Fischer")
 	b.WithAPIVersion("wardle.example.com/v1alpha1")
 	return b
+}
+
+// ExtractFischerFrom extracts the applied configuration owned by fieldManager from
+// fischer for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// fischer must be a unmodified Fischer API object that was retrieved from the Kubernetes API.
+// ExtractFischerFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractFischerFrom(fischer *wardlev1alpha1.Fischer, fieldManager string, subresource string) (*FischerApplyConfiguration, error) {
+	b := &FischerApplyConfiguration{}
+	err := managedfields.ExtractInto(fischer, internal.Parser().Type("io.k8s.sample-apiserver.pkg.apis.wardle.v1alpha1.Fischer"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(fischer.Name)
+
+	b.WithKind("Fischer")
+	b.WithAPIVersion("wardle.example.com/v1alpha1")
+	return b, nil
+}
+
+// ExtractFischer extracts the applied configuration owned by fieldManager from
+// fischer. If no managedFields are found in fischer for fieldManager, a
+// FischerApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// fischer must be a unmodified Fischer API object that was retrieved from the Kubernetes API.
+// ExtractFischer provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractFischer(fischer *wardlev1alpha1.Fischer, fieldManager string) (*FischerApplyConfiguration, error) {
+	return ExtractFischerFrom(fischer, fieldManager, "")
 }
 
 func (b FischerApplyConfiguration) IsApplyConfiguration() {}

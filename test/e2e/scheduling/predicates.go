@@ -1267,6 +1267,12 @@ func getNodeHostIP(ctx context.Context, f *framework.Framework, nodeName string)
 	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, family)
-	gomega.Expect(ips).ToNot(gomega.BeEmpty())
+	if len(ips) == 0 {
+		ips = e2enode.GetAddressesByTypeAndFamily(node, v1.NodeExternalIP, family)
+	}
+	if len(ips) == 0 {
+		framework.Failf("No address by family (%s) on node (%s) found.",
+			family, nodeName)
+	}
 	return ips[0]
 }

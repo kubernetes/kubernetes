@@ -146,11 +146,12 @@ build-tests/%:
 
 # Tests
 
-TEST_TARGETS := test-default test-bench test-short test-verbose test-race test-concurrent-safe
+TEST_TARGETS := test-default test-bench test-short test-verbose test-race test-concurrent-safe test-fuzz
 .PHONY: $(TEST_TARGETS) test
 test-default test-race: ARGS=-race
 test-bench:   ARGS=-run=xxxxxMatchNothingxxxxx -test.benchtime=1ms -bench=.
 test-short:   ARGS=-short
+test-fuzz:    ARGS=-fuzztime=10s -fuzz
 test-verbose: ARGS=-v -race
 test-concurrent-safe: ARGS=-run=ConcurrentSafe -count=100 -race
 test-concurrent-safe: TIMEOUT=120

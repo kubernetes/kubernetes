@@ -65,7 +65,7 @@ type quotaEvaluator struct {
 	workLock   sync.Mutex
 	work       map[string][]*admissionWaiter
 	dirtyWork  map[string][]*admissionWaiter
-	inProgress sets.String
+	inProgress sets.Set[string]
 
 	// controls the run method so that we can cleanly conform to the Evaluator interface
 	workers int
@@ -125,7 +125,7 @@ func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.
 		queue:      workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "admission_quota_controller"}),
 		work:       map[string][]*admissionWaiter{},
 		dirtyWork:  map[string][]*admissionWaiter{},
-		inProgress: sets.String{},
+		inProgress: sets.Set[string]{},
 
 		workers: workers,
 		stopCh:  stopCh,

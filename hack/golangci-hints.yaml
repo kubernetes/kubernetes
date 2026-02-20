@@ -147,7 +147,7 @@ linters:
       # Commentstart - Ignore commentstart issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "godoc for field .* should start with '.* ...'"
-        path: "staging/src/k8s.io/api/(admissionregistration|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+        path: "staging/src/k8s.io/api/(apiserverinternal|apps|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
       - text: "field .* is missing godoc comment"
         path: "staging/src/k8s.io/api/autoscaling/"
       
@@ -211,6 +211,30 @@ linters:
         path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
       - text: "field (CapacityRequirements.Requests|DeviceRequestAllocationResult.ConsumedCapacity) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+      
+      # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
+      # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
+      - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/(admission|apidiscovery|apps|authorization|autoscaling|batch|certificates|core|discovery|events|extensions|flowcontrol|networking|rbac|resource|storage)"
+      
+      # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
+      - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
+        path: "staging/src/k8s.io/api/(core/v1|extensions/v1beta1|networking/(v1|v1beta1))"
+      
+      # jsontags: 'Port' must be capitalized for backward compatibility
+      - text: 'jsontags: field DaemonEndpoint.Port json tag does not match'
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      
+      # NonPointerStructs - Existing fields that are non-pointer structs but where the current rules are incorrect.
+      
+      # The PodGroup.Policy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
+      # Validation makes this require at least one of the fields within to be set.
+      - text: "nonpointerstructs: field PodGroup.Policy is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/scheduling/v1alpha1/types.go"
+
+      - linters:
+        - forbidigo
+        path: test/e2e/e2e_test\.go|test/e2e/framework/internal/.*|test/e2e/framework/[^/]*\.go|test/e2e/invariants/.*
 
   default: standard
   enable: # please keep this alphabetized
@@ -223,6 +247,7 @@ linters:
     - ineffassign
     - kubeapilinter
     - logcheck
+    - modernize
     - revive
     - sorted
     - staticcheck
@@ -272,6 +297,7 @@ linters:
             contextual k8s.io/client-go/tools/cache/.*
             contextual k8s.io/client-go/tools/events/.*
             contextual k8s.io/client-go/tools/record/.*
+            contextual k8s.io/component-base/featuregate/*
             contextual k8s.io/component-helpers/.*
             contextual k8s.io/cri-api/.*
             contextual k8s.io/cri-client/.*
@@ -382,20 +408,23 @@ linters:
               - "conditions" # Ensure conditions have the correct json tags and markers.
               - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
               - "integers" # Ensure only int32 and int64 are used for integers.
-              # - "jsontags" # Ensure every field has a json tag.
+              - "jsontags" # Ensure every field has a json tag.
               # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
               # - "nobools" # Bools do not evolve over time, should use enums instead.
               # - "nofloats" # Ensure floats are not used.
               - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
+              - "nonpointerstructs" # Ensure non-pointer structs are correctly tagged as optional or required.
               - "nonullable" # Ensure fields are not marked as nullable.
               # - "nophase" # Ensure field names do not have the word "phase" in them.
               - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
               # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
-              # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
+              - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
               # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
               - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
               - "duplicatemarkers" #Prevent identical markers from being present on types and fields
+              - "dependenttags" # Ensure markers dependent on other markers are present.
+              - "nodurations" # Ensure duration types are not used.
           lintersConfig:
             conditions:
               isFirstField: Ignore
@@ -413,12 +442,17 @@ linters:
                 - ["k8s:required", "required", "kubebuilder:validation:Required"]
                 - ["default"]
                 description: "fields with default values are always optional"
+            dependenttags:
+              rules:
+                - identifier: "k8s:unionMember"
+                  type: "All"
+                  dependsOn:
+                    - "k8s:optional"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:
             #   policy: AllowStringToStringMaps # Determines how the linter should handle maps of basic types. Maps of objects are always disallowed.
             # optionalFields:
-            #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.optionalfields:
             #  pointers:
             #    preference: Always | WhenRequired # Whether to always require pointers, or only when required. Defaults to `Always`.
             #    policy: SuggestFix | Warn # The policy for pointers in optional fields. Defaults to `SuggestFix`.
@@ -429,7 +463,6 @@ linters:
             # optionalOrRequired:
             #   preferredOptionalMarker: optional # The preferred optional marker to use, fixes will suggest to use this marker. Defaults to `optional`.
             #   preferredRequiredMarker: required # The preferred required marker to use, fixes will suggest to use this marker. Defaults to `required`. 
-            #   policy: AllowOptionalFields # Determines how the linter should handle optional fields.
             # requiredFields:
             #   pointers:
             #    policy: SuggestFix | Warn # The policy for pointers in required fields. Defaults to `SuggestFix`.
@@ -479,12 +512,59 @@ linters:
         - pattern: \.Add$
           pkg: ^k8s\.io/component-base/featuregate$         
           msg: should not use Add, use AddVersioned instead
+        - pattern: \.(ReportBeforeSuite|ReportAfterSuite)
+          pkg: ^github\.com/onsi/ginkgo/v2$
+          msg: usage is restricted to code under control of SIG Testing
+          # Exceptions are listed above under rules.
         - pattern: ^gomega\.BeTrue$
           pkg: ^github.com/onsi/gomega$
           msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
         - pattern: ^gomega\.BeFalse$
           pkg: ^github.com/onsi/gomega$
           msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+    modernize:
+      # List of analyzers to disable.
+      # By default, all analyzers are enabled but in
+      # Kubernetes we want to be more selective and
+      # disable those which are not useful for it.
+      #
+      # Analyzers which are kept enabled are not
+      # called out here, see https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/modernize#section-documentation
+      # for the full list.
+      disable:
+        # Replace interface{} with any.
+        #
+        # Disabled because developers may
+        # prefer to use `interface{}` for
+        # consistency with existing code
+        # and it's just syntactic sugar.
+        - any
+        # Suggest replacing omitempty with omitzero for struct fields.
+        #
+        # Disabled because might interfere
+        # with encoding of API structs.
+        - omitzero
+        # Replace += with strings.Builder.
+        #
+        # Disabled because in code which
+        # isn't performance-sensitive +=
+        # can be a bit more readable.
+        - stringsbuilder
+        # Replace context.WithCancel with t.Context in tests.
+        #
+        # Disabled because in Kubernetes,
+        # test/utils/ktesting handles
+        # context cancellation and also
+        # addresses other pain points.
+        - testingcontext
+        # Replace wg.Add(1)/go/wg.Done() with wg.Go.
+        #
+        # A useful hint leading to shorter code.
+        # Makes wait.Group obsolete.
+        # Please enable when all supported Kubernetes versions
+        # are on GoLang 1.25+
+        - waitgroup
+
     revive:
       # Only these rules are enabled.
       rules:

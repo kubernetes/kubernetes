@@ -462,6 +462,8 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimRef kub
 
 	logger := klog.FromContext(ctx)
 
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
 	claimID := ClaimID{Name: claimRef.Name, UID: claimRef.UID}
 	devices, ok := ex.prepared[claimID]
 	if !ok {
@@ -593,6 +595,17 @@ func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resour
 // To restore normal GetInfo behavior, call SetGetInfoError(nil).
 func (ex *ExamplePlugin) SetGetInfoError(err error) {
 	ex.d.SetGetInfoError(err)
+}
+
+// SetNotifyRegistrationStatusError sets an error to be returned by the
+// plugin's NotifyRegistrationStatus call.
+// This can be used in tests to simulate a registration failure scenario,
+// allowing verification that the kubelet plugin manager retries registration
+// when NotifyRegistrationStatus fails.
+//
+// To restore normal NotifyRegistrationStatus behavior, call SetNotifyRegistrationStatusError(nil).
+func (ex *ExamplePlugin) SetNotifyRegistrationStatusError(err error) {
+	ex.d.SetNotifyRegistrationStatusError(err)
 }
 
 func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1alpha1.NodeWatchResourcesRequest, srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {

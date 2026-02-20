@@ -213,7 +213,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.ShareProcesses, "share-processes", o.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
 	cmd.Flags().StringVar(&o.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
-	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Options are "legacy", "general", "baseline", "netadmin", "restricted" or "sysadmin".`))
+	cmd.Flags().StringVar(&o.Profile, "profile", ProfileGeneral, i18n.T(`Options are "general", "baseline", "restricted", "netadmin" or "sysadmin". Defaults to "general"`))
 	cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON or YAML file containing a partial container spec to customize built-in debug profiles."))
 }
 
@@ -401,7 +401,7 @@ func (o *DebugOptions) Validate() error {
 
 	// Warning for legacy profile
 	if o.Profile == ProfileLegacy {
-		fmt.Fprintln(o.ErrOut, `--profile=legacy is deprecated and will be removed in the future. It is recommended to explicitly specify a profile, for example "--profile=general".`)
+		fmt.Fprintln(o.ErrOut, `--profile=legacy is deprecated and planned to be removed in v1.39. It is recommended to specify other profile, for example "--profile=general".`) //nolint:errcheck
 	}
 
 	return nil

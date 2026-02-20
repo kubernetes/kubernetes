@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
@@ -314,7 +315,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	if csiRPCError != nil {
 		// If operation finished with error then we can remove the mount directory.
-		if volumetypes.IsOperationFinishedError(csiRPCError) {
+		if volumetypes.IsOperationFinishedError(csiRPCError) && !mounterArgs.ReconstructedVolume {
 			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
 				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
 			}
@@ -560,12 +561,7 @@ func (c *csiMountMgr) supportsVolumeLifecycleMode() error {
 
 // containsVolumeMode checks whether the given volume mode is listed.
 func containsVolumeMode(modes []storage.VolumeLifecycleMode, mode storage.VolumeLifecycleMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(modes, mode)
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check

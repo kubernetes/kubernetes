@@ -32,7 +32,7 @@ var byteType = reflect.TypeOf(byte(0))
 func Unmarshal(tag string, goType reflect.Type, evs protoreflect.EnumValueDescriptors) protoreflect.FieldDescriptor {
 	f := new(filedesc.Field)
 	f.L0.ParentFile = filedesc.SurrogateProto2
-	f.L1.EditionFeatures = f.L0.ParentFile.L1.EditionFeatures
+	packed := false
 	for len(tag) > 0 {
 		i := strings.IndexByte(tag, ',')
 		if i < 0 {
@@ -108,7 +108,7 @@ func Unmarshal(tag string, goType reflect.Type, evs protoreflect.EnumValueDescri
 				f.L1.StringName.InitJSON(jsonName)
 			}
 		case s == "packed":
-			f.L1.EditionFeatures.IsPacked = true
+			packed = true
 		case strings.HasPrefix(s, "def="):
 			// The default tag is special in that everything afterwards is the
 			// default regardless of the presence of commas.
@@ -119,6 +119,13 @@ func Unmarshal(tag string, goType reflect.Type, evs protoreflect.EnumValueDescri
 			f.L0.ParentFile = filedesc.SurrogateProto3
 		}
 		tag = strings.TrimPrefix(tag[i:], ",")
+	}
+
+	// Update EditionFeatures after the loop and after we know whether this is
+	// a proto2 or proto3 field.
+	f.L1.EditionFeatures = f.L0.ParentFile.L1.EditionFeatures
+	if packed {
+		f.L1.EditionFeatures.IsPacked = true
 	}
 
 	// The generator uses the group message name instead of the field name.

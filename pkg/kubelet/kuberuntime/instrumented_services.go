@@ -181,7 +181,7 @@ func (in instrumentedRuntimeService) RunPodSandbox(ctx context.Context, config *
 	const operation = "run_podsandbox"
 	startTime := time.Now()
 	defer recordOperation(operation, startTime)
-	defer metrics.RunPodSandboxDuration.WithLabelValues(runtimeHandler).Observe(metrics.SinceInSeconds(startTime))
+	defer metrics.RunPodSandboxDuration.ObserveSince(startTime, runtimeHandler)()
 
 	out, err := in.service.RunPodSandbox(ctx, config, runtimeHandler)
 	recordError(operation, err)

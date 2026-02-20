@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"os/user"
-	"runtime"
 	"sync"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -61,6 +61,7 @@ var NodePrePullImageList = sets.NewString(
 	imageutils.GetPauseImageName(),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbEp),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbIs),
+	imageutils.GetE2EImage(imageutils.NodePerfPytorchWideDeep),
 	imageutils.GetE2EImage(imageutils.Etcd),
 )
 
@@ -69,11 +70,6 @@ var NodePrePullImageList = sets.NewString(
 // 2. the ones passed in from framework.TestContext.ExtraEnvs
 // So this function needs to be called after the extra envs are applied.
 func updateImageAllowList(ctx context.Context) {
-	// Architecture-specific image
-	if !isRunningOnArm64() {
-		// NodePerfTfWideDeep is only supported on x86_64, pulling in arm64 will fail
-		NodePrePullImageList = NodePrePullImageList.Insert(imageutils.GetE2EImage(imageutils.NodePerfTfWideDeep))
-	}
 	// Union NodePrePullImageList and PrePulledImages into the framework image pre-pull list.
 	e2epod.ImagePrePullList = NodePrePullImageList.Union(commontest.PrePulledImages)
 	// Images from extra envs
@@ -83,20 +79,16 @@ func updateImageAllowList(ctx context.Context) {
 	} else {
 		e2epod.ImagePrePullList.Insert(sriovDevicePluginImage)
 	}
-	if samplePluginImage, err := getContainerImageFromE2ETestDaemonset(SampleDevicePluginDSYAML); err != nil {
+	if samplePluginImage, err := getContainerImageFromE2ETestDaemonset(e2enode.SampleDevicePluginDSYAML); err != nil {
 		klog.Errorln(err)
 	} else {
 		e2epod.ImagePrePullList.Insert(samplePluginImage)
 	}
-	if samplePluginImageCtrlReg, err := getContainerImageFromE2ETestDaemonset(SampleDevicePluginControlRegistrationDSYAML); err != nil {
+	if samplePluginImageCtrlReg, err := getContainerImageFromE2ETestDaemonset(e2enode.SampleDevicePluginControlRegistrationDSYAML); err != nil {
 		klog.Errorln(err)
 	} else {
 		e2epod.ImagePrePullList.Insert(samplePluginImageCtrlReg)
 	}
-}
-
-func isRunningOnArm64() bool {
-	return runtime.GOARCH == "arm64"
 }
 
 func getNodeProblemDetectorImage() string {

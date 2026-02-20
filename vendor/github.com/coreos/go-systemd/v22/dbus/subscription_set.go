@@ -15,6 +15,7 @@
 package dbus
 
 import (
+	"context"
 	"time"
 )
 
@@ -29,14 +30,19 @@ func (s *SubscriptionSet) filter(unit string) bool {
 	return !s.Contains(unit)
 }
 
-// Subscribe starts listening for dbus events for all of the units in the set.
+// SubscribeContext starts listening for dbus events for all of the units in the set.
 // Returns channels identical to conn.SubscribeUnits.
-func (s *SubscriptionSet) Subscribe() (<-chan map[string]*UnitStatus, <-chan error) {
+func (s *SubscriptionSet) SubscribeContext(ctx context.Context) (<-chan map[string]*UnitStatus, <-chan error) {
 	// TODO: Make fully evented by using systemd 209 with properties changed values
-	return s.conn.SubscribeUnitsCustom(time.Second, 0,
+	return s.conn.SubscribeUnitsCustomContext(ctx, time.Second, 0,
 		mismatchUnitStatus,
 		func(unit string) bool { return s.filter(unit) },
 	)
+}
+
+// Deprecated: use SubscribeContext instead.
+func (s *SubscriptionSet) Subscribe() (<-chan map[string]*UnitStatus, <-chan error) {
+	return s.SubscribeContext(context.Background())
 }
 
 // NewSubscriptionSet returns a new subscription set.

@@ -646,16 +646,41 @@ func ValidatePodCertificateRequestCreate(req *certificates.PodCertificateRequest
 		}
 	}
 
+	// Either (PKIXPublicKey, ProofOfPossession) xor (StubPKCS10Request)
+	// must be set.
+
+	//nolint:staticcheck // SA1019 this deprecated field still needs to be validated.
+	if len(req.Spec.StubPKCS10Request) != 0 && len(req.Spec.PKIXPublicKey) == 0 && len(req.Spec.ProofOfPossession) == 0 {
+		// Valid, using StubPKCS10Request
+		allErrors = append(allErrors, validateStubPKCS10Request(req)...)
+		return allErrors
+	} else if len(req.Spec.StubPKCS10Request) == 0 && len(req.Spec.PKIXPublicKey) != 0 && len(req.Spec.ProofOfPossession) != 0 {
+		// Valid, using PKIXPublicKey and ProofOfPossession
+		allErrors = append(allErrors, validateDeprecatedPKIXPublicKey(req)...)
+		return allErrors
+	} else {
+		// Invalid, any other combination.
+		allErrors = append(allErrors, field.Invalid(field.NewPath("spec"), field.OmitValueType{}, "exactly one of (stubPKCS10Request) or (pkixPublicKey, proofOfPossession) must be set"))
+		return allErrors
+	}
+}
+
+func validateDeprecatedPKIXPublicKey(req *certificates.PodCertificateRequest) field.ErrorList {
+	var allErrors field.ErrorList
+
+	//nolint:staticcheck // SA1019 this deprecated field still needs to be validated.
 	if len(req.Spec.PKIXPublicKey) > certificates.MaxPKIXPublicKeySize {
 		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "pkixPublicKey"), req.Spec.PKIXPublicKey, certificates.MaxPKIXPublicKeySize))
 		return allErrors
 	}
 
+	//nolint:staticcheck // SA1019 this deprecated field still needs to be validated.
 	if len(req.Spec.ProofOfPossession) > certificates.MaxProofOfPossessionSize {
 		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "proofOfPossession"), req.Spec.ProofOfPossession, certificates.MaxProofOfPossessionSize))
 		return allErrors
 	}
 
+	//nolint:staticcheck // SA1019 this deprecated field still needs to be validated.
 	pubAny, err := x509.ParsePKIXPublicKey(req.Spec.PKIXPublicKey)
 	if err != nil {
 		allErrors = append(allErrors, field.Invalid(pkixPath, req.Spec.PKIXPublicKey, "must be a valid PKIX-serialized public key"))
@@ -699,6 +724,54 @@ func ValidatePodCertificateRequestCreate(req *certificates.PodCertificateRequest
 	return allErrors
 }
 
+func validateStubPKCS10Request(req *certificates.PodCertificateRequest) field.ErrorList {
+	var allErrors field.ErrorList
+
+	if len(req.Spec.StubPKCS10Request) > certificates.MaxStubPKCS10RequestSize {
+		allErrors = append(allErrors, field.TooLong(pkcs10ReqPath, req.Spec.StubPKCS10Request, certificates.MaxStubPKCS10RequestSize))
+		return allErrors
+	}
+
+	pkcs10Req, err := x509.ParseCertificateRequest(req.Spec.StubPKCS10Request)
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, field.OmitValueType{}, "must be a valid PKCS#10 CSR"))
+		return allErrors
+	}
+
+	// Check key type and parameters
+	switch pkcs10Pub := pkcs10Req.PublicKey.(type) {
+	case ed25519.PublicKey:
+		// ed25519 has no key configuration to check
+	case *ecdsa.PublicKey:
+		if pkcs10Pub.Curve != elliptic.P256() && pkcs10Pub.Curve != elliptic.P384() && pkcs10Pub.Curve != elliptic.P521() {
+			allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, "curve "+pkcs10Pub.Curve.Params().Name, "elliptic public keys must use curve P256, P384, or P521"))
+			return allErrors
+		}
+	case *rsa.PublicKey:
+		if pkcs10Pub.Size()*8 != 3072 && pkcs10Pub.Size()*8 != 4096 {
+			allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, fmt.Sprintf("%d-bit modulus", pkcs10Pub.Size()*8), "RSA keys must have modulus size 3072 or 4096"))
+			return allErrors
+		}
+	default:
+		allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, field.OmitValueType{}, "unknown public key type; supported types are Ed25519, ECDSA, and RSA"))
+		return allErrors
+	}
+
+	// We explicitly do not validate the contents of the stub CSR.  Kubelet
+	// always generates empty CSRs.  Having kube-apiserver not care about the
+	// contents eases any future evolution we want to do here.
+	//
+	// Signers shipped by the Kubernetes project should deny the request if the
+	// CSR is not empty.
+
+	if err := pkcs10Req.CheckSignature(); err != nil {
+		allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, field.OmitValueType{}, "invalid signature"))
+		return allErrors
+	}
+
+	return allErrors
+}
+
 func hashBytes(in []byte) []byte {
 	out := sha256.Sum256(in)
 	return out[:]
@@ -707,6 +780,7 @@ func hashBytes(in []byte) []byte {
 var (
 	pkixPath         = field.NewPath("spec", "pkixPublicKey")
 	popPath          = field.NewPath("spec", "proofOfPossession")
+	pkcs10ReqPath    = field.NewPath("spec", "stubPKCS10Request")
 	certChainPath    = field.NewPath("status", "certificateChain")
 	notBeforePath    = field.NewPath("status", "notBefore")
 	notAfterPath     = field.NewPath("status", "notAfter")
@@ -826,12 +900,25 @@ func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodC
 			}
 		}
 
-		// Was the certificate issued to the public key in the spec?
-		wantPKAny, err := x509.ParsePKIXPublicKey(oldReq.Spec.PKIXPublicKey)
-		if err != nil {
-			allErrors = append(allErrors, field.Invalid(pkixPath, oldReq.Spec.PKIXPublicKey, "must be a valid PKIX-serialized public key"))
-			return allErrors
+		// Get the public key from either StubPKCS10Request or PKIXPublicKey.
+		var wantPKAny crypto.PublicKey
+		if len(oldReq.Spec.StubPKCS10Request) != 0 {
+			pkcs10Req, err := x509.ParseCertificateRequest(oldReq.Spec.StubPKCS10Request)
+			if err != nil {
+				allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, field.OmitValueType{}, "must be a valid PKCS#10 CSR"))
+				return allErrors
+			}
+			wantPKAny = pkcs10Req.PublicKey
+		} else {
+			//nolint:staticcheck // SA1019 this deprecated field still needs to be validated.
+			wantPKAny, err = x509.ParsePKIXPublicKey(oldReq.Spec.PKIXPublicKey)
+			if err != nil {
+				allErrors = append(allErrors, field.Invalid(pkixPath, field.OmitValueType{}, "must be a valid PKIX-serialized public key"))
+				return allErrors
+			}
 		}
+
+		// Was the certificate issued to the public key in the spec?
 		switch wantPK := wantPKAny.(type) {
 		case ed25519.PublicKey:
 			if !wantPK.Equal(leafCert.PublicKey) {

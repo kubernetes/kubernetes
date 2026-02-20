@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
+	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/test/e2e/framework"
 	netutil "k8s.io/utils/net"
 )
@@ -500,6 +501,49 @@ func hasNonblockingTaint(node *v1.Node, nonblockingTaints string) bool {
 	return false
 }
 
+// GetNodeAllocatableAndAvailableQuantities with resourceName set to v1.ResourceCPU ( or set to v1.ResourceMemory ) returns
+//   - the first return value, upon success is the allocatable portion of a node's total "CPU" ( or "Memory" ) capacity that's available for pods to use,
+//     calculated by subtracting "CPU" ( or "Memory") resources reserved for node's operating system, Kubelet and other
+//     system daemons from the node's total "CPU" ( or "Memory" ) resource, upon failure is empty.
+//   - the second return value, upon success is the available portion of a node's allocatable "CPU" capacity, calculated by subtracting "CPU"
+//     ( or "Memory" ) resource reserved for node's pods from the node's allocatable "CPU" ( or "Memory" ) resource, upon failure is empty.
+//   - the third return value, upon success is nil, upon failure is the coresponding error.
+func GetNodeAllocatableAndAvailableQuantities(ctx context.Context, c clientset.Interface, n *v1.Node, resourceName v1.ResourceName) (resource.Quantity, resource.Quantity, error) {
+	var nodeAllocatable, podAllocated, nodeAvailable resource.Quantity
+	switch resourceName {
+	case v1.ResourceCPU:
+		nodeAllocatable = n.Status.Allocatable.Cpu().DeepCopy()
+	case v1.ResourceMemory:
+		nodeAllocatable = n.Status.Allocatable.Memory().DeepCopy()
+	default:
+		return resource.Quantity{}, resource.Quantity{}, fmt.Errorf("unexpected resource type %q; expected either 'CPU' or 'Memory'", resourceName)
+	}
+
+	if n.Status.Allocatable == nil {
+		return resource.Quantity{}, resource.Quantity{}, fmt.Errorf("unexpected empty value of allocatable, while attempting to get node's allocatable %s", resourceName.String())
+	}
+
+	// Exclude pods that are in the Succeeded or Failed states
+	selector := fmt.Sprintf("spec.nodeName=%s,status.phase!=%v,status.phase!=%v", n.Name, v1.PodSucceeded, v1.PodFailed)
+	listOptions := metav1.ListOptions{FieldSelector: selector}
+	podList, err := c.CoreV1().Pods(metav1.NamespaceAll).List(ctx, listOptions)
+	if err != nil {
+		return resource.Quantity{}, resource.Quantity{}, fmt.Errorf("error getting list of pods: %w, while attempting to get node's allocatable %s", err, resourceName.String())
+	}
+
+	for _, pod := range podList.Items {
+		podRequest := resourceapi.GetResourceRequestQuantity(&pod, resourceName)
+		podAllocated.Add(podRequest)
+	}
+	nodeAvailable = nodeAllocatable.DeepCopy()
+	nodeAvailable.Sub(podAllocated)
+	if nodeAvailable.Sign() < 0 {
+		return resource.Quantity{}, resource.Quantity{}, fmt.Errorf("unexpected negative value of nodeAvailable %s, while attempting to get node's allocatable and available %s", nodeAvailable.String(), resourceName.String())
+	}
+
+	return nodeAllocatable, nodeAvailable, nil
+}
+
 // GetNodeHeartbeatTime returns the timestamp of the last status update of the node.
 func GetNodeHeartbeatTime(node *v1.Node) metav1.Time {
 	for _, condition := range node.Status.Conditions {
@@ -533,7 +577,7 @@ func PodNodePairs(ctx context.Context, c clientset.Interface, ns string) ([]PodN
 func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
 	nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %w", err)
+		return nil, fmt.Errorf("error getting nodes while attempting to list cluster zones: %w", err)
 	}
 
 	// collect values of zone label from all nodes

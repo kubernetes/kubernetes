@@ -74,7 +74,7 @@ func (p *DRAPlugin) NodePrepareResources(
 	req *drapbv1.NodePrepareResourcesRequest,
 	opts ...grpc.CallOption,
 ) (*drapbv1.NodePrepareResourcesResponse, error) {
-	logger := klog.FromContext(ctx)
+	logger := klog.FromContext(ctx).WithName("dra-plugin")
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("Calling NodePrepareResources rpc", "request", req)
@@ -105,10 +105,11 @@ func (p *DRAPlugin) NodeUnprepareResources(
 	req *drapbv1.NodeUnprepareResourcesRequest,
 	opts ...grpc.CallOption,
 ) (*drapbv1.NodeUnprepareResourcesResponse, error) {
-	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
+	logger := klog.FromContext(ctx).WithName("dra-plugin")
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
+
+	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
 
 	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
@@ -157,9 +158,10 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 
 // NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
 func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
+	logger := klog.FromContext(ctx).WithName("dra-plugin")
+	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	healthClient := drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
 
-	logger := klog.FromContext(ctx).WithValues("pluginName", p.driverName)
 	logger.V(4).Info("Starting WatchResources stream")
 	stream, err := healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
 	if err != nil {

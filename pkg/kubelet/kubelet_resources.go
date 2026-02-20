@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -35,12 +36,12 @@ import (
 // If a container has no limits specified, it defaults to the pod-level resources.
 // If neither container-level nor pod-level resources limits are specified, it defaults
 // to the node's allocatable resources.
-func (kl *Kubelet) defaultPodLimitsForDownwardAPI(pod *corev1.Pod, container *corev1.Container) (*corev1.Pod, *corev1.Container, error) {
+func (kl *Kubelet) defaultPodLimitsForDownwardAPI(ctx context.Context, pod *corev1.Pod, container *corev1.Container) (*corev1.Pod, *corev1.Container, error) {
 	if pod == nil {
 		return nil, nil, fmt.Errorf("invalid input, pod cannot be nil")
 	}
 
-	node, err := kl.getNodeAnyWay()
+	node, err := kl.getNodeAnyWay(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to find node object, expected a node")
 	}

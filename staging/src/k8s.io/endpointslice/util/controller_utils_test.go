@@ -25,10 +25,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
 
@@ -946,5 +946,17 @@ func TestDeepObjectPointer(t *testing.T) {
 		if hash1 != hash3 {
 			t.Errorf("hash1 (%d) and hash3(%d) must be the same because although they point to different objects, they have the same values for wheel size", hash1, hash3)
 		}
+	}
+}
+
+func TestNewPortMapKey_NilVsEmptySlice(t *testing.T) {
+	var nilPorts []discovery.EndpointPort
+	emptyPorts := []discovery.EndpointPort{}
+
+	nilKey := NewPortMapKey(nilPorts)
+	emptyKey := NewPortMapKey(emptyPorts)
+
+	if nilKey != emptyKey {
+		t.Errorf("NewPortMapKey should return the same key for nil and empty slice, got nil=%q empty=%q", nilKey, emptyKey)
 	}
 }

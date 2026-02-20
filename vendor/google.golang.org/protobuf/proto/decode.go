@@ -121,9 +121,8 @@ func (o UnmarshalOptions) unmarshal(b []byte, m protoreflect.Message) (out proto
 
 		out, err = methods.Unmarshal(in)
 	} else {
-		o.RecursionLimit--
-		if o.RecursionLimit < 0 {
-			return out, errors.New("exceeded max recursion depth")
+		if o.RecursionLimit--; o.RecursionLimit < 0 {
+			return out, errRecursionDepth
 		}
 		err = o.unmarshalMessageSlow(b, m)
 	}
@@ -220,6 +219,9 @@ func (o UnmarshalOptions) unmarshalSingular(b []byte, wtyp protowire.Type, m pro
 }
 
 func (o UnmarshalOptions) unmarshalMap(b []byte, wtyp protowire.Type, mapv protoreflect.Map, fd protoreflect.FieldDescriptor) (n int, err error) {
+	if o.RecursionLimit--; o.RecursionLimit < 0 {
+		return 0, errRecursionDepth
+	}
 	if wtyp != protowire.BytesType {
 		return 0, errUnknown
 	}
@@ -305,3 +307,5 @@ func (o UnmarshalOptions) unmarshalMap(b []byte, wtyp protowire.Type, mapv proto
 var errUnknown = errors.New("BUG: internal error (unknown)")
 
 var errDecode = errors.New("cannot parse invalid wire-format data")
+
+var errRecursionDepth = errors.New("exceeded maximum recursion depth")

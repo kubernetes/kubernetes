@@ -111,7 +111,7 @@ func (TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 	}
 
 	// Clear all flags other than the trace-context supported sampling bit.
-	scc.TraceFlags = trace.TraceFlags(opts[0]) & trace.FlagsSampled
+	scc.TraceFlags = trace.TraceFlags(opts[0]) & trace.FlagsSampled // nolint:gosec // slice size already checked.
 
 	// Ignore the error returned here. Failure to parse tracestate MUST NOT
 	// affect the parsing of traceparent according to the W3C tracecontext

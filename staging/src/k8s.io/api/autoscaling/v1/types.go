@@ -47,9 +47,15 @@ type HorizontalPodAutoscalerSpec struct {
 	// metric is configured.  Scaling is active as long as at least one metric value is
 	// available.
 	// +optional
+	// +k8s:optional
+	// +k8s:ifEnabled(HPAScaleToZero)=+k8s:minimum=0
+	// +k8s:ifDisabled(HPAScaleToZero)=+k8s:minimum=1
 	MinReplicas *int32 `json:"minReplicas,omitempty" protobuf:"varint,2,opt,name=minReplicas"`
 
 	// maxReplicas is the upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
+	// +required
+	// +k8s:required
+	// +k8s:minimum=1
 	MaxReplicas int32 `json:"maxReplicas" protobuf:"varint,3,opt,name=maxReplicas"`
 
 	// targetCPUUtilizationPercentage is the target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
@@ -93,7 +99,7 @@ type HorizontalPodAutoscaler struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec defines the behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
-	// +optional
+	// +required
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is the current information about the autoscaler.

@@ -2390,6 +2390,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 
 func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, allocatedPods []*v1.Pod, nodeConfig *cm.NodeConfig) Manager {
 	t.Helper()
+	logger, _ := ktesting.NewTestContext(t)
 	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 	var containerManager *cm.FakeContainerManager
 	if nodeConfig == nil {
@@ -2398,8 +2399,6 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 		containerManager = cm.NewFakeContainerManagerWithNodeConfig(*nodeConfig)
 	}
 	allocationManager := NewInMemoryManager(
-		containerManager.GetNodeConfig(),
-		containerManager.GetNodeAllocatableAbsolute(),
 		statusManager,
 		func(pod *v1.Pod) {
 			/* For testing, just mark the pod as having a pod sync triggered in an annotation. */
@@ -2437,9 +2436,10 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			},
 		}, nil
 	}
-	handler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
-	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 
+	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
+	resizeHandler := NewPodResizesAdmitHandler(containerManager, runtime, allocationManager, logger)
+	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
 	return allocationManager
 }
 

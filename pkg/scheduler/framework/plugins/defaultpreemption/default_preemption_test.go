@@ -52,12 +52,12 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -163,19 +163,35 @@ const (
 	LabelValueNonViolatingPDB = "non-violating"
 )
 
+func checkPostFilterResult(t *testing.T, result *fwk.PostFilterResult, expectedNode string, expectedVictims sets.Set[string]) {
+	if expectedNode != result.NominatedNodeName {
+		t.Errorf("expected NodeName %q, got %q", expectedNode, result.NominatedNodeName)
+	}
+	if len(result.Victims) != len(expectedVictims) {
+		t.Errorf("expected %d victims, got %d", len(expectedVictims), len(result.Victims))
+	}
+	for _, victim := range result.Victims {
+		if !expectedVictims.Has(victim.Name) {
+			t.Errorf("pod %v is not expected to be a victim.", victim.Name)
+		}
+	}
+}
+
 func TestPostFilter(t *testing.T) {
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
 	nodeRes := map[v1.ResourceName]string{v1.ResourceCPU: "200m", v1.ResourceMemory: "400"}
 	tests := []struct {
-		name                  string
-		pod                   *v1.Pod
-		pods                  []*v1.Pod
-		pdbs                  []*policy.PodDisruptionBudget
-		nodes                 []*v1.Node
-		filteredNodesStatuses *framework.NodeToStatus
-		extender              fwk.Extender
-		wantResult            *fwk.PostFilterResult
-		wantStatus            *fwk.Status
+		name                    string
+		pod                     *v1.Pod
+		pods                    []*v1.Pod
+		pdbs                    []*policy.PodDisruptionBudget
+		nodes                   []*v1.Node
+		filteredNodesStatuses   *framework.NodeToStatus
+		extender                fwk.Extender
+		wantNilPostFilterResult bool
+		expectedVictims         sets.Set[string]
+		expectedNominatedNode   string
+		wantStatus              *fwk.Status
 	}{
 		{
 			name: "pod with higher priority can be made schedulable",
@@ -189,8 +205,9 @@ func TestPostFilter(t *testing.T) {
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			expectedNominatedNode: "node1",
+			expectedVictims:       sets.New("p1"),
+			wantStatus:            fwk.NewStatus(fwk.Success),
 		},
 		{
 			name: "pod with tied priority is still unschedulable",
@@ -204,8 +221,9 @@ func TestPostFilter(t *testing.T) {
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."),
+			expectedNominatedNode: "",
+			expectedVictims:       nil,
+			wantStatus:            fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."),
 		},
 		{
 			name: "preemption should respect filteredNodesStatuses",
@@ -219,8 +237,9 @@ func TestPostFilter(t *testing.T) {
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
 				"node1": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
+			expectedNominatedNode: "",
+			expectedVictims:       nil,
+			wantStatus:            fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
 		},
 		{
 			name: "preemption should respect absent NodeToStatusReader entry meaning UnschedulableAndUnresolvable",
@@ -232,7 +251,8 @@ func TestPostFilter(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 			},
 			filteredNodesStatuses: framework.NewDefaultNodeToStatus(),
-			wantResult:            framework.NewPostFilterResultWithNominatedNode(""),
+			expectedNominatedNode: "",
+			expectedVictims:       nil,
 			wantStatus:            fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
 		},
 		{
@@ -250,8 +270,9 @@ func TestPostFilter(t *testing.T) {
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			expectedNominatedNode: "node2",
+			expectedVictims:       sets.New("p2"),
+			wantStatus:            fwk.NewStatus(fwk.Success),
 		},
 		{
 			name: "pod can be made schedulable on minHighestPriority node",
@@ -273,8 +294,9 @@ func TestPostFilter(t *testing.T) {
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			expectedNominatedNode: "node2",
+			expectedVictims:       sets.New("p3"),
+			wantStatus:            fwk.NewStatus(fwk.Success),
 		},
 		{
 			name: "preemption result filtered out by extenders",
@@ -295,8 +317,9 @@ func TestPostFilter(t *testing.T) {
 				ExtenderName: "FakeExtender1",
 				Predicates:   []tf.FitPredicate{tf.Node1PredicateExtender},
 			},
-			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			expectedNominatedNode: "node1",
+			expectedVictims:       sets.New("p1"),
+			wantStatus:            fwk.NewStatus(fwk.Success),
 		},
 		{
 			name: "no candidate nodes found, no enough resource after removing low priority pods",
@@ -313,8 +336,9 @@ func TestPostFilter(t *testing.T) {
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/2 nodes are available: 2 Insufficient cpu."),
+			expectedNominatedNode: "",
+			expectedVictims:       nil,
+			wantStatus:            fwk.NewStatus(fwk.Unschedulable, "preemption: 0/2 nodes are available: 2 Insufficient cpu."),
 		},
 		{
 			name: "no candidate nodes found with mixed reasons, no lower priority pod and no enough CPU resource",
@@ -334,8 +358,9 @@ func TestPostFilter(t *testing.T) {
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 				"node3": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/3 nodes are available: 1 Insufficient cpu, 2 No preemption victims found for incoming pod."),
+			expectedNominatedNode: "",
+			expectedVictims:       nil,
+			wantStatus:            fwk.NewStatus(fwk.Unschedulable, "preemption: 0/3 nodes are available: 1 Insufficient cpu, 2 No preemption victims found for incoming pod."),
 		},
 		{
 			name: "no candidate nodes found with mixed reason, 2 UnschedulableAndUnresolvable nodes and 2 nodes don't have enough CPU resource",
@@ -355,8 +380,9 @@ func TestPostFilter(t *testing.T) {
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 				"node4": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/4 nodes are available: 2 Insufficient cpu, 2 Preemption is not helpful for scheduling."),
+			expectedNominatedNode: "",
+			expectedVictims:       nil,
+			wantStatus:            fwk.NewStatus(fwk.Unschedulable, "preemption: 0/4 nodes are available: 2 Insufficient cpu, 2 Preemption is not helpful for scheduling."),
 		},
 		{
 			name: "only one node but failed with TestPlugin",
@@ -369,8 +395,8 @@ func TestPostFilter(t *testing.T) {
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: nil,
-			wantStatus: fwk.AsStatus(errors.New("preemption: running RemovePod on PreFilter plugin \"test-plugin\": failed to remove pod: p")),
+			wantNilPostFilterResult: true,
+			wantStatus:              fwk.AsStatus(errors.New("preemption: running RemovePod on PreFilter plugin \"test-plugin\": failed to remove pod: p")),
 		},
 		{
 			name: "one failed with TestPlugin and the other pass",
@@ -388,8 +414,9 @@ func TestPostFilter(t *testing.T) {
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			expectedNominatedNode: "node2",
+			expectedVictims:       sets.New("p2"),
+			wantStatus:            fwk.NewStatus(fwk.Success),
 		},
 	}
 
@@ -450,12 +477,13 @@ func TestPostFilter(t *testing.T) {
 					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 					frameworkruntime.WithLogger(logger),
 					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+					frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 				)
 				if err != nil {
 					t.Fatal(err)
 				}
 				if asyncAPICallsEnabled {
-					cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
+					cache := internalcache.New(ctx, apiDispatcher)
 					f.SetAPICacher(apicache.New(nil, cache))
 				}
 
@@ -481,8 +509,12 @@ func TestPostFilter(t *testing.T) {
 						t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 					}
 				}
-				if diff := cmp.Diff(tt.wantResult, gotResult); diff != "" {
-					t.Errorf("Unexpected postFilterResult (-want, +got):\n%s", diff)
+				if tt.wantNilPostFilterResult {
+					if gotResult != nil {
+						t.Errorf("expected nil PostFilterResult, got %v", gotResult)
+					}
+				} else {
+					checkPostFilterResult(t, gotResult, tt.expectedNominatedNode, tt.expectedVictims)
 				}
 			})
 		}
@@ -1932,14 +1964,15 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 func TestPreempt(t *testing.T) {
 	metrics.Register()
 	tests := []struct {
-		name           string
-		pod            *v1.Pod
-		pods           []*v1.Pod
-		extenders      []*tf.FakeExtender
-		nodeNames      []string
-		registerPlugin tf.RegisterPluginFunc
-		want           *fwk.PostFilterResult
-		expectedPods   []string // list of preempted pods
+		name                    string
+		pod                     *v1.Pod
+		pods                    []*v1.Pod
+		extenders               []*tf.FakeExtender
+		nodeNames               []string
+		registerPlugin          tf.RegisterPluginFunc
+		wantNilPostFilterResult bool
+		expectedVictims         sets.Set[string]
+		expectedNominatedNode   string
 	}{
 		{
 			name: "basic preemption logic",
@@ -1950,10 +1983,10 @@ func TestPreempt(t *testing.T) {
 				st.MakePod().Name("p2.1").UID("p2.1").Node("node2").Priority(highPriority).Req(largeRes).Obj(),
 				st.MakePod().Name("p3.1").UID("p3.1").Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
 			},
-			nodeNames:      []string{"node1", "node2", "node3"},
-			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			want:           framework.NewPostFilterResultWithNominatedNode("node1"),
-			expectedPods:   []string{"p1.1", "p1.2"},
+			nodeNames:             []string{"node1", "node2", "node3"},
+			registerPlugin:        tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			expectedVictims:       sets.New("p1.1", "p1.2"),
+			expectedNominatedNode: "node1",
 		},
 		{
 			name: "preemption for topology spread constraints",
@@ -1968,10 +2001,10 @@ func TestPreempt(t *testing.T) {
 				st.MakePod().Name("p-x1").UID("p-x1").Namespace(v1.NamespaceDefault).Node("node-x").Label("foo", "").Priority(highPriority).Obj(),
 				st.MakePod().Name("p-x2").UID("p-x2").Namespace(v1.NamespaceDefault).Node("node-x").Label("foo", "").Priority(highPriority).Obj(),
 			},
-			nodeNames:      []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
-			registerPlugin: tf.RegisterPluginAsExtensions(podtopologyspread.Name, podTopologySpreadFunc, "PreFilter", "Filter"),
-			want:           framework.NewPostFilterResultWithNominatedNode("node-b"),
-			expectedPods:   []string{"p-b1"},
+			nodeNames:             []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
+			registerPlugin:        tf.RegisterPluginAsExtensions(podtopologyspread.Name, podTopologySpreadFunc, "PreFilter", "Filter"),
+			expectedVictims:       sets.New("p-b1"),
+			expectedNominatedNode: "node-b",
 		},
 		{
 			name: "Scheduler extenders allow only node1, otherwise node3 would have been chosen",
@@ -1992,9 +2025,9 @@ func TestPreempt(t *testing.T) {
 					Predicates:   []tf.FitPredicate{tf.Node1PredicateExtender},
 				},
 			},
-			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			want:           framework.NewPostFilterResultWithNominatedNode("node1"),
-			expectedPods:   []string{"p1.1", "p1.2"},
+			registerPlugin:        tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			expectedVictims:       sets.New("p1.1", "p1.2"),
+			expectedNominatedNode: "node1",
 		},
 		{
 			name: "Scheduler extenders do not allow any preemption",
@@ -2011,9 +2044,8 @@ func TestPreempt(t *testing.T) {
 					Predicates:   []tf.FitPredicate{tf.FalsePredicateExtender},
 				},
 			},
-			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			want:           nil,
-			expectedPods:   []string{},
+			registerPlugin:          tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			wantNilPostFilterResult: true,
 		},
 		{
 			name: "One scheduler extender allows only node1, the other returns error but ignorable. Only node1 would be chosen",
@@ -2035,9 +2067,9 @@ func TestPreempt(t *testing.T) {
 					ExtenderName: "FakeExtender2",
 				},
 			},
-			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			want:           framework.NewPostFilterResultWithNominatedNode("node1"),
-			expectedPods:   []string{"p1.1", "p1.2"},
+			registerPlugin:        tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			expectedVictims:       sets.New("p1.1", "p1.2"),
+			expectedNominatedNode: "node1",
 		},
 		{
 			name: "One scheduler extender allows only node1, but it is not interested in given pod, otherwise node1 would have been chosen",
@@ -2059,10 +2091,10 @@ func TestPreempt(t *testing.T) {
 					Predicates:   []tf.FitPredicate{tf.TruePredicateExtender},
 				},
 			},
-			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			registerPlugin:  tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			expectedVictims: sets.New("p2.1"),
 			// sum of priorities of all victims on node1 is larger than node2, node2 is chosen.
-			want:         framework.NewPostFilterResultWithNominatedNode("node2"),
-			expectedPods: []string{"p2.1"},
+			expectedNominatedNode: "node2",
 		},
 		{
 			name: "no preempting in pod",
@@ -2073,10 +2105,9 @@ func TestPreempt(t *testing.T) {
 				st.MakePod().Name("p2.1").UID("p2.1").Namespace(v1.NamespaceDefault).Node("node2").Priority(highPriority).Req(largeRes).Obj(),
 				st.MakePod().Name("p3.1").UID("p3.1").Namespace(v1.NamespaceDefault).Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
 			},
-			nodeNames:      []string{"node1", "node2", "node3"},
-			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			want:           nil,
-			expectedPods:   nil,
+			nodeNames:               []string{"node1", "node2", "node3"},
+			registerPlugin:          tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			wantNilPostFilterResult: true,
 		},
 		{
 			name: "PreemptionPolicy is nil",
@@ -2087,10 +2118,10 @@ func TestPreempt(t *testing.T) {
 				st.MakePod().Name("p2.1").UID("p2.1").Namespace(v1.NamespaceDefault).Node("node2").Priority(highPriority).Req(largeRes).Obj(),
 				st.MakePod().Name("p3.1").UID("p3.1").Namespace(v1.NamespaceDefault).Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
 			},
-			nodeNames:      []string{"node1", "node2", "node3"},
-			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			want:           framework.NewPostFilterResultWithNominatedNode("node1"),
-			expectedPods:   []string{"p1.1", "p1.2"},
+			nodeNames:             []string{"node1", "node2", "node3"},
+			registerPlugin:        tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			expectedVictims:       sets.New("p1.1", "p1.2"),
+			expectedNominatedNode: "node1",
 		},
 	}
 
@@ -2169,7 +2200,7 @@ func TestPreempt(t *testing.T) {
 						defer apiDispatcher.Close()
 					}
 
-					cache := internalcache.New(ctx, time.Duration(0), apiDispatcher)
+					cache := internalcache.New(ctx, apiDispatcher)
 					for _, pod := range testPods {
 						if err := cache.AddPod(logger, pod.DeepCopy()); err != nil {
 							t.Fatalf("Failed to add pod %s: %v", pod.Name, err)
@@ -2217,6 +2248,7 @@ func TestPreempt(t *testing.T) {
 						frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(testPods, nodes)),
 						frameworkruntime.WithInformerFactory(informerFactory),
 						frameworkruntime.WithWaitingPods(waitingPods),
+						frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 						frameworkruntime.WithLogger(logger),
 						frameworkruntime.WithPodActivator(&fakePodActivator{}),
 					)
@@ -2253,8 +2285,12 @@ func TestPreempt(t *testing.T) {
 					if !status.IsSuccess() && !status.IsRejected() {
 						t.Errorf("unexpected error in preemption: %v", status.AsError())
 					}
-					if diff := cmp.Diff(test.want, res); diff != "" {
-						t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+					if test.wantNilPostFilterResult {
+						if res != nil {
+							t.Errorf("expected nil postFilterResult, got %v", res)
+						}
+					} else {
+						checkPostFilterResult(t, res, test.expectedNominatedNode, test.expectedVictims)
 					}
 
 					if asyncPreemptionEnabled {
@@ -2262,15 +2298,15 @@ func TestPreempt(t *testing.T) {
 						if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 							mu.RLock()
 							defer mu.RUnlock()
-							return len(deletedPodNames) == len(test.expectedPods), nil
+							return len(deletedPodNames) == len(test.expectedVictims), nil
 						}); err != nil {
-							t.Errorf("expected %v pods to be deleted, got %v.", len(test.expectedPods), len(deletedPodNames))
+							t.Errorf("expected %v pods to be deleted, got %v.", len(test.expectedVictims), len(deletedPodNames))
 						}
 					} else {
 						mu.RLock()
 						// If async preemption is disabled, the pod should be deleted immediately.
-						if len(deletedPodNames) != len(test.expectedPods) {
-							t.Errorf("expected %v pods to be deleted, got %v.", len(test.expectedPods), len(deletedPodNames))
+						if len(deletedPodNames) != len(test.expectedVictims) {
+							t.Errorf("expected %v pods to be deleted, got %v.", len(test.expectedVictims), len(deletedPodNames))
 						}
 						mu.RUnlock()
 					}
@@ -2295,16 +2331,9 @@ func TestPreempt(t *testing.T) {
 						}
 					}
 
-					for victimName := range deletedPodNames {
-						found := false
-						for _, expPod := range test.expectedPods {
-							if expPod == victimName {
-								found = true
-								break
-							}
-						}
-						if !found {
-							t.Errorf("pod %v is not expected to be a victim.", victimName)
+					for deletedPod := range deletedPodNames {
+						if !test.expectedVictims.Has(deletedPod) {
+							t.Errorf("pod %v is not expected to be deleted.", deletedPod)
 						}
 					}
 					if res != nil && res.NominatingInfo != nil {

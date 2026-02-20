@@ -17,6 +17,7 @@ limitations under the License.
 package benchmark
 
 import (
+	"context"
 	"fmt"
 	"math/rand/v2"
 	"path/filepath"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -118,10 +120,7 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 		}
 	}
 
-	workers := op.Count
-	if workers > 30 {
-		workers = 30
-	}
+	workers := min(op.Count, 30)
 	workqueue.ParallelizeUntil(tCtx, workers, op.Count, create)
 	if createErr != nil {
 		tCtx.Fatal(createErr.Error())
@@ -198,7 +197,7 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext, draManager framewo
 		numSlices++
 	}
 
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
+	tCtx.Eventually(func(tCtx ktesting.TContext) int {
 		slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
 		tCtx.ExpectNoError(err, "list ResourceSlices")
 		return len(slices)
@@ -229,7 +228,7 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 		},
 	}
 
-	for i := 0; i < capacity; i++ {
+	for i := range capacity {
 		slice.Spec.Devices = append(slice.Spec.Devices,
 			resourceapi.Device{
 				Name: fmt.Sprintf("instance-%d", i),
@@ -278,7 +277,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	claims, err := tCtx.Client().ResourceV1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "list claims")
 	tCtx.Logf("allocating %d ResourceClaims", len(claims.Items))
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 	defer tCtx.Cancel("allocResourceClaimsOp.run is done")
 
 	// Track cluster state.
@@ -297,7 +296,8 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	tCtx.ExpectNoError(err, "start resource slice tracker")
-	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), resourceSliceTracker, informerFactory)
+	assumeCache := assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil)
+	draManager := dynamicresources.NewDRAManager(tCtx, assumeCache, resourceSliceTracker, informerFactory)
 	informerFactory.Start(tCtx.Done())
 	defer func() {
 		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
@@ -316,6 +316,16 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 
 	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
 	celCache := cel.NewCache(10, cel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)})
+
+	// Also wait for the assume cache to catch up.
+	// Without this we cannot reliably store the result of
+	// the UpdateStatus call below.
+	// Has to be done indirectly, the assume cache itself has
+	// no HasSynced method (maybe it should).
+	handle := assumeCache.AddEventHandler(cache.ResourceEventHandlerFuncs{})
+	if !cache.WaitForCacheSync(tCtx.Done(), handle.HasSynced) {
+		tCtx.Fatalf("assume cache failed to sync: %v", context.Cause(tCtx))
+	}
 
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())

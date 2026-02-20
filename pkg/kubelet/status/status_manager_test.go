@@ -52,6 +52,7 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/utils/ptr"
 )
 
 type mutablePodManager interface {
@@ -180,8 +181,8 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	syncer.SetPodStatus(logger, pod, getRandomPodStatus())
 
 	status := expectPodStatus(t, syncer, pod)
-	if !status.StartTime.Time.Equal(startTime.Time) {
-		t.Errorf("Unexpected start time, expected %v, actual %v", startTime, status.StartTime)
+	if !status.StartTime.Time.Equal(startTime.Rfc3339Copy().Time) {
+		t.Errorf("Unexpected start time, expected %v, actual %v", startTime.Rfc3339Copy(), status.StartTime)
 	}
 }
 
@@ -510,6 +511,25 @@ func TestStatusEquality(t *testing.T) {
 	normalizeStatus(&pod, &podStatus)
 	if !isPodStatusByKubeletEqual(&oldPodStatus, &podStatus) {
 		t.Fatalf("Differences in pod condition not owned by kubelet should not affect normalized equality.")
+	}
+
+	claimStatusA := v1.PodResourceClaimStatus{
+		Name:              "my-claim",
+		ResourceClaimName: ptr.To("claim"),
+	}
+	extendedClaimStatusA := &v1.PodExtendedResourceClaimStatus{
+		RequestMappings: []v1.ContainerExtendedResourceRequest{
+			{RequestName: "request", ContainerName: "c", ResourceName: "example.com/gpu"},
+		},
+		ResourceClaimName: "claim",
+	}
+	oldPodStatus.ResourceClaimStatuses = []v1.PodResourceClaimStatus{claimStatusA}
+	oldPodStatus.ExtendedResourceClaimStatus = extendedClaimStatusA
+
+	normalizeStatus(&pod, &oldPodStatus)
+	normalizeStatus(&pod, &podStatus)
+	if !isPodStatusByKubeletEqual(&oldPodStatus, &podStatus) {
+		t.Fatalf("Differences in pod resource claim statuses not owned by kubelet should not affect normalized equality.")
 	}
 }
 
@@ -2161,7 +2181,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize pending condition to deferred with message",
 			updateFunc: func(podUID types.UID) bool {
-				return m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "some-message", 1)
+				return m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", 1)
 			},
 			expectedUpdateFuncReturnVal: true,
 			expected: []*v1.PodCondition{

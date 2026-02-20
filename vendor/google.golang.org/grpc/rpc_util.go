@@ -33,6 +33,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/encoding/proto"
+	"google.golang.org/grpc/internal"
+	"google.golang.org/grpc/internal/grpcutil"
 	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/mem"
 	"google.golang.org/grpc/metadata"
@@ -40,6 +42,10 @@ import (
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 )
+
+func init() {
+	internal.AcceptCompressors = acceptCompressors
+}
 
 // Compressor defines the interface gRPC uses to compress a message.
 //
@@ -151,16 +157,32 @@ func (d *gzipDecompressor) Type() string {
 
 // callInfo contains all related configuration and information about an RPC.
 type callInfo struct {
-	compressorName        string
-	failFast              bool
-	maxReceiveMessageSize *int
-	maxSendMessageSize    *int
-	creds                 credentials.PerRPCCredentials
-	contentSubtype        string
-	codec                 baseCodec
-	maxRetryRPCBufferSize int
-	onFinish              []func(err error)
-	authority             string
+	compressorName              string
+	failFast                    bool
+	maxReceiveMessageSize       *int
+	maxSendMessageSize          *int
+	creds                       credentials.PerRPCCredentials
+	contentSubtype              string
+	codec                       baseCodec
+	maxRetryRPCBufferSize       int
+	onFinish                    []func(err error)
+	authority                   string
+	acceptedResponseCompressors []string
+}
+
+func acceptedCompressorAllows(allowed []string, name string) bool {
+	if allowed == nil {
+		return true
+	}
+	if name == "" || name == encoding.Identity {
+		return true
+	}
+	for _, a := range allowed {
+		if a == name {
+			return true
+		}
+	}
+	return false
 }
 
 func defaultCallInfo() *callInfo {
@@ -168,6 +190,29 @@ func defaultCallInfo() *callInfo {
 		failFast:              true,
 		maxRetryRPCBufferSize: 256 * 1024, // 256KB
 	}
+}
+
+func newAcceptedCompressionConfig(names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	var allowed []string
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" || name == encoding.Identity {
+			continue
+		}
+		if !grpcutil.IsCompressorNameRegistered(name) {
+			return nil, status.Errorf(codes.InvalidArgument, "grpc: compressor %q is not registered", name)
+		}
+		if _, dup := seen[name]; dup {
+			continue
+		}
+		seen[name] = struct{}{}
+		allowed = append(allowed, name)
+	}
+	return allowed, nil
 }
 
 // CallOption configures a Call before it starts or extracts information from
@@ -471,6 +516,31 @@ func (o CompressorCallOption) before(c *callInfo) error {
 }
 func (o CompressorCallOption) after(*callInfo, *csAttempt) {}
 
+// acceptCompressors returns a CallOption that limits the compression algorithms
+// advertised in the grpc-accept-encoding header for response messages.
+// Compression algorithms not in the provided list will not be advertised, and
+// responses compressed with non-listed algorithms will be rejected.
+func acceptCompressors(names ...string) CallOption {
+	cp := append([]string(nil), names...)
+	return acceptCompressorsCallOption{names: cp}
+}
+
+// acceptCompressorsCallOption is a CallOption that limits response compression.
+type acceptCompressorsCallOption struct {
+	names []string
+}
+
+func (o acceptCompressorsCallOption) before(c *callInfo) error {
+	allowed, err := newAcceptedCompressionConfig(o.names)
+	if err != nil {
+		return err
+	}
+	c.acceptedResponseCompressors = allowed
+	return nil
+}
+
+func (acceptCompressorsCallOption) after(*callInfo, *csAttempt) {}
+
 // CallContentSubtype returns a CallOption that will set the content-subtype
 // for a call. For example, if content-subtype is "json", the Content-Type over
 // the wire will be "application/grpc+json". The content-subtype is converted
@@ -657,8 +727,20 @@ type streamReader interface {
 	Read(n int) (mem.BufferSlice, error)
 }
 
+// noCopy may be embedded into structs which must not be copied
+// after the first use.
+//
+// See https://golang.org/issues/8005#issuecomment-190753527
+// for details.
+type noCopy struct {
+}
+
+func (*noCopy) Lock()   {}
+func (*noCopy) Unlock() {}
+
 // parser reads complete gRPC messages from the underlying reader.
 type parser struct {
+	_ noCopy
 	// r is the underlying reader.
 	// See the comment on recvMsg for the permissible
 	// error types.
@@ -845,8 +927,7 @@ func (p *payloadInfo) free() {
 // the buffer is no longer needed.
 // TODO: Refactor this function to reduce the number of arguments.
 // See: https://google.github.io/styleguide/go/best-practices.html#function-argument-lists
-func recvAndDecompress(p *parser, s recvCompressor, dc Decompressor, maxReceiveMessageSize int, payInfo *payloadInfo, compressor encoding.Compressor, isServer bool,
-) (out mem.BufferSlice, err error) {
+func recvAndDecompress(p *parser, s recvCompressor, dc Decompressor, maxReceiveMessageSize int, payInfo *payloadInfo, compressor encoding.Compressor, isServer bool) (out mem.BufferSlice, err error) {
 	pf, compressed, err := p.recvMsg(maxReceiveMessageSize)
 	if err != nil {
 		return nil, err
@@ -949,7 +1030,7 @@ func recv(p *parser, c baseCodec, s recvCompressor, dc Decompressor, m any, maxR
 // Information about RPC
 type rpcInfo struct {
 	failfast      bool
-	preloaderInfo *compressorInfo
+	preloaderInfo compressorInfo
 }
 
 // Information about Preloader
@@ -968,7 +1049,7 @@ type rpcInfoContextKey struct{}
 func newContextWithRPCInfo(ctx context.Context, failfast bool, codec baseCodec, cp Compressor, comp encoding.Compressor) context.Context {
 	return context.WithValue(ctx, rpcInfoContextKey{}, &rpcInfo{
 		failfast: failfast,
-		preloaderInfo: &compressorInfo{
+		preloaderInfo: compressorInfo{
 			codec: codec,
 			cp:    cp,
 			comp:  comp,

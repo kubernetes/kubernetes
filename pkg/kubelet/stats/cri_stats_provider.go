@@ -165,9 +165,7 @@ func (p *criStatsProvider) listPodStats(ctx context.Context, updateCPUNanoCoreUs
 			return nil, err
 		}
 		// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
-		logger.V(5).Error(err,
-			"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
-		)
+		logger.V(5).Info("CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.", "err", err)
 	}
 	return p.listPodStatsPartiallyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
 }

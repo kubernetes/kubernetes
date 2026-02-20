@@ -218,6 +218,29 @@ func (s *SchemaValidator) sliceValidator() ValueValidator {
 }
 
 func (s *SchemaValidator) numberValidator() ValueValidator {
+	var typeName string
+	var format string
+
+	// We only pass the format to the validator if it is valid for the resolved type
+	// and the type is unambiguous (exactly one type specified).
+	// This prevents the validator from enforcing ranges for mismatched formats
+	// (e.g. enforcing "int32" range on a "number" type) or ambiguous types.
+	if len(s.Schema.Type) == 1 {
+		switch s.Schema.Type[0] {
+		case integerType:
+			typeName = integerType
+			switch s.Schema.Format {
+			case integerFormatInt32, integerFormatInt64:
+				format = s.Schema.Format
+			}
+		case numberType:
+			typeName = numberType
+			switch s.Schema.Format {
+			case numberFormatFloat, numberFormatDouble:
+				format = s.Schema.Format
+			}
+		}
+	}
 	return &numberValidator{
 		Path:             s.Path,
 		In:               s.in,
@@ -227,6 +250,8 @@ func (s *SchemaValidator) numberValidator() ValueValidator {
 		ExclusiveMaximum: s.Schema.ExclusiveMaximum,
 		Minimum:          s.Schema.Minimum,
 		ExclusiveMinimum: s.Schema.ExclusiveMinimum,
+		Type:             typeName,
+		Format:           format,
 	}
 }
 

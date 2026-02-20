@@ -149,3 +149,48 @@
       initPods: 2500
       measurePods: 2500
       maxClaimsPerNode: 10
+
+- name: ImplicitExtendedResource_25Classes
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAExtendedResource: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: ../templates/deviceclass-implicit-extended-resource.yaml
+    countParam: $classes
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-with-implicit-extended-resource-mod25.yaml
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-with-implicit-extended-resource-mod25.yaml
+    collectMetrics: true
+  workloads:
+  - name: 2000pods_200nodes
+    params:
+      classes: 25
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 10
+  - name: 5000pods_500nodes
+    labels: [performance]
+    params:
+      classes: 25
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2500
+      measurePods: 2500
+      maxClaimsPerNode: 10

@@ -201,22 +201,22 @@ func TestGetUnrecognizedFormats(t *testing.T) {
 			expectedFormats:      []string{},
 		},
 		{
-			name:                 "unrecognized format for integer type is not reported",
+			name:                 "unrecognized format for integer type is reported",
 			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format", Type: []string{"integer"}}},
 			compatibilityVersion: version.MajorMinor(1, 0),
-			expectedFormats:      []string{},
+			expectedFormats:      []string{"unknown-format"},
 		},
 		{
-			name:                 "unrecognized format for string,null type is not reported",
+			name:                 "unrecognized format for string,null type is reported",
 			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format", Type: []string{"string", "null"}}},
 			compatibilityVersion: version.MajorMinor(1, 0),
-			expectedFormats:      []string{},
+			expectedFormats:      []string{"unknown-format"},
 		},
 		{
-			name:                 "unrecognized format for no type is not reported",
+			name:                 "unrecognized format for no type is reported",
 			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "unknown-format"}},
 			compatibilityVersion: version.MajorMinor(1, 0),
-			expectedFormats:      []string{},
+			expectedFormats:      []string{"unknown-format"},
 		},
 	}
 

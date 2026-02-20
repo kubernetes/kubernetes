@@ -38,7 +38,7 @@ func (kl *Kubelet) GetCachedNode(ctx context.Context, useCache bool) (*v1.Node, 
 // and returns the newer one.
 func (kl *Kubelet) getCachedNode(ctx context.Context) (*v1.Node, error) {
 	logger := klog.FromContext(ctx)
-	informerNode, err := kl.GetNode()
+	informerNode, err := kl.GetNode(ctx)
 	if err != nil {
 		if kl.cachedNode != nil {
 			logger.Error(err, "failed to list node; using cached node")

@@ -244,6 +244,8 @@ func getCgroupConfigInternal(rl v1.ResourceList, compressibleResourcesOnly bool)
 // Note that not all resources that are available on the node are included in the returned list of resources.
 // Returns a ResourceList.
 func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
+	cm.RLock()
+	defer cm.RUnlock()
 	return cm.getNodeAllocatableAbsoluteImpl(cm.capacity)
 }
 
@@ -275,6 +277,8 @@ func (cm *containerManagerImpl) getNodeAllocatableInternalAbsolute() v1.Resource
 
 // GetNodeAllocatableReservation returns amount of compute or storage resource that have to be reserved on this node from scheduling.
 func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
+	cm.RLock()
+	defer cm.RUnlock()
 	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
 	result := make(v1.ResourceList)
 	for k := range cm.capacity {
@@ -298,6 +302,8 @@ func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList 
 // validateNodeAllocatable ensures that the user specified Node Allocatable Configuration doesn't reserve more than the node capacity.
 // Returns error if the configuration is invalid, nil otherwise.
 func (cm *containerManagerImpl) validateNodeAllocatable() error {
+	cm.RLock()
+	defer cm.RUnlock()
 	var errors []string
 	nar := cm.GetNodeAllocatableReservation()
 	for k, v := range nar {

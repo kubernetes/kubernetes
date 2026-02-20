@@ -161,8 +161,7 @@ type VolumeSource struct {
 	Projected *ProjectedVolumeSource `json:"projected,omitempty" protobuf:"bytes,26,opt,name=projected"`
 	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
 	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-	// is on.
+	// are redirected to the pxd.portworx.com CSI driver.
 	// +optional
 	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,24,opt,name=portworxVolume"`
 	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
@@ -325,8 +324,7 @@ type PersistentVolumeSource struct {
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,17,opt,name=photonPersistentDisk"`
 	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
 	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-	// is on.
+	// are redirected to the pxd.portworx.com CSI driver.
 	// +optional
 	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,18,opt,name=portworxVolume"`
 	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
@@ -3575,8 +3573,6 @@ type PodCondition struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
 	Type PodConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PodConditionType"`
 	// If set, this represents the .metadata.generation that the pod condition was set based upon.
-	// The PodObservedGenerationTracking feature gate must be enabled to use this field.
-	// +featureGate=PodObservedGenerationTracking
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,7,opt,name=observedGeneration"`
 	// Status is the status of the condition.
@@ -5274,7 +5270,6 @@ type EphemeralContainer struct {
 type PodStatus struct {
 	// If set, this represents the .metadata.generation that the pod status was set based upon.
 	// The PodObservedGenerationTracking feature gate must be enabled to use this field.
-	// +featureGate=PodObservedGenerationTracking
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,17,opt,name=observedGeneration"`
 	// The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.

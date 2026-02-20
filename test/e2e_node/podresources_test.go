@@ -2107,7 +2107,7 @@ func waitForTopologyUnawareResources(ctx context.Context, f *framework.Framework
 
 	gomega.Eventually(ctx, func(ctx context.Context) bool {
 		node := getLocalNode(ctx, f)
-		resourceAmount := CountSampleDeviceAllocatable(node)
+		resourceAmount := e2enode.CountSampleDeviceAllocatable(node)
 		return resourceAmount > 0
 	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected %q resources to be available, got no resources", defaultTopologyUnawareResourceName))
 }

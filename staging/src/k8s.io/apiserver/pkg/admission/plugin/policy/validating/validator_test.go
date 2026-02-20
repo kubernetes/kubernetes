@@ -53,7 +53,7 @@ func (f *fakeCelFilter) ForInput(ctx context.Context, versionedAttr *admission.V
 	if costBudget <= 0 { // this filter will cost 1, so cost = 0 means fail.
 		return nil, -1, &apiservercel.Error{
 			Type:   apiservercel.ErrorTypeInvalid,
-			Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
+			Detail: "validation failed due to running out of cost budget, no further validation rules will be run",
 			Cause:  apiservercel.ErrOutOfBudget,
 		}
 	}

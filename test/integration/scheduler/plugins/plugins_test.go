@@ -92,6 +92,10 @@ type PreEnqueuePlugin struct {
 	admit  bool
 }
 
+type PreEnqueueGateAfterPreBindPlugin struct {
+	preBind *PreBindPlugin
+}
+
 type PreFilterPlugin struct {
 	numPreFilterCalled   atomic.Int64
 	failPreFilter        bool
@@ -306,6 +310,7 @@ const (
 	preBindPluginName            = "prebind-plugin"
 	postBindPluginName           = "postbind-plugin"
 	permitPluginName             = "permit-plugin"
+	preEnqueueGatePluginName     = "preenqueue-gate-plugin"
 )
 
 var _ fwk.PreEnqueuePlugin = &PreEnqueuePlugin{}
@@ -326,6 +331,7 @@ var _ fwk.PostBindPlugin = &PostBindPlugin{}
 var _ fwk.PermitPlugin = &PermitPlugin{}
 var _ fwk.EnqueueExtensions = &PermitPlugin{}
 var _ fwk.QueueSortPlugin = &QueueSortPlugin{}
+var _ fwk.PreEnqueuePlugin = &PreEnqueueGateAfterPreBindPlugin{}
 
 func (ep *QueueSortPlugin) Name() string {
 	return queuesortPluginName
@@ -494,8 +500,8 @@ func (pp *PreBindPlugin) Name() string {
 }
 
 // PreBindPreFlight is a test function that returns nil for testing.
-func (pp *PreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
-	return nil
+func (pp *PreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	return &fwk.PreBindPreFlightResult{AllowParallel: false}, nil
 }
 
 // PreBind is a test function that returns (true, nil) or errors for testing.
@@ -519,6 +525,16 @@ func (pp *PreBindPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod 
 
 func (pp *PreBindPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
+}
+
+func (pp *PreBindPlugin) hasTriedPreBind(uid types.UID) bool {
+	pp.mutex.Lock()
+	defer pp.mutex.Unlock()
+	if pp.podUIDs == nil {
+		return false
+	}
+	_, ok := pp.podUIDs[uid]
+	return ok
 }
 
 const bindPluginAnnotation = "bindPluginName"
@@ -689,6 +705,19 @@ func (pp *PermitPlugin) rejectAllPods() {
 
 func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
+}
+
+// Name returns name of the plugin.
+func (pl *PreEnqueueGateAfterPreBindPlugin) Name() string {
+	return preEnqueueGatePluginName
+}
+
+// PreEnqueue is a test function that blocks re-enqueue after PreBind was attempted.
+func (pl *PreEnqueueGateAfterPreBindPlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
+	if pl.preBind != nil && pl.preBind.hasTriedPreBind(p.UID) {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "test gate: block re-enqueue after PreBind was attempted")
+	}
+	return nil
 }
 
 // TestPreFilterPlugin tests invocation of prefilter plugins.
@@ -1590,7 +1619,8 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 				name:        "reservePlugin",
 				failReserve: false,
 			}
-			registry, profile := initRegistryAndConfig(t, []fwk.Plugin{test.plugin, reservePlugin}...)
+			requeueGate := &PreEnqueueGateAfterPreBindPlugin{preBind: test.plugin}
+			registry, profile := initRegistryAndConfig(t, []fwk.Plugin{requeueGate, test.plugin, reservePlugin}...)
 
 			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
 				scheduler.WithProfiles(profile),

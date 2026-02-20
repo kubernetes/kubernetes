@@ -499,7 +499,7 @@ func makePodStorageStats(logger klog.Logger, s *statsapi.PodStats, rootFsInfo *c
 
 	logStats, err := hostStatsProvider.getPodLogStats(podNs, podName, podUID, rootFsInfo)
 	if err != nil {
-		logger.V(6).Error(err, "Unable to fetch pod log stats", "pod", klog.KRef(podNs, podName))
+		logger.V(6).Info("Unable to fetch pod log stats", "pod", klog.KRef(podNs, podName), "err", err)
 		// If people do in-place upgrade, there might be pods still using
 		// the old log path. For those pods, no pod log stats is returned.
 		// We should continue generating other stats in that case.
@@ -507,7 +507,7 @@ func makePodStorageStats(logger klog.Logger, s *statsapi.PodStats, rootFsInfo *c
 	}
 	etcHostsStats, err := hostStatsProvider.getPodEtcHostsStats(podUID, rootFsInfo)
 	if err != nil {
-		logger.V(6).Error(err, "Unable to fetch pod etc hosts stats", "pod", klog.KRef(podNs, podName))
+		logger.V(6).Info("Unable to fetch pod etc hosts stats", "pod", klog.KRef(podNs, podName), "err", err)
 	}
 	s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo, logStats, etcHostsStats, isCRIStatsProvider)
 }

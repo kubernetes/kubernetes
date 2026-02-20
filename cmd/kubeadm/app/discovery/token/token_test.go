@@ -268,7 +268,7 @@ users: null
 			}
 
 			// Create a fake client and create the cluster-info ConfigMap
-			client := fakeclient.NewClientset()
+			client := fakeclient.NewSimpleClientset()
 			if err = test.configMap.createOrUpdate(client); err != nil {
 				t.Fatalf("could not create ConfigMap: %v", err)
 			}

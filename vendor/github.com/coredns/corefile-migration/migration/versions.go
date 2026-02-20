@@ -30,7 +30,25 @@ type release struct {
 
 // Versions holds a map of plugin/option migrations per CoreDNS release (since 1.1.4)
 var Versions = map[string]release{
+	"1.14.1": {
+		priorVersion:   "1.14.0",
+		dockerImageSHA: "82b57287b29beb757c740dbbe68f2d4723da94715b563fffad5c13438b71b14a",
+		plugins:        plugins_1_14_0,
+	},
+	"1.14.0": {
+		nextVersion:    "1.14.1",
+		priorVersion:   "1.13.2",
+		dockerImageSHA: "4fbdd8fb53c5d1748aeb98f0799798fb073bb11128c13e8415aa254ad1ae0203",
+		plugins:        plugins_1_14_0,
+	},
+	"1.13.2": {
+		nextVersion:    "1.14.0",
+		priorVersion:   "1.13.1",
+		dockerImageSHA: "94caebb89dcfb9d2c4be45bfda34410a3e1092458fbbbc0284365c9e4c9a7818",
+		plugins:        plugins_1_13_0,
+	},
 	"1.13.1": {
+		nextVersion:    "1.13.2",
 		priorVersion:   "1.13.0",
 		dockerImageSHA: "9b9128672209474da07c91439bf15ed704ae05ad918dd6454e5b6ae14e35fee6",
 		plugins:        plugins_1_13_0,
@@ -806,9 +824,28 @@ var Versions = map[string]release{
     }
     prometheus :9153
     proxy . *
-    cache 30
-    reload
+	cache 30
+	reload
 }`},
+}
+
+var plugins_1_14_0 = map[string]plugin{
+	"errors":       plugins["errors"]["v3"],
+	"log":          plugins["log"]["v1"],
+	"health":       plugins["health"]["v1"],
+	"ready":        {},
+	"autopath":     {},
+	"kubernetes":   plugins["kubernetes"]["v8"],
+	"k8s_external": plugins["k8s_external"]["v2"],
+	"prometheus":   {},
+	"forward":      plugins["forward"]["v5"],
+	"cache":        plugins["cache"]["v4"],
+	"loop":         {},
+	"reload":       {},
+	"loadbalance":  {},
+	"hosts":        plugins["hosts"]["v1"],
+	"rewrite":      plugins["rewrite"]["v3"],
+	"transfer":     plugins["transfer"]["v1"],
 }
 
 var plugins_1_13_0 = map[string]plugin{

@@ -237,7 +237,7 @@ spec:
       serviceAccountName: csi-hostpathplugin-sa
       containers:
         - name: hostpath
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.17.0
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.17.1
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
@@ -386,6 +386,23 @@ spec:
             - mountPath: /csi
               name: socket-dir
 
+        - name: csi-snapshot-metadata
+          image: registry.k8s.io/sig-storage/csi-snapshot-metadata:v0.2.0
+          imagePullPolicy: IfNotPresent
+          args:
+          - --csi-address=/csi/csi.sock
+          - --tls-cert=/tmp/certificates/tls.crt
+          - --tls-key=/tmp/certificates/tls.key
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /csi
+            name: socket-dir
+          - mountPath: /tmp/certificates
+            name: csi-snapshot-metadata-server-certs
+            readOnly: true
+
         # end csi containers
 
       volumes:
@@ -415,4 +432,8 @@ spec:
             path: /dev
             type: Directory
           name: dev-dir
+        - name: csi-snapshot-metadata-server-certs
+          secret:
+            defaultMode: 420
+            secretName: csi-snapshot-metadata-server-certs
         # end csi volumes

@@ -46,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/kubelet/pkg/cri/streaming"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
@@ -69,6 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -271,7 +274,7 @@ func (fk *fakeKubelet) GetPortForward(ctx context.Context, podName, podNamespace
 }
 
 // Unused functions
-func (*fakeKubelet) GetNode() (*v1.Node, error)                       { return nil, nil }
+func (*fakeKubelet) GetNode(context.Context) (*v1.Node, error)        { return nil, nil }
 func (*fakeKubelet) GetNodeConfig() cm.NodeConfig                     { return cm.NodeConfig{} }
 func (*fakeKubelet) GetPodCgroupRoot() string                         { return "" }
 func (*fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return nil, false }
@@ -564,6 +567,9 @@ func TestAuthzCoverage(t *testing.T) {
 	defer fw.testHTTPServer.Close()
 
 	for _, fineGrained := range []bool{false, true} {
+		if !fineGrained {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		t.Run(fmt.Sprintf("fineGrained=%v", fineGrained), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGrained)
 			// method:path -> has coverage
@@ -686,9 +692,12 @@ func TestAuthFilters(t *testing.T) {
 	attributesGetter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
 
 	for _, fineGraned := range []bool{false, true} {
+		if !fineGraned {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGraned)
 		for _, tc := range AuthzTestCases(fineGraned) {
-			t.Run(fmt.Sprintf("method=%v:path=%v:fineGrained=%v", tc.Method, tc.Method, fineGraned), func(t *testing.T) {
+			t.Run(fmt.Sprintf("method=%v:path=%v:fineGrained=%v", tc.Method, tc.Path, fineGraned), func(t *testing.T) {
 				var (
 					expectedUser = AuthzTestUser()
 
@@ -2013,4 +2022,48 @@ func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
 	// Check if both servers registered the /metrics/slis endpoint
 	assert.Contains(t, server1.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "First server should register /metrics/slis")
 	assert.Contains(t, server2.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "Second server should register /metrics/slis")
+}
+
+// This test verifies that the HTTP request duration metric captures the actual
+// request handling time.
+func TestServeHTTPRequestDurationMetric(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	// Register and reset the metric before the test
+	servermetrics.Register()
+	servermetrics.HTTPRequestsDuration.Reset()
+
+	// Add a delay to the pods handler to simulate request processing time.
+	// We use 50ms which is long enough to be clearly distinguishable from
+	// the ~2 microsecond bug, but short enough to not slow down tests.
+	handlerDelay := 50 * time.Millisecond
+	fw.fakeKubelet.podsFunc = func() []*v1.Pod {
+		time.Sleep(handlerDelay)
+		return []*v1.Pod{}
+	}
+
+	// Make a request to the pods endpoint
+	resp, err := http.Get(fw.testHTTPServer.URL + "/pods/")
+	require.NoError(t, err)
+	defer resp.Body.Close() //nolint:errcheck
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Read the body to ensure the request is fully processed
+	_, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	// Get the recorded duration from the metric
+	observerMetric := servermetrics.HTTPRequestsDuration.WithLabelValues("GET", "pods", "readwrite", "false")
+	metricValue, err := testutil.GetHistogramMetricValue(observerMetric)
+	require.NoError(t, err)
+
+	// Use the handler delay as the minimum expected duration. This avoids any
+	// timing-sensitive percentage-based checks.
+	minExpectedDuration := handlerDelay.Seconds()
+	assert.GreaterOrEqual(t, metricValue, minExpectedDuration,
+		"HTTP request duration metric recorded %v seconds, expected at least %v seconds. ",
+		metricValue, minExpectedDuration,
+	)
 }

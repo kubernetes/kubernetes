@@ -43,12 +43,12 @@ type keyValuePair struct {
 }
 
 type itemTagValidator struct {
-	validator  Validator
+	validator  TagValidationExtractor
 	listByPath map[string]*listMetadata
 }
 
 func (itv *itemTagValidator) Init(cfg Config) {
-	itv.validator = cfg.Validator
+	itv.validator = cfg.TagValidator
 }
 
 func (itemTagValidator) TagName() string {
@@ -160,7 +160,7 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		ParentPath:   context.Path,
 	}
 
-	validations, err := itv.validator.ExtractValidations(subContext, *tag.ValueTag)
+	validations, err := itv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
 	}
@@ -249,7 +249,7 @@ func parseTypedValue(value string, argType codetags.ArgType) (any, codetags.Valu
 func (itv itemTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            itv.TagName(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         itv.ValidScopes().UnsortedList(),
 		Description: "Declares a validation for an item of a slice declared as a +k8s:listType=map. " +
 			"The item to match is declared by providing field-value pair arguments. All key fields must be specified.",

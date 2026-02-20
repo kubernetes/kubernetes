@@ -68,7 +68,6 @@ func (k *NodeKiller) kill(ctx context.Context, nodes []v1.Node) {
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodes))
 	for _, node := range nodes {
-		node := node
 		go func() {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()

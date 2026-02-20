@@ -43,16 +43,12 @@ const (
 
 var (
 	lazyCompositionEnvTemplateWithStrictCostInit sync.Once
-	lazyCompositionEnvTemplateWithStrictCost     *cel.CompositionEnv
+	lazyCompositionEnvTemplateWithStrictCost     *environment.EnvSet
 )
 
-func getCompositionEnvTemplateWithStrictCost() *cel.CompositionEnv {
+func getCompositionEnvTemplateWithStrictCost() *environment.EnvSet {
 	lazyCompositionEnvTemplateWithStrictCostInit.Do(func() {
-		env, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
-		if err != nil {
-			panic(err)
-		}
-		lazyCompositionEnvTemplateWithStrictCost = env
+		lazyCompositionEnvTemplateWithStrictCost = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	})
 	return lazyCompositionEnvTemplateWithStrictCost
 }
@@ -120,9 +116,11 @@ func compilePolicy(policy *Policy) Validator {
 	failurePolicy := policy.Spec.FailurePolicy
 	var matcher matchconditions.Matcher = nil
 	matchConditions := policy.Spec.MatchConditions
-	var compositionEnvTemplate *cel.CompositionEnv
-	compositionEnvTemplate = getCompositionEnvTemplateWithStrictCost()
-	filterCompiler := cel.NewCompositedCompilerFromTemplate(compositionEnvTemplate)
+	compositionEnvTemplate := getCompositionEnvTemplateWithStrictCost()
+	filterCompiler, err := cel.NewCompositedCompiler(compositionEnvTemplate)
+	if err != nil {
+		return NewValidator(nil, nil, nil, nil, failurePolicy, err)
+	}
 	filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
 
 	if len(matchConditions) > 0 {
@@ -138,6 +136,7 @@ func compilePolicy(policy *Policy) Validator {
 		filterCompiler.CompileCondition(convertv1AuditAnnotations(policy.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
 		filterCompiler.CompileCondition(convertv1MessageExpressions(policy.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
 		failurePolicy,
+		nil,
 	)
 
 	return res

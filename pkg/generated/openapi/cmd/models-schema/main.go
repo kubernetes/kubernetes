@@ -30,7 +30,7 @@ import (
 func main() {
 	err := output()
 	if err != nil {
-		os.Stderr.WriteString(fmt.Sprintf("Failed: %v", err))
+		os.Stderr.WriteString(fmt.Sprintf("Failed: %v", err)) // nolint:errcheck
 		os.Exit(1)
 	}
 }
@@ -71,6 +71,6 @@ func output() error {
 	if err != nil {
 		return fmt.Errorf("error serializing api definitions: %w", err)
 	}
-	os.Stdout.Write(data)
+	os.Stdout.Write(data) // nolint:errcheck
 	return nil
 }

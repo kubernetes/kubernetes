@@ -146,6 +146,7 @@ API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudS
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,RouteReconciliationPeriod
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,UseServiceAccountCredentials
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,WebhookConfiguration,Webhooks
+API rule violation: names_match,k8s.io/cloud-provider/controllers/node/config/v1alpha1,NodeControllerConfiguration,ConcurrentNodeStatusUpdates
 API rule violation: names_match,k8s.io/cloud-provider/controllers/node/config/v1alpha1,NodeControllerConfiguration,ConcurrentNodeSyncs
 API rule violation: names_match,k8s.io/cloud-provider/controllers/service/config/v1alpha1,ServiceControllerConfiguration,ConcurrentServiceSyncs
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Address

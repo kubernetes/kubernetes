@@ -268,7 +268,7 @@ func (r LocalPackageReader) Read() ([]*yaml.RNode, error) {
 		// to another location.
 		relPath, err := filepath.Rel(pathRelativeTo, path)
 		if err != nil {
-			return errors.WrapPrefixf(err, pathRelativeTo)
+			return errors.WrapPrefixf(err, "%s", pathRelativeTo)
 		}
 		if match, err := r.shouldSkipFile(path, relPath, ignoreFilesMatcher); err != nil {
 			return err
@@ -280,7 +280,7 @@ func (r LocalPackageReader) Read() ([]*yaml.RNode, error) {
 		r.initReaderAnnotations(relPath, info)
 		nodes, err := r.readFile(path, info)
 		if err != nil {
-			return errors.WrapPrefixf(err, path)
+			return errors.WrapPrefixf(err, "%s", path)
 		}
 		operand = append(operand, nodes...)
 		return nil

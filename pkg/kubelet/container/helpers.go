@@ -50,19 +50,19 @@ type HandlerRunner interface {
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
 	GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes ImageVolumes) (contOpts *RunContainerOptions, cleanupAction func(), err error)
-	GetPodDNS(pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
+	GetPodDNS(ctx context.Context, pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
 	// GetPodCgroupParent returns the CgroupName identifier, and its literal cgroupfs form on the host
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
-	GeneratePodHostNameAndDomain(pod *v1.Pod) (hostname string, hostDomain string, err error)
+	GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 
 	// GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-	GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
+	GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
 
 	// PrepareDynamicResources prepares resources for a pod.
 	PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error
@@ -277,14 +277,20 @@ func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (comm
 }
 
 // FilterEventRecorder creates an event recorder to record object's event except implicitly required container's, like infra container.
-func FilterEventRecorder(recorder record.EventRecorder) record.EventRecorder {
+func FilterEventRecorder(recorder record.EventRecorderLogger) record.EventRecorderLogger {
 	return &innerEventRecorder{
 		recorder: recorder,
 	}
 }
 
 type innerEventRecorder struct {
-	recorder record.EventRecorder
+	recorder record.EventRecorderLogger
+}
+
+func (irecorder *innerEventRecorder) WithLogger(logger klog.Logger) record.EventRecorderLogger {
+	return &innerEventRecorder{
+		recorder: irecorder.recorder.WithLogger(logger),
+	}
 }
 
 func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {

@@ -23,7 +23,6 @@ import (
 	"go/token"
 	"go/types"
 	"reflect"
-	"unsafe"
 
 	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/internal/aliases"
@@ -40,8 +39,7 @@ func SetUsesCgo(conf *types.Config) bool {
 		}
 	}
 
-	addr := unsafe.Pointer(f.UnsafeAddr())
-	*(*bool)(addr) = true
+	*(*bool)(f.Addr().UnsafePointer()) = true
 
 	return true
 }

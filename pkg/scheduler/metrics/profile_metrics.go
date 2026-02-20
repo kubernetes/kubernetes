@@ -19,9 +19,10 @@ package metrics
 // This file contains helpers for metrics that are associated to a profile.
 
 var (
-	ScheduledResult     = "scheduled"
-	UnschedulableResult = "unschedulable"
-	ErrorResult         = "error"
+	ScheduledResult           = "scheduled"
+	UnschedulableResult       = "unschedulable"
+	WaitingOnPreemptionResult = "waiting_on_preemption"
+	ErrorResult               = "error"
 )
 
 // PodScheduled can records a successful scheduling attempt and the duration
@@ -45,4 +46,27 @@ func PodScheduleError(profile string, duration float64) {
 func observeScheduleAttemptAndLatency(result, profile string, duration float64) {
 	schedulingLatency.WithLabelValues(result, profile).Observe(duration)
 	scheduleAttempts.WithLabelValues(result, profile).Inc()
+}
+
+// PodGroupScheduled can records a successful pod group scheduling attempt and the duration
+// since `start`.
+func PodGroupScheduled(profile string, duration float64) {
+	observePodGroupScheduleAttemptAndLatency(ScheduledResult, profile, duration)
+}
+
+// PodGroupUnschedulable can records a pod group scheduling attempt for an unschedulable pod group
+// and the duration since `start`.
+func PodGroupUnschedulable(profile string, duration float64) {
+	observePodGroupScheduleAttemptAndLatency(UnschedulableResult, profile, duration)
+}
+
+// PodGroupWaitingOnPreemption can records a pod group scheduling attempt for an unschedulable pod group
+// waiting on preemption, and the duration since `start`.
+func PodGroupWaitingOnPreemption(profile string, duration float64) {
+	observePodGroupScheduleAttemptAndLatency(WaitingOnPreemptionResult, profile, duration)
+}
+
+func observePodGroupScheduleAttemptAndLatency(result, profile string, duration float64) {
+	podGroupSchedulingLatency.WithLabelValues(result, profile).Observe(duration)
+	podGroupScheduleAttempts.WithLabelValues(result, profile).Inc()
 }

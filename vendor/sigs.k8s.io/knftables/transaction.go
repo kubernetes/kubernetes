@@ -44,29 +44,23 @@ const (
 	insertVerb  verb = "insert"
 	replaceVerb verb = "replace"
 	deleteVerb  verb = "delete"
+	destroyVerb verb = "destroy"
 	flushVerb   verb = "flush"
+	resetVerb   verb = "reset"
 )
 
 // populateCommandBuf populates the transaction as series of nft commands to the given bytes.Buffer.
-func (tx *Transaction) populateCommandBuf(buf *bytes.Buffer) error {
-	if tx.err != nil {
-		return tx.err
-	}
-
+func (tx *Transaction) populateCommandBuf(buf *bytes.Buffer) {
 	for _, op := range tx.operations {
 		op.obj.writeOperation(op.verb, tx.nftContext, buf)
 	}
-	return nil
 }
 
 // String returns the transaction as a string containing the nft commands; if there is
 // a pending error, it will be output as a comment at the end of the transaction.
 func (tx *Transaction) String() string {
 	buf := &bytes.Buffer{}
-	for _, op := range tx.operations {
-		op.obj.writeOperation(op.verb, tx.nftContext, buf)
-	}
-
+	tx.populateCommandBuf(buf)
 	if tx.err != nil {
 		fmt.Fprintf(buf, "# ERROR: %v", tx.err)
 	}
@@ -83,7 +77,7 @@ func (tx *Transaction) operation(verb verb, obj Object) {
 	if tx.err != nil {
 		return
 	}
-	if tx.err = obj.validate(verb); tx.err != nil {
+	if tx.err = obj.validate(verb, tx.nftContext); tx.err != nil {
 		return
 	}
 
@@ -132,10 +126,63 @@ func (tx *Transaction) Flush(obj Object) {
 	tx.operation(flushVerb, obj)
 }
 
-// Delete adds an "nft delete" operation to tx, deleting obj. The Delete() call always
-// succeeds, but if obj does not exist or cannot be deleted based on the information
-// provided (eg, Handle is required but not set) then an error will be returned when the
-// transaction is Run.
+// Delete adds an "nft delete" operation to tx, deleting obj, which must exist. The
+// Delete() call always succeeds, but if obj does not exist or cannot be deleted based on
+// the information provided (eg, Handle is required but not set) then an error will be
+// returned when the transaction is Run.
 func (tx *Transaction) Delete(obj Object) {
 	tx.operation(deleteVerb, obj)
+}
+
+// Reset adds a "nft reset" operation to tx, resetting obj (which must be a Counter).
+// The Reset() call always succeeds, but if obj does not exist then an error will be
+// returned when the transaction is Run.
+func (tx *Transaction) Reset(obj Object) {
+	tx.operation(resetVerb, obj)
+}
+
+// Destroy adds an "nft destroy" operation to tx, ensuring that obj does not exist, by
+// deleting it if it does exist. The Destroy() call always succeeds, but if obj cannot be
+// deleted based on the information provided (eg, Handle is required but not set) then an
+// error will be returned when the transaction is Run.
+//
+// Support for the actual "nft destroy" command requires kernel 6.3+ and nft 1.0.7+. You
+// can create the Interface with the `RequireDestroy` option if you want construction to
+// fail on older hosts. Alternatively, you can create the interface with the
+// `EmulateDestroy` option, in which case knftables will emulate Destroy by doing an
+// Add+Delete. In that case, obj must be valid for both an Add and a Delete. (Even if the
+// system you are on supports destroy, you may only call Destroy() in a
+// backward-compatible way if you are using `EmulateDestroy`.) In particular, this means:
+//
+//   - You can only Destroy() objects by Name or Key, not by Handle.
+//   - You can't Destroy() a Rule (since they can only be deleted by Handle).
+//   - You do not need to include optional values in obj (e.g. base chain properties) but
+//     if you do include them, they need to be correct.
+//   - When Destroy()ing a Set or Map you must include the correct Type.
+//   - When Destroy()ing a Map Element you must include the correct Value.
+func (tx *Transaction) Destroy(obj Object) {
+	if tx.err != nil {
+		return
+	}
+	if tx.err = obj.validate(destroyVerb, tx.nftContext); tx.err != nil {
+		return
+	}
+
+	if tx.emulateDestroy {
+		err := obj.validate(addVerb, tx.nftContext)
+		if err == nil {
+			err = obj.validate(deleteVerb, tx.nftContext)
+		}
+		if err != nil {
+			tx.err = fmt.Errorf("object is not compatible with EmulateDestroy: %w", err)
+			return
+		}
+	}
+
+	if tx.emulateDestroy && !tx.nftContext.hasDestroy {
+		tx.operations = append(tx.operations, operation{verb: addVerb, obj: obj})
+		tx.operations = append(tx.operations, operation{verb: deleteVerb, obj: obj})
+	} else {
+		tx.operations = append(tx.operations, operation{verb: destroyVerb, obj: obj})
+	}
 }

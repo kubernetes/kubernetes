@@ -27,6 +27,9 @@ import (
 const (
 	subsystem  = "apiserver"
 	statuscode = "code"
+	group      = "group"
+	version    = "version"
+	resource   = "resource"
 )
 
 var registerMetricsOnce sync.Once
@@ -37,10 +40,10 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      subsystem,
 			Name:           "rerouted_request_total",
-			Help:           "Total number of requests that were proxied to a peer kube apiserver because the local apiserver was not capable of serving it",
+			Help:           `Total number of requests that were proxied to a peer kube-apiserver because the local apiserver was not capable of serving it, broken down by 'group', 'version', and 'resource' indicating the GVR of the request. If all three are empty (""), the request is a discovery request.`,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{statuscode},
+		[]string{statuscode, group, version, resource},
 	)
 )
 
@@ -56,6 +59,6 @@ func Reset() {
 }
 
 // IncPeerProxiedRequest increments the # of proxied requests to peer kube-apiserver
-func IncPeerProxiedRequest(ctx context.Context, status string) {
-	peerProxiedRequestsTotal.WithContext(ctx).WithLabelValues(status).Add(1)
+func IncPeerProxiedRequest(ctx context.Context, status, g, v, r string) {
+	peerProxiedRequestsTotal.WithContext(ctx).WithLabelValues(status, g, v, r).Add(1)
 }

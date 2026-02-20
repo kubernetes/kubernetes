@@ -16,13 +16,6 @@ limitations under the License.
 
 package ktesting
 
-import "strings"
-
-// Deprecated: use tCtx.WithStep instead
-func WithStep(tCtx TContext, step string) TContext {
-	return tCtx.WithStep(step)
-}
-
 // WithStep creates a context where a prefix is added to all errors and log
 // messages, similar to how errors are wrapped. This can be nested, leaving a
 // trail of "bread crumbs" that help figure out where in a test some problem
@@ -52,29 +45,9 @@ func (tc *TC) WithStep(step string) *TC {
 // Inside the callback, the tCtx variable is the one where the step
 // has been added. This avoids the need to introduce multiple different
 // context variables and risk of using the wrong one.
-func Step(tCtx TContext, what string, cb func(tCtx TContext)) {
-	tCtx.Helper()
-	cb(WithStep(tCtx, what))
-}
-
-// TODO: remove Begin+End when not needed anymore
-
-// Deprecated
-func Begin(tCtx TContext, what string) TContext {
-	return WithStep(tCtx, what)
-}
-
-// Deprecated
-func End(tc *TC) TContext {
-	// This is a quick hack to keep End working. Will be removed.
-	tc = tc.clone()
-	index := strings.LastIndex(strings.TrimSuffix(tc.steps, ": "), ": ")
-	if index > 0 {
-		tc.steps = tc.steps[:index+2]
-	} else {
-		tc.steps = ""
-	}
-	return tc
+func (tc *TC) Step(step string, cb func(tCtx TContext)) {
+	tc.Helper()
+	cb(tc.WithStep(step))
 }
 
 // Value intercepts a search for the special "GINKGO_SPEC_CONTEXT" and

@@ -48,7 +48,7 @@ var (
 	udpPort            = 8081
 	sctpPort           = -1
 	shellPath          = "/bin/sh"
-	serverReady        = &atomicBool{0}
+	serverReady        atomic.Bool
 	certFile           = ""
 	privKeyFile        = ""
 	httpOverride       = ""
@@ -144,25 +144,6 @@ func init() {
 	CmdNetexec.Flags().StringVar(&httpOverride, "http-override", "", "Override the HTTP handler to always respond as if it were a GET with this path & params")
 	CmdNetexec.Flags().StringVar(&udpListenAddresses, "udp-listen-addresses", "", "A comma separated list of ip addresses the udp servers listen from")
 	CmdNetexec.Flags().IntVar(&delayShutdown, "delay-shutdown", 0, "Number of seconds to delay shutdown when receiving SIGTERM.")
-}
-
-// atomicBool uses load/store operations on an int32 to simulate an atomic boolean.
-type atomicBool struct {
-	v int32
-}
-
-// set sets the int32 to the given boolean.
-func (a *atomicBool) set(value bool) {
-	if value {
-		atomic.StoreInt32(&a.v, 1)
-		return
-	}
-	atomic.StoreInt32(&a.v, 0)
-}
-
-// get returns true if the int32 == 1
-func (a *atomicBool) get() bool {
-	return atomic.LoadInt32(&a.v) == 1
 }
 
 func main(cmd *cobra.Command, args []string) {
@@ -354,7 +335,7 @@ func hostnameHandler(w http.ResponseWriter, r *http.Request) {
 // as a health check of the HTTP server by virtue of being a HTTP handler.
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /healthz")
-	if serverReady.get() {
+	if serverReady.Load() {
 		w.WriteHeader(200)
 		return
 	}
@@ -376,7 +357,7 @@ func readyzHandler(sigTermReceived chan struct{}) func(w http.ResponseWriter, r 
 			return
 
 		default:
-			if serverReady.get() {
+			if serverReady.Load() {
 				if _, err := w.Write([]byte("ok")); err != nil {
 					utilruntime.HandleError(err)
 				}
@@ -651,14 +632,14 @@ func startUDPServer(address string, udpPort int) {
 
 	log.Printf("Started UDP server on port %s %d", address, udpPort)
 	// Start responding to readiness probes.
-	serverReady.set(true)
+	serverReady.Store(true)
 	defer func() {
 		log.Printf("UDP server exited")
-		serverReady.set(false)
+		serverReady.Store(false)
 	}()
 	for {
 		n, clientAddress, err := serverConn.ReadFromUDP(buf)
-		assertNoError(err, fmt.Sprintf("failed accepting UDP connections"))
+		assertNoError(err, "failed accepting UDP connections")
 		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
 		if receivedText == "hostname" {
 			log.Println("Sending udp hostName response")
@@ -698,14 +679,14 @@ func startSCTPServer(sctpPort int) {
 
 	log.Printf("Started SCTP server")
 	// Start responding to readiness probes.
-	serverReady.set(true)
+	serverReady.Store(true)
 	defer func() {
 		log.Printf("SCTP server exited")
-		serverReady.set(false)
+		serverReady.Store(false)
 	}()
 	for {
 		conn, err := listener.AcceptSCTP()
-		assertNoError(err, fmt.Sprintf("failed accepting SCTP connections"))
+		assertNoError(err, "failed accepting SCTP connections")
 		remoteAddr, err := conn.SCTPRemoteAddr(0)
 		if err != nil {
 			assertNoError(err, "failed to get SCTP client remote address")

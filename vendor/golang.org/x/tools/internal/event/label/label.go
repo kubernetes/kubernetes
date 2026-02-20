@@ -7,7 +7,6 @@ package label
 import (
 	"fmt"
 	"io"
-	"reflect"
 	"slices"
 	"unsafe"
 )
@@ -103,11 +102,10 @@ type stringptr unsafe.Pointer
 // This method is for implementing new key types, label creation should
 // normally be done with the Of method of the key.
 func OfString(k Key, v string) Label {
-	hdr := (*reflect.StringHeader)(unsafe.Pointer(&v))
 	return Label{
 		key:     k,
-		packed:  uint64(hdr.Len),
-		untyped: stringptr(hdr.Data),
+		packed:  uint64(len(v)),
+		untyped: stringptr(unsafe.StringData(v)),
 	}
 }
 
@@ -116,11 +114,7 @@ func OfString(k Key, v string) Label {
 // This method is for implementing new key types, for type safety normal
 // access should be done with the From method of the key.
 func (t Label) UnpackString() string {
-	var v string
-	hdr := (*reflect.StringHeader)(unsafe.Pointer(&v))
-	hdr.Data = uintptr(t.untyped.(stringptr))
-	hdr.Len = int(t.packed)
-	return v
+	return unsafe.String((*byte)(t.untyped.(stringptr)), int(t.packed))
 }
 
 // Valid returns true if the Label is a valid one (it has a key).

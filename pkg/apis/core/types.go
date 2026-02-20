@@ -166,8 +166,7 @@ type VolumeSource struct {
 	Projected *ProjectedVolumeSource
 	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
 	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-	// is on.
+	// are redirected to the pxd.portworx.com CSI driver.
 	// +optional
 	PortworxVolume *PortworxVolumeSource
 	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
@@ -309,8 +308,7 @@ type PersistentVolumeSource struct {
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
 	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
 	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-	// is on.
+	// are redirected to the pxd.portworx.com CSI driver.
 	// +optional
 	PortworxVolume *PortworxVolumeSource
 	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
@@ -3161,7 +3159,6 @@ const (
 // PodCondition represents pod's condition
 type PodCondition struct {
 	Type PodConditionType
-	// +featureGate=PodObservedGenerationTracking
 	// +optional
 	ObservedGeneration int64
 	Status             ConditionStatus
@@ -4539,8 +4536,6 @@ type EphemeralContainer struct {
 // state of a system.
 type PodStatus struct {
 	// If set, this represents the .metadata.generation that the pod status was set based upon.
-	// The PodObservedGenerationTracking feature gate must be enabled to use this field.
-	// +featureGate=PodObservedGenerationTracking
 	// +optional
 	ObservedGeneration int64
 	// +optional

@@ -25,7 +25,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -742,16 +741,12 @@ func (m *IssuingManager) createPodCertificateRequest(
 	podName string, podUID types.UID,
 	serviceAccountName string, serviceAccountUID types.UID,
 	nodeName types.NodeName, nodeUID types.UID,
-	signerName, keyType string, maxExpirationSeconds *int32, userAnnotations map[string]string) ([]byte, *certificatesv1beta1.PodCertificateRequest, error) {
-
-	privateKey, publicKey, proof, err := generateKeyAndProof(keyType, []byte(podUID))
+	signerName, keyType string, maxExpirationSeconds *int32,
+	userAnnotations map[string]string,
+) ([]byte, *certificatesv1beta1.PodCertificateRequest, error) {
+	privateKey, pkcs10Req, err := generateKeyAndProof(keyType)
 	if err != nil {
 		return nil, nil, fmt.Errorf("while generating keypair: %w", err)
-	}
-
-	pkixPublicKey, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("while marshaling public key: %w", err)
 	}
 
 	keyPEM, err := pemEncodeKey(privateKey)
@@ -781,8 +776,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 			NodeName:                  nodeName,
 			NodeUID:                   nodeUID,
 			MaxExpirationSeconds:      maxExpirationSeconds,
-			PKIXPublicKey:             pkixPublicKey,
-			ProofOfPossession:         proof,
+			StubPKCS10Request:         pkcs10Req,
 			UnverifiedUserAnnotations: userAnnotations,
 		},
 	}
@@ -877,73 +871,57 @@ func (m *IssuingManager) MetricReport() *MetricReport {
 	return report
 }
 
-func hashBytes(in []byte) []byte {
-	out := sha256.Sum256(in)
-	return out[:]
-}
+func generateKeyAndProof(keyType string) (crypto.PrivateKey, []byte, error) {
+	var privKey crypto.PrivateKey
 
-func generateKeyAndProof(keyType string, toBeSigned []byte) (privKey crypto.PrivateKey, pubKey crypto.PublicKey, sig []byte, err error) {
 	switch keyType {
 	case "RSA3072":
-		key, err := rsa.GenerateKey(rand.Reader, 3072)
+		priv, err := rsa.GenerateKey(rand.Reader, 3072)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating RSA 3072 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating RSA 3072 key: %w", err)
 		}
-		sig, err := rsa.SignPSS(rand.Reader, key, crypto.SHA256, hashBytes(toBeSigned), nil)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "RSA4096":
-		key, err := rsa.GenerateKey(rand.Reader, 4096)
+		priv, err := rsa.GenerateKey(rand.Reader, 4096)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating RSA 4096 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating RSA 4096 key: %w", err)
 		}
-		sig, err := rsa.SignPSS(rand.Reader, key, crypto.SHA256, hashBytes(toBeSigned), nil)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "ECDSAP256":
-		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating ECDSA P256 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating ECDSA P256 key: %w", err)
 		}
-		sig, err := ecdsa.SignASN1(rand.Reader, key, hashBytes(toBeSigned))
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "ECDSAP384":
-		key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+		priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating ECDSA P384 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating ECDSA P384 key: %w", err)
 		}
-		sig, err := ecdsa.SignASN1(rand.Reader, key, hashBytes(toBeSigned))
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "ECDSAP521":
-		key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		priv, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating ECDSA P521 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating ECDSA P521 key: %w", err)
 		}
-		sig, err := ecdsa.SignASN1(rand.Reader, key, hashBytes(toBeSigned))
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "ED25519":
-		pub, priv, err := ed25519.GenerateKey(rand.Reader)
+		_, priv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating Ed25519 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating Ed25519 key: %w", err)
 		}
-		sig := ed25519.Sign(priv, toBeSigned)
-		return priv, pub, sig, nil
+		privKey = priv
 	default:
-		return nil, nil, nil, fmt.Errorf("unknown key type %q", keyType)
+		return nil, nil, fmt.Errorf("unknown key type %q", keyType)
 	}
+
+	tmpl := &x509.CertificateRequest{}
+	pkcs10Req, err := x509.CreateCertificateRequest(rand.Reader, tmpl, privKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("while generating stub PKCS#10 request: %w", err)
+	}
+
+	return privKey, pkcs10Req, nil
 }
 
 func pemEncodeKey(key crypto.PrivateKey) ([]byte, error) {

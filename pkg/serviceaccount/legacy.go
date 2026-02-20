@@ -113,7 +113,7 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 
 	if v.lookup {
 		// Make sure token hasn't been invalidated by deletion of the secret
-		secret, err := v.getter.GetSecret(namespace, secretName)
+		secret, err := v.getter.GetSecret(ctx, namespace, secretName)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
 			return nil, errors.New("Token has been invalidated")
@@ -128,7 +128,7 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 		}
 
 		// Make sure service account still exists (name and UID)
-		serviceAccount, err := v.getter.GetServiceAccount(namespace, serviceAccountName)
+		serviceAccount, err := v.getter.GetServiceAccount(ctx, namespace, serviceAccountName)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, serviceAccountName, err)
 			return nil, err

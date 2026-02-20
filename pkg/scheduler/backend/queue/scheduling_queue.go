@@ -111,6 +111,10 @@ type SchedulingQueue interface {
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
 	Pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
+	// PopSpecificPod removes the pod from the queue and returns it.
+	// It behaves like Pop for the popped pod (metrics, in-flight tracking, etc.).
+	// It returns nil if the pod is not in the queue.
+	PopSpecificPod(logger klog.Logger, pod *v1.Pod) *framework.QueuedPodInfo
 	// Done must be called for pod returned by Pop. This allows the queue to
 	// keep track of which pods are currently being processed.
 	Done(types.UID)
@@ -206,6 +210,8 @@ type PriorityQueue struct {
 	isSchedulingQueueHintEnabled bool
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
+	// isGenericWorkloadEnabled indicates whether the feature gate GenericWorkload is enabled.
+	isGenericWorkloadEnabled bool
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
@@ -351,6 +357,7 @@ func NewPriorityQueue(
 
 	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
+	isGenericWorkloadEnabled := utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload)
 	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessFn, isPopFromBackoffQEnabled)
@@ -369,6 +376,7 @@ func NewPriorityQueue(
 		apiDispatcher:                     options.apiDispatcher,
 		isSchedulingQueueHintEnabled:      isSchedulingQueueHintEnabled,
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
+		isGenericWorkloadEnabled:          isGenericWorkloadEnabled,
 	}
 	var backoffQPopper backoffQPopper
 	if isPopFromBackoffQEnabled {
@@ -610,8 +618,11 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Log
 		// No need to change GatingPlugin; it's overwritten by the next PreEnqueue plugin if they gate this pod, or it's overwritten with an empty string if all PreEnqueue plugins pass.
 		return s
 	}
+	// Only increment metric and insert if not already incremented for this plugin
+	if !pInfo.UnschedulablePlugins.Has(pl.Name()) && !pInfo.PendingPlugins.Has(pl.Name()) {
+		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
+	}
 	pInfo.UnschedulablePlugins.Insert(pl.Name())
-	metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
 	pInfo.GatingPlugin = pl.Name()
 	pInfo.GatingPluginEvents = p.pluginToEventsMap[pInfo.GatingPlugin]
 	if s.Code() == fwk.Error {
@@ -896,6 +907,8 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	pInfo.BackoffExpiration = time.Time{}
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
+	// Pod with Workload reference should always need the cycle after got unschedulable for some reason.
+	pInfo.NeedsPodGroupScheduling = p.isGenericWorkloadEnabled && pod.Spec.WorkloadRef != nil
 
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
@@ -968,6 +981,54 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 // as it would lead to scheduling throughput degradation.
 func (p *PriorityQueue) Pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	return p.activeQ.pop(logger)
+}
+
+// PopSpecificPod removes the pod from the queue and returns it.
+// It behaves like Pop for the popped pod (metrics, in-flight tracking, etc.).
+// It returns nil if the pod is not in the queue.
+func (p *PriorityQueue) PopSpecificPod(logger klog.Logger, pod *v1.Pod) *framework.QueuedPodInfo {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	pInfoLookup := newQueuedPodInfoForLookup(pod)
+
+	var pInfo *framework.QueuedPodInfo
+	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
+		pInfo, _ = unlockedActiveQ.get(pInfoLookup)
+	})
+	if pInfo != nil {
+		if err := p.activeQ.delete(pInfo); err != nil {
+			return nil
+		}
+	} else {
+		var exists bool
+		pInfo, exists = p.backoffQ.get(pInfoLookup)
+		if exists {
+			if !p.backoffQ.delete(pInfo) {
+				return nil
+			}
+		} else {
+			pInfo = p.unschedulablePods.get(pod)
+			if pInfo != nil {
+				if pInfo.Gated() {
+					// Gated pod shouldn't be popped.
+					return nil
+				}
+				p.unschedulablePods.delete(pod, pInfo.Gated())
+			} else {
+				// Not found in any queue
+				return nil
+			}
+		}
+	}
+
+	err := p.activeQ.movePodToInFlight(pInfo)
+	if err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Discarding the popped pod")
+		return nil
+	}
+
+	return pInfo
 }
 
 // Done must be called for pod returned by Pop. This allows the queue to
@@ -1130,6 +1191,10 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) {
 	}
 	if pInfo = p.unschedulablePods.get(pod); pInfo != nil {
 		p.unschedulablePods.delete(pod, pInfo.Gated())
+		// Drop metric for deleted pod.
+		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
+			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+		}
 	}
 }
 
@@ -1432,6 +1497,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 		Timestamp:               now,
 		InitialAttemptTimestamp: nil,
 		UnschedulablePlugins:    sets.New(plugins...),
+		NeedsPodGroupScheduling: p.isGenericWorkloadEnabled && pod.Spec.WorkloadRef != nil,
 	}
 }
 

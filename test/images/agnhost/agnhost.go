@@ -27,6 +27,7 @@ import (
 	crdconvwebhook "k8s.io/kubernetes/test/images/agnhost/crd-conversion-webhook"
 	"k8s.io/kubernetes/test/images/agnhost/dns"
 	"k8s.io/kubernetes/test/images/agnhost/entrypoint-tester"
+	externalmetrics "k8s.io/kubernetes/test/images/agnhost/external-metrics"
 	"k8s.io/kubernetes/test/images/agnhost/fakegitserver"
 	"k8s.io/kubernetes/test/images/agnhost/fakeregistryserver"
 	grpchealthchecking "k8s.io/kubernetes/test/images/agnhost/grpc-health-checking"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/nettest"
 	nosnat "k8s.io/kubernetes/test/images/agnhost/no-snat-test"
 	nosnatproxy "k8s.io/kubernetes/test/images/agnhost/no-snat-test-proxy"
+	"k8s.io/kubernetes/test/images/agnhost/nonewprivs"
 	"k8s.io/kubernetes/test/images/agnhost/openidmetadata"
 	"k8s.io/kubernetes/test/images/agnhost/pause"
 	"k8s.io/kubernetes/test/images/agnhost/podcertificatesigner"
@@ -96,6 +98,8 @@ func main() {
 	rootCmd.AddCommand(podcertificatesigner.CmdPodCertificateSigner)
 	rootCmd.AddCommand(mtlsclient.CmdMtlsClient)
 	rootCmd.AddCommand(mtlsserver.CmdMtlsServer)
+	rootCmd.AddCommand(nonewprivs.CmdNoNewPrivs)
+	rootCmd.AddCommand(externalmetrics.CmdExternalMetricsServer)
 	// NOTE(claudiub): Some tests are passing logging related flags, so we need to be able to
 	// accept them. This will also include them in the printed help.
 	code := cli.Run(rootCmd)

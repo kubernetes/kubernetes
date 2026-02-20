@@ -98,7 +98,7 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 func (v neqTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:              v.TagName(),
-		StabilityLevel:   Alpha,
+		StabilityLevel:   TagStabilityLevelAlpha,
 		Scopes:           v.ValidScopes().UnsortedList(),
 		Description:      "Verifies the field's value is not equal to a specific disallowed value. Supports string, integer, and boolean types.",
 		PayloadsRequired: true,

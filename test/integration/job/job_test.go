@@ -2338,7 +2338,7 @@ func TestImmediateJobRecreation(t *testing.T) {
 	// more Jobs than the number of Job controller workers to make it very unlikely
 	// that syncJob executes (and cleans the in-memory state) before the corresponding
 	// replacement Jobs are created.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, ptr.To(jobSpec(i)))
 		if err != nil {
 			t.Fatalf("Error %v when creating the job %q", err, klog.KObj(jobObj))
@@ -3209,7 +3209,6 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "pod-replacement-policy")
 	t.Cleanup(closeFn)
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			if !tc.podReplacementPolicyEnabled {
 				// TODO: this will be removed in 1.37.
@@ -3436,7 +3435,6 @@ func TestElasticIndexedJob(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 	t.Cleanup(closeFn)
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 			t.Cleanup(cancel)
@@ -4230,6 +4228,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 
 func TestNodeSelectorUpdate(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "suspend")
+
 	t.Cleanup(closeFn)
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 	t.Cleanup(cancel)
@@ -4245,7 +4244,14 @@ func TestNodeSelectorUpdate(t *testing.T) {
 	jobNamespace := job.Namespace
 	jobClient := clientSet.BatchV1().Jobs(jobNamespace)
 
-	// (1) Unsuspend and set node selector in the same update.
+	// Since MutableSchedulingDirectives is set to true, one needs
+	// to wait for the suspend condition to be set reflecting that the
+	// job is actually suspended.
+	waitForPodsToBeActive(ctx, t, jobClient, 0, job)
+	validateJobCondition(ctx, t, clientSet, job, batchv1.JobSuspended)
+
+	// (1) set node selector in the same update.
+
 	nodeSelector := map[string]string{"foo": "bar"}
 	if _, err := updateJob(ctx, jobClient, jobName, func(j *batchv1.Job) {
 		j.Spec.Template.Spec.NodeSelector = nodeSelector
@@ -4563,7 +4569,6 @@ func TestDelayedJobUpdateEvent(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig, transformOpt)
 			t.Cleanup(cancel)
@@ -5000,16 +5005,15 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 	wg := sync.WaitGroup{}
 	wg.Add(len(updates))
 	errCh := make(chan error, len(updates))
-	var updated int32
+	var updated atomic.Int32
 
 	for _, pod := range updates {
-		pod := pod
 		go func() {
 			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, &pod, metav1.UpdateOptions{})
 			if err != nil {
 				errCh <- err
 			} else {
-				atomic.AddInt32(&updated, 1)
+				updated.Add(1)
 			}
 			wg.Done()
 		}()
@@ -5018,10 +5022,10 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 
 	select {
 	case err := <-errCh:
-		return int(updated), fmt.Errorf("updating Pod status: %w", err)
+		return int(updated.Load()), fmt.Errorf("updating Pod status: %w", err)
 	default:
 	}
-	return int(updated), nil
+	return int(updated.Load()), nil
 }
 
 func setJobPhaseForIndex(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, phase v1.PodPhase, ix int) error {
@@ -5080,7 +5084,6 @@ func getJobPodsForIndex(ctx context.Context, clientSet clientset.Interface, jobO
 	}
 	var result []*v1.Pod
 	for _, pod := range pods.Items {
-		pod := pod
 		if !metav1.IsControlledBy(&pod, jobObj) {
 			continue
 		}
@@ -5292,4 +5295,196 @@ func failTerminatingPods(ctx context.Context, t *testing.T, clientSet clientset.
 	if err != nil {
 		t.Fatalf("Failed to update pod statuses: %v", err)
 	}
+}
+
+// TestMutablePodResourcesWithPodReplacementPolicyFailed tests that when a job with
+// PodReplacementPolicy=Failed is suspended and pods are terminating, resource updates
+// can be made to the job but new pods are only created after terminating pods are removed.
+// The new pods should have the updated resources.
+func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
+	const blockDeletionFinalizerForTest string = "fake.example.com/blockDeletion"
+
+	// Enable MutablePodResourcesForSuspendedJobs feature gate
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, true)
+
+	closeFn, restConfig, cs, ns := setup(t, "mutable-resources-pod-replacement")
+	defer closeFn()
+
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	defer cancel()
+
+	// Create a job with PodReplacementPolicy=Failed and a finalizer to block pod deletion
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: ns.Name,
+		},
+		Spec: batchv1.JobSpec{
+			Parallelism:          ptr.To[int32](2),
+			Completions:          ptr.To[int32](2),
+			PodReplacementPolicy: ptr.To(batchv1.Failed),
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{blockDeletionFinalizerForTest},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:  "test-container",
+						Image: "busybox",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+						},
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+
+	job, err := createJobWithDefaults(ctx, cs, ns.Name, job)
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	jobClient := cs.BatchV1().Jobs(ns.Name)
+
+	// Wait for pods to be active
+	t.Log("Waiting for 2 pods to be active")
+	waitForPodsToBeActive(ctx, t, jobClient, 2, job)
+
+	// Suspend the job
+	t.Log("Suspending the job")
+	_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+		j.Spec.Suspend = ptr.To(true)
+	})
+	if err != nil {
+		t.Fatalf("Failed to suspend Job: %v", err)
+	}
+
+	// Wait for the job to be suspended
+	err = wait.PollUntilContextTimeout(ctx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		j, err := jobClient.Get(ctx, job.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return j.Spec.Suspend != nil && *j.Spec.Suspend, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for job to be suspended: %v", err)
+	}
+	t.Log("Job is suspended")
+
+	// Delete the pods to make them go to Terminating state
+	t.Log("Deleting pods to make them go to Terminating state")
+	deletePods(ctx, t, cs, ns.Name)
+
+	// Verify pods are in Terminating state (because of the finalizer)
+	validateJobsPodsStatusOnly(ctx, t, cs, job, podsByStatus{
+		Terminating: ptr.To[int32](2),
+		Active:      0,
+		Ready:       ptr.To[int32](0),
+	})
+	t.Log("Pods are in Terminating state")
+
+	// Update the job's pod template with new resources
+	t.Log("Updating job resources")
+	_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+		for i := range j.Spec.Template.Spec.Containers {
+			j.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("300m"),
+					v1.ResourceMemory: resource.MustParse("384Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("600m"),
+					v1.ResourceMemory: resource.MustParse("768Mi"),
+				},
+			}
+		}
+	})
+	if err != nil {
+		t.Fatalf("Failed to update Job resources: %v", err)
+	}
+	t.Log("Job resources updated")
+
+	// Wait a bit to ensure the controller has time to process the update
+	// With PodReplacementPolicy=Failed, no new pods should be created while old pods are terminating
+	time.Sleep(sleepDurationForControllerLatency)
+
+	// Verify that no new pods are created while old pods are terminating
+	validateJobsPodsStatusOnly(ctx, t, cs, job, podsByStatus{
+		Terminating: ptr.To[int32](2),
+		Active:      0,
+		Ready:       ptr.To[int32](0),
+	})
+	t.Log("Verified: No new pods created while old pods are terminating")
+
+	// Remove the finalizers to allow pods to finish terminating
+	t.Log("Removing finalizers from terminating pods")
+	err = removePodsFinalizers(ctx, cs, ns.Name, []string{blockDeletionFinalizerForTest})
+	if err != nil {
+		t.Fatalf("Failed to remove finalizers: %v", err)
+	}
+
+	// Wait for pods to be deleted and verify terminating count drops to 0
+	err = wait.PollUntilContextTimeout(ctx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		updatedJob, err := jobClient.Get(ctx, job.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return updatedJob.Status.Terminating == nil || *updatedJob.Status.Terminating == 0, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for terminating pods to be removed: %v", err)
+	}
+	t.Log("Terminating pods have been removed")
+
+	// Unsuspend the job
+	t.Log("Unsuspending the job")
+	_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+		j.Spec.Suspend = ptr.To(false)
+	})
+	if err != nil {
+		t.Fatalf("Failed to unsuspend Job: %v", err)
+	}
+
+	// Wait for new pods to be created
+	waitForPodsToBeActive(ctx, t, jobClient, 2, job)
+	t.Log("New pods are active")
+
+	// Verify that the new pods have the updated resources
+	pods, err := getJobPods(ctx, t, cs, job, func(s v1.PodStatus) bool { return true })
+	if err != nil {
+		t.Fatalf("Failed to get Job pods: %v", err)
+	}
+	if len(pods) != 2 {
+		t.Fatalf("Expected 2 pods, got %d", len(pods))
+	}
+
+	expectedResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("300m"),
+			v1.ResourceMemory: resource.MustParse("384Mi"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("600m"),
+			v1.ResourceMemory: resource.MustParse("768Mi"),
+		},
+	}
+
+	for _, pod := range pods {
+		for i := range pod.Spec.Containers {
+			if diff := cmp.Diff(expectedResources, pod.Spec.Containers[i].Resources); diff != "" {
+				t.Errorf("Unexpected resources in pod %s for container %q (-want +got):\n%s", pod.Name, pod.Spec.Containers[i].Name, diff)
+			}
+		}
+	}
+	t.Log("Verified: New pods have the updated resources")
 }

@@ -3,17 +3,19 @@
 
 package telemetry
 
+// StatusCode is the status of a Span.
+//
 // For the semantics of status codes see
 // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#set-status
 type StatusCode int32
 
 const (
-	// The default status.
+	// StatusCodeUnset is the default status.
 	StatusCodeUnset StatusCode = 0
-	// The Span has been validated by an Application developer or Operator to
-	// have completed successfully.
+	// StatusCodeOK is used when the Span has been validated by an Application
+	// developer or Operator to have completed successfully.
 	StatusCodeOK StatusCode = 1
-	// The Span contains an error.
+	// StatusCodeError is used when the Span contains an error.
 	StatusCodeError StatusCode = 2
 )
 

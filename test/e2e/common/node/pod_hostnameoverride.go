@@ -43,7 +43,7 @@ func newTestPod(namespace string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "test-pod-hostname-override",
-					Image:   imageutils.GetE2EImage(imageutils.JessieDnsutils),
+					Image:   imageutils.GetE2EImage(imageutils.GlibcDnsTesting),
 					Command: []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"},
 				},
 			},

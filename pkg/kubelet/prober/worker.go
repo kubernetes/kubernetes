@@ -214,7 +214,7 @@ func (w *worker) stop() {
 // Returns whether the worker should continue.
 func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
-	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
+	defer runtime.HandleCrashWithContext(ctx, func(ctx context.Context, _ interface{}) { keepGoing = true })
 
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()

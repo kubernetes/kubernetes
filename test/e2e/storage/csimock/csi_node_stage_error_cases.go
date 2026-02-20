@@ -268,11 +268,12 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 			test := t
 			ginkgo.It(test.name, func(ctx context.Context) {
 				// Index of the last deleted pod. NodeUnstage calls are then related to this pod.
-				var deletedPodNumber int64 = 1
+				var deletedPodNumber atomic.Int64
+				deletedPodNumber.Store(1)
 				var hooks *drivers.Hooks
 				if test.nodeUnstageHook != nil {
 					hooks = createPreHook("NodeUnstageVolume", func(counter int64) error {
-						pod := atomic.LoadInt64(&deletedPodNumber)
+						pod := deletedPodNumber.Load()
 						return test.nodeUnstageHook(counter, pod)
 					})
 				}
@@ -302,7 +303,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 				framework.ExpectNoError(err, "while waiting for the second pod to start")
 				// The second pod is running and kubelet can't call NodeUnstage of the first one.
 				// Therefore incrementing the pod counter is safe here.
-				atomic.AddInt64(&deletedPodNumber, 1)
+				deletedPodNumber.Add(1)
 				err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
 				framework.ExpectNoError(err, "while deleting the second pod")
 

@@ -1,5 +1,3 @@
-# Please keep kube-proxy configuration in-sync with:
-# cluster/addons/kube-proxy/kube-proxy-ds.yaml
 apiVersion: v1
 kind: Pod
 metadata:

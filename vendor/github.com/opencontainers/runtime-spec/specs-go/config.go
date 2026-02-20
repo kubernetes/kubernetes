@@ -31,6 +31,8 @@ type Spec struct {
 	VM *VM `json:"vm,omitempty" platform:"vm"`
 	// ZOS is platform-specific configuration for z/OS based containers.
 	ZOS *ZOS `json:"zos,omitempty" platform:"zos"`
+	// FreeBSD is platform-specific configuration for FreeBSD based containers.
+	FreeBSD *FreeBSD `json:"freebsd,omitempty" platform:"freebsd"`
 }
 
 // Scheduler represents the scheduling attributes for a process. It is based on
@@ -170,7 +172,7 @@ type Mount struct {
 	// Destination is the absolute path where the mount will be placed in the container.
 	Destination string `json:"destination"`
 	// Type specifies the mount kind.
-	Type string `json:"type,omitempty" platform:"linux,solaris,zos"`
+	Type string `json:"type,omitempty" platform:"linux,solaris,zos,freebsd"`
 	// Source specifies the source path of the mount.
 	Source string `json:"source,omitempty"`
 	// Options are fstab style mount options.
@@ -236,6 +238,8 @@ type Linux struct {
 	Namespaces []LinuxNamespace `json:"namespaces,omitempty"`
 	// Devices are a list of device nodes that are created for the container
 	Devices []LinuxDevice `json:"devices,omitempty"`
+	// NetDevices are key-value pairs, keyed by network device name on the host, moved to the container's network namespace.
+	NetDevices map[string]LinuxNetDevice `json:"netDevices,omitempty"`
 	// Seccomp specifies the seccomp security settings for the container.
 	Seccomp *LinuxSeccomp `json:"seccomp,omitempty"`
 	// RootfsPropagation is the rootfs mount propagation mode for the container.
@@ -249,6 +253,8 @@ type Linux struct {
 	// IntelRdt contains Intel Resource Director Technology (RDT) information for
 	// handling resource constraints and monitoring metrics (e.g., L3 cache, memory bandwidth) for the container
 	IntelRdt *LinuxIntelRdt `json:"intelRdt,omitempty"`
+	// MemoryPolicy contains NUMA memory policy for the container.
+	MemoryPolicy *LinuxMemoryPolicy `json:"memoryPolicy,omitempty"`
 	// Personality contains configuration for the Linux personality syscall
 	Personality *LinuxPersonality `json:"personality,omitempty"`
 	// TimeOffsets specifies the offset for supporting time namespaces.
@@ -430,7 +436,7 @@ type LinuxCPU struct {
 // LinuxPids for Linux cgroup 'pids' resource management (Linux 4.3)
 type LinuxPids struct {
 	// Maximum number of PIDs. Default is "no limit".
-	Limit int64 `json:"limit"`
+	Limit *int64 `json:"limit,omitempty"`
 }
 
 // LinuxNetwork identification and priority configuration
@@ -489,6 +495,12 @@ type LinuxDevice struct {
 	UID *uint32 `json:"uid,omitempty"`
 	// Gid of the device.
 	GID *uint32 `json:"gid,omitempty"`
+}
+
+// LinuxNetDevice represents a single network device to be added to the container's network namespace
+type LinuxNetDevice struct {
+	// Name of the device in the container namespace
+	Name string `json:"name,omitempty"`
 }
 
 // LinuxDeviceCgroup represents a device rule for the devices specified to
@@ -678,6 +690,32 @@ type WindowsHyperV struct {
 	UtilityVMPath string `json:"utilityVMPath,omitempty"`
 }
 
+// IOMems contains information about iomem addresses that should be passed to the VM.
+type IOMems struct {
+	// Guest Frame Number to map the iomem range. If GFN is not specified, the mapping will be done to the same Frame Number as was provided in FirstMFN.
+	FirstGFN *uint64 `json:"firstGFN,omitempty"`
+	// Physical page number of iomem regions.
+	FirstMFN *uint64 `json:"firstMFN"`
+	// Number of pages to be mapped.
+	NrMFNs *uint64 `json:"nrMFNs"`
+}
+
+// Hardware configuration for the VM image
+type HWConfig struct {
+	// Path to the container device-tree file that should be passed to the VM configuration.
+	DeviceTree string `json:"deviceTree,omitempty"`
+	// Number of virtual cpus for the VM.
+	VCPUs *uint32 `json:"vcpus,omitempty"`
+	// Maximum memory in bytes allocated to the VM.
+	Memory *uint64 `json:"memory,omitempty"`
+	// Host device tree nodes to passthrough to the VM.
+	DtDevs []string `json:"dtdevs,omitempty"`
+	// Allow auto-translated domains to access specific hardware I/O memory pages.
+	IOMems []IOMems `json:"iomems,omitempty"`
+	// Allows VM to access specific physical IRQs.
+	Irqs []uint32 `json:"irqs,omitempty"`
+}
+
 // VM contains information for virtual-machine-based containers.
 type VM struct {
 	// Hypervisor specifies hypervisor-related configuration for virtual-machine-based containers.
@@ -686,6 +724,8 @@ type VM struct {
 	Kernel VMKernel `json:"kernel"`
 	// Image specifies guest image related configuration for virtual-machine-based containers.
 	Image VMImage `json:"image,omitempty"`
+	// Hardware configuration that should be passed to the VM.
+	HwConfig *HWConfig `json:"hwconfig,omitempty"`
 }
 
 // VMHypervisor contains information about the hypervisor to use for a virtual machine.
@@ -828,23 +868,41 @@ type LinuxSyscall struct {
 type LinuxIntelRdt struct {
 	// The identity for RDT Class of Service
 	ClosID string `json:"closID,omitempty"`
+
+	// Schemata specifies the complete schemata to be written as is to the
+	// schemata file in resctrl fs. Each element represents a single line in the schemata file.
+	// NOTE: This will overwrite schemas specified in the L3CacheSchema and/or
+	// MemBwSchema fields.
+	Schemata []string `json:"schemata,omitempty"`
+
 	// The schema for L3 cache id and capacity bitmask (CBM)
 	// Format: "L3:<cache_id0>=<cbm0>;<cache_id1>=<cbm1>;..."
+	// NOTE: Should not be specified if Schemata is non-empty.
 	L3CacheSchema string `json:"l3CacheSchema,omitempty"`
 
 	// The schema of memory bandwidth per L3 cache id
 	// Format: "MB:<cache_id0>=bandwidth0;<cache_id1>=bandwidth1;..."
 	// The unit of memory bandwidth is specified in "percentages" by
 	// default, and in "MBps" if MBA Software Controller is enabled.
+	// NOTE: Should not be specified if Schemata is non-empty.
 	MemBwSchema string `json:"memBwSchema,omitempty"`
 
-	// EnableCMT is the flag to indicate if the Intel RDT CMT is enabled. CMT (Cache Monitoring Technology) supports monitoring of
-	// the last-level cache (LLC) occupancy for the container.
-	EnableCMT bool `json:"enableCMT,omitempty"`
+	// EnableMonitoring enables resctrl monitoring for the container. This will
+	// create a dedicated resctrl monitoring group for the container.
+	EnableMonitoring bool `json:"enableMonitoring,omitempty"`
+}
 
-	// EnableMBM is the flag to indicate if the Intel RDT MBM is enabled. MBM (Memory Bandwidth Monitoring) supports monitoring of
-	// total and local memory bandwidth for the container.
-	EnableMBM bool `json:"enableMBM,omitempty"`
+// LinuxMemoryPolicy represents input for the set_mempolicy syscall.
+type LinuxMemoryPolicy struct {
+	// Mode for the set_mempolicy syscall.
+	Mode MemoryPolicyModeType `json:"mode"`
+
+	// Nodes representing the nodemask for the set_mempolicy syscall in comma separated ranges format.
+	// Format: "<node0>-<node1>,<node2>,<node3>-<node4>,..."
+	Nodes string `json:"nodes"`
+
+	// Flags for the set_mempolicy syscall.
+	Flags []MemoryPolicyFlagType `json:"flags,omitempty"`
 }
 
 // ZOS contains platform-specific configuration for z/OS based containers.
@@ -874,6 +932,26 @@ const (
 	ZOSIPCNamespace ZOSNamespaceType = "ipc"
 	// UTSNamespace for isolating hostname and NIS domain name
 	ZOSUTSNamespace ZOSNamespaceType = "uts"
+)
+
+type MemoryPolicyModeType string
+
+const (
+	MpolDefault            MemoryPolicyModeType = "MPOL_DEFAULT"
+	MpolBind               MemoryPolicyModeType = "MPOL_BIND"
+	MpolInterleave         MemoryPolicyModeType = "MPOL_INTERLEAVE"
+	MpolWeightedInterleave MemoryPolicyModeType = "MPOL_WEIGHTED_INTERLEAVE"
+	MpolPreferred          MemoryPolicyModeType = "MPOL_PREFERRED"
+	MpolPreferredMany      MemoryPolicyModeType = "MPOL_PREFERRED_MANY"
+	MpolLocal              MemoryPolicyModeType = "MPOL_LOCAL"
+)
+
+type MemoryPolicyFlagType string
+
+const (
+	MpolFNumaBalancing MemoryPolicyFlagType = "MPOL_F_NUMA_BALANCING"
+	MpolFRelativeNodes MemoryPolicyFlagType = "MPOL_F_RELATIVE_NODES"
+	MpolFStaticNodes   MemoryPolicyFlagType = "MPOL_F_STATIC_NODES"
 )
 
 // LinuxSchedulerPolicy represents different scheduling policies used with the Linux Scheduler
@@ -915,3 +993,75 @@ const (
 	// SchedFlagUtilClampMin represents the utilization clamp maximum scheduling flag
 	SchedFlagUtilClampMax LinuxSchedulerFlag = "SCHED_FLAG_UTIL_CLAMP_MAX"
 )
+
+// FreeBSD contains platform-specific configuration for FreeBSD based containers.
+type FreeBSD struct {
+	// Devices which are accessible in the container
+	Devices []FreeBSDDevice `json:"devices,omitempty"`
+	// Jail definition for this container
+	Jail *FreeBSDJail `json:"jail,omitempty"`
+}
+
+type FreeBSDDevice struct {
+	// Path to the device, relative to /dev.
+	Path string `json:"path"`
+	// FileMode permission bits for the device.
+	Mode *os.FileMode `json:"mode,omitempty"`
+}
+
+// FreeBSDJail describes how to configure the container's jail
+type FreeBSDJail struct {
+	// Parent jail name - this can be used to share a single vnet
+	// across several containers
+	Parent string `json:"parent,omitempty"`
+	// Whether to use parent UTS names or override in the container
+	Host FreeBSDSharing `json:"host,omitempty"`
+	// IPv4 address sharing for the container
+	Ip4 FreeBSDSharing `json:"ip4,omitempty"`
+	// IPv4 addresses for the container
+	Ip4Addr []string `json:"ip4Addr,omitempty"`
+	// IPv6 address sharing for the container
+	Ip6 FreeBSDSharing `json:"ip6,omitempty"`
+	// IPv6 addresses for the container
+	Ip6Addr []string `json:"ip6Addr,omitempty"`
+	// Which network stack to use for the container
+	Vnet FreeBSDSharing `json:"vnet,omitempty"`
+	// If set, Ip4Addr and Ip6Addr addresses will be added to this interface
+	Interface string `json:"interface,omitempty"`
+	// List interfaces to be moved to the container's vnet
+	VnetInterfaces []string `json:"vnetInterfaces,omitempty"`
+	// SystemV IPC message sharing for the container
+	SysVMsg FreeBSDSharing `json:"sysvmsg,omitempty"`
+	// SystemV semaphore message sharing for the container
+	SysVSem FreeBSDSharing `json:"sysvsem,omitempty"`
+	// SystemV memory sharing for the container
+	SysVShm FreeBSDSharing `json:"sysvshm,omitempty"`
+	// Mount visibility (see jail(8) for details)
+	EnforceStatfs *int `json:"enforceStatfs,omitempty"`
+	// Jail capabilities
+	Allow *FreeBSDJailAllow `json:"allow,omitempty"`
+}
+
+// These values are used to control access to features in the container, either
+// disabling the feature, sharing state with the parent or creating new private
+// state in the container.
+type FreeBSDSharing string
+
+const (
+	FreeBSDShareDisable FreeBSDSharing = "disable"
+	FreeBSDShareNew     FreeBSDSharing = "new"
+	FreeBSDShareInherit FreeBSDSharing = "inherit"
+)
+
+// FreeBSDJailAllow describes jail capabilities
+type FreeBSDJailAllow struct {
+	SetHostname   bool     `json:"setHostname,omitempty"`
+	RawSockets    bool     `json:"rawSockets,omitempty"`
+	Chflags       bool     `json:"chflags,omitempty"`
+	Mount         []string `json:"mount,omitempty"`
+	Quotas        bool     `json:"quotas,omitempty"`
+	SocketAf      bool     `json:"socketAf,omitempty"`
+	Mlock         bool     `json:"mlock,omitempty"`
+	ReservedPorts bool     `json:"reservedPorts,omitempty"`
+	Suser         bool     `json:"suser,omitempty"`
+}

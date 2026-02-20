@@ -33,7 +33,7 @@ import (
 )
 
 func TestMakeUserNsManagerSwitch(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 	// Create the manager with the feature gate enabled, to record some pods on disk.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
@@ -51,7 +51,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 	// Record the pods on disk.
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
-		_, err := m.GetOrCreateUserNamespaceMappings(ctx, &pod, "")
+		_, err := m.GetOrCreateUserNamespaceMappings(logger, &pod, "")
 		require.NoError(t, err, "failed to record userns range for pod %v", podUID)
 	}
 
@@ -69,7 +69,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 }
 
 func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 	// Enable the feature gate to create some pods on disk.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
@@ -87,7 +87,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 	// Record the pods on disk.
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
-		_, err := m.GetOrCreateUserNamespaceMappings(ctx, &pod, "")
+		_, err := m.GetOrCreateUserNamespaceMappings(logger, &pod, "")
 		require.NoError(t, err, "failed to record userns range for pod %v", podUID)
 	}
 
@@ -100,7 +100,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
-		userns, err := m2.GetOrCreateUserNamespaceMappings(ctx, &pod, "")
+		userns, err := m2.GetOrCreateUserNamespaceMappings(logger, &pod, "")
 
 		assert.NoError(t, err, "failed to record userns range for pod %v", podUID)
 		assert.Nil(t, userns, "userns range should be nil for pod %v", podUID)
@@ -125,7 +125,7 @@ func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
 	// Record the pods on disk.
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
-		_, err := m.GetOrCreateUserNamespaceMappings(ctx, &pod, "")
+		_, err := m.GetOrCreateUserNamespaceMappings(logger, &pod, "")
 		require.NoError(t, err, "failed to record userns range for pod %v", podUID)
 	}
 

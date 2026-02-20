@@ -27,11 +27,6 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
-// Deprecated: use tCtx.WithRESTConfig instead
-func WithRESTConfig(tCtx TContext, cfg *rest.Config) TContext {
-	return tCtx.WithRESTConfig(cfg)
-}
-
 // WithRESTConfig initializes all client-go clients with new clients
 // created for the config. The current test name gets included in the UserAgent.
 func (tc *TC) WithRESTConfig(cfg *rest.Config) TContext {
@@ -46,11 +41,6 @@ func (tc *TC) WithRESTConfig(cfg *rest.Config) TContext {
 	cachedDiscovery := memory.NewMemCacheClient(tc.client.Discovery())
 	tc.restMapper = restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
 	return tc
-}
-
-// Deprecated: use tCtx.WithClients instead
-func WithClients(tCtx TContext, cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface, apiextensions apiextensions.Interface) TContext {
-	return tCtx.WithClients(cfg, mapper, client, dynamic, apiextensions)
 }
 
 // WithClients uses an existing config and clients.

@@ -72,7 +72,7 @@ func NewSummaryProvider(ctx context.Context, statsProvider Provider) SummaryProv
 func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*statsapi.Summary, error) {
 	// TODO(timstclair): Consider returning a best-effort response if any of
 	// the following errors occur.
-	node, err := sp.provider.GetNode()
+	node, err := sp.provider.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node info: %v", err)
 	}
@@ -129,7 +129,7 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*statsapi.Summary, error) {
 	// TODO(timstclair): Consider returning a best-effort response if any of
 	// the following errors occur.
-	node, err := sp.provider.GetNode()
+	node, err := sp.provider.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node info: %v", err)
 	}

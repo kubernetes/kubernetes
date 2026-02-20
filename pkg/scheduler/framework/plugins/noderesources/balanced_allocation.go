@@ -191,14 +191,30 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 	}, nil
 }
 
-func balancedResourceScorer(requested, allocable []int64) int64 {
+func balancedResourceScorer(requested, allocated, allocatable []int64) int64 {
+	// Compute the score for the node with pending pod requests
+	scoreWithPod := balancedResourceScore(requested, allocatable)
+	// Compute the score for the node without pending pod requests
+	scoreWithoutPod := balancedResourceScore(allocated, allocatable)
+	// Score based on the improvement to the node balance (before vs after adding the pod).
+	// Scores with/without pod are in range [MaxNodeScore/2, MaxNodeScore].
+	// Therefore, their difference will be in range [-MaxNodeScore/2, MaxNodeScore/2].
+	// This operation brings the range back to [MaxNodeScore/2, MaxNodeScore]
+	// to be closer to the original implementation that only considered the score after adding the pod.
+	// If the difference to the balance is small, the score will be around 75.
+	// If the balance is improved, the score will move towards 100.
+	// If the balance is decreased, the score will move towards 50.
+	return fwk.MaxNodeScore/2 + (fwk.MaxNodeScore/2+scoreWithPod-scoreWithoutPod)/2
+}
+
+func balancedResourceScore(requested, allocatable []int64) int64 {
 	var resourceToFractions []float64
 	var totalFraction float64
 	for i := range requested {
-		if allocable[i] == 0 {
+		if allocatable[i] == 0 {
 			continue
 		}
-		fraction := float64(requested[i]) / float64(allocable[i])
+		fraction := float64(requested[i]) / float64(allocatable[i])
 		if fraction > 1 {
 			fraction = 1
 		}

@@ -3,11 +3,14 @@ apiVersion: kind.x-k8s.io/v1alpha4
 # this containerd config patch sets the registry to the local registry where we push mock kms provider
 containerdConfigPatches:
 - |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
-    endpoint = ["http://kind-registry:5000"]
+  [plugins."io.containerd.grpc.v1.cri".registry]
+    config_path = "/etc/containerd/certs.d"
 nodes:
 - role: control-plane
   extraMounts:
+  - containerPath: /etc/containerd/certs.d
+    hostPath: test/e2e/testing-manifests/auth/encrypt/certs.d
+    readOnly: true
   - containerPath: /etc/kubernetes/encryption-config.yaml
     hostPath: test/e2e/testing-manifests/auth/encrypt/encryption-config.yaml
     readOnly: true

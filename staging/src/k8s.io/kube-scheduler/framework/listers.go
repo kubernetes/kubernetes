@@ -149,12 +149,12 @@ type CSIManager interface {
 // WorkloadManager provides an interface for scheduling plugins to provide workload-aware scheduling.
 // It acts as the central source of truth for runtime information about workloads.
 type WorkloadManager interface {
-	// PodGroupInfo retrieves the runtime state for a specific pod group, identified by workload's namespace and reference.
-	PodGroupInfo(namespace string, workloadRef *v1.WorkloadReference) (PodGroupInfo, error)
+	// PodGroupState retrieves the runtime state for a specific pod group, identified by workload's namespace and reference.
+	PodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
 }
 
-// PodGroupInfo provides an interface to view and modify the state of a single pod group.
-type PodGroupInfo interface {
+// PodGroupState provides an interface to view and modify the state of a single pod group.
+type PodGroupState interface {
 	// AllPods returns the UIDs of all pods known to the scheduler for this group.
 	AllPods() sets.Set[types.UID]
 	// UnscheduledPods returns all pods that are unscheduled for this group,
