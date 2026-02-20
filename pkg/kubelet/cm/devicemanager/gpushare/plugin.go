@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
@@ -38,6 +39,7 @@ const (
 // GPUSharePlugin is a dummy device plugin that advertises fractional GPUs
 // It simply multiplies physical GPUs by a factor (e.g., 100 slices per GPU)
 type GPUSharePlugin struct {
+	pluginapi.UnimplementedDevicePluginServer
 	devs   []*pluginapi.Device
 	socket string
 	server *grpc.Server
@@ -81,14 +83,22 @@ func (p *GPUSharePlugin) Start() error {
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
-		p.server.Serve(sock)
+		if err := p.server.Serve(sock); err != nil {
+			klog.ErrorS(err, "GPUShare device plugin server crashed")
+		}
 	}()
 
 	klog.Info("GPUShare device plugin started, waiting for ready...")
 	// Wait for server to start by dialing it
-	conn, err := grpc.Dial(p.socket, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(5*time.Second), grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-		return net.DialTimeout("unix", addr, timeout)
-	}))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, p.socket,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+		grpc.WithContextDialer(func(c context.Context, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(c, "unix", addr)
+		}),
+	)
 	if err != nil {
 		return fmt.Errorf("could not wait for device plugin server to start: %w", err)
 	}
@@ -109,9 +119,15 @@ func (p *GPUSharePlugin) Stop() error {
 }
 
 func (p *GPUSharePlugin) register() error {
-	conn, err := grpc.Dial(pluginapi.KubeletSocket, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(5*time.Second), grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-		return net.DialTimeout("unix", addr, timeout)
-	}))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, pluginapi.KubeletSocket,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+		grpc.WithContextDialer(func(c context.Context, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(c, "unix", addr)
+		}),
+	)
 	if err != nil {
 		return fmt.Errorf("device plugin unable to connect to Kubelet: %w", err)
 	}
@@ -167,7 +183,7 @@ func (p *GPUSharePlugin) Allocate(ctx context.Context, reqs *pluginapi.AllocateR
 	return &responses, nil
 }
 
-// PreStartContainer is called, if indicated by Device Plugin during registeration phase, before each container start.
+// PreStartContainer is called, if indicated by Device Plugin during registration phase, before each container start.
 func (p *GPUSharePlugin) PreStartContainer(context.Context, *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
 	return &pluginapi.PreStartContainerResponse{}, nil
 }

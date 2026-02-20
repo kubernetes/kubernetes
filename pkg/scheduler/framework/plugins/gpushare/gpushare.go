@@ -24,11 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "GPUShare"
+	Name = names.GPUShare
 
 	// GPUShareResourceName is the extended resource name for fractional GPU allocation
 	GPUShareResourceName = v1.ResourceName("gpushare.com/vgpu")
@@ -36,6 +37,7 @@ const (
 
 var _ framework.FilterPlugin = &GPUShare{}
 var _ framework.ScorePlugin = &GPUShare{}
+var _ framework.EnqueueExtensions = &GPUShare{}
 
 // GPUShare is a plugin that schedules pods requesting fractional GPU resources.
 type GPUShare struct {
@@ -58,10 +60,32 @@ func (pl *GPUShare) ScoreExtensions() framework.ScoreExtensions {
 func (pl *GPUShare) Filter(ctx context.Context, cycleState framework.CycleState, pod *v1.Pod, nodeInfo framework.NodeInfo) *framework.Status {
 	// Calculate the pod's fractional GPU request
 	var podGPURequest int64
+	var maxInitGPURequest int64
+
+	for i := range pod.Spec.InitContainers {
+		if val, ok := pod.Spec.InitContainers[i].Resources.Requests[GPUShareResourceName]; ok {
+			if pod.Spec.InitContainers[i].RestartPolicy != nil && *pod.Spec.InitContainers[i].RestartPolicy == v1.ContainerRestartPolicyAlways {
+				podGPURequest += val.Value()
+			} else if val.Value() > maxInitGPURequest {
+				maxInitGPURequest = val.Value()
+			}
+		}
+	}
+
 	for i := range pod.Spec.Containers {
 		if val, ok := pod.Spec.Containers[i].Resources.Requests[GPUShareResourceName]; ok {
 			podGPURequest += val.Value()
 		}
+	}
+
+	for i := range pod.Spec.EphemeralContainers {
+		if val, ok := pod.Spec.EphemeralContainers[i].Resources.Requests[GPUShareResourceName]; ok {
+			podGPURequest += val.Value()
+		}
+	}
+
+	if maxInitGPURequest > podGPURequest {
+		podGPURequest = maxInitGPURequest
 	}
 
 	if podGPURequest == 0 {
@@ -100,10 +124,32 @@ func (pl *GPUShare) Score(ctx context.Context, state framework.CycleState, pod *
 	}
 
 	var podGPURequest int64
+	var maxInitGPURequest int64
+
+	for i := range pod.Spec.InitContainers {
+		if val, ok := pod.Spec.InitContainers[i].Resources.Requests[GPUShareResourceName]; ok {
+			if pod.Spec.InitContainers[i].RestartPolicy != nil && *pod.Spec.InitContainers[i].RestartPolicy == v1.ContainerRestartPolicyAlways {
+				podGPURequest += val.Value()
+			} else if val.Value() > maxInitGPURequest {
+				maxInitGPURequest = val.Value()
+			}
+		}
+	}
+
 	for i := range pod.Spec.Containers {
 		if val, ok := pod.Spec.Containers[i].Resources.Requests[GPUShareResourceName]; ok {
 			podGPURequest += val.Value()
 		}
+	}
+
+	for i := range pod.Spec.EphemeralContainers {
+		if val, ok := pod.Spec.EphemeralContainers[i].Resources.Requests[GPUShareResourceName]; ok {
+			podGPURequest += val.Value()
+		}
+	}
+
+	if maxInitGPURequest > podGPURequest {
+		podGPURequest = maxInitGPURequest
 	}
 
 	if podGPURequest == 0 {

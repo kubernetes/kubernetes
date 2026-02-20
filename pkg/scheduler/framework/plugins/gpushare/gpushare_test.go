@@ -213,7 +213,7 @@ func TestGPUShareScore(t *testing.T) {
 			nodeInfo.SetNode(test.node)
 
 			score, status := p.Score(context.Background(), nil, test.pod, nodeInfo)
-			if status.Code() != fwk.Success && status != nil {
+			if status != nil && status.Code() != fwk.Success {
 				t.Errorf("expected success, got %v", status)
 			}
 			if score != test.expectedScore {
