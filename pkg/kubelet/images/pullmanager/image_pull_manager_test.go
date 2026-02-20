@@ -1177,7 +1177,7 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 			}
 			f.intentCounters.Store(tt.image, tt.pullsInFlight)
 			origIntentCounter := f.getIntentCounterForImage(tt.image)
-			f.RecordImagePulled(tCtx, tt.image, tt.imageRef, tt.creds)
+			f.RecordImagePulled(tCtx, tt.image, tt.imageRef, tt.creds, false)
 			require.Equal(t, f.getIntentCounterForImage(tt.image), origIntentCounter-1, "intent counter for %s was not decremented", tt.image)
 
 			for _, fname := range tt.expectPulled {

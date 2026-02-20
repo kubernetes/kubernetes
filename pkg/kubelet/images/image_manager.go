@@ -327,11 +327,27 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 		}
 
 		defer func() {
-			if pullSucceeded {
-				m.imagePullManager.RecordImagePulled(ctx, image, imageRef, trackedToImagePullCreds(finalPullCredentials))
-			} else {
+			if !pullSucceeded {
 				m.imagePullManager.RecordImagePullFailed(ctx, image)
+				return
 			}
+
+			if imageID := imagePullResult.imageID; len(imageID) > 0 {
+				m.imagePullManager.RecordImagePulled(ctx, image, imageID, trackedToImagePullCreds(finalPullCredentials), false)
+				return
+			}
+
+			keepPullingRecord := false
+			imageID, getIDErr := m.imageService.GetImageRef(ctx, imgSpec)
+			if getIDErr != nil || imageID == "" {
+				klog.Error(getIDErr, "failed to retrieve image ID from the image service")
+				// leaving a dangling pulling record should cause the image
+				// pull to be always attempted in case GetImageRef returns different
+				// ID than what's in the imageRef
+				keepPullingRecord = true
+				imageID = imagePullResult.imageRef
+			}
+			m.imagePullManager.RecordImagePulled(ctx, image, imageID, trackedToImagePullCreds(finalPullCredentials), keepPullingRecord)
 		}()
 	}
 
