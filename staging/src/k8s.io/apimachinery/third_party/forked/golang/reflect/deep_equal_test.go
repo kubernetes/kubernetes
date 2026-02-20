@@ -6,6 +6,7 @@ package reflect
 
 import (
 	"testing"
+	"time"
 )
 
 func TestEqualities(t *testing.T) {
@@ -156,6 +157,11 @@ func TestPublicEqualities(t *testing.T) {
 
 	type unexportedEmbeddedTypeWithExportedField struct {
 		ExportedStruct
+	}
+
+	type TimeTest struct {
+		X int
+		t time.Time
 	}
 
 	type doublyNestedUnexportedTypeInner struct {
@@ -455,6 +461,12 @@ func TestPublicEqualities(t *testing.T) {
 			[]map[string]string{{"foo": "bar"}, {"bar": "foo"}},
 			[]map[string]string{{"foo": "bar"}, {"bar": "foo"}},
 			&DeepEqualOptions{}, true, false,
+		},
+		{
+			"unexported time.Time does not affect equality check",
+			TimeTest{1, time.Time{}},
+			TimeTest{1, time.Time{}.Add(time.Hour)},
+			&DeepEqualOptions{IgnoreUnexportedFields: true}, true, false,
 		},
 	}
 
