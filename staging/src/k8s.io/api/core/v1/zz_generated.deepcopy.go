@@ -484,6 +484,11 @@ func (in *ClusterTrustBundleProjection) DeepCopyInto(out *ClusterTrustBundleProj
 		*out = new(bool)
 		**out = **in
 	}
+	if in.User != nil {
+		in, out := &in.User, &out.User
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
@@ -771,6 +776,11 @@ func (in *ConfigMapVolumeSource) DeepCopyInto(out *ConfigMapVolumeSource) {
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
 		*out = new(bool)
+		**out = **in
+	}
+	if in.DefaultUser != nil {
+		in, out := &in.DefaultUser, &out.DefaultUser
+		*out = new(int64)
 		**out = **in
 	}
 	return
@@ -1216,6 +1226,11 @@ func (in *DownwardAPIVolumeFile) DeepCopyInto(out *DownwardAPIVolumeFile) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.User != nil {
+		in, out := &in.User, &out.User
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
@@ -1242,6 +1257,11 @@ func (in *DownwardAPIVolumeSource) DeepCopyInto(out *DownwardAPIVolumeSource) {
 	if in.DefaultMode != nil {
 		in, out := &in.DefaultMode, &out.DefaultMode
 		*out = new(int32)
+		**out = **in
+	}
+	if in.DefaultUser != nil {
+		in, out := &in.DefaultUser, &out.DefaultUser
+		*out = new(int64)
 		**out = **in
 	}
 	return
@@ -2192,6 +2212,11 @@ func (in *KeyToPath) DeepCopyInto(out *KeyToPath) {
 	if in.Mode != nil {
 		in, out := &in.Mode, &out.Mode
 		*out = new(int32)
+		**out = **in
+	}
+	if in.User != nil {
+		in, out := &in.User, &out.User
+		*out = new(int64)
 		**out = **in
 	}
 	return
@@ -3931,6 +3956,11 @@ func (in *PodCertificateProjection) DeepCopyInto(out *PodCertificateProjection) 
 			(*out)[key] = val
 		}
 	}
+	if in.User != nil {
+		in, out := &in.User, &out.User
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
@@ -4956,6 +4986,11 @@ func (in *ProjectedVolumeSource) DeepCopyInto(out *ProjectedVolumeSource) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.DefaultUser != nil {
+		in, out := &in.DefaultUser, &out.DefaultUser
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
@@ -5771,6 +5806,11 @@ func (in *SecretVolumeSource) DeepCopyInto(out *SecretVolumeSource) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.DefaultUser != nil {
+		in, out := &in.DefaultUser, &out.DefaultUser
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
@@ -5993,6 +6033,11 @@ func (in *ServiceAccountTokenProjection) DeepCopyInto(out *ServiceAccountTokenPr
 	*out = *in
 	if in.ExpirationSeconds != nil {
 		in, out := &in.ExpirationSeconds, &out.ExpirationSeconds
+		*out = new(int64)
+		**out = **in
+	}
+	if in.User != nil {
+		in, out := &in.User, &out.User
 		*out = new(int64)
 		**out = **in
 	}

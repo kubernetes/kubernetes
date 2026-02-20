@@ -466,6 +466,11 @@ message ClusterTrustBundleProjection {
 
   // Relative path from the volume root to write the bundle.
   optional string path = 4;
+
+  // user is Optional: The owner UID of the created file.
+  // Default is implementation-defined.
+  // +optional
+  optional int64 user = 6;
 }
 
 // Information about the condition of a component.
@@ -674,6 +679,11 @@ message ConfigMapVolumeSource {
   // optional specify whether the ConfigMap or its keys must be defined
   // +optional
   optional bool optional = 4;
+
+  // defaultUser is Optional: The owner UID of the created files by default.
+  // Default is implementation-defined.
+  // +optional
+  optional int64 defaultUser = 5;
 }
 
 // A single application container that you want to run within a pod.
@@ -1217,6 +1227,11 @@ message DownwardAPIVolumeFile {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 mode = 4;
+
+  // user is Optional: The owner UID of the created file.
+  // Default is implementation-defined.
+  // +optional
+  optional int64 user = 5;
 }
 
 // DownwardAPIVolumeSource represents a volume containing downward API info.
@@ -1237,6 +1252,11 @@ message DownwardAPIVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 2;
+
+  // defaultUser is Optional: The owner UID of the created files by default.
+  // Default is implementation-defined.
+  // +optional
+  optional int64 defaultUser = 3;
 }
 
 // Represents an empty directory for a pod.
@@ -2304,6 +2324,11 @@ message KeyToPath {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 mode = 3;
+
+  // user is Optional: The owner UID of the created file.
+  // Default is implementation-defined.
+  // +optional
+  optional int64 user = 4;
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle
@@ -3918,6 +3943,11 @@ message PodCertificateProjection {
   // Signers should document the keys and values they support. Signers should
   // deny requests that contain keys they do not recognize.
   map<string, string> userAnnotations = 7;
+
+  // user is Optional: The owner UID of the created file.
+  // Default is implementation-defined.
+  // +optional
+  optional int64 user = 8;
 }
 
 // PodCondition contains details for the current condition of this pod.
@@ -5142,6 +5172,11 @@ message ProjectedVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 2;
+
+  // defaultUser is Optional: The owner UID of the created files by default.
+  // Default is implementation-defined.
+  // +optional
+  optional int64 defaultUser = 3;
 }
 
 // Represents a Quobyte mount that lasts the lifetime of a pod.
@@ -5898,6 +5933,11 @@ message SecretVolumeSource {
   // optional field specify whether the Secret or its keys must be defined
   // +optional
   optional bool optional = 4;
+
+  // defaultUser is Optional: The owner UID of the created files by default.
+  // Default is implementation-defined.
+  // +optional
+  optional int64 defaultUser = 5;
 }
 
 // SecurityContext holds security configuration that will be applied to a container.
@@ -6098,6 +6138,11 @@ message ServiceAccountTokenProjection {
   // path is the path relative to the mount point of the file to project the
   // token into.
   optional string path = 3;
+
+  // user is Optional: The owner UID of the created file.
+  // Default is implementation-defined.
+  // +optional
+  optional int64 user = 4;
 }
 
 // ServiceList holds a list of services.

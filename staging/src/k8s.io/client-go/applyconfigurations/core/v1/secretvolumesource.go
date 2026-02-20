@@ -48,6 +48,9 @@ type SecretVolumeSourceApplyConfiguration struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
 	// optional field specify whether the Secret or its keys must be defined
 	Optional *bool `json:"optional,omitempty"`
+	// defaultUser is Optional: The owner UID of the created files by default.
+	// Default is implementation-defined.
+	DefaultUser *int64 `json:"defaultUser,omitempty"`
 }
 
 // SecretVolumeSourceApplyConfiguration constructs a declarative configuration of the SecretVolumeSource type for use with
@@ -90,5 +93,13 @@ func (b *SecretVolumeSourceApplyConfiguration) WithDefaultMode(value int32) *Sec
 // If called multiple times, the Optional field is set to the value of the last call.
 func (b *SecretVolumeSourceApplyConfiguration) WithOptional(value bool) *SecretVolumeSourceApplyConfiguration {
 	b.Optional = &value
+	return b
+}
+
+// WithDefaultUser sets the DefaultUser field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DefaultUser field is set to the value of the last call.
+func (b *SecretVolumeSourceApplyConfiguration) WithDefaultUser(value int64) *SecretVolumeSourceApplyConfiguration {
+	b.DefaultUser = &value
 	return b
 }

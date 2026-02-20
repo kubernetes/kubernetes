@@ -2966,6 +2966,7 @@ func autoConvert_v1_ClusterTrustBundleProjection_To_core_ClusterTrustBundleProje
 	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	out.Path = in.Path
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
@@ -2980,6 +2981,7 @@ func autoConvert_core_ClusterTrustBundleProjection_To_v1_ClusterTrustBundleProje
 	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	out.Path = in.Path
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
@@ -3223,6 +3225,7 @@ func autoConvert_v1_ConfigMapVolumeSource_To_core_ConfigMapVolumeSource(in *core
 	out.Items = *(*[]core.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	out.DefaultUser = (*int64)(unsafe.Pointer(in.DefaultUser))
 	return nil
 }
 
@@ -3238,6 +3241,7 @@ func autoConvert_core_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *core
 	out.Items = *(*[]corev1.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	out.DefaultUser = (*int64)(unsafe.Pointer(in.DefaultUser))
 	return nil
 }
 
@@ -3677,6 +3681,7 @@ func autoConvert_v1_DownwardAPIVolumeFile_To_core_DownwardAPIVolumeFile(in *core
 	out.FieldRef = (*core.ObjectFieldSelector)(unsafe.Pointer(in.FieldRef))
 	out.ResourceFieldRef = (*core.ResourceFieldSelector)(unsafe.Pointer(in.ResourceFieldRef))
 	out.Mode = (*int32)(unsafe.Pointer(in.Mode))
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
@@ -3690,6 +3695,7 @@ func autoConvert_core_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *core
 	out.FieldRef = (*corev1.ObjectFieldSelector)(unsafe.Pointer(in.FieldRef))
 	out.ResourceFieldRef = (*corev1.ResourceFieldSelector)(unsafe.Pointer(in.ResourceFieldRef))
 	out.Mode = (*int32)(unsafe.Pointer(in.Mode))
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
@@ -3701,6 +3707,7 @@ func Convert_core_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *core.Dow
 func autoConvert_v1_DownwardAPIVolumeSource_To_core_DownwardAPIVolumeSource(in *corev1.DownwardAPIVolumeSource, out *core.DownwardAPIVolumeSource, s conversion.Scope) error {
 	out.Items = *(*[]core.DownwardAPIVolumeFile)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.DefaultUser = (*int64)(unsafe.Pointer(in.DefaultUser))
 	return nil
 }
 
@@ -3712,6 +3719,7 @@ func Convert_v1_DownwardAPIVolumeSource_To_core_DownwardAPIVolumeSource(in *core
 func autoConvert_core_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in *core.DownwardAPIVolumeSource, out *corev1.DownwardAPIVolumeSource, s conversion.Scope) error {
 	out.Items = *(*[]corev1.DownwardAPIVolumeFile)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.DefaultUser = (*int64)(unsafe.Pointer(in.DefaultUser))
 	return nil
 }
 
@@ -4692,6 +4700,7 @@ func autoConvert_v1_KeyToPath_To_core_KeyToPath(in *corev1.KeyToPath, out *core.
 	out.Key = in.Key
 	out.Path = in.Path
 	out.Mode = (*int32)(unsafe.Pointer(in.Mode))
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
@@ -4704,6 +4713,7 @@ func autoConvert_core_KeyToPath_To_v1_KeyToPath(in *core.KeyToPath, out *corev1.
 	out.Key = in.Key
 	out.Path = in.Path
 	out.Mode = (*int32)(unsafe.Pointer(in.Mode))
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
@@ -6359,6 +6369,7 @@ func autoConvert_v1_PodCertificateProjection_To_core_PodCertificateProjection(in
 	out.KeyPath = in.KeyPath
 	out.CertificateChainPath = in.CertificateChainPath
 	out.UserAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UserAnnotations))
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
@@ -6375,6 +6386,7 @@ func autoConvert_core_PodCertificateProjection_To_v1_PodCertificateProjection(in
 	out.KeyPath = in.KeyPath
 	out.CertificateChainPath = in.CertificateChainPath
 	out.UserAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UserAnnotations))
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
@@ -7474,6 +7486,7 @@ func autoConvert_v1_ProjectedVolumeSource_To_core_ProjectedVolumeSource(in *core
 		out.Sources = nil
 	}
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.DefaultUser = (*int64)(unsafe.Pointer(in.DefaultUser))
 	return nil
 }
 
@@ -7495,6 +7508,7 @@ func autoConvert_core_ProjectedVolumeSource_To_v1_ProjectedVolumeSource(in *core
 		out.Sources = nil
 	}
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.DefaultUser = (*int64)(unsafe.Pointer(in.DefaultUser))
 	return nil
 }
 
@@ -8344,6 +8358,7 @@ func autoConvert_v1_SecretVolumeSource_To_core_SecretVolumeSource(in *corev1.Sec
 	out.Items = *(*[]core.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	out.DefaultUser = (*int64)(unsafe.Pointer(in.DefaultUser))
 	return nil
 }
 
@@ -8357,6 +8372,7 @@ func autoConvert_core_SecretVolumeSource_To_v1_SecretVolumeSource(in *core.Secre
 	out.Items = *(*[]corev1.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	out.DefaultUser = (*int64)(unsafe.Pointer(in.DefaultUser))
 	return nil
 }
 
@@ -8517,6 +8533,7 @@ func autoConvert_v1_ServiceAccountTokenProjection_To_core_ServiceAccountTokenPro
 		return err
 	}
 	out.Path = in.Path
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
@@ -8531,6 +8548,7 @@ func autoConvert_core_ServiceAccountTokenProjection_To_v1_ServiceAccountTokenPro
 		return err
 	}
 	out.Path = in.Path
+	out.User = (*int64)(unsafe.Pointer(in.User))
 	return nil
 }
 
