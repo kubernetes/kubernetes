@@ -70,8 +70,8 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	return "", nil, utilerrors.NewAggregate(pullErrs)
 }
 
-// GetImageRef gets the ID of the image which has already been in
-// the local storage. It returns ("", nil) if the image isn't in the local storage.
+// GetImageRef DOES NOT return an ImageRef. It returns an ID of the image which has
+// already been in the local storage. It returns ("", nil) if the image isn't in the local storage.
 func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubecontainer.ImageSpec) (string, error) {
 	logger := klog.FromContext(ctx)
 	resp, err := m.imageService.ImageStatus(ctx, ToRuntimeAPIImageSpec(image), false)
