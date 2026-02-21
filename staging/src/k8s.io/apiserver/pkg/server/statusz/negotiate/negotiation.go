@@ -42,7 +42,7 @@ func (StatuszEndpointRestrictions) AllowsStreamSchema(s string) bool {
 
 func isStructured(gvk *schema.GroupVersionKind) bool {
 	if gvk != nil {
-		if gvk.Group == "config.k8s.io" && gvk.Version == "v1alpha1" {
+		if gvk.Group == "config.k8s.io" && gvk.Version == "v1beta1" {
 			if gvk.Kind == "Statusz" {
 				return true
 			}

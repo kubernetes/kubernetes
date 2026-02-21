@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 
 	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
-	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	v1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
 )
 
 const (
@@ -275,13 +275,13 @@ func TestStatusz(t *testing.T) {
 	}
 
 	wantBodyString := "statusz\nWarning: This endpoint is not meant to be machine parseable"
-	wantBodyStructured := &v1alpha1.Statusz{
+	wantBodyStructured := &v1beta1.Statusz{
 		// StartTime, UptimeSeconds, GoVersion, BinaryVersion,
 		// EmulationVersion, Paths are dynamic, so we only check
 		// static fields
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Statusz",
-			APIVersion: "config.k8s.io/v1alpha1",
+			APIVersion: "config.k8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "apiserver",
@@ -293,8 +293,8 @@ func TestStatusz(t *testing.T) {
 		name               string
 		acceptHeader       string
 		wantStatus         int
-		wantBodySub        string            // for text/plain responses
-		wantStructuredBody *v1alpha1.Statusz // for structured responses (JSON/YAML/CBOR)
+		wantBodySub        string           // for text/plain responses
+		wantStructuredBody *v1beta1.Statusz // for structured responses (JSON/YAML/CBOR)
 	}{
 		{
 			name:         "text plain response",
@@ -304,7 +304,7 @@ func TestStatusz(t *testing.T) {
 		},
 		{
 			name:               "structured json response",
-			acceptHeader:       "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
 			wantStatus:         http.StatusOK,
 			wantStructuredBody: wantBodyStructured,
 		},
@@ -326,7 +326,7 @@ func TestStatusz(t *testing.T) {
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
@@ -343,13 +343,13 @@ func TestStatusz(t *testing.T) {
 		},
 		{
 			name:               "structured yaml response",
-			acceptHeader:       "application/yaml;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Statusz",
 			wantStatus:         http.StatusOK,
 			wantStructuredBody: wantBodyStructured,
 		},
 		{
 			name:               "structured cbor response",
-			acceptHeader:       "application/cbor;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Statusz",
 			wantStatus:         http.StatusOK,
 			wantStructuredBody: wantBodyStructured,
 		},
@@ -374,7 +374,7 @@ func TestStatusz(t *testing.T) {
 					}
 				}
 				if tc.wantStructuredBody != nil {
-					var got v1alpha1.Statusz
+					var got v1beta1.Statusz
 					unmarshalResponse(t, tc.acceptHeader, raw, &got)
 					// Only check static fields, since others are dynamic
 					if got.TypeMeta != tc.wantStructuredBody.TypeMeta {

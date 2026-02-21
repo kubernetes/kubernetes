@@ -39,7 +39,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	v1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -58,7 +58,7 @@ const (
 	DefaultStatuszPath = "/statusz"
 	Kind               = "Statusz"
 	GroupName          = "config.k8s.io"
-	Version            = "v1alpha1"
+	Version            = "v1beta1"
 )
 
 const headerFmt = `
@@ -92,7 +92,7 @@ func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...Option
 
 func Install(m mux, componentName string, reg statuszRegistry) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	filteredCodecFactory, err := newStatuszCodecFactory(scheme, componentName, reg)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -276,7 +276,7 @@ func writeStructuredResponse(obj runtime.Object, serializer runtime.NegotiatedSe
 	)
 }
 
-func statusz(componentName string, reg statuszRegistry) *v1alpha1.Statusz {
+func statusz(componentName string, reg statuszRegistry) *v1beta1.Statusz {
 	startTime := reg.processStartTime()
 	upTimeSeconds := max(0, int64(time.Since(startTime).Seconds()))
 	goVersion := reg.goVersion()
@@ -287,7 +287,7 @@ func statusz(componentName string, reg statuszRegistry) *v1alpha1.Statusz {
 	}
 
 	paths := aggregatePaths(reg.paths())
-	data := &v1alpha1.Statusz{
+	data := &v1beta1.Statusz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       Kind,
 			APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),

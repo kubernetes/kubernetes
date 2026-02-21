@@ -32,7 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
-	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	"k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -245,10 +245,10 @@ func TestSchedulerZPages(t *testing.T) {
 	}
 
 	statuszWantBodyStr := "kube-scheduler statusz\nWarning: This endpoint is not meant to be machine parseable"
-	statuszWantBodyJSON := &v1alpha1.Statusz{
+	statuszWantBodyJSON := &v1beta1.Statusz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Statusz",
-			APIVersion: "config.k8s.io/v1alpha1",
+			APIVersion: "config.k8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-scheduler",
@@ -271,8 +271,8 @@ func TestSchedulerZPages(t *testing.T) {
 		name         string
 		acceptHeader string
 		wantStatus   int
-		wantBodySub  string            // for text/plain
-		wantJSON     *v1alpha1.Statusz // for application/json
+		wantBodySub  string           // for text/plain
+		wantJSON     *v1beta1.Statusz // for application/json
 	}{
 		{
 			name:         "text plain response",
@@ -282,7 +282,7 @@ func TestSchedulerZPages(t *testing.T) {
 		},
 		{
 			name:         "structured json response",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
 			wantStatus:   http.StatusOK,
 			wantJSON:     statuszWantBodyJSON,
 		},
@@ -304,7 +304,7 @@ func TestSchedulerZPages(t *testing.T) {
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
@@ -408,7 +408,7 @@ func TestSchedulerZPages(t *testing.T) {
 					}
 				}
 				if tc.wantJSON != nil {
-					var got v1alpha1.Statusz
+					var got v1beta1.Statusz
 					if err := json.Unmarshal(body, &got); err != nil {
 						t.Fatalf("error unmarshalling JSON: %v", err)
 					}

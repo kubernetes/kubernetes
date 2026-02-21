@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
 	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	"k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
 	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/apiserver/pkg/server"
@@ -358,10 +359,10 @@ users:
 	}
 
 	statuszWantBodyStr := "kube-controller-manager statusz\nWarning: This endpoint is not meant to be machine parseable"
-	statuszWantBodyJSON := &v1alpha1.Statusz{
+	statuszWantBodyJSON := &v1beta1.Statusz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Statusz",
-			APIVersion: "config.k8s.io/v1alpha1",
+			APIVersion: "config.k8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-controller-manager",
@@ -384,8 +385,8 @@ users:
 		name         string
 		acceptHeader string
 		wantStatus   int
-		wantBodySub  string            // for text/plain
-		wantJSON     *v1alpha1.Statusz // for structured json
+		wantBodySub  string           // for text/plain
+		wantJSON     *v1beta1.Statusz // for structured json
 	}{
 		{
 			name:         "text plain response",
@@ -395,7 +396,7 @@ users:
 		},
 		{
 			name:         "structured json response",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
 			wantStatus:   http.StatusOK,
 			wantJSON:     statuszWantBodyJSON,
 		},
@@ -417,7 +418,7 @@ users:
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
