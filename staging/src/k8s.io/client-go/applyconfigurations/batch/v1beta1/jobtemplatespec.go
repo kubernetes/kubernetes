@@ -30,10 +30,10 @@ import (
 //
 // JobTemplateSpec describes the data a Job should have when created from a template
 type JobTemplateSpecApplyConfiguration struct {
-	// Standard object's metadata of the jobs created from this template.
+	// metadata is the standard object metadata of the jobs created from this template.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the job.
+	// spec specifies the desired behavior of a job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *batchv1.JobSpecApplyConfiguration `json:"spec,omitempty"`
 }

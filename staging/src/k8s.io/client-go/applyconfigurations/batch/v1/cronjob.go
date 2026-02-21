@@ -33,13 +33,13 @@ import (
 // CronJob represents the configuration of a single cron job.
 type CronJobApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the desired behavior of a cron job, including the schedule.
+	// spec specifies the desired behavior of a cron job, including the schedule.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *CronJobSpecApplyConfiguration `json:"spec,omitempty"`
-	// Current status of a cron job.
+	// status reports the current status of a cron job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status *CronJobStatusApplyConfiguration `json:"status,omitempty"`
 }
