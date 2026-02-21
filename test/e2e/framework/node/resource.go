@@ -294,19 +294,6 @@ func CollectAddresses(nodes *v1.NodeList, addressType v1.NodeAddressType) []stri
 	return ips
 }
 
-// PickIP picks one public node IP
-func PickIP(ctx context.Context, c clientset.Interface) (string, error) {
-	publicIps, err := GetPublicIps(ctx, c)
-	if err != nil {
-		return "", fmt.Errorf("get node public IPs error: %w", err)
-	}
-	if len(publicIps) == 0 {
-		return "", fmt.Errorf("got unexpected number (%d) of public IPs", len(publicIps))
-	}
-	ip := publicIps[0]
-	return ip, nil
-}
-
 // GetPublicIps returns a public IP list of nodes.
 func GetPublicIps(ctx context.Context, c clientset.Interface) ([]string, error) {
 	nodes, err := GetReadySchedulableNodes(ctx, c)

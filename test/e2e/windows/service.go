@@ -54,8 +54,6 @@ var _ = sigDescribe("Services", skipUnlessWindows(func() {
 		ns := f.Namespace.Name
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		nodeIP, err := e2enode.PickIP(ctx, jig.Client)
-		framework.ExpectNoError(err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
@@ -63,6 +61,11 @@ var _ = sigDescribe("Services", skipUnlessWindows(func() {
 		})
 		framework.ExpectNoError(err)
 
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, jig.Client)
+		framework.ExpectNoError(err)
+		ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, svc.Spec.IPFamilies[0])
+		gomega.Expect(ips).NotTo(gomega.BeEmpty())
+		nodeIP := ips[0]
 		nodePort := int(svc.Spec.Ports[0].NodePort)
 
 		ginkgo.By("creating Pod to be part of service " + serviceName)
