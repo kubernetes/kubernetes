@@ -20,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -47,8 +46,23 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 		return requirementsQOS(pod.Spec.Resources)
 	}
 
+	// Iterator for Init & main Containers.
+	// Cannot use podutil.ContainerIter due to forbidden import.
+	containerIter := func(yield func(*v1.Container) bool) {
+		for _, c := range pod.Spec.InitContainers {
+			if !yield(&c) {
+				return
+			}
+		}
+		for _, c := range pod.Spec.Containers {
+			if !yield(&c) {
+				return
+			}
+		}
+	}
+
 	var podQOS v1.PodQOSClass
-	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+	for container := range containerIter {
 		containerQOS := requirementsQOS(&container.Resources)
 		if containerQOS == v1.PodQOSBurstable {
 			return containerQOS // If any container is Burstable, we know the pod isn't BestEffort or Guaranteed
