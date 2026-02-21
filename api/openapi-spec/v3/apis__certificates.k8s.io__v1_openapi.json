@@ -18,7 +18,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
               }
             ],
-            "default": {}
+            "default": {},
+            "description": "metadata is the standard object metadata."
           },
           "spec": {
             "allOf": [

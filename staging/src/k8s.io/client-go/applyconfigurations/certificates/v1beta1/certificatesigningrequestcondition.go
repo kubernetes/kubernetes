@@ -29,16 +29,16 @@ import (
 type CertificateSigningRequestConditionApplyConfiguration struct {
 	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
 	Type *certificatesv1beta1.RequestConditionType `json:"type,omitempty"`
-	// Status of the condition, one of True, False, Unknown.
+	// status of the condition, one of True, False, Unknown.
 	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
 	// Defaults to "True".
 	// If unset, should be treated as "True".
 	Status *v1.ConditionStatus `json:"status,omitempty"`
-	// brief reason for the request state
+	// reason for the request state
 	Reason *string `json:"reason,omitempty"`
-	// human readable message with details about the request state
+	// message is a human readable string with details about the request state
 	Message *string `json:"message,omitempty"`
-	// timestamp for the last update to this condition
+	// lastUpdateTime is the timestamp for the last update to this condition
 	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
 	// lastTransitionTime is the time the condition last transitioned from one status to another.
 	// If unset, when a new condition type is added or an existing condition's status is changed,
