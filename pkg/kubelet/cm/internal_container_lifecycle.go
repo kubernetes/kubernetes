@@ -21,6 +21,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
@@ -36,6 +37,7 @@ type internalContainerLifecycleImpl struct {
 	cpuManager      cpumanager.Manager
 	memoryManager   memorymanager.Manager
 	topologyManager topologymanager.Manager
+	draManager      *dra.Manager
 }
 
 func (i *internalContainerLifecycleImpl) PreStartContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerID string) error {
@@ -47,11 +49,18 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(logger klog.Logger, p
 		i.memoryManager.AddContainer(logger, pod, container, containerID)
 	}
 
+	if i.draManager != nil {
+		i.draManager.AddContainer(logger, pod, container, containerID)
+	}
+
 	i.topologyManager.AddContainer(pod, container, containerID)
 
 	return nil
 }
 
 func (i *internalContainerLifecycleImpl) PostStopContainer(logger klog.Logger, containerID string) error {
+	if i.draManager != nil {
+		i.draManager.RemoveContainer(logger, containerID)
+	}
 	return i.topologyManager.RemoveContainer(containerID)
 }

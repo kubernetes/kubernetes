@@ -69,6 +69,7 @@ func TestPreStartContainer(t *testing.T) {
 				cpuManager:      &mockCPUManager{},
 				memoryManager:   nil,
 				topologyManager: &mockTopologyManager{},
+				draManager:      nil,
 			},
 		}, {
 			name: "When a Memory manager is provided it has AddContainer called",
@@ -76,6 +77,7 @@ func TestPreStartContainer(t *testing.T) {
 				cpuManager:      nil,
 				memoryManager:   &mockMemoryManager{},
 				topologyManager: &mockTopologyManager{},
+				draManager:      nil,
 			},
 		}, {
 			name: "When a CPU manager/Memory manager is not provided, it's ok",
@@ -83,6 +85,7 @@ func TestPreStartContainer(t *testing.T) {
 				cpuManager:      nil,
 				memoryManager:   nil,
 				topologyManager: &mockTopologyManager{},
+				draManager:      nil,
 			},
 		},
 	}

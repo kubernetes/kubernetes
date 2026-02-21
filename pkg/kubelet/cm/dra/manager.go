@@ -34,9 +34,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/metrics"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
-
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -106,6 +106,14 @@ type Manager struct {
 
 	// update channel for resource updates
 	update chan resourceupdates.Update
+
+	// containerRuntime is the container runtime service interface needed
+	// to make UpdateContainerResources() calls against the containers.
+	containerRuntime runtimeService
+}
+
+type runtimeService interface {
+	UpdateContainerResources(ctx context.Context, id string, resources *runtimeapi.ContainerResources) error
 }
 
 // NewManager creates a new DRA manager.
@@ -156,10 +164,11 @@ func (m *Manager) GetWatcherHandler() cache.PluginHandler {
 }
 
 // Start starts the reconcile loop of the manager.
-func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady) error {
+func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady, containerRuntime runtimeService) error {
 	m.initDRAPluginManager(ctx, getNode, defaultWipingDelay)
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
+	m.containerRuntime = containerRuntime
 	go wait.UntilWithContext(ctx, func(ctx context.Context) { m.reconcileLoop(ctx) }, m.reconcilePeriod)
 	return nil
 }
@@ -217,6 +226,89 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 			logger.Info("Unpreparing pod resources in reconcile loop failed, will retry", "podUID", podClaims.uid, "err", err)
 		}
 	}
+}
+
+// AddContainer implements the InternalContainerLifecycle hook to enforce DRA cgroup limits dynamically.
+func (m *Manager) AddContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
+	if m.containerRuntime == nil {
+		return
+	}
+
+	totalGPUMemory := int64(0)
+
+	// Check claims used by this container
+	for _, claimRef := range pod.Spec.ResourceClaims {
+		usesClaim := false
+		for _, cRef := range container.Resources.Claims {
+			if cRef.Name == claimRef.Name {
+				usesClaim = true
+				break
+			}
+		}
+		if !usesClaim {
+			continue
+		}
+
+		claimName, _, err := resourceclaim.Name(pod, &claimRef)
+		if err != nil || claimName == nil {
+			continue
+		}
+
+		// Fetch the ResourceClaim
+		rc, err := m.kubeClient.ResourceV1().ResourceClaims(pod.Namespace).Get(context.TODO(), *claimName, metav1.GetOptions{})
+		if err != nil {
+			logger.Error(err, "Failed to fetch ResourceClaim for DRA cgroup hook", "claimName", *claimName)
+			continue
+		}
+
+		// Sum up all gpu-memory capacities requested
+		if rc.Spec.Devices.Requests != nil {
+			for _, req := range rc.Spec.Devices.Requests {
+				if req.Exactly != nil && req.Exactly.Capacity != nil {
+					for capName, capVal := range req.Exactly.Capacity.Requests {
+						if capName == "gpu-memory" || capName == "dra.example.com/gpu-memory" {
+							totalGPUMemory += capVal.Value()
+						}
+					}
+				}
+				if req.FirstAvailable != nil {
+					for _, first := range req.FirstAvailable {
+						if first.Capacity != nil {
+							for capName, capVal := range first.Capacity.Requests {
+								if capName == "gpu-memory" || capName == "dra.example.com/gpu-memory" {
+									totalGPUMemory += capVal.Value()
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if totalGPUMemory > 0 {
+		// Update CRI with cgroup v2 misc limit for GPU memory
+		unified := map[string]string{
+			"misc.max": fmt.Sprintf("nvidia.com/gpu=%d", totalGPUMemory),
+		}
+
+		res := &runtimeapi.ContainerResources{
+			Linux: &runtimeapi.LinuxContainerResources{
+				Unified: unified,
+			},
+		}
+		if err := m.containerRuntime.UpdateContainerResources(context.Background(), containerID, res); err != nil {
+			logger.Error(err, "Failed to update DRA container resources directly via CRI", "containerID", containerID)
+		} else {
+			logger.Info("Successfully applied DRA cgroup limits", "containerID", containerID, "gpuMemory", totalGPUMemory)
+		}
+	}
+}
+
+// RemoveContainer implements the InternalContainerLifecycle hook for DRA.
+func (m *Manager) RemoveContainer(logger klog.Logger, containerID string) error {
+	// Currently nothing to clean up locally. The container's cgroups are destroyed by the runtime.
+	return nil
 }
 
 // PrepareResources attempts to prepare all of the required resources
