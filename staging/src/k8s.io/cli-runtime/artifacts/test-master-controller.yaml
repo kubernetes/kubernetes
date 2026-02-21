@@ -17,10 +17,9 @@ spec:
     spec:
       containers:
       - name: master
-        image: registry.k8s.io/redis:e2e  # or just image: redis
+        image: registry.k8s.io/e2e-test-images/agnhost:2.63
+        command: ["/agnhost", "pause"]
         resources:
           requests:
             cpu: 100m
             memory: 100Mi
-        ports:
-        - containerPort: 6379

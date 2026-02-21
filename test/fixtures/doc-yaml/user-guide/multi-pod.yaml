@@ -10,7 +10,7 @@ metadata:
 spec:
   containers:
     - name: master
-      image: registry.k8s.io/e2e-test-images/agnhost:2.61
+      image: registry.k8s.io/e2e-test-images/agnhost:2.63
       command: ["/agnhost", "pause"]
       env:
         - name: MASTER
@@ -24,7 +24,7 @@ spec:
         - mountPath: /redis-master-data
           name: data
     - name: sentinel
-      image: registry.k8s.io/e2e-test-images/agnhost:2.61
+      image: registry.k8s.io/e2e-test-images/agnhost:2.63
       command: ["/agnhost", "pause"]
       env:
         - name: SENTINEL
@@ -44,7 +44,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-serve-hostname
-    image: registry.k8s.io/e2e-test-images/agnhost:2.61
+    image: registry.k8s.io/e2e-test-images/agnhost:2.63
     command: ["/agnhost", "serve-hostname"]
     resources:
       limits:

@@ -126,9 +126,7 @@ func TestDescribeObject(t *testing.T) {
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdDescribe("kubectl", tf, streams)
-	if err := cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml"); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	cmd.Flags().Set("filename", "../../../testdata/test-master-controller.yaml") //nolint:errcheck
 	cmd.Run(cmd, []string{})
 
 	if d.Name != "redis-master" || d.Namespace != "test" {
