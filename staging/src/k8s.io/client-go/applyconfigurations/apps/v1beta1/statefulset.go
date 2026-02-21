@@ -40,11 +40,12 @@ import (
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
 type StatefulSetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata is the standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec defines the desired identities of pods in this set.
+	// spec defines the desired identities of pods in this set.
 	Spec *StatefulSetSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status is the current status of Pods in this StatefulSet. This data
+	// status is the current status of Pods in this StatefulSet. This data
 	// may be out of date by some window of time.
 	Status *StatefulSetStatusApplyConfiguration `json:"status,omitempty"`
 }
