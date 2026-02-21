@@ -283,6 +283,7 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+	defer close(stopChan)
 
 	ports, err := customPF.GetPorts()
 	if err != nil {
