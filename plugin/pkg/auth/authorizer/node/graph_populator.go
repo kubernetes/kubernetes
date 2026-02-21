@@ -19,30 +19,37 @@ package node
 import (
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 
 	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	certsv1beta1informers "k8s.io/client-go/informers/certificates/v1beta1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/utils/ptr"
 )
 
 type graphPopulator struct {
-	graph *Graph
+	graph          *Graph
+	podGroupLister schedulinglisters.PodGroupLister
 }
 
 func AddGraphEventHandlers(
 	graph *Graph,
 	nodes corev1informers.NodeInformer,
 	pods corev1informers.PodInformer,
+	podGroups schedulinginformers.PodGroupInformer,
 	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
 	slices resourceinformers.ResourceSliceInformer,
@@ -93,6 +100,10 @@ func AddGraphEventHandlers(
 	}
 
 	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop, synced...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+		g.podGroupLister = podGroups.Lister()
+	}
 }
 
 func (g *graphPopulator) addPod(obj interface{}) {
@@ -118,9 +129,14 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 		}
 	}
 
+	var podGroup *schedulingapi.PodGroup
+	if g.podGroupLister != nil && pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
+		podGroup, _ = g.podGroupLister.PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
+	}
+
 	klog.V(4).Infof("updatePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
 	startTime := time.Now()
-	g.graph.AddPod(pod)
+	g.graph.AddPod(pod, podGroup)
 	klog.V(5).Infof("updatePod %s/%s for node %s completed in %v", pod.Namespace, pod.Name, pod.Spec.NodeName, time.Since(startTime))
 }
 

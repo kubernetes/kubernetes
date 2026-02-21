@@ -30,15 +30,20 @@ import (
 	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -52,6 +57,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	opts := &sampleDataOpts{
 		nodes:                              2,
 		namespaces:                         2,
+		podGroups:                          2,
 		podsPerNode:                        2,
 		attachmentsPerNode:                 1,
 		sharedConfigMapsPerPod:             0,
@@ -63,11 +69,15 @@ func TestNodeAuthorizer(t *testing.T) {
 		uniqueResourceClaimsPerPod:         1,
 		uniqueResourceClaimTemplatesPerPod: 1,
 		uniqueResourceClaimTemplatesWithClaimPerPod: 1,
+		uniquePodGroupResourceClaimsPerPod:          1,
+		uniquePodGroupResourceClaimTemplatesPerPod:  1,
+		uniqueResourceClaimsPerPodGroup:             1,
+		uniqueResourceClaimTemplatesPerPodGroup:     1,
 		nodeResourceSlicesPerNode:                   2,
 		podCertificateRequestsPerPod:                2,
 	}
-	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
-	populate(g, nodes, pods, pvs, attachments, slices, pcrs)
+	nodes, pods, pvs, attachments, slices, pcrs, podGroups := generate(opts)
+	populate(g, nodes, pods, pvs, attachments, slices, pcrs, podGroups)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
@@ -200,6 +210,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
+			name:   "allowed PodGroup resource claim",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "claim0-podgroup0-ns0", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:   "allowed PodGroup resource claim template",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "generated-podgroupclaim-podgroup0-ns0-0", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
+		{
 			name:   "allowed pv",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node0-ns0", Namespace: ""},
 			expect: authorizer.DecisionAllow,
@@ -232,6 +252,16 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "disallowed resource claim with template",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "pod0-node1-claimtemplate0", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:   "disallowed PodGroup resource claim, other node",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "claim0-podgroup1-ns0", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:   "disallowed PodGroup resource claim template, other node",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "generated-podgroupclaim-podgroup1-ns0-0", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
@@ -939,7 +969,7 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "shared-all"}}},
 			},
 		},
-	})
+	}, nil)
 	g.AddPod(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod2-node2", Namespace: "ns1"},
 		Spec: corev1.PodSpec{
@@ -949,7 +979,7 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "shared-all"}}},
 			},
 		},
-	})
+	}, nil)
 
 	pod3 := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod3-node3", Namespace: "ns1"},
@@ -960,7 +990,7 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 			},
 		},
 	}
-	g.AddPod(pod3)
+	g.AddPod(pod3, nil)
 
 	testcases := []struct {
 		User      user.Info
@@ -1021,7 +1051,7 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 
 		// should trigger recalculation of the shared secret index
 		pod3.Spec.Volumes = nil
-		g.AddPod(pod3)
+		g.AddPod(pod3, nil)
 
 		decision, _, err = authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
@@ -1148,6 +1178,7 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 type sampleDataOpts struct {
 	nodes       int
 	namespaces  int
+	podGroups   int
 	podsPerNode int
 
 	attachmentsPerNode int
@@ -1175,6 +1206,10 @@ type sampleDataOpts struct {
 	uniqueResourceClaimsPerPod                  int
 	uniqueResourceClaimTemplatesPerPod          int
 	uniqueResourceClaimTemplatesWithClaimPerPod int
+	uniquePodGroupResourceClaimsPerPod          int
+	uniquePodGroupResourceClaimTemplatesPerPod  int
+	uniqueResourceClaimsPerPodGroup             int
+	uniqueResourceClaimTemplatesPerPodGroup     int
 
 	nodeResourceSlicesPerNode int
 
@@ -1203,12 +1238,12 @@ func BenchmarkPopulationAllocation(b *testing.B) {
 		uniquePVCsPerPod:       1,
 	}
 
-	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
+	nodes, pods, pvs, attachments, slices, pcrs, podGroups := generate(opts)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		g := NewGraph()
-		populate(g, nodes, pods, pvs, attachments, slices, pcrs)
+		populate(g, nodes, pods, pvs, attachments, slices, pcrs, podGroups)
 	}
 }
 
@@ -1234,14 +1269,14 @@ func BenchmarkPopulationRetention(b *testing.B) {
 		uniquePVCsPerPod:       1,
 	}
 
-	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
+	nodes, pods, pvs, attachments, slices, pcrs, podGroups := generate(opts)
 	// Garbage collect before the first iteration
 	runtime.GC()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		g := NewGraph()
-		populate(g, nodes, pods, pvs, attachments, slices, pcrs)
+		populate(g, nodes, pods, pvs, attachments, slices, pcrs, podGroups)
 
 		if i == 0 {
 			f, _ := os.Create("BenchmarkPopulationRetention.profile")
@@ -1272,9 +1307,9 @@ func BenchmarkWriteIndexMaintenance(b *testing.B) {
 		sharedPVCsPerPod:       0,
 		uniquePVCsPerPod:       1,
 	}
-	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
+	nodes, pods, pvs, attachments, slices, pcrs, podGroups := generate(opts)
 	g := NewGraph()
-	populate(g, nodes, pods, pvs, attachments, slices, pcrs)
+	populate(g, nodes, pods, pvs, attachments, slices, pcrs, podGroups)
 	// Garbage collect before the first iteration
 	runtime.GC()
 	b.ResetTimer()
@@ -1282,7 +1317,7 @@ func BenchmarkWriteIndexMaintenance(b *testing.B) {
 	b.SetParallelism(100)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			g.AddPod(pods[0])
+			g.AddPod(pods[0], nil)
 		}
 	})
 }
@@ -1298,7 +1333,7 @@ func BenchmarkUnauthorizedRequests(b *testing.B) {
 		podsPerNode:            1,
 		sharedConfigMapsPerPod: 1,
 	}
-	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
+	nodes, pods, pvs, attachments, slices, pcrs, podGroups := generate(opts)
 
 	// Create an additional Node that doesn't have access to a shared ConfigMap
 	// that all the other Nodes are authorized to read.
@@ -1313,7 +1348,7 @@ func BenchmarkUnauthorizedRequests(b *testing.B) {
 	pods = append(pods, pod)
 
 	g := NewGraph()
-	populate(g, nodes, pods, pvs, attachments, slices, pcrs)
+	populate(g, nodes, pods, pvs, attachments, slices, pcrs, podGroups)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
@@ -1350,8 +1385,8 @@ func BenchmarkAuthorization(b *testing.B) {
 		sharedPVCsPerPod:       0,
 		uniquePVCsPerPod:       1,
 	}
-	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
-	populate(g, nodes, pods, pvs, attachments, slices, pcrs)
+	nodes, pods, pvs, attachments, slices, pcrs, podGroups := generate(opts)
+	populate(g, nodes, pods, pvs, attachments, slices, pcrs, podGroups)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
@@ -1416,7 +1451,7 @@ func BenchmarkAuthorization(b *testing.B) {
 		},
 	}
 
-	podToAdd, _, _ := generatePod("testwrite", "ns0", "node0", "default", opts, rand.Perm)
+	podToAdd, _, _ := generatePod("testwrite", "ns0", "node0", "default", "", opts, rand.Perm)
 
 	b.ResetTimer()
 	for _, testWriteContention := range []bool{false, true} {
@@ -1441,7 +1476,7 @@ func BenchmarkAuthorization(b *testing.B) {
 				for shouldWrite == 1 {
 					go func() {
 						start := time.Now()
-						authz.graph.AddPod(podToAdd)
+						authz.graph.AddPod(podToAdd, nil)
 						diff := time.Since(start)
 						atomic.AddInt64(&writes, 1)
 						switch {
@@ -1500,9 +1535,45 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice, pcrs []*certsv1beta1.PodCertificateRequest) {
+type podGroupLister []*schedulingapi.PodGroup
+
+// PodGroups implements [schedulinglisters.PodGroupLister].
+func (p podGroupLister) PodGroups(namespace string) schedulinglisters.PodGroupNamespaceLister {
+	var podGroups podGroupNamespaceLister
+	for _, podGroup := range p {
+		if podGroup.Namespace == namespace {
+			podGroups = append(podGroups, podGroup)
+		}
+	}
+	return podGroups
+}
+
+// List implements [schedulinglisters.PodGroupLister].
+func (p podGroupLister) List(selector labels.Selector) (ret []*schedulingapi.PodGroup, err error) {
+	panic("unimplemented")
+}
+
+type podGroupNamespaceLister []*schedulingapi.PodGroup
+
+// Get implements [schedulinglisters.PodGroupNamespaceLister].
+func (p podGroupNamespaceLister) Get(name string) (*schedulingapi.PodGroup, error) {
+	for _, podGroup := range p {
+		if podGroup.Name == name {
+			return podGroup, nil
+		}
+	}
+	return nil, apierrors.NewNotFound(schema.GroupResource{Group: schedulingapi.GroupName, Resource: "podgroups"}, name)
+}
+
+// List implements [schedulinglisters.PodGroupNamespaceLister].
+func (p podGroupNamespaceLister) List(selector labels.Selector) (ret []*schedulingapi.PodGroup, err error) {
+	panic("unimplemented")
+}
+
+func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice, pcrs []*certsv1beta1.PodCertificateRequest, podGroups []*schedulingapi.PodGroup) {
 	p := &graphPopulator{}
 	p.graph = graph
+	p.podGroupLister = podGroupLister(podGroups)
 	for _, pod := range pods {
 		p.addPod(pod)
 	}
@@ -1531,13 +1602,14 @@ func randomSubset(a, b int, randPerm func(int) []int) []int {
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourceapi.ResourceSlice, []*certsv1beta1.PodCertificateRequest) {
+func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourceapi.ResourceSlice, []*certsv1beta1.PodCertificateRequest, []*schedulingapi.PodGroup) {
 	nodes := make([]*corev1.Node, 0, opts.nodes)
 	pods := make([]*corev1.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*corev1.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
 	attachments := make([]*storagev1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 	slices := make([]*resourceapi.ResourceSlice, 0, opts.nodes*opts.nodeResourceSlicesPerNode)
 	pcrs := make([]*certsv1beta1.PodCertificateRequest, 0, opts.nodes*opts.podsPerNode*opts.podCertificateRequestsPerPod)
+	podGroups := make([]*schedulingapi.PodGroup, 0, opts.podGroups)
 
 	r := rand.New(rand.NewSource(12345))
 
@@ -1547,8 +1619,37 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			name := fmt.Sprintf("pod%d-%s", p, nodeName)
 			namespace := fmt.Sprintf("ns%d", p%opts.namespaces)
 			svcAccountName := fmt.Sprintf("svcacct%d-%s", p, nodeName)
+			var podGroupName string
+			if opts.podGroups > 0 {
+				id := n*opts.podsPerNode + p
+				podGroupName = fmt.Sprintf("podgroup%d", id%opts.podGroups)
+				if id < opts.podGroups {
+					podGroup := &schedulingapi.PodGroup{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      podGroupName,
+							Namespace: namespace,
+						},
+					}
+					for i := 0; i < opts.uniqueResourceClaimsPerPodGroup; i++ {
+						claimName := fmt.Sprintf("claim%d-%s-%s", i, podGroup.Name, podGroup.Namespace)
+						podGroup.Spec.ResourceClaims = append(podGroup.Spec.ResourceClaims, schedulingapi.PodGroupResourceClaim{
+							Name:              fmt.Sprintf("claim%d", i),
+							ResourceClaimName: &claimName,
+						})
+					}
+					for i := 0; i < opts.uniqueResourceClaimTemplatesPerPodGroup; i++ {
+						claimTemplateName := fmt.Sprintf("claimtemplate%d-%s-%s", i, podGroup.Name, podGroup.Namespace)
+						podGroupClaimName := fmt.Sprintf("claimtemplate%d", i)
+						podGroup.Spec.ResourceClaims = append(podGroup.Spec.ResourceClaims, schedulingapi.PodGroupResourceClaim{
+							Name:                      podGroupClaimName,
+							ResourceClaimTemplateName: &claimTemplateName,
+						})
+					}
+					podGroups = append(podGroups, podGroup)
+				}
+			}
 
-			pod, podPVs, podPCRs := generatePod(name, namespace, nodeName, svcAccountName, opts, r.Perm)
+			pod, podPVs, podPCRs := generatePod(name, namespace, nodeName, svcAccountName, podGroupName, opts, r.Perm)
 			pods = append(pods, pod)
 			pvs = append(pvs, podPVs...)
 			pcrs = append(pcrs, podPCRs...)
@@ -1576,10 +1677,10 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			slices = append(slices, slice)
 		}
 	}
-	return nodes, pods, pvs, attachments, slices, pcrs
+	return nodes, pods, pvs, attachments, slices, pcrs, podGroups
 }
 
-func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume, []*certsv1beta1.PodCertificateRequest) {
+func generatePod(name, namespace, nodeName, svcAccountName, podGroupName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume, []*certsv1beta1.PodCertificateRequest) {
 	pvs := make([]*corev1.PersistentVolume, 0, opts.uniquePVCsPerPod+opts.sharedPVCsPerPod)
 	pcrs := make([]*certsv1beta1.PodCertificateRequest, 0, opts.podCertificateRequestsPerPod)
 
@@ -1588,6 +1689,12 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 	pod.Namespace = namespace
 	pod.Spec.NodeName = nodeName
 	pod.Spec.ServiceAccountName = svcAccountName
+	if podGroupName != "" {
+		if pod.Spec.SchedulingGroup == nil {
+			pod.Spec.SchedulingGroup = &corev1.PodSchedulingGroup{}
+		}
+		pod.Spec.SchedulingGroup.PodGroupName = &podGroupName
+	}
 
 	for i := 0; i < opts.uniqueSecretsPerPod; i++ {
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
@@ -1648,6 +1755,27 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
 			Name:                      podClaimName,
 			ResourceClaimTemplateName: &claimTemplateName,
+		})
+		pod.Status.ResourceClaimStatuses = append(pod.Status.ResourceClaimStatuses, corev1.PodResourceClaimStatus{
+			Name:              podClaimName,
+			ResourceClaimName: &claimName,
+		})
+	}
+	for i := 0; i < opts.uniquePodGroupResourceClaimsPerPod; i++ {
+		podClaimName := fmt.Sprintf("podgroupclaim%d", i)
+		podGroupClaimName := fmt.Sprintf("claim%d", i)
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
+			Name:                  podClaimName,
+			PodGroupResourceClaim: &podGroupClaimName,
+		})
+	}
+	for i := 0; i < opts.uniquePodGroupResourceClaimTemplatesPerPod; i++ {
+		podClaimName := fmt.Sprintf("podgroupclaim%d", i)
+		podGroupClaimName := fmt.Sprintf("claimtemplate%d", i)
+		claimName := fmt.Sprintf("generated-podgroupclaim-%s-%s-%d", podGroupName, pod.Namespace, i)
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
+			Name:                  podClaimName,
+			PodGroupResourceClaim: &podGroupClaimName,
 		})
 		pod.Status.ResourceClaimStatuses = append(pod.Status.ResourceClaimStatuses, corev1.PodResourceClaimStatus{
 			Name:              podClaimName,

@@ -116,6 +116,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 				graph,
 				config.VersionedInformerFactory.Core().V1().Nodes(),
 				config.VersionedInformerFactory.Core().V1().Pods(),
+				config.VersionedInformerFactory.Scheduling().V1alpha2().PodGroups(),
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 				slices, // Nil check in AddGraphEventHandlers can be removed when always creating this.

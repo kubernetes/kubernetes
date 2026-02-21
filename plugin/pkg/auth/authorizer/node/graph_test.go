@@ -208,7 +208,7 @@ func TestIndex(t *testing.T) {
 				},
 			},
 		}
-		g.AddPod(pod)
+		g.AddPod(pod, nil)
 		if ok, err := a.hasPathFrom(nodeName, configMapVertexType, "ns", "cm1"); err != nil || !ok {
 			t.Errorf("expected path from %s to cm1, got %v, %v", nodeName, ok, err)
 		}
@@ -503,8 +503,8 @@ func TestIndex2(t *testing.T) {
 			desc:          "outdeg below destination edge index threshold",
 			startingGraph: NewTestGraph(),
 			graphTransformer: func(g *Graph) {
-				g.AddPod(podWithSAAndCMs("pod1", "node1"))
-				g.AddPod(podWithSAAndCMs("pod2", "node2"))
+				g.AddPod(podWithSAAndCMs("pod1", "node1"), nil)
+				g.AddPod(podWithSAAndCMs("pod2", "node2"), nil)
 			},
 			expectedGraph: map[string][]string{
 				"node:node1":            {},
@@ -522,12 +522,12 @@ func TestIndex2(t *testing.T) {
 			desc: "index built for configmaps and serviceaccounts",
 			startingGraph: func() *Graph {
 				g := NewTestGraph()
-				g.AddPod(podWithSAAndCMs("pod1", "node1"))
-				g.AddPod(podWithSAAndCMs("pod2", "node2"))
+				g.AddPod(podWithSAAndCMs("pod1", "node1"), nil)
+				g.AddPod(podWithSAAndCMs("pod2", "node2"), nil)
 				return g
 			}(),
 			graphTransformer: func(g *Graph) {
-				g.AddPod(podWithSAAndCMs("pod3", "node3"))
+				g.AddPod(podWithSAAndCMs("pod3", "node3"), nil)
 			},
 			expectedGraph: map[string][]string{
 				"node:node1":            {},
@@ -552,9 +552,9 @@ func TestIndex2(t *testing.T) {
 			desc: "no index for configmaps and serviceaccounts - dropping below threshold",
 			startingGraph: func() *Graph {
 				g := NewTestGraph()
-				g.AddPod(podWithSAAndCMs("pod1", "node1"))
-				g.AddPod(podWithSAAndCMs("pod2", "node2"))
-				g.AddPod(podWithSAAndCMs("pod3", "node3"))
+				g.AddPod(podWithSAAndCMs("pod1", "node1"), nil)
+				g.AddPod(podWithSAAndCMs("pod2", "node2"), nil)
+				g.AddPod(podWithSAAndCMs("pod3", "node3"), nil)
 				return g
 			}(),
 			graphTransformer: func(g *Graph) {
@@ -576,10 +576,10 @@ func TestIndex2(t *testing.T) {
 			desc: "removing pod but staying above threshold",
 			startingGraph: func() *Graph {
 				g := NewTestGraph()
-				g.AddPod(podWithSAAndCMs("pod1", "node1"))
-				g.AddPod(podWithSAAndCMs("pod2", "node2"))
-				g.AddPod(podWithSAAndCMs("pod3", "node3"))
-				g.AddPod(podWithSAAndCMs("pod4", "node1"))
+				g.AddPod(podWithSAAndCMs("pod1", "node1"), nil)
+				g.AddPod(podWithSAAndCMs("pod2", "node2"), nil)
+				g.AddPod(podWithSAAndCMs("pod3", "node3"), nil)
+				g.AddPod(podWithSAAndCMs("pod4", "node1"), nil)
 				return g
 			}(),
 			graphTransformer: func(g *Graph) {
@@ -608,12 +608,12 @@ func TestIndex2(t *testing.T) {
 			desc: "index built for secrets",
 			startingGraph: func() *Graph {
 				g := NewTestGraph()
-				g.AddPod(podWithSecrets("pod1", "node1"))
-				g.AddPod(podWithSecrets("pod2", "node2"))
+				g.AddPod(podWithSecrets("pod1", "node1"), nil)
+				g.AddPod(podWithSecrets("pod2", "node2"), nil)
 				return g
 			}(),
 			graphTransformer: func(g *Graph) {
-				g.AddPod(podWithSecrets("pod3", "node3"))
+				g.AddPod(podWithSecrets("pod3", "node3"), nil)
 			},
 			expectedGraph: map[string][]string{
 				"node:node1":   {},
@@ -636,9 +636,9 @@ func TestIndex2(t *testing.T) {
 			desc: "no index for secrets - dropping below threshold",
 			startingGraph: func() *Graph {
 				g := NewTestGraph()
-				g.AddPod(podWithSecrets("pod1", "node1"))
-				g.AddPod(podWithSecrets("pod2", "node2"))
-				g.AddPod(podWithSecrets("pod3", "node3"))
+				g.AddPod(podWithSecrets("pod1", "node1"), nil)
+				g.AddPod(podWithSecrets("pod2", "node2"), nil)
+				g.AddPod(podWithSecrets("pod3", "node3"), nil)
 				return g
 			}(),
 			graphTransformer: func(g *Graph) {
@@ -659,12 +659,12 @@ func TestIndex2(t *testing.T) {
 			desc: "index built for pvcs",
 			startingGraph: func() *Graph {
 				g := NewTestGraph()
-				g.AddPod(podWithPVCs("pod1", "node1"))
-				g.AddPod(podWithPVCs("pod2", "node2"))
+				g.AddPod(podWithPVCs("pod1", "node1"), nil)
+				g.AddPod(podWithPVCs("pod2", "node2"), nil)
 				return g
 			}(),
 			graphTransformer: func(g *Graph) {
-				g.AddPod(podWithPVCs("pod3", "node3"))
+				g.AddPod(podWithPVCs("pod3", "node3"), nil)
 			},
 			expectedGraph: map[string][]string{
 				"node:node1":  {},
@@ -687,9 +687,9 @@ func TestIndex2(t *testing.T) {
 			desc: "no index for pvcs - dropping below threshold",
 			startingGraph: func() *Graph {
 				g := NewTestGraph()
-				g.AddPod(podWithPVCs("pod1", "node1"))
-				g.AddPod(podWithPVCs("pod2", "node2"))
-				g.AddPod(podWithPVCs("pod3", "node3"))
+				g.AddPod(podWithPVCs("pod1", "node1"), nil)
+				g.AddPod(podWithPVCs("pod2", "node2"), nil)
+				g.AddPod(podWithPVCs("pod3", "node3"), nil)
 				return g
 			}(),
 			graphTransformer: func(g *Graph) {
@@ -710,9 +710,9 @@ func TestIndex2(t *testing.T) {
 			desc:          "index built for resourceclaims",
 			startingGraph: NewTestGraph(),
 			graphTransformer: func(g *Graph) {
-				g.AddPod(podWithResourceClaims("pod1", "node1"))
-				g.AddPod(podWithResourceClaims("pod2", "node2"))
-				g.AddPod(podWithResourceClaims("pod3", "node3"))
+				g.AddPod(podWithResourceClaims("pod1", "node1"), nil)
+				g.AddPod(podWithResourceClaims("pod2", "node2"), nil)
+				g.AddPod(podWithResourceClaims("pod3", "node3"), nil)
 			},
 			expectedGraph: map[string][]string{
 				"node:node1":           {},
@@ -737,9 +737,9 @@ func TestIndex2(t *testing.T) {
 			desc: "no index for resourceclaims - dropping below threshold",
 			startingGraph: func() *Graph {
 				g := NewTestGraph()
-				g.AddPod(podWithResourceClaims("pod1", "node1"))
-				g.AddPod(podWithResourceClaims("pod2", "node2"))
-				g.AddPod(podWithResourceClaims("pod3", "node3"))
+				g.AddPod(podWithResourceClaims("pod1", "node1"), nil)
+				g.AddPod(podWithResourceClaims("pod2", "node2"), nil)
+				g.AddPod(podWithResourceClaims("pod3", "node3"), nil)
 				return g
 			}(),
 			graphTransformer: func(g *Graph) {
