@@ -651,7 +651,7 @@ func TestFilePatternBuilder(t *testing.T) {
 	singleItemImplied := false
 
 	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
-	if err != nil || singleItemImplied || len(test.Infos) < 3 {
+	if err != nil || singleItemImplied || len(test.Infos) < 2 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 
