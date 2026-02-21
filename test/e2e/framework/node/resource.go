@@ -89,18 +89,6 @@ type PodNode struct {
 	Node string
 }
 
-// FirstAddress returns the first address of the given type of each node.
-func FirstAddress(nodelist *v1.NodeList, addrType v1.NodeAddressType) string {
-	for _, n := range nodelist.Items {
-		for _, addr := range n.Status.Addresses {
-			if addr.Type == addrType && addr.Address != "" {
-				return addr.Address
-			}
-		}
-	}
-	return ""
-}
-
 func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool) bool {
 	// Check the node readiness condition (logging all).
 	for _, cond := range node.Status.Conditions {
