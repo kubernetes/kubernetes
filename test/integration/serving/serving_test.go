@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -32,16 +31,17 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
-	statusztesting "k8s.io/apiserver/pkg/server/statusz/testing"
-	"k8s.io/client-go/tools/cache"
-
 	apiserverfeat "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
+	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	flagzv1beta1 "k8s.io/apiserver/pkg/server/flagz/api/v1beta1"
+	flagztesting "k8s.io/apiserver/pkg/server/flagz/testing"
 	"k8s.io/apiserver/pkg/server/options"
 	statuszv1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
 	statuszv1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
+	statusztesting "k8s.io/apiserver/pkg/server/statusz/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
 	"k8s.io/cloud-provider/fake"
@@ -381,11 +381,20 @@ users:
 		Paths: []string{"/configz", "/flagz", "/healthz", "/metrics"},
 	}
 
-	flagzWantBodyStr := "kube-controller-manager flagz\nWarning: This endpoint is not meant to be machine parseable"
-	flagzWantBodyJSON := &flagzv1alpha1.Flagz{
+	flagzWantBodyText := "kube-controller-manager flagz\nWarning: This endpoint is not meant to be machine parseable"
+	flagzWantBodyStructuredAlpha := &flagzv1alpha1.Flagz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Flagz",
 			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-controller-manager",
+		},
+	}
+	flagzWantBodyStructuredBeta := &flagzv1beta1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-controller-manager",
@@ -474,29 +483,30 @@ users:
 	}
 
 	flagzTestCases := []struct {
-		name         string
-		acceptHeader string
-		wantStatus   int
-		wantBodySub  string               // for text/plain
-		wantJSON     *flagzv1alpha1.Flagz // for structured json
+		name                  string
+		acceptHeader          string
+		wantStatus            int
+		wantBodyText          string      // for text/plain
+		wantBodyStructured    interface{} // for structured json
+		wantDeprecationHeader bool
 	}{
 		{
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  flagzWantBodyStr,
+			wantBodyText: flagzWantBodyText,
 		},
 		{
-			name:         "structured json response",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
-			wantStatus:   http.StatusOK,
-			wantJSON:     flagzWantBodyJSON,
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: flagzWantBodyStructuredBeta,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  flagzWantBodyStr,
+			wantBodyText: flagzWantBodyText,
 		},
 		{
 			name:         "invalid accept header",
@@ -510,20 +520,46 @@ users:
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  flagzWantBodyStr,
+			wantBodyText: flagzWantBodyText,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  flagzWantBodyStr,
+			wantBodyText: flagzWantBodyText,
+		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: flagzWantBodyStructuredBeta,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: flagzWantBodyStructuredBeta,
+		},
+		{
+			name:                  "alpha specified before beta, should show warning",
+			acceptHeader:          "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz,application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    flagzWantBodyStructuredAlpha,
+			wantDeprecationHeader: true,
+		},
+		{
+			name:                  "beta specified before alpha, no warning",
+			acceptHeader:          "application/json;v=v1beta1;g=config.k8s.io;as=Flagz,application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    flagzWantBodyStructuredBeta,
+			wantDeprecationHeader: false,
 		},
 	}
 
@@ -640,23 +676,14 @@ users:
 			}
 
 			if tc.wantStatus == http.StatusOK {
-				if tc.wantBodySub != "" {
-					if !strings.Contains(string(body), tc.wantBodySub) {
-						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+				if tc.wantBodyText != "" {
+					if !strings.Contains(string(body), tc.wantBodyText) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(body))
 					}
 				}
-				if tc.wantJSON != nil {
-					var got flagzv1alpha1.Flagz
-					if err := json.Unmarshal(body, &got); err != nil {
-						t.Fatalf("error unmarshalling JSON: %v", err)
-					}
-					// Only check static fields, since others are dynamic
-					if got.TypeMeta != tc.wantJSON.TypeMeta {
-						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
-					}
-					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
-						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
-					}
+				if tc.wantBodyStructured != nil {
+					warnings := append([]string{}, r.Header.Values("Warning")...)
+					flagztesting.VerifyStructuredResponse(t, tc.acceptHeader, body, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
 				}
 			}
 		})
