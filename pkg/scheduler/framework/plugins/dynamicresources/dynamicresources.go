@@ -107,6 +107,20 @@ type stateData struct {
 
 	// nodeAllocations caches the result of Filter for the nodes, its key is node name.
 	nodeAllocations map[string]nodeAllocation
+
+	// deviceTotalCapacities caches the total published capacity of each device
+	// from ResourceSlice data, keyed by DeviceID. Used during Score to compute
+	// bin-packing utilization ratios when DRAConsumableCapacity is enabled.
+	deviceTotalCapacities map[structured.DeviceID]structured.ConsumedCapacity
+
+	// aggregatedCapacity holds the total consumed capacity across all existing
+	// allocations at the start of the scheduling cycle. Populated from
+	// AllocatedState in PreFilter when DRAConsumableCapacity is enabled.
+	aggregatedCapacity structured.ConsumedCapacityCollection
+
+	// enableBinPacking indicates whether the DRAConsumableCapacity feature
+	// is enabled, activating the bin-packing scoring logic.
+	enableBinPacking bool
 }
 
 func (d *stateData) Clone() fwk.StateData {
@@ -569,6 +583,31 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		}
 		s.allocator = allocator
 		s.nodeAllocations = make(map[string]nodeAllocation)
+
+		// When DRAConsumableCapacity is enabled, cache device total capacities
+		// from ResourceSlice data and existing consumption for bin-packing scoring.
+		if pl.fts.EnableDRAConsumableCapacity {
+			s.enableBinPacking = true
+			s.aggregatedCapacity = allocatedState.AggregatedCapacity
+			deviceTotalCaps := make(map[structured.DeviceID]structured.ConsumedCapacity)
+			for _, slice := range slices {
+				driver := slice.Spec.Driver
+				pool := slice.Spec.Pool.Name
+				for _, dev := range slice.Spec.Devices {
+					if len(dev.Capacity) == 0 {
+						continue
+					}
+					devID := structured.MakeDeviceID(driver, pool, dev.Name)
+					cap := make(structured.ConsumedCapacity)
+					for qualName, devCap := range dev.Capacity {
+						q := devCap.Value.DeepCopy()
+						cap[qualName] = &q
+					}
+					deviceTotalCaps[devID] = cap
+				}
+			}
+			s.deviceTotalCapacities = deviceTotalCaps
+		}
 	}
 	s.claims = claims
 	return nil, nil
@@ -854,14 +893,20 @@ func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v
 		return 0, nil
 	}
 
-	score, err := computeScore(state.claims.all(), allocations)
+	score, err := computeScore(state.claims.all(), allocations, state.enableBinPacking, state.aggregatedCapacity, state.deviceTotalCapacities)
 	if err != nil {
 		return 0, statusError(logger, err)
 	}
 	return score, nil
 }
 
-func computeScore(iterator iter.Seq2[int, *resourceapi.ResourceClaim], allocations nodeAllocation) (int64, error) {
+func computeScore(
+	iterator iter.Seq2[int, *resourceapi.ResourceClaim],
+	allocations nodeAllocation,
+	enableBinPacking bool,
+	aggregatedCapacity structured.ConsumedCapacityCollection,
+	deviceTotalCapacities map[structured.DeviceID]structured.ConsumedCapacity,
+) (int64, error) {
 	var score int64
 	for i, claim := range iterator {
 		// Collect the names for all allocated subrequests.
@@ -889,7 +934,89 @@ func computeScore(iterator iter.Seq2[int, *resourceapi.ResourceClaim], allocatio
 			}
 		}
 	}
+
+	// Bin-packing bonus: when DRAConsumableCapacity is enabled, prefer
+	// nodes where this allocation would result in higher device utilization.
+	// This consolidates fractional workloads onto partially-used devices,
+	// preserving empty devices for larger exclusive allocations.
+	if enableBinPacking && deviceTotalCapacities != nil {
+		score += computeBinPackingScore(allocations, aggregatedCapacity, deviceTotalCapacities)
+	}
+
 	return score, nil
+}
+
+// computeBinPackingScore calculates a bonus score based on device utilization.
+// For each device in the allocation that reports ConsumedCapacity, it computes
+// the ratio of (existing consumption + new consumption) / total capacity.
+// Higher utilization ratios yield higher scores, encouraging the scheduler to
+// pack workloads onto partially-used devices.
+func computeBinPackingScore(
+	allocations nodeAllocation,
+	aggregatedCapacity structured.ConsumedCapacityCollection,
+	deviceTotalCapacities map[structured.DeviceID]structured.ConsumedCapacity,
+) int64 {
+	var totalRatio float64
+	var deviceCount int
+
+	for _, allocation := range allocations.allocationResults {
+		for _, res := range allocation.Devices.Results {
+			if len(res.ConsumedCapacity) == 0 {
+				continue
+			}
+
+			deviceID := structured.MakeDeviceID(res.Driver, res.Pool, res.Device)
+			totalCap, found := deviceTotalCapacities[deviceID]
+			if !found || len(totalCap) == 0 {
+				continue
+			}
+
+			// Compute utilization ratio averaged across all capacity counters.
+			var counterRatioSum float64
+			var counterCount int
+			for qualName, totalQty := range totalCap {
+				if totalQty == nil || totalQty.IsZero() {
+					continue
+				}
+
+				// Start with existing consumption from other claims.
+				var consumed float64
+				if existingCap, ok := aggregatedCapacity[deviceID]; ok {
+					if existingQty, ok := existingCap[qualName]; ok && existingQty != nil {
+						consumed = existingQty.AsApproximateFloat64()
+					}
+				}
+
+				// Add the new consumption from this allocation.
+				if newQty, ok := res.ConsumedCapacity[qualName]; ok {
+					consumed += newQty.AsApproximateFloat64()
+				}
+
+				totalFloat := totalQty.AsApproximateFloat64()
+				if totalFloat > 0 {
+					ratio := consumed / totalFloat
+					if ratio > 1.0 {
+						ratio = 1.0
+					}
+					counterRatioSum += ratio
+					counterCount++
+				}
+			}
+
+			if counterCount > 0 {
+				totalRatio += counterRatioSum / float64(counterCount)
+				deviceCount++
+			}
+		}
+	}
+
+	if deviceCount == 0 {
+		return 0
+	}
+
+	// Average the utilization ratios across all devices and scale to MaxNodeScore.
+	avgRatio := totalRatio / float64(deviceCount)
+	return int64(avgRatio * float64(fwk.MaxNodeScore))
 }
 
 func (pl *DynamicResources) ScoreExtensions() fwk.ScoreExtensions {

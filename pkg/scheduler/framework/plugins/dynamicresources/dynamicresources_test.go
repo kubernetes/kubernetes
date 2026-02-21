@@ -3615,7 +3615,7 @@ func Test_computesScore(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			iterator := slices.All(tc.claims)
-			score, err := computeScore(iterator, tc.allocations)
+			score, err := computeScore(iterator, tc.allocations, false, nil, nil)
 			if err != nil {
 				if !tc.expectErr {
 					t.Fatalf("unexpected error: %v", err)
@@ -3628,6 +3628,143 @@ func Test_computesScore(t *testing.T) {
 			assert.Equal(t, tc.expectedScore, score)
 		})
 	}
+}
+
+func Test_computeBinPackingScore(t *testing.T) {
+	gpuMemory := resourceapi.QualifiedName("gpu-memory")
+	deviceID := structured.MakeDeviceID("nvidia.com", "gpu-pool", "gpu-0")
+
+	testcases := map[string]struct {
+		allocations           nodeAllocation
+		aggregatedCapacity    structured.ConsumedCapacityCollection
+		deviceTotalCapacities map[structured.DeviceID]structured.ConsumedCapacity
+		expectedScore         int64
+	}{
+		"no-consumed-capacity-in-results": {
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1",
+									Driver:  "nvidia.com",
+									Pool:    "gpu-pool",
+									Device:  "gpu-0",
+									// No ConsumedCapacity
+								},
+							},
+						},
+					},
+				},
+			},
+			deviceTotalCapacities: map[structured.DeviceID]structured.ConsumedCapacity{
+				deviceID: {gpuMemory: resourcePtr("80Gi")},
+			},
+			expectedScore: 0,
+		},
+		"half-utilized-device": {
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1",
+									Driver:  "nvidia.com",
+									Pool:    "gpu-pool",
+									Device:  "gpu-0",
+									ConsumedCapacity: map[resourceapi.QualifiedName]apiresource.Quantity{
+										gpuMemory: apiresource.MustParse("10Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			aggregatedCapacity: structured.ConsumedCapacityCollection{
+				deviceID: structured.ConsumedCapacity{
+					gpuMemory: resourcePtr("30Gi"),
+				},
+			},
+			deviceTotalCapacities: map[structured.DeviceID]structured.ConsumedCapacity{
+				deviceID: {gpuMemory: resourcePtr("80Gi")},
+			},
+			// (30 + 10) / 80 = 0.5 → 50
+			expectedScore: 50,
+		},
+		"fully-utilized-device": {
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1",
+									Driver:  "nvidia.com",
+									Pool:    "gpu-pool",
+									Device:  "gpu-0",
+									ConsumedCapacity: map[resourceapi.QualifiedName]apiresource.Quantity{
+										gpuMemory: apiresource.MustParse("40Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			aggregatedCapacity: structured.ConsumedCapacityCollection{
+				deviceID: structured.ConsumedCapacity{
+					gpuMemory: resourcePtr("40Gi"),
+				},
+			},
+			deviceTotalCapacities: map[structured.DeviceID]structured.ConsumedCapacity{
+				deviceID: {gpuMemory: resourcePtr("80Gi")},
+			},
+			// (40 + 40) / 80 = 1.0 → 100
+			expectedScore: 100,
+		},
+		"empty-device-low-score": {
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{
+									Request: "req-1",
+									Driver:  "nvidia.com",
+									Pool:    "gpu-pool",
+									Device:  "gpu-0",
+									ConsumedCapacity: map[resourceapi.QualifiedName]apiresource.Quantity{
+										gpuMemory: apiresource.MustParse("10Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			aggregatedCapacity: structured.ConsumedCapacityCollection{},
+			deviceTotalCapacities: map[structured.DeviceID]structured.ConsumedCapacity{
+				deviceID: {gpuMemory: resourcePtr("80Gi")},
+			},
+			// (0 + 10) / 80 = 0.125 → 12
+			expectedScore: 12,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			score := computeBinPackingScore(tc.allocations, tc.aggregatedCapacity, tc.deviceTotalCapacities)
+			assert.Equal(t, tc.expectedScore, score)
+		})
+	}
+}
+
+func resourcePtr(s string) *apiresource.Quantity {
+	q := apiresource.MustParse(s)
+	return &q
 }
 
 func TestNormalizeScore(t *testing.T) {
