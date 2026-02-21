@@ -24,12 +24,12 @@ import (
 
 // JobTemplateSpec describes the data a Job should have when created from a template
 type JobTemplateSpec struct {
-	// Standard object's metadata of the jobs created from this template.
+	// metadata is the standard object metadata of the jobs created from this template.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the desired behavior of the job.
+	// spec specifies the desired behavior of a job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec batchv1.JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
@@ -45,17 +45,17 @@ type JobTemplateSpec struct {
 // CronJob represents the configuration of a single cron job.
 type CronJob struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the desired behavior of a cron job, including the schedule.
+	// spec specifies the desired behavior of a cron job, including the schedule.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +required
 	Spec CronJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Current status of a cron job.
+	// status reports the current status of a cron job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status CronJobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
@@ -83,29 +83,29 @@ type CronJobList struct {
 // CronJobSpec describes how the job execution will look like and when it will actually run.
 type CronJobSpec struct {
 
-	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	// schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	// +required
 	// +k8s:required
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
-	// The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
+	// timeZone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
 	// If not specified, this will default to the time zone of the kube-controller-manager process.
 	// The set of valid time zone names and the time zone offset is loaded from the system-wide time zone
 	// database by the API server during CronJob validation and the controller manager during execution.
 	// If no system-wide time zone database can be found a bundled version of the database is used instead.
 	// If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host
-	// configuration, the controller will stop creating new new Jobs and will create a system event with the
+	// configuration, the controller will stop creating new Jobs and will create a system event with the
 	// reason UnknownTimeZone.
 	// More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
 	// +optional
 	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 
-	// Optional deadline in seconds for starting the job if it misses scheduled
-	// time for any reason.  Missed jobs executions will be counted as failed ones.
+	// startingDeadlineSeconds is an optional deadline in seconds for starting the job if it misses scheduled
+	// time for any reason. Missed jobs executions will be counted as failed ones.
 	// +optional
 	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=startingDeadlineSeconds"`
 
-	// Specifies how to treat concurrent executions of a Job.
+	// concurrencyPolicy specifies how to treat concurrent executions of a Job.
 	// Valid values are:
 	//
 	// - "Allow" (default): allows CronJobs to run concurrently;
@@ -114,21 +114,21 @@ type CronJobSpec struct {
 	// +optional
 	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty" protobuf:"bytes,3,opt,name=concurrencyPolicy,casttype=ConcurrencyPolicy"`
 
-	// This flag tells the controller to suspend subsequent executions, it does
-	// not apply to already started executions.  Defaults to false.
+	// suspend is a flag, telling the controller to suspend subsequent executions, it does
+	// not apply to already started executions. Defaults to false.
 	// +optional
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
-	// Specifies the job that will be created when executing a CronJob.
+	// jobTemplate specifies the job that will be created when executing a CronJob.
 	JobTemplate JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
 
-	// The number of successful finished jobs to retain.
+	// successfulJobsHistoryLimit specifies the number of successful finished jobs to retain.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	// Defaults to 3.
 	// +optional
 	SuccessfulJobsHistoryLimit *int32 `json:"successfulJobsHistoryLimit,omitempty" protobuf:"varint,6,opt,name=successfulJobsHistoryLimit"`
 
-	// The number of failed finished jobs to retain.
+	// failedJobsHistoryLimit specifies the number of failed finished jobs to retain.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	// Defaults to 1.
 	// +optional
