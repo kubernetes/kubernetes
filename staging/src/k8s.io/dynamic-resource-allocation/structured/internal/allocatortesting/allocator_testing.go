@@ -50,7 +50,6 @@ type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
 type DeviceID = internal.DeviceID
 
-// types_experimental
 type SharedDeviceID = internal.SharedDeviceID
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
@@ -6308,7 +6307,9 @@ func TestAllocator(t *testing.T,
 			if _, ok := allocator.(internal.AllocatorExtended); tc.expectNumAllocateOneInvocations > 0 && !ok {
 				t.Skipf("%T does not support the AllocatorStats interface", allocator)
 			}
-
+			if tc.node == nil {
+				tc.node = node(node1, region1)
+			}
 			results, err := allocator.Allocate(ctx, tc.node, unwrap(claimsToAllocate...))
 			matchError := tc.expectError
 			if matchError == nil {

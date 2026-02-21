@@ -220,7 +220,7 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		unscheduledPods := podGroupState.UnscheduledPods()
 		pl.handle.Activate(klog.FromContext(ctx), unscheduledPods)
 		logger.V(4).Info("Quorum is not met for a gang. Waiting for another pod to allow", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "activatedPods", len(unscheduledPods))
-		return fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be waiting on permit"), podGroupState.SchedulingTimeout()
+		return fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be scheduled"), podGroupState.SchedulingTimeout()
 	}
 
 	logger.V(4).Info("Quorum is met for a gang. Allowing other pods from a gang waiting on permit", "pod", klog.KObj(pod), "workloadRef", pod.Spec.WorkloadRef, "allowedPods", len(assumedPods))

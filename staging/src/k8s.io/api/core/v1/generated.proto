@@ -3927,8 +3927,6 @@ message PodCondition {
   optional string type = 1;
 
   // If set, this represents the .metadata.generation that the pod condition was set based upon.
-  // The PodObservedGenerationTracking feature gate must be enabled to use this field.
-  // +featureGate=PodObservedGenerationTracking
   // +optional
   optional int64 observedGeneration = 7;
 
@@ -4763,7 +4761,6 @@ message PodSpec {
 message PodStatus {
   // If set, this represents the .metadata.generation that the pod status was set based upon.
   // The PodObservedGenerationTracking feature gate must be enabled to use this field.
-  // +featureGate=PodObservedGenerationTracking
   // +optional
   optional int64 observedGeneration = 17;
 

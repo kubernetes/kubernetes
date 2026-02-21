@@ -24,9 +24,6 @@ set -o pipefail
 # Unset CDPATH, having it set messes up with script import paths
 unset CDPATH
 
-USER_ID=$(id -u)
-GROUP_ID=$(id -g)
-
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 IFS=" " read -r -a DOCKER <<< "docker ${DOCKER_OPTS}"
 DOCKER_HOST=${DOCKER_HOST:-""}
@@ -80,8 +77,8 @@ readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.8.7
-readonly __default_go_runner_version=v2.4.0-go1.25.6-bookworm.0
+readonly __default_distroless_iptables_version=v0.8.8
+readonly __default_go_runner_version=v2.4.0-go1.25.7-bookworm.0
 readonly __default_setcap_version=bookworm-v1.0.6
 
 # The default image for all binaries which are dynamically linked.
@@ -347,6 +344,9 @@ function kube::build::clean() {
     # We don't need to do this at all for dockerized builds
     if [[ -d "${LOCAL_OUTPUT_ROOT}/local/go/cache" ]]; then
       chmod -R +w "${LOCAL_OUTPUT_ROOT}/local/go/cache"
+    fi
+    if [[ -d "${LOCAL_OUTPUT_ROOT}/dockerized/go/cache" ]]; then
+      chmod -R +w "${LOCAL_OUTPUT_ROOT}/dockerized/go/cache"
     fi
     rm -rf "${LOCAL_OUTPUT_ROOT}"
   fi

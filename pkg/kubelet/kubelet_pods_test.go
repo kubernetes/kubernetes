@@ -49,6 +49,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	"k8s.io/kubelet/pkg/cri/streaming/remotecommand"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -360,7 +361,7 @@ func TestRunInContainer(t *testing.T) {
 		assert.Equal(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
 		// this isn't 100% foolproof as a bug in a real CommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
 		assert.Equal(t, "foo", string(actualOutput), "(testError=%v) output", testError)
-		assert.Equal(t, err, testError, "(testError=%v) err", testError)
+		assert.Equal(t, testError, err, "(testError=%v) err", testError)
 	}
 }
 
@@ -7475,7 +7476,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				if !ok {
 					t.Fatalf("unable to reject pod by UID %v", reject.uid)
 				}
-				kl.rejectPod(pod, reject.reason, reject.message)
+				kl.rejectPod(tCtx, pod, reject.reason, reject.message)
 			}
 
 			if err := kl.HandlePodCleanups(tCtx); (err != nil) != tt.wantErr {
@@ -7516,7 +7517,8 @@ func testMetric(t *testing.T, metricName string, expectedMetric string) {
 }
 
 func TestGetNonExistentImagePullSecret(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	_, tCtx := ktesting.NewTestContext(t)
+	logger := klog.FromContext(tCtx)
 	secrets := make([]*v1.Secret, 0)
 	fakeRecorder := record.NewFakeRecorder(1)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)

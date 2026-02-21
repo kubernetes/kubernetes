@@ -37,7 +37,7 @@ type streamer interface {
 var _ streamer = &oomparser.OomParser{}
 
 type realWatcher struct {
-	recorder    record.EventRecorder
+	recorder    record.EventRecorderLogger
 	oomStreamer streamer
 }
 
@@ -45,7 +45,7 @@ var _ Watcher = &realWatcher{}
 
 // NewWatcher creates and initializes a OOMWatcher backed by Cadvisor as
 // the oom streamer.
-func NewWatcher(recorder record.EventRecorder) (Watcher, error) {
+func NewWatcher(recorder record.EventRecorderLogger) (Watcher, error) {
 	// for test purpose
 	_, ok := recorder.(*record.FakeRecorder)
 	if ok {
@@ -86,7 +86,7 @@ func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error
 				if event.ProcessName != "" && event.Pid != 0 {
 					eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
 				}
-				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
+				ow.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
 			}
 		}
 		logger.Error(nil, "Unexpectedly stopped receiving OOM notifications")

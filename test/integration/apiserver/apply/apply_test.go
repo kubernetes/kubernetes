@@ -855,7 +855,7 @@ func TestApplyGroupsManySeparateUpdates(t *testing.T) {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
 	}
 
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		unique := fmt.Sprintf("updater%v", i)
 		object, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
 			AbsPath("/apis/admissionregistration.k8s.io/v1").
@@ -906,7 +906,7 @@ func TestCreateVeryLargeObject(t *testing.T) {
 		Data: map[string]string{},
 	}
 
-	for i := 0; i < 9999; i++ {
+	for i := range 9999 {
 		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
 		cfg.Data[unique] = "A"
 	}
@@ -965,7 +965,7 @@ func TestUpdateVeryLargeObject(t *testing.T) {
 		}
 
 		// Apply the large update, then attempt to push it to the apiserver.
-		for i := 0; i < 9999; i++ {
+		for i := range 9999 {
 			unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
 			updateCfg.Data[unique] = "A"
 		}
@@ -1020,7 +1020,7 @@ func TestPatchVeryLargeObject(t *testing.T) {
 	}
 
 	patchString := `{"data":{"k":"v"`
-	for i := 0; i < 9999; i++ {
+	for i := range 9999 {
 		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
 		patchString = fmt.Sprintf("%s,%q:%q", patchString, unique, "A")
 	}
@@ -1081,7 +1081,7 @@ func TestPatchVeryLargeObjectCBORApply(t *testing.T) {
 	}
 
 	patchString := `{"data":{"k":"v"`
-	for i := 0; i < 9999; i++ {
+	for i := range 9999 {
 		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
 		patchString = fmt.Sprintf("%s,%q:%q", patchString, unique, "A")
 	}
@@ -3015,7 +3015,7 @@ func benchPostPod(client clientset.Interface, pod v1.Pod, parallel int) func(*te
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			c := make(chan error)
-			for j := 0; j < parallel; j++ {
+			for j := range parallel {
 				j := j
 				i := i
 				go func(pod v1.Pod) {
@@ -3028,7 +3028,7 @@ func benchPostPod(client clientset.Interface, pod v1.Pod, parallel int) func(*te
 					c <- err
 				}(pod)
 			}
-			for j := 0; j < parallel; j++ {
+			for range parallel {
 				err := <-c
 				if err != nil {
 					b.Fatal(err)
@@ -3062,7 +3062,7 @@ func benchListPod(client clientset.Interface, pod v1.Pod, num int) func(*testing
 			b.Fatal(err)
 		}
 		// Create pods
-		for i := 0; i < num; i++ {
+		for i := range num {
 			pod.Name = fmt.Sprintf("get-%d-%d", b.N, i)
 			pod.Namespace = namespace
 			_, err := client.CoreV1().RESTClient().Post().

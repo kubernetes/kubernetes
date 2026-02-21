@@ -21,7 +21,9 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientgofeaturegate "k8s.io/client-go/features"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -43,13 +45,19 @@ import (
 type ThreadSafeStore interface {
 	Add(key string, obj interface{})
 	Update(key string, obj interface{})
+	// Delete is equivalent to calling DeleteWithObject(key, nil) however it is
+	// not recommended to use this function as it will not update the resource
+	// version of the store, possibly causing it to be out of date.
 	Delete(key string)
+	DeleteWithObject(key string, obj interface{})
 	Get(key string) (item interface{}, exists bool)
 	List() []interface{}
 	ListKeys() []string
 	Replace(map[string]interface{}, string)
 	Index(indexName string, obj interface{}) ([]interface{}, error)
 	IndexKeys(indexName, indexedValue string) ([]string, error)
+	Bookmark(rv string)
+	LastStoreSyncResourceVersion() string
 	ListIndexFuncValues(name string) []string
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	GetIndexers() Indexers
@@ -242,9 +250,15 @@ type threadSafeMap struct {
 
 	// index implements the indexing functionality
 	index *storeIndex
+	rv    string
 }
 
 func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
+	if len(txns) == 0 {
+		return
+	}
+	finalObj := txns[len(txns)-1].Object
+	rv, rvErr := rvFromObject(finalObj)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	trace := utiltrace.New("ThreadSafeMap Transaction Process",
@@ -262,6 +276,9 @@ func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
 			c.deleteLocked(txn.Key)
 		}
 	}
+	if rvErr == nil {
+		c.rv = rv
+	}
 }
 
 func (c *threadSafeMap) Add(key string, obj interface{}) {
@@ -273,9 +290,13 @@ func (c *threadSafeMap) addLocked(key string, obj interface{}) {
 }
 
 func (c *threadSafeMap) Update(key string, obj interface{}) {
+	rv, rvErr := rvFromObject(obj)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.updateLocked(key, obj)
+	if rvErr == nil {
+		c.rv = rv
+	}
 }
 
 func (c *threadSafeMap) updateLocked(key string, obj interface{}) {
@@ -285,9 +306,21 @@ func (c *threadSafeMap) updateLocked(key string, obj interface{}) {
 }
 
 func (c *threadSafeMap) Delete(key string) {
+	c.DeleteWithObject(key, nil)
+}
+
+func (c *threadSafeMap) DeleteWithObject(key string, obj interface{}) {
+	var rv string
+	var rvErr error
+	if obj != nil {
+		rv, rvErr = rvFromObject(obj)
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.deleteLocked(key)
+	if obj != nil && rvErr == nil {
+		c.rv = rv
+	}
 }
 
 func (c *threadSafeMap) deleteLocked(key string) {
@@ -330,12 +363,21 @@ func (c *threadSafeMap) Replace(items map[string]interface{}, resourceVersion st
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items = items
-
+	c.rv = resourceVersion
 	// rebuild any index
 	c.index.reset()
 	for key, item := range c.items {
 		c.index.updateIndices(nil, item, key)
 	}
+}
+
+func rvFromObject(obj interface{}) (rv string, err error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	rv = meta.GetResourceVersion()
+	return rv, nil
 }
 
 // Index returns a list of items that match the given object on the index function.
@@ -354,6 +396,24 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 		list = append(list, c.items[storeKey])
 	}
 	return list, nil
+}
+
+// LastStoreSyncResourceVersion returns the latest resource version that the store has seen.
+func (c *threadSafeMap) LastStoreSyncResourceVersion() string {
+	// We cannot return the resource version if the AtomicFIFO feature gate is not enabled.
+	if !clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO) {
+		return ""
+	}
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.rv
+}
+
+// Bookmark sets the latest resource version that the store has seen.
+func (c *threadSafeMap) Bookmark(rv string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.rv = rv
 }
 
 // ByIndex returns a list of the items whose indexed values in the given index include the given indexed value

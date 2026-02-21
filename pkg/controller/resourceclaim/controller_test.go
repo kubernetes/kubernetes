@@ -438,7 +438,6 @@ func TestSyncHandler(t *testing.T) {
 		// Run sequentially because of global logging and global metrics.
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			tCtx = ktesting.WithCancel(tCtx)
 
 			var objects []runtime.Object
 			for _, pod := range tc.pods {
@@ -533,7 +532,6 @@ func TestSyncHandler(t *testing.T) {
 
 func TestResourceClaimTemplateEventHandler(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	tCtx = ktesting.WithCancel(tCtx)
 
 	fakeKubeClient := createTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
@@ -631,33 +629,33 @@ func TestResourceClaimTemplateEventHandler(t *testing.T) {
 	// - fake-1 in the tmp namespace
 	_, err = podClient.Create(tCtx, testPodWithResource, metav1.CreateOptions{})
 	_, err1 := podTmpClient.Create(tCtx, makePod("fake-1", tmpNamespace, "uidpod2", *makePodResourceClaim(podResourceClaimName, templateName)), metav1.CreateOptions{})
-	ktesting.Step(tCtx, "create pod", func(tCtx ktesting.TContext) {
+	tCtx.Step("create pod", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		tCtx.ExpectNoError(err1)
 		expectQueue(tCtx, []string{testPodKey, podKeyPrefix + tmpNamespace + "/" + "fake-1"}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
 	})
 
 	// The item  has been forgotten and marked as done in the workqueue,so queue is nil
-	ktesting.Step(tCtx, "expect queue is nil", func(tCtx ktesting.TContext) {
+	tCtx.Step("expect queue is nil", func(tCtx ktesting.TContext) {
 		expectQueue(tCtx, []string{}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
 	})
 
 	// After create claim template,queue should have test pod key
 	_, err = claimTemplateClient.Create(tCtx, template, metav1.CreateOptions{})
-	ktesting.Step(tCtx, "create claim template after pod backoff", func(tCtx ktesting.TContext) {
+	tCtx.Step("create claim template after pod backoff", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		expectQueue(tCtx, []string{testPodKey}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
 	})
 
 	// The item  has been forgotten and marked as done in the workqueue,so queue is nil
-	ktesting.Step(tCtx, "expect queue is nil", func(tCtx ktesting.TContext) {
+	tCtx.Step("expect queue is nil", func(tCtx ktesting.TContext) {
 		expectQueue(tCtx, []string{}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
 	})
 
 	// After create tmp namespace claim template,queue should have fake pod key
 	TmpNamespaceTemplate := makeTemplate(templateName, "tmp", className, nil)
 	_, err = claimTemplateTmpClient.Create(tCtx, TmpNamespaceTemplate, metav1.CreateOptions{})
-	ktesting.Step(tCtx, "create  claim template in tmp namespace after  pod backoff in test namespace", func(tCtx ktesting.TContext) {
+	tCtx.Step("create  claim template in tmp namespace after  pod backoff in test namespace", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		expectQueue(tCtx, []string{podKeyPrefix + tmpNamespace + "/" + "fake-1"}, []string{testNamespace + "/" + templateName, tmpNamespace + "/" + templateName})
 	})
@@ -666,7 +664,6 @@ func TestResourceClaimTemplateEventHandler(t *testing.T) {
 
 func TestResourceClaimEventHandler(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	tCtx = ktesting.WithCancel(tCtx)
 
 	fakeKubeClient := createTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
@@ -725,7 +722,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 
 	_, err = claimClient.Create(tCtx, testClaim, metav1.CreateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
-	ktesting.Step(tCtx, "create claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("create claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 		expectQueue(tCtx, []string{testClaimKey})
@@ -734,7 +731,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	modifiedClaim := testClaim.DeepCopy()
 	modifiedClaim.Labels = map[string]string{"foo": "bar"}
 	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
-	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("modify claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Consistently(tCtx)
 		expectQueue(tCtx, []string{testClaimKey})
@@ -743,7 +740,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	_, err = claimClient.Update(tCtx, testClaimAllocated, metav1.UpdateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
-	ktesting.Step(tCtx, "allocate claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("allocate claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 		expectQueue(tCtx, []string{testClaimKey})
@@ -752,7 +749,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	modifiedClaim = testClaimAllocated.DeepCopy()
 	modifiedClaim.Labels = map[string]string{"foo": "bar2"}
 	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
-	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("modify claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Consistently(tCtx)
 		expectQueue(tCtx, []string{testClaimKey})
@@ -762,7 +759,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	otherClaimAllocated.Name += "2"
 	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
-	ktesting.Step(tCtx, "create allocated claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("create allocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 		expectQueue(tCtx, []string{testClaimKey + "2"})
@@ -771,7 +768,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	_, err = claimClient.Update(tCtx, testClaim, metav1.UpdateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
-	ktesting.Step(tCtx, "deallocate claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("deallocate claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 		expectQueue(tCtx, []string{testClaimKey})
@@ -779,7 +776,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 
 	err = claimClient.Delete(tCtx, testClaim.Name, metav1.DeleteOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
-	ktesting.Step(tCtx, "delete deallocated claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("delete deallocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 		expectQueue(tCtx, []string{})
@@ -787,7 +784,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 
 	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
-	ktesting.Step(tCtx, "delete allocated claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("delete allocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 		expectQueue(tCtx, []string{})
@@ -795,7 +792,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 
 	_, err = claimClient.Create(tCtx, templatedTestClaimWithAdmin, metav1.CreateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
-	ktesting.Step(tCtx, "create claim with admin access", func(tCtx ktesting.TContext) {
+	tCtx.Step("create claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
@@ -803,7 +800,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	modifiedClaim = templatedTestClaimWithAdmin.DeepCopy()
 	modifiedClaim.Labels = map[string]string{"foo": "bar"}
 	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
-	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("modify claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Consistently(tCtx)
 	})
@@ -811,7 +808,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	_, err = claimClient.Update(tCtx, templatedTestClaimWithAdminAllocated, metav1.UpdateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
-	ktesting.Step(tCtx, "allocate claim with admin access", func(tCtx ktesting.TContext) {
+	tCtx.Step("allocate claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
@@ -819,7 +816,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	modifiedClaim = templatedTestClaimWithAdminAllocated.DeepCopy()
 	modifiedClaim.Labels = map[string]string{"foo": "bar2"}
 	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
-	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("modify claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Consistently(tCtx)
 	})
@@ -828,7 +825,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	otherClaimAllocated.Name += "2"
 	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
-	ktesting.Step(tCtx, "create allocated claim with admin access", func(tCtx ktesting.TContext) {
+	tCtx.Step("create allocated claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
@@ -836,28 +833,28 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	_, err = claimClient.Update(tCtx, templatedTestClaimWithAdmin, metav1.UpdateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
-	ktesting.Step(tCtx, "deallocate claim with admin access", func(tCtx ktesting.TContext) {
+	tCtx.Step("deallocate claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	err = claimClient.Delete(tCtx, templatedTestClaimWithAdmin.Name, metav1.DeleteOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
-	ktesting.Step(tCtx, "delete deallocated claim with admin access", func(tCtx ktesting.TContext) {
+	tCtx.Step("delete deallocated claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
-	ktesting.Step(tCtx, "delete allocated claim with admin access", func(tCtx ktesting.TContext) {
+	tCtx.Step("delete allocated claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	_, err = claimClient.Create(tCtx, extendedTestClaim, metav1.CreateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
-	ktesting.Step(tCtx, "create extended resource claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("create extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
@@ -865,7 +862,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	_, err = claimClient.Update(tCtx, extendedTestClaimAllocated, metav1.UpdateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, 1)
-	ktesting.Step(tCtx, "allocate extended resource claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("allocate extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
@@ -873,14 +870,14 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	_, err = claimClient.Update(tCtx, extendedTestClaim, metav1.UpdateOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, -1)
-	ktesting.Step(tCtx, "deallocate extended resource claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("deallocate extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	err = claimClient.Delete(tCtx, extendedTestClaim.Name, metav1.DeleteOptions{})
 	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
-	ktesting.Step(tCtx, "delete extended resource claim", func(tCtx ktesting.TContext) {
+	tCtx.Step("delete extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
@@ -1490,7 +1487,6 @@ func TestEnqueuePodExtendedResourceClaims(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.featureGateEnabled)
 
 			tCtx := ktesting.Init(t)
-			tCtx = ktesting.WithCancel(tCtx)
 
 			fakeKubeClient := createTestClient()
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())

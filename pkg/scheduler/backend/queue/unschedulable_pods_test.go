@@ -17,6 +17,7 @@ limitations under the License.
 package queue
 
 import (
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -24,115 +25,389 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
+var _ metrics.MetricRecorder = &mockMetricRecorder{}
+
+type mockMetricRecorder struct {
+	val atomic.Int64
+}
+
+func (m *mockMetricRecorder) Inc() {
+	m.val.Add(1)
+}
+
+func (m *mockMetricRecorder) Dec() {
+	m.val.Add(-1)
+}
+
+func (m *mockMetricRecorder) Clear() {
+	m.val.Store(0)
+}
+
+func (m *mockMetricRecorder) value() int64 {
+	return m.val.Load()
+}
+
 func TestUnschedulablePods(t *testing.T) {
+	type action string
+
+	const (
+		add    action = "adding"
+		update action = "updating"
+		delete action = "deleting"
+		clear  action = "clearing"
+	)
+
+	type step struct {
+		action       action
+		pods         []*framework.QueuedPodInfo
+		expectedPods []*framework.QueuedPodInfo
+	}
+
+	var actionToOperation = map[action]func(upm *unschedulablePods, pInfo *framework.QueuedPodInfo, gatedBefore bool){
+		add: func(upm *unschedulablePods, pInfo *framework.QueuedPodInfo, _ bool) {
+			upm.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
+		},
+		update: func(upm *unschedulablePods, pInfo *framework.QueuedPodInfo, gatedBefore bool) {
+			upm.addOrUpdate(pInfo, gatedBefore, framework.EventUnscheduledPodUpdate.Label())
+		},
+		delete: func(upm *unschedulablePods, pInfo *framework.QueuedPodInfo, gatedBefore bool) {
+			upm.delete(pInfo.Pod, gatedBefore)
+		},
+		clear: func(upm *unschedulablePods, _ *framework.QueuedPodInfo, _ bool) {
+			upm.clear()
+		},
+	}
+
 	var pods = []*v1.Pod{
 		st.MakePod().Name("p0").Namespace("ns1").Annotation("annot1", "val1").NominatedNodeName("node1").Obj(),
 		st.MakePod().Name("p1").Namespace("ns1").Annotation("annot", "val").Obj(),
 		st.MakePod().Name("p2").Namespace("ns2").Annotation("annot2", "val2").Annotation("annot3", "val3").NominatedNodeName("node3").Obj(),
-		st.MakePod().Name("p3").Namespace("ns4").Annotation("annot2", "val2").Annotation("annot3", "val3").NominatedNodeName("node1").Obj(),
+		st.MakePod().Name("p3").Namespace("ns1").Annotation("annot4", "val4").Obj(),
+		st.MakePod().Name("p4").Namespace("ns2").Annotation("annot5", "val5").NominatedNodeName("node4").Obj(),
+		st.MakePod().Name("p5").Namespace("ns1").Annotation("annot6", "val6").Obj(),
 	}
-	var updatedPods = make([]*v1.Pod, len(pods))
-	updatedPods[0] = pods[0].DeepCopy()
-	updatedPods[1] = pods[1].DeepCopy()
-	updatedPods[3] = pods[3].DeepCopy()
+
+	gated := func(p *v1.Pod, upm *unschedulablePods) bool {
+		pInfo := upm.get(p)
+		return pInfo != nil && pInfo.Gated()
+	}
+
+	makePodInfo := func(p *v1.Pod, gated bool) *framework.QueuedPodInfo {
+		info := &framework.QueuedPodInfo{
+			PodInfo:              mustNewTestPodInfo(t, p),
+			UnschedulablePlugins: sets.New[string](),
+		}
+		if gated {
+			info.GatingPlugin = "test"
+			info.UnschedulablePlugins.Insert("test")
+		}
+		return info
+	}
+
+	makePodInfoMap := func(pods []*framework.QueuedPodInfo) map[string]*framework.QueuedPodInfo {
+		podInfoMap := make(map[string]*framework.QueuedPodInfo)
+		for _, p := range pods {
+			podInfoMap[util.GetPodFullName(p.Pod)] = p
+		}
+		return podInfoMap
+	}
 
 	tests := []struct {
-		name                   string
-		podsToAdd              []*v1.Pod
-		expectedMapAfterAdd    map[string]*framework.QueuedPodInfo
-		podsToUpdate           []*v1.Pod
-		expectedMapAfterUpdate map[string]*framework.QueuedPodInfo
-		podsToDelete           []*v1.Pod
-		expectedMapAfterDelete map[string]*framework.QueuedPodInfo
+		name  string
+		steps []step
 	}{
 		{
-			name:      "create, update, delete subset of pods",
-			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
-			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
-			},
-			podsToUpdate: []*v1.Pod{updatedPods[0]},
-			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, updatedPods[0]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
-			},
-			podsToDelete: []*v1.Pod{pods[0], pods[1]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
+			name: "create, update, delete subset of pods",
+			steps: []step{
+				{
+					action: add,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+					},
+				},
+				{
+					action: update,
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+					},
+				},
+				{
+					action: delete,
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false), makePodInfo(pods[1], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+					},
+				},
 			},
 		},
 		{
-			name:      "create, update, delete all",
-			podsToAdd: []*v1.Pod{pods[0], pods[3]},
-			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
+			name: "create, update, delete all",
+			steps: []step{
+				{
+					action: add,
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false), makePodInfo(pods[3], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[3], false),
+					},
+				},
+				{
+					action: update,
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[3], false)},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[3], false),
+					},
+				},
+				{
+					action:       delete,
+					pods:         []*framework.QueuedPodInfo{makePodInfo(pods[0], false), makePodInfo(pods[3], false)},
+					expectedPods: []*framework.QueuedPodInfo{},
+				},
 			},
-			podsToUpdate: []*v1.Pod{updatedPods[3]},
-			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, updatedPods[3]), UnschedulablePlugins: sets.New[string]()},
-			},
-			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{},
 		},
 		{
-			name:      "delete non-existing and existing pods",
-			podsToAdd: []*v1.Pod{pods[1], pods[2]},
-			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
+			name: "delete non-existing and existing pods",
+			steps: []step{
+				{
+					action: add,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+					},
+				},
+				{
+					action: update,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], false),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+					},
+				},
+				{
+					action: delete,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], false),
+					},
+				},
 			},
-			podsToUpdate: []*v1.Pod{updatedPods[1]},
-			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
+		},
+		{
+			name: "add/delete gated pods",
+			steps: []step{
+				{
+					action: add,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+						makePodInfo(pods[1], true),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+						makePodInfo(pods[1], true),
+					},
+				},
+				{
+					action: delete,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[1], true),
+					},
+				},
 			},
-			podsToDelete: []*v1.Pod{pods[2], pods[3]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.New[string]()},
+		},
+		{
+			name: "add gated and non-gated pods, then delete",
+			steps: []step{
+				{
+					action: add,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], true),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], true),
+					},
+				},
+				{
+					action: delete,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], true),
+					},
+					expectedPods: []*framework.QueuedPodInfo{},
+				},
+			},
+		},
+		{
+			name: "add gated pod, update it to non-gated",
+			steps: []step{
+				{
+					action: add,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+					},
+				},
+				{
+					action: update,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+					},
+				},
+				{
+					action: delete,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+					},
+					expectedPods: []*framework.QueuedPodInfo{},
+				},
+			},
+		},
+		{
+			name: "add non-gated pod, update it to gated",
+			steps: []step{
+				{
+					action: add,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+					},
+				},
+				{
+					action: update,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+					},
+				},
+			},
+		},
+		{
+			name: "add 4 ungated and 2 gated, update 2 to gated and 1 to ungated",
+			steps: []step{
+				{
+					action: add,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+						makePodInfo(pods[4], true),
+						makePodInfo(pods[5], true),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], false),
+						makePodInfo(pods[1], false),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+						makePodInfo(pods[4], true),
+						makePodInfo(pods[5], true),
+					},
+				},
+				{
+					action: update,
+					pods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+						makePodInfo(pods[1], true),
+						makePodInfo(pods[4], false),
+					},
+					expectedPods: []*framework.QueuedPodInfo{
+						makePodInfo(pods[0], true),
+						makePodInfo(pods[1], true),
+						makePodInfo(pods[2], false),
+						makePodInfo(pods[3], false),
+						makePodInfo(pods[4], false),
+						makePodInfo(pods[5], true),
+					},
+				},
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			upm := newUnschedulablePods(nil, nil)
-			for _, p := range test.podsToAdd {
-				upm.addOrUpdate(newQueuedPodInfoForLookup(p), false, framework.EventUnscheduledPodAdd.Label())
-			}
-			if diff := cmp.Diff(test.expectedMapAfterAdd, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
-				t.Errorf("Unexpected map after adding pods(-want, +got):\n%s", diff)
+			unschedulableRecorder := &mockMetricRecorder{}
+			gatedRecorder := &mockMetricRecorder{}
+			upm := newUnschedulablePods(unschedulableRecorder, gatedRecorder)
+			assertMetrics := func(expectedPods []*framework.QueuedPodInfo, action string) {
+				t.Helper()
+
+				expectedUnschedulableMetric := 0
+				expectedGatedMetric := 0
+				for _, p := range expectedPods {
+					if p.Gated() {
+						expectedGatedMetric++
+					} else {
+						expectedUnschedulableMetric++
+					}
+				}
+				if unschedulableRecorder.value() != int64(expectedUnschedulableMetric) {
+					t.Errorf("Expected unschedulable metric to be %d, but got %d after %s", expectedUnschedulableMetric, unschedulableRecorder.value(), action)
+				}
+				if gatedRecorder.value() != int64(expectedGatedMetric) {
+					t.Errorf("Expected gated metric to be %d, but got %d after %s", expectedGatedMetric, gatedRecorder.value(), action)
+				}
 			}
 
-			if len(test.podsToUpdate) > 0 {
-				for _, p := range test.podsToUpdate {
-					upm.addOrUpdate(newQueuedPodInfoForLookup(p), false, framework.EventUnscheduledPodUpdate.Label())
+			for _, step := range test.steps {
+				op := actionToOperation[step.action]
+				for _, p := range step.pods {
+					op(upm, p, gated(p.Pod, upm))
 				}
-				if diff := cmp.Diff(test.expectedMapAfterUpdate, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
-					t.Errorf("Unexpected map after updating pods (-want, +got):\n%s", diff)
+				if diff := cmp.Diff(makePodInfoMap(step.expectedPods), upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+					t.Errorf("Unexpected map after %s pods(-want, +got):\n%s", step.action, diff)
 				}
+
+				assertMetrics(step.expectedPods, string(step.action))
 			}
-			for _, p := range test.podsToDelete {
-				upm.delete(p, false)
-			}
-			if diff := cmp.Diff(test.expectedMapAfterDelete, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
-				t.Errorf("Unexpected map after deleting pods (-want, +got):\n%s", diff)
-			}
+
 			upm.clear()
 			if len(upm.podInfoMap) != 0 {
 				t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.podInfoMap))
 			}
+			assertMetrics([]*framework.QueuedPodInfo{}, string(clear))
 		})
 	}
 }

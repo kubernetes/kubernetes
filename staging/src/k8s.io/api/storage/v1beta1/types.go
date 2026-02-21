@@ -139,6 +139,7 @@ type VolumeAttachment struct {
 	// spec represents specification of the desired attach/detach volume behavior.
 	// Populated by the Kubernetes system.
 	// +k8s:immutable
+	// +required
 	Spec VolumeAttachmentSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status represents status of the VolumeAttachment request.

@@ -1164,7 +1164,7 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	timeout := 30 * time.Minute
-	tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
+	tCtx = tCtx.WithTimeout(timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 		registerQHintMetrics()
@@ -1472,27 +1472,34 @@ func valueWithinThreshold(value, threshold float64, expectLower bool) bool {
 	return value > threshold
 }
 
-func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
+// applyThreshold adds the threshold to data item with metric specified via metricSelector and verifies that
+// this metrics value is within threshold.
+func applyThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
 	if threshold == 0 {
 		return nil
 	}
 	dataBucket := metricSelector.DataBucket
+	var errs []error
 	for _, item := range items {
 		if item.Labels["Metric"] != metricSelector.Name || !labelsMatch(item.Labels, metricSelector.Labels) {
 			continue
 		}
+		thresholdItemName := dataBucket + "Threshold"
+		item.Data[thresholdItemName] = threshold
 		dataItem, ok := item.Data[dataBucket]
 		if !ok {
-			return fmt.Errorf("%s: no data present for %q metric %q bucket", item.Labels["Name"], metricSelector.Name, dataBucket)
+			errs = append(errs, fmt.Errorf("%s: no data present for %q metric %q bucket", item.Labels["Name"], metricSelector.Name, dataBucket))
+			continue
 		}
 		if !valueWithinThreshold(dataItem, threshold, metricSelector.ExpectLower) {
 			if metricSelector.ExpectLower {
-				return fmt.Errorf("%s: expected %q %q to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold)
+				errs = append(errs, fmt.Errorf("%s: expected %q %q to be lower: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold))
+			} else {
+				errs = append(errs, fmt.Errorf("%s: expected %q %q to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold))
 			}
-			return fmt.Errorf("%s: expected %q %q to be higher: got %f, want %f", item.Labels["Name"], metricSelector.Name, dataBucket, dataItem, threshold)
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func checkEmptyInFlightEvents() error {
@@ -1510,7 +1517,7 @@ func checkEmptyInFlightEvents() error {
 }
 
 func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string, labelSelector map[string]string) (ktesting.TContext, []testDataCollector, error) {
-	collectorCtx := ktesting.WithCancel(tCtx)
+	collectorCtx := tCtx.WithCancel()
 	workloadName := tCtx.Name()
 
 	// Clean up memory usage from the initial setup phase.
@@ -1554,7 +1561,7 @@ func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContex
 	for _, collector := range collectors {
 		items := collector.collect()
 		dataItems = append(dataItems, items...)
-		err := compareMetricWithThreshold(items, threshold, tms)
+		err := applyThreshold(items, threshold, tms)
 		if err != nil {
 			tCtx.Errorf("op %d: %s", opIndex, err)
 		}
@@ -1610,7 +1617,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, topicName st
 	podInformer := informerFactory.Core().V1().Pods()
 
 	// Everything else started by this function gets stopped before it returns.
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 
 	executor := WorkloadExecutor{
 		tCtx:                         tCtx,
@@ -1835,7 +1842,7 @@ func (e *WorkloadExecutor) runDeletePodsOp(opIndex int, op *deletePodsOp) error 
 			ticker := time.NewTicker(time.Second / time.Duration(op.DeletePodsPerSecond))
 			defer ticker.Stop()
 
-			for i := 0; i < len(podsToDelete); i++ {
+			for i := range podsToDelete {
 				select {
 				case <-ticker.C:
 					if err := e.tCtx.Client().CoreV1().Pods(op.Namespace).Delete(e.tCtx, podsToDelete[i].Name, metav1.DeleteOptions{}); err != nil {
@@ -2026,7 +2033,8 @@ type testDataCollector interface {
 	collect() []DataItem
 }
 
-func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
+// var for mocking in tests.
+var getTestDataCollectors = func(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}
@@ -2088,7 +2096,7 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 		return err
 	}
 	tCtx.Logf("creating pods in namespace %q for %s", namespace, cpo.Duration)
-	tCtx = ktesting.WithTimeout(tCtx, cpo.Duration.Duration, fmt.Sprintf("the operation ran for the configured %s", cpo.Duration.Duration))
+	tCtx = tCtx.WithTimeout(cpo.Duration.Duration, fmt.Sprintf("the operation ran for the configured %s", cpo.Duration.Duration))
 
 	// Start watching pods in the namespace. Any pod which is seen as being scheduled
 	// gets deleted.

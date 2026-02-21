@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -203,6 +203,10 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 	// usedPVCSet must be re-created whenever the head node generation is greater than
 	// last snapshot generation.
 	updateUsedPVCSet := false
+
+	// Forget all assumed pods from a previous snapshot version.
+	// This is a safety check in case any pod wasn't forgotten in the previous scheduling cycle.
+	nodeSnapshot.forgetAllAssumedPods(logger)
 
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.

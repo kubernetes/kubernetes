@@ -2338,7 +2338,7 @@ func TestImmediateJobRecreation(t *testing.T) {
 	// more Jobs than the number of Job controller workers to make it very unlikely
 	// that syncJob executes (and cleans the in-memory state) before the corresponding
 	// replacement Jobs are created.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, ptr.To(jobSpec(i)))
 		if err != nil {
 			t.Fatalf("Error %v when creating the job %q", err, klog.KObj(jobObj))
@@ -4228,6 +4228,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 
 func TestNodeSelectorUpdate(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "suspend")
+
 	t.Cleanup(closeFn)
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 	t.Cleanup(cancel)
@@ -4243,7 +4244,14 @@ func TestNodeSelectorUpdate(t *testing.T) {
 	jobNamespace := job.Namespace
 	jobClient := clientSet.BatchV1().Jobs(jobNamespace)
 
-	// (1) Unsuspend and set node selector in the same update.
+	// Since MutableSchedulingDirectives is set to true, one needs
+	// to wait for the suspend condition to be set reflecting that the
+	// job is actually suspended.
+	waitForPodsToBeActive(ctx, t, jobClient, 0, job)
+	validateJobCondition(ctx, t, clientSet, job, batchv1.JobSuspended)
+
+	// (1) set node selector in the same update.
+
 	nodeSelector := map[string]string{"foo": "bar"}
 	if _, err := updateJob(ctx, jobClient, jobName, func(j *batchv1.Job) {
 		j.Spec.Template.Spec.NodeSelector = nodeSelector
@@ -4997,7 +5005,7 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 	wg := sync.WaitGroup{}
 	wg.Add(len(updates))
 	errCh := make(chan error, len(updates))
-	var updated int32
+	var updated atomic.Int32
 
 	for _, pod := range updates {
 		go func() {
@@ -5005,7 +5013,7 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 			if err != nil {
 				errCh <- err
 			} else {
-				atomic.AddInt32(&updated, 1)
+				updated.Add(1)
 			}
 			wg.Done()
 		}()
@@ -5014,10 +5022,10 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 
 	select {
 	case err := <-errCh:
-		return int(updated), fmt.Errorf("updating Pod status: %w", err)
+		return int(updated.Load()), fmt.Errorf("updating Pod status: %w", err)
 	default:
 	}
-	return int(updated), nil
+	return int(updated.Load()), nil
 }
 
 func setJobPhaseForIndex(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, phase v1.PodPhase, ix int) error {

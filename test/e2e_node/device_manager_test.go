@@ -132,7 +132,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 			}
 
 			ginkgo.By("Scheduling a sample device plugin pod")
-			data, err := e2etestfiles.Read(SampleDevicePluginControlRegistrationDSYAML)
+			data, err := e2etestfiles.Read(e2enode.SampleDevicePluginControlRegistrationDSYAML)
 			if err != nil {
 				framework.Fail(err.Error())
 			}
@@ -140,7 +140,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 
 			dp := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: SampleDevicePluginName,
+					Name: e2enode.SampleDevicePluginName,
 				},
 				Spec: ds.Spec.Template.Spec,
 			}
@@ -182,9 +182,9 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 			var err error
 			podCMD := "while true; do sleep 1000; done;"
 
-			ginkgo.By(fmt.Sprintf("creating a pods requiring %d %q", deviceCount, SampleDeviceResourceName))
+			ginkgo.By(fmt.Sprintf("creating a pods requiring %d %q", deviceCount, e2enode.SampleDeviceResourceName))
 
-			pod := makeBusyboxDeviceRequiringPod(SampleDeviceResourceName, podCMD)
+			pod := makeBusyboxDeviceRequiringPod(e2enode.SampleDeviceResourceName, podCMD)
 			testPod := e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 			ginkgo.By("making sure all the pods are ready")
@@ -341,7 +341,7 @@ func isNodeReadyWithSampleResources(ctx context.Context, f *framework.Framework)
 		return false, fmt.Errorf("expected node to be ready=%t", ready)
 	}
 
-	if CountSampleDeviceCapacity(node) <= 0 {
+	if e2enode.CountSampleDeviceCapacity(node) <= 0 {
 		return false, fmt.Errorf("expected devices to be advertised")
 	}
 	return true, nil
@@ -374,11 +374,11 @@ func isNodeReadyWithAllocatableSampleResources(ctx context.Context, f *framework
 		return false, fmt.Errorf("expected node to be ready=%t", ready)
 	}
 
-	if CountSampleDeviceCapacity(node) != devCount {
+	if e2enode.CountSampleDeviceCapacity(node) != devCount {
 		return false, fmt.Errorf("expected devices capacity to be: %d", devCount)
 	}
 
-	if CountSampleDeviceAllocatable(node) != devCount {
+	if e2enode.CountSampleDeviceAllocatable(node) != devCount {
 		return false, fmt.Errorf("expected devices allocatable to be: %d", devCount)
 	}
 	return true, nil
@@ -390,7 +390,7 @@ func isNodeReadyWithoutSampleResources(ctx context.Context, f *framework.Framewo
 		return false, fmt.Errorf("expected node to be ready=%t", ready)
 	}
 
-	if CountSampleDeviceCapacity(node) > 0 {
+	if e2enode.CountSampleDeviceCapacity(node) > 0 {
 		return false, fmt.Errorf("expected devices to be not present")
 	}
 	return true, nil

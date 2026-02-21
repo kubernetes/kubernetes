@@ -30,6 +30,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
 	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 
@@ -510,6 +511,23 @@ func TestGenericStorageProviders(t *testing.T) {
 	generic, err := completed.ControlPlane.GenericStorageProviders(client.Discovery())
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	genericStorageGroups := sets.New[string]()
+	for _, provider := range generic {
+		genericStorageGroups.Insert(provider.GroupName())
+	}
+
+	genericConfigGroups := sets.New[string]()
+	for gv := range DefaultGenericAPIResourceConfigSource().GroupVersionConfigs {
+		genericConfigGroups.Insert(gv.Group)
+	}
+
+	if extra := genericStorageGroups.Difference(genericConfigGroups); len(extra) > 0 {
+		t.Fatalf("GenericStorageProviders has providers for groups in DefaultGenericAPIResourceConfigSource: %v", sets.List(extra))
+	}
+	if extra := genericConfigGroups.Difference(genericStorageGroups); len(extra) > 0 {
+		t.Fatalf("DefaultGenericAPIResourceConfigSource has config for groups not in GenericStorageProviders: %v", sets.List(extra))
 	}
 
 	g := 0 // generic index

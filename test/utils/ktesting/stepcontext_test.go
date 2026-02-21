@@ -17,9 +17,11 @@ limitations under the License.
 package ktesting
 
 import (
+	"context"
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/onsi/gomega"
 	"go.uber.org/goleak"
@@ -29,7 +31,7 @@ func TestStepContext(t *testing.T) {
 	for name, tc := range map[string]testcase{
 		"output": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				tCtx.Log("Log", "a", "b", 42)
 				tCtx.Logf("Logf %s %s %d", "a", "b", 42)
 				tCtx.Error("Error", "a", "b", 42)
@@ -45,7 +47,7 @@ func TestStepContext(t *testing.T) {
 		},
 		"fatal": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				tCtx.Fatal("Error", "a", "b", 42)
 				// not reached
 				tCtx.Log("Log")
@@ -56,7 +58,7 @@ func TestStepContext(t *testing.T) {
 		},
 		"fatalf": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				tCtx.Fatalf("Error %s %s %d", "a", "b", 42)
 				// not reached
 				tCtx.Log("Log")
@@ -73,31 +75,46 @@ func TestStepContext(t *testing.T) {
 }
 
 func TestProgressReport(t *testing.T) {
+	oldOut := defaultProgressReporter.out
+	out := newOutputStream()
+	defaultProgressReporter.out = out
 	t.Cleanup(func() {
 		goleak.VerifyNone(t)
-	})
-
-	oldOut := defaultProgressReporter.out
-	reportStream := newOutputStream()
-	defaultProgressReporter.out = reportStream
-	t.Cleanup(func() {
 		defaultProgressReporter.out = oldOut
+
+		// If we get here, the defaultProgressReporter is not active anymore,
+		// but the interrupt context should still be canceled.
+		gomega.NewGomegaWithT(t).Expect(defaultProgressReporter.usageCount).To(gomega.Equal(int64(0)), "usage count")
+		gomega.NewGomegaWithT(t).Expect(context.Cause(interruptCtx)).To(gomega.MatchError(gomega.Equal("received interrupt signal")), "interrupted persistently")
+
+		// Reset for next test.
+		interruptCtx, interrupted = context.WithCancelCause(context.Background())
 	})
 
 	// This must use a real testing.T, otherwise Init doesn't initialize signal handling.
 	tCtx := Init(t)
-	tCtx = WithStep(tCtx, "step")
+	tCtx = tCtx.WithStep("step")
 	removeReporter := tCtx.Value("GINKGO_SPEC_CONTEXT").(ginkgoReporter).AttachProgressReporter(func() string { return "hello world" })
 	defer removeReporter()
 	tCtx.Expect(tCtx.Value("some other key")).To(gomega.BeNil(), "value for unknown context value key")
 
 	// Trigger report and wait for it.
 	defaultProgressReporter.progressChannel <- os.Interrupt
-	report := <-reportStream.stream
+	report := <-out.stream
 	tCtx.Expect(report).To(gomega.Equal(`You requested a progress report.
 
 step: hello world
 `), "report")
+
+	gomega.NewGomegaWithT(t).Expect(context.Cause(interruptCtx)).To(gomega.Succeed(), "not interrupted yet")
+	defaultProgressReporter.signalChannel <- os.Interrupt
+	message := <-out.stream
+	tCtx.Expect(message).To(gomega.Equal(`
+
+INFO: canceling test context: received interrupt signal
+
+`))
+	gomega.NewGomegaWithT(t).Eventually(func() error { return context.Cause(tCtx) }).WithTimeout(30*time.Second).To(gomega.MatchError(gomega.Equal("received interrupt signal")), "interrupted")
 }
 
 // outputStream forwards exactly one Write call to a stream.
@@ -116,6 +133,5 @@ func newOutputStream() *outputStream {
 
 func (s *outputStream) Write(buf []byte) (int, error) {
 	s.stream <- string(buf)
-	close(s.stream)
 	return len(buf), nil
 }

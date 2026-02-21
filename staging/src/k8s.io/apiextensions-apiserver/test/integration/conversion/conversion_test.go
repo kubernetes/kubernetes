@@ -1541,11 +1541,10 @@ func servedVersions(versions []apiextensionsv1.CustomResourceDefinitionVersion) 
 
 func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
 	// Setup server and clients
-	tearDown, config, options, err := fixtures.StartDefaultServer(t)
+	apiServerTearDown, config, options, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tearDown()
 
 	apiExtensionsClient, err := clientset.NewForConfig(config)
 	if err != nil {
@@ -1591,11 +1590,17 @@ func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
 	verifyMultiVersionObject(t, "v1beta1", obj)
 
 	// Set up webhook conversion
-	tearDown, webhookClientConfig, err := StartConversionWebhookServer(NewObjectConverterWebhookHandler(t, noopConverter))
+	webhookTearDown, webhookClientConfig, err := StartConversionWebhookServer(NewObjectConverterWebhookHandler(t, noopConverter))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tearDown()
+
+	t.Cleanup(func() {
+		// Ensure conversion webhook remains available until the apiserver
+		// and its etcd watches are fully shut down.
+		apiServerTearDown()
+		webhookTearDown()
+	})
 
 	crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
 		Strategy: apiextensionsv1.WebhookConverter,

@@ -19,7 +19,6 @@ package experimental
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/go-logr/logr"
 
@@ -55,11 +54,11 @@ func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice, node *v1.Node, features Features, allSlices []*resourceapi.ResourceSlice) ([]*Pool, error) {
 	pools := make(map[PoolID][]*draapi.ResourceSlice)
 	var slicesWithBindingConditions []*resourceapi.ResourceSlice
 
-	for _, slice := range slices {
+	for _, slice := range slicesForNode {
 		if !features.PartitionableDevices && (slice.Spec.PerDeviceNodeSelection != nil || len(slice.Spec.SharedCounters) > 0) {
 			continue
 		}
@@ -155,7 +154,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		// which were filtered out above because their node selection made them look irrelevant
 		// for the current node. This is necessary for "allocate all" mode (it rejects incomplete
 		// pools).
-		isObsolete, allSlicesForPool := checkSlicesInPool(slices, poolID, slicesForPool[0].Spec.Pool.Generation)
+		isObsolete, allSlicesForPool := checkSlicesInPool(allSlices, poolID, slicesForPool[0].Spec.Pool.Generation)
 		if isObsolete {
 			// A more thorough check determined that the DRA driver is in the process
 			// of replacing the current generation. The newer one didn't have any slice
@@ -524,50 +523,4 @@ func (p *poolsLogger) addDevicesInSlices(devices []string, poolID PoolID, slices
 		}
 	}
 	return devices
-}
-
-// logPools returns a handle for the value in a structured log call which
-// includes varying amounts of information about the allocated devices, depending on
-// the verbosity of the logger.
-func logAllocatedDevices(logger klog.Logger, allocatedDevices sets.Set[DeviceID]) any {
-	// We need to check verbosity here because our caller's source code
-	// location may be relevant (-vmodule !).
-	helper, logger := logger.WithCallStackHelper()
-	helper()
-
-	// We always produce the same output at V <= 5. 6 adds all IDs.
-	verbosity := 5
-	for i := 7; i > verbosity; i-- {
-		if loggerV := logger.V(i); loggerV.Enabled() {
-			verbosity = i
-			break
-		}
-	}
-
-	return &allocatedDevicesLogger{verbosity, allocatedDevices}
-}
-
-type allocatedDevicesLogger struct {
-	verbosity int
-	devices   sets.Set[DeviceID]
-}
-
-var _ logr.Marshaler = &allocatedDevicesLogger{}
-
-func (a *allocatedDevicesLogger) MarshalLog() any {
-	info := map[string]any{"count": len(a.devices)}
-	if a.verbosity >= 6 {
-		ids := make([]string, 0, len(a.devices))
-		for id := range a.devices {
-			if a.verbosity == 6 && len(ids) >= maxDevicesLevel6 {
-				ids = append(ids, "...")
-				break
-			}
-			ids = append(ids, id.String())
-		}
-		slices.Sort(ids)
-		info["devices"] = ids
-
-	}
-	return info
 }

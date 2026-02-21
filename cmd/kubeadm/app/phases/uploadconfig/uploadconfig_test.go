@@ -58,7 +58,7 @@ func TestUploadConfiguration(t *testing.T) {
 			cfg.NodeRegistration.Name = "node-foo"
 			cfg.NodeRegistration.CRISocket = kubeadmconstants.DefaultCRISocket
 
-			client := clientsetfake.NewClientset()
+			client := clientsetfake.NewSimpleClientset()
 			// For idempotent test, we check the result of the second call.
 			if err := UploadConfiguration(cfg, client); err != nil {
 				t2.Fatalf("UploadConfiguration() error = %v", err)

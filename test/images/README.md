@@ -52,8 +52,19 @@ After going through these steps your image will be used in the e2e tests. There 
 
 ### Creating and promoting new images
 
-If you intend to add an entirely different image and have it automatically built by the Image Builder
-and used in E2E tests, you will also have to define the postsubmit prow job for it. This can easily
+Please reach out to SIG Testing to see if we can meet your needs with the agnhost image first,
+including adding new functionality to that image.
+
+Consolidating images has many benefits including:
+- Reduced patching toil (dependencies, base images, go, ...)
+- Less dependency on pulling images at runtime and therefore faster test results
+- Simplified airgap testing (fewer images to mirror / airgap)
+
+We are working to reduce the number of existing images.
+
+If you still truly need to add an entirely different image, confirm with SIG Testing.
+You will need to have it automatically built by the Image Builder, to do this
+you will have to define the postsubmit prow job for it. This can easily
 be done by running [this script](https://github.com/kubernetes/test-infra/blob/master/config/jobs/image-pushing/k8s-staging-e2e-test-images.sh)
 in `kubernetes/test-infra`.
 

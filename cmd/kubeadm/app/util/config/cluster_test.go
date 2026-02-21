@@ -319,7 +319,7 @@ func TestGetNodeRegistration(t *testing.T) {
 				}
 			}
 
-			client := clientsetfake.NewClientset()
+			client := clientsetfake.NewSimpleClientset()
 
 			if rt.node != nil {
 				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node, metav1.CreateOptions{})
@@ -457,7 +457,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewClientset()
+			client := clientsetfake.NewSimpleClientset()
 			if rt.staticPod != nil {
 				rt.staticPod.NodeName = rt.nodeName
 				if err := rt.staticPod.Create(client); err != nil {
@@ -607,7 +607,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 				}
 			}
 
-			client := clientsetfake.NewClientset()
+			client := clientsetfake.NewSimpleClientset()
 
 			if rt.node != nil {
 				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node, metav1.CreateOptions{})
@@ -717,7 +717,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewClientset()
+			client := clientsetfake.NewSimpleClientset()
 			for i, pod := range rt.pods {
 				pod.NodeName = rt.nodeName
 				if err := pod.CreateWithPodSuffix(client, strconv.Itoa(i)); err != nil {
@@ -833,7 +833,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewClientset()
+			client := clientsetfake.NewSimpleClientset()
 			for i, pod := range rt.pods {
 				pod.NodeName = rt.nodeName
 				if err := pod.CreateWithPodSuffix(client, strconv.Itoa(i)); err != nil {
@@ -918,7 +918,7 @@ func TestGetNodeNameFromSSR(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewClientset()
+			client := clientsetfake.NewSimpleClientset()
 			rt.clientSetup(client)
 
 			nodeName, err := getNodeNameFromSSR(client)

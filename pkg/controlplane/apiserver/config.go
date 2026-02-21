@@ -131,7 +131,7 @@ func BuildGenericConfig(
 		return
 	}
 
-	if lastErr = s.SecureServing.ApplyTo(&genericConfig.SecureServing, &genericConfig.LoopbackClientConfig); lastErr != nil {
+	if lastErr = s.SecureServing.ApplyToConfig(genericConfig); lastErr != nil {
 		return
 	}
 
@@ -330,7 +330,9 @@ func CreateConfig(
 				opts.PeerAdvertiseAddress,
 				genericConfig.APIServerID,
 				config.Extra.PeerEndpointLeaseReconciler,
-				config.Generic.Serializer)
+				config.Generic.Serializer,
+				config.Generic.EgressSelector,
+			)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -360,6 +362,7 @@ func CreateConfig(
 	genericAdmissionConfig := controlplaneadmission.Config{
 		ExternalInformers:    versionedInformers,
 		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
+		APIResourceConfig:    storageFactory.APIResourceConfigSource,
 	}
 	genericInitializers, err := genericAdmissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
 	if err != nil {

@@ -23,9 +23,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// Deprecated: use tCtx.WithCancel instead
-func WithCancel(tCtx TContext) TContext { return tCtx.WithCancel() }
-
 // WithCancel sets up cancellation in a [TContext.Cleanup] callback and
 // constructs a new TContext where [TContext.Cancel] cancels only the new
 // context.
@@ -44,9 +41,6 @@ func (tc *TC) WithCancel() TContext {
 	return tc
 }
 
-// Deprecated: use tCtx.WithoutCancel instead
-func WithoutCancel(tCtx TContext) TContext { return tCtx.WithoutCancel() }
-
 // WithoutCancel causes the returned context to ignore cancellation of its parent.
 // Calling Cancel will not cancel the parent either.
 // This matches [context.WithoutCancel].
@@ -57,11 +51,6 @@ func (tc *TC) WithoutCancel() TContext {
 	tc.Context = ctx
 	tc.cancel = nil
 	return tc
-}
-
-// Deprecated: use tCtx.WithTimeout instead
-func WithTimeout(tCtx TContext, timeout time.Duration, timeoutCause string) TContext {
-	return tCtx.WithTimeout(timeout, timeoutCause)
 }
 
 // WithTimeout sets up new context with a timeout. Canceling the timeout gets
@@ -76,11 +65,6 @@ func (tc *TC) WithTimeout(timeout time.Duration, timeoutCause string) TContext {
 	tc.Context = ctx
 	tc.cancel = cancel
 	return tc
-}
-
-// Deprecated: used tCtx.WithLogger instead
-func WithLogger(tCtx TContext, logger klog.Logger) TContext {
-	return tCtx.WithLogger(logger)
 }
 
 // WithLogger constructs a new context with a different logger.

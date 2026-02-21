@@ -396,11 +396,11 @@ func TestScope(t *testing.T) {
 			noMatch: attrList(),
 		},
 	}
-	keys := sets.NewString()
+	keys := sets.New[string]()
 	for name := range table {
 		keys.Insert(name)
 	}
-	for _, name := range keys.List() {
+	for _, name := range sets.List(keys) {
 		tt := table[name]
 		for i, m := range tt.match {
 			t.Run(fmt.Sprintf("%s_match_%d", name, i), func(t *testing.T) {

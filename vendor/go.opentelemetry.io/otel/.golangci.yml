@@ -16,6 +16,7 @@ linters:
     - govet
     - ineffassign
     - misspell
+    - modernize
     - perfsprint
     - revive
     - staticcheck
@@ -111,6 +112,9 @@ linters:
       locale: US
       ignore-rules:
         - cancelled
+    modernize:
+      disable:
+        - omitzero
     perfsprint:
       int-conversion: true
       err-error: true

@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -50,27 +49,17 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// ExtendedResourceName returns hard coded extended resource name with a variable
-// suffix from the input integer when it's greater than or equal to 0.
-// "example.com/resource" is not special, any valid extended resource name can be used
-// instead, except when using example device plugin in the test, which hard coded it,
-// see test/e2e/dra/deploy_device_plugin.go.
-// i == -1 == SingletonIndex is special, the extended resource name has no extra suffix
-// and matches the one used by the example device plugin.
-func (b *Builder) ExtendedResourceName(i int) string {
-	switch i {
-	case SingletonIndex:
-		return "example.com/resource"
-	default:
-		return b.driver.Name + "/resource" + fmt.Sprintf("-%d", i)
-	}
+// ExtendedResourceName returns extended resource name with a variable suffix.
+// Example: b.ExtendedResourceName("gpu") returns "driver-name/resource-gpu"
+func (b *Builder) ExtendedResourceName(suffix string) string {
+	return b.Driver.Name + "/resource-" + suffix
 }
 
 // Builder contains a running counter to make objects unique within their
 // namespace.
 type Builder struct {
 	namespace               string
-	driver                  *Driver
+	Driver                  *Driver
 	UseExtendedResourceName bool
 
 	podCounter      int
@@ -79,65 +68,68 @@ type Builder struct {
 	SkipCleanup     bool
 }
 
-// ClassName returns the default device class name.
-func (b *Builder) ClassName() string {
-	return b.namespace + b.driver.NameSuffix + "-class"
+// DeviceClassWrapper is a wrapper around DeviceClass that allows
+// adding builder-style functions that modify the class before creation.
+type DeviceClassWrapper struct {
+	*resourceapi.DeviceClass
 }
 
-// SingletonIndex causes Builder.Class and ExtendedResourceName to create a
-// DeviceClass where the the extended resource name has no %d
-// suffix and matches the name as used by the example device plugin.
-const SingletonIndex = -1
+// ClassName returns the default device class name.
+func (b *Builder) ClassName() string {
+	return b.namespace + b.Driver.NameSuffix + "-class"
+}
 
 // Class returns the device Class that the builder's other objects
 // reference.
-// The input i is used to pick the extended resource name whose suffix has the
-// same i for the device class.
-// i == -1 == SingletonIndex is special, the extended resource name has no extra suffix.
-func (b *Builder) Class(i int) *resourceapi.DeviceClass {
-	ern := b.ExtendedResourceName(i)
+func (b *Builder) Class() *DeviceClassWrapper {
 	name := b.ClassName()
-	switch i {
-	case SingletonIndex:
-		name += "-singleton"
-	case 0:
-		// No numeric suffix. This is what most tests use.
-	default:
-		name += "-" + strconv.Itoa(i)
-	}
 	class := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	if b.UseExtendedResourceName {
-		class.Spec = resourceapi.DeviceClassSpec{
-			ExtendedResourceName: &ern,
-		}
-	}
 	class.Spec.Selectors = []resourceapi.DeviceSelector{{
 		CEL: &resourceapi.CELDeviceSelector{
-			Expression: fmt.Sprintf(`device.driver == "%s"`, b.driver.Name),
+			Expression: fmt.Sprintf(`device.driver == "%s"`, b.Driver.Name),
 		},
 	}}
 	if b.ClassParameters != "" {
 		class.Spec.Config = []resourceapi.DeviceClassConfiguration{{
 			DeviceConfiguration: resourceapi.DeviceConfiguration{
 				Opaque: &resourceapi.OpaqueDeviceConfiguration{
-					Driver:     b.driver.Name,
+					Driver:     b.Driver.Name,
 					Parameters: runtime.RawExtension{Raw: []byte(b.ClassParameters)},
 				},
 			},
 		}}
 	}
-	return class
+	return &DeviceClassWrapper{DeviceClass: class}
+}
+
+// ClassWithExtendedResource returns a device class with the extended resource name set to the provided value.
+// The class name is suffixed with the last part of the extended resource name to make it unique.
+func (b *Builder) ClassWithExtendedResource(extendedResource string) *resourceapi.DeviceClass {
+	suffix := extendedResource[strings.LastIndex(extendedResource, "/")+1:]
+	return b.Class().WithName(b.ClassName() + "-" + suffix).WithExtendedResource(extendedResource).DeviceClass
+}
+
+// WithName sets the name of the device class.
+func (dcw *DeviceClassWrapper) WithName(name string) *DeviceClassWrapper {
+	dcw.ObjectMeta.Name = name
+	return dcw
+}
+
+// WithExtendedResource sets the extended resource name of the device class.
+func (dcw *DeviceClassWrapper) WithExtendedResource(extendedResourceName string) *DeviceClassWrapper {
+	dcw.Spec.ExtendedResourceName = &extendedResourceName
+	return dcw
 }
 
 // ExternalClaim returns external resource claim
 // that test pods can reference
 func (b *Builder) ExternalClaim() *resourceapi.ResourceClaim {
 	b.claimCounter++
-	name := "external-claim" + b.driver.NameSuffix // This is what podExternal expects.
+	name := "external-claim" + b.Driver.NameSuffix // This is what podExternal expects.
 	if b.claimCounter > 1 {
 		name += fmt.Sprintf("-%d", b.claimCounter)
 	}
@@ -162,7 +154,7 @@ func (b *Builder) claimSpecWithV1beta1() resourcev1beta1.ResourceClaimSpec {
 			Config: []resourcev1beta1.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourcev1beta1.DeviceConfiguration{
 					Opaque: &resourcev1beta1.OpaqueDeviceConfiguration{
-						Driver: b.driver.Name,
+						Driver: b.Driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
 						},
@@ -190,7 +182,7 @@ func (b *Builder) claimSpecWithV1beta2() resourcev1beta2.ResourceClaimSpec {
 			Config: []resourcev1beta2.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
 					Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
-						Driver: b.driver.Name,
+						Driver: b.Driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
 						},
@@ -218,7 +210,7 @@ func (b *Builder) ClaimSpec() resourceapi.ResourceClaimSpec {
 			Config: []resourceapi.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourceapi.DeviceConfiguration{
 					Opaque: &resourceapi.OpaqueDeviceConfiguration{
-						Driver: b.driver.Name,
+						Driver: b.Driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
 						},
@@ -251,7 +243,7 @@ func (b *Builder) Pod() *v1.Pod {
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 	pod.GenerateName = ""
 	b.podCounter++
-	pod.Name = fmt.Sprintf("tester%s-%d", b.driver.NameSuffix, b.podCounter)
+	pod.Name = fmt.Sprintf("tester%s-%d", b.Driver.NameSuffix, b.podCounter)
 	return pod
 }
 
@@ -315,12 +307,11 @@ func (b *Builder) PodInlineMultiple() (*v1.Pod, *resourceapi.ResourceClaimTempla
 	return pod, template
 }
 
-// PodExternal adds a pod that references external resource claim with default class name and parameters.
-func (b *Builder) PodExternal() *v1.Pod {
+// PodExternal adds a pod that references the named resource claim.
+func (b *Builder) PodExternal(externalClaimName string) *v1.Pod {
 	pod := b.Pod()
 	pod.Spec.Containers[0].Name = "with-resource"
 	podClaimName := "resource-claim"
-	externalClaimName := "external-claim" + b.driver.NameSuffix
 	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 		{
 			Name:              podClaimName,
@@ -331,9 +322,9 @@ func (b *Builder) PodExternal() *v1.Pod {
 	return pod
 }
 
-// podShared returns a pod with 3 containers that reference external resource claim with default class name and parameters.
-func (b *Builder) PodExternalMultiple() *v1.Pod {
-	pod := b.PodExternal()
+// podShared returns a pod with 3 containers that reference the named external resource claim.
+func (b *Builder) PodExternalMultiple(externalClaimName string) *v1.Pod {
+	pod := b.PodExternal(externalClaimName)
 	pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy(), *pod.Spec.Containers[0].DeepCopy())
 	pod.Spec.Containers[1].Name += "-1"
 	pod.Spec.Containers[2].Name += "-2"
@@ -419,7 +410,7 @@ func (b *Builder) DeletePodAndWaitForNotFound(tCtx ktesting.TContext, pod *v1.Po
 func (b *Builder) TestPod(tCtx ktesting.TContext, pod *v1.Pod, env ...string) {
 	tCtx.Helper()
 
-	if !b.driver.WithKubelet {
+	if !b.Driver.WithKubelet {
 		// Less testing when we cannot rely on the kubelet to actually run the pod.
 		err := e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), pod.Namespace, pod.Name)
 		tCtx.ExpectNoError(err, "schedule pod")
@@ -476,7 +467,7 @@ func TestContainerEnv(tCtx ktesting.TContext, pod *v1.Pod, containerName string,
 }
 
 func NewBuilder(f *framework.Framework, driver *Driver) *Builder {
-	b := &Builder{driver: driver}
+	b := &Builder{Driver: driver}
 	ginkgo.BeforeEach(func() {
 		b.setUp(f.TContext(context.Background()))
 	})
@@ -484,7 +475,7 @@ func NewBuilder(f *framework.Framework, driver *Driver) *Builder {
 }
 
 func NewBuilderNow(tCtx ktesting.TContext, driver *Driver) *Builder {
-	b := &Builder{driver: driver}
+	b := &Builder{Driver: driver}
 	b.setUp(tCtx)
 	return b
 }
@@ -493,7 +484,7 @@ func (b *Builder) setUp(tCtx ktesting.TContext) {
 	b.namespace = tCtx.Namespace()
 	b.podCounter = 0
 	b.claimCounter = 0
-	b.Create(tCtx, b.Class(0))
+	b.Create(tCtx, b.Class().DeviceClass)
 	tCtx.CleanupCtx(b.tearDown)
 }
 
@@ -517,7 +508,12 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 			continue
 		}
 		tCtx.Logf("Deleting %T %s", &pod, klog.KObj(&pod))
-		err := tCtx.Client().CoreV1().Pods(b.namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
+		options := metav1.DeleteOptions{}
+		if !b.Driver.WithRealNodes {
+			// Force-delete, no kubelet.
+			options.GracePeriodSeconds = ptr.To(int64(0))
+		}
+		err := tCtx.Client().CoreV1().Pods(b.namespace).Delete(tCtx, pod.Name, options)
 		if !apierrors.IsNotFound(err) {
 			tCtx.ExpectNoError(err, "delete pod")
 		}
@@ -539,7 +535,7 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 		}
 	}
 
-	for host, plugin := range b.driver.Nodes {
+	for host, plugin := range b.Driver.Nodes {
 		tCtx.Logf("Waiting for resources on %s to be unprepared", host)
 		tCtx.Eventually(func(ktesting.TContext) []app.ClaimID { return plugin.GetPreparedResources() }).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
 	}

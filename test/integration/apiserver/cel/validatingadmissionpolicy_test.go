@@ -2230,7 +2230,7 @@ func Test_CostLimitForValidation(t *testing.T) {
 // generate n validation rules with provided expression
 func generateValidationsWithAuthzCheck(num int, exp string) []admissionregistrationv1.Validation {
 	var validations = make([]admissionregistrationv1.Validation, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		validations[i].Expression = exp
 	}
 	return validations
@@ -2609,7 +2609,7 @@ func TestCRDsOnStartup(t *testing.T) {
 	}
 
 	// Create a bunch of fake CRDs to make the initial startup sync take a long time
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		crd := myCRD.DeepCopy()
 		crd.Name = fmt.Sprintf("foos%d.cr.bar.com", i)
 		crd.Spec.Names.Plural = fmt.Sprintf("foos%d", i)
@@ -3219,7 +3219,7 @@ func withBindingExistsLabels(labels []string, policy *admissionregistrationv1.Va
 
 func buildExistsSelector(labels []string) []metav1.LabelSelectorRequirement {
 	matchExprs := make([]metav1.LabelSelectorRequirement, len(labels))
-	for i := 0; i < len(labels); i++ {
+	for i := range labels {
 		matchExprs[i].Key = labels[i]
 		matchExprs[i].Operator = metav1.LabelSelectorOpExists
 	}

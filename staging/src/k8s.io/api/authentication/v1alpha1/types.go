@@ -37,6 +37,7 @@ type SelfSubjectReview struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// status is filled in by the server with the user attributes.
+	// +optional
 	Status SelfSubjectReviewStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 }
 

@@ -164,12 +164,6 @@ func buildDescription(explain ...interface{}) string {
 	return fmt.Sprintf(explain[0].(string), explain[1:]...)
 }
 
-// Deprecated: use tCtx.Eventually instead.
-func Eventually[T any](tCtx TContext, cb func(TContext) T) gomega.AsyncAssertion {
-	tCtx.Helper()
-	return tCtx.Eventually(cb)
-}
-
 // Eventually wraps [gomega.Eventually]. Supported argument types are:
 //   - A function with a `tCtx ktesting.TContext` or `ctx context.Context`
 //     parameter plus additional parameters and arbitrary return values.
@@ -249,12 +243,6 @@ func (tc *TC) Eventually(arg any) gomega.AsyncAssertion {
 func (tc *TC) AssertEventually(arg any) gomega.AsyncAssertion {
 	tc.Helper()
 	return tc.newAsyncAssertion(gomega.NewWithT(assertTestingT{tc}).Eventually, arg)
-}
-
-// Deprecated: use tCtx.Consistently instead.
-func Consistently[T any](tCtx TContext, cb func(TContext) T) gomega.AsyncAssertion {
-	tCtx.Helper()
-	return tCtx.Consistently(cb)
 }
 
 // Consistently wraps [gomega.Consistently] the same way as [Eventually] wraps

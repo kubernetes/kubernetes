@@ -35,7 +35,7 @@ func errSliceEq(a []error, b []error) bool {
 	return true
 }
 
-func TestNodeControllerConcurrentNodeSyncsValidation(t *testing.T) {
+func TestNodeControllerValidation(t *testing.T) {
 	testCases := []struct {
 		desc   string
 		input  *NodeControllerOptions
@@ -45,18 +45,27 @@ func TestNodeControllerConcurrentNodeSyncsValidation(t *testing.T) {
 			desc: "empty options",
 		},
 		{
-			desc:   "negative value",
+			desc:   "concurrent-node-syncs negative value",
 			input:  &NodeControllerOptions{NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: -5}},
 			expect: []error{fmt.Errorf("concurrent-node-syncs must be a positive number")},
 		},
 		{
-			desc:   "zero value",
+			desc:   "concurrent-node-syncs zero value",
 			input:  &NodeControllerOptions{NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 0}},
 			expect: []error{fmt.Errorf("concurrent-node-syncs must be a positive number")},
 		},
 		{
-			desc:  "positive value",
+			desc:  "concurrent-node-syncs positive value, concurrent-node-status-updates default 0",
 			input: &NodeControllerOptions{NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 5}},
+		},
+		{
+			desc:  "concurrent-node-syncs positive value, concurrent-node-status-updates positive value",
+			input: &NodeControllerOptions{NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 5, ConcurrentNodeStatusUpdates: 5}},
+		},
+		{
+			desc:   "concurrent-node-syncs positive value, concurrent-node-status-updates negative value",
+			input:  &NodeControllerOptions{NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 5, ConcurrentNodeStatusUpdates: -1}},
+			expect: []error{fmt.Errorf("concurrent-node-status-updates cannot be a negative number")},
 		},
 	}
 	for _, tc := range testCases {

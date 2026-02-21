@@ -19,7 +19,6 @@ package incubating
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/go-logr/logr"
 
@@ -55,10 +54,11 @@ func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice, node *v1.Node, features Features, allSlices []*resourceapi.ResourceSlice) ([]*Pool, error) {
 	pools := make(map[PoolID][]*draapi.ResourceSlice)
+	var slicesWithBindingConditions []*resourceapi.ResourceSlice
 
-	for _, slice := range slices {
+	for _, slice := range slicesForNode {
 		if !features.PartitionableDevices && (slice.Spec.PerDeviceNodeSelection != nil || len(slice.Spec.SharedCounters) > 0) {
 			continue
 		}
@@ -75,6 +75,14 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
 			}
 			if match {
+				if hasBindingConditions(slice) {
+					// If there is a Device in the ResourceSlice that contains BindingConditions,
+					// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions
+					// because then the allocation is going to prefer the simpler devices without
+					// binding conditions.
+					slicesWithBindingConditions = append(slicesWithBindingConditions, slice)
+					continue
+				}
 				if err := addSlice(pools, slice); err != nil {
 					return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
 				}
@@ -87,6 +95,12 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 						device.String(), slice.Name, err)
 				}
 				if match {
+					if hasBindingConditions(slice) {
+						// If there is a Device in the ResourceSlice that contains BindingConditions,
+						// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions.
+						slicesWithBindingConditions = append(slicesWithBindingConditions, slice)
+						break
+					}
 					if err := addSlice(pools, slice); err != nil {
 						return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
 					}
@@ -106,6 +120,12 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 
 	}
 
+	for _, slice := range slicesWithBindingConditions {
+		if err := addSlice(pools, slice); err != nil {
+			return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
+		}
+	}
+
 	// Find incomplete pools and flatten into a single slice.
 	//
 	// When we get here, we only have slices relevant for the node.
@@ -114,6 +134,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	// if they are not relevant for the node, so we have to be
 	// careful with the "is incomplete" check.
 	result := make([]*Pool, 0, len(pools))
+	var resultWithBindingConditions []*Pool
 	for poolID, slicesForPool := range pools {
 		// If we have all slices, we are done.
 		isComplete := int64(len(slicesForPool)) == slicesForPool[0].Spec.Pool.ResourceSliceCount
@@ -122,6 +143,10 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			if err != nil {
 				return nil, err
 			}
+			if poolHasBindingConditions(*pool) {
+				resultWithBindingConditions = append(resultWithBindingConditions, pool)
+				continue
+			}
 			result = append(result, pool)
 			continue
 		}
@@ -129,7 +154,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		// which were filtered out above because their node selection made them look irrelevant
 		// for the current node. This is necessary for "allocate all" mode (it rejects incomplete
 		// pools).
-		isObsolete, allSlicesForPool := checkSlicesInPool(slices, poolID, slicesForPool[0].Spec.Pool.Generation)
+		isObsolete, allSlicesForPool := checkSlicesInPool(allSlices, poolID, slicesForPool[0].Spec.Pool.Generation)
 		if isObsolete {
 			// A more thorough check determined that the DRA driver is in the process
 			// of replacing the current generation. The newer one didn't have any slice
@@ -159,7 +184,15 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		if err != nil {
 			return nil, err
 		}
+		// if pool has binding conditions, add the pool to the end of the result
+		if poolHasBindingConditions(*pool) {
+			resultWithBindingConditions = append(resultWithBindingConditions, pool)
+			continue
+		}
 		result = append(result, pool)
+	}
+	if len(resultWithBindingConditions) != 0 {
+		result = append(result, resultWithBindingConditions...)
 	}
 
 	return result, nil
@@ -344,6 +377,26 @@ func validateDeviceCounterConsumption(counterSets map[draapi.UniqueString]*draap
 	return nil
 }
 
+func hasBindingConditions(slice *resourceapi.ResourceSlice) bool {
+	for _, device := range slice.Spec.Devices {
+		if device.BindingConditions != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func poolHasBindingConditions(pool Pool) bool {
+	for _, slice := range pool.DeviceSlicesTargetingNode {
+		for _, device := range slice.Spec.Devices {
+			if device.BindingConditions != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // checkSlicesInPool is an expensive check of all slices in the pool.
 // The generation is what the caller wants to move ahead with.
 //
@@ -470,50 +523,4 @@ func (p *poolsLogger) addDevicesInSlices(devices []string, poolID PoolID, slices
 		}
 	}
 	return devices
-}
-
-// logPools returns a handle for the value in a structured log call which
-// includes varying amounts of information about the allocated devices, depending on
-// the verbosity of the logger.
-func logAllocatedDevices(logger klog.Logger, allocatedDevices sets.Set[DeviceID]) any {
-	// We need to check verbosity here because our caller's source code
-	// location may be relevant (-vmodule !).
-	helper, logger := logger.WithCallStackHelper()
-	helper()
-
-	// We always produce the same output at V <= 5. 6 adds all IDs.
-	verbosity := 5
-	for i := 7; i > verbosity; i-- {
-		if loggerV := logger.V(i); loggerV.Enabled() {
-			verbosity = i
-			break
-		}
-	}
-
-	return &allocatedDevicesLogger{verbosity, allocatedDevices}
-}
-
-type allocatedDevicesLogger struct {
-	verbosity int
-	devices   sets.Set[DeviceID]
-}
-
-var _ logr.Marshaler = &allocatedDevicesLogger{}
-
-func (a *allocatedDevicesLogger) MarshalLog() any {
-	info := map[string]any{"count": len(a.devices)}
-	if a.verbosity >= 6 {
-		ids := make([]string, 0, len(a.devices))
-		for id := range a.devices {
-			if a.verbosity == 6 && len(ids) >= maxDevicesLevel6 {
-				ids = append(ids, "...")
-				break
-			}
-			ids = append(ids, id.String())
-		}
-		slices.Sort(ids)
-		info["devices"] = ids
-
-	}
-	return info
 }

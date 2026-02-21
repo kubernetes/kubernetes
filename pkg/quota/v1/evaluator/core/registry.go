@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -42,15 +43,24 @@ var legacyObjectCountAliases = map[schema.GroupVersionResource]corev1.ResourceNa
 }
 
 // NewEvaluators returns the list of static evaluators that manage more than counts
-func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) ([]quota.Evaluator, error) {
-	// these evaluators have special logic
-	result := []quota.Evaluator{
-		NewPodEvaluator(f, clock.RealClock{}),
-		NewServiceEvaluator(f),
-		NewPersistentVolumeClaimEvaluator(f),
+func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFactory, isEnabled func(schema.GroupVersionResource) bool) ([]quota.Evaluator, error) {
+	if isEnabled == nil {
+		isEnabled = func(schema.GroupVersionResource) bool { return true }
 	}
-	var claimGetter resourceClaimPodOwnerGetter
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+
+	// these evaluators have special logic
+	result := []quota.Evaluator{}
+	if isEnabled(corev1.SchemeGroupVersion.WithResource("pods")) {
+		result = append(result, NewPodEvaluator(f, clock.RealClock{}))
+	}
+	if isEnabled(corev1.SchemeGroupVersion.WithResource("services")) {
+		result = append(result, NewServiceEvaluator(f))
+	}
+	if isEnabled(corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims")) {
+		result = append(result, NewPersistentVolumeClaimEvaluator(f))
+	}
+	if isEnabled(resourcev1.SchemeGroupVersion.WithResource("resourceclaims")) && utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		var claimGetter resourceClaimPodOwnerGetter
 		var podLister corev1listers.PodLister
 		var deviceClassMapping *extendedresourcecache.ExtendedResourceCache
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {

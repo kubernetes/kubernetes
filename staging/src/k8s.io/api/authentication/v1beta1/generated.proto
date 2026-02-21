@@ -48,6 +48,7 @@ message SelfSubjectReview {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // status is filled in by the server with the user attributes.
+  // +optional
   optional SelfSubjectReviewStatus status = 2;
 }
 
@@ -68,6 +69,7 @@ message TokenReview {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec holds information about the request being evaluated
+  // +required
   optional TokenReviewSpec spec = 2;
 
   // status is filled in by the server and indicates whether the token can be authenticated.
@@ -78,7 +80,7 @@ message TokenReview {
 // TokenReviewSpec is a description of the token authentication request.
 message TokenReviewSpec {
   // token is the opaque bearer token.
-  // +optional
+  // +required
   optional string token = 1;
 
   // audiences is a list of the identifiers that the resource server presented

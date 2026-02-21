@@ -91,16 +91,16 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 	})
 
 	// These tests take ~20 minutes each.
-	f.Describe("ReplicationController", func() {
+	f.Describe("ReplicaSet", func() {
 		ginkgo.It(titleUp+" and verify decision stability", func(ctx context.Context) {
-			scaleUp(ctx, "rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
+			scaleUp(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, true, f)
 		})
 		ginkgo.It(titleDown+" and verify decision stability", func(ctx context.Context) {
-			scaleDown(ctx, "rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
+			scaleDown(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, true, f)
 		})
 	})
 
-	f.Describe("ReplicationController light", func() {
+	f.Describe("ReplicaSet light", func() {
 		ginkgo.It("Should scale from 1 pod to 2 pods", func(ctx context.Context) {
 			st := &HPAScaleTest{
 				initPods:         1,
@@ -113,7 +113,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 				resourceType:     cpuResource,
 				metricTargetType: utilizationMetricType,
 			}
-			st.run(ctx, "rc-light", e2eautoscaling.KindRC, f)
+			st.run(ctx, "rs-light", e2eautoscaling.KindReplicaSet, f)
 		})
 		f.It("Should scale from 2 pods to 1 pod", func(ctx context.Context) {
 			st := &HPAScaleTest{
@@ -127,7 +127,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 				resourceType:     cpuResource,
 				metricTargetType: utilizationMetricType,
 			}
-			st.run(ctx, "rc-light", e2eautoscaling.KindRC, f)
+			st.run(ctx, "rs-light", e2eautoscaling.KindReplicaSet, f)
 		})
 	})
 

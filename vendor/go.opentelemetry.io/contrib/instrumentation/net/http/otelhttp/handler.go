@@ -219,21 +219,3 @@ func (h *middleware) metricAttributesFromRequest(r *http.Request) []attribute.Ke
 	}
 	return attributeForRequest
 }
-
-// WithRouteTag annotates spans and metrics with the provided route name
-// with HTTP route attribute.
-//
-// Deprecated: spans are automatically annotated with the route attribute.
-// To annotate metrics, use the [WithMetricAttributesFn] option.
-func WithRouteTag(route string, h http.Handler) http.Handler {
-	attr := semconv.NewHTTPServer(nil).Route(route)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		span := trace.SpanFromContext(r.Context())
-		span.SetAttributes(attr)
-
-		labeler, _ := LabelerFromContext(r.Context())
-		labeler.Add(attr)
-
-		h.ServeHTTP(w, r)
-	})
-}

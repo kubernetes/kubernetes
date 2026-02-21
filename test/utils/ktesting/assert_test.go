@@ -29,7 +29,7 @@ func TestAssert(t *testing.T) {
 	for name, tc := range map[string]testcase{
 		"eventually-timeout": {
 			cb: func(tCtx TContext) {
-				Eventually(tCtx, func(tCtx TContext) int {
+				tCtx.Eventually(func(tCtx TContext) int {
 					// Canceling here is a nop.
 					tCtx.Cancel("testing")
 					return 0
@@ -46,7 +46,7 @@ func TestAssert(t *testing.T) {
 		},
 		"eventually-final": {
 			cb: func(tCtx TContext) {
-				Eventually(tCtx, func(tCtx TContext) float64 {
+				tCtx.Eventually(func(tCtx TContext) float64 {
 					gomega.StopTrying("final error").Now()
 					return 0
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
@@ -59,7 +59,7 @@ func TestAssert(t *testing.T) {
 		},
 		"eventually-error": {
 			cb: func(tCtx TContext) {
-				Eventually(tCtx, func(tCtx TContext) float64 {
+				tCtx.Eventually(func(tCtx TContext) float64 {
 					tCtx.Fatal("some error")
 					return 0
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
@@ -151,7 +151,7 @@ func TestAssert(t *testing.T) {
 		},
 		"eventually-success": {
 			cb: func(tCtx TContext) {
-				Eventually(tCtx, func(tCtx TContext) float64 {
+				tCtx.Eventually(func(tCtx TContext) float64 {
 					return 1.0
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
@@ -160,7 +160,7 @@ func TestAssert(t *testing.T) {
 		},
 		"eventually-retry": {
 			cb: func(tCtx TContext) {
-				Eventually(tCtx, func(tCtx TContext) float64 {
+				tCtx.Eventually(func(tCtx TContext) float64 {
 					gomega.TryAgainAfter(time.Millisecond).Now()
 					return 0
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
@@ -173,7 +173,7 @@ func TestAssert(t *testing.T) {
 		},
 		"consistently-timeout": {
 			cb: func(tCtx TContext) {
-				Consistently(tCtx, func(tCtx TContext) float64 {
+				tCtx.Consistently(func(tCtx TContext) float64 {
 					// Canceling here is a nop.
 					tCtx.Cancel("testing")
 					return 0
@@ -190,7 +190,7 @@ func TestAssert(t *testing.T) {
 		},
 		"consistently-final": {
 			cb: func(tCtx TContext) {
-				Consistently(tCtx, func(tCtx TContext) float64 {
+				tCtx.Consistently(func(tCtx TContext) float64 {
 					gomega.StopTrying("final error").Now()
 					tCtx.FailNow()
 					return 0
@@ -204,7 +204,7 @@ func TestAssert(t *testing.T) {
 		},
 		"consistently-error": {
 			cb: func(tCtx TContext) {
-				Consistently(tCtx, func(tCtx TContext) float64 {
+				tCtx.Consistently(func(tCtx TContext) float64 {
 					tCtx.Fatal("some error")
 					return 0
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
@@ -237,7 +237,7 @@ func TestAssert(t *testing.T) {
 		},
 		"consistently-success": {
 			cb: func(tCtx TContext) {
-				Consistently(tCtx, func(tCtx TContext) float64 {
+				tCtx.Consistently(func(tCtx TContext) float64 {
 					return 1.0
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))
 			},
@@ -246,7 +246,7 @@ func TestAssert(t *testing.T) {
 		},
 		"consistently-retry": {
 			cb: func(tCtx TContext) {
-				Consistently(tCtx, func(tCtx TContext) float64 {
+				tCtx.Consistently(func(tCtx TContext) float64 {
 					gomega.TryAgainAfter(time.Millisecond).Wrap(errors.New("intermittent error")).Now()
 					return 0
 				}).WithTimeout(time.Second).Should(gomega.Equal(1.0))

@@ -642,6 +642,13 @@ func (m *PodCertificateRequestSpec) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	_ = i
 	var l int
 	_ = l
+	if m.StubPKCS10Request != nil {
+		i -= len(m.StubPKCS10Request)
+		copy(dAtA[i:], m.StubPKCS10Request)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(m.StubPKCS10Request)))
+		i--
+		dAtA[i] = 0x62
+	}
 	if len(m.UnverifiedUserAnnotations) > 0 {
 		keysForUnverifiedUserAnnotations := make([]string, 0, len(m.UnverifiedUserAnnotations))
 		for k := range m.UnverifiedUserAnnotations {
@@ -1058,6 +1065,10 @@ func (m *PodCertificateRequestSpec) Size() (n int) {
 			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
 		}
 	}
+	if m.StubPKCS10Request != nil {
+		l = len(m.StubPKCS10Request)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1274,6 +1285,7 @@ func (this *PodCertificateRequestSpec) String() string {
 		`PKIXPublicKey:` + valueToStringGenerated(this.PKIXPublicKey) + `,`,
 		`ProofOfPossession:` + valueToStringGenerated(this.ProofOfPossession) + `,`,
 		`UnverifiedUserAnnotations:` + mapStringForUnverifiedUserAnnotations + `,`,
+		`StubPKCS10Request:` + valueToStringGenerated(this.StubPKCS10Request) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3489,6 +3501,40 @@ func (m *PodCertificateRequestSpec) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.UnverifiedUserAnnotations[mapkey] = mapvalue
+			iNdEx = postIndex
+		case 12:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StubPKCS10Request", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.StubPKCS10Request = append(m.StubPKCS10Request[:0], dAtA[iNdEx:postIndex]...)
+			if m.StubPKCS10Request == nil {
+				m.StubPKCS10Request = []byte{}
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

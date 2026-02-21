@@ -19,6 +19,7 @@ package clusterrole
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -42,6 +43,21 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		input        rbac.ClusterRole
 		expectedErrs field.ErrorList
 	}{
+		"valid": {
+			input: mkValidClusterRole(),
+		},
+		"invalid ClusterRole missing verbs": {
+			input: mkValidClusterRole(tweakVerbs(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
+			},
+		},
+		"invalid ClusterRole empty verbs": {
+			input: mkValidClusterRole(tweakVerbs([]string{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
@@ -67,11 +83,50 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		update       rbac.ClusterRole
 		expectedErrs field.ErrorList
 	}{
+		"valid update": {
+			old:    mkValidClusterRole(),
+			update: mkValidClusterRole(),
+		},
+		"invalid update clearing verbs": {
+			old:    mkValidClusterRole(),
+			update: mkValidClusterRole(tweakVerbs([]string{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), ""),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
+	}
+}
+
+func mkValidClusterRole(tweaks ...func(*rbac.ClusterRole)) rbac.ClusterRole {
+	cr := rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "valid-cluster-role",
+		},
+		Rules: []rbac.PolicyRule{{
+			APIGroups: []string{"rbac.authorization.k8s.io"},
+			Resources: []string{"pods"},
+			Verbs:     []string{"get", "list"},
+		}},
+	}
+
+	for _, tweak := range tweaks {
+		tweak(&cr)
+	}
+	return cr
+}
+
+func tweakVerbs(verbs []string) func(*rbac.ClusterRole) {
+	return func(cr *rbac.ClusterRole) {
+		if len(cr.Rules) > 0 {
+			cr.Rules[0].Verbs = verbs
+		}
 	}
 }

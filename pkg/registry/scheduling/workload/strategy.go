@@ -47,7 +47,7 @@ func (workloadStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object
 func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	workloadScheduling := obj.(*scheduling.Workload)
 	allErrs := validation.ValidateWorkload(workloadScheduling)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create, rest.WithDeclarativeEnforcement())
 }
 
 func (workloadStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -64,7 +64,7 @@ func (workloadStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 
 func (workloadStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	allErrs := validation.ValidateWorkloadUpdate(obj.(*scheduling.Workload), old.(*scheduling.Workload))
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update, rest.WithDeclarativeEnforcement())
 }
 
 func (workloadStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {

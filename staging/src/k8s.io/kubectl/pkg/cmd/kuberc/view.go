@@ -38,13 +38,13 @@ var (
 
 	viewExample = templates.Examples(i18n.T(`
 		# View kuberc configuration in YAML format (default)
-		kubectl alpha kuberc view
+		kubectl kuberc view
 
 		# View kuberc configuration in JSON format
-		kubectl alpha kuberc view --output json
+		kubectl kuberc view --output json
 
 		# View a specific kuberc file
-		kubectl alpha kuberc view --kuberc /path/to/kuberc`))
+		kubectl kuberc view --kuberc /path/to/kuberc`))
 )
 
 // ViewOptions contains the options for viewing kuberc configuration

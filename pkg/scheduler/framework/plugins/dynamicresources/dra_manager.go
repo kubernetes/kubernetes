@@ -20,7 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
+
+	"github.com/go-logr/logr"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,6 +35,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -183,6 +187,8 @@ func (c *claimTracker) ClaimHasPendingAllocation(claimUID types.UID) bool {
 
 func (c *claimTracker) SignalClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
 	c.inFlightAllocations.Store(claimUID, allocatedClaim)
+	// This is the same verbosity as the corresponding log in the assume cache.
+	c.logger.V(5).Info("Added in-flight claim", "claim", klog.KObj(allocatedClaim), "uid", claimUID, "version", allocatedClaim.ResourceVersion)
 	// There's no reason to return an error in this implementation, but the error is helpful for other implementations.
 	// For example, implementations that have to deal with fake claims might want to return an error if the allocation
 	// is for an invalid claim.
@@ -190,7 +196,14 @@ func (c *claimTracker) SignalClaimPendingAllocation(claimUID types.UID, allocate
 }
 
 func (c *claimTracker) RemoveClaimPendingAllocation(claimUID types.UID) (deleted bool) {
-	_, found := c.inFlightAllocations.LoadAndDelete(claimUID)
+	claim, found := c.inFlightAllocations.LoadAndDelete(claimUID)
+	// The assume cache doesn't log this, but maybe it should.
+	if found {
+		claim := claim.(*resourceapi.ResourceClaim)
+		c.logger.V(5).Info("Removed in-flight claim", "claim", klog.KObj(claim), "uid", claimUID, "version", claim.ResourceVersion)
+	} else {
+		c.logger.V(5).Info("Redundant remove of in-flight claim, not found", "uid", claimUID)
+	}
 	return found
 }
 
@@ -238,7 +251,12 @@ func (c *claimTracker) List() ([]*resourceapi.ResourceClaim, error) {
 // so we don't need to re-check the in-flight claims.
 var errClaimTrackerConcurrentModification = errors.New("conflicting concurrent modification")
 
-func (c *claimTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
+func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID], err error) {
+	c.logger.V(6).Info("Starting ListAllAllocatedDevices")
+	defer func() {
+		c.logger.V(6).Info("Finished ListAllAllocatedDevices", "allocatedDevices", logAllocatedDevices(c.logger, a), "err", err)
+	}()
+
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
 	allocated, revision := c.allocatedDevices.Get()
@@ -261,32 +279,75 @@ func (c *claimTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID],
 	return nil, errClaimTrackerConcurrentModification
 }
 
-func (c *claimTracker) GatherAllocatedState() (*structured.AllocatedState, error) {
+// GatherAllocatedState collects and returns the current allocation state of all devices
+// across the cluster. This includes:
+// - AllocatedDevices: Set of device IDs that are fully allocated (dedicated mode)
+// - AllocatedSharedDeviceIDs: Set of shared device IDs when consumable capacity is enabled
+// - AggregatedCapacity: Consumed capacity across all devices when consumable capacity is enabled
+//
+// The function handles two allocation models:
+//  1. Legacy dedicated mode (DRAConsumableCapacity disabled): Devices are allocated exclusively
+//     to a single claim. Shared devices are converted to their base device IDs.
+//  2. Consumable capacity mode (DRAConsumableCapacity enabled): Devices can be shared across
+//     multiple claims with capacity tracking.
+//
+// The function ensures consistency by:
+// - Reading allocation state from informer-backed cache
+// - Including in-flight allocations that haven't been persisted yet
+// - Using revision numbers to detect concurrent modifications and retry if needed
+//
+// Returns errClaimTrackerConcurrentModification if the state changed during collection,
+// indicating the caller should retry.
+func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err error) {
+	c.logger.V(6).Info("Starting GatherAllocatedState")
+	defer func() {
+		var a sets.Set[structured.DeviceID]
+		if s != nil {
+			a = s.AllocatedDevices
+		}
+		c.logger.V(6).Info("Finished GatherAllocatedState", "allocatedDevices", logAllocatedDevices(c.logger, a), "err", err)
+	}()
+
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
-	allocated, revision1 := c.allocatedDevices.Get()
-	allocatedSharedDeviceIDs := sets.New[structured.SharedDeviceID]()
-	aggregatedCapacity, revision2 := c.allocatedDevices.Capacities()
+	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
 
-	if revision1 != revision2 {
+	allocated, revision1 := c.allocatedDevices.Get()
+	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.GetSharedDeviceIDs()
+	aggregatedCapacity, revision3 := c.allocatedDevices.Capacities()
+
+	if revision1 != revision2 || revision2 != revision3 {
 		// Already not consistent. Try again.
 		return nil, errClaimTrackerConcurrentModification
 	}
 
-	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
+	if !enabledConsumableCapacity {
+		// When the DRAConsumableCapacity feature is disabled, we fall back to the legacy
+		// dedicated device allocation model.
+		// This ensures backward compatibility with the original DRA behavior where devices
+		// could only be allocated exclusively to a single claim.
+		for sharedDeviceID := range allocatedSharedDeviceIDs {
+			allocated.Insert(sharedDeviceID.GetDeviceID())
+		}
+		// Reset allocatedSharedDeviceIDs and aggregatedCapacity
+		allocatedSharedDeviceIDs = sets.New[structured.SharedDeviceID]()
+		aggregatedCapacity = make(schedulerapi.ConsumedCapacityCollection)
+	}
 
 	// Whatever is in flight also has to be checked.
 	c.inFlightAllocations.Range(func(key, value any) bool {
 		claim := value.(*resourceapi.ResourceClaim)
-		foreachAllocatedDevice(claim, func(deviceID structured.DeviceID) {
-			c.logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
-			allocated.Insert(deviceID)
-		},
+		foreachAllocatedDevice(claim,
+			func(deviceID structured.DeviceID) { // dedicatedDeviceCallback
+				c.logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
+				allocated.Insert(deviceID)
+			},
 			enabledConsumableCapacity,
-			func(sharedDeviceID structured.SharedDeviceID) {
+			func(sharedDeviceID structured.SharedDeviceID) { // sharedDeviceCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "shared device", sharedDeviceID, "claim", klog.KObj(claim))
 				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
-			}, func(capacity structured.DeviceConsumedCapacity) {
+			},
+			func(capacity structured.DeviceConsumedCapacity) { // consumedCapacityCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "consumed capacity", capacity, "claim", klog.KObj(claim))
 				aggregatedCapacity.Insert(capacity)
 			})
@@ -311,4 +372,65 @@ func (c *claimTracker) AssumeClaimAfterAPICall(claim *resourceapi.ResourceClaim)
 
 func (c *claimTracker) AssumedClaimRestore(namespace, claimName string) {
 	c.cache.Restore(namespace + "/" + claimName)
+}
+
+// At V(6), log only a limited number of devices to avoid blowing up logs. For
+// many E2E tests, 10 devices is enough for all devices without having to
+// truncate, at least when running the tests sequentially.
+const maxDevicesLevel6 = 10
+
+// logAllocatedDevices returns a handle for the value in a structured log call which
+// includes varying amounts of information about the allocated devices, depending on
+// the verbosity of the logger.
+func logAllocatedDevices(logger klog.Logger, allocatedDevices sets.Set[structured.DeviceID]) any {
+	// We need to check verbosity here because our caller's source code
+	// location may be relevant (-vmodule !).
+	helper, logger := logger.WithCallStackHelper()
+	helper()
+
+	// We always produce the same output at V <= 5. 6 adds all IDs.
+	verbosity := 5
+	for i := 7; i > verbosity; i-- {
+		if loggerV := logger.V(i); loggerV.Enabled() {
+			verbosity = i
+			break
+		}
+	}
+
+	return &allocatedDevicesLogger{verbosity, allocatedDevices}
+}
+
+type allocatedDevicesLogger struct {
+	verbosity int
+	devices   sets.Set[structured.DeviceID]
+}
+
+var _ logr.Marshaler = &allocatedDevicesLogger{}
+
+func (a *allocatedDevicesLogger) MarshalLog() any {
+	if a.verbosity < 6 {
+		return nil
+	}
+
+	info := struct {
+		Count   int      `json:"count"`
+		Devices []string `json:"devices"`
+	}{
+		Count: len(a.devices),
+	}
+	ids := make([]string, 0, len(a.devices))
+	for id := range a.devices {
+		ids = append(ids, id.String())
+	}
+	slices.Sort(ids)
+	if a.verbosity == 6 && len(ids) > maxDevicesLevel6 {
+		truncated := make([]string, 0, maxDevicesLevel6+1)
+		truncated = append(truncated, ids[:maxDevicesLevel6/2]...)
+		truncated = append(truncated, "...")
+		truncated = append(truncated, ids[len(ids)-maxDevicesLevel6/2:]...)
+		ids = truncated
+	}
+	info.Devices = ids
+
+	return info
 }

@@ -29,8 +29,26 @@ kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     "${SCRIPT_ROOT}/pkg/apis"
 
+if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
+    report_filename="${API_KNOWN_VIOLATIONS_DIR}/sample_controller_violation_exceptions.list"
+    if [[ "${UPDATE_API_KNOWN_VIOLATIONS:-}" == "true" ]]; then
+        update_report="--update-report"
+    fi
+fi
+
+kube::codegen::gen_openapi \
+    --output-dir "${SCRIPT_ROOT}/pkg/generated/openapi" \
+    --output-pkg "k8s.io/${THIS_PKG}/pkg/generated/openapi" \
+    --report-filename "${report_filename:-"/dev/null"}" \
+    --output-model-name-file "zz_generated.model_name.go" \
+    ${update_report:+"${update_report}"} \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
+
 kube::codegen::gen_client \
     --with-watch \
+    --with-applyconfig \
+    --applyconfig-openapi-schema <(go run k8s.io/sample-controller/pkg/generated/openapi/cmd/models-schema) \
     --output-dir "${SCRIPT_ROOT}/pkg/generated" \
     --output-pkg "${THIS_PKG}/pkg/generated" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \

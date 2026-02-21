@@ -48,14 +48,14 @@ type prober struct {
 	grpc   grpcprobe.Prober
 	runner kubecontainer.CommandRunner
 
-	recorder record.EventRecorder
+	recorder record.EventRecorderLogger
 }
 
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
 func newProber(
 	runner kubecontainer.CommandRunner,
-	recorder record.EventRecorder) *prober {
+	recorder record.EventRecorderLogger) *prober {
 
 	const followNonLocalRedirects = false
 	return &prober{
@@ -76,7 +76,7 @@ func (pb *prober) recordContainerEvent(ctx context.Context, pod *v1.Pod, contain
 		logger.Error(err, "Can't make a ref to pod and container", "pod", klog.KObj(pod), "containerName", container.Name)
 		return
 	}
-	pb.recorder.Eventf(ref, eventType, reason, message, args...)
+	pb.recorder.WithLogger(logger).Eventf(ref, eventType, reason, message, args...)
 }
 
 // probe probes the container.

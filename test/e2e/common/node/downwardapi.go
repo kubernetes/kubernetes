@@ -163,7 +163,7 @@ var _ = SIGDescribe("Downward API", func() {
 		}
 
 		expectations := []string{
-			fmt.Sprintf("OK"),
+			"OK",
 		}
 
 		pod := &v1.Pod{

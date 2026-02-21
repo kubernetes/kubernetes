@@ -40,11 +40,11 @@ type ErrorMatcher struct {
 	matchField bool
 	// TODO(thockin): consider whether value could be assumed - if the
 	// "want" error has a nil value, don't match on value.
-	matchValue               bool
-	matchOrigin              bool
-	matchDetail              func(want, got string) bool
-	requireOriginWhenInvalid bool
-	matchDeclarativeNative   bool
+	matchValue                    bool
+	matchOrigin                   bool
+	matchDetail                   func(want, got string) bool
+	requireOriginWhenInvalid      bool
+	matchValidationStabilityLevel bool
 	// normalizationRules holds the pre-compiled regex patterns for path normalization.
 	normalizationRules []NormalizationRule
 }
@@ -87,7 +87,7 @@ func (m ErrorMatcher) Matches(want, got *Error) bool {
 	if m.matchDetail != nil && !m.matchDetail(want.Detail, got.Detail) {
 		return false
 	}
-	if m.matchDeclarativeNative && want.DeclarativeNative != got.DeclarativeNative {
+	if m.matchValidationStabilityLevel && want.ValidationStabilityLevel != got.ValidationStabilityLevel {
 		return false
 	}
 
@@ -153,9 +153,9 @@ func (m ErrorMatcher) Render(e *Error) string {
 		comma()
 		buf.WriteString(fmt.Sprintf("Detail=%q", e.Detail))
 	}
-	if m.matchDeclarativeNative {
+	if m.matchValidationStabilityLevel {
 		comma()
-		buf.WriteString(fmt.Sprintf("DeclarativeNative=%t", e.DeclarativeNative))
+		buf.WriteString(fmt.Sprintf("ValidationStabilityLevel=%s", e.ValidationStabilityLevel))
 	}
 	return "{" + buf.String() + "}"
 }
@@ -233,10 +233,10 @@ func (m ErrorMatcher) RequireOriginWhenInvalid() ErrorMatcher {
 	return m
 }
 
-// ByDeclarativeNative returns a derived ErrorMatcher which also matches by the DeclarativeNative
+// ByValidationStabilityLevel returns a derived ErrorMatcher which also matches by the validation stability level
 // value of field errors.
-func (m ErrorMatcher) ByDeclarativeNative() ErrorMatcher {
-	m.matchDeclarativeNative = true
+func (m ErrorMatcher) ByValidationStabilityLevel() ErrorMatcher {
+	m.matchValidationStabilityLevel = true
 	return m
 }
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
 
 // ParseFullMethod returns a span name following the OpenTelemetry semantic
@@ -23,19 +23,5 @@ func ParseFullMethod(fullMethod string) (string, []attribute.KeyValue) {
 		return fullMethod, nil
 	}
 	name := fullMethod[1:]
-	pos := strings.LastIndex(name, "/")
-	if pos < 0 {
-		// Invalid format, does not follow `/package.service/method`.
-		return name, nil
-	}
-	service, method := name[:pos], name[pos+1:]
-
-	var attrs []attribute.KeyValue
-	if service != "" {
-		attrs = append(attrs, semconv.RPCService(service))
-	}
-	if method != "" {
-		attrs = append(attrs, semconv.RPCMethod(method))
-	}
-	return name, attrs
+	return name, []attribute.KeyValue{semconv.RPCMethod(name)}
 }

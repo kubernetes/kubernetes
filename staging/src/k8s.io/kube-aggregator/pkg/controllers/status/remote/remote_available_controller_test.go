@@ -29,7 +29,6 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apiserver/pkg/util/proxy"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	discoveryv1listers "k8s.io/client-go/listers/discovery/v1"
@@ -41,6 +40,7 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
+	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
 
@@ -173,12 +173,12 @@ func BenchmarkBuildCache(b *testing.B) {
 	apiServiceName := "remote.group"
 	// model 1 APIService pointing at a given service, and 30 pointing at local group/versions
 	apiServices := []runtime.Object{newRemoteAPIService(apiServiceName)}
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		apiServices = append(apiServices, newLocalAPIService(fmt.Sprintf("local.group%d", i)))
 	}
 	// model one service backing an API service, and 100 unrelated services
 	services := []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)}
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		services = append(services, newService("foo", fmt.Sprintf("bar%d", i), testServicePort, testServicePortName))
 	}
 	c, _ := setupAPIServices(b, apiServices)

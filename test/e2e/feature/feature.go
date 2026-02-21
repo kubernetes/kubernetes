@@ -99,9 +99,6 @@ var (
 	// Testing critical pod admission
 	CriticalPod = framework.WithFeature(framework.ValidFeatures.Add("CriticalPod"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	CustomMetricsAutoscaling = framework.WithFeature(framework.ValidFeatures.Add("CustomMetricsAutoscaling"))
-
 	// OWNER: sig-node
 	// Testing device managers
 	DeviceManager = framework.WithFeature(framework.ValidFeatures.Add("DeviceManager"))
@@ -406,6 +403,15 @@ var (
 	// Marks tests of KEP-1880 that require the `MultiCIDRServiceAllocator` feature gate
 	// and the networking.k8s.io/v1alpha1 API.
 	ServiceCIDRs = framework.WithFeature(framework.ValidFeatures.Add("ServiceCIDRs"))
+
+	// Owner: sig-storage
+	// KEP: https://kep.k8s.io/3314
+	// Tests marked with this feature require:
+	// - A CSI driver that supports the snapshot metadata service (e.g., CSI hostpath driver with --enable-snapshot-metadata)
+	// - The external-snapshot-metadata sidecar deployed alongside the CSI driver
+	// - The SnapshotMetadataService CRD (cbt.storage.k8s.io/v1alpha1) installed
+	// - A storage driver that implements the CapSnapshotMetadata capability
+	SnapshotMetadata = framework.WithFeature(framework.ValidFeatures.Add("SnapshotMetadata"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StackdriverAcceleratorMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverAcceleratorMonitoring"))

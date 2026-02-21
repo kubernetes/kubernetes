@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"sort"
 	"time"
 
@@ -44,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 const (
@@ -58,6 +58,7 @@ type frameworkImpl struct {
 	registry             Registry
 	snapshotSharedLister fwk.SharedLister
 	waitingPods          *waitingPodsMap
+	podsInPreBind        *podsInPreBindMap
 	scorePluginWeight    map[string]int
 	preEnqueuePlugins    []fwk.PreEnqueuePlugin
 	enqueueExtensions    []fwk.EnqueueExtensions
@@ -153,6 +154,7 @@ type frameworkOptions struct {
 	captureProfile         CaptureProfile
 	parallelizer           parallelize.Parallelizer
 	waitingPods            *waitingPodsMap
+	podsInPreBind          *podsInPreBindMap
 	apiDispatcher          *apidispatcher.APIDispatcher
 	workloadManager        fwk.WorkloadManager
 	logger                 *klog.Logger
@@ -285,6 +287,13 @@ func WithWaitingPods(wp *waitingPodsMap) Option {
 	}
 }
 
+// WithPodsInPreBind sets podsInPreBind for the scheduling frameworkImpl.
+func WithPodsInPreBind(bp *podsInPreBindMap) Option {
+	return func(o *frameworkOptions) {
+		o.podsInPreBind = bp
+	}
+}
+
 // WithLogger overrides the default logger from k8s.io/klog.
 func WithLogger(logger klog.Logger) Option {
 	return func(o *frameworkOptions) {
@@ -323,6 +332,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		sharedCSIManager:     options.sharedCSIManager,
 		scorePluginWeight:    make(map[string]int),
 		waitingPods:          options.waitingPods,
+		podsInPreBind:        options.podsInPreBind,
 		clientSet:            options.clientSet,
 		kubeConfig:           options.kubeConfig,
 		eventRecorder:        options.eventRecorder,
@@ -654,7 +664,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *con
 		// - part 3: other plugins (excluded by part 1 & 2) in regular extension point.
 		newPlugins := reflect.New(reflect.TypeOf(e.slicePtr).Elem()).Elem()
 		// part 1
-		for _, name := range slice.CopyStrings(enabledSet.list) {
+		for _, name := range slices.Clone(enabledSet.list) {
 			if overridePlugins.has(name) {
 				newPlugins = reflect.Append(newPlugins, reflect.ValueOf(f.pluginsMap[name]))
 				enabledSet.delete(name)
@@ -1456,6 +1466,10 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 				return plStatus
 			}
 			err := plStatus.AsError()
+			if errors.Is(err, context.Canceled) {
+				err = context.Cause(ctx)
+			}
+
 			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
 			return fwk.AsStatus(fmt.Errorf("running PreBind plugin %q: %w", pl.Name(), err))
 		}
@@ -1752,12 +1766,38 @@ func (f *frameworkImpl) runReservePluginUnreserve(ctx context.Context, pl fwk.Re
 // to a map of currently waiting pods and return status with "Wait" code.
 // Pod will remain waiting pod for the minimum duration returned by the permit plugins.
 func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
+	return f.runPermitPlugins(ctx, state, pod, nodeName, func(pluginsWaitTime map[string]time.Duration, status *fwk.Status) *fwk.Status {
+		waitingPod := newWaitingPod(pod, pluginsWaitTime)
+		f.waitingPods.add(waitingPod)
+		msg := fmt.Sprintf("one or more plugins asked to wait and no plugin rejected pod %q", pod.Name)
+		return fwk.NewStatus(fwk.Wait, msg)
+	})
+}
+
+// RunPermitPluginsWithoutWaiting runs the set of configured permit plugins. If any of these
+// plugins returns a status other than "Success" or "Wait", it does not continue
+// running the remaining plugins and returns an error. If any of the
+// plugins returns "Wait", this function will NOT create a waiting pod object,
+// but just return status with "Wait" code. It's caller's responsibility to act on that code.
+func (f *frameworkImpl) RunPermitPluginsWithoutWaiting(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
+	return f.runPermitPlugins(ctx, state, pod, nodeName, func(_ map[string]time.Duration, status *fwk.Status) *fwk.Status {
+		// Return the wait status without overwriting the message and creating a waitingPod.
+		return status
+	})
+}
+
+// runPermitPlugin runs the set of configured permit plugins. If any of these
+// plugins returns a status other than "Success" or "Wait", it does not continue
+// running the remaining plugins and returns an error.
+// This is a helper function that takes an onWait callback to act on when the pod has to wait.
+// RunPermitPlugins or RunPermitPluginsWithoutWaiting should be used to run the permit plugins.
+func (f *frameworkImpl) runPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string, onWait func(pluginsWaitTime map[string]time.Duration, status *fwk.Status) *fwk.Status) (status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Permit, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+	var waitStatus *fwk.Status
 	pluginsWaitTime := make(map[string]time.Duration)
-	statusCode := fwk.Success
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
@@ -1782,7 +1822,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleSta
 					timeout = maxTimeout
 				}
 				pluginsWaitTime[pl.Name()] = timeout
-				statusCode = fwk.Wait
+				waitStatus = status
 			} else {
 				err := status.AsError()
 				logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
@@ -1790,12 +1830,9 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleSta
 			}
 		}
 	}
-	if statusCode == fwk.Wait {
-		waitingPod := newWaitingPod(pod, pluginsWaitTime)
-		f.waitingPods.add(waitingPod)
-		msg := fmt.Sprintf("one or more plugins asked to wait and no plugin rejected pod %q", pod.Name)
+	if waitStatus.IsWait() {
 		logger.V(4).Info("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
-		return fwk.NewStatus(fwk.Wait, msg)
+		return onWait(pluginsWaitTime, waitStatus)
 	}
 	return nil
 }
@@ -1863,13 +1900,30 @@ func (f *frameworkImpl) GetWaitingPod(uid types.UID) fwk.WaitingPod {
 }
 
 // RejectWaitingPod rejects a WaitingPod given its UID.
-// The returned value indicates if the given pod is waiting or not.
+// The returned value indicates if the rejection was successful.
 func (f *frameworkImpl) RejectWaitingPod(uid types.UID) bool {
 	if waitingPod := f.waitingPods.get(uid); waitingPod != nil {
-		waitingPod.Reject("", "removed")
-		return true
+		return waitingPod.Reject("", "removed")
 	}
 	return false
+}
+
+// AddPodInPreBind adds a pod to the pods in preBind list.
+func (f *frameworkImpl) AddPodInPreBind(uid types.UID, cancel context.CancelCauseFunc) {
+	f.podsInPreBind.add(uid, cancel)
+}
+
+// GetPodInPreBind returns a pod that is in the binding cycle but before it is bound given its UID.
+func (f *frameworkImpl) GetPodInPreBind(uid types.UID) fwk.PodInPreBind {
+	if bp := f.podsInPreBind.get(uid); bp != nil {
+		return bp
+	}
+	return nil
+}
+
+// RemovePodInPreBind removes a pod from the pods in preBind list.
+func (f *frameworkImpl) RemovePodInPreBind(uid types.UID) {
+	f.podsInPreBind.remove(uid)
 }
 
 // HasFilterPlugins returns true if at least one filter plugin is defined.

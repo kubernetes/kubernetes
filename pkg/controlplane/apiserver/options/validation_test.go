@@ -28,7 +28,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	basecompatibility "k8s.io/component-base/compatibility"
 	basemetrics "k8s.io/component-base/metrics"
-	"k8s.io/kubernetes/pkg/features"
 
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -241,13 +240,11 @@ func TestValidateOptions(t *testing.T) {
 func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 	tests := []struct {
 		name           string
-		featureEnabled bool
 		options        *Options
 		expectedErrors []error
 	}{
 		{
-			name:           "Signing keys file provided while external signer endpoint is provided",
-			featureEnabled: true,
+			name: "Signing keys file provided while external signer endpoint is provided",
 			expectedErrors: []error{
 				fmt.Errorf("can't set `--service-account-signing-key-file` and/or `--service-account-key-file` with `--service-account-signing-endpoint` (They are mutually exclusive)"),
 			},
@@ -257,8 +254,7 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "Verification keys file provided while external signer endpoint is provided",
-			featureEnabled: true,
+			name: "Verification keys file provided while external signer endpoint is provided",
 			expectedErrors: []error{
 				fmt.Errorf("can't set `--service-account-signing-key-file` and/or `--service-account-key-file` with `--service-account-signing-endpoint` (They are mutually exclusive)"),
 			},
@@ -275,8 +271,7 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "Verification key  and signing key file provided while external signer endpoint is provided",
-			featureEnabled: true,
+			name: "Verification key  and signing key file provided while external signer endpoint is provided",
 			expectedErrors: []error{
 				fmt.Errorf("can't set `--service-account-signing-key-file` and/or `--service-account-key-file` with `--service-account-signing-endpoint` (They are mutually exclusive)"),
 			},
@@ -294,26 +289,14 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "feature disabled and external signer endpoint is provided",
-			featureEnabled: false,
-			expectedErrors: []error{
-				fmt.Errorf("setting `--service-account-signing-endpoint` requires enabling ExternalServiceAccountTokenSigner feature gate"),
-			},
-			options: &Options{
-				ServiceAccountSigningEndpoint: "@ebc.eng.hij",
-			},
-		},
-		{
 			name:           "relative external signer endpoint provided",
-			featureEnabled: true,
 			expectedErrors: []error{},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "abc",
 			},
 		},
 		{
-			name:           "invalid external signer endpoint provided - 2",
-			featureEnabled: true,
+			name: "invalid external signer endpoint provided - 2",
 			expectedErrors: []error{
 				fmt.Errorf("invalid value \"@abc@\" passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name"),
 			},
@@ -322,8 +305,7 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "invalid external signer endpoint provided - 3",
-			featureEnabled: true,
+			name: "invalid external signer endpoint provided - 3",
 			expectedErrors: []error{
 				fmt.Errorf("invalid value \"@abc.abc  .ae\" passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name"),
 			},
@@ -333,7 +315,6 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 		},
 		{
 			name:           "valid external signer endpoint provided - 1",
-			featureEnabled: true,
 			expectedErrors: []error{},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "/e/an_b-d/efg",
@@ -341,7 +322,6 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 		},
 		{
 			name:           "valid external signer endpoint provided - 2",
-			featureEnabled: true,
 			expectedErrors: []error{},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "@ebc.sock",
@@ -349,18 +329,15 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 		},
 		{
 			name:           "valid external signer endpoint provided - 3",
-			featureEnabled: true,
 			expectedErrors: []error{},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "@ebc.eng.hij",
 			},
 		},
 		{
-			name:           "All errors at once",
-			featureEnabled: false,
+			name: "All errors at once",
 			expectedErrors: []error{
 				fmt.Errorf("can't set `--service-account-signing-key-file` and/or `--service-account-key-file` with `--service-account-signing-endpoint` (They are mutually exclusive)"),
-				fmt.Errorf("setting `--service-account-signing-endpoint` requires enabling ExternalServiceAccountTokenSigner feature gate"),
 				fmt.Errorf("invalid value \"@a@\" passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name"),
 			},
 			options: &Options{
@@ -388,7 +365,6 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 				}
 			}
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, test.featureEnabled)
 			errs := validateServiceAccountTokenSigningConfig(test.options)
 			if !reflect.DeepEqual(errs, test.expectedErrors) {
 				t.Errorf("Expected errors message: %v \n but got: %v", test.expectedErrors, errs)

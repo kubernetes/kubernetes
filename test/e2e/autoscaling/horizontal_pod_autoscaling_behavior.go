@@ -499,7 +499,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 	})
 })
 
-var _ = SIGDescribe(feature.HPAConfigurableTolerance, framework.WithFeatureGate(features.HPAConfigurableTolerance),
+var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), framework.WithFeatureGate(features.HPAConfigurableTolerance),
 	"Horizontal pod autoscaling (configurable tolerance)", func() {
 		f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -547,10 +547,10 @@ var _ = SIGDescribe(feature.HPAConfigurableTolerance, framework.WithFeatureGate(
 		})
 
 		ginkgo.Describe("with small scale-up, large scale-down tolerances", func() {
-			ginkgo.It("should not scale", func(ctx context.Context) {
+			ginkgo.It("should scale up but should not scale down", func(ctx context.Context) {
 				ginkgo.By("setting up resource consumer and HPA")
 				initPods := 10
-				podCPURequest := 200
+				podCPURequest := 500
 				targetCPUUtilizationPercent := 60
 				initCPUUsageTotal := usageForReplicasWithRequest(initPods, podCPURequest, targetCPUUtilizationPercent)
 				waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer

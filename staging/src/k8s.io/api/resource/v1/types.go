@@ -79,6 +79,7 @@ type ResourceSlice struct {
 	// Contains the information published by the driver.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
+	// +required
 	Spec ResourceSliceSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 

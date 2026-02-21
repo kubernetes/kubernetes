@@ -26,6 +26,9 @@ import (
 
 const (
 	kubeletSubsystem = "kubelet"
+
+	CAdvisorMetricsProvider MetricsProviderType = "cadvisor"
+	CRIMetricsProvider      MetricsProviderType = "cri"
 )
 
 var (
@@ -76,6 +79,15 @@ var (
 		},
 		[]string{"metric_source"},
 	)
+	MetricsProvider = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeletSubsystem,
+			Name:           "metrics_provider",
+			Help:           "Metrics provider used by kubelet to collect container stats. Values can be 'cadvisor' and 'cri'",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"provider"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -87,6 +99,7 @@ func Register() {
 		legacyregistry.MustRegister(HTTPRequestsDuration)
 		legacyregistry.MustRegister(HTTPInflightRequests)
 		legacyregistry.MustRegister(VolumeStatCalDuration)
+		legacyregistry.MustRegister(MetricsProvider)
 	})
 }
 
@@ -98,4 +111,12 @@ func SinceInSeconds(start time.Time) float64 {
 // CollectVolumeStatCalDuration collects the duration in seconds to calculate volume stats.
 func CollectVolumeStatCalDuration(metricSource string, start time.Time) {
 	VolumeStatCalDuration.WithLabelValues(metricSource).Observe(SinceInSeconds(start))
+}
+
+type MetricsProviderType string
+
+// SetMetricsProvider sets the metrics provider.
+func SetMetricsProvider(provider MetricsProviderType) {
+	MetricsProvider.Reset()
+	MetricsProvider.WithLabelValues(string(provider)).Set(1)
 }

@@ -123,7 +123,7 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 func (ftv formatTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            ftv.TagName(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         ftv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a string field has a particular format.",
 		Payloads: []TagPayloadDoc{{ // Keep this list alphabetized.

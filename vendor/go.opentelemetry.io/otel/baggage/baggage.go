@@ -317,7 +317,7 @@ func parseMember(member string) (Member, error) {
 	keyValue, properties, found := strings.Cut(member, propertyDelimiter)
 	if found {
 		// Parse the member properties.
-		for _, pStr := range strings.Split(properties, propertyDelimiter) {
+		for pStr := range strings.SplitSeq(properties, propertyDelimiter) {
 			p, err := parseProperty(pStr)
 			if err != nil {
 				return newInvalidMember(), err
@@ -480,7 +480,7 @@ func Parse(bStr string) (Baggage, error) {
 	}
 
 	b := make(baggage.List)
-	for _, memberStr := range strings.Split(bStr, listDelimiter) {
+	for memberStr := range strings.SplitSeq(bStr, listDelimiter) {
 		m, err := parseMember(memberStr)
 		if err != nil {
 			return Baggage{}, err

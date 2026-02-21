@@ -156,6 +156,10 @@ var (
 	// The below is only available when the DRAExtendedResource feature gate is enabled.
 	ResourceClaimCreatesTotal *metrics.CounterVec
 
+	podGroupScheduleAttempts           *metrics.CounterVec
+	podGroupSchedulingLatency          *metrics.HistogramVec
+	PodGroupSchedulingAlgorithmLatency *metrics.Histogram
+
 	// metricsList is a list of all metrics that should be registered always, regardless of any feature gate's value.
 	metricsList []metrics.Registerable
 )
@@ -185,6 +189,13 @@ func Register() {
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
 			RegisterMetrics(ResourceClaimCreatesTotal)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+			RegisterMetrics(
+				podGroupScheduleAttempts,
+				podGroupSchedulingLatency,
+				PodGroupSchedulingAlgorithmLatency,
+			)
 		}
 	})
 }
@@ -461,6 +472,31 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"profile"})
+
+	// The below (podGroupScheduleAttempts, podGroupSchedulingLatency and PodGroupSchedulingAlgorithmLatency) are only available when the GenericWorkload feature gate is enabled.
+	podGroupScheduleAttempts = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "podgroup_schedule_attempts_total",
+			Help:           "Number of attempts to schedule pod group, by the result. 'unschedulable' means a pod group could not be scheduled, while 'error' means an internal scheduler problem.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"result", "profile"})
+	podGroupSchedulingLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "podgroup_scheduling_attempt_duration_seconds",
+			Help:           "Pod group scheduling attempt latency in seconds (scheduling algorithm + binding)",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15), // TBD: Correct buckets
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"result", "profile"})
+	PodGroupSchedulingAlgorithmLatency = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "podgroup_scheduling_algorithm_duration_seconds",
+			Help:           "Pod group scheduling algorithm latency in seconds",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15), // TBD: Correct buckets
+			StabilityLevel: metrics.ALPHA,
+		})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,

@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
 	"k8s.io/kubectl/pkg/cmd/get"
+	kuberccmd "k8s.io/kubectl/pkg/cmd/kuberc"
 	"k8s.io/kubectl/pkg/cmd/kustomize"
 	"k8s.io/kubectl/pkg/cmd/label"
 	"k8s.io/kubectl/pkg/cmd/logs"
@@ -354,6 +355,9 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.AddCommand(apiresources.NewCmdAPIVersions(f, o.IOStreams))
 	cmds.AddCommand(apiresources.NewCmdAPIResources(f, o.IOStreams))
 	cmds.AddCommand(options.NewCmdOptions(o.IOStreams.Out))
+	if !cmdutil.KubeRC.IsDisabled() {
+		cmds.AddCommand(kuberccmd.NewCmdKubeRC(o.IOStreams))
+	}
 
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.

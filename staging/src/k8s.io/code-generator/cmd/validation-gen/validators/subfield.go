@@ -34,11 +34,11 @@ func init() {
 }
 
 type subfieldTagValidator struct {
-	validator Validator
+	validator TagValidationExtractor
 }
 
 func (stv *subfieldTagValidator) Init(cfg Config) {
-	stv.validator = cfg.Validator
+	stv.validator = cfg.TagValidator
 }
 
 func (subfieldTagValidator) TagName() string {
@@ -77,7 +77,7 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 		Member:     submemb,
 		ParentPath: context.Path,
 	}
-	if validations, err := stv.validator.ExtractValidations(subContext, *tag.ValueTag); err != nil {
+	if validations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		if len(validations.Variables) > 0 {
@@ -134,7 +134,7 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 func (stv subfieldTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            stv.TagName(),
-		StabilityLevel: Stable,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         stv.ValidScopes().UnsortedList(),
 		Description:    "Declares a validation for a subfield of a struct.",
 		Args: []TagArgDoc{{

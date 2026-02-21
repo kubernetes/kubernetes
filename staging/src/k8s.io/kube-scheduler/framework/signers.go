@@ -18,6 +18,7 @@ package framework
 
 import (
 	"encoding/json"
+	"slices"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
@@ -59,9 +60,7 @@ func HostPortsSigner(pod *v1.Pod) any {
 		}
 	}
 	ports := portSet.UnsortedList()
-	sort.Slice(ports, func(i, j int) bool {
-		return ports[i] < ports[j]
-	})
+	slices.Sort(ports)
 	return ports
 }
 
@@ -69,18 +68,14 @@ func NodeSelectorRequirementsSigner(reqs []v1.NodeSelectorRequirement) ([]string
 	ret := make([]string, len(reqs))
 	for i, req := range reqs {
 		t := req.DeepCopy()
-		sort.Slice(t.Values, func(i, j int) bool {
-			return t.Values[i] < t.Values[j]
-		})
+		slices.Sort(t.Values)
 		v, err := json.Marshal(t)
 		if err != nil {
 			return nil, err
 		}
 		ret[i] = string(v)
 	}
-	sort.Slice(ret, func(i, j int) bool {
-		return ret[i] < ret[j]
-	})
+	slices.Sort(ret)
 	return ret, nil
 }
 
@@ -125,9 +120,7 @@ func PreferredSchedulingTermSigner(terms []v1.PreferredSchedulingTerm) ([]string
 		}
 		newTerms[i] = string(termStr)
 	}
-	sort.Slice(newTerms, func(i, j int) bool {
-		return newTerms[i] < newTerms[j]
-	})
+	slices.Sort(newTerms)
 	return newTerms, nil
 }
 
@@ -144,10 +137,7 @@ func NodeSelectorTermsSigner(terms []v1.NodeSelectorTerm) ([]string, error) {
 		}
 		req[i] = string(tStr)
 	}
-
-	sort.Slice(req, func(i, j int) bool {
-		return req[i] < req[j]
-	})
+	slices.Sort(req)
 
 	return req, nil
 }
@@ -210,8 +200,6 @@ func VolumesSigner(pod *v1.Pod) any {
 			ret = append(ret, string(volStr))
 		}
 	}
-	sort.Slice(ret, func(i, j int) bool {
-		return ret[i] < ret[j]
-	})
+	slices.Sort(ret)
 	return ret
 }
