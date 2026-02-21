@@ -194,7 +194,9 @@ func TestComputePodQOS(t *testing.T) {
 
 			// Convert v1.Pod to core.Pod, and then check against the internal version of `ComputePodQOS`.
 			pod := core.Pod{}
-			corev1.Convert_v1_Pod_To_core_Pod(testCase.pod, &pod, nil)
+			if err := corev1.Convert_v1_Pod_To_core_Pod(testCase.pod, &pod, nil); err != nil {
+				t.Fatal(err)
+			}
 
 			if actual := v1.PodQOSClass(qos.ComputePodQOS(&pod)); testCase.expected != actual {
 				t.Errorf("internal ComputePodQOS error: expected: %s, actual: %s;\npod = %s", testCase.expected, actual, prettyPrintPod(testCase.pod))
