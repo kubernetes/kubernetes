@@ -176,7 +176,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 		return err
 	}
 
-	data, err := CollectData(b.source.Items, b.pod, b.plugin.host, b.source.DefaultMode)
+	data, err := CollectData(b.source.Items, b.pod, b.plugin.host, b.source.DefaultMode, b.source.DefaultUser)
 	if err != nil {
 		klog.Errorf("Error preparing data for downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
@@ -235,7 +235,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 // Map's value is the (sorted) content of the field to be dumped in the file.
 //
 // Note: this function is exported so that it can be called from the projection volume driver
-func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.VolumeHost, defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
+func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.VolumeHost, defaultMode *int32, defaultUser *int64) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
@@ -245,6 +245,8 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 	for _, fileInfo := range items {
 		var fileProjection volumeutil.FileProjection
 		fPath := filepath.Clean(fileInfo.Path)
+
+		fileProjection.FsUser = volumeutil.ResolvesFsUser(defaultUser, fileInfo.User)
 		if fileInfo.Mode != nil {
 			fileProjection.Mode = *fileInfo.Mode
 		} else {

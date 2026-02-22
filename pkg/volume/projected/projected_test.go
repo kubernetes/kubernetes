@@ -827,14 +827,19 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 	testNamespace := "test_projected_namespace"
 	testPodUID := types.UID("test_pod_uid")
 	testPodName := "podName"
+	caseMappingUser1 := int64(1001)
+	caseMappingUser2 := int64(1002)
 
 	cases := []struct {
 		name       string
 		volumeFile []v1.DownwardAPIVolumeFile
 		pod        *v1.Pod
 		mode       int32
+		user       *int64
 		payload    map[string]util.FileProjection
 		success    bool
+
+		disableUserFieldsGate bool
 	}{
 		{
 			name: "annotation",
@@ -952,16 +957,97 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			},
 			success: true,
 		},
+		{
+			name: "defaultUser",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "namespace_file_name", FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+			success: true,
+		},
+		{
+			name: "user",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "namespace_file_name", User: &caseMappingUser2, FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
+		{
+			name: "defaultUser-and-user",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "namespace_file_name", User: &caseMappingUser2, FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
+		{
+			name: "user-fields-with-disabled-feature-gate",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "namespace_file_name", User: &caseMappingUser2, FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644},
+			},
+			disableUserFieldsGate: true,
+			success:               true,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			source := makeProjection("", ptr.To[int32](tc.mode), nil, "downwardAPI")
+			if tc.disableUserFieldsGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AtomicWriteVolumeUserFields, !tc.disableUserFieldsGate)
+
+			source := makeProjection("", new(tc.mode), tc.user, "downwardAPI")
 			source.Sources[0].DownwardAPI.Items = tc.volumeFile
 
 			client := fake.NewSimpleClientset(tc.pod)
 			tempDir, host := newTestHost(t, client)
-			defer os.RemoveAll(tempDir)
+			defer func() {
+				if err := os.RemoveAll(tempDir); err != nil {
+					t.Fatal(err)
+				}
+			}()
 			var myVolumeMounter = projectedVolumeMounter{
 				projectedVolume: &projectedVolume{
 					sources: source.Sources,
