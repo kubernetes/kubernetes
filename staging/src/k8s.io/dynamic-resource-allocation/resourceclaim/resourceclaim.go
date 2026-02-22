@@ -163,6 +163,37 @@ func CanBeReserved(claim *resourceapi.ResourceClaim) bool {
 	return true
 }
 
+// BindTo constructs a consumer reference for the claim that refers to the
+// object to which the claim should be bound. When the claim refers to a
+// ResourceClaimName or ResourceClaimTemplateName, the claim is bound to the
+// Pod. When the claim refers to a PodGroupResourceClaim and the podGroup
+// parameter is non-nil, the claim is bound to the PodGroup. The podGroup
+// parameter should only be non-nil when the
+// DRAWorkloadResourceClaims feature gate is enabled.
+func BindTo(pod *v1.Pod, podGroup *schedulingapi.PodGroup, podClaim *v1.PodResourceClaim) (resourceapi.ResourceClaimConsumerReference, error) {
+	switch {
+	case podClaim.ResourceClaimName != nil, podClaim.ResourceClaimTemplateName != nil:
+		return resourceapi.ResourceClaimConsumerReference{
+			APIGroup: v1.GroupName,
+			Resource: "pods",
+			Name:     pod.Name,
+			UID:      pod.UID,
+		}, nil
+	case podGroup != nil && podClaim.PodGroupResourceClaim != nil:
+		if err := podMatchesPodGroup(pod, podGroup); err != nil {
+			return resourceapi.ResourceClaimConsumerReference{}, err
+		}
+		return resourceapi.ResourceClaimConsumerReference{
+			APIGroup: schedulingapi.GroupName,
+			Resource: "podgroups",
+			Name:     podGroup.Name,
+			UID:      podGroup.UID,
+		}, nil
+	default:
+		return resourceapi.ResourceClaimConsumerReference{}, fmt.Errorf(`pod "%s/%s", spec.resourceClaim %q: %w`, pod.Namespace, pod.Name, podClaim.Name, ErrAPIUnsupported)
+	}
+}
+
 // BaseRequestRef returns the request name if the reference is to a top-level
 // request and the name of the parent request if the reference is to a subrequest.
 func BaseRequestRef(requestRef string) string {

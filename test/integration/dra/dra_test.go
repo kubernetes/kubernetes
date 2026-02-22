@@ -1861,6 +1861,16 @@ func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadAPIEnabled, work
 
 	namespace := createTestNamespace(tCtx, nil)
 
+	startScheduler(tCtx)
+
+	class, driverName := createTestClass(tCtx, namespace)
+
+	slice := st.MakeResourceSlice("worker-0", driverName).Devices(device1, device2)
+	_ = createSlice(tCtx, slice.Obj())
+
+	podGroupResourceClaim := createClaim(tCtx, namespace, "-podgroup", class, claim)
+	podResourceClaim := createClaim(tCtx, namespace, "", class, claim)
+
 	podGroupClaimName := "podgroup-claim"
 	podGroupName := "podgroup"
 	podGroup := &schedulingapi.PodGroup{
@@ -1881,7 +1891,7 @@ func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadAPIEnabled, work
 			ResourceClaims: []schedulingapi.PodGroupResourceClaim{
 				{
 					Name:              podGroupClaimName,
-					ResourceClaimName: &claimName,
+					ResourceClaimName: &podGroupResourceClaim.Name,
 				},
 			},
 		},
@@ -1889,6 +1899,10 @@ func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadAPIEnabled, work
 	podGroup, err := tCtx.Client().SchedulingV1alpha2().PodGroups(namespace).Create(tCtx, podGroup, metav1.CreateOptions{FieldValidation: "Strict"})
 	if workloadAPIEnabled {
 		tCtx.ExpectNoError(err, "create PodGroup")
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			tCtx.Log("Cleaning up PodGroup...")
+			deleteAndWait(tCtx, tCtx.Client().SchedulingV1alpha2().PodGroups(namespace).Delete, tCtx.Client().SchedulingV1alpha2().PodGroups(namespace).Get, podGroup.Name)
+		})
 		if workloadResourceClaimsEnabled {
 			assert.NotEmpty(tCtx, podGroup.Spec.ResourceClaims, "should store resource claims in PodGroup spec")
 		} else {
@@ -1906,8 +1920,21 @@ func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadAPIEnabled, work
 	podWithClaimName.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
 		PodGroupName: &podGroupName,
 	}
-	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, podWithClaimName, metav1.CreateOptions{FieldValidation: "Strict"})
-	tCtx.ExpectNoError(err, "create pod")
+
+	createPod := func(pod *v1.Pod) *v1.Pod {
+		// createPod isn't used here since we want to define some claims with
+		// PodGroupResourceClaim instead of only ResourceClaimName.
+		pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{FieldValidation: "Strict"})
+		tCtx.ExpectNoError(err, "create pod")
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			tCtx.Log("Cleaning up Pod...")
+			// We must delete pods before uninstalling our driver.
+			// Also, we want to know when stopping it gets stuck.
+			deleteAndWait(tCtx, tCtx.Client().CoreV1().Pods(namespace).Delete, tCtx.Client().CoreV1().Pods(namespace).Get, pod.Name)
+		})
+		return pod
+	}
+	pod := createPod(podWithClaimName)
 
 	hasPodGroupClaim := slices.ContainsFunc(pod.Spec.ResourceClaims, func(claim v1.PodResourceClaim) bool {
 		return claim.Name == podClaimName
@@ -1919,4 +1946,51 @@ func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadAPIEnabled, work
 		// only the PodGroup claim should be dropped
 		assert.NotEmpty(tCtx, pod.Spec.ResourceClaims, "should not drop non-PodGroup claims from Pod spec")
 	}
+
+	waitForClaimAllocatedToDevice(tCtx, namespace, podResourceClaim.Name, schedulingTimeout)
+	waitForClaim(tCtx, namespace, podResourceClaim.Name, schedulingTimeout,
+		gomega.HaveField(
+			"Status.ReservedFor",
+			gomega.ConsistOf(gomega.HaveField("UID", gomega.Equal(pod.UID))),
+		),
+		"Claim should have been reserved for the Pod.",
+	)
+	if workloadResourceClaimsEnabled {
+		waitForClaimAllocatedToDevice(tCtx, namespace, podGroupResourceClaim.Name, schedulingTimeout)
+		waitForClaim(tCtx, namespace, podGroupResourceClaim.Name, schedulingTimeout,
+			gomega.HaveField(
+				"Status.ReservedFor",
+				gomega.ConsistOf(gomega.HaveField("UID", gomega.Equal(podGroup.UID))),
+			),
+			"Claim should have been reserved for the PodGroup.",
+		)
+	}
+
+	waitForPodScheduled(tCtx, namespace, pod.Name)
+
+	secondPod := podWithClaimName.DeepCopy()
+	secondPod.Name += "-2"
+	secondPod = createPod(secondPod)
+
+	waitForClaim(tCtx, namespace, podResourceClaim.Name, schedulingTimeout,
+		gomega.HaveField(
+			"Status.ReservedFor",
+			gomega.ConsistOf(
+				gomega.HaveField("UID", gomega.Equal(pod.UID)),
+				gomega.HaveField("UID", gomega.Equal(secondPod.UID)),
+			),
+		),
+		"Claim should have been reserved for both Pods.",
+	)
+	if workloadResourceClaimsEnabled {
+		waitForClaim(tCtx, namespace, podGroupResourceClaim.Name, schedulingTimeout,
+			gomega.HaveField(
+				"Status.ReservedFor",
+				gomega.ConsistOf(gomega.HaveField("UID", gomega.Equal(podGroup.UID))),
+			),
+			"Claim should stay reserved only for the PodGroup after creating another Pod.",
+		)
+	}
+
+	waitForPodScheduled(tCtx, namespace, secondPod.Name)
 }

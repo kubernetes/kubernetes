@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -127,6 +128,12 @@ type DeviceClassResolver interface {
 	GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass
 }
 
+// PodGroupLister can be used to obtain PodGroups.
+type PodGroupLister interface {
+	// Get returns the PodGroup with the given podGroupName.
+	Get(namespace, podGroupName string) (*schedulingapi.PodGroup, error)
+}
+
 // SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
 // The plugin's default implementation obtains the objects from the API. A different implementation can be
 // plugged into the framework in order to simulate the state of DRA objects. For example, Cluster Autoscaler
@@ -136,6 +143,7 @@ type SharedDRAManager interface {
 	ResourceSlices() ResourceSliceLister
 	DeviceClasses() DeviceClassLister
 	DeviceClassResolver() DeviceClassResolver
+	PodGroups() PodGroupLister
 }
 
 // CSIManager can be used to obtain CSINode objects, and track changes to CSINode objects in-memory.
