@@ -857,7 +857,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		hpaController.hpaSelectors = tc.hpaSelectors
 	}
 
-	// reset all HPA promethous metrics
+	// reset all HPA prometheus metrics
 	monitor.Register()
 	monitor.ReconciliationsTotal.Reset()
 	monitor.ReconciliationsDuration.Reset()
