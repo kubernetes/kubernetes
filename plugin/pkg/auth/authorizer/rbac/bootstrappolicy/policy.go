@@ -272,6 +272,10 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie())
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("deletecollection").Groups(resourceGroup).Resources("resourceslices").RuleOrDie())
+		// ResourceClaims may be defined by a PodGroup
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+			nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(schedulingGroup).Resources("podgroups").RuleOrDie())
+		}
 	}
 	// Kubelet needs access to ClusterTrustBundles to support the pemTrustAnchors volume type.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {

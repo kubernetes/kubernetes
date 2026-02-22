@@ -38,6 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -64,6 +65,7 @@ const (
 	driverClassName = "test"
 	podName         = "test-pod"
 	containerName   = "test-container"
+	podGroupName    = "test-podgroup"
 )
 
 var (
@@ -457,6 +459,56 @@ func genTestPodWithExtendedResource() *v1.Pod {
 	}
 }
 
+func genTestPodWithPodGroup() *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			UID:       podUID,
+		},
+		Spec: v1.PodSpec{
+			SchedulingGroup: &v1.PodSchedulingGroup{
+				PodGroupName: new(podGroupName),
+			},
+			ResourceClaims: []v1.PodResourceClaim{
+				{
+					Name:                  claimName,
+					PodGroupResourceClaim: new(podGroupClaimName),
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{
+							{
+								Name: claimName,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func genTestPodGroup() *schedulingapi.PodGroup {
+	return &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podGroupName,
+			Namespace: namespace,
+			UID:       podGroupUID,
+		},
+		Spec: schedulingapi.PodGroupSpec{
+			ResourceClaims: []schedulingapi.PodGroupResourceClaim{
+				{
+					Name:              podGroupClaimName,
+					ResourceClaimName: new(claimName),
+				},
+			},
+		},
+	}
+}
+
 // genTestClaim generates resource claim object
 func genTestClaim(name, driver, device, podUID string) *resourceapi.ResourceClaim {
 	return &resourceapi.ResourceClaim{
@@ -532,6 +584,45 @@ func genTestClaimWithExtendedResource(name, driver, device, podUID string) *reso
 			},
 			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 				{UID: types.UID(podUID)},
+			},
+		},
+	}
+}
+
+func genTestPodGroupClaim(name, driver, device, podGroupUID string) *resourceapi.ResourceClaim {
+	return &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       types.UID(fmt.Sprintf("%s-uid", name)),
+		},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{
+					{
+						Name: requestName,
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: className,
+						},
+					},
+				},
+			},
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Request: requestName,
+							Pool:    poolName,
+							Device:  device,
+							Driver:  driver,
+						},
+					},
+				},
+			},
+			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+				{UID: types.UID(podGroupUID)},
 			},
 		},
 	}
@@ -765,6 +856,7 @@ func TestPrepareResources(t *testing.T) {
 		description         string
 		driverName          string
 		pod                 *v1.Pod
+		podGroup            *schedulingapi.PodGroup
 		claimInfo           *ClaimInfo
 		claim               *resourceapi.ResourceClaim
 		resp                *drapb.NodePrepareResourcesResponse
@@ -977,6 +1069,27 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 `,
 		},
 		{
+			description:            "should prepare resource for podgroup, claim not in cache",
+			driverName:             driverName,
+			pod:                    genTestPodWithPodGroup(),
+			podGroup:               genTestPodGroup(),
+			claim:                  genTestPodGroupClaim(claimName, driverName, deviceName, podGroupUID),
+			expectedClaimInfoState: genClaimInfoState(cdiID),
+			resp:                   genPrepareResourcesResponse(claimUID),
+			expectedPrepareCalls:   1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
+		},
+		{
 			description:    "claim UIDs mismatch",
 			driverName:     driverName,
 			pod:            genTestPod(),
@@ -1059,6 +1172,14 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 					require.NoError(t, fakeKubeClient.ResourceV1().ResourceClaims(test.pod.Namespace).Delete(tCtx, test.claim.Name, metav1.DeleteOptions{}))
 				}()
 			}
+			if test.podGroup != nil {
+				if _, err := fakeKubeClient.SchedulingV1alpha2().PodGroups(test.podGroup.Namespace).Create(tCtx, test.podGroup, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("failed to create PodGroup %s: %+v", test.podGroup.Name, err)
+				}
+				defer func() {
+					require.NoError(t, fakeKubeClient.SchedulingV1alpha2().PodGroups(test.podGroup.Namespace).Delete(tCtx, test.podGroup.Name, metav1.DeleteOptions{}))
+				}()
+			}
 
 			var pluginClientTimeout *time.Duration
 			if test.wantTimeout {
@@ -1080,8 +1201,12 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 				manager.cache.add(test.claimInfo)
 			}
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, true)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAExtendedResource:       true,
+				features.DRAConsumableCapacity:     true,
+				features.DRAWorkloadResourceClaims: true,
+				features.GenericWorkload:           true, // dependency of above
+			})
 			err = manager.PrepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
@@ -1103,7 +1228,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 			// check the cache contains the expected claim info
 			var podClaimName *string
 			if len(test.pod.Spec.ResourceClaims) > 0 {
-				podClaimName, _, err = resourceclaim.Name(test.pod, nil /* TODO */, &test.pod.Spec.ResourceClaims[0])
+				podClaimName, _, err = resourceclaim.Name(test.pod, test.podGroup, &test.pod.Spec.ResourceClaims[0])
 				require.NoError(t, err)
 			}
 			if podClaimName == nil {
@@ -1195,8 +1320,8 @@ func TestUnprepareResources(t *testing.T) {
 		description         string
 		driverName          string
 		pod                 *v1.Pod
+		podGroup            *schedulingapi.PodGroup
 		claimInfo           *ClaimInfo
-		claim               *resourceapi.ResourceClaim
 		resp                *drapb.NodeUnprepareResourcesResponse
 		wantTimeout         bool
 		wantResourceSkipped bool
@@ -1294,8 +1419,26 @@ dra_operations_duration_seconds_count{is_error="true",operation_name="UnprepareR
 			description:            "should unprepare already prepared extended resource backed by DRA",
 			driverName:             driverName,
 			pod:                    genTestPodWithExtendedResource(),
-			claim:                  genTestClaimWithExtendedResource(claimName, driverName, deviceName, podUID),
 			claimInfo:              genTestClaimInfoWithExtendedResource([]string{podUID}, true),
+			expectedUnprepareCalls: 1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
+		},
+		{
+			description:            "should unprepare already prepared resource for PodGroup",
+			driverName:             driverName,
+			pod:                    genTestPod(),
+			podGroup:               genTestPodGroup(),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true, nil),
 			expectedUnprepareCalls: 1,
 			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
 # TYPE dra_grpc_operations_duration_seconds histogram
@@ -1313,7 +1456,6 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			description:            "should unprepare already prepared resource",
 			driverName:             driverName,
 			pod:                    genTestPod(),
-			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
 			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true, nil),
 			expectedUnprepareCalls: 1,
 			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
@@ -1388,8 +1530,20 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
 			}
+			if test.podGroup != nil {
+				if _, err := fakeKubeClient.SchedulingV1alpha2().PodGroups(test.podGroup.Namespace).Create(tCtx, test.podGroup, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("failed to create PodGroup %s: %+v", test.podGroup.Name, err)
+				}
+				defer func() {
+					require.NoError(t, fakeKubeClient.SchedulingV1alpha2().PodGroups(test.podGroup.Namespace).Delete(tCtx, test.podGroup.Name, metav1.DeleteOptions{}))
+				}()
+			}
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAExtendedResource:       true,
+				features.DRAWorkloadResourceClaims: true,
+				features.GenericWorkload:           true, // dependency of above
+			})
 			err = manager.UnprepareResources(tCtx, test.pod)
 
 			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
@@ -1416,7 +1570,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			// Check cache was cleared only on successful unprepare
 			var podClaimName *string
 			if len(test.pod.Spec.ResourceClaims) > 0 {
-				podClaimName, _, err = resourceclaim.Name(test.pod, nil /* TODO */, &test.pod.Spec.ResourceClaims[0])
+				podClaimName, _, err = resourceclaim.Name(test.pod, test.podGroup, &test.pod.Spec.ResourceClaims[0])
 				require.NoError(t, err)
 			}
 			claimName := claimName

@@ -1270,6 +1270,12 @@ items:
     verbs:
     - deletecollection
   - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - podgroups
+    verbs:
+    - get
+  - apiGroups:
     - certificates.k8s.io
     resources:
     - clustertrustbundles

@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -242,6 +243,11 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	batches := make(map[*draplugin.DRAPlugin][]*drapb.Claim)
 	resourceClaims := make(map[types.UID]*resourceapi.ResourceClaim)
 
+	podGroup, err := m.getPodGroup(ctx, pod)
+	if err != nil {
+		return err
+	}
+
 	// Do a validation pass *without* changing the claim info cache.
 	// If anything goes wrong, we don't proceed. This has the advantage
 	// that the failing pod can be deleted without getting stuck.
@@ -272,7 +278,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		podClaim := &podResourceClaims[i]
 		infos[i].podClaim = podClaim
 		logger.V(3).Info("Processing resource", "podClaim", podClaim.Name)
-		claimName, mustCheckOwner, err := resourceclaim.Name(pod, nil /* TODO */, podClaim)
+		claimName, mustCheckOwner, err := resourceclaim.Name(pod, podGroup, podClaim)
 		if err != nil {
 			return err
 		}
@@ -291,14 +297,14 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		}
 
 		if mustCheckOwner {
-			if err = resourceclaim.IsForPod(pod, nil /* TODO */, resourceClaim); err != nil {
+			if err = resourceclaim.IsForPod(pod, podGroup, resourceClaim); err != nil {
 				// No wrapping, error is already informative.
 				return err
 			}
 		}
 
 		// Check if pod is in the ReservedFor for the claim
-		if !resourceclaim.IsReservedForPod(pod, nil /* TODO */, resourceClaim) {
+		if !resourceclaim.IsReservedForPod(pod, podGroup, resourceClaim) {
 			return fmt.Errorf("pod %s (%s) is not allowed to use ResourceClaim %s (%s)",
 				pod.Name, pod.UID, *claimName, resourceClaim.UID)
 		}
@@ -487,6 +493,7 @@ func truncateHealthMessage(message string) string {
 // GetResources gets a ContainerInfo object from the claimInfo cache.
 // This information is used by the caller to update a container config.
 func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
+	ctx := context.TODO()
 	cdiDevices := []kubecontainer.CDIDevice{}
 
 	// claimRequests maps claimName -> []requestNames for this container
@@ -501,6 +508,11 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 		containerClaimsMap[claim.Name] = append(containerClaimsMap[claim.Name], claim.Request)
 	}
 
+	podGroup, err := m.getPodGroup(ctx, pod)
+	if err != nil {
+		return nil, err
+	}
+
 	for i := range pod.Spec.ResourceClaims {
 		podClaim := &pod.Spec.ResourceClaims[i]
 		requests, ok := containerClaimsMap[podClaim.Name]
@@ -508,7 +520,7 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 			continue
 		}
 
-		claimName, _, err := resourceclaim.Name(pod, nil /* TODO */, podClaim)
+		claimName, _, err := resourceclaim.Name(pod, podGroup, podClaim)
 		if err != nil {
 			// No wrapping, error is already informative.
 			return nil, err
@@ -587,8 +599,14 @@ func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 
 func (m *Manager) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) error {
 	var claimNames []string
+
+	podGroup, err := m.getPodGroup(ctx, pod)
+	if err != nil {
+		return err
+	}
+
 	for i := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, nil /* TODO */, &pod.Spec.ResourceClaims[i])
+		claimName, _, err := resourceclaim.Name(pod, podGroup, &pod.Spec.ResourceClaims[i])
 		if err != nil {
 			// No wrapping, the error is already informative.
 			return err
@@ -730,6 +748,7 @@ func (m *Manager) PodMightNeedToUnprepareResources(uid types.UID) bool {
 
 // GetContainerClaimInfos gets Container's ClaimInfo
 func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error) {
+	ctx := context.TODO()
 	claimInfos := make([]*ClaimInfo, 0, len(pod.Spec.ResourceClaims))
 
 	// Build a map of container claims for O(1) lookup
@@ -738,13 +757,18 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 		containerClaimsMap[claim.Name] = true
 	}
 
+	podGroup, err := m.getPodGroup(ctx, pod)
+	if err != nil {
+		return nil, err
+	}
+
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
 		// Only process claims that this container actually uses
 		if !containerClaimsMap[podResourceClaim.Name] {
 			continue
 		}
 
-		claimName, _, err := resourceclaim.Name(pod, nil /* TODO */, &pod.Spec.ResourceClaims[i])
+		claimName, _, err := resourceclaim.Name(pod, podGroup, &pod.Spec.ResourceClaims[i])
 		if err != nil {
 			// No wrapping, the error is already informative.
 			return nil, err
@@ -804,7 +828,9 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 
 // UpdateAllocatedResourcesStatus updates the health status of allocated DRA resources in the pod's container statuses.
 func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
-	logger := klog.FromContext(context.Background()).WithName("dra-manager")
+	ctx := context.TODO()
+
+	logger := klog.FromContext(ctx).WithName("dra-manager")
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 	for i := range status.ContainerStatuses {
 		containerStatus := &status.ContainerStatuses[i]
@@ -838,6 +864,11 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 			}
 		}
 
+		podGroup, err := m.getPodGroup(ctx, pod)
+		if err != nil {
+			logger.V(4).Info("Failed to get PodGroup for Pod, will not consider resource claims made through the PodGroup", "container", containerSpec.Name)
+		}
+
 		// Iterate through the claims requested by this specific container.
 		for _, claim := range containerSpec.Resources.Claims {
 			// Find the actual name of the ResourceClaim object.
@@ -850,7 +881,7 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 			if actualClaimName == "" {
 				for i := range pod.Spec.ResourceClaims {
 					if pod.Spec.ResourceClaims[i].Name == claim.Name {
-						claimNamePtr, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+						claimNamePtr, _, err := resourceclaim.Name(pod, podGroup, &pod.Spec.ResourceClaims[i])
 						if err == nil && claimNamePtr != nil {
 							actualClaimName = *claimNamePtr
 						}
@@ -1075,4 +1106,17 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 func (m *Manager) Updates() <-chan resourceupdates.Update {
 	// Return the internal channel that HandleWatchResourcesStream writes to.
 	return m.update
+}
+
+func (m *Manager) getPodGroup(ctx context.Context, pod *v1.Pod) (*schedulingapi.PodGroup, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAWorkloadResourceClaims) &&
+		pod.Spec.SchedulingGroup != nil &&
+		pod.Spec.SchedulingGroup.PodGroupName != nil {
+		return m.kubeClient.SchedulingV1alpha2().PodGroups(pod.Namespace).Get(
+			ctx,
+			*pod.Spec.SchedulingGroup.PodGroupName,
+			metav1.GetOptions{},
+		)
+	}
+	return nil, nil
 }
