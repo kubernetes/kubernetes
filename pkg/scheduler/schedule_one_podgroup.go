@@ -439,7 +439,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 		} else {
 			// TBD: Add a message to status if the pod used features for which finding a placement cannot be guaranteed,
 			// such as heterogeneous pod group or using inter-pod dependencies.
-			if podResult.scheduleResult.nominatingInfo.NominatedNodeName != "" && result.status == podGroupUnschedulable {
+			if podResult.scheduleResult.nominatingInfo != nil && podResult.scheduleResult.nominatingInfo.NominatedNodeName != "" && result.status == podGroupUnschedulable {
 				// Pod group is unschedulable, so the pod has to be marked as unschedulable, even if it just required preemption.
 				// Its rejection status is set to its permit status message, as the preemption message is no longer relevant.
 				status := fwk.NewStatus(fwk.Unschedulable, podResult.permitStatus.Message()).WithError(errPodGroupUnschedulable)
