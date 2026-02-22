@@ -348,14 +348,25 @@ func makeStatefulSetWithMaxUnavailable(maxUnavailable *int) *apps.StatefulSet {
 	}
 }
 
+func makeStatefulSetWithUpdateStrategy(updateStrategy apps.StatefulSetUpdateStrategyType) *apps.StatefulSet {
+	return &apps.StatefulSet{
+		Spec: apps.StatefulSetSpec{
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{
+				Type: updateStrategy,
+			},
+		},
+	}
+}
+
 // TestDropStatefulSetDisabledFields tests if the drop functionality is working fine or not
 func TestDropStatefulSetDisabledFields(t *testing.T) {
 	testCases := []struct {
-		name                 string
-		enableMaxUnavailable bool
-		ss                   *apps.StatefulSet
-		oldSS                *apps.StatefulSet
-		expectedSS           *apps.StatefulSet
+		name                   string
+		enableMaxUnavailable   bool
+		enableRecreateStrategy bool
+		ss                     *apps.StatefulSet
+		oldSS                  *apps.StatefulSet
+		expectedSS             *apps.StatefulSet
 	}{
 		{
 			name:       "MaxUnavailable not enabled, field not used",
@@ -391,10 +402,46 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 			oldSS:                makeStatefulSetWithMaxUnavailable(ptr.To(3)),
 			expectedSS:           makeStatefulSetWithMaxUnavailable(ptr.To(1)),
 		},
+		{
+			name:                   "RecreateStrategy not enabled, type is not set",
+			enableRecreateStrategy: false,
+			ss:                     makeStatefulSetWithUpdateStrategy(""),
+			oldSS:                  nil,
+			expectedSS:             makeStatefulSetWithUpdateStrategy(""),
+		},
+		{
+			name:                   "RecreateStrategy not enabled, type is set in new, not in old",
+			enableRecreateStrategy: false,
+			ss:                     makeStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			oldSS:                  nil,
+			expectedSS:             makeStatefulSetWithUpdateStrategy(""),
+		},
+		{
+			name:                   "RecreateStrategy not enabled, type is set in old and new",
+			enableRecreateStrategy: false,
+			ss:                     makeStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			oldSS:                  makeStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			expectedSS:             makeStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+		},
+		{
+			name:                   "RecreateStrategy enabled, type is set in new only",
+			enableRecreateStrategy: true,
+			ss:                     makeStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			oldSS:                  nil,
+			expectedSS:             makeStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+		},
+		{
+			name:                   "RecreateStrategy enabled, type is set in both old and new",
+			enableRecreateStrategy: true,
+			ss:                     makeStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			oldSS:                  makeStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			expectedSS:             makeStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, tc.enableMaxUnavailable)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, tc.enableRecreateStrategy)
 			old := tc.oldSS.DeepCopy()
 
 			dropStatefulSetDisabledFields(tc.ss, tc.oldSS)

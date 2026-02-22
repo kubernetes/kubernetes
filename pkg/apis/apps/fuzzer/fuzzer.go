@@ -72,6 +72,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(s.Labels) == 0 {
 				s.Labels = s.Spec.Template.Labels
 			}
+			if s.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
+				s.Spec.UpdateStrategy.RollingUpdate = nil
+			}
 			if s.Spec.UpdateStrategy.RollingUpdate != nil && s.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
 				s.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(1))
 			}
