@@ -716,7 +716,7 @@ func (tc *testCase) verifyResults(ctx context.Context, t *testing.T) {
 func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 	actionStr := string(tc.expectedReportedReconciliationActionLabel)
 	errorStr := string(tc.expectedReportedReconciliationErrorLabel)
-	
+
 	if err := wait.PollUntilContextTimeout(ctx, 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 		v, err := metricstestutil.GetCounterMetricValue(monitor.ReconciliationsTotal.WithLabelValues(actionStr, errorStr))
 		if err != nil {
