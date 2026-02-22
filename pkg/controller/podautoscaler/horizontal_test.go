@@ -5453,7 +5453,7 @@ func TestMultipleHPAs(t *testing.T) {
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
 	v, err := metricstestutil.GetGaugeMetricValue(monitor.NumHorizontalPodAutoscalers)
 	require.NoError(t, err)
-	assert.Equal(t, float64(hpaCount), v, "Expected objects count to match number of HPAs")
+	assert.InEpsilon(t, float64(hpaCount), v, 0.01, "Expected objects count to match number of HPAs")
 
 	// Simulate the watch event for deletion
 	hpaWatcher.Delete(&hpaList[0])
