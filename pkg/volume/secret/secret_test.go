@@ -41,11 +41,15 @@ import (
 
 func TestMakePayload(t *testing.T) {
 	caseMappingMode := int32(0400)
+	caseMappingUser1 := int64(1001)
+	caseMappingUser2 := int64(1002)
+
 	cases := []struct {
 		name     string
 		mappings []v1.KeyToPath
 		secret   *v1.Secret
 		mode     int32
+		user     *int64
 		optional bool
 		payload  map[string]util.FileProjection
 		success  bool
@@ -238,10 +242,107 @@ func TestMakePayload(t *testing.T) {
 			payload:  map[string]util.FileProjection{},
 			success:  true,
 		},
+		{
+			name: "mapping with defaultUser",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+				},
+			},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+			success: true,
+		},
+		{
+			name: "mapping with User",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+					User: &caseMappingUser2,
+				},
+			},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
+		{
+			name: "mapping with defaultUser and User",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+					User: &caseMappingUser2,
+				},
+			},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
+		{
+			name:     "empty mappings",
+			mappings: []v1.KeyToPath{},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644},
+				"bar": {Data: []byte("bar"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
+			name:     "empty mappings with defaultUser",
+			mappings: []v1.KeyToPath{},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser1},
+				"bar": {Data: []byte("bar"), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+			success: true,
+		},
 	}
 
 	for _, tc := range cases {
-		actualPayload, err := MakePayload(tc.mappings, tc.secret, &tc.mode, tc.optional)
+		actualPayload, err := MakePayload(tc.mappings, tc.secret, &tc.mode, tc.user, tc.optional)
 		if err != nil && tc.success {
 			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 			continue
