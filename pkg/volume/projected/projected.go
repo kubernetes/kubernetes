@@ -274,7 +274,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 					},
 				}
 			}
-			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, s.source.DefaultMode, optional)
+			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, s.source.DefaultMode, s.source.DefaultUser, optional)
 			if err != nil {
 				klog.Errorf("Couldn't get secret payload %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
 				errlist = append(errlist, err)
