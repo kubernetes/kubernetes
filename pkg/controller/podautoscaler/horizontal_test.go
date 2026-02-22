@@ -62,6 +62,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
@@ -732,7 +733,7 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 		if err != nil {
 			t.Fatalf("error getting reconciliation duration metric: %v", err)
 		}
-		assert.Greater(t, count, uint64(0), "reconciliation duration should be recorded")
+		assert.Positive(t, count, "reconciliation duration should be recorded")
 	}
 
 	if tc.expectedReconciliationCount > 0 {
@@ -757,7 +758,7 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 				if err != nil {
 					t.Fatalf("error getting metric computation duration for type %s: %v", metricType, err)
 				}
-				assert.Greater(t, count, uint64(0), "metric computation duration for %s should be recorded", metricType)
+				assert.Positive(t, count, "metric computation duration for %s should be recorded", metricType)
 			}
 		}
 
@@ -778,7 +779,7 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 			if err != nil {
 				t.Fatalf("error getting desired replicas metric: %v", err)
 			}
-			assert.Equal(t, float64(tc.expectedDesiredReplicas), v,
+			assert.InEpsilon(t, float64(tc.expectedDesiredReplicas), v, 0.01,
 				"the desired replicas should be recorded in monitor expectedly")
 		}
 	}
@@ -5451,7 +5452,7 @@ func TestMultipleHPAs(t *testing.T) {
 
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
 	v, err := metricstestutil.GetGaugeMetricValue(monitor.NumHorizontalPodAutoscalers)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, float64(hpaCount), v, "Expected objects count to match number of HPAs")
 
 	// Simulate the watch event for deletion
