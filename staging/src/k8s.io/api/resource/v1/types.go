@@ -694,6 +694,9 @@ type DeviceAttributeListType struct {
 	VersionValue []string `json:"versions,omitempty" protobuf:"bytes,5,opt,name=versions"`
 }
 
+// DeviceAttributeListMaxLength is the maximum number of entries in a list attribute value.
+const DeviceAttributeListMaxLength = 64
+
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64
 

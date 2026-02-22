@@ -174,7 +174,10 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		// This is a LRU cache for compiled CEL expressions. The most
 		// recent 10 of them get reused across different scheduling
 		// cycles.
-		celCache:   cel.NewCache(10, cel.Features{EnableConsumableCapacity: fts.EnableDRAConsumableCapacity}),
+		celCache: cel.NewCache(10, cel.Features{
+			EnableConsumableCapacity: fts.EnableDRAConsumableCapacity,
+			EnableListTypeAttributes: fts.EnableDRAListTypeAttributes,
+		}),
 		draManager: fh.SharedDRAManager(),
 	}
 

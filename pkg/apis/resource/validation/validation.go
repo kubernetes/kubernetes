@@ -325,7 +325,10 @@ func validateCELSelector(celSelector resource.CELDeviceSelector, fldPath *field.
 		return allErrs
 	}
 
-	result := dracel.GetCompiler(dracel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)}).CompileCELExpression(celSelector.Expression, dracel.Options{EnvType: &envType})
+	result := dracel.GetCompiler(dracel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	}).CompileCELExpression(celSelector.Expression, dracel.Options{EnvType: &envType})
 	if result.Error != nil {
 		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath.Child("expression"), celSelector.Expression, result.Error))
 	} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {
