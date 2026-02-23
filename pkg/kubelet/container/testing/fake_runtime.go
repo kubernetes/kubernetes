@@ -320,7 +320,7 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, creds []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
+func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, creds []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, *credentialprovider.TrackedAuthConfig, error) {
 	f.Lock()
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
 
@@ -340,7 +340,7 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 		case <-ctx.Done():
 		case <-f.imagePullTokenBucket:
 		case pullImageErr := <-f.imagePullErrBucket:
-			return "", nil, pullImageErr
+			return "", "", nil, pullImageErr
 		}
 	}
 
@@ -361,7 +361,7 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 		retCreds = &creds[0]
 	}
 
-	return image.Image, retCreds, f.Err
+	return image.Image, image.Image, retCreds, f.Err // TODO: explicitly differentiate imageRef and imageID in the response
 }
 
 // UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.

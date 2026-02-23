@@ -30,7 +30,7 @@ import (
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecontainer.ImageSpec, credentials []crededentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *crededentialprovider.TrackedAuthConfig, error) {
+func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecontainer.ImageSpec, credentials []crededentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, *crededentialprovider.TrackedAuthConfig, error) {
 	logger := klog.FromContext(ctx)
 	img := image.Image
 	imgSpec := ToRuntimeAPIImageSpec(image)
@@ -38,13 +38,13 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	if len(credentials) == 0 {
 		logger.V(3).Info("Pulling image without credentials", "image", img)
 
-		imageRef, err := m.imageService.PullImage(ctx, imgSpec, nil, podSandboxConfig)
+		imageRef, imageID, err := m.imageService.PullImage(ctx, imgSpec, nil, podSandboxConfig)
 		if err != nil {
 			logger.Error(err, "Failed to pull image", "image", img)
-			return "", nil, err
+			return "", "", nil, err
 		}
 
-		return imageRef, nil, nil
+		return imageRef, imageID, nil, nil
 	}
 
 	var pullErrs []error
@@ -58,16 +58,16 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 			RegistryToken: currentCreds.RegistryToken,
 		}
 
-		imageRef, err := m.imageService.PullImage(ctx, imgSpec, auth, podSandboxConfig)
+		imageRef, imageID, err := m.imageService.PullImage(ctx, imgSpec, auth, podSandboxConfig)
 		// If there was no error, return success
 		if err == nil {
-			return imageRef, &currentCreds, nil
+			return imageRef, imageID, &currentCreds, nil
 		}
 
 		pullErrs = append(pullErrs, err)
 	}
 
-	return "", nil, utilerrors.NewAggregate(pullErrs)
+	return "", "", nil, utilerrors.NewAggregate(pullErrs)
 }
 
 // GetImageRef DOES NOT return an ImageRef. It returns an ID of the image which has

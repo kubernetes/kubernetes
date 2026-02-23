@@ -36,7 +36,7 @@ type Impl interface {
 	ListPodSandbox(ctx context.Context, runtimeService criapi.RuntimeService, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
 	StopPodSandbox(ctx context.Context, runtimeService criapi.RuntimeService, sandboxID string) error
 	RemovePodSandbox(ctx context.Context, runtimeService criapi.RuntimeService, podSandboxID string) error
-	PullImage(ctx context.Context, imageService criapi.ImageManagerService, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	PullImage(ctx context.Context, imageService criapi.ImageManagerService, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (imageRef string, imageID string, err error)
 	ImageStatus(ctx context.Context, imageService criapi.ImageManagerService, image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error)
 }
 
@@ -68,7 +68,7 @@ func (*defaultImpl) RemovePodSandbox(ctx context.Context, runtimeService criapi.
 	return runtimeService.RemovePodSandbox(ctx, podSandboxID)
 }
 
-func (*defaultImpl) PullImage(ctx context.Context, imageService criapi.ImageManagerService, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (*defaultImpl) PullImage(ctx context.Context, imageService criapi.ImageManagerService, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
 	return imageService.PullImage(ctx, image, auth, podSandboxConfig)
 }
 

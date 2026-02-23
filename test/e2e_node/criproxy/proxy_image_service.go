@@ -66,12 +66,13 @@ func (p *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageReq
 		return nil, err
 	}
 
-	image, err := p.imageService.PullImage(ctx, req.Image, req.Auth, req.SandboxConfig)
+	imageRef, imageID, err := p.imageService.PullImage(ctx, req.Image, req.Auth, req.SandboxConfig)
 	if err != nil {
 		return nil, err
 	}
 	return &kubeapi.PullImageResponse{
-		ImageRef: image,
+		ImageRef: imageRef,
+		ImageId:  imageID,
 	}, nil
 }
 

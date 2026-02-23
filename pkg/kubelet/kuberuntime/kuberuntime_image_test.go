@@ -42,10 +42,11 @@ func TestPullImage(t *testing.T) {
 	_, _, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
-	imageRef, creds, err := fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	imageRef, imageID, creds, err := fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "busybox", imageRef)
-	assert.Nil(t, creds) // as this was an anonymous pull
+	assert.Equal(t, "busybox", imageID) // TODO: use something different from imageRef?
+	assert.Nil(t, creds)                // as this was an anonymous pull
 
 	images, err := fakeManager.ListImages(tCtx)
 	assert.NoError(t, err)
@@ -59,9 +60,10 @@ func TestPullImageWithError(t *testing.T) {
 	assert.NoError(t, err)
 
 	fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
-	imageRef, creds, err := fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	imageRef, imageID, creds, err := fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.Error(t, err)
 	assert.Equal(t, "", imageRef)
+	assert.Equal(t, "", imageID)
 	assert.Nil(t, creds)
 
 	images, err := fakeManager.ListImages(tCtx)
@@ -214,7 +216,7 @@ func TestRemoveImage(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
-	_, _, err = fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	_, _, _, err = fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Len(t, fakeImageService.Images, 1)
 
@@ -237,7 +239,7 @@ func TestRemoveImageWithError(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
-	_, _, err = fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	_, _, _, err = fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Len(t, fakeImageService.Images, 1)
 
@@ -497,7 +499,7 @@ func TestPullThenListWithAnnotations(t *testing.T) {
 		},
 	}
 
-	_, _, err = fakeManager.PullImage(tCtx, imageSpec, nil, nil)
+	_, _, _, err = fakeManager.PullImage(tCtx, imageSpec, nil, nil)
 	assert.NoError(t, err)
 
 	images, err := fakeManager.ListImages(tCtx)

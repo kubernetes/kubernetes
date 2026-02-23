@@ -184,14 +184,14 @@ func (r *remoteImageService) imageStatusV1(ctx context.Context, image *runtimeap
 }
 
 // PullImage pulls an image with authentication config.
-func (r *remoteImageService) PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *remoteImageService) PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	return r.pullImageV1(ctx, image, auth, podSandboxConfig)
 }
 
-func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
 	resp, err := r.imageClient.PullImage(ctx, &runtimeapi.PullImageRequest{
 		Image:         image,
 		Auth:          auth,
@@ -207,19 +207,19 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 		// works in `imageManager.EnsureImageExists` (pkg/kubelet/images/image_manager.go).
 		statusErr, ok := status.FromError(err)
 		if ok && statusErr.Code() == codes.Unknown {
-			return "", errors.New(statusErr.Message())
+			return "", "", errors.New(statusErr.Message())
 		}
 
-		return "", err
+		return "", "", err
 	}
 
-	if resp.ImageRef == "" {
-		r.logErr(errors.New("PullImage failed"), "ImageRef of image is not set", "image", image.Image)
-		errorMessage := fmt.Sprintf("imageRef of image %q is not set", image.Image)
-		return "", errors.New(errorMessage)
+	if resp.ImageRef == "" && resp.ImageId == "" {
+		r.logErr(errors.New("PullImage failed"), "Neither ImageRef nor ImageId of image are set", "image", image.Image)
+		errorMessage := fmt.Sprintf("neither imageRef nor imageId of image %q are set", image.Image)
+		return "", "", errors.New(errorMessage)
 	}
 
-	return resp.ImageRef, nil
+	return resp.ImageRef, resp.ImageId, nil
 }
 
 // RemoveImage removes the image.
