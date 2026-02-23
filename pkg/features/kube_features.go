@@ -249,6 +249,14 @@ const (
 	// scheduler plugin configuration).
 	DRASchedulerFilterTimeout featuregate.Feature = "DRASchedulerFilterTimeout"
 
+	// owner: @macsko
+	// kep: http://kep.k8s.io/4671
+	//
+	// Decouples the computation of the preemption decisions from their actuation
+	// in the pod group scheduling cycle to prevent premature preemptions
+	// for pod groups that would not fit in the cluster in the first place.
+	DelayedPreemption featuregate.Feature = "DelayedPreemption"
+
 	// owner: @atiratree
 	// kep: http://kep.k8s.io/3973
 	//
@@ -1248,6 +1256,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	DelayedPreemption: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	DeploymentReplicaSetTerminatingReplicas: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2197,6 +2209,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
 
+	DelayedPreemption: {},
+
 	DeploymentReplicaSetTerminatingReplicas: {},
 
 	DisableAllocatorDualWrite: {MultiCIDRServiceAllocator},
@@ -2217,7 +2231,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	GangScheduling: {GenericWorkload},
 
-	GenericWorkload: {},
+	GenericWorkload: {DelayedPreemption},
 
 	GitRepoVolumeDriver: {},
 
