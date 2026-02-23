@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
 
@@ -67,7 +69,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string) (http.Handler, error) {
+func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, completeHook WatchListCompleteHook) (http.Handler, error) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		return nil, err
@@ -174,7 +176,8 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		TimeoutFactory:       &realTimeoutFactory{timeout},
 		ServerShuttingDownCh: serverShuttingDownCh,
 
-		metricsScope: metricsScope,
+		metricsScope:          metricsScope,
+		watchListCompleteHook: completeHook,
 	}
 
 	if wsstream.IsWebSocketRequest(req) {
@@ -204,8 +207,11 @@ type WatchServer struct {
 	TimeoutFactory       TimeoutFactory
 	ServerShuttingDownCh <-chan struct{}
 
-	metricsScope string
+	metricsScope          string
+	watchListCompleteHook WatchListCompleteHook
 }
+
+type WatchListCompleteHook func()
 
 // watchEventMetricsRecorder allows the caller to count bytes written and report the size of the event.
 // It is thread-safe, as long as underlying io.Writer is thread-safe.
@@ -233,6 +239,15 @@ func (c *watchEventMetricsRecorder) RecordEvent() {
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
 // or over a websocket connection.
 func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+	ctx, span := tracing.Start(ctx, "WatchServer.HandleHTTP",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("method", req.Method),
+		attribute.String("url", req.URL.Path),
+		attribute.String("protocol", req.Proto),
+		attribute.String("mediaType", s.MediaType),
+		attribute.String("encoder", string(s.Encoder.Identifier())))
+	req = req.WithContext(ctx)
 	defer func() {
 		if s.MemoryAllocator != nil {
 			runtime.AllocatorPool.Put(s.MemoryAllocator)
@@ -278,6 +293,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
+	span.AddEvent("About to start writing response")
 	for {
 		select {
 		case <-s.ServerShuttingDownCh:
@@ -321,6 +337,9 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					auditID := audit.GetAuditIDTruncated(req.Context())
 					klog.V(3).InfoS("WatchList initial events sent", "path", req.URL.Path, "auditID", auditID, "initLatency", initLatency)
 					httplog.AddKeyValue(req.Context(), "watchlist_init_latency", initLatency)
+					span.AddEvent("Writing initial events done")
+					span.End(5 * time.Second)
+					s.watchListCompleteHook()
 				}
 			}
 		}

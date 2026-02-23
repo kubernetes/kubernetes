@@ -25,10 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metainternalversionvalidation "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
@@ -259,6 +256,14 @@ func listOpts(req *http.Request, scope *RequestScope) (metainternalversion.ListO
 }
 
 func handleWatch(ctx context.Context, rw rest.Watcher, scope *RequestScope, req *http.Request, w http.ResponseWriter, opts metainternalversion.ListOptions, outputMediaType negotiation.MediaTypeOptions, minRequestTimeout time.Duration) error {
+	var span *tracing.Span
+	var onWatchListComplete WatchListCompleteHook
+	if isListWatchRequest(opts) {
+		ctx, span = tracing.Start(ctx, "WatchList", traceFields(req)...)
+		onWatchListComplete = func() { span.End(500 * time.Millisecond) }
+		req = req.WithContext(ctx)
+	}
+
 	if rw == nil {
 		return errors.NewMethodNotSupported(scope.Resource.GroupResource(), "watch")
 	}
@@ -278,7 +283,7 @@ func handleWatch(ctx context.Context, rw rest.Watcher, scope *RequestScope, req 
 	if err != nil {
 		return err
 	}
-	handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts))
+	handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), onWatchListComplete)
 	if err != nil {
 		return err
 	}
@@ -311,13 +316,15 @@ func handleList(ctx context.Context, r rest.Lister, scope *RequestScope, req *ht
 	defer span.End(500 * time.Millisecond)
 	req = req.WithContext(ctx)
 
-	span.AddEvent("About to List from storage")
 	result, err := r.List(ctx, &opts)
 	if err != nil {
 		return err
 	}
-	span.AddEvent("Listing from storage done")
-	defer span.AddEvent("Writing http response done", attribute.Int("count", meta.LenList(result)))
 	transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
 	return nil
+}
+
+// isListWatchRequest is mirrored in staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+func isListWatchRequest(opts metainternalversion.ListOptions) bool {
+	return opts.SendInitialEvents != nil && *opts.SendInitialEvents && opts.AllowWatchBookmarks
 }
