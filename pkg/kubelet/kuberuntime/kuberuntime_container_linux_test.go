@@ -153,8 +153,8 @@ func TestGenerateContainerConfig(t *testing.T) {
 	_, _, err = m.generateContainerConfig(tCtx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
 	assert.Error(t, err)
 
-	imageID, _ := imageService.PullImage(tCtx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
-	resp, _ := imageService.ImageStatus(tCtx, &runtimeapi.ImageSpec{Image: imageID}, false)
+	imageRef, imageID, _ := imageService.PullImage(tCtx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
+	resp, _ := imageService.ImageStatus(tCtx, &runtimeapi.ImageSpec{Image: imageID, ImageRef: imageRef}, false)
 
 	resp.Image.Uid = nil
 	resp.Image.Username = "test"

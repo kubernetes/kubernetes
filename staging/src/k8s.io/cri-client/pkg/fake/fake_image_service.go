@@ -48,13 +48,14 @@ func (f *RemoteRuntime) ImageStatus(ctx context.Context, req *kubeapi.ImageStatu
 
 // PullImage pulls an image with authentication config.
 func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
-	image, err := f.ImageService.PullImage(ctx, req.Image, req.Auth, req.SandboxConfig)
+	imageRef, imageID, err := f.ImageService.PullImage(ctx, req.Image, req.Auth, req.SandboxConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &kubeapi.PullImageResponse{
-		ImageRef: image,
+		ImageRef: imageRef,
+		ImageId:  imageID,
 	}, nil
 }
 

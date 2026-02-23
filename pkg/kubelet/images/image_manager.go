@@ -320,6 +320,7 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 	var pullSucceeded bool
 	var finalPullCredentials *credentialprovider.TrackedAuthConfig
 
+	var imagePullResult pullResult
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
 		if err := m.imagePullManager.RecordPullIntent(logger, image); err != nil {
 			return "", fmt.Sprintf("Failed to record image pull intent for container image %q: %v", image, err), err
@@ -358,7 +359,7 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 
 	pullChan := make(chan pullResult)
 	m.puller.pullImage(ctx, imgSpec, pullCredentials, pullChan, podSandboxConfig)
-	imagePullResult := <-pullChan
+	imagePullResult = <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(objRef, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", image, imagePullResult.err), klog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
