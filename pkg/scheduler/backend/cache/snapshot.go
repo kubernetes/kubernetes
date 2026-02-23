@@ -270,5 +270,5 @@ func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
 			utilruntime.HandleErrorWithLogger(logger, err, "Failed to forget assumed pod")
 		}
 	}
-	utilruntime.HandleErrorWithLogger(logger, nil, "Found assumed pods in the snapshot that were not forgotten", "assumedPodsCount", len(s.assumedPods))
+	logger.Error(nil, "Found assumed pods in the snapshot that were not forgotten", "assumedPodsCount", len(s.assumedPods))
 }
