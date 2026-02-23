@@ -115,7 +115,7 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 		}
 		decision, err := a.authorizer.Authorize(ctx, deleteAttributes)
 		if !decision.IsAllowed() {
-			return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", decision.Reason(), err))
+			return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %w", decision.Reason(), err))
 		}
 	}
 
@@ -138,7 +138,7 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 	for _, ref := range newBlockingRefs {
 		records, err := a.ownerRefToDeleteAttributeRecords(ref, attributes)
 		if err != nil {
-			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion in this case because cannot find RESTMapping for APIVersion %s Kind %s: %v", ref.APIVersion, ref.Kind, err))
+			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion in this case because cannot find RESTMapping for APIVersion %s Kind %s: %w", ref.APIVersion, ref.Kind, err))
 		}
 		// Multiple records are returned if ref.Kind could map to multiple
 		// resources. User needs to have delete permission on all the
@@ -146,7 +146,7 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 		for _, record := range records {
 			decision, err := a.authorizer.Authorize(ctx, record)
 			if !decision.IsAllowed() {
-				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %v", decision.Reason(), err))
+				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %w", decision.Reason(), err))
 			}
 		}
 	}

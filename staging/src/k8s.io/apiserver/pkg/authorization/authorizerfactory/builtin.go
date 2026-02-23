@@ -75,7 +75,7 @@ type privilegedGroupAuthorizer struct {
 
 func (r *privilegedGroupAuthorizer) Authorize(ctx context.Context, attr authorizer.Attributes) (authorizer.Decision, error) {
 	if attr.GetUser() == nil {
-		return authorizer.DecisionNoOpinion("Error"), errors.New("no user on request.")
+		return authorizer.DecisionNoOpinion("Error"), errors.New("no user on request")
 	}
 	for _, attr_group := range attr.GetUser().GetGroups() {
 		for _, priv_group := range r.groups {

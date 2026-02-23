@@ -37,7 +37,6 @@ type fakeAuthorizer struct {
 	attrs authorizer.Attributes
 
 	decision authorizer.Decision
-	reason   string
 	err      error
 }
 
