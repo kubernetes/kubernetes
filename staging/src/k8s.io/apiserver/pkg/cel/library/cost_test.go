@@ -1511,6 +1511,6 @@ func (t *testCostEstimator) EstimateCallCost(function, overloadId string, target
 
 type alwaysAllowAuthorizer struct{}
 
-func (f alwaysAllowAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return authorizer.DecisionAllow, "", nil
+func (f alwaysAllowAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return authorizer.DecisionAllow(""), nil
 }

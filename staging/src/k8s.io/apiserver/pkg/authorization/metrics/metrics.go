@@ -74,19 +74,19 @@ type instrumentedAuthorizer struct {
 	delegate       authorizer.Authorizer
 }
 
-func (a *instrumentedAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
-	decision, reason, err := a.delegate.Authorize(ctx, attributes)
-	switch decision {
-	case authorizer.DecisionNoOpinion:
+func (a *instrumentedAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, error) {
+	decision, err := a.delegate.Authorize(ctx, attributes)
+	switch {
+	case decision.IsNoOpinion():
 		// non-terminal, not reported
-	case authorizer.DecisionAllow:
+	case decision.IsAllowed():
 		// matches SubjectAccessReview status.allowed field name
 		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "allowed")
-	case authorizer.DecisionDeny:
+	case decision.IsDenied():
 		// matches SubjectAccessReview status.denied field name
 		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "denied")
 	default:
 		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "unknown")
 	}
-	return decision, reason, err
+	return decision, err
 }

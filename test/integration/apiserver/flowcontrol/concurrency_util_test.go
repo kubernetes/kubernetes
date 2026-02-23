@@ -125,7 +125,7 @@ type noxuDelayingAuthorizer struct {
 	Authorizer authorizer.Authorizer
 }
 
-func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	if a.GetUser().GetName() == "noxu1" || a.GetUser().GetName() == "noxu2" {
 		time.Sleep(fakeworkDuration) // simulate fake work with sleep
 	}

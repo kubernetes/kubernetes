@@ -116,11 +116,11 @@ func (v *mutatingAdmissionPolicyBindingStrategy) authorize(ctx context.Context, 
 		Resource:        resource,
 	}
 
-	d, _, err := v.authorizer.Authorize(ctx, attrs)
+	d, err := v.authorizer.Authorize(ctx, attrs)
 	if err != nil {
 		return err
 	}
-	if d != authorizer.DecisionAllow {
+	if !d.IsAllowed() {
 		if policyErr != nil {
 			return fmt.Errorf(`unable to get policy %s to determine minimum required permissions and user %v does not have "%v" permission for all groups, versions and resources`, binding.Spec.PolicyName, user, verb)
 		}
@@ -130,7 +130,7 @@ func (v *mutatingAdmissionPolicyBindingStrategy) authorize(ctx context.Context, 
 		if gvrResolveErr != nil {
 			return fmt.Errorf(`unable to resolve paramKind %v to determine minimum required permissions and user %v does not have "%v" permission for all groups, versions and resources`, policy.Spec.ParamKind, user, verb)
 		}
-		return fmt.Errorf(`user %v does not have "%v" permission on the object referenced by paramRef`, verb, user)
+		return fmt.Errorf(`user %v does not have "%v" permission on the object referenced by paramRef`, user, verb)
 	}
 
 	return nil

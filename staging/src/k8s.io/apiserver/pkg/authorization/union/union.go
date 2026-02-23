@@ -26,7 +26,6 @@ package union
 
 import (
 	"context"
-	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -42,30 +41,29 @@ func New(authorizationHandlers ...authorizer.Authorizer) authorizer.Authorizer {
 }
 
 // Authorizes against a chain of authorizer.Authorizer objects and returns nil if successful and returns error if unsuccessful
-func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	var (
 		errlist    []error
 		reasonlist []string
 	)
 
 	for _, currAuthzHandler := range authzHandler {
-		decision, reason, err := currAuthzHandler.Authorize(ctx, a)
-
+		decision, err := currAuthzHandler.Authorize(ctx, a)
+		// Ignore previous errors/reasons from NoOpinion responses
+		if decision.IsAllowed() || decision.IsDenied() {
+			return decision, err
+		}
+		// If NoOpinion, save the reasons and errors, if any
 		if err != nil {
 			errlist = append(errlist, err)
 		}
+		reason := decision.Reason()
 		if len(reason) != 0 {
 			reasonlist = append(reasonlist, reason)
 		}
-		switch decision {
-		case authorizer.DecisionAllow, authorizer.DecisionDeny:
-			return decision, reason, err
-		case authorizer.DecisionNoOpinion:
-			// continue to the next authorizer
-		}
 	}
 
-	return authorizer.DecisionNoOpinion, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
+	return authorizer.DecisionNoOpinion(reasonlist...), utilerrors.NewAggregate(errlist)
 }
 
 // unionAuthzRulesHandler authorizer against a chain of authorizer.RuleResolver

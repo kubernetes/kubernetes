@@ -536,8 +536,7 @@ func TestAuthorizeUnsafeDelete(t *testing.T) {
 				},
 			}),
 			authz: &fakeAuthorizer{
-				decision: authorizer.DecisionDeny,
-				reason:   "does not have permission",
+				decision: authorizer.DecisionDeny("does not have permission"),
 			},
 			err: func(attr admission.Attributes) error {
 				return admission.NewForbidden(attr, fmt.Errorf("not permitted to do %q, reason: %s", verbWant, "does not have permission"))
@@ -554,8 +553,7 @@ func TestAuthorizeUnsafeDelete(t *testing.T) {
 				},
 			}),
 			authz: &fakeAuthorizer{
-				decision: authorizer.DecisionNoOpinion,
-				reason:   "no opinion",
+				decision: authorizer.DecisionNoOpinion("no opinion"),
 			},
 			err: func(attr admission.Attributes) error {
 				return admission.NewForbidden(attr, fmt.Errorf("not permitted to do %q, reason: %s", verbWant, "no opinion"))
@@ -573,8 +571,7 @@ func TestAuthorizeUnsafeDelete(t *testing.T) {
 				userInfo: &user.DefaultInfo{Name: "foo"},
 			}),
 			authz: &fakeAuthorizer{
-				decision: authorizer.DecisionAllow,
-				reason:   "permitted",
+				decision: authorizer.DecisionAllow("permitted"),
 			},
 		},
 	}
@@ -650,10 +647,9 @@ func (f *fakeAttributes) AddAnnotation(key, value string) error {
 
 type fakeAuthorizer struct {
 	decision authorizer.Decision
-	reason   string
 	err      error
 }
 
-func (authorizer fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return authorizer.decision, authorizer.reason, authorizer.err
+func (authorizer fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, err error) {
+	return authorizer.decision, authorizer.err
 }

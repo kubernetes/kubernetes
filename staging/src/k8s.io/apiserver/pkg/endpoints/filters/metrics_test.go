@@ -178,8 +178,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 		{
 			desc: "auth ok",
 			authorizer: fakeAuthorizer{
-				authorizer.DecisionAllow,
-				"RBAC: allowed to patch pod",
+				authorizer.DecisionAllow("RBAC: allowed to patch pod"),
 				nil,
 			},
 			want: `
@@ -191,8 +190,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 		{
 			desc: "decision forbid",
 			authorizer: fakeAuthorizer{
-				authorizer.DecisionDeny,
-				"RBAC: not allowed to patch pod",
+				authorizer.DecisionDeny("RBAC: not allowed to patch pod"),
 				nil,
 			},
 			want: `
@@ -204,8 +202,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 		{
 			desc: "authorizer failed with error",
 			authorizer: fakeAuthorizer{
-				authorizer.DecisionNoOpinion,
-				"",
+				authorizer.DecisionNoOpinion(""),
 				errors.New("can't parse user info"),
 			},
 			want: `
@@ -217,8 +214,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 		{
 			desc: "authorizer decided allow with error",
 			authorizer: fakeAuthorizer{
-				authorizer.DecisionAllow,
-				"",
+				authorizer.DecisionAllow(""),
 				errors.New("can't parse user info"),
 			},
 			want: `
@@ -230,8 +226,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 		{
 			desc: "authorizer failed with error",
 			authorizer: fakeAuthorizer{
-				authorizer.DecisionNoOpinion,
-				"",
+				authorizer.DecisionNoOpinion(""),
 				nil,
 			},
 			want: `

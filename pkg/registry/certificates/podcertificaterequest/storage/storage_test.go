@@ -46,12 +46,11 @@ import (
 
 type fakeAuthorizer struct {
 	decision authorizer.Decision
-	reason   string
 	err      error
 }
 
-func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return f.decision, f.reason, f.err
+func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return f.decision, f.err
 }
 
 func newStorage(t *testing.T, authz authorizer.Authorizer, clock clock.PassiveClock) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
@@ -71,7 +70,7 @@ func newStorage(t *testing.T, authz authorizer.Authorizer, clock clock.PassiveCl
 
 func TestCreate(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionAllow,
+		decision: authorizer.DecisionAllow(""),
 	}
 
 	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
@@ -133,7 +132,7 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionAllow,
+		decision: authorizer.DecisionAllow(""),
 	}
 	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)
@@ -188,7 +187,7 @@ func TestUpdate(t *testing.T) {
 
 func TestUpdateStompsStatus(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionAllow,
+		decision: authorizer.DecisionAllow(""),
 	}
 	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)
@@ -236,7 +235,7 @@ func TestUpdateStompsStatus(t *testing.T) {
 
 func TestUpdateStatus(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionAllow,
+		decision: authorizer.DecisionAllow(""),
 	}
 	_, statusStorage, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)
@@ -303,7 +302,7 @@ func TestUpdateStatus(t *testing.T) {
 
 func TestUpdateStatusStompsSpec(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionAllow,
+		decision: authorizer.DecisionAllow(""),
 	}
 	_, statusStorage, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)
@@ -349,7 +348,7 @@ func TestUpdateStatusStompsSpec(t *testing.T) {
 
 func TestUpdateStatusFailsWhenAuthorizerDenies(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionNoOpinion,
+		decision: authorizer.DecisionNoOpinion(""),
 	}
 	_, statusStorage, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)
@@ -417,7 +416,7 @@ func TestUpdateStatusFailsWhenAuthorizerDenies(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionAllow,
+		decision: authorizer.DecisionAllow(""),
 	}
 	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)
@@ -455,7 +454,7 @@ func TestDelete(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionAllow,
+		decision: authorizer.DecisionAllow(""),
 	}
 	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)
@@ -493,7 +492,7 @@ func TestGet(t *testing.T) {
 
 func TestList(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionAllow,
+		decision: authorizer.DecisionAllow(""),
 	}
 	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)
@@ -531,7 +530,7 @@ func TestList(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	authz := &fakeAuthorizer{
-		decision: authorizer.DecisionAllow,
+		decision: authorizer.DecisionAllow(""),
 	}
 	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)

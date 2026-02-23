@@ -41,16 +41,15 @@ type fakeAuthorizer struct {
 	err      error
 }
 
-func (f *fakeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+func (f *fakeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, error) {
 	f.attrs = attrs
-	return f.decision, f.reason, f.err
+	return f.decision, f.err
 }
 
 func TestCreate(t *testing.T) {
 	testcases := map[string]struct {
 		spec     authorizationapi.SubjectAccessReviewSpec
 		decision authorizer.Decision
-		reason   string
 		err      error
 
 		expectedErr    string
@@ -66,8 +65,7 @@ func TestCreate(t *testing.T) {
 				User:                  "bob",
 				NonResourceAttributes: &authorizationapi.NonResourceAttributes{Verb: "get", Path: "/mypath"},
 			},
-			decision: authorizer.DecisionNoOpinion,
-			reason:   "myreason",
+			decision: authorizer.DecisionNoOpinion("myreason"),
 			err:      errors.New("myerror"),
 			expectedAttrs: authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
@@ -87,8 +85,7 @@ func TestCreate(t *testing.T) {
 				User:                  "bob",
 				NonResourceAttributes: &authorizationapi.NonResourceAttributes{Verb: "get", Path: "/mypath"},
 			},
-			decision: authorizer.DecisionAllow,
-			reason:   "allowed",
+			decision: authorizer.DecisionAllow("allowed"),
 			err:      nil,
 			expectedAttrs: authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
@@ -116,8 +113,7 @@ func TestCreate(t *testing.T) {
 					Name:        "mydeployment",
 				},
 			},
-			decision: authorizer.DecisionNoOpinion,
-			reason:   "myreason",
+			decision: authorizer.DecisionNoOpinion("myreason"),
 			err:      errors.New("myerror"),
 			expectedAttrs: authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
@@ -151,8 +147,7 @@ func TestCreate(t *testing.T) {
 					Name:        "mydeployment",
 				},
 			},
-			decision: authorizer.DecisionAllow,
-			reason:   "allowed",
+			decision: authorizer.DecisionAllow("allowed"),
 			err:      nil,
 			expectedAttrs: authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
@@ -178,7 +173,7 @@ func TestCreate(t *testing.T) {
 				User:               "bob",
 				ResourceAttributes: &authorizationapi.ResourceAttributes{},
 			},
-			decision: authorizer.DecisionDeny,
+			decision: authorizer.DecisionDeny(""),
 			expectedAttrs: authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
 				ResourceRequest: true,
@@ -198,7 +193,7 @@ func TestCreate(t *testing.T) {
 					LabelSelector: &authorizationapi.LabelSelectorAttributes{RawSelector: "key=value"},
 				},
 			},
-			decision: authorizer.DecisionDeny,
+			decision: authorizer.DecisionDeny(""),
 			expectedAttrs: authorizer.AttributesRecord{
 				User:                      &user.DefaultInfo{Name: "bob"},
 				ResourceRequest:           true,
@@ -219,7 +214,7 @@ func TestCreate(t *testing.T) {
 					LabelSelector: &authorizationapi.LabelSelectorAttributes{RawSelector: "&"},
 				},
 			},
-			decision: authorizer.DecisionDeny,
+			decision: authorizer.DecisionDeny(""),
 			expectedAttrs: authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
 				ResourceRequest: true,
@@ -236,7 +231,6 @@ func TestCreate(t *testing.T) {
 	for k, tc := range testcases {
 		auth := &fakeAuthorizer{
 			decision: tc.decision,
-			reason:   tc.reason,
 			err:      tc.err,
 		}
 		storage := NewREST(auth)

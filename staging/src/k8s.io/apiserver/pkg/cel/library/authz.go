@@ -583,7 +583,7 @@ func decisionAllowed(arg ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(arg)
 	}
 
-	return types.Bool(decision.authDecision == authorizer.DecisionAllow)
+	return types.Bool(decision.authDecision.IsAllowed())
 }
 
 func decisionReason(arg ref.Val) ref.Val {
@@ -592,7 +592,7 @@ func decisionReason(arg ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(arg)
 	}
 
-	return types.String(decision.reason)
+	return types.String(decision.authDecision.Reason())
 }
 
 var (
@@ -670,8 +670,8 @@ func (a pathCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
 		User: a.authorizer.userInfo,
 	}
 
-	decision, reason, err := a.authorizer.authAuthorizer.Authorize(ctx, attr)
-	return newDecision(decision, err, reason)
+	decision, err := a.authorizer.authAuthorizer.Authorize(ctx, attr)
+	return newDecision(decision, err)
 }
 
 type groupCheckVal struct {
@@ -727,19 +727,18 @@ func (a resourceCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
 		}
 	}
 
-	decision, reason, err := a.groupCheck.authorizer.authAuthorizer.Authorize(ctx, attr)
-	return newDecision(decision, err, reason)
+	decision, err := a.groupCheck.authorizer.authAuthorizer.Authorize(ctx, attr)
+	return newDecision(decision, err)
 }
 
-func newDecision(authDecision authorizer.Decision, err error, reason string) decisionVal {
-	return decisionVal{receiverOnlyObjectVal: receiverOnlyVal(DecisionType), authDecision: authDecision, err: err, reason: reason}
+func newDecision(authDecision authorizer.Decision, err error) decisionVal {
+	return decisionVal{receiverOnlyObjectVal: receiverOnlyVal(DecisionType), authDecision: authDecision, err: err}
 }
 
 type decisionVal struct {
 	receiverOnlyObjectVal
 	err          error
 	authDecision authorizer.Decision
-	reason       string
 }
 
 // receiverOnlyObjectVal provides an implementation of ref.Val for

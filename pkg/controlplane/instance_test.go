@@ -200,7 +200,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{
 		Authorizer: &fakeAuthorizer{
-			decision: authorizer.DecisionAllow,
+			decision: authorizer.DecisionAllow(""),
 		},
 	}
 	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ControlPlane.APIResourceConfigSource, apiserverCfg.ControlPlane.Generic.RESTOptionsGetter)
@@ -217,12 +217,11 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 
 type fakeAuthorizer struct {
 	decision authorizer.Decision
-	reason   string
 	err      error
 }
 
-func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return f.decision, f.reason, f.err
+func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return f.decision, f.err
 }
 
 func newInstance(t *testing.T) (*Instance, *etcd3testing.EtcdTestServer, CompletedConfig, *assert.Assertions) {

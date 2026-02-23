@@ -40,8 +40,7 @@ func mustParseLabelSelector(str string) labels.Requirements {
 func TestCachingAuthorizer(t *testing.T) {
 	type result struct {
 		decision authorizer.Decision
-		reason   string
-		error    error
+		err      error
 	}
 
 	type invocation struct {
@@ -60,25 +59,22 @@ func TestCachingAuthorizer(t *testing.T) {
 				{
 					attributes: authorizer.AttributesRecord{Name: "test name"},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
 					attributes: authorizer.AttributesRecord{Name: "test name"},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason",
-					error:    fmt.Errorf("test error"),
+					decision: authorizer.DecisionAllow("test reason"),
+					err:      fmt.Errorf("test error"),
 				},
 			},
 		},
@@ -92,9 +88,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						},
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
@@ -104,17 +99,15 @@ func TestCachingAuthorizer(t *testing.T) {
 						},
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason",
-					error:    fmt.Errorf("test error"),
+					decision: authorizer.DecisionAllow("test reason"),
+					err:      fmt.Errorf("test error"),
 				},
 			},
 		},
@@ -130,9 +123,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						},
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
@@ -144,17 +136,15 @@ func TestCachingAuthorizer(t *testing.T) {
 						},
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason",
-					error:    fmt.Errorf("test error"),
+					decision: authorizer.DecisionAllow("test reason"),
+					err:      fmt.Errorf("test error"),
 				},
 			},
 		},
@@ -164,30 +154,26 @@ func TestCachingAuthorizer(t *testing.T) {
 				{
 					attributes: authorizer.AttributesRecord{Name: "alpha"},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason alpha",
-						error:    fmt.Errorf("test error alpha"),
+						decision: authorizer.DecisionAllow("test reason alpha"),
+						err:      fmt.Errorf("test error alpha"),
 					},
 				},
 				{
 					attributes: authorizer.AttributesRecord{Name: "beta"},
 					expected: result{
-						decision: authorizer.DecisionDeny,
-						reason:   "test reason beta",
-						error:    fmt.Errorf("test error beta"),
+						decision: authorizer.DecisionDeny("test reason beta"),
+						err:      fmt.Errorf("test error beta"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason alpha",
-					error:    fmt.Errorf("test error alpha"),
+					decision: authorizer.DecisionAllow("test reason alpha"),
+					err:      fmt.Errorf("test error alpha"),
 				},
 				{
-					decision: authorizer.DecisionDeny,
-					reason:   "test reason beta",
-					error:    fmt.Errorf("test error beta"),
+					decision: authorizer.DecisionDeny("test reason beta"),
+					err:      fmt.Errorf("test error beta"),
 				},
 			},
 		},
@@ -199,9 +185,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						User: &user.DefaultInfo{Name: "alpha"},
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason alpha",
-						error:    fmt.Errorf("test error alpha"),
+						decision: authorizer.DecisionAllow("test reason alpha"),
+						err:      fmt.Errorf("test error alpha"),
 					},
 				},
 				{
@@ -209,22 +194,19 @@ func TestCachingAuthorizer(t *testing.T) {
 						User: &user.DefaultInfo{Name: "beta"},
 					},
 					expected: result{
-						decision: authorizer.DecisionDeny,
-						reason:   "test reason beta",
-						error:    fmt.Errorf("test error beta"),
+						decision: authorizer.DecisionDeny("test reason beta"),
+						err:      fmt.Errorf("test error beta"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason alpha",
-					error:    fmt.Errorf("test error alpha"),
+					decision: authorizer.DecisionAllow("test reason alpha"),
+					err:      fmt.Errorf("test error alpha"),
 				},
 				{
-					decision: authorizer.DecisionDeny,
-					reason:   "test reason beta",
-					error:    fmt.Errorf("test error beta"),
+					decision: authorizer.DecisionDeny("test reason beta"),
+					err:      fmt.Errorf("test error beta"),
 				},
 			},
 		},
@@ -237,9 +219,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						FieldSelectorRequirements: fields.ParseSelectorOrDie("foo=bar").Requirements(),
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
@@ -247,9 +228,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						Name: "test name",
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason 2",
-						error:    fmt.Errorf("test error 2"),
+						decision: authorizer.DecisionAllow("test reason 2"),
+						err:      fmt.Errorf("test error 2"),
 					},
 				},
 				{
@@ -259,22 +239,19 @@ func TestCachingAuthorizer(t *testing.T) {
 						FieldSelectorRequirements: fields.ParseSelectorOrDie("foo=bar").Requirements(),
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason",
-					error:    fmt.Errorf("test error"),
+					decision: authorizer.DecisionAllow("test reason"),
+					err:      fmt.Errorf("test error"),
 				},
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason 2",
-					error:    fmt.Errorf("test error 2"),
+					decision: authorizer.DecisionAllow("test reason 2"),
+					err:      fmt.Errorf("test error 2"),
 				},
 			},
 		},
@@ -287,9 +264,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						FieldSelectorParsingErr: errors.New("malformed"),
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
@@ -299,17 +275,15 @@ func TestCachingAuthorizer(t *testing.T) {
 						Name: "test name",
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason",
-					error:    fmt.Errorf("test error"),
+					decision: authorizer.DecisionAllow("test reason"),
+					err:      fmt.Errorf("test error"),
 				},
 			},
 		},
@@ -321,9 +295,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						Name: "test name",
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
@@ -333,17 +306,15 @@ func TestCachingAuthorizer(t *testing.T) {
 						FieldSelectorParsingErr: errors.New("malformed"),
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason",
-					error:    fmt.Errorf("test error"),
+					decision: authorizer.DecisionAllow("test reason"),
+					err:      fmt.Errorf("test error"),
 				},
 			},
 		},
@@ -357,9 +328,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						LabelSelectorRequirements: mustParseLabelSelector("foo=bar"),
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
@@ -367,9 +337,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						Name: "test name",
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason 2",
-						error:    fmt.Errorf("test error 2"),
+						decision: authorizer.DecisionAllow("test reason 2"),
+						err:      fmt.Errorf("test error 2"),
 					},
 				},
 				{
@@ -379,9 +348,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						LabelSelectorRequirements: mustParseLabelSelector("foo=bar"),
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
@@ -390,27 +358,23 @@ func TestCachingAuthorizer(t *testing.T) {
 						LabelSelectorRequirements: mustParseLabelSelector("diff=zero"),
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason 3",
-						error:    fmt.Errorf("test error 3"),
+						decision: authorizer.DecisionAllow("test reason 3"),
+						err:      fmt.Errorf("test error 3"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason",
-					error:    fmt.Errorf("test error"),
+					decision: authorizer.DecisionAllow("test reason"),
+					err:      fmt.Errorf("test error"),
 				},
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason 2",
-					error:    fmt.Errorf("test error 2"),
+					decision: authorizer.DecisionAllow("test reason 2"),
+					err:      fmt.Errorf("test error 2"),
 				},
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason 3",
-					error:    fmt.Errorf("test error 3"),
+					decision: authorizer.DecisionAllow("test reason 3"),
+					err:      fmt.Errorf("test error 3"),
 				},
 			},
 		},
@@ -423,9 +387,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						LabelSelectorParsingErr: errors.New("malformed mess"),
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
@@ -435,17 +398,15 @@ func TestCachingAuthorizer(t *testing.T) {
 						Name: "test name",
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason",
-					error:    fmt.Errorf("test error"),
+					decision: authorizer.DecisionAllow("test reason"),
+					err:      fmt.Errorf("test error"),
 				},
 			},
 		},
@@ -457,9 +418,8 @@ func TestCachingAuthorizer(t *testing.T) {
 						Name: "test name",
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 				{
@@ -469,17 +429,15 @@ func TestCachingAuthorizer(t *testing.T) {
 						LabelSelectorParsingErr: errors.New("malformed mess"),
 					},
 					expected: result{
-						decision: authorizer.DecisionAllow,
-						reason:   "test reason",
-						error:    fmt.Errorf("test error"),
+						decision: authorizer.DecisionAllow("test reason"),
+						err:      fmt.Errorf("test error"),
 					},
 				},
 			},
 			backend: []result{
 				{
-					decision: authorizer.DecisionAllow,
-					reason:   "test reason",
-					error:    fmt.Errorf("test error"),
+					decision: authorizer.DecisionAllow("test reason"),
+					err:      fmt.Errorf("test error"),
 				},
 			},
 		},
@@ -487,26 +445,26 @@ func TestCachingAuthorizer(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var misses int
 			frontend := NewCachingAuthorizer(func() authorizer.Authorizer {
-				return authorizer.AuthorizerFunc(func(_ context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.AuthorizerFunc(func(_ context.Context, attributes authorizer.Attributes) (authorizer.Decision, error) {
 					if misses >= len(tc.backend) {
 						t.Fatalf("got more than expected %d backend invocations", len(tc.backend))
 					}
 					result := tc.backend[misses]
 					misses++
-					return result.decision, result.reason, result.error
+					return result.decision, result.err
 				})
 			}())
 
 			for i, invocation := range tc.calls {
-				decision, reason, err := frontend.Authorize(context.TODO(), invocation.attributes)
-				if decision != invocation.expected.decision {
+				decision, err := frontend.Authorize(context.TODO(), invocation.attributes)
+				if !decision.Equal(invocation.expected.decision) {
 					t.Errorf("(call %d of %d) expected decision %v, got %v", i+1, len(tc.calls), invocation.expected.decision, decision)
 				}
-				if reason != invocation.expected.reason {
-					t.Errorf("(call %d of %d) expected reason %q, got %q", i+1, len(tc.calls), invocation.expected.reason, reason)
+				if decision.Reason() != invocation.expected.decision.Reason() {
+					t.Errorf("(call %d of %d) expected reason %q, got %q", i+1, len(tc.calls), invocation.expected.decision.Reason(), decision.Reason())
 				}
-				if err.Error() != invocation.expected.error.Error() {
-					t.Errorf("(call %d of %d) expected error %q, got %q", i+1, len(tc.calls), invocation.expected.error.Error(), err.Error())
+				if err.Error() != invocation.expected.err.Error() {
+					t.Errorf("(call %d of %d) expected error %q, got %q", i+1, len(tc.calls), invocation.expected.err.Error(), err.Error())
 				}
 			}
 

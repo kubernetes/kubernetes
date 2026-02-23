@@ -863,15 +863,15 @@ func TestRBACContextContamination(t *testing.T) {
 		testcases = append(testcases, []authorizeRequest{
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: "", ResourceRequest: true, User: user},
-				expected: authorizer.DecisionAllow,
+				expected: authorizer.DecisionAllow(""),
 			},
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: validNamespace, ResourceRequest: true, User: user},
-				expected: authorizer.DecisionAllow,
+				expected: authorizer.DecisionAllow(""),
 			},
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "configmaps", Namespace: "", ResourceRequest: true, User: user},
-				expected: authorizer.DecisionNoOpinion,
+				expected: authorizer.DecisionNoOpinion(""),
 			},
 		}...,
 		)
@@ -900,19 +900,19 @@ func TestRBACContextContamination(t *testing.T) {
 		testcases = append(testcases, []authorizeRequest{
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: "", ResourceRequest: true, User: user},
-				expected: authorizer.DecisionNoOpinion,
+				expected: authorizer.DecisionNoOpinion(""),
 			},
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: validNamespace, ResourceRequest: true, User: user},
-				expected: authorizer.DecisionAllow,
+				expected: authorizer.DecisionAllow(""),
 			},
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "configmaps", Namespace: validNamespace, ResourceRequest: true, User: user},
-				expected: authorizer.DecisionNoOpinion,
+				expected: authorizer.DecisionNoOpinion(""),
 			},
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: invalidNamespace, ResourceRequest: true, User: user},
-				expected: authorizer.DecisionNoOpinion,
+				expected: authorizer.DecisionNoOpinion(""),
 			},
 		}...,
 		)
@@ -944,19 +944,19 @@ func TestRBACContextContamination(t *testing.T) {
 		testcases = append(testcases, []authorizeRequest{
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: "", ResourceRequest: true, User: user},
-				expected: authorizer.DecisionNoOpinion,
+				expected: authorizer.DecisionNoOpinion(""),
 			},
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: validNamespace, ResourceRequest: true, User: user},
-				expected: authorizer.DecisionAllow,
+				expected: authorizer.DecisionAllow(""),
 			},
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "configmaps", Namespace: validNamespace, ResourceRequest: true, User: user},
-				expected: authorizer.DecisionNoOpinion,
+				expected: authorizer.DecisionNoOpinion(""),
 			},
 			{
 				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: invalidNamespace, ResourceRequest: true, User: user},
-				expected: authorizer.DecisionNoOpinion,
+				expected: authorizer.DecisionNoOpinion(""),
 			},
 		}...,
 		)
@@ -1018,24 +1018,24 @@ func TestRBACContextContamination(t *testing.T) {
 	for j, r := range testcases {
 		ctx := context.Background()
 		// 1. Default context
-		if decision, _, err := rbacAuthz.Authorize(ctx, &r.ar); err != nil {
+		if decision, err := rbacAuthz.Authorize(ctx, &r.ar); err != nil {
 			t.Errorf("req %d: unexpected error: %v", j, err)
 			return
-		} else if decision != r.expected {
+		} else if !decision.Equal(r.expected) {
 			t.Errorf("req %d: expected %v, got %v", j, r.expected, decision)
 		}
 		// 2. Empty namespace
-		if decision, _, err := rbacAuthz.Authorize(genericapirequest.WithNamespace(ctx, ""), &r.ar); err != nil {
+		if decision, err := rbacAuthz.Authorize(genericapirequest.WithNamespace(ctx, ""), &r.ar); err != nil {
 			t.Errorf("req %d: unexpected error: %v", j, err)
 			return
-		} else if decision != r.expected {
+		} else if !decision.Equal(r.expected) {
 			t.Errorf("req %d: expected %v, got %v", j, r.expected, decision)
 		}
 		// 3. Invalid namespace in the context
-		if decision, _, err := rbacAuthz.Authorize(genericapirequest.WithNamespace(ctx, invalidNamespace), &r.ar); err != nil {
+		if decision, err := rbacAuthz.Authorize(genericapirequest.WithNamespace(ctx, invalidNamespace), &r.ar); err != nil {
 			t.Errorf("req %d: unexpected error: %v", j, err)
 			return
-		} else if decision != r.expected {
+		} else if !decision.Equal(r.expected) {
 			t.Errorf("req %d: expected %v, got %v", j, r.expected, decision)
 		}
 

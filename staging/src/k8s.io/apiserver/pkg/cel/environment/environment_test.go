@@ -80,7 +80,7 @@ func TestBaseEnvironment(t *testing.T) {
 				// always enabled for StoredExpressions
 			},
 			invalidExpressions: []string{"authorizer.path('/healthz').check('get').allowed()"},
-			activation:         map[string]any{"authorizer": library.NewAuthorizerVal(nil, fakeAuthorizer{decision: authorizer.DecisionAllow})},
+			activation:         map[string]any{"authorizer": library.NewAuthorizerVal(nil, fakeAuthorizer{decision: authorizer.DecisionAllow("")})},
 			opts: []VersionedOptions{
 				{IntroducedVersion: version.MajorMinor(1, 27), EnvOptions: []cel.EnvOption{cel.Variable("authorizer", library.AuthorizerType)}},
 			},
@@ -92,7 +92,7 @@ func TestBaseEnvironment(t *testing.T) {
 				{version.MajorMinor(1, 26), StoredExpressions},
 			},
 			validExpressions: []string{"authorizer.path('/healthz').check('get').allowed()"},
-			activation:       map[string]any{"authorizer": library.NewAuthorizerVal(nil, fakeAuthorizer{decision: authorizer.DecisionAllow})},
+			activation:       map[string]any{"authorizer": library.NewAuthorizerVal(nil, fakeAuthorizer{decision: authorizer.DecisionAllow("")})},
 			opts: []VersionedOptions{
 				{IntroducedVersion: version.MajorMinor(1, 27), EnvOptions: []cel.EnvOption{cel.Variable("authorizer", library.AuthorizerType)}},
 			},
@@ -362,10 +362,9 @@ func isValid(env *cel.Env, expr string, activation any) (bool, error) {
 
 type fakeAuthorizer struct {
 	decision authorizer.Decision
-	reason   string
 	err      error
 }
 
-func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return f.decision, f.reason, f.err
+func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return f.decision, f.err
 }

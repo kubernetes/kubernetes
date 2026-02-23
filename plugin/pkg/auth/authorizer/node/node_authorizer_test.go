@@ -139,473 +139,473 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "allowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "list allowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "watch allowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:         "disallowed list many secrets",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			expectReason: "No Object name found,",
 		},
 		{
 			name:         "disallowed watch many secrets",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			expectReason: "No Object name found,",
 		},
 		{
 			name:         "disallowed list secrets from all namespaces with name",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: ""},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			expectReason: "can only read namespaced object of this type",
 		},
 		{
 			name:   "allowed shared secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed shared secret via pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node0-ns0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed resource claim",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "claim0-pod0-node0-ns0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed resource claim with template",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "generated-claim-pod0-node0-ns0-0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed pv",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node0-ns0", Namespace: ""},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "disallowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node1", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node1", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed shared secret via pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node1-ns0", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node1", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed resource claim, other node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "claim0-pod0-node1-ns0", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed resource claim with template",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceclaims", APIGroup: "resource.k8s.io", Name: "pod0-node1-claimtemplate0", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed pv",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "allowed attachment",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed svcacct token create",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "disallowed svcacct token create - serviceaccount not attached to node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node1", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed svcacct token create - no subresource",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed svcacct token create - non create",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:     "get allowed svcacct via pod - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: serviceAccountTokenForCredentialProvidersEnabled,
 		},
 		{
 			name:         "disallowed get svcacct via pod - feature disabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			features:     serviceAccountTokenForCredentialProvidersDisabled,
 			expectReason: "not allowed to get service accounts",
 		},
 		{
 			name:         "disallowed list svcacct via pod - feature disabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			features:     serviceAccountTokenForCredentialProvidersDisabled,
 			expectReason: "can only create tokens for individual service accounts",
 		},
 		{
 			name:         "disallowed watch svcacct via pod - feature disabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			features:     serviceAccountTokenForCredentialProvidersDisabled,
 			expectReason: "can only create tokens for individual service accounts",
 		},
 		{
 			name:     "allowed svcacct token create when PodCertificateProjection is enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: podCertificateProjectionEnabled,
 		},
 		{
 			name:     "allowed svcacct get when PodCertificateProjection is enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: podCertificateProjectionEnabled,
 		},
 		{
 			name:     "disallowed pcr create when PodCertificateProjection is disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionNoOpinion,
+			expect:   authorizer.DecisionNoOpinion(""),
 			features: podCertificateProjectionDisabled,
 		},
 		{
 			name:     "allowed pcr create when PodCertificateProjection is enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: podCertificateProjectionEnabled,
 		},
 		{
 			name:     "disallowed pcr get when PodCertificateProjection is disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionNoOpinion,
+			expect:   authorizer.DecisionNoOpinion(""),
 			features: podCertificateProjectionDisabled,
 		},
 		{
 			name:     "allowed pcr get when PodCertificateProjection is enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: podCertificateProjectionEnabled,
 		},
 		{
 			name:     "disallowed pcr list when PodCertificateProjection is disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionNoOpinion,
+			expect:   authorizer.DecisionNoOpinion(""),
 			features: podCertificateProjectionDisabled,
 		},
 		{
 			name:         "disallowed pcr list (un-filtered) when PodCertificateProjection is enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			expectReason: "can only list/watch podcertificaterequests with nodeName field selector",
 			features:     podCertificateProjectionEnabled,
 		},
 		{
 			name:         "disallowed pcr list (filtered to other node) when PodCertificateProjection is enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0", FieldSelectorRequirements: fields.Requirements{{Field: "spec.nodeName", Operator: "=", Value: "othernode"}}},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			expectReason: "can only list/watch podcertificaterequests with nodeName field selector",
 			features:     podCertificateProjectionEnabled,
 		},
 		{
 			name:     "allowed pcr list (filtered to correct node) when PodCertificateProjection is enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0", FieldSelectorRequirements: fields.Requirements{{Field: "spec.nodeName", Operator: "=", Value: "node0"}}},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: podCertificateProjectionEnabled,
 		},
 		{
 			name:     "disallowed pcr watch when PodCertificateProjection is disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionNoOpinion,
+			expect:   authorizer.DecisionNoOpinion(""),
 			features: podCertificateProjectionDisabled,
 		},
 		{
 			name:         "disallowed pcr watch (un-filtered) when PodCertificateProjection is enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			expectReason: "can only list/watch podcertificaterequests with nodeName field selector",
 			features:     podCertificateProjectionEnabled,
 		},
 		{
 			name:         "disallowed pcr watch (filtered to other node) when PodCertificateProjection is enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0", FieldSelectorRequirements: fields.Requirements{{Field: "spec.nodeName", Operator: "=", Value: "othernode"}}},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			expectReason: "can only list/watch podcertificaterequests with nodeName field selector",
 			features:     podCertificateProjectionEnabled,
 		},
 		{
 			name:     "allowed pcr watch (filtered to correct node) when PodCertificateProjection is enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0", FieldSelectorRequirements: fields.Requirements{{Field: "spec.nodeName", Operator: "=", Value: "node0"}}},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: podCertificateProjectionEnabled,
 		},
 		{
 			name:   "disallowed get lease in namespace other than kube-node-lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed create lease in namespace other than kube-node-lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed update lease in namespace other than kube-node-lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed patch lease in namespace other than kube-node-lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed delete lease in namespace other than kube-node-lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed get another node's lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed update another node's lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed patch another node's lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed delete another node's lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed list node leases - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "leases", APIGroup: "coordination.k8s.io", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed watch node leases - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "leases", APIGroup: "coordination.k8s.io", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "allowed get node lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed create node lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed update node lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed patch node lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed delete node lease - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		// CSINode
 		{
 			name:   "disallowed CSINode with subresource - feature enabled",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "csiDrivers", APIGroup: "storage.k8s.io", Name: "node0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed get another node's CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed update another node's CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed patch another node's CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed delete another node's CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed list CSINodes",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "csinodes", APIGroup: "storage.k8s.io"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed watch CSINodes",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "csinodes", APIGroup: "storage.k8s.io"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "allowed get CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed create CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed update CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed patch CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed delete CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		// ResourceSlice
 		{
 			name:   "disallowed ResourceSlice with subresource",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceslices", Subresource: "status", APIGroup: "resource.k8s.io", Name: "slice0-node0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed get another node's ResourceSlice",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceslices", APIGroup: "resource.k8s.io", Name: "slice0-node1"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed update another node's ResourceSlice",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "resourceslices", APIGroup: "resource.k8s.io", Name: "slice0-node1"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed patch another node's ResourceSlice",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "resourceslices", APIGroup: "resource.k8s.io", Name: "slice0-node1"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed delete another node's ResourceSlice",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "resourceslices", APIGroup: "resource.k8s.io", Name: "slice0-node1"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "allowed filtered list ResourceSlices",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:     "allowed unfiltered list ResourceSlices - selector authz disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "disallowed unfiltered list ResourceSlices - selector authz enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch/deletecollection resourceslices with nodeName field selector",
 		},
 		{
 			name:   "allowed filtered watch ResourceSlices",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:     "allowed unfiltered watch ResourceSlices - selector authz disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "disallowed unfiltered watch ResourceSlices - selector authz enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
-			expect:       authorizer.DecisionNoOpinion,
+			expect:       authorizer.DecisionNoOpinion(""),
 			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch/deletecollection resourceslices with nodeName field selector",
 		},
 		{
 			name:   "allowed get ResourceSlice",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "resourceslices", APIGroup: "resource.k8s.io", Name: "slice0-node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed create ResourceSlice",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "resourceslices", APIGroup: "resource.k8s.io", Name: "slice0-node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed update ResourceSlice",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "resourceslices", APIGroup: "resource.k8s.io", Name: "slice0-node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed patch ResourceSlice",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "resourceslices", APIGroup: "resource.k8s.io", Name: "slice0-node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed delete ResourceSlice",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "resourceslices", APIGroup: "resource.k8s.io", Name: "slice0-node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 
 		// pods
@@ -613,18 +613,18 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "get related pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "pods", APIGroup: "", Name: "pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:     "get unrelated pod - selector disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "pods", APIGroup: "", Name: "pod0-node1", Namespace: "ns0"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "get unrelated pod - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "pods", APIGroup: "", Name: "pod0-node1", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			expect:       authorizer.DecisionNoOpinion(""), // stricter with selector authz enabled
 			features:     selectorAuthzEnabled,
 			expectReason: "no relationship found between node 'node0' and this object",
 		},
@@ -632,28 +632,28 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "list related pods",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: "", FieldSelectorRequirements: mustParseFields("spec.nodeName=node0")},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "list related pods - alternate selector",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: "", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "list single related pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: "", Name: "pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:     "list unrelated pods - selector disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: ""},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "list unrelated pods - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: ""},
-			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			expect:       authorizer.DecisionNoOpinion(""), // stricter with selector authz enabled
 			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch pods with spec.nodeName field selector",
 		},
@@ -661,28 +661,28 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "watch related pods",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: "", FieldSelectorRequirements: mustParseFields("spec.nodeName=node0")},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "watch related pods",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: "", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "watch single related pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: "", Name: "pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:     "watch unrelated pods - selector disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: ""},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "watch unrelated pods - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: ""},
-			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			expect:       authorizer.DecisionNoOpinion(""), // stricter with selector authz enabled
 			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch pods with spec.nodeName field selector",
 		},
@@ -690,64 +690,64 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "create unnamed pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "pods", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "create pod proxy subresource forbidden",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "pods", Name: "", Subresource: "proxy", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "delete related pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "pods", Name: "pod0-node0", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "delete unrelated pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "pods", Name: "pod0-node1", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow, // guarded by NodeRestriction admission
+			expect: authorizer.DecisionAllow(""), // guarded by NodeRestriction admission
 		},
 		{
 			name:   "delete pod proxy subresource forbidden",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "pods", Name: "pod0-node0", Subresource: "proxy", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		// update/patch pod status
 		{
 			name:   "update related pod status",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "pods", Subresource: "status", Name: "pod0-node0", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "update unrelated pod status",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "pods", Subresource: "status", Name: "pod0-node1", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow, // guarded by NodeRestriction admission
+			expect: authorizer.DecisionAllow(""), // guarded by NodeRestriction admission
 		},
 		{
 			name:   "patch related pod status",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "pods", Subresource: "status", Name: "pod0-node0", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "patch unrelated pod status",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "pods", Subresource: "status", Name: "pod0-node1", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow, // guarded by NodeRestriction admission
+			expect: authorizer.DecisionAllow(""), // guarded by NodeRestriction admission
 		},
 		{
 			name:   "get pod status",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "pods", Subresource: "status", Name: "pod0-node0", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion, // get status not allowed before or after selector feature
+			expect: authorizer.DecisionNoOpinion(""), // get status not allowed before or after selector feature
 		},
 		// create pod eviction
 		{
 			name:   "create related pod eviction",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "pods", Subresource: "eviction", Name: "pod0-node0", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "create unrelated pod eviction",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "pods", Subresource: "eviction", Name: "pod0-node1", APIGroup: "", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow, // guarded by NodeRestriction admission
+			expect: authorizer.DecisionAllow(""), // guarded by NodeRestriction admission
 		},
 
 		// nodes
@@ -755,23 +755,23 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "get related unregistered node",
 			attrs:  authorizer.AttributesRecord{User: nodeunregistered, ResourceRequest: true, Verb: "get", Resource: "nodes", APIGroup: "", Name: "nodeunregistered"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "get related node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "nodes", APIGroup: "", Name: "node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:     "get unrelated node - selector disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "nodes", APIGroup: "", Name: "node1"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "get unrelated pod - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "nodes", APIGroup: "", Name: "node1"},
-			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			expect:       authorizer.DecisionNoOpinion(""), // stricter with selector authz enabled
 			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read 'node1', only its own Node object",
 		},
@@ -779,31 +779,31 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "list single related node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: "", Name: "node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:     "list single unrelated node - selector disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: "", Name: "node1"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "list single unrelated node - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: "", Name: "node1"},
-			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			expect:       authorizer.DecisionNoOpinion(""), // stricter with selector authz enabled
 			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read 'node1', only its own Node object",
 		},
 		{
 			name:     "list all nodes - selector disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: ""},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "list all nodes - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: ""},
-			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			expect:       authorizer.DecisionNoOpinion(""), // stricter with selector authz enabled
 			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read all nodes, only its own Node object",
 		},
@@ -811,31 +811,31 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "watch single related node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: "", Name: "node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:     "watch single unrelated node - selector disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: "", Name: "node1"},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "watch single unrelated node - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: "", Name: "node1"},
-			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			expect:       authorizer.DecisionNoOpinion(""), // stricter with selector authz enabled
 			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read 'node1', only its own Node object",
 		},
 		{
 			name:     "watch all nodes - selector disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: ""},
-			expect:   authorizer.DecisionAllow,
+			expect:   authorizer.DecisionAllow(""),
 			features: selectorAuthzDisabled,
 		},
 		{
 			name:         "watch all nodes - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: ""},
-			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			expect:       authorizer.DecisionNoOpinion(""), // stricter with selector authz enabled
 			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read all nodes, only its own Node object",
 		},
@@ -843,49 +843,49 @@ func TestNodeAuthorizer(t *testing.T) {
 		{
 			name:   "create node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "nodes", APIGroup: ""},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		// update/patch nodes
 		{
 			name:   "update related node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "nodes", Name: "node0", APIGroup: ""},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "update unrelated node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "nodes", Name: "node1", APIGroup: ""},
-			expect: authorizer.DecisionAllow, // guarded by NodeRestriction admission
+			expect: authorizer.DecisionAllow(""), // guarded by NodeRestriction admission
 		},
 		{
 			name:   "patch related node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "nodes", Name: "node0", APIGroup: ""},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "patch unrelated node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "nodes", Name: "node1", APIGroup: ""},
-			expect: authorizer.DecisionAllow, // guarded by NodeRestriction admission
+			expect: authorizer.DecisionAllow(""), // guarded by NodeRestriction admission
 		},
 		// update/patch node status
 		{
 			name:   "update related node status",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "nodes", Subresource: "status", Name: "node0", APIGroup: ""},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "update unrelated node status",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "nodes", Subresource: "status", Name: "node1", APIGroup: ""},
-			expect: authorizer.DecisionAllow, // guarded by NodeRestriction admission
+			expect: authorizer.DecisionAllow(""), // guarded by NodeRestriction admission
 		},
 		{
 			name:   "patch related node status",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "nodes", Subresource: "status", Name: "node0", APIGroup: ""},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "patch unrelated node status",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "nodes", Subresource: "status", Name: "node1", APIGroup: ""},
-			expect: authorizer.DecisionAllow, // guarded by NodeRestriction admission
+			expect: authorizer.DecisionAllow(""), // guarded by NodeRestriction admission
 		},
 	}
 
@@ -894,25 +894,26 @@ func TestNodeAuthorizer(t *testing.T) {
 			for _, variant := range featureVariants {
 				t.Run(tc.name+"_"+variant.suffix, func(t *testing.T) {
 					authz.features = variant.features(t)
-					decision, reason, _ := authz.Authorize(context.Background(), tc.attrs)
-					if decision != tc.expect {
-						t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)
+					decision, _ := authz.Authorize(context.Background(), tc.attrs)
+					if !decision.Equal(tc.expect) {
+						t.Errorf("expected %v, got %v (%s)", tc.expect, decision, decision.Reason())
 					}
+					// TODO(luxas): Compare error and reason here?
 				})
 			}
 		} else {
 			t.Run(tc.name, func(t *testing.T) {
 				authz.features = tc.features(t)
-				decision, reason, err := authz.Authorize(context.Background(), tc.attrs)
+				decision, err := authz.Authorize(context.Background(), tc.attrs)
 				if err != nil {
 					t.Fatalf("Unexpected error calling Authorize: %v", err)
 				}
 
-				if decision != tc.expect {
-					t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)
+				if !decision.Equal(tc.expect) {
+					t.Errorf("expected %v, got %v (%s)", tc.expect, decision, decision.Reason())
 				}
-				if reason != tc.expectReason {
-					t.Errorf("expected reason %q, got %q", tc.expectReason, reason)
+				if decision.Reason() != tc.expectReason {
+					t.Errorf("expected reason %q, got %q", tc.expectReason, decision.Reason())
 				}
 			})
 		}
@@ -968,17 +969,17 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 		ConfigMap string
 		Decision  authorizer.Decision
 	}{
-		{User: node1, Decision: authorizer.DecisionAllow, Secret: "node1-only"},
-		{User: node1, Decision: authorizer.DecisionAllow, Secret: "node1-node2-only"},
-		{User: node1, Decision: authorizer.DecisionAllow, Secret: "shared-all"},
+		{User: node1, Decision: authorizer.DecisionAllow(""), Secret: "node1-only"},
+		{User: node1, Decision: authorizer.DecisionAllow(""), Secret: "node1-node2-only"},
+		{User: node1, Decision: authorizer.DecisionAllow(""), Secret: "shared-all"},
 
-		{User: node2, Decision: authorizer.DecisionNoOpinion, Secret: "node1-only"},
-		{User: node2, Decision: authorizer.DecisionAllow, Secret: "node1-node2-only"},
-		{User: node2, Decision: authorizer.DecisionAllow, Secret: "shared-all"},
+		{User: node2, Decision: authorizer.DecisionNoOpinion(""), Secret: "node1-only"},
+		{User: node2, Decision: authorizer.DecisionAllow(""), Secret: "node1-node2-only"},
+		{User: node2, Decision: authorizer.DecisionAllow(""), Secret: "shared-all"},
 
-		{User: node3, Decision: authorizer.DecisionNoOpinion, Secret: "node1-only"},
-		{User: node3, Decision: authorizer.DecisionNoOpinion, Secret: "node1-node2-only"},
-		{User: node3, Decision: authorizer.DecisionAllow, Secret: "shared-all"},
+		{User: node3, Decision: authorizer.DecisionNoOpinion(""), Secret: "node1-only"},
+		{User: node3, Decision: authorizer.DecisionNoOpinion(""), Secret: "node1-node2-only"},
+		{User: node3, Decision: authorizer.DecisionAllow(""), Secret: "shared-all"},
 	}
 
 	for i, tc := range testcases {
@@ -988,13 +989,13 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 		)
 
 		if len(tc.Secret) > 0 {
-			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+			decision, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
 			}
 		} else if len(tc.ConfigMap) > 0 {
-			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
+			decision, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
@@ -1003,19 +1004,20 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 			t.Fatalf("test case must include a request for a Secret or ConfigMap")
 		}
 
-		if decision != tc.Decision {
+		if !decision.Equal(tc.Decision) {
 			t.Errorf("%d: expected %v, got %v", i, tc.Decision, decision)
 		}
+		// TODO(luxas): check reason here?
 	}
 
 	{
 		node3SharedSecretGet := authorizer.AttributesRecord{User: node3, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: "shared-all"}
 
-		decision, _, err := authz.Authorize(context.Background(), node3SharedSecretGet)
+		decision, err := authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if decision != authorizer.DecisionAllow {
+		if !decision.IsAllowed() {
 			t.Error("expected allowed")
 		}
 
@@ -1023,11 +1025,11 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 		pod3.Spec.Volumes = nil
 		g.AddPod(pod3)
 
-		decision, _, err = authz.Authorize(context.Background(), node3SharedSecretGet)
+		decision, err = authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if decision == authorizer.DecisionAllow {
+		if decision.IsAllowed() {
 			t.Errorf("unexpectedly allowed")
 		}
 	}
@@ -1104,11 +1106,11 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 		Decision  authorizer.Decision
 		EphCont   *corev1.EphemeralContainer
 	}{
-		{User: node1, Decision: authorizer.DecisionAllow, Secret: "node1-only"},
-		{User: node1, Decision: authorizer.DecisionNoOpinion, Secret: "new-secret"},
-		{User: node1, Decision: authorizer.DecisionAllow, Secret: "new-secret", EphCont: &ecNewSecret},
-		{User: node1, Decision: authorizer.DecisionNoOpinion, ConfigMap: "new-config-map"},
-		{User: node1, Decision: authorizer.DecisionAllow, ConfigMap: "new-config-map", EphCont: &ecNewConfigMap},
+		{User: node1, Decision: authorizer.DecisionAllow(""), Secret: "node1-only"},
+		{User: node1, Decision: authorizer.DecisionNoOpinion(""), Secret: "new-secret"},
+		{User: node1, Decision: authorizer.DecisionAllow(""), Secret: "new-secret", EphCont: &ecNewSecret},
+		{User: node1, Decision: authorizer.DecisionNoOpinion(""), ConfigMap: "new-config-map"},
+		{User: node1, Decision: authorizer.DecisionAllow(""), ConfigMap: "new-config-map", EphCont: &ecNewConfigMap},
 	}
 
 	for i, tc := range testcases {
@@ -1124,13 +1126,13 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 		}
 
 		if len(tc.Secret) > 0 {
-			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+			decision, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
 			}
 		} else if len(tc.ConfigMap) > 0 {
-			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
+			decision, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
@@ -1139,7 +1141,7 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 			t.Fatalf("test case must include a request for a Secret")
 		}
 
-		if decision != tc.Decision {
+		if !decision.Equal(tc.Decision) {
 			t.Errorf("%d: expected %v, got %v", i, tc.Decision, decision)
 		}
 	}
@@ -1323,9 +1325,9 @@ func BenchmarkUnauthorizedRequests(b *testing.B) {
 	b.SetParallelism(500)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			decision, _, _ := authz.Authorize(context.Background(), attrs)
-			if decision != authorizer.DecisionNoOpinion {
-				b.Errorf("expected %v, got %v", authorizer.DecisionNoOpinion, decision)
+			decision, _ := authz.Authorize(context.Background(), attrs)
+			if !decision.IsNoOpinion() {
+				b.Errorf("expected %v, got %v", authorizer.DecisionNoOpinion(""), decision)
 			}
 		}
 	})
@@ -1367,52 +1369,52 @@ func BenchmarkAuthorization(b *testing.B) {
 		{
 			name:   "allowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "allowed shared secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 		{
 			name:   "disallowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node1", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node1", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed shared secret via pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node1-ns0", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node1", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed pv",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "disallowed attachment - no relationship",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
-			expect: authorizer.DecisionNoOpinion,
+			expect: authorizer.DecisionNoOpinion(""),
 		},
 		{
 			name:   "allowed attachment",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			expect: authorizer.DecisionAllow,
+			expect: authorizer.DecisionAllow(""),
 		},
 	}
 
@@ -1481,8 +1483,8 @@ func BenchmarkAuthorization(b *testing.B) {
 				b.SetParallelism(5000)
 				b.RunParallel(func(pb *testing.PB) {
 					for pb.Next() {
-						decision, _, _ := authz.Authorize(context.Background(), tc.attrs)
-						if decision != tc.expect {
+						decision, _ := authz.Authorize(context.Background(), tc.attrs)
+						if !decision.Equal(tc.expect) {
 							b.Errorf("expected %v, got %v", tc.expect, decision)
 						}
 					}

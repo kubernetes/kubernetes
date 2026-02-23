@@ -101,7 +101,7 @@ func TestAuthzWebhookRequestEncoding(t *testing.T) {
 				t.Fatalf("failed to build authorizer: %v", err)
 			}
 
-			if _, _, err := authz.Authorize(context.Background(), &authorizer.AttributesRecord{}); err != nil {
+			if _, err := authz.Authorize(context.Background(), &authorizer.AttributesRecord{}); err != nil {
 				t.Fatalf("Authorize failed: %v", err)
 			}
 

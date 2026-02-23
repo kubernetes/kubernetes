@@ -77,13 +77,13 @@ func associatedNodeImpersonationMode(a authorizer.Authorizer) impersonationMode 
 	// and the node name used in the authorization check.  this makes our authorization checks match
 	// the exact semantics of our cache key which prevents unexpected privilege escalation on a cache
 	// hit.  see the comment below for the cache key details.
-	wrappedAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
+	wrappedAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, error) {
 		// we use checkAuthorization instead of directly calling the authorizer so we can
 		// make the error message line up with the actual attributes authorized against
 		if err := checkAuthorization(ctx, a, &associatedNodeImpersonationAttributes{Attributes: attributes}); err != nil {
-			return authorizer.DecisionDeny, "", err
+			return authorizer.DecisionDeny(""), err
 		}
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	})
 	mode := newConstrainedImpersonationMode(wrappedAuthorizer, "associated-node",
 		func(wantedUser *user.DefaultInfo, requestor user.Info) bool {
@@ -557,10 +557,10 @@ func (i *impersonateOnAttributes) GetVerb() string {
 }
 
 func checkAuthorization(ctx context.Context, a authorizer.Authorizer, attributes authorizer.Attributes) error {
-	authorized, reason, err := a.Authorize(ctx, attributes)
+	decision, err := a.Authorize(ctx, attributes)
 
 	// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
-	if authorized == authorizer.DecisionAllow {
+	if decision.IsAllowed() {
 		return nil
 	}
 
@@ -569,6 +569,7 @@ func checkAuthorization(ctx context.Context, a authorizer.Authorizer, attributes
 		return err
 	}
 
+	reason := decision.Reason()
 	msg := reason
 	switch {
 	case err != nil && len(reason) > 0:

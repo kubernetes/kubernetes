@@ -42,8 +42,8 @@ func TestRecordAuthorizationDecisionsTotal(t *testing.T) {
 
 	// allow
 	{
-		dummyAuthorizer.decision = authorizer.DecisionAllow
-		_, _, _ = a.Authorize(context.Background(), nil)
+		dummyAuthorizer.decision = authorizer.DecisionAllow("")
+		_, _ = a.Authorize(context.Background(), nil)
 		expectedValue := prefix + `
 			apiserver_authorization_decisions_total{decision="allowed",name="myname",type="mytype"} 1
 		`
@@ -55,11 +55,14 @@ func TestRecordAuthorizationDecisionsTotal(t *testing.T) {
 
 	// deny
 	{
-		dummyAuthorizer.decision = authorizer.DecisionDeny
-		_, _, _ = a.Authorize(context.Background(), nil)
-		_, _, _ = a.Authorize(context.Background(), nil)
+		dummyAuthorizer.decision = authorizer.DecisionDeny("")
+		_, _ = a.Authorize(context.Background(), nil)
+		_, _ = a.Authorize(context.Background(), nil)
+		dummyAuthorizer.decision = authorizer.Decision{} // zero value is deny
+		_, _ = a.Authorize(context.Background(), nil)
+		_, _ = a.Authorize(context.Background(), nil)
 		expectedValue := prefix + `
-			apiserver_authorization_decisions_total{decision="denied",name="myname",type="mytype"} 2
+			apiserver_authorization_decisions_total{decision="denied",name="myname",type="mytype"} 4
 		`
 		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
 			t.Fatal(err)
@@ -69,9 +72,9 @@ func TestRecordAuthorizationDecisionsTotal(t *testing.T) {
 
 	// no-opinion emits no metric
 	{
-		dummyAuthorizer.decision = authorizer.DecisionNoOpinion
-		_, _, _ = a.Authorize(context.Background(), nil)
-		_, _, _ = a.Authorize(context.Background(), nil)
+		dummyAuthorizer.decision = authorizer.DecisionNoOpinion("")
+		_, _ = a.Authorize(context.Background(), nil)
+		_, _ = a.Authorize(context.Background(), nil)
 		expectedValue := prefix + `
 		`
 		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
@@ -79,20 +82,8 @@ func TestRecordAuthorizationDecisionsTotal(t *testing.T) {
 		}
 		authorizationDecisionsTotal.Reset()
 	}
-
-	// unknown decision emits a metric
-	{
-		dummyAuthorizer.decision = authorizer.DecisionDeny + 10
-		_, _, _ = a.Authorize(context.Background(), nil)
-		expectedValue := prefix + `
-			apiserver_authorization_decisions_total{decision="unknown",name="myname",type="mytype"} 1
-		`
-		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
-			t.Fatal(err)
-		}
-		authorizationDecisionsTotal.Reset()
-	}
-
+	// There is no way to construct a Decision not falling into the Allow/Deny/NoOpinion categories,
+	// so there is no test for the Unknown metric.
 }
 
 type dummyAuthorizer struct {
@@ -100,6 +91,6 @@ type dummyAuthorizer struct {
 	err      error
 }
 
-func (d *dummyAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
-	return d.decision, "", d.err
+func (d *dummyAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, error) {
+	return d.decision, d.err
 }

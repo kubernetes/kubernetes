@@ -34,7 +34,7 @@ func TestAuthorization(t *testing.T) {
 		name             string
 		userInfo         user.Info
 		obj              *admissionregistration.MutatingAdmissionPolicy
-		auth             AuthFunc
+		auth             authorizer.AuthorizerFunc
 		resourceResolver resolver.ResourceResolverFunc
 		expectErr        bool
 	}{
@@ -43,19 +43,19 @@ func TestAuthorization(t *testing.T) {
 			userInfo:  &user.DefaultInfo{Groups: []string{user.SystemPrivilegedGroup}},
 			expectErr: false, // success despite always-denying authorizer
 			obj:       validMutatingAdmissionPolicy(),
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-				return authorizer.DecisionDeny, "", nil
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+				return authorizer.DecisionDeny(""), nil
 			},
 		},
 		{
 			name:     "authorized",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
 			obj:      validMutatingAdmissionPolicy(),
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 				if a.GetResource() == "replicalimits" {
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				}
-				return authorizer.DecisionDeny, "", nil
+				return authorizer.DecisionDeny(""), nil
 			},
 			resourceResolver: func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
 				return schema.GroupVersionResource{
@@ -70,11 +70,11 @@ func TestAuthorization(t *testing.T) {
 			name:     "denied",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
 			obj:      validMutatingAdmissionPolicy(),
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 				if a.GetResource() == "configmaps" {
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				}
-				return authorizer.DecisionDeny, "", nil
+				return authorizer.DecisionDeny(""), nil
 			},
 			resourceResolver: func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
 				return schema.GroupVersionResource{
@@ -89,11 +89,11 @@ func TestAuthorization(t *testing.T) {
 			name:     "param not found",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
 			obj:      validMutatingAdmissionPolicy(),
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 				if a.GetResource() == "replicalimits" {
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				}
-				return authorizer.DecisionDeny, "", nil
+				return authorizer.DecisionDeny(""), nil
 			},
 			resourceResolver: func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
 				return schema.GroupVersionResource{}, &meta.NoKindMatchError{GroupKind: gvk.GroupKind(), SearchedVersions: []string{gvk.Version}}
@@ -122,10 +122,4 @@ func TestAuthorization(t *testing.T) {
 			})
 		})
 	}
-}
-
-type AuthFunc func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
-
-func (f AuthFunc) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return f(ctx, a)
 }

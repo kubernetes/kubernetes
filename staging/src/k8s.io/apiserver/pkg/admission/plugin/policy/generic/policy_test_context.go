@@ -639,6 +639,6 @@ func (fl *FakeList[P]) DeepCopyObject() runtime.Object {
 
 type fakeAuthorizer struct{}
 
-func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return authorizer.DecisionAllow, "", nil
+func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return authorizer.DecisionAllow(""), nil
 }

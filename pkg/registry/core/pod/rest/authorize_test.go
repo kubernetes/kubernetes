@@ -30,12 +30,11 @@ import (
 // mockAuthorizer provides a mock implementation of the authorizer.Interface.
 type mockAuthorizer struct {
 	decision authorizer.Decision
-	reason   string
 	err      error
 }
 
-func (a *mockAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return a.decision, a.reason, a.err
+func (a *mockAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, error) {
+	return a.decision, a.err
 }
 
 func TestEnsureAuthorizedForVerb(t *testing.T) {
@@ -81,7 +80,7 @@ func TestEnsureAuthorizedForVerb(t *testing.T) {
 		{
 			name:          "authorizer denies",
 			ctx:           genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{Verb: "get", Resource: "pods", Name: "my-pod"}),
-			authorizer:    &mockAuthorizer{decision: authorizer.DecisionDeny, reason: "no reason"},
+			authorizer:    &mockAuthorizer{decision: authorizer.DecisionDeny("no reason")},
 			verb:          "create",
 			expectErr:     `pods "my-pod" is forbidden: no reason`,
 			expectErrType: &apierrors.StatusError{},
@@ -89,7 +88,7 @@ func TestEnsureAuthorizedForVerb(t *testing.T) {
 		{
 			name:       "authorizer allows",
 			ctx:        genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{Verb: "get"}),
-			authorizer: &mockAuthorizer{decision: authorizer.DecisionAllow},
+			authorizer: &mockAuthorizer{decision: authorizer.DecisionAllow("")},
 			verb:       "create",
 		},
 	}

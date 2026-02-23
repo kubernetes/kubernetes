@@ -33,39 +33,39 @@ type mockAuthzHandler struct {
 	err      error
 }
 
-func (mock *mockAuthzHandler) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return mock.decision, "", mock.err
+func (mock *mockAuthzHandler) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return mock.decision, mock.err
 }
 
 func TestAuthorizationSecondPasses(t *testing.T) {
-	handler1 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion}
-	handler2 := &mockAuthzHandler{decision: authorizer.DecisionAllow}
+	handler1 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion("")}
+	handler2 := &mockAuthzHandler{decision: authorizer.DecisionAllow("")}
 	authzHandler := New(handler1, handler2)
 
-	authorized, _, _ := authzHandler.Authorize(context.Background(), nil)
-	if authorized != authorizer.DecisionAllow {
+	authorized, _ := authzHandler.Authorize(context.Background(), nil)
+	if !authorized.IsAllowed() {
 		t.Errorf("Unexpected authorization failure")
 	}
 }
 
 func TestAuthorizationFirstPasses(t *testing.T) {
-	handler1 := &mockAuthzHandler{decision: authorizer.DecisionAllow}
-	handler2 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion}
+	handler1 := &mockAuthzHandler{decision: authorizer.DecisionAllow("")}
+	handler2 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion("")}
 	authzHandler := New(handler1, handler2)
 
-	authorized, _, _ := authzHandler.Authorize(context.Background(), nil)
-	if authorized != authorizer.DecisionAllow {
+	authorized, _ := authzHandler.Authorize(context.Background(), nil)
+	if !authorized.IsAllowed() {
 		t.Errorf("Unexpected authorization failure")
 	}
 }
 
 func TestAuthorizationNonePasses(t *testing.T) {
-	handler1 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion}
-	handler2 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion}
+	handler1 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion("")}
+	handler2 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion("")}
 	authzHandler := New(handler1, handler2)
 
-	authorized, _, _ := authzHandler.Authorize(context.Background(), nil)
-	if authorized == authorizer.DecisionAllow {
+	authorized, _ := authzHandler.Authorize(context.Background(), nil)
+	if authorized.IsAllowed() {
 		t.Errorf("Expected failed authorization")
 	}
 }
@@ -75,7 +75,7 @@ func TestAuthorizationError(t *testing.T) {
 	handler2 := &mockAuthzHandler{err: fmt.Errorf("foo")}
 	authzHandler := New(handler1, handler2)
 
-	_, _, err := authzHandler.Authorize(context.Background(), nil)
+	_, err := authzHandler.Authorize(context.Background(), nil)
 	if err == nil {
 		t.Errorf("Expected error: %v", err)
 	}
@@ -228,39 +228,39 @@ func TestAuthorizationUnequivocalDeny(t *testing.T) {
 	}{
 		{
 			authorizers: []authorizer.Authorizer{},
-			decision:    authorizer.DecisionNoOpinion,
+			decision:    authorizer.DecisionNoOpinion(""),
 		},
 		{
 			authorizers: []authorizer.Authorizer{
-				&mockAuthzHandler{decision: authorizer.DecisionNoOpinion},
-				&mockAuthzHandler{decision: authorizer.DecisionAllow},
-				&mockAuthzHandler{decision: authorizer.DecisionDeny},
+				&mockAuthzHandler{decision: authorizer.DecisionNoOpinion("")},
+				&mockAuthzHandler{decision: authorizer.DecisionAllow("")},
+				&mockAuthzHandler{decision: authorizer.DecisionDeny("")},
 			},
-			decision: authorizer.DecisionAllow,
+			decision: authorizer.DecisionAllow(""),
 		},
 		{
 			authorizers: []authorizer.Authorizer{
-				&mockAuthzHandler{decision: authorizer.DecisionNoOpinion},
-				&mockAuthzHandler{decision: authorizer.DecisionDeny},
-				&mockAuthzHandler{decision: authorizer.DecisionAllow},
+				&mockAuthzHandler{decision: authorizer.DecisionNoOpinion("")},
+				&mockAuthzHandler{decision: authorizer.DecisionDeny("")},
+				&mockAuthzHandler{decision: authorizer.DecisionAllow("")},
 			},
-			decision: authorizer.DecisionDeny,
+			decision: authorizer.DecisionDeny(""),
 		},
 		{
 			authorizers: []authorizer.Authorizer{
-				&mockAuthzHandler{decision: authorizer.DecisionNoOpinion},
-				&mockAuthzHandler{decision: authorizer.DecisionDeny, err: errors.New("webhook failed closed")},
-				&mockAuthzHandler{decision: authorizer.DecisionAllow},
+				&mockAuthzHandler{decision: authorizer.DecisionNoOpinion("")},
+				&mockAuthzHandler{decision: authorizer.DecisionDeny(""), err: errors.New("webhook failed closed")},
+				&mockAuthzHandler{decision: authorizer.DecisionAllow("")},
 			},
-			decision: authorizer.DecisionDeny,
+			decision: authorizer.DecisionDeny(""),
 		},
 	}
 	for i, c := range cs {
 		t.Run(fmt.Sprintf("case %v", i), func(t *testing.T) {
 			authzHandler := New(c.authorizers...)
 
-			decision, _, _ := authzHandler.Authorize(context.Background(), nil)
-			if decision != c.decision {
+			decision, _ := authzHandler.Authorize(context.Background(), nil)
+			if !decision.Equal(c.decision) {
 				t.Errorf("Unexpected authorization failure: %v, expected: %v", decision, c.decision)
 			}
 		})

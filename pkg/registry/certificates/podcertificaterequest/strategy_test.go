@@ -238,7 +238,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 
 	strategy := NewStrategy()
 	authz := &FakeAuthorizer{
-		authorized: authorizer.DecisionAllow,
+		authorized: authorizer.DecisionAllow(""),
 	}
 	statusStrategy := NewStatusStrategy(strategy, authz, clock.RealClock{})
 
@@ -400,7 +400,7 @@ func TestStatusValidateUpdate(t *testing.T) {
 				},
 			},
 			authz: &FakeAuthorizer{
-				authorized: authorizer.DecisionAllow,
+				authorized: authorizer.DecisionAllow(""),
 			},
 		},
 		{
@@ -455,8 +455,7 @@ func TestStatusValidateUpdate(t *testing.T) {
 				},
 			},
 			authz: &FakeAuthorizer{
-				authorized: authorizer.DecisionNoOpinion,
-				reason:     "not authorized",
+				authorized: authorizer.DecisionNoOpinion("not authorized"),
 			},
 			wantValidationErrors: field.ErrorList{
 				field.Forbidden(field.NewPath("spec", "signerName"), "User \"bob\" is not permitted to \"sign\" for signer \"foo.com/abc\""),
@@ -496,10 +495,9 @@ func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte) (ed25519.Privat
 
 type FakeAuthorizer struct {
 	authorized authorizer.Decision
-	reason     string
 	err        error
 }
 
-func (f *FakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return f.authorized, f.reason, f.err
+func (f *FakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return f.authorized, f.err
 }

@@ -75,7 +75,7 @@ type authorizerResolver struct {
 	ruleResolver authorizer.RuleResolver
 }
 
-func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	return r.current.Load().authorizer.Authorize(ctx, a)
 }
 
@@ -135,9 +135,9 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			var decisionOnError authorizer.Decision
 			switch configuredAuthorizer.Webhook.FailurePolicy {
 			case authzconfig.FailurePolicyNoOpinion:
-				decisionOnError = authorizer.DecisionNoOpinion
+				decisionOnError = authorizer.DecisionNoOpinion("")
 			case authzconfig.FailurePolicyDeny:
-				decisionOnError = authorizer.DecisionDeny
+				decisionOnError = authorizer.DecisionDeny("")
 			default:
 				return nil, nil, fmt.Errorf("unknown failurePolicy %q", configuredAuthorizer.Webhook.FailurePolicy)
 			}

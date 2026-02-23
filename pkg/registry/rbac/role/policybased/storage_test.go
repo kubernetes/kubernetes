@@ -60,12 +60,12 @@ func TestEscalation(t *testing.T) {
 
 	authzCalled := 0
 	fakeStorage := &fakeStorage{}
-	fakeAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attr authorizer.Attributes) (authorizer.Decision, string, error) {
+	fakeAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attr authorizer.Attributes) (authorizer.Decision, error) {
 		authzCalled++
 		if attr.GetUser().GetName() == "steve" {
-			return authorizer.DecisionAllow, "", nil
+			return authorizer.DecisionAllow(""), nil
 		}
-		return authorizer.DecisionNoOpinion, "", nil
+		return authorizer.DecisionNoOpinion(""), nil
 	})
 	fakeRuleResolver, _ := validation.NewTestRuleResolver(
 		nil,

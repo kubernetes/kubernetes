@@ -217,7 +217,7 @@ current-context: default
 			if err != nil {
 				return fmt.Errorf("error building sar client: %v", err)
 			}
-			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, authorizer.DecisionNoOpinion, []apiserver.WebhookMatchCondition{}, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), "")
+			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, authorizer.DecisionNoOpinion(""), []apiserver.WebhookMatchCondition{}, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), "")
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -367,7 +367,7 @@ func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cache
 	if err != nil {
 		return nil, fmt.Errorf("error building sar client: %v", err)
 	}
-	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion, expressions, metrics, compiler, authzName)
+	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion(""), expressions, metrics, compiler, authzName)
 }
 
 func TestV1TLSConfig(t *testing.T) {
@@ -436,13 +436,13 @@ func TestV1TLSConfig(t *testing.T) {
 
 			// Allow all and see if we get an error.
 			service.Allow()
-			decision, _, err := wh.Authorize(context.Background(), attr)
+			decision, err := wh.Authorize(context.Background(), attr)
 			if tt.wantAuth {
-				if decision != authorizer.DecisionAllow {
+				if !decision.IsAllowed() {
 					t.Errorf("expected successful authorization")
 				}
 			} else {
-				if decision == authorizer.DecisionAllow {
+				if decision.IsAllowed() {
 					t.Errorf("expected failed authorization")
 				}
 			}
@@ -458,7 +458,7 @@ func TestV1TLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			if decision, _, _ := wh.Authorize(context.Background(), attr); decision == authorizer.DecisionAllow {
+			if decision, _ := wh.Authorize(context.Background(), attr); decision.IsAllowed() {
 				t.Errorf("%s: incorrectly authorized with DenyAll policy", tt.test)
 			}
 		}()
@@ -562,11 +562,11 @@ func TestV1Webhook(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		decision, _, err := wh.Authorize(context.Background(), tt.attr)
+		decision, err := wh.Authorize(context.Background(), tt.attr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if decision != authorizer.DecisionAllow {
+		if !decision.IsAllowed() {
 			t.Errorf("case %d: authorization failed", i)
 			continue
 		}
@@ -672,14 +672,14 @@ func TestV1WebhookCache(t *testing.T) {
 			serv.called = 0
 			serv.allow = test.allow
 			serv.statusCode = test.statusCode
-			authorized, _, err := wh.Authorize(context.Background(), test.attr)
+			authorized, err := wh.Authorize(context.Background(), test.attr)
 			if test.expectedErr && err == nil {
 				t.Fatalf("%d: Expected error", i)
 			} else if !test.expectedErr && err != nil {
 				t.Fatalf("%d: unexpected error: %v", i, err)
 			}
 
-			if test.expectedAuthorized != (authorized == authorizer.DecisionAllow) {
+			if test.expectedAuthorized != authorized.IsAllowed() {
 				t.Errorf("%d: expected authorized=%v, got %v", i, test.expectedAuthorized, authorized)
 			}
 
@@ -743,7 +743,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 			attr:               aliceAttr,
 			allow:              true,
 			expectedCompileErr: false,
-			expectedDecision:   authorizer.DecisionAllow,
+			expectedDecision:   authorizer.DecisionAllow(""),
 			expressions:        []apiserver.WebhookMatchCondition{},
 		},
 		{
@@ -751,7 +751,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 			attr:               aliceWithSelectorsAttr,
 			allow:              true,
 			expectedCompileErr: false,
-			expectedDecision:   authorizer.DecisionAllow,
+			expectedDecision:   authorizer.DecisionAllow(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'alice'",
@@ -799,14 +799,14 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 				t.Fatalf("%d: unexpected error when creating a new WebhookAuthorizer: %v", i, err)
 			}
 			if err == nil {
-				authorized, _, err := wh.Authorize(context.Background(), test.attr)
+				authorized, err := wh.Authorize(context.Background(), test.attr)
 				if test.expectedEvalErr && err == nil {
 					t.Fatalf("%d: Expected eval error", i)
 				} else if !test.expectedEvalErr && err != nil {
 					t.Fatalf("%d: unexpected error when authorizing: %v", i, err)
 				}
 
-				if test.expectedDecision != authorized {
+				if !test.expectedDecision.Equal(authorized) {
 					t.Errorf("%d: expected authorized=%v, got %v", i, test.expectedDecision, authorized)
 				}
 			}
@@ -908,8 +908,8 @@ func TestWebhookMetrics(t *testing.T) {
 				t.Fatal(err)
 			}
 			if err == nil {
-				_, _, _ = wh1.Authorize(context.Background(), tt.attr)
-				_, _, _ = wh2.Authorize(context.Background(), tt.attr)
+				_, _ = wh1.Authorize(context.Background(), tt.attr)
+				_, _ = wh2.Authorize(context.Background(), tt.attr)
 			}
 
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
@@ -1105,7 +1105,7 @@ func benchmarkWebhookAuthorize(b *testing.B, expressions []apiserver.WebhookMatc
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Call authorize may or may not require cel evaluations
-		_, _, err = wh.Authorize(context.Background(), attr)
+		_, err = wh.Authorize(context.Background(), attr)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -1162,14 +1162,14 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "match all with no expressions",
 			attr:               aliceAttr,
 			expectedCompileErr: "",
-			expectedDecision:   authorizer.DecisionAllow,
+			expectedDecision:   authorizer.DecisionAllow(""),
 			expressions:        []apiserver.WebhookMatchCondition{},
 		},
 		{
 			name:               "match all against all expressions",
 			attr:               aliceAttr,
 			expectedCompileErr: "",
-			expectedDecision:   authorizer.DecisionAllow,
+			expectedDecision:   authorizer.DecisionAllow(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'alice'",
@@ -1201,7 +1201,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "match all except group, eval to one successful false, no error",
 			attr:               aliceAttr,
 			expectedCompileErr: "",
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expectedEvalErr:    "",
 			expressions: []apiserver.WebhookMatchCondition{
 				{
@@ -1222,7 +1222,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "match condition with one compilation error",
 			attr:               aliceAttr,
 			expectedCompileErr: "matchConditions[2].expression: Invalid value: \"('group3' in request.group)\": compilation failed: ERROR: <input>:1:21: undefined field 'group'\n | ('group3' in request.group)\n | ....................^",
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'alice'",
@@ -1242,7 +1242,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "match all except uid",
 			attr:               aliceAttr,
 			expectedCompileErr: "",
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'alice'",
@@ -1262,7 +1262,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "match on user name but not namespace",
 			attr:               aliceAttr,
 			expectedCompileErr: "",
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'alice'",
@@ -1276,7 +1276,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "mismatch on user name",
 			attr:               bobAttr,
 			expectedCompileErr: "",
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'alice'",
@@ -1287,7 +1287,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "match on user name but not resourceAttributes",
 			attr:               bobAttr,
 			expectedCompileErr: "",
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'bob'",
@@ -1301,7 +1301,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "expression failed to compile due to wrong return type",
 			attr:               bobAttr,
 			expectedCompileErr: `matchConditions[0].expression: Invalid value: "request.user": must evaluate to bool but got string`,
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user",
@@ -1313,7 +1313,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			attr:               alice2Attr,
 			expectedCompileErr: "",
 			expectedEvalErr:    "cel evaluation error: expression 'request.resourceAttributes.namespace == 'kittensandponies'' resulted in error: no such key: resourceAttributes",
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'alice2'",
@@ -1328,7 +1328,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			attr:               alice2Attr,
 			expectedCompileErr: "",
 			expectedEvalErr:    "",
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user != 'alice2'",
@@ -1342,7 +1342,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "match on user name but failed to compile due to type check in nonResourceAttributes",
 			attr:               bobAttr,
 			expectedCompileErr: "matchConditions[1].expression: Invalid value: \"request.nonResourceAttributes.verb == 2\": compilation failed: ERROR: <input>:1:36: found no matching overload for '_==_' applied to '(string, int)'\n | request.nonResourceAttributes.verb == 2\n | ...................................^",
-			expectedDecision:   authorizer.DecisionNoOpinion,
+			expectedDecision:   authorizer.DecisionNoOpinion(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'bob'",
@@ -1356,7 +1356,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			name:               "match on user name and nonresourceAttributes",
 			attr:               bobAttr,
 			expectedCompileErr: "",
-			expectedDecision:   authorizer.DecisionAllow,
+			expectedDecision:   authorizer.DecisionAllow(""),
 			expressions: []apiserver.WebhookMatchCondition{
 				{
 					Expression: "request.user == 'bob'",
@@ -1371,7 +1371,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 			attr:               authorizer.AttributesRecord{},
 			expectedCompileErr: "",
 			// default decisionOnError in newWithBackoff to skip
-			expectedDecision: authorizer.DecisionNoOpinion,
+			expectedDecision: authorizer.DecisionNoOpinion(""),
 			expectedEvalErr:  "cel evaluation error: expression 'request.resourceAttributes.verb == 'get'' resulted in error: no such key: resourceAttributes",
 			expressions: []apiserver.WebhookMatchCondition{
 				{
@@ -1395,7 +1395,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 				}
 			}
 			if err == nil {
-				authorized, _, err := wh.Authorize(context.Background(), test.attr)
+				authorized, err := wh.Authorize(context.Background(), test.attr)
 				if len(test.expectedEvalErr) > 0 && err == nil {
 					t.Fatalf("%d: Expected eval error", i)
 				} else if len(test.expectedEvalErr) == 0 && err != nil {
@@ -1408,7 +1408,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 					}
 				}
 
-				if test.expectedDecision != authorized {
+				if !test.expectedDecision.Equal(authorized) {
 					t.Errorf("%d: expected authorized=%v, got %v", i, test.expectedDecision, authorized)
 				}
 			}

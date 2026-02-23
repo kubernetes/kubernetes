@@ -50,50 +50,50 @@ type constrainedImpersonationTest struct {
 	echoCalled                      bool
 }
 
-func (c *constrainedImpersonationTest) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (c *constrainedImpersonationTest) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	c.checkedAttrs = append(c.checkedAttrs, a)
 
 	u := a.GetUser()
 
 	if u.GetName() == "sa-impersonater" && a.GetVerb() == "impersonate:serviceaccount" && a.GetResource() == "serviceaccounts" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if u.GetName() == "system:serviceaccount:default:node" && a.GetVerb() == "impersonate:arbitrary-node" && a.GetResource() == "nodes" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if u.GetName() == "node-impersonater" && a.GetVerb() == "impersonate:arbitrary-node" && a.GetResource() == "nodes" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(u.GetGroups()) > 0 && u.GetGroups()[0] == "associate-node-impersonater" && a.GetVerb() == "impersonate:associated-node" && a.GetResource() == "nodes" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if u.GetName() == "user-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "users" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(u.GetGroups()) > 0 && u.GetGroups()[0] == "group-impersonater" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "groups" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(u.GetGroups()) > 0 && u.GetGroups()[0] == "extra-setter-scopes" && a.GetVerb() == "impersonate:user-info" && a.GetResource() == "userextras" && a.GetSubresource() == "pandas.io/scopes" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if u.GetName() == "legacy-impersonater" && a.GetVerb() == "impersonate" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if u.GetName() != "legacy-impersonator" &&
 		strings.HasPrefix(a.GetVerb(), "impersonate-on:") &&
 		(strings.HasSuffix(a.GetVerb(), "list") || strings.HasSuffix(a.GetVerb(), "get")) {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
-	return authorizer.DecisionNoOpinion, "deny by default", nil
+	return authorizer.DecisionNoOpinion("deny by default"), nil
 }
 
 func (c *constrainedImpersonationTest) echoUserInfoHandler() http.HandlerFunc {

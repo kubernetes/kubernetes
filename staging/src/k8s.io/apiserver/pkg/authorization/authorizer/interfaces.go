@@ -78,15 +78,17 @@ type Attributes interface {
 }
 
 // Authorizer makes an authorization decision based on information gained by making
-// zero or more calls to methods of the Attributes interface.  It returns nil when an action is
-// authorized, otherwise it returns an error.
+// zero or more calls to methods of the Attributes interface. It might return
+// an error together with any decision. It is then up to the caller to decide
+// whether that error is critical or not.
 type Authorizer interface {
-	Authorize(ctx context.Context, a Attributes) (authorized Decision, reason string, err error)
+	Authorize(ctx context.Context, a Attributes) (Decision, error)
 }
 
-type AuthorizerFunc func(ctx context.Context, a Attributes) (Decision, string, error)
+// AuthorizerFunc implements Authorizer using a function.
+type AuthorizerFunc func(ctx context.Context, a Attributes) (Decision, error)
 
-func (f AuthorizerFunc) Authorize(ctx context.Context, a Attributes) (Decision, string, error) {
+func (f AuthorizerFunc) Authorize(ctx context.Context, a Attributes) (Decision, error) {
 	return f(ctx, a)
 }
 
@@ -172,27 +174,96 @@ func (a AttributesRecord) GetLabelSelector() (labels.Requirements, error) {
 	return a.LabelSelectorRequirements, a.LabelSelectorParsingErr
 }
 
-type Decision int
+// decision is the internal enum type backing Decision.
+type decision int
 
 const (
-	// DecisionDeny means that an authorizer decided to deny the action.
-	DecisionDeny Decision = iota
-	// DecisionAllow means that an authorizer decided to allow the action.
-	DecisionAllow
-	// DecisionNoOpinion means that an authorizer has no opinion on whether
-	// to allow or deny an action.
-	DecisionNoOpinion
+	decisionDeny decision = iota
+	decisionAllow
+	decisionNoOpinion
 )
 
+// Decision models an authorization decision. It can be Allow, Deny, or NoOpinion.
+// The zero value is equivalent to DecisionDeny("").
+// A Decision is passed by value.
+// Decision equality must be checked with Decision.Equal, not reflect.DeepEqual.
+type Decision struct {
+	decision decision
+	// each reasons element should be a non-empty string
+	reasons []string
+}
+
+// DecisionAllow constructs an Allow decision with the given reason.
+func DecisionAllow(reasons ...string) Decision {
+	return Decision{decision: decisionAllow, reasons: nil}.WithAdditionalReasons(reasons...)
+}
+
+// DecisionDeny constructs a Deny decision with the given reason.
+func DecisionDeny(reasons ...string) Decision {
+	return Decision{decision: decisionDeny, reasons: nil}.WithAdditionalReasons(reasons...)
+}
+
+// DecisionNoOpinion constructs a NoOpinion decision with the given reason.
+func DecisionNoOpinion(reasons ...string) Decision {
+	return Decision{decision: decisionNoOpinion, reasons: nil}.WithAdditionalReasons(reasons...)
+}
+
+// IsAllowed returns true if the decision is Allow.
+func (d Decision) IsAllowed() bool { return d.decision == decisionAllow }
+
+// IsDenied returns true if the decision is Deny.
+func (d Decision) IsDenied() bool { return d.decision == decisionDeny }
+
+// IsNoOpinion returns true if the decision is NoOpinion.
+func (d Decision) IsNoOpinion() bool { return d.decision == decisionNoOpinion }
+
+// Reason returns the reason string associated with this decision.
+func (d Decision) Reason() string {
+	if len(d.reasons) == 0 {
+		return ""
+	}
+	if len(d.reasons) == 1 {
+		return d.reasons[0]
+	}
+	return fmt.Sprintf("%v", d.reasons)
+}
+
+// Equal returns whether d is equal to other.
+// Decision equality is defined as:
+// "do the two decisions yield the same final outcome (request allowed/denied), for any input?"
+// Note that this equality notion does not take reason into account.
+func (d Decision) Equal(other Decision) bool {
+	return d.decision == other.decision
+}
+
+// WithAdditionalReasons creates a new Decision with additional reasons
+func (d Decision) WithAdditionalReasons(additionalReasons ...string) Decision {
+	if len(additionalReasons) == 0 {
+		return d
+	}
+
+	nonEmptyReasons := make([]string, 0, len(additionalReasons))
+	for _, additionalReason := range additionalReasons {
+		if len(additionalReason) != 0 {
+			nonEmptyReasons = append(nonEmptyReasons, additionalReason)
+		}
+	}
+	return Decision{
+		decision: d.decision,
+		reasons:  append(d.reasons, nonEmptyReasons...),
+	}
+}
+
+// String returns a human-readable representation of the decision.
 func (d Decision) String() string {
-	switch d {
-	case DecisionDeny:
+	switch d.decision {
+	case decisionDeny:
 		return "Deny"
-	case DecisionAllow:
+	case decisionAllow:
 		return "Allow"
-	case DecisionNoOpinion:
+	case decisionNoOpinion:
 		return "NoOpinion"
 	default:
-		return fmt.Sprintf("Unknown (%d)", int(d))
+		return fmt.Sprintf("Unknown (%d)", int(d.decision))
 	}
 }

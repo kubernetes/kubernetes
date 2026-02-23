@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
@@ -115,8 +115,9 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 				return
 			}
 
-			decision, reason, err := a.Authorize(ctx, actingAsAttributes)
-			if err != nil || decision != authorizer.DecisionAllow {
+			decision, err := a.Authorize(ctx, actingAsAttributes)
+			if err != nil || !decision.IsAllowed() {
+				reason := decision.Reason()
 				klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
 				responsewriters.Forbidden(actingAsAttributes, w, req, reason, s)
 				return

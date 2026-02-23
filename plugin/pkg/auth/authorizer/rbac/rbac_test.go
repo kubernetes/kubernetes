@@ -257,13 +257,13 @@ func TestAuthorizer(t *testing.T) {
 		ruleResolver, _ := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := RBACAuthorizer{ruleResolver}
 		for _, attr := range tt.shouldPass {
-			if decision, _, _ := a.Authorize(context.Background(), attr); decision != authorizer.DecisionAllow {
+			if decision, _ := a.Authorize(context.Background(), attr); !decision.IsAllowed() {
 				t.Errorf("case %d: incorrectly restricted %s", i, attr)
 			}
 		}
 
 		for _, attr := range tt.shouldFail {
-			if decision, _, _ := a.Authorize(context.Background(), attr); decision == authorizer.DecisionAllow {
+			if decision, _ := a.Authorize(context.Background(), attr); decision.IsAllowed() {
 				t.Errorf("case %d: incorrectly passed %s", i, attr)
 			}
 		}

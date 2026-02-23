@@ -36,70 +36,70 @@ import (
 
 type impersonateAuthorizer struct{}
 
-func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, err error) {
 	user := a.GetUser()
 
 	switch {
 	case user.GetName() == "system:admin":
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 
 	case user.GetName() == "tester":
-		return authorizer.DecisionNoOpinion, "", fmt.Errorf("works on my machine")
+		return authorizer.DecisionNoOpinion(""), fmt.Errorf("works on my machine")
 
 	case user.GetName() == "deny-me":
-		return authorizer.DecisionNoOpinion, "denied", nil
+		return authorizer.DecisionNoOpinion("denied"), nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "wheel" && a.GetVerb() == "impersonate" && a.GetResource() == "users" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "sa-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "serviceaccounts" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "regular-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "users" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "group-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "groups" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-scopes" && a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "scopes" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 1 && (user.GetGroups()[1] == "escaped-scopes" || user.GetGroups()[1] == "almost-escaped-scopes") {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-particular-scopes" &&
 		a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "scopes" && a.GetName() == "scope-a" && a.GetAPIGroup() == "authentication.k8s.io" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-project" && a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "project" && a.GetAPIGroup() == "authentication.k8s.io" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "everything-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "users" && a.GetAPIGroup() == "" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "everything-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "uids" && a.GetName() == "some-uid" && a.GetAPIGroup() == "authentication.k8s.io" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "everything-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "groups" && a.GetAPIGroup() == "" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "everything-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "scopes" && a.GetAPIGroup() == "authentication.k8s.io" {
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
-	return authorizer.DecisionNoOpinion, "deny by default", nil
+	return authorizer.DecisionNoOpinion("deny by default"), nil
 }
 
 func TestImpersonationFilter(t *testing.T) {

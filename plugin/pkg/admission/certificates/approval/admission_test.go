@@ -119,7 +119,7 @@ func TestPlugin_Validate(t *testing.T) {
 					t:           t,
 					verb:        "approve",
 					allowedName: test.allowedName,
-					decision:    authorizer.DecisionAllow,
+					decision:    authorizer.DecisionAllow(""),
 					err:         test.authzErr,
 				},
 			}
@@ -142,29 +142,29 @@ type fakeAuthorizer struct {
 	err         error
 }
 
-func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	if f.err != nil {
-		return f.decision, "forced error", f.err
+		return f.decision, f.err
 	}
 	if a.GetVerb() != f.verb {
-		return authorizer.DecisionDeny, fmt.Sprintf("unrecognised verb '%s'", a.GetVerb()), nil
+		return authorizer.DecisionDeny(fmt.Sprintf("unrecognised verb '%s'", a.GetVerb())), nil
 	}
 	if a.GetAPIGroup() != "certificates.k8s.io" {
-		return authorizer.DecisionDeny, fmt.Sprintf("unrecognised groupName '%s'", a.GetAPIGroup()), nil
+		return authorizer.DecisionDeny(fmt.Sprintf("unrecognised groupName '%s'", a.GetAPIGroup())), nil
 	}
 	if a.GetAPIVersion() != "*" {
-		return authorizer.DecisionDeny, fmt.Sprintf("unrecognised apiVersion '%s'", a.GetAPIVersion()), nil
+		return authorizer.DecisionDeny(fmt.Sprintf("unrecognised apiVersion '%s'", a.GetAPIVersion())), nil
 	}
 	if a.GetResource() != "signers" {
-		return authorizer.DecisionDeny, fmt.Sprintf("unrecognised resource '%s'", a.GetResource()), nil
+		return authorizer.DecisionDeny(fmt.Sprintf("unrecognised resource '%s'", a.GetResource())), nil
 	}
 	if a.GetName() != f.allowedName {
-		return authorizer.DecisionDeny, fmt.Sprintf("unrecognised resource name '%s'", a.GetName()), nil
+		return authorizer.DecisionDeny(fmt.Sprintf("unrecognised resource name '%s'", a.GetName())), nil
 	}
 	if !a.IsResourceRequest() {
-		return authorizer.DecisionDeny, fmt.Sprintf("unrecognised IsResourceRequest '%t'", a.IsResourceRequest()), nil
+		return authorizer.DecisionDeny(fmt.Sprintf("unrecognised IsResourceRequest '%t'", a.IsResourceRequest())), nil
 	}
-	return f.decision, "", nil
+	return f.decision, nil
 }
 
 type testAttributes struct {

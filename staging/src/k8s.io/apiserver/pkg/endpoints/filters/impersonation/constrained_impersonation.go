@@ -164,8 +164,8 @@ type impersonationModesTracker struct {
 }
 
 func newImpersonationModesTracker(a authorizer.Authorizer) *impersonationModesTracker {
-	loggingAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
-		decision, reason, err := a.Authorize(ctx, attributes)
+	loggingAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, error) {
+		decision, err := a.Authorize(ctx, attributes)
 		// build a detailed log of the authorization
 		// make the whole block conditional so we do not do a lot of string-building we will not use
 		if klogV := klog.V(5); klogV.Enabled() { // same log level that the RBAC authorizer uses for verbose logging
@@ -195,11 +195,11 @@ func newImpersonationModesTracker(a authorizer.Authorizer) *impersonationModesTr
 				"path", attributes.GetPath(),
 
 				"decision", decision,
-				"reason", reason,
+				"reason", decision.Reason(),
 				"err", err,
 			)
 		}
-		return decision, reason, err
+		return decision, err
 	})
 	return &impersonationModesTracker{
 		modes:    allImpersonationModes(loggingAuthorizer),

@@ -113,9 +113,9 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 			ResourceRequest: true,
 			Path:            "",
 		}
-		decision, reason, err := a.authorizer.Authorize(ctx, deleteAttributes)
-		if decision != authorizer.DecisionAllow {
-			return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
+		decision, err := a.authorizer.Authorize(ctx, deleteAttributes)
+		if !decision.IsAllowed() {
+			return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", decision.Reason(), err))
 		}
 	}
 
@@ -131,7 +131,7 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 	// This can prevent creating the pod to run the network to be able to do discovery and it appears as a timeout, not a rejection.
 	// Because the timeout is wrapper on admission/request, we can run a single check to see if the user can finalize any
 	// possible resource.
-	if decision, _, _ := a.authorizer.Authorize(ctx, finalizeAnythingRecord(attributes.GetUserInfo())); decision == authorizer.DecisionAllow {
+	if decision, _ := a.authorizer.Authorize(ctx, finalizeAnythingRecord(attributes.GetUserInfo())); decision.IsAllowed() {
 		return nil
 	}
 
@@ -144,9 +144,9 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 		// resources. User needs to have delete permission on all the
 		// matched Resources.
 		for _, record := range records {
-			decision, reason, err := a.authorizer.Authorize(ctx, record)
-			if decision != authorizer.DecisionAllow {
-				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %v", reason, err))
+			decision, err := a.authorizer.Authorize(ctx, record)
+			if !decision.IsAllowed() {
+				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %v", decision.Reason(), err))
 			}
 		}
 	}

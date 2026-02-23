@@ -94,11 +94,11 @@ func (v *validatingAdmissionPolicyStrategy) authorize(ctx context.Context, polic
 		Resource:        resource,
 	}
 
-	d, _, err := v.authorizer.Authorize(ctx, attrs)
+	d, err := v.authorizer.Authorize(ctx, attrs)
 	if err != nil {
 		return err
 	}
-	if d != authorizer.DecisionAllow {
+	if !d.IsAllowed() {
 		return fmt.Errorf(`user %v must have "get" permission on all objects of the referenced paramKind (kind=%s, apiVersion=%s)`, user, paramKind.Kind, paramKind.APIVersion)
 	}
 	return nil

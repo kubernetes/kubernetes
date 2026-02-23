@@ -29,8 +29,8 @@ import (
 // It is useful in tests and when using kubernetes in an open manner.
 type alwaysAllowAuthorizer struct{}
 
-func (alwaysAllowAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return authorizer.DecisionAllow, "", nil
+func (alwaysAllowAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return authorizer.DecisionAllow(""), nil
 }
 
 func (alwaysAllowAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -57,8 +57,8 @@ func NewAlwaysAllowAuthorizer() *alwaysAllowAuthorizer {
 // It is useful in unit tests to force an operation to be forbidden.
 type alwaysDenyAuthorizer struct{}
 
-func (alwaysDenyAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
-	return authorizer.DecisionNoOpinion, "Everything is forbidden.", nil
+func (alwaysDenyAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return authorizer.DecisionNoOpinion("Everything is forbidden."), nil
 }
 
 func (alwaysDenyAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -73,18 +73,18 @@ type privilegedGroupAuthorizer struct {
 	groups []string
 }
 
-func (r *privilegedGroupAuthorizer) Authorize(ctx context.Context, attr authorizer.Attributes) (authorizer.Decision, string, error) {
+func (r *privilegedGroupAuthorizer) Authorize(ctx context.Context, attr authorizer.Attributes) (authorizer.Decision, error) {
 	if attr.GetUser() == nil {
-		return authorizer.DecisionNoOpinion, "Error", errors.New("no user on request.")
+		return authorizer.DecisionNoOpinion("Error"), errors.New("no user on request.")
 	}
 	for _, attr_group := range attr.GetUser().GetGroups() {
 		for _, priv_group := range r.groups {
 			if priv_group == attr_group {
-				return authorizer.DecisionAllow, "", nil
+				return authorizer.DecisionAllow(""), nil
 			}
 		}
 	}
-	return authorizer.DecisionNoOpinion, "", nil
+	return authorizer.DecisionNoOpinion(""), nil
 }
 
 // NewPrivilegedGroups is for use in loopback scenarios

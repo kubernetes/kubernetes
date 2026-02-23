@@ -1537,16 +1537,16 @@ func TestCompilationErrors(t *testing.T) {
 	}
 }
 
-var denyAll = fakeAuthorizer{defaultResult: authorizerResult{decision: authorizer.DecisionDeny, reason: "fake reason", err: nil}}
-var errorAll = fakeAuthorizer{defaultResult: authorizerResult{decision: authorizer.DecisionNoOpinion, reason: "", err: fmt.Errorf("fake authz error")}}
+var denyAll = fakeAuthorizer{defaultResult: authorizerResult{decision: authorizer.DecisionDeny("fake reason"), err: nil}}
+var errorAll = fakeAuthorizer{defaultResult: authorizerResult{decision: authorizer.DecisionNoOpinion(""), err: fmt.Errorf("fake authz error")}}
 
 func newAuthzAllowMatch(match authorizer.AttributesRecord) fakeAuthorizer {
 	return fakeAuthorizer{
 		match: &authorizerMatch{
 			match:            match,
-			authorizerResult: authorizerResult{decision: authorizer.DecisionAllow, reason: "", err: nil},
+			authorizerResult: authorizerResult{decision: authorizer.DecisionAllow(""), err: nil},
 		},
-		defaultResult: authorizerResult{decision: authorizer.DecisionDeny, reason: "", err: nil},
+		defaultResult: authorizerResult{decision: authorizer.DecisionDeny(""), err: nil},
 	}
 }
 
@@ -1557,7 +1557,6 @@ type fakeAuthorizer struct {
 
 type authorizerResult struct {
 	decision authorizer.Decision
-	reason   string
 	err      error
 }
 
@@ -1566,7 +1565,7 @@ type authorizerMatch struct {
 	match authorizer.AttributesRecord
 }
 
-func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	if f.match != nil {
 		other, ok := a.(*authorizer.AttributesRecord)
 		if !ok {
@@ -1576,10 +1575,10 @@ func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) 
 		// Compare AttributesRecord structs - contains error fields but we're comparing the struct, not handling errors
 		//nolint:all
 		if reflect.DeepEqual(f.match.match, *other) {
-			return f.match.decision, f.match.reason, f.match.err
+			return f.match.decision, f.match.err
 		}
 	}
-	return f.defaultResult.decision, f.defaultResult.reason, f.defaultResult.err
+	return f.defaultResult.decision, f.defaultResult.err
 }
 
 func endpointCreateAttributes() admission.Attributes {

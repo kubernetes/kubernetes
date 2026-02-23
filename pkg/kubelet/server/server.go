@@ -350,7 +350,7 @@ func (s *Server) InstallAuthFilter(ctx context.Context) {
 		var subresources []string
 		for _, attr := range attrs {
 			subresources = append(subresources, attr.GetSubresource())
-			decision, _, err := s.auth.Authorize(req.Request.Context(), attr)
+			decision, err := s.auth.Authorize(req.Request.Context(), attr)
 			if err != nil {
 				logger.Error(err, "Authorization error", "user", attr.GetUser().GetName(), "verb", attr.GetVerb(), "resource", attr.GetResource(), "subresource", attr.GetSubresource())
 				msg = fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attr.GetUser().GetName(), attr.GetVerb(), attr.GetResource(), attr.GetSubresource())
@@ -359,7 +359,7 @@ func (s *Server) InstallAuthFilter(ctx context.Context) {
 
 			}
 
-			if decision == authorizer.DecisionAllow {
+			if decision.IsAllowed() {
 				allowed = true
 				break
 			}

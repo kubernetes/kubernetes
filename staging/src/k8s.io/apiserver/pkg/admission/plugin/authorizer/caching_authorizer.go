@@ -30,7 +30,6 @@ import (
 
 type authzResult struct {
 	authorized authorizer.Decision
-	reason     string
 	err        error
 }
 
@@ -78,7 +77,7 @@ var _ user.Info = (interface {
 
 // Authorize returns an authorization decision by delegating to another Authorizer. If an equivalent
 // check has already been performed, a cached result is returned. Not safe for concurrent use.
-func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	type SerializableAttributes struct {
 		authorizer.AttributesRecord
 		LabelSelector string
@@ -135,21 +134,20 @@ func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 
 	var b strings.Builder
 	if err := json.NewEncoder(&b).Encode(serializableAttributes); err != nil {
-		return authorizer.DecisionNoOpinion, "", err
+		return authorizer.DecisionNoOpinion(""), err
 	}
 	key := b.String()
 
 	if cached, ok := ca.decisions[key]; ok {
-		return cached.authorized, cached.reason, cached.err
+		return cached.authorized, cached.err
 	}
 
-	authorized, reason, err := ca.authorizer.Authorize(ctx, a)
+	authorized, err := ca.authorizer.Authorize(ctx, a)
 
 	ca.decisions[key] = authzResult{
 		authorized: authorized,
-		reason:     reason,
 		err:        err,
 	}
 
-	return authorized, reason, err
+	return authorized, err
 }

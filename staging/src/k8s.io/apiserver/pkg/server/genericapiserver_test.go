@@ -529,9 +529,9 @@ type mockAuthorizer struct {
 	lastURI string
 }
 
-func (authz *mockAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (authz *mockAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	authz.lastURI = a.GetPath()
-	return authorizer.DecisionAllow, "", nil
+	return authorizer.DecisionAllow(""), nil
 }
 
 type testGetterStorage struct {

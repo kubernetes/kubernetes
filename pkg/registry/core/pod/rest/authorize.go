@@ -52,12 +52,12 @@ func ensureAuthorizedForVerb(ctx context.Context, a authorizer.Authorizer, verb 
 	if err != nil {
 		return apierrors.NewInternalError(fmt.Errorf("error building authorizer attributes: %w", err))
 	}
-	authorized, reason, err := a.Authorize(ctx, &overrideVerb{Attributes: originalAttrs, verb: verb})
+	authorized, err := a.Authorize(ctx, &overrideVerb{Attributes: originalAttrs, verb: verb})
 	if err != nil {
 		return err
 	}
-	if authorized != authorizer.DecisionAllow {
-		return apierrors.NewForbidden(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Name, errors.New(reason))
+	if !authorized.IsAllowed() {
+		return apierrors.NewForbidden(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Name, errors.New(authorized.Reason()))
 	}
 	return nil
 }

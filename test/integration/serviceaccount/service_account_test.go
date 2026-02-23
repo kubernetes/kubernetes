@@ -353,7 +353,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 			// 1. The "root" user is allowed to do anything
 			// 2. ServiceAccounts named "ro" are allowed read-only operations in their namespace
 			// 3. ServiceAccounts named "rw" are allowed any operation in their namespace
-			authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+			authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, error) {
 				username := ""
 				if user := attrs.GetUser(); user != nil {
 					username = user.GetName()
@@ -367,15 +367,15 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 						switch serviceAccountName {
 						case readOnlyServiceAccountName:
 							if attrs.IsReadOnly() {
-								return authorizer.DecisionAllow, "", nil
+								return authorizer.DecisionAllow(""), nil
 							}
 						case readWriteServiceAccountName:
-							return authorizer.DecisionAllow, "", nil
+							return authorizer.DecisionAllow(""), nil
 						}
 					}
 				}
 
-				return authorizer.DecisionNoOpinion, fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource()), nil
+				return authorizer.DecisionNoOpinion(fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource())), nil
 			})
 			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, authorizer)
 		},

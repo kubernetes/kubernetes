@@ -148,8 +148,8 @@ var _ initializer.WantsDrainedNotification = &WantDrainedNotification{}
 // TestAuthorizer is a test stub that fulfills the WantsAuthorizer interface.
 type TestAuthorizer struct{}
 
-func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return authorizer.DecisionNoOpinion, "", nil
+func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return authorizer.DecisionNoOpinion(""), nil
 }
 
 func TestRESTMapperAdmissionPlugin(t *testing.T) {

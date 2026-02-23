@@ -116,11 +116,11 @@ func (v *validatingAdmissionPolicyBindingStrategy) authorize(ctx context.Context
 		Resource:        resource,
 	}
 
-	d, _, err := v.authorizer.Authorize(ctx, attrs)
+	d, err := v.authorizer.Authorize(ctx, attrs)
 	if err != nil {
 		return fmt.Errorf(`failed to authorize request: %w`, err)
 	}
-	if d != authorizer.DecisionAllow {
+	if !d.IsAllowed() {
 		if policyErr != nil {
 			return fmt.Errorf(`unable to get policy %s to determine minimum required permissions and user %v does not have "%v" permission for all groups, versions and resources`, binding.Spec.PolicyName, user, verb)
 		}

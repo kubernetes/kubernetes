@@ -58,17 +58,17 @@ func TestNewAuthorizer(t *testing.T) {
 				paths []string
 				want  authorizer.Decision
 			}{
-				{tt.allowed, authorizer.DecisionAllow},
-				{tt.denied, authorizer.DecisionDeny},
-				{tt.noOpinion, authorizer.DecisionNoOpinion},
+				{tt.allowed, authorizer.DecisionAllow("")},
+				{tt.denied, authorizer.DecisionDeny("")},
+				{tt.noOpinion, authorizer.DecisionNoOpinion("")},
 			} {
 				for _, pth := range cases.paths {
 					info := authorizer.AttributesRecord{
 						Path: pth,
 					}
-					if got, _, err := a.Authorize(context.Background(), info); err != nil {
+					if got, err := a.Authorize(context.Background(), info); err != nil {
 						t.Errorf("NewAuthorizer(%v).Authorize(%q) return unexpected error: %v", tt.excludedPaths, pth, err)
-					} else if got != cases.want {
+					} else if !got.Equal(cases.want) {
 						t.Errorf("NewAuthorizer(%v).Authorize(%q) = %v, want %v", tt.excludedPaths, pth, got, cases.want)
 					}
 				}

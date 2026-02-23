@@ -42,62 +42,62 @@ import (
 
 type fakeAuthorizer struct{}
 
-func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	username := a.GetUser().GetName()
 
 	if username == "non-deleter" {
 		if a.GetVerb() == "delete" {
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
 		if a.GetVerb() == "update" && a.GetSubresource() == "finalizers" {
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
 		if a.GetAPIGroup() == "*" && a.GetResource() == "*" { // this user does not have full rights
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if username == "non-pod-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "pods" {
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "pods" && a.GetSubresource() == "finalizers" {
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
 		if a.GetAPIGroup() == "*" && a.GetResource() == "*" { // this user does not have full rights
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if username == "non-rc-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "replicationcontrollers" {
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "replicationcontrollers" && a.GetSubresource() == "finalizers" {
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
 		if a.GetAPIGroup() == "*" && a.GetResource() == "*" { // this user does not have full rights
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	if username == "non-node-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "nodes" {
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "nodes" && a.GetSubresource() == "finalizers" {
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
 		if a.GetAPIGroup() == "*" && a.GetResource() == "*" { // this user does not have full rights
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
-	return authorizer.DecisionAllow, "", nil
+	return authorizer.DecisionAllow(""), nil
 }
 
 // newGCPermissionsEnforcement returns the admission controller configured for testing.

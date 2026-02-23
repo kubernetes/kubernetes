@@ -139,7 +139,7 @@ func TestAuthorizerMetrics(t *testing.T) {
 			}
 
 			attr := authorizer.AttributesRecord{User: &user.DefaultInfo{}}
-			_, _, err = wh.Authorize(ctx, attr)
+			_, err = wh.Authorize(ctx, attr)
 			if scenario.wantErr {
 				if err == nil {
 					t.Errorf("expected error making authorization request: %v", err)

@@ -107,13 +107,13 @@ func recordAuthorizationMetrics(ctx context.Context, authorized authorizer.Decis
 	var resultLabel string
 
 	switch {
-	case authorized == authorizer.DecisionAllow:
+	case authorized.IsAllowed():
 		resultLabel = allowedLabel
 	case err != nil:
 		resultLabel = errorLabel
-	case authorized == authorizer.DecisionDeny:
+	case authorized.IsDenied():
 		resultLabel = deniedLabel
-	case authorized == authorizer.DecisionNoOpinion:
+	case authorized.IsNoOpinion():
 		resultLabel = noOpinionLabel
 	}
 

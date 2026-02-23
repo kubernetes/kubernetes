@@ -34,22 +34,22 @@ import (
 func IsAuthorizedForSignerName(ctx context.Context, authz authorizer.Authorizer, info user.Info, verb, signerName string) bool {
 	// First check if the user has explicit permission to 'verb' for the given signerName.
 	attr := buildAttributes(info, verb, signerName)
-	decision, reason, err := authz.Authorize(ctx, attr)
+	decision, err := authz.Authorize(ctx, attr)
 	switch {
 	case err != nil:
-		klog.V(3).Infof("cannot authorize %q %q for policy: %v,%v", verb, attr.GetName(), reason, err)
-	case decision == authorizer.DecisionAllow:
+		klog.V(3).Infof("cannot authorize %q %q for policy: %v", verb, attr.GetName(), err)
+	case decision.IsAllowed():
 		return true
 	}
 
 	// If not, check if the user has wildcard permissions to 'verb' for the domain portion of the signerName, e.g.
 	// 'kubernetes.io/*'.
 	attr = buildWildcardAttributes(info, verb, signerName)
-	decision, reason, err = authz.Authorize(ctx, attr)
+	decision, err = authz.Authorize(ctx, attr)
 	switch {
 	case err != nil:
-		klog.V(3).Infof("cannot authorize %q %q for policy: %v,%v", verb, attr.GetName(), reason, err)
-	case decision == authorizer.DecisionAllow:
+		klog.V(3).Infof("cannot authorize %q %q for policy: %v", verb, attr.GetName(), err)
+	case decision.IsAllowed():
 		return true
 	}
 

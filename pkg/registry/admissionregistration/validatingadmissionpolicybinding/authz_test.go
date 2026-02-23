@@ -37,7 +37,7 @@ func TestAuthorization(t *testing.T) {
 	for _, tc := range []struct {
 		name              string
 		userInfo          user.Info
-		auth              AuthFunc
+		auth              authorizer.AuthorizerFunc
 		policyGetter      PolicyGetterFunc
 		resourceResolver  resolver.ResourceResolverFunc
 		expectErrContains string
@@ -45,18 +45,18 @@ func TestAuthorization(t *testing.T) {
 		{
 			name:     "superuser", // success despite always-denying authorizer
 			userInfo: &user.DefaultInfo{Groups: []string{user.SystemPrivilegedGroup}},
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-				return authorizer.DecisionDeny, "", nil
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+				return authorizer.DecisionDeny(""), nil
 			},
 		},
 		{
 			name:     "authorized",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 				if a.GetResource() == "configmaps" {
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				}
-				return authorizer.DecisionDeny, "", nil
+				return authorizer.DecisionDeny(""), nil
 			},
 			policyGetter: func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
 				return &admissionregistration.ValidatingAdmissionPolicy{
@@ -77,11 +77,11 @@ func TestAuthorization(t *testing.T) {
 		{
 			name:     "denied",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 				if a.GetResource() == "configmaps" {
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				}
-				return authorizer.DecisionDeny, "", nil
+				return authorizer.DecisionDeny(""), nil
 			},
 			policyGetter: func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
 				return &admissionregistration.ValidatingAdmissionPolicy{
@@ -103,11 +103,11 @@ func TestAuthorization(t *testing.T) {
 		{
 			name:     "unable to parse paramRef",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 				if a.GetResource() == "configmaps" {
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				}
-				return authorizer.DecisionDeny, "", nil
+				return authorizer.DecisionDeny(""), nil
 			},
 			policyGetter: func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
 				return &admissionregistration.ValidatingAdmissionPolicy{
@@ -129,11 +129,11 @@ func TestAuthorization(t *testing.T) {
 		{
 			name:     "unable to resolve param",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 				if a.GetResource() == "configmaps" {
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				}
-				return authorizer.DecisionDeny, "", nil
+				return authorizer.DecisionDeny(""), nil
 			},
 			policyGetter: func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
 				return &admissionregistration.ValidatingAdmissionPolicy{
@@ -151,11 +151,11 @@ func TestAuthorization(t *testing.T) {
 		{
 			name:     "unable to get policy",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
-			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 				if a.GetResource() == "configmaps" {
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				}
-				return authorizer.DecisionDeny, "", nil
+				return authorizer.DecisionDeny(""), nil
 			},
 			policyGetter: func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
 				return nil, fmt.Errorf("no such policy")
@@ -218,12 +218,6 @@ func TestAuthorization(t *testing.T) {
 			})
 		})
 	}
-}
-
-type AuthFunc func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
-
-func (f AuthFunc) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return f(ctx, a)
 }
 
 type PolicyGetterFunc func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error)

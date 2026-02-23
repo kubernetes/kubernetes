@@ -412,15 +412,15 @@ func authorizeUnsafeDelete(ctx context.Context, attr admission.Attributes, authz
 		}
 	}
 
-	decision, reason, err := authz.Authorize(ctx, record)
+	decision, err := authz.Authorize(ctx, record)
 	if err != nil {
 		err = fmt.Errorf("error while checking permission for %q, %w", record.Verb, err)
 		klog.FromContext(ctx).V(1).Info("failed to authorize", "err", err)
 		return admission.NewForbidden(attr, err)
 	}
-	if decision == authorizer.DecisionAllow {
+	if decision.IsAllowed() {
 		return nil
 	}
 
-	return admission.NewForbidden(attr, fmt.Errorf("not permitted to do %q, reason: %s", record.Verb, reason))
+	return admission.NewForbidden(attr, fmt.Errorf("not permitted to do %q, reason: %s", record.Verb, decision.Reason()))
 }

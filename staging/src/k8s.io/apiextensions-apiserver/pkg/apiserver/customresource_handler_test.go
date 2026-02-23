@@ -845,8 +845,8 @@ func (dummyAdmissionImpl) Handles(operation admission.Operation) bool { return f
 
 type dummyAuthorizerImpl struct{}
 
-func (dummyAuthorizerImpl) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return authorizer.DecisionAllow, "", nil
+func (dummyAuthorizerImpl) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return authorizer.DecisionAllow(""), nil
 }
 
 type dummyServiceResolverImpl struct{}

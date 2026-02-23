@@ -72,12 +72,12 @@ func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule,
 	return true
 }
 
-func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
+func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
 	r.authorizationRuleResolver.VisitRulesFor(ctx, requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
 	if ruleCheckingVisitor.allowed {
-		return authorizer.DecisionAllow, ruleCheckingVisitor.reason, nil
+		return authorizer.DecisionAllow(ruleCheckingVisitor.reason), nil
 	}
 
 	// Build a detailed log of the denial.
@@ -123,7 +123,7 @@ func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes author
 	if len(ruleCheckingVisitor.errors) > 0 {
 		reason = fmt.Sprintf("RBAC: %v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
 	}
-	return authorizer.DecisionNoOpinion, reason, nil
+	return authorizer.DecisionNoOpinion(reason), nil
 }
 
 func (r *RBACAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {

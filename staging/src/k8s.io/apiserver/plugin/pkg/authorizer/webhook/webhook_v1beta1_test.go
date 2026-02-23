@@ -198,7 +198,7 @@ current-context: default
 			if err != nil {
 				return fmt.Errorf("error building sar client: %v", err)
 			}
-			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, authorizer.DecisionNoOpinion, []authzconfig.WebhookMatchCondition{}, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), "")
+			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, authorizer.DecisionNoOpinion(""), []authzconfig.WebhookMatchCondition{}, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), "")
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -341,7 +341,7 @@ func newV1beta1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, 
 	if err != nil {
 		return nil, fmt.Errorf("error building sar client: %v", err)
 	}
-	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion, []authzconfig.WebhookMatchCondition{}, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), "")
+	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion(""), []authzconfig.WebhookMatchCondition{}, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), "")
 }
 
 func TestV1beta1TLSConfig(t *testing.T) {
@@ -410,13 +410,13 @@ func TestV1beta1TLSConfig(t *testing.T) {
 
 			// Allow all and see if we get an error.
 			service.Allow()
-			decision, _, err := wh.Authorize(context.Background(), attr)
+			decision, err := wh.Authorize(context.Background(), attr)
 			if tt.wantAuth {
-				if decision != authorizer.DecisionAllow {
+				if !decision.IsAllowed() {
 					t.Errorf("expected successful authorization")
 				}
 			} else {
-				if decision == authorizer.DecisionAllow {
+				if decision.IsAllowed() {
 					t.Errorf("expected failed authorization")
 				}
 			}
@@ -432,7 +432,7 @@ func TestV1beta1TLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			if decision, _, _ := wh.Authorize(context.Background(), attr); decision == authorizer.DecisionAllow {
+			if decision, _ := wh.Authorize(context.Background(), attr); decision.IsAllowed() {
 				t.Errorf("%s: incorrectly authorized with DenyAll policy", tt.test)
 			}
 		}()
@@ -536,11 +536,11 @@ func TestV1beta1Webhook(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		decision, _, err := wh.Authorize(context.Background(), tt.attr)
+		decision, err := wh.Authorize(context.Background(), tt.attr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if decision != authorizer.DecisionAllow {
+		if !decision.IsAllowed() {
 			t.Errorf("case %d: authorization failed", i)
 			continue
 		}
@@ -640,14 +640,14 @@ func TestV1beta1WebhookCache(t *testing.T) {
 			serv.called = 0
 			serv.allow = test.allow
 			serv.statusCode = test.statusCode
-			authorized, _, err := wh.Authorize(context.Background(), test.attr)
+			authorized, err := wh.Authorize(context.Background(), test.attr)
 			if test.expectedErr && err == nil {
 				t.Fatalf("%d: Expected error", i)
 			} else if !test.expectedErr && err != nil {
 				t.Fatalf("%d: unexpected error: %v", i, err)
 			}
 
-			if test.expectedAuthorized != (authorized == authorizer.DecisionAllow) {
+			if test.expectedAuthorized != authorized.IsAllowed() {
 				t.Errorf("%d: expected authorized=%v, got %v", i, test.expectedAuthorized, authorized)
 			}
 

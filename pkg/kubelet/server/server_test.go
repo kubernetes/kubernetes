@@ -306,7 +306,7 @@ func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bo
 type fakeAuth struct {
 	authenticateFunc func(*http.Request) (*authenticator.Response, bool, error)
 	attributesFunc   func(user.Info, *http.Request) []authorizer.Attributes
-	authorizeFunc    func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+	authorizeFunc    func(authorizer.Attributes) (authorizer.Decision, error)
 }
 
 func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
@@ -315,7 +315,7 @@ func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 func (f *fakeAuth) GetRequestAttributes(ctx context.Context, u user.Info, req *http.Request) []authorizer.Attributes {
 	return f.attributesFunc(u, req)
 }
-func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	return f.authorizeFunc(a)
 }
 
@@ -363,8 +363,8 @@ func newServerTestWithDebuggingHandlers(ctx context.Context, kubeCfg *kubeletcon
 		attributesFunc: func(u user.Info, req *http.Request) []authorizer.Attributes {
 			return []authorizer.Attributes{&authorizer.AttributesRecord{User: u}}
 		},
-		authorizeFunc: func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
-			return authorizer.DecisionAllow, "", nil
+		authorizeFunc: func(a authorizer.Attributes) (decision authorizer.Decision, err error) {
+			return authorizer.DecisionAllow(""), nil
 		},
 	}
 	server := NewServer(
@@ -717,9 +717,9 @@ func TestAuthFilters(t *testing.T) {
 					tc.AssertAttributes(t, attrs)
 					return attrs
 				}
-				fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+				fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, err error) {
 					calledAuthorize = true
-					return authorizer.DecisionNoOpinion, "", nil
+					return authorizer.DecisionNoOpinion(""), nil
 				}
 
 				req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
@@ -759,9 +759,9 @@ func TestAuthenticationError(t *testing.T) {
 		calledAttributes = true
 		return expectedAttributes
 	}
-	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, err error) {
 		calledAuthorize = true
-		return authorizer.DecisionNoOpinion, "", errors.New("Failed")
+		return authorizer.DecisionNoOpinion(""), errors.New("Failed")
 	}
 
 	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
@@ -798,9 +798,9 @@ func TestAuthenticationFailure(t *testing.T) {
 		calledAttributes = true
 		return expectedAttributes
 	}
-	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, err error) {
 		calledAuthorize = true
-		return authorizer.DecisionNoOpinion, "", nil
+		return authorizer.DecisionNoOpinion(""), nil
 	}
 
 	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusUnauthorized)
@@ -837,9 +837,9 @@ func TestAuthorizationSuccess(t *testing.T) {
 		calledAttributes = true
 		return expectedAttributes
 	}
-	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, err error) {
 		calledAuthorize = true
-		return authorizer.DecisionAllow, "", nil
+		return authorizer.DecisionAllow(""), nil
 	}
 
 	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
@@ -1920,7 +1920,7 @@ func TestFineGrainedAuthz(t *testing.T) {
 		name                     string
 		path                     string
 		expectedSubResources     []string
-		authorizer               func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+		authorizer               func(authorizer.Attributes) (authorizer.Decision, error)
 		wantStatusCode           int
 		wantCalledAuthorizeCount int
 	}{
@@ -1928,8 +1928,8 @@ func TestFineGrainedAuthz(t *testing.T) {
 			name:                 "both subresources rejected",
 			path:                 "/configz",
 			expectedSubResources: []string{"configz", "proxy"},
-			authorizer: func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-				return authorizer.DecisionNoOpinion, "", nil
+			authorizer: func(authorizer.Attributes) (authorizer.Decision, error) {
+				return authorizer.DecisionNoOpinion(""), nil
 			},
 			wantStatusCode:           403,
 			wantCalledAuthorizeCount: 2,
@@ -1938,14 +1938,14 @@ func TestFineGrainedAuthz(t *testing.T) {
 			name:                 "fine grained rejected, proxy accepted",
 			path:                 "/configz",
 			expectedSubResources: []string{"configz", "proxy"},
-			authorizer: func(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			authorizer: func(a authorizer.Attributes) (authorizer.Decision, error) {
 				switch a.GetSubresource() {
 				case "configz":
-					return authorizer.DecisionNoOpinion, "", nil
+					return authorizer.DecisionNoOpinion(""), nil
 				case "proxy":
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				default:
-					return authorizer.DecisionNoOpinion, "", fmt.Errorf("unexpected subresource %v", a.GetSubresource())
+					return authorizer.DecisionNoOpinion(""), fmt.Errorf("unexpected subresource %v", a.GetSubresource())
 				}
 			},
 			wantStatusCode:           200,
@@ -1955,14 +1955,14 @@ func TestFineGrainedAuthz(t *testing.T) {
 			name:                 "fine grained accepted",
 			path:                 "/configz",
 			expectedSubResources: []string{"configz", "proxy"},
-			authorizer: func(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			authorizer: func(a authorizer.Attributes) (authorizer.Decision, error) {
 				switch a.GetSubresource() {
 				case "configz":
-					return authorizer.DecisionAllow, "", nil
+					return authorizer.DecisionAllow(""), nil
 				case "proxy":
-					return authorizer.DecisionNoOpinion, "", fmt.Errorf("did not expect code to reach here")
+					return authorizer.DecisionNoOpinion(""), fmt.Errorf("did not expect code to reach here")
 				default:
-					return authorizer.DecisionNoOpinion, "", fmt.Errorf("unexpected subresource %v", a.GetSubresource())
+					return authorizer.DecisionNoOpinion(""), fmt.Errorf("unexpected subresource %v", a.GetSubresource())
 				}
 			},
 			wantStatusCode:           200,
@@ -1991,7 +1991,7 @@ func TestFineGrainedAuthz(t *testing.T) {
 				require.Equal(t, tc.expectedSubResources, gotSubresources)
 				return attrs
 			}
-			fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+			fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (authorizer.Decision, error) {
 				calledAuthorizeCount += 1
 				return tc.authorizer(a)
 			}

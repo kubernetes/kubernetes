@@ -258,17 +258,16 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer, attributes authorizer.Attributes) rest.ValidateObjectFunc {
 	var once sync.Once
 	var authorizerDecision authorizer.Decision
-	var authorizerReason string
 	var authorizerErr error
 	return func(ctx context.Context, obj runtime.Object) error {
 		if a == nil {
 			return errors.NewInternalError(fmt.Errorf("no authorizer provided, unable to authorize a create on update"))
 		}
 		once.Do(func() {
-			authorizerDecision, authorizerReason, authorizerErr = a.Authorize(ctx, attributes)
+			authorizerDecision, authorizerErr = a.Authorize(ctx, attributes)
 		})
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
-		if authorizerDecision == authorizer.DecisionAllow {
+		if authorizerDecision.IsAllowed() {
 			// Continue to validating admission
 			return validate(ctx, obj)
 		}
@@ -277,7 +276,7 @@ func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer
 		}
 
 		// The user is not authorized to perform this action, so we need to build the error response
-		return responsewriters.ForbiddenStatusError(attributes, authorizerReason)
+		return responsewriters.ForbiddenStatusError(attributes, authorizerDecision.Reason())
 	}
 }
 

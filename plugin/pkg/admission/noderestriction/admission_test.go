@@ -1414,7 +1414,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "foo",
-				decision:           authorizer.DecisionDeny,
+				decision:           authorizer.DecisionDeny(""),
 			},
 		},
 		{
@@ -1444,7 +1444,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "bar",
-				decision:           authorizer.DecisionDeny,
+				decision:           authorizer.DecisionDeny(""),
 			},
 		},
 		{
@@ -1491,7 +1491,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "bar",
-				decision:           authorizer.DecisionDeny,
+				decision:           authorizer.DecisionDeny(""),
 			},
 		},
 		{
@@ -1555,7 +1555,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "bar",
-				decision:           authorizer.DecisionDeny,
+				decision:           authorizer.DecisionDeny(""),
 			},
 		},
 		{
@@ -1648,7 +1648,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "foo",
-				decision:           authorizer.DecisionAllow,
+				decision:           authorizer.DecisionAllow(""),
 			},
 		},
 		{
@@ -1668,7 +1668,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "foo",
-				decision:           authorizer.DecisionDeny,
+				decision:           authorizer.DecisionDeny(""),
 			},
 			err: `serviceaccounts "mysa" is forbidden: audience "foo" not found in pod spec volume, system:node:mynode is not authorized to request tokens for this audience`,
 		},
@@ -2587,9 +2587,9 @@ type fakeAuthorizer struct {
 	err                error
 }
 
-func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 	if f.err != nil {
-		return f.decision, "forced error", f.err
+		return f.decision, f.err
 	}
 
 	expectedAttrs := authorizer.AttributesRecord{
@@ -2607,5 +2607,5 @@ func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) 
 		f.t.Errorf("expected attributes: %v, got: %v", expectedAttrs, a)
 	}
 
-	return f.decision, "", nil
+	return f.decision, nil
 }

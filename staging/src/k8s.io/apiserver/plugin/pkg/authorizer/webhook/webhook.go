@@ -185,7 +185,7 @@ func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, un
 // TODO(mikedanese): We should eventually support failing closed when we
 // encounter an error. We are failing open now to preserve backwards compatible
 // behavior.
-func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attributes) (authorizer.Decision, error) {
 	r := &authorizationv1.SubjectAccessReview{}
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorizationv1.SubjectAccessReviewSpec{
@@ -210,18 +210,18 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	// If failurePolicy=Deny, then the webhook rejects the request
 	// If failurePolicy=NoOpinion, then the error is ignored and the webhook is skipped
 	if err != nil {
-		return w.decisionOnError, "", err
+		return w.decisionOnError, err
 	}
 	// If at least one matchCondition successfully evaluates to FALSE,
 	// then the webhook is skipped.
 	if !matches {
-		return authorizer.DecisionNoOpinion, "", nil
+		return authorizer.DecisionNoOpinion(""), nil
 	}
 	// If all evaluated successfully and ALL matchConditions evaluate to TRUE,
 	// then the webhook is called.
 	key, err := json.Marshal(r.Spec)
 	if err != nil {
-		return w.decisionOnError, "", err
+		return w.decisionOnError, err
 	}
 	if entry, ok := w.responseCache.Get(string(key)); ok {
 		r.Status = entry.(authorizationv1.SubjectAccessReviewStatus)
@@ -266,11 +266,11 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			klog.Errorf("Failed to make webhook authorizer request: %v", err)
 
 			// we're returning NoOpinion, and the parent context has not timed out or been canceled
-			if w.decisionOnError == authorizer.DecisionNoOpinion && ctx.Err() == nil {
+			if w.decisionOnError.IsNoOpinion() && ctx.Err() == nil {
 				w.metrics.RecordWebhookFailOpen(ctx, w.name, metricsResult)
 			}
 
-			return w.decisionOnError, "", err
+			return w.decisionOnError, err
 		}
 
 		r.Status = result.Status
@@ -284,13 +284,13 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	}
 	switch {
 	case r.Status.Denied && r.Status.Allowed:
-		return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook subject access review returned both allow and deny response")
+		return authorizer.DecisionDeny(r.Status.Reason), fmt.Errorf("webhook subject access review returned both allow and deny response")
 	case r.Status.Denied:
-		return authorizer.DecisionDeny, r.Status.Reason, nil
+		return authorizer.DecisionDeny(r.Status.Reason), nil
 	case r.Status.Allowed:
-		return authorizer.DecisionAllow, r.Status.Reason, nil
+		return authorizer.DecisionAllow(r.Status.Reason), nil
 	default:
-		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
+		return authorizer.DecisionNoOpinion(r.Status.Reason), nil
 	}
 
 }

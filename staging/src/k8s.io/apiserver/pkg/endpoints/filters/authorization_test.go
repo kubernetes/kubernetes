@@ -227,12 +227,11 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 
 type fakeAuthorizer struct {
 	decision authorizer.Decision
-	reason   string
 	err      error
 }
 
-func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return f.decision, f.reason, f.err
+func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+	return f.decision, f.err
 }
 
 func TestAuditAnnotation(t *testing.T) {
@@ -243,8 +242,7 @@ func TestAuditAnnotation(t *testing.T) {
 	}{
 		"decision allow": {
 			fakeAuthorizer{
-				authorizer.DecisionAllow,
-				"RBAC: allowed to patch pod",
+				authorizer.DecisionAllow("RBAC: allowed to patch pod"),
 				nil,
 			},
 			"allow",
@@ -252,8 +250,7 @@ func TestAuditAnnotation(t *testing.T) {
 		},
 		"decision forbid": {
 			fakeAuthorizer{
-				authorizer.DecisionDeny,
-				"RBAC: not allowed to patch pod",
+				authorizer.DecisionDeny("RBAC: not allowed to patch pod"),
 				nil,
 			},
 			"forbid",
@@ -261,8 +258,7 @@ func TestAuditAnnotation(t *testing.T) {
 		},
 		"error": {
 			fakeAuthorizer{
-				authorizer.DecisionNoOpinion,
-				"",
+				authorizer.DecisionNoOpinion(""),
 				errors.New("can't parse user info"),
 			},
 			"",
@@ -295,5 +291,4 @@ func TestAuditAnnotation(t *testing.T) {
 		assert.True(t, ok, k+": reason annotation not found")
 		assert.Equal(t, tc.reasonAnnotation, annotation, k+": unexpected reason annotation")
 	}
-
 }

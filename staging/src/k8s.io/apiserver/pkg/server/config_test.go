@@ -91,8 +91,8 @@ func TestAuthorizeClientBearerTokenRequiredGroups(t *testing.T) {
 	fakeAuthenticator := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 		return &authenticator.Response{User: &user.DefaultInfo{}}, false, nil
 	})
-	fakeAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-		return authorizer.DecisionAllow, "", nil
+	fakeAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
+		return authorizer.DecisionAllow(""), nil
 	})
 	target := &rest.Config{BearerToken: "secretToken"}
 	authN := &AuthenticationInfo{Authenticator: fakeAuthenticator}

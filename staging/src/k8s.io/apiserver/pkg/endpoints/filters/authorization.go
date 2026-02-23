@@ -68,7 +68,8 @@ func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 			responsewriters.InternalError(w, req, err)
 			return
 		}
-		authorized, reason, err := a.Authorize(ctx, attributes)
+		authorized, err := a.Authorize(ctx, attributes)
+		reason := authorized.Reason()
 
 		authorizationFinish := time.Now()
 		request.TrackAuthorizationLatency(ctx, authorizationFinish.Sub(authorizationStart))
@@ -77,7 +78,7 @@ func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 		}()
 
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
-		if authorized == authorizer.DecisionAllow {
+		if authorized.IsAllowed() {
 			audit.AddAuditAnnotations(ctx,
 				decisionAnnotationKey, decisionAllow,
 				reasonAnnotationKey, reason)

@@ -705,10 +705,10 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		ResourceRequest: true,
 	}
 
-	authorized, _, err := p.authz.Authorize(ctx, attrs)
+	authorized, err := p.authz.Authorize(ctx, attrs)
 	// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 	// following the same pattern as withAuthorization (ref: https://github.com/kubernetes/kubernetes/blob/2b025e645975d6d51bf38c008f972c632cf49657/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authorization.go#L71-L91)
-	if authorized == authorizer.DecisionAllow {
+	if authorized.IsAllowed() {
 		return nil
 	}
 	if err != nil {

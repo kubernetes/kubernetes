@@ -47,22 +47,22 @@ func NewAuthorizer(alwaysAllowPaths []string) (authorizer.Authorizer, error) {
 		}
 	}
 
-	return authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, error) {
 		if a.IsResourceRequest() {
-			return authorizer.DecisionNoOpinion, "", nil
+			return authorizer.DecisionNoOpinion(""), nil
 		}
 
 		pth := strings.TrimPrefix(a.GetPath(), "/")
 		if paths.Has(pth) {
-			return authorizer.DecisionAllow, "", nil
+			return authorizer.DecisionAllow(""), nil
 		}
 
 		for _, prefix := range prefixes {
 			if strings.HasPrefix(pth, prefix) {
-				return authorizer.DecisionAllow, "", nil
+				return authorizer.DecisionAllow(""), nil
 			}
 		}
 
-		return authorizer.DecisionNoOpinion, "", nil
+		return authorizer.DecisionNoOpinion(""), nil
 	}), nil
 }
