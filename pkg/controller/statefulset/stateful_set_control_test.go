@@ -1971,7 +1971,7 @@ func TestStatefulSetControlRecreateUpdate(t *testing.T) {
 		name       string
 		invariants func(set *apps.StatefulSet, om *fakeObjectManager) error
 		initial    func() *apps.StatefulSet
-		preUpdate  func(set *apps.StatefulSet, om *fakeObjectManager, t *testing.T)
+		preUpdate  func(set *apps.StatefulSet, om *fakeObjectManager, t *testing.T) error
 		update     func(set *apps.StatefulSet) *apps.StatefulSet
 		validate   func(set *apps.StatefulSet, pods []*v1.Pod) error
 	}
@@ -1998,7 +1998,9 @@ func TestStatefulSetControlRecreateUpdate(t *testing.T) {
 		}
 
 		if test.preUpdate != nil {
-			test.preUpdate(set, om, t)
+			if err := test.preUpdate(set, om, t); err != nil {
+				t.Fatalf("%s: %s", test.name, err)
+			}
 		}
 
 		set = test.update(set)
@@ -2176,20 +2178,25 @@ func TestStatefulSetControlRecreateUpdate(t *testing.T) {
 			initial: func() *apps.StatefulSet {
 				return newStatefulSet(3)
 			},
-			preUpdate: func(set *apps.StatefulSet, om *fakeObjectManager, t *testing.T) {
+			preUpdate: func(set *apps.StatefulSet, om *fakeObjectManager, t *testing.T) error {
 				selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 				if err != nil {
-					t.Fatal(err)
+					return err
 				}
 				pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 				if err != nil {
-					t.Fatal(err)
+					return err
 				}
-				om.podsIndexer.Delete(findPodByOrdinal(pods, 1))
-				om.podsIndexer.Delete(findPodByOrdinal(pods, 2))
+				if err := om.podsIndexer.Delete(findPodByOrdinal(pods, 1)); err != nil {
+					return err
+				}
+				if err := om.podsIndexer.Delete(findPodByOrdinal(pods, 2)); err != nil {
+					return err
+				}
 				if _, err := om.setPodPending(set, 0); err != nil {
-					t.Fatal(err)
+					return err
 				}
+				return nil
 			},
 			update: func(set *apps.StatefulSet) *apps.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "foo"
@@ -2211,20 +2218,24 @@ func TestStatefulSetControlRecreateUpdate(t *testing.T) {
 			initial: func() *apps.StatefulSet {
 				return newStatefulSet(3)
 			},
-			preUpdate: func(set *apps.StatefulSet, om *fakeObjectManager, t *testing.T) {
+			preUpdate: func(set *apps.StatefulSet, om *fakeObjectManager, t *testing.T) error {
 				selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 				if err != nil {
-					t.Fatal(err)
+					return err
 				}
 				pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 				if err != nil {
-					t.Fatal(err)
+					return err
 				}
-				om.podsIndexer.Delete(findPodByOrdinal(pods, 1))
-				om.podsIndexer.Delete(findPodByOrdinal(pods, 2))
+				if err := om.podsIndexer.Delete(findPodByOrdinal(pods, 1)); err != nil {
+					return err
+				}
+				if err := om.podsIndexer.Delete(findPodByOrdinal(pods, 2)); err != nil {
+					return err
+				}
 				pod := findPodByOrdinal(pods, 0)
 				pod.Status.Phase = v1.PodFailed
-				om.podsIndexer.Update(pod)
+				return om.podsIndexer.Update(pod)
 			},
 			update: func(set *apps.StatefulSet) *apps.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "foo"

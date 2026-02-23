@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -578,10 +579,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 	status.CollisionCount = new(int32)
 	*status.CollisionCount = collisionCount
 
-	conditions := set.Status.Conditions
-	for i := range conditions {
-		status.Conditions = append(status.Conditions, conditions[i])
-	}
+	status.Conditions = append(status.Conditions, set.Status.Conditions...)
 
 	updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, pods)
 
@@ -767,7 +765,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 func (ssc *defaultStatefulSetControl) recreateDeleteAndWait(ctx context.Context, set *apps.StatefulSet, updateRevision *apps.ControllerRevision, replicas, condemned []*v1.Pod, status *apps.StatefulSetStatus) (bool, error) {
 	logger := klog.FromContext(ctx)
 
-	allPods := append(replicas, condemned...)
+	allPods := slices.Concat(replicas, condemned)
 	var deletedPods, terminatingPods bool
 	for _, pod := range allPods {
 		if pod == nil || !isCreated(pod) {

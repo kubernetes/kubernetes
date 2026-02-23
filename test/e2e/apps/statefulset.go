@@ -1481,9 +1481,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				len(pvcUIDs), len(newPVCs.Items))
 			for _, pvc := range newPVCs.Items {
 				oldUID, ok := pvcUIDs[pvc.Name]
-				gomega.Expect(ok).To(gomega.BeTrue(), "PersistentVolumeClaim %s/%s was newly created during recreate rollout",
-					ss.Namespace,
-					pvc.Name)
+				gomega.Expect(ok).To(gomega.BeTrueBecause("PersistentVolumeClaim %s/%s was newly created during recreate rollout", ss.Namespace, pvc.Name))
 				gomega.Expect(string(pvc.UID)).To(gomega.Equal(oldUID), "PersistentVolumeClaim %s/%s was deleted and recreated (old UID %s, new UID %s)",
 					ss.Namespace,
 					pvc.Name,
