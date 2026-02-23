@@ -136,7 +136,7 @@ func (sched *Scheduler) addPod(obj interface{}) {
 	if assignedPod(pod) {
 		sched.addAssignedPodToCache(pod)
 	} else if responsibleForPod(pod, sched.Profiles) {
-		sched.Cache.AddOrUpdatePodInGroup(nil, pod)
+		sched.Cache.AddPodInGroup(pod)
 		sched.addPodToSchedulingQueue(pod)
 	}
 }
@@ -168,7 +168,7 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 			sched.deletePodFromSchedulingQueue(oldPod, true)
 		}
 	} else if responsibleForPod(oldPod, sched.Profiles) {
-		sched.Cache.AddOrUpdatePodInGroup(oldPod, newPod)
+		sched.Cache.UpdatePodInGroup(oldPod, newPod)
 		sched.updatePodInSchedulingQueue(oldPod, newPod)
 	}
 }

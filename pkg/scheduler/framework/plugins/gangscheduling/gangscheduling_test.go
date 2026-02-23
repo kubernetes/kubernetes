@@ -279,7 +279,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 
 			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithCache(cache),
+				frameworkruntime.WithPodGroupManager(cache),
 				// frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 				frameworkruntime.WithPodActivator(fakeActivator),
@@ -297,9 +297,9 @@ func TestGangSchedulingFlow(t *testing.T) {
 			}
 
 			for _, p := range tt.initialPods {
-				cache.AddOrUpdatePodInGroup(nil, p)
+				cache.AddPodInGroup(p)
 			}
-			cache.AddOrUpdatePodInGroup(nil, tt.pod)
+			cache.AddPodInGroup(tt.pod)
 
 			p, err := New(ctx, nil, fh, feature.Features{EnableGangScheduling: true})
 			if err != nil {
@@ -345,7 +345,9 @@ func TestGangSchedulingFlow(t *testing.T) {
 			}
 			if gotPermitStatus.Code() == fwk.Wait {
 				// Pod waits for others from a gang. Simulate its eventual forget.
-				cache.ForgetPod(logger, pod)
+				if err := cache.ForgetPod(logger, pod); err != nil {
+					t.Fatalf("Failed to forget pod %q: %v", pod.Name, err)
+				}
 				return
 			}
 

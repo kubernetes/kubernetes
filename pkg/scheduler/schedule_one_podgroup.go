@@ -193,6 +193,11 @@ func (sched *Scheduler) initPodSchedulingContext(ctx context.Context, pod *v1.Po
 	podsToActivate := framework.NewPodsToActivate()
 	state.Write(framework.PodsToActivateKey, podsToActivate)
 
+	// Marks this cycle as a pod-group scheduling cycle.
+	// It indicates that Permit plugin should look at the snapshotted PodGroupState.
+	// Otherwise the Permit plugin looks at the live PodGroupState.
+	state.Write(framework.PermitPodGroupModeKey, &framework.PermitPodGroupMode{})
+
 	return &podSchedulingContext{
 		logger:         logger,
 		state:          state,
@@ -414,6 +419,9 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			case podGroupFeasible:
 				// Pod no longer needs a pod group scheduling cycle. Setting it to false to disable any checks in further functions.
 				pInfo.NeedsPodGroupScheduling = false
+				// Remove the PermitPodGroupModeKey, to consider the pod as a regular one in
+				// the binding cycle where Permit reads from the live PodGroupState.
+				podCtx.state.Delete(framework.PermitPodGroupModeKey)
 				// Schedule result is applied for pod and its binding cycle executes.
 				assumedPodInfo, status := sched.prepareForBindingCycle(ctx, podCtx.state, schedFwk, pInfo, podCtx.podsToActivate, podResult.scheduleResult)
 				if !status.IsSuccess() {

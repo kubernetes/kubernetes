@@ -76,9 +76,10 @@ type cacheImpl struct {
 	nodeTree *nodeTree
 	// A map from image name to its ImageStateSummary.
 	imageStates map[string]*fwk.ImageStateSummary
-	// PodGroupStates stores the runtime state for each known pod group (only if GenericWorkload feature gate is enabled).
+	// podGroupStates stores the runtime state for each known pod group (only if GenericWorkload feature gate is enabled).
 	podGroupStates map[PodGroupKey]*PodGroupState
-
+	// genericWorkloadEnabled stores the GenericWorkload feature gate value at construction time.
+	genericWorkloadEnabled bool
 	// apiDispatcher is used for the methods that are expected to send API calls.
 	// It's non-nil only if the SchedulerAsyncAPICalls feature gate is enabled.
 	apiDispatcher fwk.APIDispatcher
@@ -94,13 +95,14 @@ func newCache(ctx context.Context, period time.Duration, apiDispatcher fwk.APIDi
 		period: period,
 		stop:   ctx.Done(),
 
-		nodes:          make(map[string]*nodeInfoListItem),
-		nodeTree:       newNodeTree(logger, nil),
-		assumedPods:    sets.New[string](),
-		podStates:      make(map[string]*podState),
-		imageStates:    make(map[string]*fwk.ImageStateSummary),
-		podGroupStates: make(map[PodGroupKey]*PodGroupState),
-		apiDispatcher:  apiDispatcher,
+		nodes:                  make(map[string]*nodeInfoListItem),
+		nodeTree:               newNodeTree(logger, nil),
+		assumedPods:            sets.New[string](),
+		podStates:              make(map[string]*podState),
+		imageStates:            make(map[string]*fwk.ImageStateSummary),
+		podGroupStates:         make(map[PodGroupKey]*PodGroupState),
+		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
+		apiDispatcher:          apiDispatcher,
 	}
 }
 
@@ -289,13 +291,26 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 		return errors.New(errMsg)
 	}
 
-	// Also freeze a copy for podgroup states for this scheduling cycle.
-	nodeSnapshot.podGroupStates = make(map[PodGroupKey]*PodGroupState)
-	for key, state := range cache.podGroupStates {
-		nodeSnapshot.podGroupStates[key] = state.Clone()
-	}
+	// Take a snapshot of podgroup states for this scheduling cycle.
+	cache.updatePodGroupStateSnapshot(nodeSnapshot)
 
 	return nil
+}
+
+func (cache *cacheImpl) updatePodGroupStateSnapshot(snapshot *Snapshot) {
+	// Remove podgroup states from snapshot that no longer exist in cache.
+	for key := range snapshot.podGroupStates {
+		if _, exists := cache.podGroupStates[key]; !exists {
+			delete(snapshot.podGroupStates, key)
+		}
+	}
+	// Clone only podgroup states that changed since the last snapshot.
+	for key, podGroupState := range cache.podGroupStates {
+		if existing, ok := snapshot.podGroupStates[key]; ok && existing.generation == podGroupState.generation {
+			continue
+		}
+		snapshot.podGroupStates[key] = podGroupState.Clone()
+	}
 }
 
 func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot *Snapshot, updateAll bool) {
@@ -437,7 +452,7 @@ func (cache *cacheImpl) addPod(logger klog.Logger, pod *v1.Pod, assumePod bool) 
 		cache.assumedPods.Insert(key)
 		cache.assumePodInGroup(pod)
 	} else {
-		cache.addOrUpdatePodInGroup(nil, pod)
+		cache.addPodInGroup(pod)
 	}
 	return nil
 }
@@ -735,11 +750,18 @@ func (cache *cacheImpl) updateMetrics() {
 	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
 }
 
-func (cache *cacheImpl) AddOrUpdatePodInGroup(oldPod, newPod *v1.Pod) {
+func (cache *cacheImpl) AddPodInGroup(pod *v1.Pod) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	cache.addOrUpdatePodInGroup(oldPod, newPod)
+	cache.addPodInGroup(pod)
+}
+
+func (cache *cacheImpl) UpdatePodInGroup(oldPod, newPod *v1.Pod) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	cache.updatePodInGroup(oldPod, newPod)
 }
 
 func (cache *cacheImpl) RemovePodFromGroup(pod *v1.Pod) {
@@ -749,35 +771,39 @@ func (cache *cacheImpl) RemovePodFromGroup(pod *v1.Pod) {
 	cache.removePodFromGroup(pod)
 }
 
-func (cache *cacheImpl) addOrUpdatePodInGroup(oldPod, newPod *v1.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+func (cache *cacheImpl) addPodInGroup(pod *v1.Pod) {
+	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
 		return
 	}
 
-	if newPod.Spec.WorkloadRef == nil {
-		return
-	}
-
-	key := NewPodGroupKey(newPod.Namespace, newPod.Spec.WorkloadRef)
+	key := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
 		podGroupState = NewPodGroupState()
 		cache.podGroupStates[key] = podGroupState
 	}
 
-	if oldPod == nil {
-		podGroupState.AddPod(newPod)
-	} else {
-		podGroupState.UpdatePod(oldPod, newPod)
-	}
+	podGroupState.AddPod(pod)
 }
 
-func (cache *cacheImpl) removePodFromGroup(pod *v1.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+func (cache *cacheImpl) updatePodInGroup(oldPod, newPod *v1.Pod) {
+	if !cache.genericWorkloadEnabled || newPod.Spec.WorkloadRef == nil {
 		return
 	}
 
-	if pod.Spec.WorkloadRef == nil {
+	key := NewPodGroupKey(newPod.Namespace, newPod.Spec.WorkloadRef)
+	podGroupState, exists := cache.podGroupStates[key]
+	if !exists {
+		// This should not happen: the pod group state should have been created by a prior addPodInGroup call.
+		utilruntime.HandleError(fmt.Errorf("pod group state not found for update, this indicates a missed add event: pod %v, podGroupKey %v", klog.KObj(newPod), key))
+		return
+	}
+
+	podGroupState.UpdatePod(oldPod, newPod)
+}
+
+func (cache *cacheImpl) removePodFromGroup(pod *v1.Pod) {
+	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
 		return
 	}
 
@@ -793,7 +819,7 @@ func (cache *cacheImpl) removePodFromGroup(pod *v1.Pod) {
 }
 
 func (cache *cacheImpl) assumePodInGroup(pod *v1.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) || pod.Spec.WorkloadRef == nil {
+	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
 		return
 	}
 
@@ -804,7 +830,7 @@ func (cache *cacheImpl) assumePodInGroup(pod *v1.Pod) {
 }
 
 func (cache *cacheImpl) forgetPodInGroup(pod *v1.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) || pod.Spec.WorkloadRef == nil {
+	if !cache.genericWorkloadEnabled || pod.Spec.WorkloadRef == nil {
 		return
 	}
 

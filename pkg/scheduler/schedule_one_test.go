@@ -1060,7 +1060,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 		internalCache := internalcache.New(ctx, apiDispatcher)
 		if scheduleAsPodGroup {
-			internalCache.AddOrUpdatePodInGroup(nil, item.sendPod)
+			internalCache.AddPodInGroup(item.sendPod)
 		}
 		cache := &fakecache.Cache{
 			Cache: internalCache,

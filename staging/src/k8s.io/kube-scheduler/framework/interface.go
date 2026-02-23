@@ -801,8 +801,8 @@ type Handle interface {
 	// ProfileName returns the profile name associated to a profile.
 	ProfileName() string
 
-	// Cache returns the scheduler's internal cache to access pod group state.
-	Cache() Cache
+	// PodGroupManager returns the scheduler's podgroup state manager.
+	PodGroupManager() PodGroupManager
 
 	// Sign a pod.
 	SignPod(ctx context.Context, pod *v1.Pod, recordPluginStats bool) PodSignature

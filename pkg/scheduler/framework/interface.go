@@ -137,6 +137,11 @@ func (m *NodeToStatus) NodesForStatusCode(nodeLister fwk.NodeInfoLister, code fw
 // - end of a binding cycle if it succeeds
 var PodsToActivateKey fwk.StateKey = "kubernetes.io/pods-to-activate"
 
+// PermitPodGroupModeKey is a reserved state key indicating that the current
+// scheduling cycle is part of a pod group scheduling cycle. When present, the Permit
+// plugin reads pod group state from the snapshot rather than the live state,
+var PermitPodGroupModeKey fwk.StateKey = "kubernetes.io/permit-pod-group-mode"
+
 // PodsToActivate stores pods to be activated.
 type PodsToActivate struct {
 	sync.Mutex
@@ -152,6 +157,12 @@ func (s *PodsToActivate) Clone() fwk.StateData {
 // NewPodsToActivate instantiates a PodsToActivate object.
 func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
+}
+
+type PermitPodGroupMode struct{}
+
+func (s *PermitPodGroupMode) Clone() fwk.StateData {
+	return s
 }
 
 // SortedScoredNodes is a list of scored nodes, returned from scheduling.

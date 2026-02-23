@@ -152,9 +152,9 @@ func TestPodGroupInfoForPod(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			cache := internalcache.New(ctx, nil)
 
-			cache.AddOrUpdatePodInGroup(nil, tt.pInfo.Pod)
+			cache.AddPodInGroup(tt.pInfo.Pod)
 			for _, pod := range tt.unscheduledPods {
-				cache.AddOrUpdatePodInGroup(nil, pod)
+				cache.AddPodInGroup(pod)
 			}
 
 			q := internalqueue.NewTestQueue(ctx, nil)

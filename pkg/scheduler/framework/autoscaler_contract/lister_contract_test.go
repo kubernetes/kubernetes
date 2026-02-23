@@ -104,12 +104,6 @@ func (c *podGroupStateContract) AssignedPods() sets.Set[types.UID] {
 	return nil
 }
 
-func (c *podGroupStateContract) AssumePod(_ types.UID) {
-}
-
-func (c *podGroupStateContract) ForgetPod(_ types.UID) {
-}
-
 func (c *podGroupStateContract) SchedulingTimeout() time.Duration {
 	return 0
 }

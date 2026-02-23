@@ -56,7 +56,7 @@ type Snapshot struct {
 	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
 	assumedPods    map[string]*v1.Pod
-	podGroupStates map[PodGroupKey]*PodGroupState
+	podGroupStates map[PodGroupKey]*PodGroupStateSnapshot
 	generation     int64
 	// placementNodes stores nodes that are present in the current placement.
 	// If placement is not set, this is nil.
@@ -73,7 +73,7 @@ func NewEmptySnapshot() *Snapshot {
 		nodeInfoMap:    make(map[string]*framework.NodeInfo),
 		usedPVCSet:     sets.New[string](),
 		assumedPods:    make(map[string]*v1.Pod),
-		podGroupStates: make(map[PodGroupKey]*PodGroupState),
+		podGroupStates: make(map[PodGroupKey]*PodGroupStateSnapshot),
 	}
 }
 
@@ -266,6 +266,14 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	nodeInfo.AddPodInfo(podInfo)
 	nodeInfo.Generation = oldGeneration
 	s.assumedPods[key] = pod
+	// Update the pod group state in the snapshot if the pod belongs to a pod group.
+	if pod.Spec.WorkloadRef != nil {
+		pgKey := NewPodGroupKey(pod.Namespace, pod.Spec.WorkloadRef)
+		if pgs, ok := s.podGroupStates[pgKey]; ok {
+			pgs.assumedPods.Insert(pod.UID)
+			pgs.unscheduledPods.Delete(pod.UID)
+		}
+	}
 	return nil
 }
 
@@ -281,6 +289,14 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		return fmt.Errorf("assumed pod %q not found in the snapshot", key)
 	}
 	delete(s.assumedPods, key)
+	// Update the pod group state in the snapshot if the pod belongs to a pod group.
+	if assumedPod.Spec.WorkloadRef != nil {
+		pgKey := NewPodGroupKey(assumedPod.Namespace, assumedPod.Spec.WorkloadRef)
+		if pgs, ok := s.podGroupStates[pgKey]; ok {
+			pgs.assumedPods.Delete(assumedPod.UID)
+			pgs.unscheduledPods.Insert(assumedPod.UID)
+		}
+	}
 	nodeName := assumedPod.Spec.NodeName
 	if nodeInfo, ok := s.nodeInfoMap[nodeName]; ok {
 		// Calling RemovePod increases the Generation number of the nodeInfo.

@@ -365,7 +365,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithPodsInPreBind(podsInPreBind),
 		frameworkruntime.WithAPIDispatcher(apiDispatcher),
 		frameworkruntime.WithSharedCSIManager(sharedCSIManager),
-		frameworkruntime.WithCache(schedulerCache),
+		frameworkruntime.WithPodGroupManager(schedulerCache),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)

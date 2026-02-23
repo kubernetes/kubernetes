@@ -152,9 +152,8 @@ type CSIManager interface {
 	CSINodes() CSINodeLister
 }
 
-// Cache provides an interface for accessing the scheduler's internal cache.
-// It is used primarily to access pod group state information for workload-aware scheduling.
-type Cache interface {
+// PodGroupManager provides an interface for accessing the state of pod groups.
+type PodGroupManager interface {
 	GetLivePodGroupState(namespace string, workloadRef *v1.WorkloadReference) (PodGroupState, error)
 }
 
@@ -171,10 +170,6 @@ type PodGroupState interface {
 	AssumedPods() sets.Set[types.UID]
 	// AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
 	AssignedPods() sets.Set[types.UID]
-	// AssumePod marks a pod as having reached the Reserve stage.
-	AssumePod(podUID types.UID)
-	// ForgetPod removes a pod from the assumed state.
-	ForgetPod(podUID types.UID)
 	// SchedulingTimeout returns the remaining time until the pod group scheduling times out.
 	// A new deadline is created if one doesn't exist, or if the previous one has expired.
 	SchedulingTimeout() time.Duration

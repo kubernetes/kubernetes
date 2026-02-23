@@ -83,7 +83,7 @@ type frameworkImpl struct {
 	eventRecorder    events.EventRecorder
 	informerFactory  informers.SharedInformerFactory
 	sharedDRAManager fwk.SharedDRAManager
-	cache            fwk.Cache
+	podGroupManager  fwk.PodGroupManager
 	logger           klog.Logger
 
 	sharedCSIManager fwk.CSIManager
@@ -156,7 +156,7 @@ type frameworkOptions struct {
 	waitingPods            *waitingPodsMap
 	podsInPreBind          *podsInPreBindMap
 	apiDispatcher          *apidispatcher.APIDispatcher
-	cache                  fwk.Cache
+	podGroupManager        fwk.PodGroupManager
 	logger                 *klog.Logger
 }
 
@@ -256,10 +256,10 @@ func WithAPIDispatcher(apiDispatcher *apidispatcher.APIDispatcher) Option {
 	}
 }
 
-// WithCache sets the scheduler cache for the scheduling frameworkImpl.
-func WithCache(cache fwk.Cache) Option {
+// WithPodGroupManager sets the PodGroupManager for the scheduling frameworkImpl.
+func WithPodGroupManager(podGroupManager fwk.PodGroupManager) Option {
 	return func(o *frameworkOptions) {
-		o.cache = cache
+		o.podGroupManager = podGroupManager
 	}
 }
 
@@ -343,7 +343,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		PodNominator:         options.podNominator,
 		PodActivator:         options.podActivator,
 		apiDispatcher:        options.apiDispatcher,
-		cache:                options.cache,
+		podGroupManager:      options.podGroupManager,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
@@ -1979,8 +1979,8 @@ func (f *frameworkImpl) SharedCSIManager() fwk.CSIManager {
 	return f.sharedCSIManager
 }
 
-func (f *frameworkImpl) Cache() fwk.Cache {
-	return f.cache
+func (f *frameworkImpl) PodGroupManager() fwk.PodGroupManager {
+	return f.podGroupManager
 }
 
 func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {
