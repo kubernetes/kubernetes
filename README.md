@@ -2,99 +2,121 @@
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569) [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes/kubernetes)](https://goreportcard.com/report/github.com/kubernetes/kubernetes) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kubernetes/kubernetes?sort=semver)
 
-<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
+<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100" alt="Kubernetes logo" />
 
-----
+---
 
-Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
-across multiple hosts. It provides basic mechanisms for the deployment, maintenance,
-and scaling of applications.
+## Overview
+Kubernetes (sometimes abbreviated **K8s**) is an open‑source platform for automating deployment, scaling, and operation of containerised applications.  It abstracts away the underlying infrastructure—bare‑metal servers, virtual machines, or public‑cloud instances—so developers can focus on building resilient services.
 
-Kubernetes builds upon a decade and a half of experience at Google running
-production workloads at scale using a system called [Borg],
-combined with best-of-breed ideas and practices from the community.
+The project originated from Google’s internal **Borg** system and has since been re‑implemented by the community under the umbrella of the **Cloud Native Computing Foundation (CNCF)**.  Kubernetes provides a rich set of APIs, a declarative model, and a vibrant ecosystem of extensions.
 
-Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
-If your company wants to help shape the evolution of
-technologies that are container-packaged, dynamically scheduled,
-and microservices-oriented, consider joining the CNCF.
-For details about who's involved and how Kubernetes plays a role,
-read the CNCF [announcement].
+---
 
-----
+## Quick Start (Installation)
 
-## To start using K8s
+### Prerequisites
+- **Go** (the version required to build the current master is listed in `go.mod`; as of this writing it is Go 1.22 or later).
+- **Docker** (or another container runtime) for building images used by the test harness.
+- **Make** – the repository ships a `Makefile` that drives the build, test, and release processes.
 
-See our documentation on [kubernetes.io].
-
-Take a free course on [Scalable Microservices with Kubernetes].
-
-To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
-Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
-
-## To start developing K8s
-
-The [community repository] hosts all information about
-building Kubernetes from source, how to contribute code
-and documentation, who to contact about what, etc.
-
-If you want to build Kubernetes right away there are two options:
-
-##### You have a working [Go environment].
-
-```
-git clone https://github.com/kubernetes/kubernetes
+### Build from source
+```sh
+# Clone the repository
+git clone https://github.com/kubernetes/kubernetes.git
 cd kubernetes
+
+# Compile all core binaries (kube‑apiserver, kube‑controller‑manager, kube‑scheduler, kubelet, kubectl, etc.)
 make
 ```
+The `make` target builds the following executables and places them in `_output/bin/`:
+- `kube-apiserver`
+- `kube-controller-manager`
+- `kube-scheduler`
+- `kubelet`
+- `kubectl`
+- `cloud-controller-manager`
+- several helper tools under `cmd/` (e.g., `dependencycheck`, `gendocs`, `genfeaturegates`).
 
-##### You have a working [Docker environment].
+### Release binaries (optional)
+Pre‑built binaries for each release are published on the [GitHub releases page](https://github.com/kubernetes/kubernetes/releases).  Download the appropriate archive for your platform and extract the binaries to a directory on your `$PATH`.
 
+---
+
+## Usage
+
+### Running a local cluster
+Kubernetes ships a lightweight script for spinning up a single‑node cluster useful for development and testing:
+```sh
+# From the repository root
+./hack/local-up-cluster.sh
 ```
-git clone https://github.com/kubernetes/kubernetes
-cd kubernetes
-make quick-release
+The script starts `kube-apiserver`, `etcd`, `kube-controller-manager`, `kube-scheduler`, and a `kubelet` that runs workloads locally.
+
+For more ergonomic local clusters, consider using tools built on top of this repository such as **kind** or **minikube** – they pull the binaries produced by this repo.
+
+### Core command‑line tools
+- **`kubectl`** – the primary CLI for interacting with a Kubernetes cluster. Example:
+  ```sh
+  ./_output/bin/kubectl get nodes
+  ```
+- **`kube-apiserver`**, **`kube-controller-manager`**, **`kube-scheduler`**, **`kubelet`** – the control‑plane and node components.  These are typically started by systemd units in a production deployment.
+- **`cloud-controller-manager`** – runs cloud‑provider specific control loops. See `cmd/cloud-controller-manager/main.go` for the entry point.
+- **Utility commands** located under `cmd/`:
+  - `dependencycheck` – validates module and binary dependencies.
+  - `gendocs` – generates markdown documentation for `kubectl` and other components.
+  - `genfeaturegates` – produces the feature‑gate registry.
+  - `fieldnamedocscheck` – ensures API field documentation is present.
+  - `clicheck` – enforces CLI conventions across the code base.
+
+---
+
+## Development
+
+### Repository layout (high‑level)
+- **`cmd/`** – entry points for the various binaries listed above.
+- **`pkg/`** – reusable libraries that implement core Kubernetes functionality.
+- **`staging/`** – sub‑repositories that are versioned independently but vendored into the main repo (e.g., client‑go, apimachinery).
+- **`test/`** – integration and end‑to‑end test suites.
+- **`cluster/`** – scripts and configuration for provisioning clusters on cloud providers (e.g., GCE, GKE).
+- **`hack/`** – developer utilities, including the `local-up-cluster.sh` script.
+
+### Building individual binaries
+You can build a single component without compiling the whole tree, for example:
+```sh
+make WHAT=cmd/kubelet
 ```
+The binary will appear at `_output/bin/kubelet`.
 
-For the full story, head over to the [developer's documentation].
+### Running tests
+```sh
+# Run the full test matrix (may take >30 minutes)
+make test
 
-## Support
+# Run a specific test package, e.g., GCE GCI tests
+go test ./cluster/gce/gci/... -v
+```
+The repository also includes linting and static‑analysis tools that are invoked via `make sanity`.
 
-If you need support, start with the [troubleshooting guide],
-and work your way through the process that we've outlined.
+### Contributing code
+1. Fork the repository and create a feature branch.
+2. Follow the style guidelines in `hack/` (run `make verify` locally).
+3. Write unit tests covering new or changed functionality.
+4. Submit a Pull Request against the `master` branch.
+5. Ensure CI passes and address reviewer feedback.
 
-That said, if you have questions, reach out to us
-[one way or another][communication].
+For detailed contribution guidelines, see the **CONTRIBUTING.md** file and the [Kubernetes community repository](https://github.com/kubernetes/community).
 
-[announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
-[Borg]: https://research.google.com/pubs/pub43438.html?authuser=1
-[CNCF]: https://www.cncf.io/about
-[communication]: https://git.k8s.io/community/communication
-[community repository]: https://git.k8s.io/community
-[containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
-[developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
-[Docker environment]: https://docs.docker.com/engine
-[Go environment]: https://go.dev/doc/install
-[kubernetes.io]: https://kubernetes.io
-[Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
-[troubleshooting guide]: https://kubernetes.io/docs/tasks/debug/
+---
 
-## Community Meetings 
+## Contributing & Community
+Kubernetes is a community‑driven project governed by the CNCF.  Everyone is welcome to contribute:
+- **Pull Requests** – see `CONTRIBUTING.md` for the full workflow.
+- **Design Proposals** – large‑scale changes should be discussed as a KEP (Kubernetes Enhancement Proposal).
+- **Code of Conduct** – we enforce a respectful environment; read the CODE_OF_CONDUCT.md file.
+- **Community resources** – the [Kubernetes community repo](https://github.com/kubernetes/community) contains documentation on SIGs, mailing lists, meetings, and the roadmap.
 
-The [Calendar](https://www.kubernetes.dev/resources/calendar/) has the list of all the meetings in the Kubernetes community in a single location.
+---
 
-## Adopters
-
-The [User Case Studies](https://kubernetes.io/case-studies/) website has real-world use cases of organizations across industries that are deploying/migrating to Kubernetes.
-
-## Governance 
-
-Kubernetes project is governed by a framework of principles, values, policies and processes to help our community and constituents towards our shared goals.
-
-The [Kubernetes Community](https://github.com/kubernetes/community/blob/master/governance.md) is the launching point for learning about how we organize ourselves.
-
-The [Kubernetes Steering community repo](https://github.com/kubernetes/steering) is used by the Kubernetes Steering Committee, which oversees governance of the Kubernetes project.
-
-## Roadmap 
-
-The [Kubernetes Enhancements repo](https://github.com/kubernetes/enhancements) provides information about Kubernetes releases, as well as feature tracking and backlogs.
+## License
+Kubernetes is licensed under the Apache License, Version 2.0.  See the `LICENSE` file for the full text.
