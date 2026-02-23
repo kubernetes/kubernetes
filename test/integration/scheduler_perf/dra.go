@@ -24,12 +24,12 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
+	resourcebeta "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -303,18 +303,26 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
 		informerFactory.Shutdown()
 	}()
-	syncedInformers := informerFactory.WaitForCacheSync(tCtx.Done())
-	expectSyncedInformers := map[reflect.Type]bool{
-		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
-		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-		reflect.TypeOf(&v1.Node{}):                   true,
+	syncResult := informerFactory.WaitForCacheSyncWithContext(tCtx)
+	expectSyncResult := cache.SyncResult{
+		Synced: map[reflect.Type]bool{
+			reflect.TypeFor[*resourceapi.DeviceClass]():   true,
+			reflect.TypeFor[*resourceapi.ResourceClaim](): true,
+			reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+			reflect.TypeFor[*v1.Node]():                   true,
+		},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
-		expectSyncedInformers[reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{})] = true
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		expectSyncResult.Synced[reflect.TypeFor[*resourcebeta.DeviceTaintRule]()] = true
+	}
+	if diff := cmp.Diff(expectSyncResult, syncResult,
+		cmp.Transformer("TypeOf", func(t reflect.Type) string {
+			return t.String()
+		}),
+	); diff != "" {
+		tCtx.Fatalf("unexpected informer sync result (- expected, + actual):\n%s", diff)
 	}
 
-	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
 	celCache := cel.NewCache(10, cel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)})
 
 	// Also wait for the assume cache to catch up.
