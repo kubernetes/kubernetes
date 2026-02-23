@@ -362,6 +362,7 @@ func verifyOomScoreAdj(f *framework.Framework, pod *v1.Pod, containerName string
 func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
 	ginkgo.GinkgoHelper()
 	// Wait for resize to complete.
+	var resizedPod *v1.Pod
 
 	framework.ExpectNoError(framework.Gomega().
 		Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{}))).
@@ -392,12 +393,11 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 			if !podutils.IsPodReady(pod) {
 				return func() string { return "pod is not ready" }, nil
 			}
+			resizedPod = pod
 			return nil, nil
 		})),
 	)
 
-	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
-	framework.ExpectNoError(err, "failed to get resized pod")
 	return resizedPod
 }
 
