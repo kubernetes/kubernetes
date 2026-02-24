@@ -34,6 +34,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,6 +64,8 @@ type Builder struct {
 	UseExtendedResourceName bool
 
 	podCounter      int
+	workloadCounter int
+	podGroupCounter int
 	claimCounter    int
 	ClassParameters string // JSON
 	SkipCleanup     bool
@@ -331,6 +334,59 @@ func (b *Builder) PodExternalMultiple(externalClaimName string) *v1.Pod {
 	return pod
 }
 
+// GroupedPod returns a pod that is a member of the given PodGroup.
+func (b *Builder) GroupedPod(podGroup *schedulingv1alpha2.PodGroup) *v1.Pod {
+	pod := b.Pod()
+	pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+		PodGroupName: &podGroup.Name,
+	}
+	return pod
+}
+
+// Workload creates a Workload with one PodGroupTemplate and no ResourceClaims.
+func (b *Builder) Workload() *schedulingv1alpha2.Workload {
+	workload := &schedulingv1alpha2.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.namespace,
+			Name:      fmt.Sprintf("tester%s-%d", b.Driver.NameSuffix, b.workloadCounter),
+		},
+		Spec: schedulingv1alpha2.WorkloadSpec{
+			PodGroupTemplates: []schedulingv1alpha2.PodGroupTemplate{
+				{
+					Name: "group",
+					SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha2.BasicSchedulingPolicy{},
+					},
+				},
+			},
+		},
+	}
+	b.workloadCounter++
+	return workload
+}
+
+// PodGroup returns a simple PodGroup owned by the given Workload with no
+// resource claims.
+func (b *Builder) PodGroup(workload *schedulingv1alpha2.Workload, template schedulingv1alpha2.PodGroupTemplate) *schedulingv1alpha2.PodGroup {
+	podGroup := &schedulingv1alpha2.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.namespace,
+			Name:      fmt.Sprintf("%s-%s-%d", workload.Name, template.Name, b.podGroupCounter),
+		},
+		Spec: schedulingv1alpha2.PodGroupSpec{
+			PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
+				Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+					WorkloadName:         workload.Name,
+					PodGroupTemplateName: template.Name,
+				},
+			},
+			SchedulingPolicy: template.SchedulingPolicy,
+		},
+	}
+	b.podGroupCounter++
+	return podGroup
+}
+
 // Create takes a bunch of objects and calls their Create function.
 func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.KMetadata {
 	tCtx.Helper()
@@ -388,6 +444,10 @@ func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.
 				err := tCtx.Client().AppsV1().DaemonSets(b.namespace).Delete(tCtx, obj.Name, metav1.DeleteOptions{})
 				tCtx.ExpectNoError(err, "delete daemonset")
 			})
+		case *schedulingv1alpha2.Workload:
+			createdObj, err = tCtx.Client().SchedulingV1alpha2().Workloads(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
+		case *schedulingv1alpha2.PodGroup:
+			createdObj, err = tCtx.Client().SchedulingV1alpha2().PodGroups(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		default:
 			tCtx.Fatalf("internal error, unsupported type %T", obj)
 		}
@@ -483,6 +543,8 @@ func NewBuilderNow(tCtx ktesting.TContext, driver *Driver) *Builder {
 func (b *Builder) setUp(tCtx ktesting.TContext) {
 	b.namespace = tCtx.Namespace()
 	b.podCounter = 0
+	b.workloadCounter = 0
+	b.podGroupCounter = 0
 	b.claimCounter = 0
 	b.Create(tCtx, b.Class().DeviceClass)
 	tCtx.CleanupCtx(b.tearDown)

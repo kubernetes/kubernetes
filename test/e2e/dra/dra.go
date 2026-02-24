@@ -2015,6 +2015,22 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	}
 
+	podGroupResourceClaimTests := func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
+		b := drautils.NewBuilder(f, driver)
+
+		f.It("allocates devices for PodGroups", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+
+			workload := b.Workload()
+			podGroupTemplate := workload.Spec.PodGroupTemplates[0]
+			podGroup := b.PodGroup(workload, podGroupTemplate)
+			pod := b.GroupedPod(podGroup)
+			b.Create(tCtx, workload, podGroup, pod)
+		})
+	}
+
 	// It is okay to use the same context multiple times (like "control plane"),
 	// as long as the test names the still remain unique overall.
 
@@ -2033,6 +2049,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta2 API", v1beta2Tests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPartitionableDevices), partitionableDevicesTests)
+
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.DRAWorkloadResourceClaims), f.WithLabel("KubeletMinVersion:1.36"), podGroupResourceClaimTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
