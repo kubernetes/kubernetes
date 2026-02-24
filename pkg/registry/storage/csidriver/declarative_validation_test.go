@@ -73,6 +73,21 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "attachRequired"), boolPtr(false), "field is immutable").WithOrigin("immutable"),
 			},
 		},
+		"invalid update: attachRequired set from unset": {
+			oldObj:    makeValidCSIDriver(clearAttachRequired),
+			updateObj: makeValidCSIDriver(tweakAttachRequired(true)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "attachRequired"), boolPtr(true), "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update: attachRequired unset from set": {
+			oldObj:    makeValidCSIDriver(),
+			updateObj: makeValidCSIDriver(clearAttachRequired),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "attachedRequired"), ""),
+				field.Invalid(field.NewPath("spec", "attachRequired"), (*bool)(nil), "field is immutable").WithOrigin("immutable"),
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -116,6 +131,10 @@ func tweakAttachRequired(val bool) func(*storage.CSIDriver) {
 	return func(d *storage.CSIDriver) {
 		d.Spec.AttachRequired = &val
 	}
+}
+
+func clearAttachRequired(d *storage.CSIDriver) {
+	d.Spec.AttachRequired = nil
 }
 
 func boolPtr(b bool) *bool {
