@@ -58,7 +58,7 @@ const (
 	// maxLimit is a maximum page limit increase used when fetching objects from etcd.
 	// This limit is used only for increasing page size by kube-apiserver. If request
 	// specifies larger limit initially, it won't be changed.
-	maxLimit = 10
+	maxLimit = 10000
 )
 
 // authenticatedDataString satisfies the value.Context interface. It uses the key to
