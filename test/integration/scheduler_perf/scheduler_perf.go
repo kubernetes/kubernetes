@@ -1880,6 +1880,32 @@ func (e *WorkloadExecutor) runDeletePodsOp(opIndex int, op *deletePodsOp) error 
 	return nil
 }
 
+// waitUntilPodScheduledInNamespace waits until the specified pod is scheduled
+func waitUntilPodScheduledInNamespace(ctx context.Context, client clientset.Interface, namespace, name string, interval, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		select {
+		case <-ctx.Done():
+			return true, ctx.Err()
+		default:
+		}
+
+		pod, err := client.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// Pod already deleted, no need to wait
+				return true, nil
+			}
+			return false, err
+		}
+
+		scheduled := len(pod.Spec.NodeName) > 0
+		if !scheduled {
+			klog.V(4).Infof("Waiting for pod %s/%s to be scheduled", namespace, name)
+		}
+		return scheduled, nil
+	})
+}
+
 func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 	var namespace string
 	if op.Namespace != nil {
@@ -1917,6 +1943,15 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 
 		churnFns = append(churnFns, func(name string) string {
 			if name != "" {
+				// Wait for pod to be scheduled before deleting
+				if gvk.GroupKind().String() == "Pod" {
+					if err := waitUntilPodScheduledInNamespace(e.tCtx, e.tCtx.Client(), namespace, name, 1*time.Second, 2*time.Minute); err != nil {
+						if !errors.Is(err, context.Canceled) {
+							e.tCtx.Errorf("op %d: error waiting for pod %v to be scheduled: %v", opIndex, name, err)
+						}
+					}
+				}
+
 				if err := dynRes.Delete(e.tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
 					e.tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
 				}
