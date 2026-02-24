@@ -367,6 +367,8 @@ message DeploymentStatus {
 message DeploymentStrategy {
   // Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
   // +optional
+  // +k8s:alpha=+k8s:discriminator
+  // +k8s:optional
   optional string type = 1;
 
   // Rolling update config params. Present only if DeploymentStrategyType =
@@ -375,6 +377,9 @@ message DeploymentStrategy {
   // TODO: Update this to follow our convention for oneOf, whatever we decide it
   // to be.
   // +optional
+  // +k8s:optional
+  // +k8s:alpha=+k8s:member("RollingUpdate")=+k8s:required
+  // +k8s:alpha=+k8s:member("Recreate")=+k8s:forbidden
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 

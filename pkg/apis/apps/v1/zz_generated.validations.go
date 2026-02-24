@@ -101,11 +101,23 @@ func Validate_DeploymentSpec(ctx context.Context, op operation.Operation, fldPat
 // Validate_DeploymentStrategy validates an instance of DeploymentStrategy according
 // to declarative validation rules in the API schema.
 func Validate_DeploymentStrategy(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1.DeploymentStrategy) (errs field.ErrorList) {
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "rollingUpdate", func(obj *appsv1.DeploymentStrategy) *appsv1.RollingUpdateDeployment { return obj.RollingUpdate }, func(obj *appsv1.DeploymentStrategy) appsv1.DeploymentStrategyType { return obj.Type }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1.RollingUpdateDeployment) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*appsv1.RollingUpdateDeployment, appsv1.DeploymentStrategyType]{
+	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "rollingUpdate", func(obj *appsv1.DeploymentStrategy) *appsv1.RollingUpdateDeployment { return obj.RollingUpdate }, func(obj *appsv1.DeploymentStrategy) appsv1.DeploymentStrategyType { return obj.Type }, validate.SemanticDeepEqual, nil, []validate.DiscriminatedRule[*appsv1.RollingUpdateDeployment, appsv1.DeploymentStrategyType]{
+		{
+			Value: "Recreate", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1.RollingUpdateDeployment) field.ErrorList {
+				errs := field.ErrorList{}
+				earlyReturn := false
+				if e := validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return errs
+				}
+				return errs
+			}},
 		{
 			Value: "RollingUpdate", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1.RollingUpdateDeployment) field.ErrorList {
 				errs := field.ErrorList{}

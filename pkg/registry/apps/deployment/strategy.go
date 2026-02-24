@@ -91,6 +91,7 @@ func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 		nil,
 		appsvalidation.ValidateDeployment(deployment, opts),
 		operation.Create,
+		rest.WithDeclarativeEnforcement(),
 	)
 }
 
@@ -146,6 +147,7 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 		oldDeployment,
 		allErrs,
 		operation.Update,
+		rest.WithDeclarativeEnforcement(),
 	)
 }
 

@@ -404,7 +404,7 @@ func (mtfv *discriminatorFieldValidator) generateMemberFieldValidation(context C
 		equivArg,
 		defaultForbidden,
 		rulesSlice,
-	)
+	).WithStabilityLevel(context.StabilityLevel)
 
 	return Validations{Functions: []FunctionGen{fn}}, nil
 }

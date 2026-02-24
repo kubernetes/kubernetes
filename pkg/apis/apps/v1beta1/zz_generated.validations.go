@@ -112,11 +112,23 @@ func Validate_DeploymentSpec(ctx context.Context, op operation.Operation, fldPat
 func Validate_DeploymentStrategy(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1beta1.DeploymentStrategy) (errs field.ErrorList) {
 	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "rollingUpdate", func(obj *appsv1beta1.DeploymentStrategy) *appsv1beta1.RollingUpdateDeployment {
 		return obj.RollingUpdate
-	}, func(obj *appsv1beta1.DeploymentStrategy) appsv1beta1.DeploymentStrategyType { return obj.Type }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1beta1.RollingUpdateDeployment) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*appsv1beta1.RollingUpdateDeployment, appsv1beta1.DeploymentStrategyType]{
+	}, func(obj *appsv1beta1.DeploymentStrategy) appsv1beta1.DeploymentStrategyType { return obj.Type }, validate.SemanticDeepEqual, nil, []validate.DiscriminatedRule[*appsv1beta1.RollingUpdateDeployment, appsv1beta1.DeploymentStrategyType]{
+		{
+			Value: "Recreate", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1beta1.RollingUpdateDeployment) field.ErrorList {
+				errs := field.ErrorList{}
+				earlyReturn := false
+				if e := validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return errs
+				}
+				return errs
+			}},
 		{
 			Value: "RollingUpdate", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1beta1.RollingUpdateDeployment) field.ErrorList {
 				errs := field.ErrorList{}

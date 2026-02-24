@@ -96,7 +96,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Deployment.Store)
+	test := genericregistrytest.New(t, storage.Deployment.Store).SetRequestInfo(&genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	deployment := validNewDeployment()
 	deployment.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -116,7 +116,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Deployment.Store)
+	test := genericregistrytest.New(t, storage.Deployment.Store).SetRequestInfo(&genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	test.TestUpdate(
 		// valid
 		validNewDeployment(),
@@ -149,7 +149,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Deployment.Store)
+	test := genericregistrytest.New(t, storage.Deployment.Store).SetRequestInfo(&genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	test.TestDelete(validNewDeployment())
 }
 
@@ -157,7 +157,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Deployment.Store)
+	test := genericregistrytest.New(t, storage.Deployment.Store).SetRequestInfo(&genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	test.TestGet(validNewDeployment())
 }
 
@@ -165,7 +165,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Deployment.Store)
+	test := genericregistrytest.New(t, storage.Deployment.Store).SetRequestInfo(&genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	test.TestList(validNewDeployment())
 }
 
@@ -173,7 +173,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Deployment.Store)
+	test := genericregistrytest.New(t, storage.Deployment.Store).SetRequestInfo(&genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	test.TestWatch(
 		validNewDeployment(),
 		// matching labels
@@ -200,7 +200,7 @@ func TestScaleGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
 	var deployment apps.Deployment
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	key := "/deployments/" + namespace + "/" + name
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0, false); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
@@ -241,7 +241,7 @@ func TestScaleUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
 	var deployment apps.Deployment
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	key := "/deployments/" + namespace + "/" + name
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0, false); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
@@ -278,7 +278,7 @@ func TestStatusUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	key := "/deployments/" + namespace + "/" + name
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -345,7 +345,7 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 		rollbackStorage := storage.Rollback
 		deployment := validNewDeployment()
 		deployment.Namespace = fmt.Sprintf("namespace-%s", strings.ToLower(k))
-		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), deployment.Namespace)
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.WithNamespace(genericapirequest.NewContext(), deployment.Namespace), &genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 
 		if _, err := storage.Deployment.Create(ctx, deployment, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
@@ -381,7 +381,7 @@ func TestCreateDeploymentRollbackValidation(t *testing.T) {
 		RollbackTo:         apps.RollbackConfig{Revision: 1},
 	}
 
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 
 	if _, err := storage.Deployment.Create(ctx, validNewDeployment(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -406,7 +406,7 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
 	rollbackStorage := storage.Rollback
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 
 	_, err := rollbackStorage.Create(ctx, name, &apps.DeploymentRollback{
 		Name:               name,
@@ -453,7 +453,7 @@ func TestScalePatchErrors(t *testing.T) {
 	scaleStore := storage.Scale
 
 	defer resourceStore.DestroyFunc()
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 
 	{
 		applyNotFoundPatch := func() rest.TransformFunc {
@@ -507,7 +507,7 @@ func TestScalePatchConflicts(t *testing.T) {
 	scaleStore := storage.Scale
 
 	defer resourceStore.DestroyFunc()
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &genericapirequest.RequestInfo{APIGroup: "apps", APIVersion: "v1", Resource: "deployments"})
 	if _, err := resourceStore.Create(ctx, validObj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
