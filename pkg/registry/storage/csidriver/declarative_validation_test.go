@@ -24,6 +24,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/utils/ptr"
 )
 
 var apiVersions = []string{"v1beta1", "v1"}
@@ -70,7 +71,22 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			oldObj:    makeValidCSIDriver(),
 			updateObj: makeValidCSIDriver(tweakAttachRequired(false)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "attachRequired"), boolPtr(false), "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "attachRequired"), ptr.To(false), "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update: attachRequired set from unset": {
+			oldObj:    makeValidCSIDriver(clearAttachRequired),
+			updateObj: makeValidCSIDriver(tweakAttachRequired(true)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "attachRequired"), ptr.To(true), "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"invalid update: attachRequired unset from set": {
+			oldObj:    makeValidCSIDriver(),
+			updateObj: makeValidCSIDriver(clearAttachRequired),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "attachedRequired"), "").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec", "attachRequired"), (*bool)(nil), "field is immutable").WithOrigin("immutable"),
 			},
 		},
 	}
@@ -92,18 +108,16 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func makeValidCSIDriver(mutators ...func(*storage.CSIDriver)) storage.CSIDriver {
-	trueVal := true
-	falseVal := false
 	driver := storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-driver",
 		},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &trueVal,
-			PodInfoOnMount:    &trueVal,
-			RequiresRepublish: &falseVal,
-			StorageCapacity:   &falseVal,
-			SELinuxMount:      &falseVal,
+			AttachRequired:    ptr.To(true),
+			PodInfoOnMount:    ptr.To(true),
+			RequiresRepublish: ptr.To(false),
+			StorageCapacity:   ptr.To(false),
+			SELinuxMount:      ptr.To(false),
 		},
 	}
 	for _, mutate := range mutators {
@@ -118,6 +132,6 @@ func tweakAttachRequired(val bool) func(*storage.CSIDriver) {
 	}
 }
 
-func boolPtr(b bool) *bool {
-	return &b
+func clearAttachRequired(d *storage.CSIDriver) {
+	d.Spec.AttachRequired = nil
 }
