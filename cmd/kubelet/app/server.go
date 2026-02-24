@@ -528,7 +528,7 @@ func UnsecuredDependencies(ctx context.Context, s *options.KubeletServer, featur
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
 		VolumePlugins:       plugins,
-		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir, pluginRunner),
+		DynamicPluginProber: GetDynamicPluginProber(ctx, s.VolumePluginDir, pluginRunner),
 		TLSOptions:          tlsOptions}, nil
 }
 

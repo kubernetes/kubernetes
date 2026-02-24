@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,18 +40,20 @@ type flexVolumeProber struct {
 	watcher        utilfs.FSWatcher
 	factory        PluginFactory
 	fs             utilfs.Filesystem
+	ctx            context.Context
 	probeAllNeeded bool
 	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the corresponding operation
 }
 
 // GetDynamicPluginProber creates dynamic plugin prober
-func GetDynamicPluginProber(pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
+func GetDynamicPluginProber(ctx context.Context, pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
 	return &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   utilfs.NewFsnotifyWatcher(),
 		factory:   pluginFactory{},
 		runner:    runner,
 		fs:        &utilfs.DefaultFs{},
+		ctx:       ctx,
 	}
 }
 
@@ -261,7 +264,7 @@ func (prober *flexVolumeProber) initWatcher() error {
 		return fmt.Errorf("error adding watch on Flexvolume directory: %s", err)
 	}
 
-	prober.watcher.Run()
+	prober.watcher.Run(prober.ctx)
 
 	return nil
 }
