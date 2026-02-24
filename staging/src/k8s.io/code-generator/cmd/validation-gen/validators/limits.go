@@ -28,12 +28,14 @@ import (
 
 const (
 	maxItemsTagName  = "k8s:maxItems"
+	minItemsTagName  = "k8s:minItems"
 	minimumTagName   = "k8s:minimum"
 	maxLengthTagName = "k8s:maxLength"
 )
 
 func init() {
 	RegisterTagValidator(maxItemsTagValidator{})
+	RegisterTagValidator(minItemsTagValidator{})
 	RegisterTagValidator(minimumTagValidator{})
 	RegisterTagValidator(maxLengthTagValidator{})
 }
@@ -143,6 +145,64 @@ func (mitv maxItemsTagValidator) Docs() TagDoc {
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",
 			Docs:        "This list must be no more than X items long.",
+		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
+	}
+}
+
+type minItemsTagValidator struct{}
+
+func (minItemsTagValidator) Init(_ Config) {}
+
+func (minItemsTagValidator) TagName() string {
+	return minItemsTagName
+}
+
+var minItemsTagValidScopes = sets.New(
+	ScopeType,
+	ScopeField,
+	ScopeListVal,
+	ScopeMapVal,
+)
+
+func (minItemsTagValidator) ValidScopes() sets.Set[Scope] {
+	return minItemsTagValidScopes
+}
+
+var (
+	minItemsValidator = types.Name{Package: libValidationPkg, Name: "MinItems"}
+)
+
+func (minItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	var result Validations
+
+	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
+	if t := util.NativeType(context.Type); t.Kind != types.Slice && t.Kind != types.Array {
+		return Validations{}, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
+	}
+
+	intVal, err := strconv.Atoi(tag.Value)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	}
+	if intVal < 0 {
+		return result, fmt.Errorf("must be greater than or equal to zero")
+	}
+	// Note: minItems short-circuits other validations.
+	result.AddFunction(Function(minItemsTagName, ShortCircuit, minItemsValidator, intVal))
+	return result, nil
+}
+
+func (mitv minItemsTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            mitv.TagName(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         mitv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that a list has a limit on its size.",
+		Payloads: []TagPayloadDoc{{
+			Description: "<non-negative integer>",
+			Docs:        "This list must be no less than X items long.",
 		}},
 		PayloadsType:     codetags.ValueTypeInt,
 		PayloadsRequired: true,
