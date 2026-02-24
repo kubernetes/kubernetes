@@ -128,7 +128,7 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 	}
 
 	// skip crc checking if the record type is CrcType
-	if rec.Type != CrcType {
+	if rec.GetType() != CrcType {
 		_, err := d.crc.Write(rec.Data)
 		if err != nil {
 			return err

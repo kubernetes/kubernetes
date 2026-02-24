@@ -284,6 +284,8 @@ func Load(cfg *Config, patterns ...string) ([]*Package, error) {
 		}
 	}
 
+	ld.externalDriver = external
+
 	return ld.refine(response)
 }
 
@@ -692,10 +694,11 @@ type loaderPackage struct {
 type loader struct {
 	pkgs map[string]*loaderPackage // keyed by Package.ID
 	Config
-	sizes        types.Sizes // non-nil if needed by mode
-	parseCache   map[string]*parseValue
-	parseCacheMu sync.Mutex
-	exportMu     sync.Mutex // enforces mutual exclusion of exportdata operations
+	sizes          types.Sizes // non-nil if needed by mode
+	parseCache     map[string]*parseValue
+	parseCacheMu   sync.Mutex
+	exportMu       sync.Mutex // enforces mutual exclusion of exportdata operations
+	externalDriver bool       // true if an external GOPACKAGESDRIVER handled the request
 
 	// Config.Mode contains the implied mode (see impliedLoadMode).
 	// Implied mode contains all the fields we need the data for.
@@ -1226,6 +1229,10 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 	}
 	if lpkg.Module != nil && lpkg.Module.GoVersion != "" {
 		tc.GoVersion = "go" + lpkg.Module.GoVersion
+	} else if ld.externalDriver && lpkg.goVersion != 0 {
+		// Module information is missing when GOPACKAGESDRIVER is used,
+		// so use the go version from the driver response.
+		tc.GoVersion = fmt.Sprintf("go1.%d", lpkg.goVersion)
 	}
 	if (ld.Mode & typecheckCgo) != 0 {
 		if !typesinternal.SetUsesCgo(tc) {

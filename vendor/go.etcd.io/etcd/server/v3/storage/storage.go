@@ -61,8 +61,8 @@ func (st *storage) SaveSnap(snap raftpb.Snapshot) error {
 	st.mux.RLock()
 	defer st.mux.RUnlock()
 	walsnap := walpb.Snapshot{
-		Index:     snap.Metadata.Index,
-		Term:      snap.Metadata.Term,
+		Index:     toPtr(snap.Metadata.Index),
+		Term:      toPtr(snap.Metadata.Term),
 		ConfState: &snap.Metadata.ConfState,
 	}
 	// save the snapshot file before writing the snapshot to the wal.
@@ -117,8 +117,8 @@ func (st *storage) MinimalEtcdVersion() *semver.Version {
 		panic(err)
 	}
 	if sn != nil {
-		walsnap.Index = sn.Metadata.Index
-		walsnap.Term = sn.Metadata.Term
+		walsnap.Index = toPtr(sn.Metadata.Index)
+		walsnap.Term = toPtr(sn.Metadata.Term)
 		walsnap.ConfState = &sn.Metadata.ConfState
 	}
 	w, err := st.w.Reopen(st.lg, walsnap)
@@ -133,3 +133,7 @@ func (st *storage) MinimalEtcdVersion() *semver.Version {
 	st.w = w
 	return v
 }
+
+// toPtr returns a pointer to the given value.
+// TODO: remove after upgrading to Go 1.26 which supports new(expr).
+func toPtr[T any](v T) *T { return &v }

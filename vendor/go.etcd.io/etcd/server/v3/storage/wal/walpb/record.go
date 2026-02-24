@@ -22,10 +22,10 @@ import (
 var ErrCRCMismatch = errors.New("walpb: crc mismatch")
 
 func (rec *Record) Validate(crc uint32) error {
-	if rec.Crc == crc {
+	if rec.GetCrc() == crc {
 		return nil
 	}
-	return fmt.Errorf("%w: expected: %x computed: %x", ErrCRCMismatch, rec.Crc, crc)
+	return fmt.Errorf("%w: expected: %x computed: %x", ErrCRCMismatch, rec.GetCrc(), crc)
 }
 
 // ValidateSnapshotForWrite ensures the Snapshot the newly written snapshot is valid.
@@ -33,8 +33,14 @@ func (rec *Record) Validate(crc uint32) error {
 // There might exist log-entries written by old etcd versions that does not conform
 // to the requirements.
 func ValidateSnapshotForWrite(e *Snapshot) error {
+	if e.Index == nil {
+		return errors.New("snapshot is missing index: " + e.String())
+	}
+	if e.Term == nil {
+		return errors.New("snapshot is missing term: " + e.String())
+	}
 	// Since etcd>=3.5.0
-	if e.ConfState == nil && e.Index > 0 {
+	if e.ConfState == nil && e.GetIndex() > 0 {
 		return errors.New("Saved (not-initial) snapshot is missing ConfState: " + e.String())
 	}
 	return nil

@@ -31,10 +31,10 @@ func (tw *watchableStoreTxnWrite) End() {
 	for i, change := range changes {
 		evs[i].Kv = &changes[i]
 		if change.CreateRevision == 0 {
-			evs[i].Type = mvccpb.DELETE
+			evs[i].Type = mvccpb.Event_DELETE
 			evs[i].Kv.ModRevision = rev
 		} else {
-			evs[i].Type = mvccpb.PUT
+			evs[i].Type = mvccpb.Event_PUT
 		}
 	}
 

@@ -82,6 +82,12 @@ var (
 	// This feature is defined in gRFC A81 and is enabled by setting the
 	// environment variable GRPC_EXPERIMENTAL_XDS_AUTHORITY_REWRITE to "true".
 	XDSAuthorityRewrite = boolFromEnv("GRPC_EXPERIMENTAL_XDS_AUTHORITY_REWRITE", false)
+
+	// PickFirstWeightedShuffling indicates whether weighted endpoint shuffling
+	// is enabled in the pick_first LB policy, as defined in gRFC A113. This
+	// feature can be disabled by setting the environment variable
+	// GRPC_EXPERIMENTAL_PF_WEIGHTED_SHUFFLING to "false".
+	PickFirstWeightedShuffling = boolFromEnv("GRPC_EXPERIMENTAL_PF_WEIGHTED_SHUFFLING", true)
 )
 
 func boolFromEnv(envVar string, def bool) bool {

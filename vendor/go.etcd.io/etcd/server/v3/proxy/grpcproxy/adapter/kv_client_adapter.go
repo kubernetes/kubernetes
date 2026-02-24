@@ -47,3 +47,28 @@ func (s *kvs2kvc) Txn(ctx context.Context, in *pb.TxnRequest, opts ...grpc.CallO
 func (s *kvs2kvc) Compact(ctx context.Context, in *pb.CompactionRequest, opts ...grpc.CallOption) (*pb.CompactionResponse, error) {
 	return s.kvs.Compact(ctx, in)
 }
+
+func (s *kvs2kvc) RangeStream(ctx context.Context, in *pb.RangeRequest, opts ...grpc.CallOption) (pb.KV_RangeStreamClient, error) {
+	cs := newPipeStream(ctx, func(ss chanServerStream) error {
+		return s.kvs.RangeStream(in, &rs2rcServerStream{ss})
+	})
+	return &rs2rcClientStream{cs}, nil
+}
+
+// rs2rcClientStream implements KV_RangeStreamClient
+type rs2rcClientStream struct{ chanClientStream }
+
+func (s *rs2rcClientStream) Recv() (*pb.RangeStreamResponse, error) {
+	var v any
+	if err := s.RecvMsg(&v); err != nil {
+		return nil, err
+	}
+	return v.(*pb.RangeStreamResponse), nil
+}
+
+// rs2rcServerStream implements KV_RangeStreamServer
+type rs2rcServerStream struct{ chanServerStream }
+
+func (s *rs2rcServerStream) Send(r *pb.RangeStreamResponse) error {
+	return s.SendMsg(r) //nolint:staticcheck
+}

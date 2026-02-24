@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
-	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/server/v3/etcdserver"
 	"go.etcd.io/etcd/server/v3/lease"
 )
@@ -31,6 +30,7 @@ type LeaseServer struct {
 	lg  *zap.Logger
 	hdr header
 	le  etcdserver.Lessor
+	pb.UnsafeLeaseServer
 }
 
 func NewLeaseServer(s *etcdserver.EtcdServer) pb.LeaseServer {
@@ -98,11 +98,12 @@ func (ls *LeaseServer) LeaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) (err
 	select {
 	case err = <-errc:
 	case <-stream.Context().Done():
-		// the only server-side cancellation is noleader for now.
+		// We end up here due to:
+		// 1. Client cancellation
+		// 2. Server cancellation: the client ctx is wrapped with WithRequireLeader,
+		//		monitorLeader() detects no leader and thus cancels this stream with ErrGRPCNoLeader.
+		// 3. Server cancellation: the server is shutting down.
 		err = stream.Context().Err()
-		if errors.Is(err, context.Canceled) {
-			err = rpctypes.ErrGRPCNoLeader
-		}
 	}
 	return err
 }

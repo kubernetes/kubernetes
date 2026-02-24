@@ -58,10 +58,6 @@ func init() {
 
 // Compressor is used for compressing and decompressing when sending or
 // receiving messages.
-//
-// If a Compressor implements `DecompressedSize(compressedBytes []byte) int`,
-// gRPC will invoke it to determine the size of the buffer allocated for the
-// result of decompression.  A return value of -1 indicates unknown size.
 type Compressor interface {
 	// Compress writes the data written to wc to w after compressing it.  If an
 	// error occurs while initializing the compressor, that error is returned

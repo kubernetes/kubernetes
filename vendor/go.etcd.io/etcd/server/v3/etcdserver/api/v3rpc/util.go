@@ -51,6 +51,7 @@ var toGRPCErrorMap = map[error]error{
 	errors.ErrNoLeader:                   rpctypes.ErrGRPCNoLeader,
 	errors.ErrNotLeader:                  rpctypes.ErrGRPCNotLeader,
 	errors.ErrLeaderChanged:              rpctypes.ErrGRPCLeaderChanged,
+	errors.ErrCanceled:                   rpctypes.ErrGRPCCanceled,
 	errors.ErrStopped:                    rpctypes.ErrGRPCStopped,
 	errors.ErrTimeout:                    rpctypes.ErrGRPCTimeout,
 	errors.ErrTimeoutDueToLeaderFail:     rpctypes.ErrGRPCTimeoutDueToLeaderFail,

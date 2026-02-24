@@ -85,7 +85,7 @@ func (tr *storeTxnCommon) rangeKeys(ctx context.Context, key, end []byte, curRev
 		tr.trace.Step("count revisions from in-memory index tree")
 		return &RangeResult{KVs: nil, Count: total, Rev: curRev}, nil
 	}
-	revpairs, total := tr.s.kvindex.Revisions(key, end, rev, int(ro.Limit))
+	revpairs, total := tr.s.kvindex.Revisions(key, end, rev, int(ro.Limit), ro.CountTotal)
 	tr.trace.Step("range keys from in-memory index tree")
 	if len(revpairs) == 0 {
 		return &RangeResult{KVs: nil, Count: total, Rev: curRev}, nil

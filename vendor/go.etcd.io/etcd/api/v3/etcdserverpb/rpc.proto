@@ -1,7 +1,6 @@
 syntax = "proto3";
 package etcdserverpb;
 
-import "gogoproto/gogo.proto";
 import "etcd/api/mvccpb/kv.proto";
 import "etcd/api/authpb/auth.proto";
 import "etcd/api/versionpb/version.proto";
@@ -11,9 +10,6 @@ import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "go.etcd.io/etcd/api/v3/etcdserverpb";
-
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.unmarshaler_all) = true;
 
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   security_definitions: {

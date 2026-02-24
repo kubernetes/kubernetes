@@ -33,8 +33,8 @@ import (
 )
 
 const (
-	EventTypeDelete = mvccpb.DELETE
-	EventTypePut    = mvccpb.PUT
+	EventTypeDelete = mvccpb.Event_DELETE
+	EventTypePut    = mvccpb.Event_PUT
 
 	closeSendErrTimeout = 250 * time.Millisecond
 

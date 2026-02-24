@@ -15,7 +15,6 @@
 package etcdserver
 
 import (
-	"fmt"
 	"time"
 
 	"go.etcd.io/etcd/client/pkg/v3/types"
@@ -95,22 +94,4 @@ func newNotifier() *notifier {
 func (nc *notifier) notify(err error) {
 	nc.err = err
 	close(nc.c)
-}
-
-// panicAlternativeStringer wraps a fmt.Stringer, and if calling String() panics, calls the alternative instead.
-// This is needed to ensure logging slow v2 requests does not panic, which occurs when running integration tests
-// with the embedded server with github.com/golang/protobuf v1.4.0+. See https://github.com/etcd-io/etcd/issues/12197.
-type panicAlternativeStringer struct {
-	stringer    fmt.Stringer
-	alternative func() string
-}
-
-func (n panicAlternativeStringer) String() (s string) {
-	defer func() {
-		if err := recover(); err != nil {
-			s = n.alternative()
-		}
-	}()
-	s = n.stringer.String()
-	return s
 }
