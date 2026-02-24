@@ -252,7 +252,7 @@ func TestCloseIdempotent(t *testing.T) {
 	}
 
 	// Close multiple times - should not error
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := wrappedBody.Close(); err != nil {
 			t.Errorf("Close() call %d returned error: %v", i+1, err)
 		}
