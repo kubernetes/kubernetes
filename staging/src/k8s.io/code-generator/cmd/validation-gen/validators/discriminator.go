@@ -53,6 +53,7 @@ type discriminatorGroups map[string]*discriminatorGroup
 
 type discriminatorGroup struct {
 	name                string
+	exclusive           bool
 	discriminatorMember *types.Member
 	// members maps field names to their rules in this discriminator group.
 	members map[string]*fieldMemberRules
@@ -119,11 +120,25 @@ func (mtv *discriminatorTagValidator) GetValidations(context Context, tag codeta
 	if groupName == "default" {
 		return Validations{}, fmt.Errorf("discriminator group name %q is reserved", groupName)
 	}
+
+	exclusive := false
+	if exclusiveArg, ok := tag.NamedArg("exclusive"); ok {
+		switch exclusiveArg.Value {
+		case "true":
+			exclusive = true
+		case "false":
+			exclusive = false
+		default:
+			return Validations{}, fmt.Errorf("exclusive must be true or false")
+		}
+	}
+
 	group := mtv.shared[context.ParentPath.String()].getOrCreate(groupName)
 	if group.discriminatorMember != nil && group.discriminatorMember != context.Member {
 		return Validations{}, fmt.Errorf("duplicate discriminator: %q", groupName)
 	}
 	group.discriminatorMember = context.Member
+	group.exclusive = exclusive
 
 	return Validations{}, nil
 }
@@ -139,6 +154,11 @@ func (mtv *discriminatorTagValidator) Docs() TagDoc {
 			Description: "<string>",
 			Docs:        "the name of the discriminator group, if more than one exists",
 			Type:        codetags.ArgTypeString,
+		}, {
+			Name:        "exclusive",
+			Description: "<bool>",
+			Docs:        "if true, unmapped values will strictly forbid dependent fields. Defaults to false.",
+			Type:        codetags.ArgTypeBool,
 		}},
 	}
 }
@@ -317,10 +337,15 @@ func (mtfv *discriminatorFieldValidator) generateMemberFieldValidation(context C
 		jsonName = jt.Name
 	}
 
-	// Default validation is Forbidden
-	defaultForbidden, err := mtfv.getForbiddenValidation(fieldType)
-	if err != nil {
-		return Validations{}, err
+	var defaultValidation any
+	if group.exclusive {
+		df, err := mtfv.getForbiddenValidation(fieldType)
+		if err != nil {
+			return Validations{}, err
+		}
+		defaultValidation = df
+	} else {
+		defaultValidation = Literal("nil")
 	}
 
 	// Prepare DiscriminatedRules
@@ -402,7 +427,7 @@ func (mtfv *discriminatorFieldValidator) generateMemberFieldValidation(context C
 		getValue,
 		getDiscriminator,
 		equivArg,
-		defaultForbidden,
+		defaultValidation,
 		rulesSlice,
 	).WithStabilityLevel(context.StabilityLevel)
 

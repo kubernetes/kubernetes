@@ -202,3 +202,17 @@ func TestRatcheting(t *testing.T) {
 		field.TooLong(field.NewPath("fieldA"), "too-long-string", 5),
 	})
 }
+
+func TestAdditiveValidation(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	// Mode A: Required
+	st.Value(&AdditiveValidation{D1: "A"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Required(field.NewPath("fieldA"), ""),
+	})
+	st.Value(&AdditiveValidation{D1: "A", FieldA: ptr.To("val")}).ExpectValid()
+
+	// Mode B (or anything else): Not listed, so it is ignored (purely additive, no implicit forbidden)
+	st.Value(&AdditiveValidation{D1: "B", FieldA: ptr.To("val")}).ExpectValid()
+	st.Value(&AdditiveValidation{D1: "", FieldA: ptr.To("val")}).ExpectValid()
+}
