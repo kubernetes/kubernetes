@@ -26,6 +26,36 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
+var apiVersions = []string{"v1beta1", "v1"}
+
+func TestDeclarativeValidate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:          "storage.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "csidrivers",
+				IsResourceRequest: true,
+				Verb:              "create",
+			})
+
+			testCases := map[string]struct {
+				input        storage.CSIDriver
+				expectedErrs field.ErrorList
+			}{
+				"valid create": {
+					input: makeValidCSIDriver(),
+				},
+			}
+			for name, tc := range testCases {
+				t.Run(name, func(t *testing.T) {
+					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+				})
+			}
+		})
+	}
+}
+
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	testCases := map[string]struct {
 		oldObj       storage.CSIDriver
