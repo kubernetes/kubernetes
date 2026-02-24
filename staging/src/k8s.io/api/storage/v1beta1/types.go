@@ -316,6 +316,7 @@ type CSIDriverSpec struct {
 	// This field is immutable.
 	//
 	// +optional
+	// +k8s:optional
 	// +k8s:immutable
 	AttachRequired *bool `json:"attachRequired,omitempty" protobuf:"varint,1,opt,name=attachRequired"`
 

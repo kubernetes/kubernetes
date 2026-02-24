@@ -76,6 +76,7 @@ message CSIDriverSpec {
   // This field is immutable.
   //
   // +optional
+  // +k8s:optional
   // +k8s:immutable
   optional bool attachRequired = 1;
 
