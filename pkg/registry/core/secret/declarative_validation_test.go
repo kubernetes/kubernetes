@@ -26,6 +26,30 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+func TestDeclarativeValidate(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "",
+		APIVersion:        "v1",
+		Resource:          "secrets",
+		IsResourceRequest: true,
+		Verb:              "create",
+	})
+
+	testCases := map[string]struct {
+		input        api.Secret
+		expectedErrs field.ErrorList
+	}{
+		"valid create": {
+			input: makeValidSecret(),
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+		})
+	}
+}
+
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	testCases := map[string]struct {
 		oldObj       api.Secret
