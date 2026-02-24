@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -1095,7 +1096,7 @@ func TestCSINodeOwnerRefReconciliation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 		tmpDir,
@@ -1110,11 +1111,11 @@ func TestCSINodeOwnerRefReconciliation(t *testing.T) {
 	// InitializeCSINodeWithAnnotation sets nim.nodeID from the Node API
 	// and then calls ensureNodeOwnsCSINode, which should reconcile the UID.
 	err = nim.InitializeCSINodeWithAnnotation()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify CSINode still exists and was NOT deleted/recreated.
 	csiNode, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if csiNode == nil {
 		t.Fatal("expected CSINode to exist after OwnerRef reconciliation, but it was not found")
 	}
@@ -1141,10 +1142,10 @@ func TestCSINodeOwnerRefReconciliation(t *testing.T) {
 
 	// Now verify that InstallCSIDriver still works correctly after reconciliation.
 	err = nim.InstallCSIDriver("com.example.csi/new-driver", "com.example.csi/new-node-id", 0, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	csiNode, err = client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if csiNode == nil {
 		t.Fatal("expected CSINode to exist after InstallCSIDriver, but it was not found")
 	}
