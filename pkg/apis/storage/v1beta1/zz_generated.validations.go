@@ -219,6 +219,9 @@ func Validate_CSIDriverSpec(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
