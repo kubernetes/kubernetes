@@ -76,6 +76,7 @@ func TestPreFilter(t *testing.T) {
 			componenetVersion: "1.35.0",
 			nodeFeatures: []ndf.Feature{
 				createMockFeature(t, feature1, true, ""),
+				createMockFeature(t, feature2, false, ""),
 			},
 			expectedStatus: fwk.NewStatus(fwk.Skip),
 			expectedState:  nil,
@@ -87,6 +88,7 @@ func TestPreFilter(t *testing.T) {
 			componenetVersion: "1.35.0",
 			nodeFeatures: []ndf.Feature{
 				createMockFeature(t, feature1, true, ""),
+				createMockFeature(t, feature2, false, ""),
 			},
 			expectedStatus: fwk.NewStatus(fwk.Success),
 			expectedState:  &preFilterState{reqs: newFS(feature1)},
@@ -110,6 +112,7 @@ func TestPreFilter(t *testing.T) {
 			componenetVersion: "1.35.0",
 			nodeFeatures: []ndf.Feature{
 				createMockFeature(t, feature1, false, ""),
+				createMockFeature(t, feature2, false, ""),
 			},
 			expectedStatus: fwk.NewStatus(fwk.Skip),
 			expectedState:  nil,
@@ -121,6 +124,7 @@ func TestPreFilter(t *testing.T) {
 			componenetVersion: "1.34.0",
 			nodeFeatures: []ndf.Feature{
 				createMockFeature(t, feature1, true, "1.33.0"),
+				createMockFeature(t, feature2, false, ""),
 			},
 			expectedStatus: fwk.NewStatus(fwk.Skip),
 			expectedState:  nil,

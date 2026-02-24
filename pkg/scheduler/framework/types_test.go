@@ -1296,7 +1296,7 @@ func TestSetNodeDeclaredFeatures(t *testing.T) {
 			ni.SetNode(node)
 			gotFeatures := ni.GetNodeDeclaredFeatures()
 			if !tt.featureGateEnabled {
-				if gotFeatures != nil {
+				if !gotFeatures.IsEmpty() {
 					t.Errorf("Expected GetNodeDeclaredFeatures() to return nil; got %v", ndfFramework.Unmap(gotFeatures))
 				}
 				return

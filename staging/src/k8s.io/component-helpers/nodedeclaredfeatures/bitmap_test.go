@@ -39,8 +39,8 @@ func TestNewBitmap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := newBitmap(tt.size)
-			if len(b) != tt.expected {
-				t.Errorf("len(b) = %d, want %d", len(b), tt.expected)
+			if len(b.words) != tt.expected {
+				t.Errorf("len(b) = %d, want %d", len(b.words), tt.expected)
 			}
 		})
 	}
@@ -170,9 +170,6 @@ func TestBitmap_DifferenceSubset(t *testing.T) {
 				if err == nil {
 					t.Error("expected error, got nil")
 				}
-				if diff != nil {
-					t.Errorf("expected nil diff, got %v", diff)
-				}
 			} else {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -275,37 +272,42 @@ func TestBitmap_Clone(t *testing.T) {
 }
 
 func TestBitmap_String(t *testing.T) {
-	// Size 64 -> 1 uint64
-	b := newBitmap(64)
-	// 0x0000000000000001 (bit 0 set)
-	b.Set(0)
-	// Output is hex encoded BigEndian of the uint64
-	// uint64(1) -> bytes: [0 0 0 0 0 0 0 1]
-	// hex: "0000000000000001"
-	if got, want := b.String(), "0000000000000001"; got != want {
-		t.Errorf("got %q, want %q", got, want)
+	tests := []struct {
+		name     string
+		size     int
+		sets     []int
+		expected string
+	}{
+		{
+			name:     "Size 5, bit 0 and 4 set",
+			size:     5,
+			sets:     []int{0, 4},
+			expected: "10001",
+		},
+		{
+			name:     "Size 10, no bits set",
+			size:     10,
+			sets:     []int{},
+			expected: "0000000000",
+		},
+		{
+			name:     "Size 65, bit 0 and 64 set",
+			size:     65,
+			sets:     []int{0, 64},
+			expected: "10000000000000000000000000000000000000000000000000000000000000001",
+		},
 	}
 
-	b2 := newBitmap(64)
-	b2.Set(63)
-	// 1 << 63 is the highest bit.
-	// 0x8000000000000000
-	// bytes: [128 0 0 0 0 0 0 0] -> hex "8000000000000000"
-	if got, want := b2.String(), "8000000000000000"; got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-
-	// Multi-word
-	b3 := newBitmap(128)
-	b3.Set(0)
-	b3.Set(64)
-	// Array of 2 uint64s.
-	// b3[0] has bit 0 set -> "0000000000000001"
-	// b3[1] has bit 0 (global 64) set -> "0000000000000001"
-	// Output order: iterates slice.
-	// "0000000000000001" + "0000000000000001"
-	if got, want := b3.String(), "00000000000000010000000000000001"; got != want {
-		t.Errorf("got %q, want %q", got, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newBitmap(tt.size)
+			for _, s := range tt.sets {
+				b.Set(s)
+			}
+			if got := b.String(); got != tt.expected {
+				t.Errorf("got %q, want %q", got, tt.expected)
+			}
+		})
 	}
 }
 
