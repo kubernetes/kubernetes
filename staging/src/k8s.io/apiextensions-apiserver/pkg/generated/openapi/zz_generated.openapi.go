@@ -425,7 +425,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"spec"},
+				Required: []string{"spec", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -1030,6 +1030,7 @@ func schema_k8sio_api_autoscaling_v1_Scale(ref common.ReferenceCallback) common.
 						},
 					},
 				},
+				Required: []string{"status"},
 			},
 		},
 		Dependencies: []string{
