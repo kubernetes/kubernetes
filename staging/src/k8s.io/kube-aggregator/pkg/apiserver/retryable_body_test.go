@@ -187,6 +187,55 @@ func TestWrapBodyForRetryMaxAttempts(t *testing.T) {
 	}
 }
 
+func TestWrapBodyForRetryAccumulatesProgressAcrossRetries(t *testing.T) {
+	bodyContent := "0123456789abcdefghijklmnopqrstuvwxyz"
+	originalBody := io.NopCloser(bytes.NewBufferString(bodyContent))
+	config := retryableBodyConfig{maxRetryBytes: 1024, maxAttempts: 3}
+
+	wrappedBody, getBody := wrapBodyForRetry(originalBody, config)
+
+	// Simulate first request attempt consuming only a prefix before a retry.
+	firstAttemptRead := make([]byte, 5)
+	if _, err := io.ReadFull(wrappedBody, firstAttemptRead); err != nil {
+		t.Fatalf("unexpected first attempt read error: %v", err)
+	}
+	if string(firstAttemptRead) != bodyContent[:5] {
+		t.Fatalf("expected first attempt prefix %q, got %q", bodyContent[:5], string(firstAttemptRead))
+	}
+	if err := wrappedBody.Close(); err != nil {
+		t.Fatalf("unexpected wrappedBody close error: %v", err)
+	}
+
+	// Simulate first retry consuming bytes from buffered prefix and original body, then failing.
+	firstRetryBody, err := getBody()
+	if err != nil {
+		t.Fatalf("unexpected first getBody error: %v", err)
+	}
+	firstRetryRead := make([]byte, 8)
+	if _, err := io.ReadFull(firstRetryBody, firstRetryRead); err != nil {
+		t.Fatalf("unexpected first retry read error: %v", err)
+	}
+	if string(firstRetryRead) != bodyContent[:8] {
+		t.Fatalf("expected first retry prefix %q, got %q", bodyContent[:8], string(firstRetryRead))
+	}
+	if err := firstRetryBody.Close(); err != nil {
+		t.Fatalf("unexpected firstRetryBody close error: %v", err)
+	}
+
+	// Next retry should still reconstruct the full original body.
+	secondRetryBody, err := getBody()
+	if err != nil {
+		t.Fatalf("unexpected second getBody error: %v", err)
+	}
+	secondRetryData, err := io.ReadAll(secondRetryBody)
+	if err != nil {
+		t.Fatalf("unexpected second retry read error: %v", err)
+	}
+	if string(secondRetryData) != bodyContent {
+		t.Fatalf("expected full body %q, got %q", bodyContent, string(secondRetryData))
+	}
+}
+
 // TestCloseIdempotent verifies that Close() can be called multiple times safely
 // A no-op wrapped body is required as`doRequest` performs a cleanup, so we
 // avoid closing the delegating to originalBody and closing it.

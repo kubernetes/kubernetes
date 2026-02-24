@@ -74,7 +74,9 @@ func wrapBodyForRetry(originalBody io.ReadCloser, config retryableBodyConfig) (i
 		if int(attempts.Add(1)) > config.maxAttempts {
 			return nil, errRetryAlreadyAttempted
 		}
-		return io.NopCloser(io.MultiReader(bytes.NewReader(lw.bytes()), originalBody)), nil
+		// Replay currently buffered bytes from the beginning, and keep buffering
+		// any additional bytes consumed from originalBody for subsequent retries.
+		return io.NopCloser(io.MultiReader(bytes.NewReader(lw.bytes()), io.TeeReader(originalBody, lw))), nil
 	}
 
 	return wrappedBody, getBody
@@ -111,5 +113,10 @@ func (lw *limitedWriter) bytes() []byte {
 	if lw.buf == nil {
 		return nil
 	}
-	return lw.buf.Bytes()
+	// Return a copy so the snapshot is decoupled from lw.buf's backing array,
+	// which grows as TeeReader writes during retries.
+	content := lw.buf.Bytes()
+	contentCopy := make([]byte, len(content))
+	copy(contentCopy, content)
+	return contentCopy
 }
