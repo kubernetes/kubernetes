@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
+	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2/ktesting"
@@ -40,12 +40,13 @@ import (
 // createMockFeature is a helper function to create and configure a MockFeature.
 func createMockFeature(t *testing.T, name string, infer bool, maxVersionStr string) *ndftesting.MockFeature {
 	m := ndftesting.NewMockFeature(t)
-	m.SetName(name)
-	m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return infer })
+	m.EXPECT().Name().Return(name).Maybe()
+	m.EXPECT().InferForScheduling(mock.Anything).Return(infer).Maybe()
 	if maxVersionStr != "" {
-		m.SetMaxVersion(version.MustParseSemantic(maxVersionStr))
+		minVersion := version.MustParseSemantic(maxVersionStr)
+		m.EXPECT().MaxVersion().Return(minVersion).Maybe()
 	} else {
-		m.SetMaxVersion(nil)
+		m.EXPECT().MaxVersion().Return(nil).Maybe()
 	}
 	return m
 }
@@ -341,21 +342,10 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 			newPod:            st.MakePod().Name(targetPodName).UID(targetPodUID).Label("foo", "bar").Obj(),
 			componenetVersion: version.MustParseSemantic("1.35.0"),
 			setupMock: func(m *ndftesting.MockFeature) {
-				i := 0
-				m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
-					switch i {
-					case 0:
-						i++
-						return false
-					case 1:
-						i++
-						return true
-					default:
-						panic("unexpected calls to SetInferForScheduling")
-					}
-				})
-				m.SetName("TestFeature")
-				m.SetMaxVersion(nil)
+				m.EXPECT().InferForScheduling(mock.Anything).Return(false).Once()
+				m.EXPECT().InferForScheduling(mock.Anything).Return(true).Once()
+				m.EXPECT().Name().Return("TestFeature").Maybe()
+				m.EXPECT().MaxVersion().Return(nil).Maybe()
 			},
 			expectedHint: fwk.Queue,
 		},
@@ -365,21 +355,10 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 			newPod:            st.MakePod().Name(targetPodName).UID(targetPodUID).Obj(),
 			componenetVersion: version.MustParseSemantic("1.35.0"),
 			setupMock: func(m *ndftesting.MockFeature) {
-				i := 0
-				m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
-					switch i {
-					case 0:
-						i++
-						return true
-					case 1:
-						i++
-						return false
-					default:
-						panic("unexpected calls to SetInferForScheduling")
-					}
-				})
-				m.SetName("TestFeature")
-				m.SetMaxVersion(nil)
+				m.EXPECT().InferForScheduling(mock.Anything).Return(true).Once()
+				m.EXPECT().InferForScheduling(mock.Anything).Return(false).Once()
+				m.EXPECT().Name().Return("TestFeature").Maybe()
+				m.EXPECT().MaxVersion().Return(nil).Maybe()
 			},
 			expectedHint: fwk.Queue,
 		},
@@ -389,9 +368,9 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 			newPod:            st.MakePod().Name(targetPodName).UID(targetPodUID).Obj(),
 			componenetVersion: version.MustParseSemantic("1.35.0"),
 			setupMock: func(m *ndftesting.MockFeature) {
-				m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return false })
-				m.SetName("TestFeature")
-				m.SetMaxVersion(nil)
+				m.EXPECT().InferForScheduling(mock.Anything).Return(false)
+				m.EXPECT().Name().Return("TestFeature").Maybe()
+				m.EXPECT().MaxVersion().Return(nil).Maybe()
 			},
 			expectedHint: fwk.QueueSkip,
 		},
@@ -401,9 +380,9 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 			newPod:            st.MakePod().Name("another-test-pod").UID("456").Obj(),
 			componenetVersion: version.MustParseSemantic("1.35.0"),
 			setupMock: func(m *ndftesting.MockFeature) {
-				m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return false })
-				m.SetName("TestFeature")
-				m.SetMaxVersion(nil)
+				m.EXPECT().InferForScheduling(mock.Anything).Return(false).Maybe()
+				m.EXPECT().Name().Return("TestFeature").Maybe()
+				m.EXPECT().MaxVersion().Return(nil).Maybe()
 			},
 			expectedHint: fwk.QueueSkip,
 		},
@@ -413,9 +392,9 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 			newPod:            st.MakePod().Name(targetPodName).UID(targetPodUID).Label("foo", "bar").Obj(),
 			componenetVersion: nil,
 			setupMock: func(m *ndftesting.MockFeature) {
-				m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return true })
-				m.SetName("TestFeature")
-				m.SetMaxVersion(nil)
+				m.EXPECT().InferForScheduling(mock.Anything).Return(true).Maybe()
+				m.EXPECT().Name().Return("TestFeature").Maybe()
+				m.EXPECT().MaxVersion().Return(nil).Maybe()
 			},
 			expectedHint: fwk.Queue, // Queued again in case of error
 			expectedErr:  "target version cannot be nil",

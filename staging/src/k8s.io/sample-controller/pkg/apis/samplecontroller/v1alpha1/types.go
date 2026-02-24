@@ -48,7 +48,7 @@ type FooStatus struct {
 // FooList is a list of Foo resources
 type FooList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata"`
 
 	Items []Foo `json:"items"`
 }

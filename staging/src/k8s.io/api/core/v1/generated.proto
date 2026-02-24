@@ -39,6 +39,7 @@ option go_package = "k8s.io/api/core/v1";
 message AWSElasticBlockStoreVolumeSource {
   // volumeID is unique ID of the persistent disk resource in AWS (Amazon EBS volume).
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
+  // +required
   optional string volumeID = 1;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -86,6 +87,7 @@ message AppArmorProfile {
   //   RuntimeDefault - the container runtime's default profile.
   //   Unconfined - no AppArmor enforcement.
   // +unionDiscriminator
+  // +required
   optional string type = 1;
 
   // localhostProfile indicates a profile loaded on the node that should be used.
@@ -99,9 +101,11 @@ message AppArmorProfile {
 // AttachedVolume describes a volume attached to a node
 message AttachedVolume {
   // Name of the attached volume
+  // +required
   optional string name = 1;
 
   // DevicePath represents the device path where the volume should be available
+  // +required
   optional string devicePath = 2;
 }
 
@@ -119,9 +123,11 @@ message AvoidPods {
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 message AzureDiskVolumeSource {
   // diskName is the Name of the data disk in the blob storage
+  // +required
   optional string diskName = 1;
 
   // diskURI is the URI of data disk in the blob storage
+  // +required
   optional string diskURI = 2;
 
   // cachingMode is the Host Caching mode: None, Read Only, Read Write.
@@ -144,15 +150,18 @@ message AzureDiskVolumeSource {
 
   // kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
   // +default=ref(AzureSharedBlobDisk)
+  // +optional
   optional string kind = 6;
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFilePersistentVolumeSource {
   // secretName is the name of secret that contains Azure Storage Account Name and Key
+  // +required
   optional string secretName = 1;
 
   // shareName is the azure Share Name
+  // +required
   optional string shareName = 2;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -169,9 +178,11 @@ message AzureFilePersistentVolumeSource {
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
   // secretName is the  name of secret that contains Azure Storage Account Name and Key
+  // +required
   optional string secretName = 1;
 
   // shareName is the azure share Name
+  // +required
   optional string shareName = 2;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -188,6 +199,7 @@ message Binding {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The target object that you want to bind to the standard object.
+  // +optional
   optional ObjectReference target = 2;
 }
 
@@ -195,11 +207,13 @@ message Binding {
 message CSIPersistentVolumeSource {
   // driver is the name of the driver to use for this volume.
   // Required.
+  // +required
   optional string driver = 1;
 
   // volumeHandle is the unique volume name returned by the CSI volume
   // plugin’s CreateVolume to refer to the volume on all subsequent calls.
   // Required.
+  // +required
   optional string volumeHandle = 2;
 
   // readOnly value to pass to ControllerPublishVolumeRequest.
@@ -261,6 +275,7 @@ message CSIPersistentVolumeSource {
 message CSIVolumeSource {
   // driver is the name of the CSI driver that handles this volume.
   // Consult with your admin for the correct name as registered in the cluster.
+  // +required
   optional string driver = 1;
 
   // readOnly specifies a read-only configuration for the volume.
@@ -307,6 +322,7 @@ message CephFSPersistentVolumeSource {
   // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +listType=atomic
+  // +required
   repeated string monitors = 1;
 
   // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -341,6 +357,7 @@ message CephFSVolumeSource {
   // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +listType=atomic
+  // +required
   repeated string monitors = 1;
 
   // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -376,6 +393,7 @@ message CephFSVolumeSource {
 message CinderPersistentVolumeSource {
   // volumeID used to identify the volume in cinder.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
+  // +required
   optional string volumeID = 1;
 
   // fsType Filesystem type to mount.
@@ -404,6 +422,7 @@ message CinderPersistentVolumeSource {
 message CinderVolumeSource {
   // volumeID used to identify the volume in cinder.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
+  // +required
   optional string volumeID = 1;
 
   // fsType is the filesystem type to mount.
@@ -465,6 +484,7 @@ message ClusterTrustBundleProjection {
   optional bool optional = 5;
 
   // Relative path from the volume root to write the bundle.
+  // +required
   optional string path = 4;
 }
 
@@ -472,10 +492,12 @@ message ClusterTrustBundleProjection {
 message ComponentCondition {
   // Type of condition for a component.
   // Valid value: "Healthy"
+  // +required
   optional string type = 1;
 
   // Status of the condition for a component.
   // Valid values for "Healthy": "True", "False", or "Unknown".
+  // +required
   optional string status = 2;
 
   // Message about the condition for a component.
@@ -572,6 +594,7 @@ message ConfigMapKeySelector {
   optional LocalObjectReference localObjectReference = 1;
 
   // The key to select.
+  // +required
   optional string key = 2;
 
   // Specify whether the ConfigMap or its key must be defined
@@ -594,10 +617,12 @@ message ConfigMapList {
 message ConfigMapNodeConfigSource {
   // Namespace is the metadata.namespace of the referenced ConfigMap.
   // This field is required in all cases.
+  // +required
   optional string namespace = 1;
 
   // Name is the metadata.name of the referenced ConfigMap.
   // This field is required in all cases.
+  // +required
   optional string name = 2;
 
   // UID is the metadata.UID of the referenced ConfigMap.
@@ -612,6 +637,7 @@ message ConfigMapNodeConfigSource {
 
   // KubeletConfigKey declares which key of the referenced ConfigMap corresponds to the KubeletConfiguration structure
   // This field is required in all cases.
+  // +required
   optional string kubeletConfigKey = 5;
 }
 
@@ -681,6 +707,7 @@ message Container {
   // Name of the container specified as a DNS_LABEL.
   // Each container in a pod must have a unique name (DNS_LABEL).
   // Cannot be updated.
+  // +required
   optional string name = 1;
 
   // Container image name.
@@ -908,12 +935,15 @@ message Container {
 // extended resource name to the device request name.
 message ContainerExtendedResourceRequest {
   // The name of the container requesting resources.
+  // +required
   optional string containerName = 1;
 
   // The name of the extended resource in that container which gets backed by DRA.
+  // +required
   optional string resourceName = 2;
 
   // The name of the request in the special ResourceClaim which corresponds to the extended resource.
+  // +required
   optional string requestName = 3;
 }
 
@@ -947,6 +977,7 @@ message ContainerPort {
 
   // Number of port to expose on the pod's IP address.
   // This must be a valid port number, 0 < x < 65536.
+  // +required
   optional int32 containerPort = 3;
 
   // Protocol for port. Must be UDP, TCP, or SCTP.
@@ -964,10 +995,12 @@ message ContainerPort {
 message ContainerResizePolicy {
   // Name of the resource to which this resource resize policy applies.
   // Supported values: cpu, memory.
+  // +required
   optional string resourceName = 1;
 
   // Restart policy to apply when specified resource is resized.
   // If not specified, it defaults to NotRequired.
+  // +required
   optional string restartPolicy = 2;
 }
 
@@ -1031,6 +1064,7 @@ message ContainerStateRunning {
 // ContainerStateTerminated is a terminated state of a container.
 message ContainerStateTerminated {
   // Exit status from the last termination of the container
+  // +required
   optional int32 exitCode = 1;
 
   // Signal from the last termination of the container
@@ -1074,6 +1108,7 @@ message ContainerStatus {
   // Name is a DNS_LABEL representing the unique name of the container.
   // Each container in a pod must have a unique name across all container types.
   // Cannot be updated.
+  // +required
   optional string name = 1;
 
   // State holds details about the container's current condition.
@@ -1093,23 +1128,27 @@ message ContainerStatus {
   //
   // The value is typically used to determine whether a container is ready to
   // accept traffic.
+  // +required
   optional bool ready = 4;
 
   // RestartCount holds the number of times the container has been restarted.
   // Kubelet makes an effort to always increment the value, but there
   // are cases when the state may be lost due to node restarts and then the value
   // may be reset to 0. The value is never negative.
+  // +required
   optional int32 restartCount = 5;
 
   // Image is the name of container image that the container is running.
   // The container image may not match the image used in the PodSpec,
   // as it may have been resolved by the runtime.
   // More info: https://kubernetes.io/docs/concepts/containers/images.
+  // +required
   optional string image = 6;
 
   // ImageID is the image ID of the container's image. The image ID may not
   // match the image ID of the image used in the PodSpec, as it may have been
   // resolved by the runtime.
+  // +required
   optional string imageID = 7;
 
   // ContainerID is the ID of the container in the format '<type>://<container_id>'.
@@ -1198,6 +1237,7 @@ message DownwardAPIProjection {
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
 message DownwardAPIVolumeFile {
   // Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+  // +required
   optional string path = 1;
 
   // Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
@@ -1423,6 +1463,7 @@ message EnvFromSource {
 message EnvVar {
   // Name of the environment variable.
   // May consist of any printable ASCII characters except '='.
+  // +required
   optional string name = 1;
 
   // Variable references $(VAR_NAME) are expanded
@@ -1502,10 +1543,12 @@ message EphemeralContainer {
 message EphemeralContainerCommon {
   // Name of the ephemeral container specified as a DNS_LABEL.
   // This name must be unique among all containers, init containers and ephemeral containers.
+  // +required
   optional string name = 1;
 
   // Container image name.
   // More info: https://kubernetes.io/docs/concepts/containers/images
+  // +optional
   optional string image = 2;
 
   // Entrypoint array. Not executed within a shell.
@@ -1703,6 +1746,7 @@ message EphemeralVolumeSource {
   // to the PVC after it has been created.
   //
   // Required, must not be nil.
+  // +optional
   optional PersistentVolumeClaimTemplate volumeClaimTemplate = 1;
 }
 
@@ -1715,9 +1759,11 @@ message EphemeralVolumeSource {
 message Event {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The object that this event is about.
+  // +optional
   optional ObjectReference involvedObject = 2;
 
   // This should be a short, machine understandable string that gives the reason
@@ -1791,9 +1837,11 @@ message EventList {
 // continuously for some time.
 message EventSeries {
   // Number of occurrences in this series up to the last heartbeat time
+  // +optional
   optional int32 count = 1;
 
   // Time of the last occurrence observed
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 }
 
@@ -1886,6 +1934,7 @@ message FileKeySelector {
 // provisioned/attached using an exec based plugin.
 message FlexPersistentVolumeSource {
   // driver is the name of the driver to use for this volume.
+  // +required
   optional string driver = 1;
 
   // fsType is the Filesystem type to mount.
@@ -1916,6 +1965,7 @@ message FlexPersistentVolumeSource {
 // provisioned/attached using an exec based plugin.
 message FlexVolumeSource {
   // driver is the name of the driver to use for this volume.
+  // +required
   optional string driver = 1;
 
   // fsType is the filesystem type to mount.
@@ -1965,6 +2015,7 @@ message FlockerVolumeSource {
 message GCEPersistentDiskVolumeSource {
   // pdName is unique name of the PD resource in GCE. Used to identify the disk in GCE.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
+  // +required
   optional string pdName = 1;
 
   // fsType is filesystem type of the volume that you want to mount.
@@ -1993,6 +2044,7 @@ message GCEPersistentDiskVolumeSource {
 // GRPCAction specifies an action involving a GRPC service.
 message GRPCAction {
   // Port number of the gRPC service. Number must be in the range 1 to 65535.
+  // +required
   optional int32 port = 1;
 
   // Service is the name of the service to place in the gRPC HealthCheckRequest
@@ -2013,6 +2065,7 @@ message GRPCAction {
 // into the Pod's container.
 message GitRepoVolumeSource {
   // repository is the URL
+  // +required
   optional string repository = 1;
 
   // revision is the commit hash for the specified revision.
@@ -2036,6 +2089,7 @@ message GlusterfsPersistentVolumeSource {
 
   // path is the Glusterfs volume path.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+  // +required
   optional string path = 2;
 
   // readOnly here will force the Glusterfs volume to be mounted with read-only permissions.
@@ -2059,6 +2113,7 @@ message GlusterfsVolumeSource {
 
   // path is the Glusterfs volume path.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+  // +required
   optional string path = 2;
 
   // readOnly here will force the Glusterfs volume to be mounted with read-only permissions.
@@ -2077,6 +2132,7 @@ message HTTPGetAction {
   // Name or number of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
+  // +required
   optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 
   // Host name to connect to, defaults to the pod IP. You probably want to set
@@ -2099,9 +2155,11 @@ message HTTPGetAction {
 message HTTPHeader {
   // The header field name.
   // This will be canonicalized upon output, so case-variant names will be understood as the same header.
+  // +required
   optional string name = 1;
 
   // The header field value
+  // +required
   optional string value = 2;
 }
 
@@ -2114,6 +2172,7 @@ message HostAlias {
 
   // Hostnames for the above IP address.
   // +listType=atomic
+  // +optional
   repeated string hostnames = 2;
 }
 
@@ -2130,6 +2189,7 @@ message HostPathVolumeSource {
   // path of the directory on the host.
   // If the path is a symlink, it will follow the link to the real path.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+  // +required
   optional string path = 1;
 
   // type for HostPath Volume
@@ -2145,12 +2205,15 @@ message HostPathVolumeSource {
 message ISCSIPersistentVolumeSource {
   // targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
+  // +required
   optional string targetPortal = 1;
 
   // iqn is Target iSCSI Qualified Name.
+  // +required
   optional string iqn = 2;
 
   // lun is iSCSI Target Lun number.
+  // +required
   optional int32 lun = 3;
 
   // iscsiInterface is the interface Name that uses an iSCSI transport.
@@ -2203,12 +2266,15 @@ message ISCSIPersistentVolumeSource {
 message ISCSIVolumeSource {
   // targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
+  // +required
   optional string targetPortal = 1;
 
   // iqn is the target iSCSI Qualified Name.
+  // +required
   optional string iqn = 2;
 
   // lun represents iSCSI Target Lun number.
+  // +required
   optional int32 lun = 3;
 
   // iscsiInterface is the interface Name that uses an iSCSI transport.
@@ -2288,12 +2354,14 @@ message ImageVolumeStatus {
 // Maps a string key to a path within a volume.
 message KeyToPath {
   // key is the key to project.
+  // +required
   optional string key = 1;
 
   // path is the relative path of the file to map the key to.
   // May not be an absolute path.
   // May not contain the path element '..'.
   // May not start with the string '..'.
+  // +required
   optional string path = 2;
 
   // mode is Optional: mode bits used to set permissions on this file.
@@ -2367,13 +2435,14 @@ message LimitRange {
 
   // Spec defines the limits enforced.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional LimitRangeSpec spec = 2;
 }
 
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
 message LimitRangeItem {
   // Type of resource that this limit applies to.
+  // +required
   optional string type = 1;
 
   // Max usage constraints on this kind by resource name.
@@ -2413,15 +2482,18 @@ message LimitRangeList {
 message LimitRangeSpec {
   // Limits is the list of LimitRangeItem objects that are enforced.
   // +listType=atomic
+  // +required
   repeated LimitRangeItem limits = 1;
 }
 
 // LinuxContainerUser represents user identity information in Linux containers
 message LinuxContainerUser {
   // UID is the primary uid initially attached to the first process in the container
+  // +required
   optional int64 uid = 1;
 
   // GID is the primary gid initially attached to the first process in the container
+  // +required
   optional int64 gid = 2;
 
   // SupplementalGroups are the supplemental groups initially attached to the first process in the container
@@ -2510,6 +2582,7 @@ message LocalObjectReference {
 message LocalVolumeSource {
   // path of the full path to the volume on the node.
   // It can be either a directory or block device (disk, partition, ...).
+  // +required
   optional string path = 1;
 
   // fsType is the filesystem type to mount.
@@ -2523,6 +2596,7 @@ message LocalVolumeSource {
 // ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
 message ModifyVolumeStatus {
   // targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled
+  // +optional
   optional string targetVolumeAttributesClassName = 1;
 
   // status is the status of the ControllerModifyVolume operation. It can be in any of following states:
@@ -2535,6 +2609,7 @@ message ModifyVolumeStatus {
   //   Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
   // 	  resolve the error, a valid VolumeAttributesClass needs to be specified.
   // Note: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.
+  // +required
   optional string status = 2;
 }
 
@@ -2543,10 +2618,12 @@ message ModifyVolumeStatus {
 message NFSVolumeSource {
   // server is the hostname or IP address of the NFS server.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+  // +required
   optional string server = 1;
 
   // path that is exported by the NFS server.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+  // +required
   optional string path = 2;
 
   // readOnly here will force the NFS export to be mounted with read-only permissions.
@@ -2578,9 +2655,11 @@ message Namespace {
 // NamespaceCondition contains details about state of namespace.
 message NamespaceCondition {
   // Type of namespace controller condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // Last time the condition transitioned from one status to another.
@@ -2657,9 +2736,11 @@ message Node {
 // NodeAddress contains information for the node's address.
 message NodeAddress {
   // Node address type, one of Hostname, ExternalIP or InternalIP.
+  // +required
   optional string type = 1;
 
   // The node address.
+  // +required
   optional string address = 2;
 }
 
@@ -2690,9 +2771,11 @@ message NodeAffinity {
 // NodeCondition contains condition information for a node.
 message NodeCondition {
   // Type of node condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // Last time we got an update on a given condition.
@@ -2716,6 +2799,7 @@ message NodeCondition {
 // This API is deprecated since 1.22
 message NodeConfigSource {
   // ConfigMap is a reference to a Node's ConfigMap
+  // +optional
   optional ConfigMapNodeConfigSource configMap = 2;
 }
 
@@ -2834,6 +2918,7 @@ message NodeRuntimeHandlerFeatures {
 message NodeSelector {
   // Required. A list of node selector terms. The terms are ORed.
   // +listType=atomic
+  // +required
   repeated NodeSelectorTerm nodeSelectorTerms = 1;
 }
 
@@ -2841,10 +2926,12 @@ message NodeSelector {
 // that relates the key and values.
 message NodeSelectorRequirement {
   // The label key that the selector applies to.
+  // +required
   optional string key = 1;
 
   // Represents a key's relationship to a set of values.
   // Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+  // +required
   optional string operator = 2;
 
   // An array of string values. If the operator is In or NotIn,
@@ -3013,38 +3100,49 @@ message NodeSystemInfo {
   // MachineID reported by the node. For unique machine identification
   // in the cluster this field is preferred. Learn more from man(5)
   // machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html
+  // +required
   optional string machineID = 1;
 
   // SystemUUID reported by the node. For unique machine identification
   // MachineID is preferred. This field is specific to Red Hat hosts
   // https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
+  // +required
   optional string systemUUID = 2;
 
   // Boot ID reported by the node.
+  // +required
   optional string bootID = 3;
 
   // Kernel Version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64).
+  // +required
   optional string kernelVersion = 4;
 
   // OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).
+  // +required
   optional string osImage = 5;
 
   // ContainerRuntime Version reported by the node through runtime remote API (e.g. containerd://1.4.2).
+  // +required
   optional string containerRuntimeVersion = 6;
 
   // Kubelet Version reported by the node.
+  // +required
   optional string kubeletVersion = 7;
 
   // Deprecated: KubeProxy Version reported by the node.
+  // +required
   optional string kubeProxyVersion = 8;
 
   // The Operating System reported by the node
+  // +required
   optional string operatingSystem = 9;
 
   // The Architecture reported by the node
+  // +required
   optional string architecture = 10;
 
   // Swap Info reported by the node.
+  // +optional
   optional NodeSwapStatus swap = 11;
 }
 
@@ -3056,6 +3154,7 @@ message ObjectFieldSelector {
   optional string apiVersion = 1;
 
   // Path of the field to select in the specified API version.
+  // +required
   optional string fieldPath = 2;
 }
 
@@ -3165,11 +3264,13 @@ message PersistentVolumeClaim {
 message PersistentVolumeClaimCondition {
   // Type is the type of the condition.
   // More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about
+  // +required
   optional string type = 1;
 
   // Status is the status of the condition.
   // Can be True, False, Unknown.
   // More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required
+  // +required
   optional string status = 2;
 
   // lastProbeTime is the time we probed the condition.
@@ -3402,6 +3503,7 @@ message PersistentVolumeClaimTemplate {
   // copied unchanged into the PVC that gets created from this
   // template. The same fields as in a PersistentVolumeClaim
   // are also valid here.
+  // +optional
   optional PersistentVolumeClaimSpec spec = 2;
 }
 
@@ -3412,6 +3514,7 @@ message PersistentVolumeClaimTemplate {
 message PersistentVolumeClaimVolumeSource {
   // claimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+  // +required
   optional string claimName = 1;
 
   // readOnly Will force the ReadOnly setting in VolumeMounts.
@@ -3534,6 +3637,7 @@ message PersistentVolumeSource {
 
   // photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
   // Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
+  // +optional
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 17;
 
   // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
@@ -3653,11 +3757,13 @@ message PersistentVolumeStatus {
 // Represents a Photon Controller persistent disk resource.
 message PhotonPersistentDiskVolumeSource {
   // pdID is the ID that identifies Photon Controller persistent disk
+  // +required
   optional string pdID = 1;
 
   // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
   optional string fsType = 2;
 }
 
@@ -3671,7 +3777,7 @@ message Pod {
 
   // Specification of the desired behavior of the pod.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional PodSpec spec = 2;
 
   // Most recently observed status of the pod.
@@ -3735,6 +3841,7 @@ message PodAffinityTerm {
   // whose value of the label with key topologyKey matches that of any node on which any of the
   // selected pods is running.
   // Empty topologyKey is not allowed.
+  // +required
   optional string topologyKey = 3;
 
   // A label query over the set of namespaces that the term applies to.
@@ -3917,6 +4024,7 @@ message PodCertificateProjection {
   //
   // Signers should document the keys and values they support. Signers should
   // deny requests that contain keys they do not recognize.
+  // +optional
   map<string, string> userAnnotations = 7;
 }
 
@@ -3924,6 +4032,7 @@ message PodCertificateProjection {
 message PodCondition {
   // Type is the type of the condition.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+  // +required
   optional string type = 1;
 
   // If set, this represents the .metadata.generation that the pod condition was set based upon.
@@ -3933,6 +4042,7 @@ message PodCondition {
   // Status is the status of the condition.
   // Can be True, False, Unknown.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+  // +required
   optional string status = 2;
 
   // Last time we probed the condition.
@@ -3982,6 +4092,7 @@ message PodDNSConfig {
 message PodDNSConfigOption {
   // Name is this DNS resolver option's name.
   // Required.
+  // +optional
   optional string name = 1;
 
   // Value is this DNS resolver option's value.
@@ -4019,6 +4130,7 @@ message PodExecOptions {
 
   // Command is the remote command to execute. argv array. Not executed within a shell.
   // +listType=atomic
+  // +required
   repeated string command = 6;
 }
 
@@ -4029,10 +4141,12 @@ message PodExtendedResourceClaimStatus {
   // RequestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request
   // in the generated ResourceClaim.
   // +listType=atomic
+  // +required
   repeated ContainerExtendedResourceRequest requestMappings = 1;
 
   // ResourceClaimName is the name of the ResourceClaim that was
   // generated for the Pod in the namespace of the Pod.
+  // +required
   optional string resourceClaimName = 2;
 }
 
@@ -4124,6 +4238,7 @@ message PodOS {
   // Additional value may be defined in future and can be one of:
   // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
   // Clients should expect to handle additional values and treat unrecognized values in this field as os: null
+  // +required
   optional string name = 1;
 }
 
@@ -4151,6 +4266,7 @@ message PodProxyOptions {
 // PodReadinessGate contains the reference to a pod condition
 message PodReadinessGate {
   // ConditionType refers to a condition in the pod's condition list with matching type.
+  // +required
   optional string conditionType = 1;
 }
 
@@ -4163,6 +4279,7 @@ message PodReadinessGate {
 message PodResourceClaim {
   // Name uniquely identifies this resource claim inside the pod.
   // This must be a DNS_LABEL.
+  // +required
   optional string name = 1;
 
   // ResourceClaimName is the name of a ResourceClaim object in the same
@@ -4170,6 +4287,7 @@ message PodResourceClaim {
   //
   // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
   // be set.
+  // +optional
   optional string resourceClaimName = 3;
 
   // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -4187,6 +4305,7 @@ message PodResourceClaim {
   //
   // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
   // be set.
+  // +optional
   optional string resourceClaimTemplateName = 4;
 }
 
@@ -4197,6 +4316,7 @@ message PodResourceClaimStatus {
   // Name uniquely identifies this resource claim inside the pod.
   // This must match the name of an entry in pod.spec.resourceClaims,
   // which implies that the string must be a DNS_LABEL.
+  // +required
   optional string name = 1;
 
   // ResourceClaimName is the name of the ResourceClaim that was
@@ -4212,6 +4332,7 @@ message PodResourceClaimStatus {
 message PodSchedulingGate {
   // Name of the scheduling gate.
   // Each scheduling gate must have a unique name field.
+  // +required
   optional string name = 1;
 }
 
@@ -4389,6 +4510,7 @@ message PodSpec {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
+  // +optional
   repeated Container initContainers = 20;
 
   // List of containers belonging to the pod.
@@ -4399,6 +4521,7 @@ message PodSpec {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
+  // +required
   repeated Container containers = 2;
 
   // List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
@@ -4956,7 +5079,7 @@ message PodTemplate {
 
   // Template defines the pods that will be created from this pod template.
   // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional PodTemplateSpec template = 2;
 }
 
@@ -4980,17 +5103,19 @@ message PodTemplateSpec {
 
   // Specification of the desired behavior of the pod.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional PodSpec spec = 2;
 }
 
 // PortStatus represents the error condition of a service port
 message PortStatus {
   // Port is the port number of the service port of which status is recorded here
+  // +required
   optional int32 port = 1;
 
   // Protocol is the protocol of the service port of which status is recorded here
   // The supported values are: "TCP", "UDP", "SCTP"
+  // +required
   optional string protocol = 2;
 
   // Error is to record the problem with the service port
@@ -5011,11 +5136,13 @@ message PortStatus {
 // PortworxVolumeSource represents a Portworx volume resource.
 message PortworxVolumeSource {
   // volumeID uniquely identifies a Portworx volume
+  // +required
   optional string volumeID = 1;
 
   // fSType represents the filesystem type to mount
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
   optional string fsType = 2;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -5035,6 +5162,7 @@ message Preconditions {
 // Describes a class of pods that should avoid this node.
 message PreferAvoidPodsEntry {
   // The class of pods.
+  // +optional
   optional PodSignature podSignature = 1;
 
   // Time at which this entry was added to the list.
@@ -5054,9 +5182,11 @@ message PreferAvoidPodsEntry {
 // (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
 message PreferredSchedulingTerm {
   // Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
+  // +required
   optional int32 weight = 1;
 
   // A node selector term, associated with the corresponding weight.
+  // +optional
   optional NodeSelectorTerm preference = 2;
 }
 
@@ -5150,9 +5280,11 @@ message QuobyteVolumeSource {
   // registry represents a single or multiple Quobyte Registry services
   // specified as a string as host:port pair (multiple entries are separated with commas)
   // which acts as the central registry for volumes
+  // +required
   optional string registry = 1;
 
   // volume is a string that references an already created Quobyte volume by name.
+  // +required
   optional string volume = 2;
 
   // readOnly here will force the Quobyte volume to be mounted with read-only permissions.
@@ -5182,10 +5314,12 @@ message RBDPersistentVolumeSource {
   // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +listType=atomic
+  // +required
   repeated string monitors = 1;
 
   // image is the rados image name.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+  // +required
   optional string image = 2;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -5237,10 +5371,12 @@ message RBDVolumeSource {
   // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +listType=atomic
+  // +required
   repeated string monitors = 1;
 
   // image is the rados image name.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+  // +required
   optional string image = 2;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -5294,9 +5430,11 @@ message RangeAllocation {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Range is string that identifies the range represented by 'data'.
+  // +required
   optional string range = 2;
 
   // Data is a bit array containing all allocated addresses in the previous segment.
+  // +required
   optional bytes data = 3;
 }
 
@@ -5327,9 +5465,11 @@ message ReplicationController {
 // ReplicationControllerCondition describes the state of a replication controller at a certain point.
 message ReplicationControllerCondition {
   // Type of replication controller condition.
+  // +required
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +required
   optional string status = 2;
 
   // The last time the condition transitioned from one status to another.
@@ -5432,6 +5572,7 @@ message ResourceClaim {
   // Name must match the name of one entry in pod.spec.resourceClaims of
   // the Pod where this field is used. It makes that resource available
   // inside a container.
+  // +required
   optional string name = 1;
 
   // Request is the name chosen for a request in the referenced claim.
@@ -5450,6 +5591,7 @@ message ResourceFieldSelector {
   optional string containerName = 1;
 
   // Required: resource to select
+  // +required
   optional string resource = 2;
 
   // Specifies the output format of the exposed resources, defaults to "1"
@@ -5461,6 +5603,7 @@ message ResourceFieldSelector {
 // This is a part of KEP https://kep.k8s.io/4680.
 message ResourceHealth {
   // ResourceID is the unique identifier of the resource. See the ResourceID type for more information.
+  // +required
   optional string resourceID = 1;
 
   // Health of the resource.
@@ -5473,6 +5616,7 @@ message ResourceHealth {
   //             For example, Device Plugin got unregistered and hasn't been re-registered since.
   //
   // In future we may want to introduce the PermanentlyUnhealthy Status.
+  // +optional
   optional string health = 2;
 }
 
@@ -5581,6 +5725,7 @@ message ResourceStatus {
   // See ResourceID type definition for a specific format it has in various use cases.
   // +listType=map
   // +listMapKey=resourceID
+  // +optional
   repeated ResourceHealth resources = 2;
 }
 
@@ -5606,13 +5751,16 @@ message SELinuxOptions {
 // ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume
 message ScaleIOPersistentVolumeSource {
   // gateway is the host address of the ScaleIO API Gateway.
+  // +required
   optional string gateway = 1;
 
   // system is the name of the storage system as configured in ScaleIO.
+  // +required
   optional string system = 2;
 
   // secretRef references to the secret for ScaleIO user and other
   // sensitive information. If this is not provided, Login operation will fail.
+  // +required
   optional SecretReference secretRef = 3;
 
   // sslEnabled is the flag to enable/disable SSL communication with Gateway, default false
@@ -5635,6 +5783,7 @@ message ScaleIOPersistentVolumeSource {
 
   // volumeName is the name of a volume already created in the ScaleIO system
   // that is associated with this volume source.
+  // +optional
   optional string volumeName = 8;
 
   // fsType is the filesystem type to mount.
@@ -5654,13 +5803,16 @@ message ScaleIOPersistentVolumeSource {
 // ScaleIOVolumeSource represents a persistent ScaleIO volume
 message ScaleIOVolumeSource {
   // gateway is the host address of the ScaleIO API Gateway.
+  // +required
   optional string gateway = 1;
 
   // system is the name of the storage system as configured in ScaleIO.
+  // +required
   optional string system = 2;
 
   // secretRef references to the secret for ScaleIO user and other
   // sensitive information. If this is not provided, Login operation will fail.
+  // +required
   optional LocalObjectReference secretRef = 3;
 
   // sslEnabled Flag enable/disable SSL communication with Gateway, default false
@@ -5683,6 +5835,7 @@ message ScaleIOVolumeSource {
 
   // volumeName is the name of a volume already created in the ScaleIO system
   // that is associated with this volume source.
+  // +optional
   optional string volumeName = 8;
 
   // fsType is the filesystem type to mount.
@@ -5713,10 +5866,12 @@ message ScopeSelector {
 // that relates the scope name and values.
 message ScopedResourceSelectorRequirement {
   // The name of the scope that the selector applies to.
+  // +required
   optional string scopeName = 1;
 
   // Represents a scope's relationship to a set of values.
   // Valid operators are In, NotIn, Exists, DoesNotExist.
+  // +required
   optional string operator = 2;
 
   // An array of string values. If the operator is In or NotIn,
@@ -5739,6 +5894,7 @@ message SeccompProfile {
   // RuntimeDefault - the container runtime default profile should be used.
   // Unconfined - no profile should be applied.
   // +unionDiscriminator
+  // +required
   optional string type = 1;
 
   // localhostProfile indicates a profile defined in a file on the node should be used.
@@ -5806,6 +5962,7 @@ message SecretKeySelector {
   optional LocalObjectReference localObjectReference = 1;
 
   // The key of the secret to select from.  Must be a valid secret key.
+  // +required
   optional string key = 2;
 
   // Specify whether the Secret or its key must be defined
@@ -6097,6 +6254,7 @@ message ServiceAccountTokenProjection {
 
   // path is the path relative to the mount point of the file to project the
   // token into.
+  // +required
   optional string path = 3;
 }
 
@@ -6146,6 +6304,7 @@ message ServicePort {
   optional string appProtocol = 6;
 
   // The port that will be exposed by this service.
+  // +required
   optional int32 port = 3;
 
   // Number or name of the port to access on the pods targeted by the service.
@@ -6192,6 +6351,7 @@ message ServiceSpec {
   // +listType=map
   // +listMapKey=port
   // +listMapKey=protocol
+  // +optional
   repeated ServicePort ports = 1;
 
   // Route service traffic to pods with label keys and values matching this
@@ -6453,6 +6613,7 @@ message SessionAffinityConfig {
 // SleepAction describes a "sleep" action.
 message SleepAction {
   // Seconds is the number of seconds to sleep.
+  // +required
   optional int64 seconds = 1;
 }
 
@@ -6460,6 +6621,7 @@ message SleepAction {
 message StorageOSPersistentVolumeSource {
   // volumeName is the human-readable name of the StorageOS volume.  Volume
   // names are only unique within a namespace.
+  // +optional
   optional string volumeName = 1;
 
   // volumeNamespace specifies the scope of the volume within StorageOS.  If no
@@ -6492,6 +6654,7 @@ message StorageOSPersistentVolumeSource {
 message StorageOSVolumeSource {
   // volumeName is the human-readable name of the StorageOS volume.  Volume
   // names are only unique within a namespace.
+  // +optional
   optional string volumeName = 1;
 
   // volumeNamespace specifies the scope of the volume within StorageOS.  If no
@@ -6523,9 +6686,11 @@ message StorageOSVolumeSource {
 // Sysctl defines a kernel parameter to be set
 message Sysctl {
   // Name of a property to set
+  // +required
   optional string name = 1;
 
   // Value of a property to set
+  // +required
   optional string value = 2;
 }
 
@@ -6534,6 +6699,7 @@ message TCPSocketAction {
   // Number or name of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
+  // +required
   optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
 
   // Optional: Host name to connect to, defaults to the pod IP.
@@ -6545,6 +6711,7 @@ message TCPSocketAction {
 // any pod that does not tolerate the Taint.
 message Taint {
   // Required. The taint key to be applied to a node.
+  // +required
   optional string key = 1;
 
   // The taint value corresponding to the taint key.
@@ -6554,6 +6721,7 @@ message Taint {
   // Required. The effect of the taint on pods
   // that do not tolerate the taint.
   // Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
+  // +required
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
@@ -6599,11 +6767,13 @@ message Toleration {
 // This is an alpha feature and may change in the future.
 message TopologySelectorLabelRequirement {
   // The label key that the selector applies to.
+  // +required
   optional string key = 1;
 
   // An array of string values. One value must match the label to be selected.
   // Each entry in Values is ORed.
   // +listType=atomic
+  // +required
   repeated string values = 2;
 }
 
@@ -6642,6 +6812,7 @@ message TopologySpreadConstraint {
   // When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence
   // to topologies that satisfy it.
   // It's a required field. Default value is 1 and 0 is not allowed.
+  // +required
   optional int32 maxSkew = 1;
 
   // TopologyKey is the key of node labels. Nodes that have a label with this key
@@ -6654,6 +6825,7 @@ message TopologySpreadConstraint {
   // e.g. If TopologyKey is "kubernetes.io/hostname", each Node is a domain of that topology.
   // And, if TopologyKey is "topology.kubernetes.io/zone", each zone is a domain of that topology.
   // It's a required field.
+  // +required
   optional string topologyKey = 2;
 
   // WhenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
@@ -6677,6 +6849,7 @@ message TopologySpreadConstraint {
   // MaxSkew(1). In other words, the cluster can still be imbalanced, but scheduler
   // won't make it *more* imbalanced.
   // It's a required field.
+  // +required
   optional string whenUnsatisfiable = 3;
 
   // LabelSelector is used to find matching pods.
@@ -6769,9 +6942,11 @@ message TypedLocalObjectReference {
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced
+  // +required
   optional string kind = 2;
 
   // Name is the name of resource being referenced
+  // +required
   optional string name = 3;
 }
 
@@ -6784,9 +6959,11 @@ message TypedObjectReference {
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced
+  // +optional
   optional string kind = 2;
 
   // Name is the name of resource being referenced
+  // +optional
   optional string name = 3;
 
   // Namespace is the namespace of resource being referenced
@@ -6802,6 +6979,7 @@ message Volume {
   // name of the volume.
   // Must be a DNS_LABEL and unique within the pod.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // +required
   optional string name = 1;
 
   // volumeSource represents the location and type of the mounted volume.
@@ -6813,15 +6991,18 @@ message Volume {
 // volumeDevice describes a mapping of a raw block device within a container.
 message VolumeDevice {
   // name must match the name of a persistentVolumeClaim in the pod
+  // +required
   optional string name = 1;
 
   // devicePath is the path inside of the container that the device will be mapped to.
+  // +required
   optional string devicePath = 2;
 }
 
 // VolumeMount describes a mounting of a Volume within a container.
 message VolumeMount {
   // This must match the Name of a Volume.
+  // +required
   optional string name = 1;
 
   // Mounted read-only if true, read-write otherwise (false or unspecified).
@@ -6850,6 +7031,7 @@ message VolumeMount {
 
   // Path within the container at which the volume should be mounted.  Must
   // not contain ':'.
+  // +required
   optional string mountPath = 3;
 
   // Path within the volume from which the container's volume should be mounted.
@@ -6877,9 +7059,11 @@ message VolumeMount {
 // VolumeMountStatus shows status of volume mounts.
 message VolumeMountStatus {
   // Name corresponds to the name of the original VolumeMount.
+  // +required
   optional string name = 1;
 
   // MountPath corresponds to the original VolumeMount.
+  // +required
   optional string mountPath = 2;
 
   // ReadOnly corresponds to the original VolumeMount.
@@ -6901,6 +7085,7 @@ message VolumeMountStatus {
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 message VolumeNodeAffinity {
   // required specifies hard node constraints that must be met.
+  // +optional
   optional NodeSelector required = 1;
 }
 
@@ -7130,9 +7315,11 @@ message VolumeSource {
 
   // photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
   // Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
+  // +optional
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
 
   // projected items for all in one resources secrets, configmaps, and downward API
+  // +optional
   optional ProjectedVolumeSource projected = 26;
 
   // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
@@ -7214,6 +7401,7 @@ message VolumeStatus {
 // Represents a vSphere volume resource.
 message VsphereVirtualDiskVolumeSource {
   // volumePath is the path that identifies vSphere volume vmdk
+  // +required
   optional string volumePath = 1;
 
   // fsType is filesystem type to mount.
@@ -7235,9 +7423,11 @@ message VsphereVirtualDiskVolumeSource {
 message WeightedPodAffinityTerm {
   // weight associated with matching the corresponding podAffinityTerm,
   // in the range 1-100.
+  // +required
   optional int32 weight = 1;
 
   // Required. A pod affinity term, associated with the corresponding weight.
+  // +required
   optional PodAffinityTerm podAffinityTerm = 2;
 }
 

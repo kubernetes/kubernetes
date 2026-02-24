@@ -729,11 +729,6 @@ func (r *Reflector) list(ctx context.Context) error {
 			// the reflector makes forward progress.
 			list, paginatedResult, err = pager.ListWithAlloc(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
 		}
-		if err == nil {
-			if unsupportedList, unsupportedListGVK := isUnsupportedTableListObject(list); unsupportedList {
-				err = fmt.Errorf("unsupported list gvk: %v, type: %v", unsupportedListGVK, r.typeDescription)
-			}
-		}
 		close(listCh)
 	}()
 	select {
@@ -743,7 +738,6 @@ func (r *Reflector) list(ctx context.Context) error {
 		panic(r)
 	case <-listCh:
 	}
-
 	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
 	if err != nil {
 		return fmt.Errorf("failed to list %v: %w", r.typeDescription, err)
@@ -1024,11 +1018,14 @@ loop:
 					continue
 				}
 			}
-			// we don't support receiving resources in Table format
+			// For now, let’s block unsupported Table
+			// resources for watchlist only
 			// see #132926 for more info
-			if unsupportedGVK := isUnsupportedTableObject(event.Object); unsupportedGVK {
-				utilruntime.HandleErrorWithContext(ctx, nil, "Unsupported watch event object gvk", "reflector", name, "actualGVK", event.Object.GetObjectKind().GroupVersionKind())
-				continue
+			if exitOnWatchListBookmarkReceived {
+				if unsupportedGVK := isUnsupportedTableObject(event.Object); unsupportedGVK {
+					utilruntime.HandleErrorWithContext(ctx, nil, "Unsupported watch event object gvk", "reflector", name, "actualGVK", event.Object.GetObjectKind().GroupVersionKind())
+					continue
+				}
 			}
 			meta, err := meta.Accessor(event.Object)
 			if err != nil {
@@ -1323,13 +1320,4 @@ func isUnsupportedTableObject(rawObject runtime.Object) bool {
 	}
 
 	return unsupportedTableGVK[rawObject.GetObjectKind().GroupVersionKind()]
-}
-
-func isUnsupportedTableListObject(rawObject runtime.Object) (bool, schema.GroupVersionKind) {
-	unstructuredObj, ok := rawObject.(*unstructured.UnstructuredList)
-	if !ok {
-		return false, schema.GroupVersionKind{}
-	}
-
-	return unsupportedTableGVK[unstructuredObj.GetObjectKind().GroupVersionKind()], unstructuredObj.GetObjectKind().GroupVersionKind()
 }

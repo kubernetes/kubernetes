@@ -999,24 +999,6 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			expectBound:  sets.New[string](),
 			expectFailed: sets.New("p1", "p2", "p3"),
 		},
-		{
-			name: "All pods unschedulable with nil nominatingInfo",
-			algorithmResult: podGroupAlgorithmResult{
-				status: podGroupUnschedulable,
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: nil},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: nil},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: nil},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}},
-			},
-			expectBound:  sets.New[string](),
-			expectFailed: sets.New("p1", "p2", "p3"),
-		},
 	}
 
 	for _, tt := range tests {
@@ -1076,7 +1058,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 					lock.Lock()
-					if ni != nil && ni.NominatedNodeName != "" {
+					if ni.NominatedNodeName != "" {
 						preemptingPods.Insert(p.Pod.Name)
 					} else {
 						failedPods.Insert(p.Pod.Name)

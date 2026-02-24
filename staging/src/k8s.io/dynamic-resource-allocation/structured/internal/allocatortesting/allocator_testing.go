@@ -6038,7 +6038,7 @@ func TestAllocator(t *testing.T,
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 65,
+				internal.Incubating: 65,
 			},
 		},
 		"check-combinations-within-single-request-single-pool-multiple-slices": {
@@ -6060,7 +6060,7 @@ func TestAllocator(t *testing.T,
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 65,
+				internal.Incubating: 65,
 			},
 		},
 		"check-combinations-within-single-request-multiple-pools-multiple-slices": {
@@ -6084,7 +6084,7 @@ func TestAllocator(t *testing.T,
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 65,
+				internal.Incubating: 65,
 			},
 		},
 		"check-combinations-within-single-request-many-pools": {
@@ -6110,7 +6110,7 @@ func TestAllocator(t *testing.T,
 			expectResults:                   nil,
 			expectNumAllocateOneInvocations: 16,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 65,
+				internal.Incubating: 65,
 			},
 		},
 		"check-combinations-with-backtracking": {
@@ -6154,7 +6154,7 @@ func TestAllocator(t *testing.T,
 			)},
 			expectNumAllocateOneInvocations: 12,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 14,
+				internal.Incubating: 14,
 			},
 		},
 		"check-combinations-with-backtracking-across-slices-and-pools": {
@@ -6209,7 +6209,7 @@ func TestAllocator(t *testing.T,
 			)},
 			expectNumAllocateOneInvocations: 12,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 14,
+				internal.Incubating: 14,
 			},
 		},
 		"check-combinations-with-prioritized-list": {
@@ -6266,7 +6266,7 @@ func TestAllocator(t *testing.T,
 			)},
 			expectNumAllocateOneInvocations: 26,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
-				internal.Stable: 32,
+				internal.Incubating: 32,
 			},
 		},
 	}

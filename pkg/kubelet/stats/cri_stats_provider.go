@@ -1195,11 +1195,6 @@ func (p *criStatsProvider) addCadvisorContainerCPUAndMemoryStats(
 	if memory != nil {
 		cs.Memory = memory
 	}
-
-	swap := cadvisorInfoToSwapStats(caPodStats)
-	if swap != nil {
-		cs.Swap = swap
-	}
 }
 
 func getCRICadvisorStats(logger klog.Logger, infos map[string]cadvisorapiv2.ContainerInfo) (map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo) {

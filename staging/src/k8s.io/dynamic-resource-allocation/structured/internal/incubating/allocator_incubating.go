@@ -145,7 +145,7 @@ func NewAllocator(ctx context.Context,
 }
 
 func (a *Allocator) Channel() internal.AllocatorChannel {
-	return internal.Incubating
+	return internal.Experimental
 }
 
 func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {

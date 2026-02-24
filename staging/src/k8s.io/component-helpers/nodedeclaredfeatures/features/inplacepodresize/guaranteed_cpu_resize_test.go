@@ -19,6 +19,7 @@ package inplacepodresize
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,25 +64,21 @@ func TestGuaranteedQoSPodCPUResizeFeature_Discover(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockFG := test.NewMockFeatureGate(t)
-			mockFG.SetEnabled(IPPRExclusiveCPUsFeatureGate, tc.gateEnabled)
+			mockFG.EXPECT().Enabled(IPPRExclusiveCPUsFeatureGate).Return(tc.gateEnabled)
 
 			config := &nodedeclaredfeatures.NodeConfiguration{
 				FeatureGates: mockFG,
 				StaticConfig: nodedeclaredfeatures.StaticConfiguration{CPUManagerPolicy: tc.cpuManagerPolicy},
 			}
 			enabled := feature.Discover(config)
-			if tc.expected != enabled {
-				t.Fatalf("expected %v, got %v", tc.expected, enabled)
-			}
+			assert.Equal(t, tc.expected, enabled)
 		})
 	}
 }
 
 func TestGuaranteedQoSPodCPUResizeFeature_InferForScheduling(t *testing.T) {
 	feature := &guaranteedQoSPodCPUResizeFeature{}
-	if feature.InferForScheduling(&nodedeclaredfeatures.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}}) {
-		t.Fatalf("InferForScheduling should always be false")
-	}
+	assert.False(t, feature.InferForScheduling(&nodedeclaredfeatures.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}}), "InferForScheduling should always be false")
 }
 
 func TestGuaranteedQoSPodCPUResizeFeature_InferFromUpdate(t *testing.T) {
@@ -150,9 +147,7 @@ func TestGuaranteedQoSPodCPUResizeFeature_InferFromUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			oldPodInfo := &nodedeclaredfeatures.PodInfo{Spec: &tc.oldPod.Spec, Status: &tc.oldPod.Status}
 			newPodInfo := &nodedeclaredfeatures.PodInfo{Spec: &tc.newPod.Spec, Status: &tc.newPod.Status}
-			if want, got := tc.expected, feature.InferForUpdate(oldPodInfo, newPodInfo); want != got {
-				t.Fatalf("want=%v,got=%v", want, got)
-			}
+			assert.Equal(t, tc.expected, feature.InferForUpdate(oldPodInfo, newPodInfo))
 		})
 	}
 }

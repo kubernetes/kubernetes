@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
@@ -84,12 +85,13 @@ func TestAdmission(t *testing.T) {
 
 	createMockFeature := func(t *testing.T, name string, inferForUpdate bool, maxVersionStr string) *ndftesting.MockFeature {
 		m := ndftesting.NewMockFeature(t)
-		m.SetName(name)
-		m.SetInferForUpdate(func(_, _ *ndf.PodInfo) bool { return inferForUpdate })
+		m.EXPECT().Name().Return(name).Maybe()
+		m.EXPECT().InferForUpdate(mock.Anything, mock.Anything).Return(inferForUpdate).Maybe()
 		if maxVersionStr != "" {
-			m.SetMaxVersion(version.MustParseSemantic(maxVersionStr))
+			minVersion := version.MustParseSemantic(maxVersionStr)
+			m.EXPECT().MaxVersion().Return(minVersion).Maybe()
 		} else {
-			m.SetMaxVersion(nil)
+			m.EXPECT().MaxVersion().Return(nil).Maybe()
 		}
 		return m
 	}

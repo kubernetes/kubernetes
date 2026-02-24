@@ -19,6 +19,7 @@ package inplacepodresize
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
@@ -46,22 +47,18 @@ func TestPodLevelResourcesResizeFeatureDiscover(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockFG := test.NewMockFeatureGate(t)
-			mockFG.SetEnabled(IPPRPodLevelResourcesFeatureGate, tt.featureGate)
+			mockFG.EXPECT().Enabled(IPPRPodLevelResourcesFeatureGate).Return(tt.featureGate)
 
 			cfg := &nodedeclaredfeatures.NodeConfiguration{FeatureGates: mockFG}
 			enabled := PodLevelResourcesResizeFeature.Discover(cfg)
-			if want, got := tt.expected, enabled; want != got {
-				t.Fatalf("want=%v,got=%v", want, got)
-			}
+			assert.Equal(t, tt.expected, enabled)
 		})
 	}
 }
 
 func TestPodLevelResourcesResizeFeatureInferForScheduling(t *testing.T) {
 	podInfo := &nodedeclaredfeatures.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}}
-	if PodLevelResourcesResizeFeature.InferForScheduling(podInfo) {
-		t.Fatalf("InferForScheduling should always be false")
-	}
+	assert.False(t, PodLevelResourcesResizeFeature.InferForScheduling(podInfo), "InferForScheduling should always be false")
 }
 
 func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
@@ -165,9 +162,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if want, got := tt.expected, PodLevelResourcesResizeFeature.InferForUpdate(tt.oldPodInfo, tt.newPodInfo); want != got {
-				t.Fatalf("want=%v,got=%v", want, got)
-			}
+			assert.Equal(t, tt.expected, PodLevelResourcesResizeFeature.InferForUpdate(tt.oldPodInfo, tt.newPodInfo))
 		})
 	}
 }

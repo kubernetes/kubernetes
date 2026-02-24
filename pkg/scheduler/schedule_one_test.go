@@ -940,12 +940,11 @@ func TestSchedulerScheduleOne(t *testing.T) {
 					bp.CancelPod("context cancelled externally")
 				}
 			},
-			asyncAPICallsEnabled:                   ptr.To(false),
 			nominatedNodeNameForExpectationEnabled: ptr.To(true),
 			expectAssumedPod:                       assignedTestPod,
 			expectErrorPod:                         assignedTestPod,
 			expectForgetPod:                        assignedTestPod,
-			expectNominatedNodeName:                "",
+			expectNominatedNodeName:                testNode.Name,
 			expectPodInBackoffQ:                    testPod,
 			expectError:                            fmt.Errorf(`running PreBind plugin "BlockingPreBindPlugin": context cancelled externally`),
 			eventReason:                            "FailedScheduling",
@@ -999,7 +998,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			}(),
 			// Depending on the timing, if asyncAPICallsEnabled, the NNN update might not be sent yet while checking the expectNominatedNodeName.
 			// So, asyncAPICallsEnabled is set to false.
-			// TODO(Argh4k): create a method on APIDispatcher to wait for all API calls to finish to ease testing.
 			asyncAPICallsEnabled:    ptr.To(false),
 			expectNominatedNodeName: "",
 			eventReason:             "FailedScheduling",
@@ -1184,15 +1182,8 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 		<-called
 
-		// TODO(Argh4k): Re-enable this assumption for item.expectError != nil once solution to
-		// https://github.com/kubernetes/kubernetes/issues/137125 is agreed upon and implemented.
-		// Right now, handleSchedulingFailure does not guarantee that all updates
-		// to nominated nodes will be send out as patch calls as its:
-		// - refreshes pod with data from informer cache that can be not up to date
-		// - with async calls enabled the previous update to NNN can still be sitting in async queue
 		mu.Lock()
-		// Cases with expected error are tested below
-		if item.expectError == nil && item.expectNominatedNodeName != updatedNominatedNodeName {
+		if item.expectNominatedNodeName != updatedNominatedNodeName {
 			t.Errorf("Expected nominated node name %q, got %q", item.expectNominatedNodeName, updatedNominatedNodeName)
 		}
 		mu.Unlock()

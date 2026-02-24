@@ -2848,7 +2848,7 @@ func schema_pkg_apis_samplecontroller_v1alpha1_FooList(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"items"},
+				Required: []string{"metadata", "items"},
 			},
 		},
 		Dependencies: []string{
