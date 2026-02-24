@@ -52,6 +52,7 @@ type EndpointSlice struct {
 
 	// endpoints is a list of unique endpoints in this slice. Each slice may
 	// include a maximum of 1000 endpoints.
+	// +optional
 	// +listType=atomic
 	Endpoints []Endpoint `json:"endpoints" protobuf:"bytes,2,rep,name=endpoints"`
 
@@ -96,6 +97,7 @@ type Endpoint struct {
 	Addresses []string `json:"addresses" protobuf:"bytes,1,rep,name=addresses"`
 
 	// conditions contains information about the current status of the endpoint.
+	// +optional
 	Conditions EndpointConditions `json:"conditions,omitempty" protobuf:"bytes,2,opt,name=conditions"`
 
 	// hostname of this endpoint. This field may be used by consumers of
@@ -167,11 +169,13 @@ type EndpointConditions struct {
 type EndpointHints struct {
 	// forZones indicates the zone(s) this endpoint should be consumed by to
 	// enable topology aware routing. May contain a maximum of 8 entries.
+	// +optional
 	// +listType=atomic
 	ForZones []ForZone `json:"forZones,omitempty" protobuf:"bytes,1,name=forZones"`
 
 	// forNodes indicates the node(s) this endpoint should be consumed by when
 	// using topology aware routing. May contain a maximum of 8 entries.
+	// +optional
 	// +listType=atomic
 	ForNodes []ForNode `json:"forNodes,omitempty" protobuf:"bytes,2,name=forNodes"`
 }
@@ -179,12 +183,14 @@ type EndpointHints struct {
 // ForZone provides information about which zones should consume this endpoint.
 type ForZone struct {
 	// name represents the name of the zone.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
 
 // ForNode provides information about which nodes should consume this endpoint.
 type ForNode struct {
 	// name represents the name of the node.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
 
@@ -197,16 +203,19 @@ type EndpointPort struct {
 	// * must consist of lower case alphanumeric characters or '-'.
 	// * must start and end with an alphanumeric character.
 	// Default is empty string.
+	// +optional
 	Name *string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
 
 	// protocol represents the IP protocol for this port.
 	// Must be UDP, TCP, or SCTP.
 	// Default is TCP.
+	// +optional
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,2,name=protocol"`
 
 	// port represents the port number of the endpoint.
 	// If this is not specified, ports are not restricted and must be
 	// interpreted in the context of the specific consumer.
+	// +optional
 	Port *int32 `json:"port,omitempty" protobuf:"bytes,3,opt,name=port"`
 
 	// appProtocol represents the application protocol for this port.

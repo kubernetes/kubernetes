@@ -44,6 +44,7 @@ message Endpoint {
   repeated string addresses = 1;
 
   // conditions contains information about the current status of the endpoint.
+  // +optional
   optional EndpointConditions conditions = 2;
 
   // hostname of this endpoint. This field may be used by consumers of
@@ -115,11 +116,13 @@ message EndpointConditions {
 message EndpointHints {
   // forZones indicates the zone(s) this endpoint should be consumed by to
   // enable topology aware routing. May contain a maximum of 8 entries.
+  // +optional
   // +listType=atomic
   repeated ForZone forZones = 1;
 
   // forNodes indicates the node(s) this endpoint should be consumed by when
   // using topology aware routing. May contain a maximum of 8 entries.
+  // +optional
   // +listType=atomic
   repeated ForNode forNodes = 2;
 }
@@ -133,16 +136,19 @@ message EndpointPort {
   // * must consist of lower case alphanumeric characters or '-'.
   // * must start and end with an alphanumeric character.
   // Default is empty string.
+  // +optional
   optional string name = 1;
 
   // protocol represents the IP protocol for this port.
   // Must be UDP, TCP, or SCTP.
   // Default is TCP.
+  // +optional
   optional string protocol = 2;
 
   // port represents the port number of the endpoint.
   // If this is not specified, ports are not restricted and must be
   // interpreted in the context of the specific consumer.
+  // +optional
   optional int32 port = 3;
 
   // appProtocol represents the application protocol for this port.
@@ -177,6 +183,7 @@ message EndpointSlice {
 
   // endpoints is a list of unique endpoints in this slice. Each slice may
   // include a maximum of 1000 endpoints.
+  // +optional
   // +listType=atomic
   repeated Endpoint endpoints = 2;
 
@@ -203,12 +210,14 @@ message EndpointSliceList {
 // ForNode provides information about which nodes should consume this endpoint.
 message ForNode {
   // name represents the name of the node.
+  // +required
   optional string name = 1;
 }
 
 // ForZone provides information about which zones should consume this endpoint.
 message ForZone {
   // name represents the name of the zone.
+  // +required
   optional string name = 1;
 }
 
