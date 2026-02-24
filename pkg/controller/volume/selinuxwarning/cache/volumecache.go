@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/internal/parse"
 	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/translator"
 )
 
@@ -81,6 +82,8 @@ type podInfo struct {
 	// SELinux seLinuxLabel to be applied to the volume in the Pod.
 	// Either as mount option or recursively by the container runtime.
 	seLinuxLabel string
+	// Pre-parsed SELinux label parts for fast conflict detection.
+	seLinuxParts [4]string
 	// SELinuxChangePolicy of the Pod.
 	changePolicy v1.PodSELinuxChangePolicy
 }
@@ -89,6 +92,7 @@ func newPodInfoListForPod(podKey cache.ObjectName, seLinuxLabel string, changePo
 	return map[cache.ObjectName]podInfo{
 		podKey: {
 			seLinuxLabel: seLinuxLabel,
+			seLinuxParts: parse.ParseSELinuxLabel(seLinuxLabel),
 			changePolicy: changePolicy,
 		},
 	}
@@ -116,6 +120,7 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 	// The volume is already known
 	podInfo := podInfo{
 		seLinuxLabel: label,
+		seLinuxParts: parse.ParseSELinuxLabel(label),
 		changePolicy: changePolicy,
 	}
 	oldPodInfo, found := volume.pods[podKey]
@@ -148,7 +153,7 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 				OtherPropertyValue: string(changePolicy),
 			})
 		}
-		if c.seLinuxTranslator.Conflicts(otherPodInfo.seLinuxLabel, label) {
+		if c.seLinuxTranslator.ConflictsParsed(otherPodInfo.seLinuxParts, podInfo.seLinuxParts) {
 			// Send conflict to both pods
 			conflicts = append(conflicts, Conflict{
 				PropertyName:       "SELinuxLabel",

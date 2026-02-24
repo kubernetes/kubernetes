@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/internal/parse"
 	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/translator"
 )
 
@@ -436,6 +437,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 			}
 			expectedPodInfo := podInfo{
 				seLinuxLabel: tt.podToAdd.label,
+				seLinuxParts: parse.ParseSELinuxLabel(tt.podToAdd.label),
 				changePolicy: tt.podToAdd.changePolicy,
 			}
 			if !reflect.DeepEqual(existingInfo, expectedPodInfo) {
