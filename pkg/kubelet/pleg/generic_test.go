@@ -559,12 +559,8 @@ func TestReinspect(t *testing.T) {
 			ch := pleg.Watch()
 
 			podID := types.UID("test-pod")
-			if tc.alreadyReinspect {
-				pleg.RequestReinspect(podID)
-			}
-
-			if tc.requestReinspect {
-				pleg.RequestReinspect(podID)
+			if tc.alreadyReinspect || tc.requestReinspect {
+				pleg.RequestRelist(podID, true)
 			}
 
 			pod := &kubecontainer.Pod{ID: podID, Name: "name", Namespace: "ns"}

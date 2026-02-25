@@ -3477,6 +3477,6 @@ func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 	}
 }
 
-func (kl *Kubelet) RequestPodReinspect(podUID types.UID) {
-	kl.pleg.RequestReinspect(podUID)
+func (kl *Kubelet) RequestPodRelist(podUID types.UID, reinspect bool) {
+	kl.pleg.RequestRelist(podUID, reinspect)
 }

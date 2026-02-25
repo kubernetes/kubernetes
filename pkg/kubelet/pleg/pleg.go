@@ -66,8 +66,7 @@ type PodLifecycleEventGenerator interface {
 	Start()
 	Watch() chan *PodLifecycleEvent
 	Healthy() (bool, error)
-	// RequestReinspect flags the pod for reinspection on the next Relist iteration.
-	RequestReinspect(podUID types.UID)
+	RequestRelist(podUID types.UID, reinspect bool)
 }
 
 // podLifecycleEventGeneratorHandler contains functions that are useful for different PLEGs

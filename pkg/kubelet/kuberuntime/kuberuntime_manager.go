@@ -970,7 +970,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 	// Always update the pod status once. Even if there was a resize error, the resize may have been
 	// partially actuated.
-	defer m.runtimeHelper.RequestPodReinspect(pod.UID)
+	defer m.runtimeHelper.RequestPodRelist(pod.UID, true)
 
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 		if podResources.Memory == nil {
