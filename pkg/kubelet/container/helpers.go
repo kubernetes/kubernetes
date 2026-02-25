@@ -70,8 +70,8 @@ type RuntimeHelper interface {
 	// UnprepareDynamicResources unprepares resources for a a pod.
 	UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error
 
-	// SetPodWatchCondition flags a pod to be inspected until the condition is met.
-	SetPodWatchCondition(types.UID, string, func(*PodStatus) bool)
+	// RequestPodReinspect flags a pod to be inspected on the next relist.
+	RequestPodReinspect(types.UID)
 
 	// PodCPUAndMemoryStats reads the latest CPU & memory usage stats.
 	PodCPUAndMemoryStats(context.Context, *v1.Pod, *PodStatus) (*statsapi.PodStats, error)
