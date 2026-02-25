@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"sync/atomic"
 	"testing"
 )
 
@@ -236,8 +235,8 @@ func TestWrapBodyForRetryAccumulatesProgressAcrossRetries(t *testing.T) {
 	}
 }
 
-// TestCloseIdempotent verifies that Close() can be called multiple times safely
-// A no-op wrapped body is required as`doRequest` performs a cleanup, so we
+// TestCloseIdempotent verifies that Close() can be called multiple times safely.
+// A no-op wrapped body is required as doRequest performs a cleanup, so we
 // avoid closing the delegating to originalBody and closing it.
 func TestCloseIdempotent(t *testing.T) {
 	originalBody := io.NopCloser(bytes.NewBufferString("test content"))
@@ -298,8 +297,7 @@ func TestLimitedWriterStopsBuffering(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			exceeded := atomic.Bool{}
-			lw := &limitedWriter{buf: &buf, limit: tc.limit, exceeded: &exceeded}
+			lw := &limitedWriter{buf: &buf, limit: tc.limit}
 
 			for _, w := range tc.writes {
 				n, err := lw.Write([]byte(w))
@@ -311,17 +309,21 @@ func TestLimitedWriterStopsBuffering(t *testing.T) {
 				}
 			}
 
-			if exceeded.Load() != tc.wantExceeded {
-				t.Errorf("expected exceeded=%v, got %v", tc.wantExceeded, exceeded.Load())
+			buffered, exceeded := lw.snapshotForRetry(1)
+			if exceeded != nil {
+				if !tc.wantExceeded {
+					t.Errorf("expected exceeded=false, got error: %v", exceeded)
+				} else if !errors.Is(exceeded, errRequestBodyTooLarge) {
+					t.Errorf("expected errRequestBodyTooLarge, got: %v", exceeded)
+				}
+			} else if tc.wantExceeded {
+				t.Errorf("expected exceeded=true, got false")
 			}
 
-			// When exceeded, buffer is nil; otherwise check length
-			if tc.wantExceeded {
-				if lw.buf != nil {
-					t.Errorf("expected buffer to be nil after exceeding limit")
+			if !tc.wantExceeded {
+				if len(buffered) != tc.wantBufLen {
+					t.Errorf("expected buffer length %d, got %d", tc.wantBufLen, len(buffered))
 				}
-			} else if lw.buf.Len() != tc.wantBufLen {
-				t.Errorf("expected buffer length %d, got %d", tc.wantBufLen, lw.buf.Len())
 			}
 		})
 	}

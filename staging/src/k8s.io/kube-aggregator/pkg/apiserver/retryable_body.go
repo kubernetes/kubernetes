@@ -21,7 +21,6 @@ import (
 	"errors"
 	"io"
 	"sync"
-	"sync/atomic"
 )
 
 const (
@@ -59,64 +58,68 @@ func wrapBodyForRetry(originalBody io.ReadCloser, config retryableBodyConfig) (i
 		return nil, nil
 	}
 
-	var buf bytes.Buffer
-	var exceeded atomic.Bool
-	var attempts atomic.Int32
-
-	lw := &limitedWriter{buf: &buf, limit: config.maxRetryBytes, exceeded: &exceeded}
+	lw := &limitedWriter{buf: &bytes.Buffer{}, limit: config.maxRetryBytes}
 
 	wrappedBody := io.NopCloser(io.TeeReader(originalBody, lw))
 
 	getBody := func() (io.ReadCloser, error) {
-		if exceeded.Load() {
-			return nil, errRequestBodyTooLarge
+		buffered, err := lw.snapshotForRetry(config.maxAttempts)
+		if err != nil {
+			return nil, err
 		}
-		if int(attempts.Add(1)) > config.maxAttempts {
-			return nil, errRetryAlreadyAttempted
-		}
-		// Replay currently buffered bytes from the beginning, and keep buffering
-		// any additional bytes consumed from originalBody for subsequent retries.
-		return io.NopCloser(io.MultiReader(bytes.NewReader(lw.bytes()), io.TeeReader(originalBody, lw))), nil
+		return io.NopCloser(io.MultiReader(bytes.NewReader(buffered), io.TeeReader(originalBody, lw))), nil
 	}
 
 	return wrappedBody, getBody
 }
 
-// limitedWriter buffers up to limit bytes; once exceeded it discards further writes.
+// limitedWriter buffers up to limit bytes; once exceeded it discards further
+// writes. All methods are safe for concurrent use.
 type limitedWriter struct {
 	mu       sync.Mutex
 	buf      *bytes.Buffer
 	limit    int
-	exceeded *atomic.Bool
+	exceeded bool
+	attempts int
 }
 
 func (lw *limitedWriter) Write(p []byte) (n int, err error) {
 	lw.mu.Lock()
 	defer lw.mu.Unlock()
 
-	if lw.exceeded.Load() {
+	if lw.exceeded {
 		return len(p), nil
 	}
 
 	if lw.buf.Len()+len(p) > lw.limit {
-		lw.exceeded.Store(true)
+		lw.exceeded = true
 		lw.buf = nil
 		return len(p), nil
 	}
 	return lw.buf.Write(p)
 }
 
-// bytes returns a copy of the buffered data, safe for concurrent use
-func (lw *limitedWriter) bytes() []byte {
+// snapshotForRetry checks the exceeded flag, increments the retry
+// counter, and returns a copy of the buffered data. Combining all three under
+// a single lock eliminates TOCTOU races between concurrent Write and GetBody
+// calls.
+func (lw *limitedWriter) snapshotForRetry(maxAttempts int) ([]byte, error) {
 	lw.mu.Lock()
 	defer lw.mu.Unlock()
-	if lw.buf == nil {
-		return nil
+
+	if lw.exceeded {
+		return nil, errRequestBodyTooLarge
 	}
+
+	lw.attempts++
+	if lw.attempts > maxAttempts {
+		return nil, errRetryAlreadyAttempted
+	}
+
 	// Return a copy so the snapshot is decoupled from lw.buf's backing array,
 	// which grows as TeeReader writes during retries.
 	content := lw.buf.Bytes()
 	contentCopy := make([]byte, len(content))
 	copy(contentCopy, content)
-	return contentCopy
+	return contentCopy, nil
 }
