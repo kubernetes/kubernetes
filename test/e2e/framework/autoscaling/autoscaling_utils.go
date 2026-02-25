@@ -165,8 +165,8 @@ func (cpf *customPortForwarder) ForwardPorts(method string, url *url.URL, opts k
 		return err
 	}
 	cpf.forwarder = forwarder
-	go forwarder.ForwardPorts() //nolint:errcheck
-	return nil
+	// ForwardPorts is expected to block until StopChannel is closed.
+	return forwarder.ForwardPorts()
 }
 
 func (cpf *customPortForwarder) GetPorts() ([]string, error) {
@@ -285,14 +285,55 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 		}
 	}()
 
+	// Wait for port-forward to be ready with timeout
+	const readyTimeout = 20 * time.Second
 	select {
 	case <-readyChan:
+		framework.Logf("port-forward: ready channel signaled")
 	case err := <-errChan:
 		return fmt.Errorf("port-forward failed: %w", err)
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-time.After(readyTimeout):
+		return fmt.Errorf("timeout waiting for port-forward ready")
 	}
 	defer close(stopChan)
+
+	// Verify forwarded ports are reported by custom port-forwarder (poll briefly)
+	var localPort int
+	for i := 0; i < 10; i++ {
+		ports, err := customPF.GetPorts()
+		if err == nil && len(ports) > 0 {
+			// ports format is "local:remote"
+			parts := strings.Split(ports[0], ":")
+			if len(parts) == 2 {
+				if p, err := strconv.Atoi(parts[0]); err == nil && p != 0 {
+					localPort = p
+					break
+				}
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if localPort == 0 {
+		return fmt.Errorf("port-forward ready but no local port reported")
+	}
+	framework.Logf("port-forward: local port %d verified from GetPorts()", localPort)
+
+	// Probe TCP connect to ensure listener is accepting before HTTP client uses it
+	addr := fmt.Sprintf("127.0.0.1:%d", localPort)
+	for i := 0; i < 10; i++ {
+		conn, err := net.DialTimeout("tcp", addr, 500*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			framework.Logf("port-forward: TCP probe to %s successful", addr)
+			break
+		}
+		if i == 9 {
+			return fmt.Errorf("failed to verify port-forward TCP probe to %s: %v", addr, err)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 
 	ports, err := customPF.GetPorts()
 	if err != nil {
