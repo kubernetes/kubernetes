@@ -45,6 +45,7 @@ var (
 type Metrics map[string]Samples
 type Samples = model.Samples
 type Sample = model.Sample
+type Time = model.Time
 type Metric = model.Metric
 type LabelValue = model.LabelValue
 type LabelName = model.LabelName
