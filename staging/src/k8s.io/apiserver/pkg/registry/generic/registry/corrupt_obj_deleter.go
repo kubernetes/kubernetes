@@ -93,8 +93,13 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 		return nil, false, apierrors.NewInvalid(qualifiedKind, name, fieldErrList)
 	}
 
+	if dryrun.IsDryRun(opts.DryRun) {
+		// The object is confirmed corrupt above, simulate successful
+		// force-delete. We return nil because the object can't be decoded.
+		return nil, true, nil
+	}
+
 	// try normal deletion anyway, it is expected to fail
-	// NOTE: handled by classic DRY-RUN
 	obj, deleted, err := d.store.Delete(ctx, name, deleteValidation, opts)
 	if err == nil {
 		return obj, deleted, err
@@ -103,11 +108,6 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 	// conversion to API error drops the inner error chain
 	if !strings.Contains(err.Error(), "corrupt object") {
 		return obj, deleted, err
-	}
-
-	if dryrun.IsDryRun(opts.DryRun) {
-		// NOTE: in line with the return on success.
-		return nil, true, nil
 	}
 
 	// TODO: at this instant, some actor may have a) managed to recreate this
