@@ -120,10 +120,7 @@ func (f *Framework) MatchNode(requiredFeatures FeatureSet, node *v1.Node) (*Matc
 	if node == nil {
 		return nil, fmt.Errorf("node cannot be nil")
 	}
-	fs, err := f.MapSorted(node.Status.DeclaredFeatures)
-	if err != nil {
-		return nil, err
-	}
+	fs := f.TryMap(node.Status.DeclaredFeatures)
 	return f.MatchNodeFeatureSet(requiredFeatures, fs)
 }
 
@@ -135,13 +132,17 @@ func (f *Framework) MatchNodeFeatureSet(requiredFeatures FeatureSet, nodeFeature
 	if requiredFeatures.IsEmpty() {
 		return &MatchResult{IsMatch: true}, nil // No requirements to match.
 	}
-	diff, err := requiredFeatures.Difference(nodeFeatures)
+	// Perform an explicit IsSubset check first to optimize for the success path,
+	// since IsSubset is faster than Difference (no allocations).
+	isMatch, err := requiredFeatures.IsSubset(nodeFeatures)
 	if err != nil {
 		return nil, err
 	}
-	if diff.IsEmpty() {
+	if isMatch {
 		return &MatchResult{IsMatch: true}, nil
 	}
+
+	diff, _ := requiredFeatures.Difference(nodeFeatures) // Difference will error IFF IsSubset also does, so we can ignore the error here.
 	unsatisfiedRequirements := f.Unmap(diff)
 	return &MatchResult{IsMatch: false, UnsatisfiedRequirements: unsatisfiedRequirements}, nil
 }
