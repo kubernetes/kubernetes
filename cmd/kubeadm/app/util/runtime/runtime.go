@@ -83,13 +83,13 @@ func (runtime *CRIRuntime) SetImpl(impl Impl) {
 
 // Connect establishes a connection with the CRI runtime.
 func (runtime *CRIRuntime) Connect() error {
-	runtimeService, err := runtime.impl.NewRemoteRuntimeService(runtime.criSocket, defaultTimeout)
+	runtimeService, err := runtime.impl.NewRemoteRuntimeService(context.Background(), runtime.criSocket, defaultTimeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create new CRI runtime service")
 	}
 	runtime.runtimeService = runtimeService
 
-	imageService, err := runtime.impl.NewRemoteImageService(runtime.criSocket, defaultTimeout)
+	imageService, err := runtime.impl.NewRemoteImageService(context.Background(), runtime.criSocket, defaultTimeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create new CRI image service")
 	}

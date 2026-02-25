@@ -210,7 +210,7 @@ func createStaticPodFromPod(dir string, pod *v1.Pod) (string, error) {
 }
 
 func removeInitContainer(ctx context.Context, ctrID string) {
-	cricli, _, err := getCRIClient()
+	cricli, _, err := getCRIClient(ctx)
 	framework.ExpectNoError(err)
 	splitID := strings.Split(ctrID, "://")
 	gomega.Expect(splitID).To(gomega.HaveLen(2))

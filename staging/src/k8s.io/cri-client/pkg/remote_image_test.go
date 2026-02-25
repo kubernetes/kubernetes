@@ -30,23 +30,20 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-client/pkg/util"
-	"k8s.io/klog/v2"
 )
 
-func createRemoteImageServiceWithTracerProvider(endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.ImageManagerService {
-	logger := klog.Background()
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, tp, &logger)
+func createRemoteImageServiceWithTracerProvider(ctx context.Context, endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.ImageManagerService {
+	imageService, err := NewRemoteImageService(ctx, endpoint, defaultConnectionTimeout, tp)
 	require.NoError(t, err)
 
-	return runtimeService
+	return imageService
 }
 
-func createRemoteImageServiceWithoutTracerProvider(endpoint string, t *testing.T) internalapi.ImageManagerService {
-	logger := klog.Background()
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), &logger)
+func createRemoteImageServiceWithoutTracerProvider(ctx context.Context, endpoint string, t *testing.T) internalapi.ImageManagerService {
+	imageService, err := NewRemoteImageService(ctx, endpoint, defaultConnectionTimeout, noop.NewTracerProvider())
 	require.NoError(t, err)
 
-	return runtimeService
+	return imageService
 }
 
 func TestImageServiceSpansWithTP(t *testing.T) {
@@ -65,7 +62,7 @@ func TestImageServiceSpansWithTP(t *testing.T) {
 		sdktrace.WithBatcher(exp),
 	)
 	ctx := context.Background()
-	imgSvc := createRemoteImageServiceWithTracerProvider(endpoint, tp, t)
+	imgSvc := createRemoteImageServiceWithTracerProvider(ctx, endpoint, tp, t)
 	imgRef, err := imgSvc.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "busybox", imgRef)
@@ -91,7 +88,7 @@ func TestImageServiceSpansWithoutTP(t *testing.T) {
 		sdktrace.WithBatcher(exp),
 	)
 	ctx := context.Background()
-	imgSvc := createRemoteImageServiceWithoutTracerProvider(endpoint, t)
+	imgSvc := createRemoteImageServiceWithoutTracerProvider(ctx, endpoint, t)
 	imgRef, err := imgSvc.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "busybox", imgRef)

@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cri-client/pkg/logs"
-	"k8s.io/klog/v2"
 )
 
 // ReadLogs read the container log and redirect into stdout and stderr.
@@ -32,6 +31,5 @@ import (
 func (m *kubeGenericRuntimeManager) ReadLogs(ctx context.Context, path, containerID string, apiOpts *v1.PodLogOptions, stdout, stderr io.Writer) error {
 	// Convert v1.PodLogOptions into internal log options.
 	opts := logs.NewLogOptions(apiOpts, time.Now())
-	logger := klog.FromContext(ctx)
-	return logs.ReadLogs(ctx, &logger, path, containerID, opts, m.runtimeService, stdout, stderr)
+	return logs.ReadLogs(ctx, path, containerID, opts, m.runtimeService, stdout, stderr)
 }

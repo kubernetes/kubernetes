@@ -155,10 +155,10 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		e2enodeCgroupDriver = oldCfg.CgroupDriver
 		framework.Logf("cgroup driver: %s", e2enodeCgroupDriver)
 
-		runtime, _, err := getCRIClient()
+		runtime, _, err := getCRIClient(ctx)
 		framework.ExpectNoError(err, "Failed to get CRI client")
 
-		version, err := runtime.Version(context.Background(), "")
+		version, err := runtime.Version(ctx, "")
 		framework.ExpectNoError(err, "Failed to get runtime version")
 
 		e2enodeRuntimeName = version.GetRuntimeName()
@@ -2001,10 +2001,10 @@ var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Or
 		e2enodeCgroupDriver = oldCfg.CgroupDriver
 		framework.Logf("cgroup driver: %s", e2enodeCgroupDriver)
 
-		runtime, _, err := getCRIClient()
+		runtime, _, err := getCRIClient(ctx)
 		framework.ExpectNoError(err, "Failed to get CRI client")
 
-		version, err := runtime.Version(context.Background(), "")
+		version, err := runtime.Version(ctx, "")
 		framework.ExpectNoError(err, "Failed to get runtime version")
 
 		e2enodeRuntimeName = version.GetRuntimeName()

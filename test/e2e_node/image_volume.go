@@ -61,11 +61,11 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 	)
 
 	// TODO: remove when containerd 2.2 is available on all node e2e test platforms.
-	requireContainerdVersion := func(givenVersion string) {
-		runtime, _, err := getCRIClient()
+	requireContainerdVersion := func(ctx context.Context, givenVersion string) {
+		runtime, _, err := getCRIClient(ctx)
 		framework.ExpectNoError(err, "Failed to get CRI client")
 
-		resp, err := runtime.Version(context.Background(), "")
+		resp, err := runtime.Version(ctx, "")
 		framework.ExpectNoError(err, "Failed to get runtime version")
 
 		// Other runtimes like CRI-O do not need to enforce any version requirement.
@@ -126,7 +126,7 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 	}
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		requireContainerdVersion("2.1")
+		requireContainerdVersion(ctx, "2.1")
 	})
 
 	f.It("should succeed with pod and pull policy of Always", func(ctx context.Context) {
@@ -303,7 +303,7 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 
 	f.Context("subPath", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			requireContainerdVersion("2.2")
+			requireContainerdVersion(ctx, "2.2")
 		})
 
 		f.It("should succeed when using a valid subPath", func(ctx context.Context) {
