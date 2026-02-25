@@ -59,29 +59,6 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-
-	// PoolsCounted tracks the number of pools counted in status calculations.
-	PoolsCounted = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Subsystem:      Subsystem,
-			Name:           "pools_counted",
-			Help:           "Number of pools counted per ResourcePoolStatusRequest",
-			Buckets:        metrics.ExponentialBuckets(1, 2, 10),
-			StabilityLevel: metrics.ALPHA,
-		},
-	)
-
-	// CacheRebuildDuration tracks the time taken to rebuild caches.
-	CacheRebuildDuration = metrics.NewHistogramVec(
-		&metrics.HistogramOpts{
-			Subsystem:      Subsystem,
-			Name:           "cache_rebuild_duration_seconds",
-			Help:           "Time taken to rebuild internal caches",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"cache_type"},
-	)
 )
 
 var registerOnce sync.Once
@@ -92,7 +69,5 @@ func Register() {
 		legacyregistry.MustRegister(RequestsProcessed)
 		legacyregistry.MustRegister(RequestProcessingErrors)
 		legacyregistry.MustRegister(RequestProcessingDuration)
-		legacyregistry.MustRegister(PoolsCounted)
-		legacyregistry.MustRegister(CacheRebuildDuration)
 	})
 }

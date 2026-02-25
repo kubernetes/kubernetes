@@ -20,10 +20,8 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
 	"time"
 
-	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,27 +81,6 @@ type Controller struct {
 
 	// workqueue is a rate limited work queue for processing ResourcePoolStatusRequests
 	workqueue workqueue.TypedRateLimitingInterface[string]
-
-	// poolDataMu protects poolData and allocationData
-	poolDataMu sync.RWMutex
-
-	// poolData caches aggregated pool data from ResourceSlices
-	// key is "driver/poolName"
-	poolData map[string]*poolInfo
-
-	// allocationData caches allocated device counts by pool
-	// key is "driver/poolName"
-	allocationData map[string]int32
-}
-
-// poolInfo aggregates data for a single pool across all its ResourceSlices
-type poolInfo struct {
-	driver       string
-	poolName     string
-	nodeName     string
-	totalDevices int32
-	sliceCount   int32
-	generation   int64
 }
 
 // NewController creates a new ResourcePoolStatusRequest controller.
@@ -119,16 +96,14 @@ func NewController(
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 
 	c := &Controller{
-		client:         client,
-		requestLister:  requestInformer.Lister(),
-		sliceLister:    sliceInformer.Lister(),
-		claimLister:    claimInformer.Lister(),
-		requestSynced:  requestInformer.Informer().HasSynced,
-		sliceSynced:    sliceInformer.Informer().HasSynced,
-		claimSynced:    claimInformer.Informer().HasSynced,
-		workqueue:      workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
-		poolData:       make(map[string]*poolInfo),
-		allocationData: make(map[string]int32),
+		client:        client,
+		requestLister: requestInformer.Lister(),
+		sliceLister:   sliceInformer.Lister(),
+		claimLister:   claimInformer.Lister(),
+		requestSynced: requestInformer.Informer().HasSynced,
+		sliceSynced:   sliceInformer.Informer().HasSynced,
+		claimSynced:   claimInformer.Informer().HasSynced,
+		workqueue:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 	}
 
 	// Register metrics
@@ -140,54 +115,14 @@ func NewController(
 			c.enqueueRequest(logger, obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
-			// Only re-queue if the spec changed or status is not yet set
-			oldReq := old.(*resourcev1alpha1.ResourcePoolStatusRequest)
 			newReq := new.(*resourcev1alpha1.ResourcePoolStatusRequest)
 			if newReq.Status.ObservationTime == nil {
 				c.enqueueRequest(logger, new)
-			} else if oldReq.ResourceVersion != newReq.ResourceVersion {
-				// Status was already set, but resource version changed
-				// This could be a retry after conflict, re-queue if still incomplete
-				if newReq.Status.ObservationTime == nil {
-					c.enqueueRequest(logger, new)
-				}
 			}
 		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to add request event handler: %w", err)
-	}
-
-	// Set up event handlers for ResourceSlices to rebuild cache
-	_, err = sliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			c.handleSliceChange(logger, obj)
-		},
-		UpdateFunc: func(old, new interface{}) {
-			c.handleSliceChange(logger, new)
-		},
-		DeleteFunc: func(obj interface{}) {
-			c.handleSliceDelete(logger, obj)
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to add slice event handler: %w", err)
-	}
-
-	// Set up event handlers for ResourceClaims to track allocations
-	_, err = claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			c.handleClaimChange(logger)
-		},
-		UpdateFunc: func(old, new interface{}) {
-			c.handleClaimChange(logger)
-		},
-		DeleteFunc: func(obj interface{}) {
-			c.handleClaimChange(logger)
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to add claim event handler: %w", err)
 	}
 
 	logger.Info("ResourcePoolStatusRequest controller initialized")
@@ -208,10 +143,6 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 		logger.Error(nil, "Failed to wait for caches to sync")
 		return
 	}
-
-	// Build initial cache data
-	c.rebuildPoolCache(logger)
-	c.rebuildAllocationCache(logger)
 
 	logger.Info("Starting workers", "count", workers)
 	for range workers {
@@ -286,7 +217,7 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 
 	logger.V(2).Info("Processing ResourcePoolStatusRequest", "request", key, "driver", request.Spec.Driver)
 
-	// Calculate the pool status
+	// Calculate the pool status on-demand from listers
 	status := c.calculatePoolStatus(ctx, request)
 
 	// Update the request status
@@ -304,30 +235,114 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 	return nil
 }
 
-// calculatePoolStatus computes the pool status based on current state.
+// calculatePoolStatus computes the pool status on-demand by reading directly
+// from the shared informer listers. No caches are maintained between requests.
 func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev1alpha1.ResourcePoolStatusRequest) resourcev1alpha1.ResourcePoolStatusRequestStatus {
 	logger := klog.FromContext(ctx)
 
-	c.poolDataMu.RLock()
-	defer c.poolDataMu.RUnlock()
-
-	var pools []resourcev1alpha1.PoolStatus
 	driver := request.Spec.Driver
 	var poolNameFilter string
 	if request.Spec.PoolName != nil {
 		poolNameFilter = *request.Spec.PoolName
 	}
 
-	// Find matching pools
-	for key, info := range c.poolData {
-		if info.driver != driver {
+	// Step 1: Aggregate pool data from ResourceSlices.
+	// Uses two passes: first finds the max generation per pool, then only
+	// counts slices at that generation (older-generation slices are ignored
+	// per KEP-5677).
+	type poolInfo struct {
+		driver       string
+		poolName     string
+		nodeName     string
+		totalDevices int32
+		sliceCount   int32
+		generation   int64
+	}
+
+	slices, err := c.sliceLister.List(labels.Everything())
+	if err != nil {
+		logger.Error(err, "Failed to list ResourceSlices")
+		return errorStatus("Failed to list ResourceSlices: " + err.Error())
+	}
+
+	// Pass 1: Find max generation per pool
+	maxGeneration := make(map[string]int64)
+	for _, slice := range slices {
+		if slice.Spec.Driver != driver {
 			continue
 		}
-		if poolNameFilter != "" && info.poolName != poolNameFilter {
+		slicePoolName := slice.Spec.Pool.Name
+		if poolNameFilter != "" && slicePoolName != poolNameFilter {
+			continue
+		}
+		key := slice.Spec.Driver + "/" + slicePoolName
+		if gen, exists := maxGeneration[key]; !exists || slice.Spec.Pool.Generation > gen {
+			maxGeneration[key] = slice.Spec.Pool.Generation
+		}
+	}
+
+	// Pass 2: Aggregate only slices at max generation
+	poolData := make(map[string]*poolInfo)
+	for _, slice := range slices {
+		if slice.Spec.Driver != driver {
+			continue
+		}
+		slicePoolName := slice.Spec.Pool.Name
+		if poolNameFilter != "" && slicePoolName != poolNameFilter {
 			continue
 		}
 
-		allocatedDevices := c.allocationData[key]
+		key := slice.Spec.Driver + "/" + slicePoolName
+
+		// Skip slices from older generations
+		if slice.Spec.Pool.Generation < maxGeneration[key] {
+			continue
+		}
+
+		deviceCount := int32(len(slice.Spec.Devices))
+		info, exists := poolData[key]
+		if !exists {
+			var nodeName string
+			if slice.Spec.NodeName != nil {
+				nodeName = *slice.Spec.NodeName
+			}
+			poolData[key] = &poolInfo{
+				driver:       slice.Spec.Driver,
+				poolName:     slicePoolName,
+				nodeName:     nodeName,
+				totalDevices: deviceCount,
+				sliceCount:   1,
+				generation:   maxGeneration[key],
+			}
+		} else {
+			info.totalDevices += deviceCount
+			info.sliceCount++
+		}
+	}
+
+	// Step 2: Count allocations from ResourceClaims
+	allocationData := make(map[string]int32)
+
+	claims, err := c.claimLister.List(labels.Everything())
+	if err != nil {
+		logger.Error(err, "Failed to list ResourceClaims")
+		return errorStatus("Failed to list ResourceClaims: " + err.Error())
+	}
+
+	for _, claim := range claims {
+		if claim.Status.Allocation == nil {
+			continue
+		}
+		for _, result := range claim.Status.Allocation.Devices.Results {
+			key := result.Driver + "/" + result.Pool
+			allocationData[key]++
+		}
+	}
+
+	// Step 3: Build pool status list
+	var pools []resourcev1alpha1.PoolStatus
+	for key, info := range poolData {
+		allocatedDevices := allocationData[key]
 		availableDevices := max(0, info.totalDevices-allocatedDevices)
 
 		totalDevices := info.totalDevices
@@ -382,7 +397,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				Type:               resourcev1alpha1.ResourcePoolStatusRequestConditionComplete,
 				Status:             metav1.ConditionTrue,
 				LastTransitionTime: now,
-				Reason:             "Calculated",
+				Reason:             "CalculationComplete",
 				Message:            fmt.Sprintf("Successfully calculated status for %d pools", len(pools)),
 			},
 		},
@@ -395,6 +410,23 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		"truncation", truncation)
 
 	return status
+}
+
+// errorStatus returns a status indicating a processing failure.
+func errorStatus(message string) resourcev1alpha1.ResourcePoolStatusRequestStatus {
+	now := metav1.Now()
+	return resourcev1alpha1.ResourcePoolStatusRequestStatus{
+		ObservationTime: &now,
+		Conditions: []metav1.Condition{
+			{
+				Type:               resourcev1alpha1.ResourcePoolStatusRequestConditionFailed,
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: now,
+				Reason:             "CalculationFailed",
+				Message:            message,
+			},
+		},
+	}
 }
 
 // enqueueRequest adds a request to the workqueue.
@@ -411,135 +443,6 @@ func (c *Controller) enqueueRequest(logger klog.Logger, obj interface{}) {
 	}
 
 	c.workqueue.Add(request.Name)
-}
-
-// handleSliceChange updates the pool cache when a ResourceSlice changes.
-func (c *Controller) handleSliceChange(logger klog.Logger, obj interface{}) {
-	slice, ok := obj.(*resourcev1.ResourceSlice)
-	if !ok {
-		logger.Error(nil, "Failed to cast object to ResourceSlice")
-		return
-	}
-
-	c.updatePoolData(slice)
-}
-
-// handleSliceDelete handles ResourceSlice deletion.
-func (c *Controller) handleSliceDelete(logger klog.Logger, obj interface{}) {
-	// On delete, rebuild the entire cache to be safe
-	c.rebuildPoolCache(logger)
-}
-
-// handleClaimChange rebuilds the allocation cache when claims change.
-func (c *Controller) handleClaimChange(logger klog.Logger) {
-	c.rebuildAllocationCache(logger)
-}
-
-// updatePoolData updates the pool cache for a single slice.
-func (c *Controller) updatePoolData(slice *resourcev1.ResourceSlice) {
-	driver := slice.Spec.Driver
-	poolName := slice.Spec.Pool.Name
-	key := driver + "/" + poolName
-
-	c.poolDataMu.Lock()
-	defer c.poolDataMu.Unlock()
-
-	// Count devices in this slice
-	deviceCount := int32(len(slice.Spec.Devices))
-
-	info, exists := c.poolData[key]
-	if !exists {
-		var nodeName string
-		if slice.Spec.NodeName != nil {
-			nodeName = *slice.Spec.NodeName
-		}
-		c.poolData[key] = &poolInfo{
-			driver:       driver,
-			poolName:     poolName,
-			nodeName:     nodeName,
-			totalDevices: deviceCount,
-			sliceCount:   1,
-			generation:   slice.Spec.Pool.Generation,
-		}
-	} else if slice.Spec.Pool.Generation > info.generation {
-		// Update existing pool info generation if newer
-		info.generation = slice.Spec.Pool.Generation
-	}
-}
-
-// rebuildPoolCache rebuilds the entire pool cache from scratch.
-func (c *Controller) rebuildPoolCache(logger klog.Logger) {
-	slices, err := c.sliceLister.List(labels.Everything())
-	if err != nil {
-		logger.Error(err, "Failed to list ResourceSlices for cache rebuild")
-		return
-	}
-
-	newPoolData := make(map[string]*poolInfo)
-
-	for _, slice := range slices {
-		driver := slice.Spec.Driver
-		poolName := slice.Spec.Pool.Name
-		key := driver + "/" + poolName
-
-		deviceCount := int32(len(slice.Spec.Devices))
-
-		info, exists := newPoolData[key]
-		if !exists {
-			var nodeName string
-			if slice.Spec.NodeName != nil {
-				nodeName = *slice.Spec.NodeName
-			}
-			newPoolData[key] = &poolInfo{
-				driver:       driver,
-				poolName:     poolName,
-				nodeName:     nodeName,
-				totalDevices: deviceCount,
-				sliceCount:   1,
-				generation:   slice.Spec.Pool.Generation,
-			}
-		} else {
-			info.totalDevices += deviceCount
-			info.sliceCount++
-			if slice.Spec.Pool.Generation > info.generation {
-				info.generation = slice.Spec.Pool.Generation
-			}
-		}
-	}
-
-	c.poolDataMu.Lock()
-	c.poolData = newPoolData
-	c.poolDataMu.Unlock()
-
-	logger.V(4).Info("Rebuilt pool cache", "poolCount", len(newPoolData))
-}
-
-// rebuildAllocationCache rebuilds the allocation counts from ResourceClaims.
-func (c *Controller) rebuildAllocationCache(logger klog.Logger) {
-	claims, err := c.claimLister.List(labels.Everything())
-	if err != nil {
-		logger.Error(err, "Failed to list ResourceClaims for allocation cache rebuild")
-		return
-	}
-
-	newAllocationData := make(map[string]int32)
-
-	for _, claim := range claims {
-		if claim.Status.Allocation == nil {
-			continue
-		}
-
-		for _, result := range claim.Status.Allocation.Devices.Results {
-			key := result.Driver + "/" + result.Pool
-			newAllocationData[key]++
-		}
-	}
-
-	c.poolDataMu.Lock()
-	c.allocationData = newAllocationData
-	c.poolDataMu.Unlock()
-
-	logger.V(4).Info("Rebuilt allocation cache", "allocationCount", len(newAllocationData))
 }
 
 // cleanupExpiredRequests deletes ResourcePoolStatusRequests that have exceeded their TTL.

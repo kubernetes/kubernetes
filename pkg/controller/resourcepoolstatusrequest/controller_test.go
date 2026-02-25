@@ -24,7 +24,6 @@ import (
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
@@ -179,6 +178,26 @@ func TestCalculatePoolStatus(t *testing.T) {
 			expectedTotal: 0,
 			expectedAlloc: 0,
 		},
+		{
+			name: "older-generation-slices-ignored",
+			request: &resourcev1alpha1.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-request"},
+				Spec: resourcev1alpha1.ResourcePoolStatusRequestSpec{
+					Driver: "test.example.com",
+				},
+			},
+			slices: []*resourcev1.ResourceSlice{
+				// Old generation slice (should be ignored)
+				makeSliceWithGeneration("slice-old", "test.example.com", "pool-1", "node-1", 8, 1),
+				// New generation slices (should be counted)
+				makeSliceWithGeneration("slice-new-1", "test.example.com", "pool-1", "node-1", 4, 2),
+				makeSliceWithGeneration("slice-new-2", "test.example.com", "pool-1", "node-1", 4, 2),
+			},
+			claims:        []*resourcev1.ResourceClaim{},
+			expectedPools: 1,
+			expectedTotal: 8, // 4+4 from gen 2 only, not 8 from gen 1
+			expectedAlloc: 0,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -195,7 +214,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 				t.Fatalf("Failed to create controller: %v", err)
 			}
 
-			// Add slices to the cache
+			// Add slices to the informer store
 			for _, slice := range tc.slices {
 				err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(slice)
 				if err != nil {
@@ -203,7 +222,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 				}
 			}
 
-			// Add claims to the cache
+			// Add claims to the informer store
 			for _, claim := range tc.claims {
 				err := informerFactory.Resource().V1().ResourceClaims().Informer().GetStore().Add(claim)
 				if err != nil {
@@ -211,11 +230,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 				}
 			}
 
-			// Rebuild caches
-			controller.rebuildPoolCache(ktesting.NewLogger(t, ktesting.NewConfig()))
-			controller.rebuildAllocationCache(ktesting.NewLogger(t, ktesting.NewConfig()))
-
-			// Calculate pool status
+			// Calculate pool status (reads directly from listers)
 			status := controller.calculatePoolStatus(ctx, tc.request)
 
 			// Verify results
@@ -286,10 +301,6 @@ func TestSyncRequest(t *testing.T) {
 		t.Fatalf("Failed to add slice to informer: %v", err)
 	}
 
-	// Rebuild caches
-	controller.rebuildPoolCache(ktesting.NewLogger(t, ktesting.NewConfig()))
-	controller.rebuildAllocationCache(ktesting.NewLogger(t, ktesting.NewConfig()))
-
 	// Sync the request
 	err = controller.syncRequest(ctx, "test-request")
 	if err != nil {
@@ -353,104 +364,13 @@ func TestSkipProcessedRequest(t *testing.T) {
 	}
 }
 
-func TestRebuildPoolCache(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-
-	fakeClient := fake.NewClientset()
-	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
-
-	controller, err := NewController(ctx, fakeClient, informerFactory)
-	if err != nil {
-		t.Fatalf("Failed to create controller: %v", err)
-	}
-
-	// Add slices to informer
-	slices := []*resourcev1.ResourceSlice{
-		makeSlice("slice-1", "driver-a", "pool-1", "node-1", 4),
-		makeSlice("slice-2", "driver-a", "pool-1", "node-1", 4),
-		makeSlice("slice-3", "driver-a", "pool-2", "node-2", 8),
-		makeSlice("slice-4", "driver-b", "pool-3", "node-3", 2),
-	}
-
-	for _, slice := range slices {
-		err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(slice)
-		if err != nil {
-			t.Fatalf("Failed to add slice: %v", err)
-		}
-	}
-
-	// Rebuild cache
-	controller.rebuildPoolCache(ktesting.NewLogger(t, ktesting.NewConfig()))
-
-	// Verify pool data
-	controller.poolDataMu.RLock()
-	defer controller.poolDataMu.RUnlock()
-
-	if len(controller.poolData) != 3 {
-		t.Errorf("Expected 3 pools, got %d", len(controller.poolData))
-	}
-
-	pool1 := controller.poolData["driver-a/pool-1"]
-	if pool1 == nil {
-		t.Fatal("pool-1 not found")
-	}
-	if pool1.totalDevices != 8 {
-		t.Errorf("Expected pool-1 totalDevices=8, got %d", pool1.totalDevices)
-	}
-	if pool1.sliceCount != 2 {
-		t.Errorf("Expected pool-1 sliceCount=2, got %d", pool1.sliceCount)
-	}
-}
-
-func TestRebuildAllocationCache(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-
-	fakeClient := fake.NewClientset()
-	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
-
-	controller, err := NewController(ctx, fakeClient, informerFactory)
-	if err != nil {
-		t.Fatalf("Failed to create controller: %v", err)
-	}
-
-	// Add claims to informer
-	claims := []*resourcev1.ResourceClaim{
-		makeAllocatedClaim("claim-1", "ns1", "driver-a", "pool-1", "device-0"),
-		makeAllocatedClaim("claim-2", "ns1", "driver-a", "pool-1", "device-1"),
-		makeAllocatedClaim("claim-3", "ns2", "driver-a", "pool-2", "device-0"),
-		makeUnallocatedClaim("claim-4", "ns1"),
-	}
-
-	for _, claim := range claims {
-		err := informerFactory.Resource().V1().ResourceClaims().Informer().GetStore().Add(claim)
-		if err != nil {
-			t.Fatalf("Failed to add claim: %v", err)
-		}
-	}
-
-	// Rebuild cache
-	controller.rebuildAllocationCache(ktesting.NewLogger(t, ktesting.NewConfig()))
-
-	// Verify allocation data
-	controller.poolDataMu.RLock()
-	defer controller.poolDataMu.RUnlock()
-
-	if len(controller.allocationData) != 2 {
-		t.Errorf("Expected 2 allocation entries, got %d", len(controller.allocationData))
-	}
-
-	if controller.allocationData["driver-a/pool-1"] != 2 {
-		t.Errorf("Expected pool-1 allocations=2, got %d", controller.allocationData["driver-a/pool-1"])
-	}
-
-	if controller.allocationData["driver-a/pool-2"] != 1 {
-		t.Errorf("Expected pool-2 allocations=1, got %d", controller.allocationData["driver-a/pool-2"])
-	}
-}
-
 // Helper functions
 
 func makeSlice(name, driver, pool, node string, deviceCount int) *resourcev1.ResourceSlice {
+	return makeSliceWithGeneration(name, driver, pool, node, deviceCount, 1)
+}
+
+func makeSliceWithGeneration(name, driver, pool, node string, deviceCount int, generation int64) *resourcev1.ResourceSlice {
 	devices := make([]resourcev1.Device, deviceCount)
 	for i := range deviceCount {
 		devices[i] = resourcev1.Device{
@@ -467,7 +387,7 @@ func makeSlice(name, driver, pool, node string, deviceCount int) *resourcev1.Res
 			NodeName: ptr.To(node),
 			Pool: resourcev1.ResourcePool{
 				Name:       pool,
-				Generation: 1,
+				Generation: generation,
 			},
 			Devices: devices,
 		},
@@ -496,20 +416,6 @@ func makeAllocatedClaim(name, namespace, driver, pool, device string) *resourcev
 		},
 	}
 }
-
-func makeUnallocatedClaim(name, namespace string) *resourcev1.ResourceClaim {
-	return &resourcev1.ResourceClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec:   resourcev1.ResourceClaimSpec{},
-		Status: resourcev1.ResourceClaimStatus{},
-	}
-}
-
-// Compile-time check that our test helpers work with the lister
-var _ = labels.Everything()
 
 func TestIsOlderThan(t *testing.T) {
 	testCases := []struct {
