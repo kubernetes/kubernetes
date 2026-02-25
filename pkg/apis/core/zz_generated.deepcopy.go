@@ -3468,6 +3468,10 @@ func (in *PersistentVolumeClaimStatus) DeepCopyInto(out *PersistentVolumeClaimSt
 		*out = new(ModifyVolumeStatus)
 		**out = **in
 	}
+	if in.UnusedSince != nil {
+		in, out := &in.UnusedSince, &out.UnusedSince
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
