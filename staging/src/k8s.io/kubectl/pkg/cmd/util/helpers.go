@@ -500,7 +500,7 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().String(
 		"dry-run",
 		"none",
-		`Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`,
+		`Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it (note the client strategy still requires access to the server to fetch discovery data and existing objects). If server strategy, submit server-side request without persisting the resource.`,
 	)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 }
