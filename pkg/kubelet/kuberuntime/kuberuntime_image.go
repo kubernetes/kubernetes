@@ -44,7 +44,7 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 			return "", nil, err
 		}
 
-		return imageRef, nil, nil
+		return m.imageRefToCanonical(ctx, image, imageRef), nil, nil
 	}
 
 	var pullErrs []error
@@ -61,13 +61,23 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 		imageRef, err := m.imageService.PullImage(ctx, imgSpec, auth, podSandboxConfig)
 		// If there was no error, return success
 		if err == nil {
-			return imageRef, &currentCreds, nil
+			return m.imageRefToCanonical(ctx, image, imageRef), &currentCreds, nil
 		}
 
 		pullErrs = append(pullErrs, err)
 	}
 
 	return "", nil, utilerrors.NewAggregate(pullErrs)
+}
+
+// imageRefToCanonical normalizes a pull result using ImageStatus() so callers
+// can consistently key cache entries by Image.Id across runtimes.
+func (m *kubeGenericRuntimeManager) imageRefToCanonical(ctx context.Context, image kubecontainer.ImageSpec, pullImageRef string) string {
+	canonicalImageRef, err := m.GetImageRef(ctx, image)
+	if err != nil || len(canonicalImageRef) == 0 {
+		return pullImageRef
+	}
+	return canonicalImageRef
 }
 
 // GetImageRef gets the ID of the image which has already been in
