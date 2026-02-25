@@ -86,6 +86,9 @@ func validatePodGroupSpec(spec *scheduling.PodGroupSpec, fldPath *field.Path) fi
 		allErrs = append(allErrs, validatePodGroupTemplateRef(spec.PodGroupTemplateRef, fldPath.Child("podGroupTemplateRef"))...)
 	}
 	allErrs = append(allErrs, validatePodGroupSchedulingPolicy(&spec.SchedulingPolicy, fldPath.Child("schedulingPolicy"))...)
+	if spec.SchedulingConstraints != nil {
+		allErrs = append(allErrs, validatePodGroupSchedulingConstraints(spec.SchedulingConstraints, fldPath.Child("schedulingConstraints"))...)
+	}
 	return allErrs
 }
 
@@ -128,6 +131,7 @@ func validatePodGroupSpecUpdate(spec, oldSpec *scheduling.PodGroupSpec, fldPath 
 		allErrs = append(allErrs, field.Required(fldPath.Child("podGroupTemplateRef"), "").MarkCoveredByDeclarative())
 	}
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SchedulingPolicy, oldSpec.SchedulingPolicy, fldPath.Child("schedulingPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SchedulingConstraints, oldSpec.SchedulingConstraints, fldPath.Child("schedulingConstraints")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 
@@ -207,6 +211,9 @@ func validatePodGroupTemplate(podGroupTemplate *scheduling.PodGroupTemplate, fld
 		existingPodGroupTemplates.Insert(podGroupTemplate.Name)
 	}
 	allErrs = append(allErrs, validatePodGroupSchedulingPolicy(&podGroupTemplate.SchedulingPolicy, fldPath.Child("schedulingPolicy"))...)
+	if podGroupTemplate.SchedulingConstraints != nil {
+		allErrs = append(allErrs, validatePodGroupSchedulingConstraints(podGroupTemplate.SchedulingConstraints, fldPath.Child("schedulingConstraints"))...)
+	}
 	return allErrs
 }
 
@@ -233,6 +240,31 @@ func validatePodGroupSchedulingPolicy(policy *scheduling.PodGroupSchedulingPolic
 		allErrs = append(allErrs, validateGangSchedulingPolicy(policy.Gang, fldPath.Child("gang"))...)
 	}
 
+	return allErrs
+}
+
+func validatePodGroupSchedulingConstraints(constraints *scheduling.PodGroupSchedulingConstraints, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	topologyConstraintsPath := fldPath.Child("topologyConstraints")
+	if len(constraints.TopologyConstraints) > 1 {
+		allErrs = append(allErrs, field.TooMany(topologyConstraintsPath, len(constraints.TopologyConstraints), 1).WithOrigin("maxItems").MarkCoveredByDeclarative())
+	}
+	if len(constraints.TopologyConstraints) == 0 {
+		allErrs = append(allErrs, field.Required(topologyConstraintsPath, "").MarkCoveredByDeclarative())
+	}
+	for i, constraint := range constraints.TopologyConstraints {
+		allErrs = append(allErrs, validatePodGroupTopologyConstraint(&constraint, topologyConstraintsPath.Index(i))...)
+	}
+	return allErrs
+}
+
+func validatePodGroupTopologyConstraint(constraint *scheduling.TopologyConstraint, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if constraint.TopologyKey == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "").MarkCoveredByDeclarative())
+	} else {
+		allErrs = append(allErrs, metav1validation.ValidateLabelName(constraint.TopologyKey, fldPath.Child("topologyKey")).WithOrigin("format=k8s-label-key").MarkCoveredByDeclarative()...)
+	}
 	return allErrs
 }
 

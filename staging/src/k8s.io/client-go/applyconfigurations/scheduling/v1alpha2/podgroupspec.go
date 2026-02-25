@@ -32,6 +32,10 @@ type PodGroupSpecApplyConfiguration struct {
 	// It is copied from the template on PodGroup creation.
 	// This field is immutable.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup.
+	// It is copied from the template on PodGroup creation. This field is immutable.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	SchedulingConstraints *PodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
 }
 
 // PodGroupSpecApplyConfiguration constructs a declarative configuration of the PodGroupSpec type for use with
@@ -53,5 +57,13 @@ func (b *PodGroupSpecApplyConfiguration) WithPodGroupTemplateRef(value *PodGroup
 // If called multiple times, the SchedulingPolicy field is set to the value of the last call.
 func (b *PodGroupSpecApplyConfiguration) WithSchedulingPolicy(value *PodGroupSchedulingPolicyApplyConfiguration) *PodGroupSpecApplyConfiguration {
 	b.SchedulingPolicy = value
+	return b
+}
+
+// WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SchedulingConstraints field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithSchedulingConstraints(value *PodGroupSchedulingConstraintsApplyConfiguration) *PodGroupSpecApplyConfiguration {
+	b.SchedulingConstraints = value
 	return b
 }

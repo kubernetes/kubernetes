@@ -28,6 +28,9 @@ type PodGroupTemplateApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 	// SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	SchedulingConstraints *PodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
 }
 
 // PodGroupTemplateApplyConfiguration constructs a declarative configuration of the PodGroupTemplate type for use with
@@ -49,5 +52,13 @@ func (b *PodGroupTemplateApplyConfiguration) WithName(value string) *PodGroupTem
 // If called multiple times, the SchedulingPolicy field is set to the value of the last call.
 func (b *PodGroupTemplateApplyConfiguration) WithSchedulingPolicy(value *PodGroupSchedulingPolicyApplyConfiguration) *PodGroupTemplateApplyConfiguration {
 	b.SchedulingPolicy = value
+	return b
+}
+
+// WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SchedulingConstraints field is set to the value of the last call.
+func (b *PodGroupTemplateApplyConfiguration) WithSchedulingConstraints(value *PodGroupSchedulingConstraintsApplyConfiguration) *PodGroupTemplateApplyConfiguration {
+	b.SchedulingConstraints = value
 	return b
 }

@@ -39,6 +39,9 @@ spec:
     name: nameValue
   podGroupTemplates:
   - name: nameValue
+    schedulingConstraints:
+      topologyConstraints:
+      - topologyKey: topologyKeyValue
     schedulingPolicy:
       basic: {}
       gang:

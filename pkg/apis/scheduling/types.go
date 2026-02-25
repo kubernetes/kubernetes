@@ -178,6 +178,12 @@ type PodGroupTemplate struct {
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	//
+	// +optional
+	SchedulingConstraints *PodGroupSchedulingConstraints
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -272,6 +278,13 @@ type PodGroupSpec struct {
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup.
+	// It is copied from the template on PodGroup creation. This field is immutable.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	//
+	// +optional
+	SchedulingConstraints *PodGroupSchedulingConstraints
 }
 
 // PodGroupStatus represents information about the status of a pod group.
@@ -336,4 +349,26 @@ type WorkloadPodGroupTemplateReference struct {
 	//
 	// +required
 	PodGroupTemplateName string
+}
+
+// PodGroupSchedulingConstraints defines optional scheduling constraints (e.g. topology) for a PodGroup.
+type PodGroupSchedulingConstraints struct {
+	// TopologyConstraints defines the topology constraints for the pod group.
+	// This field is required but we might loosen this assumption in the future
+	// if more types of constraints are added.
+	//
+	// +optional
+	// +listType=atomic
+	TopologyConstraints []TopologyConstraint
+}
+
+// TopologyConstraint defines a topology constraint for a PodGroup.
+type TopologyConstraint struct {
+	// TopologyKey specifies the key of the node label representing the topology domain.
+	// All pods within the PodGroup must be colocated within the same domain instance.
+	// Different replicas of the PodGroup can land on different domain instances.
+	// Examples: "topology.kubernetes.io/rack"
+	//
+	// +required
+	TopologyKey string
 }

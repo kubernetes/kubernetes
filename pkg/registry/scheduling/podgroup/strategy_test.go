@@ -18,13 +18,17 @@ package podgroup
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var podGroup = &scheduling.PodGroup{
@@ -42,6 +46,31 @@ var podGroup = &scheduling.PodGroup{
 		SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 			Gang: &scheduling.GangSchedulingPolicy{
 				MinCount: 5,
+			},
+		},
+	},
+}
+
+var podGroupWithSchedulingConstraints = &scheduling.PodGroup{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "foo",
+		Namespace: metav1.NamespaceDefault,
+	},
+	Spec: scheduling.PodGroupSpec{
+		PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+			Workload: &scheduling.WorkloadPodGroupTemplateReference{
+				WorkloadName:         "w",
+				PodGroupTemplateName: "t",
+			},
+		},
+		SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+			Gang: &scheduling.GangSchedulingPolicy{
+				MinCount: 5,
+			},
+		},
+		SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+			TopologyConstraints: []scheduling.TopologyConstraint{
+				{TopologyKey: "foo"},
 			},
 		},
 	},
@@ -76,11 +105,13 @@ func ctxWithRequestInfo() context.Context {
 func TestStrategyCreate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	now := metav1.Now()
-	testCases := map[string]struct {
+	type testCase struct {
 		obj                   *scheduling.PodGroup
 		expectObj             *scheduling.PodGroup
 		expectValidationError string
-	}{
+		tasEnabled            bool
+	}
+	testCases := map[string]testCase{
 		"simple": {
 			obj:       podGroup,
 			expectObj: podGroup,
@@ -125,10 +156,45 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			expectObj: podGroup,
 		},
+		"multiple topology constraints": {
+			obj: func() *scheduling.PodGroup {
+				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
+				newPodGroup.Spec.SchedulingConstraints.TopologyConstraints = []scheduling.TopologyConstraint{
+					{TopologyKey: "foo"},
+					{TopologyKey: "bar"},
+				}
+				return newPodGroup
+			}(),
+			expectValidationError: "must have at most 1 item",
+			tasEnabled:            true,
+		},
+		"invalid topology key": {
+			obj: func() *scheduling.PodGroup {
+				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
+				newPodGroup.Spec.SchedulingConstraints.TopologyConstraints[0].TopologyKey = "foo-"
+				return newPodGroup
+			}(),
+			expectValidationError: "Invalid value: \"foo-\"",
+			tasEnabled:            true,
+		},
 	}
 
+	allTestCases := make(map[string]testCase)
 	for name, tc := range testCases {
+		allTestCases[name] = tc
+		if tc.tasEnabled {
+			newTc := testCase{
+				obj:       tc.obj,
+				expectObj: podGroup,
+			}
+			allTestCases[fmt.Sprintf("drops scheduling constraints, originally %s", name)] = newTc
+		}
+	}
+
+	for name, tc := range allTestCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tc.tasEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, tc.tasEnabled)
 			podGroup := tc.obj.DeepCopy()
 
 			strategy := NewStrategy()
@@ -151,6 +217,9 @@ func TestStrategyCreate(t *testing.T) {
 			if warnings := strategy.WarningsOnCreate(ctx, podGroup); len(warnings) != 0 {
 				t.Fatalf("unexpected warnings: %q", warnings)
 			}
+			if tc.expectObj != nil {
+				assert.Equal(t, tc.expectObj, podGroup)
+			}
 		})
 	}
 }
@@ -161,6 +230,7 @@ func TestStrategyUpdate(t *testing.T) {
 		oldObj                *scheduling.PodGroup
 		newObj                *scheduling.PodGroup
 		expectValidationError string
+		tasEnabled            bool
 	}{
 		"no changes": {
 			oldObj: podGroup,
@@ -209,10 +279,41 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationError: fieldImmutableError,
 		},
+		"changing scheduling constraints not allowed": {
+			oldObj: podGroupWithSchedulingConstraints,
+			newObj: func() *scheduling.PodGroup {
+				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
+				newPodGroup.Spec.SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{}
+				return newPodGroup
+			}(),
+			expectValidationError: fieldImmutableError,
+		},
+		"changing topology constraints not allowed": {
+			oldObj: podGroupWithSchedulingConstraints,
+			newObj: func() *scheduling.PodGroup {
+				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
+				newPodGroup.Spec.SchedulingConstraints.TopologyConstraints = []scheduling.TopologyConstraint{}
+				return newPodGroup
+			}(),
+			expectValidationError: fieldImmutableError,
+			tasEnabled:            true,
+		},
+		"changing topology key not allowed": {
+			oldObj: podGroupWithSchedulingConstraints,
+			newObj: func() *scheduling.PodGroup {
+				newPodGroup := podGroupWithSchedulingConstraints.DeepCopy()
+				newPodGroup.Spec.SchedulingConstraints.TopologyConstraints[0].TopologyKey = "foobar"
+				return newPodGroup
+			}(),
+			expectValidationError: fieldImmutableError,
+			tasEnabled:            true,
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tc.tasEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, tc.tasEnabled)
 			podGroup := tc.oldObj.DeepCopy()
 			newPodGroup := tc.newObj.DeepCopy()
 			newPodGroup.ResourceVersion = "4"

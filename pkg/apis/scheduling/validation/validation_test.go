@@ -192,6 +192,9 @@ func TestValidateWorkload(t *testing.T) {
 		"no controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.ControllerRef.APIGroup = ""
 		}),
+		"no scheduling constraints": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates[1].SchedulingConstraints = nil
+		}),
 	}
 	for name, workload := range successCases {
 		errs := ValidateWorkload(workload)
@@ -400,6 +403,40 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(1).Child("schedulingPolicy", "gang", "minCount"), int64(-1), "must be greater than zero").WithOrigin("minimum").MarkCoveredByDeclarative(),
 			},
 		},
+		"multiple topology constraints": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints = append(w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints, scheduling.TopologyConstraint{
+					TopologyKey: "bar",
+				})
+			}),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "podGroupTemplates").Index(1).Child("schedulingConstraints", "topologyConstraints"), 2, 1).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+			},
+		},
+		"empty topology key": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints[0].TopologyKey = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "podGroupTemplates").Index(1).Child("schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "").MarkCoveredByDeclarative(),
+			},
+		},
+		"no topology constraints": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "podGroupTemplates").Index(1).Child("schedulingConstraints", "topologyConstraints"), "").MarkCoveredByDeclarative(),
+			},
+		},
+		"invalid topology key": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[1].SchedulingConstraints.TopologyConstraints[0].TopologyKey = "foo-"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(1).Child("schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "foo-", "").MarkCoveredByDeclarative(),
+			},
+		},
 	}
 
 	for name, tc := range failureCases {
@@ -535,11 +572,21 @@ func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
 				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 					Basic: &scheduling.BasicSchedulingPolicy{},
 				},
+				SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+					TopologyConstraints: []scheduling.TopologyConstraint{
+						{TopologyKey: "foo"},
+					},
+				},
 			}, {
 				Name: "group2",
 				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 					Gang: &scheduling.GangSchedulingPolicy{
 						MinCount: 2,
+					},
+				},
+				SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+					TopologyConstraints: []scheduling.TopologyConstraint{
+						{TopologyKey: "foo"},
 					},
 				},
 			}},
@@ -558,6 +605,9 @@ func TestValidatePodGroup(t *testing.T) {
 			pg.Spec.SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
 				Basic: &scheduling.BasicSchedulingPolicy{},
 			}
+		}),
+		"no scheduling constraints": mkPodGroup(func(pg *scheduling.PodGroup) {
+			pg.Spec.SchedulingConstraints = nil
 		}),
 	}
 	for name, podGroup := range successCases {
@@ -713,6 +763,40 @@ func TestValidatePodGroup(t *testing.T) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "podGroupTemplateRef", "workload", "podGroupTemplateName"), "/baz", "must not contain '/'").WithOrigin("format=k8s-short-name").MarkCoveredByDeclarative(),
+			},
+		},
+		"multiple topology constraints": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.SchedulingConstraints.TopologyConstraints = append(pg.Spec.SchedulingConstraints.TopologyConstraints, scheduling.TopologyConstraint{
+					TopologyKey: "bar",
+				})
+			}),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "schedulingConstraints", "topologyConstraints"), 2, 1).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+			},
+		},
+		"empty topology key": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.SchedulingConstraints.TopologyConstraints[0].TopologyKey = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "").MarkCoveredByDeclarative(),
+			},
+		},
+		"no topology constraints": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.SchedulingConstraints.TopologyConstraints = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "schedulingConstraints", "topologyConstraints"), "").MarkCoveredByDeclarative(),
+			},
+		},
+		"invalid topology key": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.SchedulingConstraints.TopologyConstraints[0].TopologyKey = "foo-"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingConstraints", "topologyConstraints").Index(0).Child("topologyKey"), "foo-", "").MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -998,6 +1082,11 @@ func mkPodGroup(tweaks ...func(pg *scheduling.PodGroup)) *scheduling.PodGroup {
 			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 				Gang: &scheduling.GangSchedulingPolicy{
 					MinCount: 5,
+				},
+			},
+			SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+				TopologyConstraints: []scheduling.TopologyConstraint{
+					{TopologyKey: "foo"},
 				},
 			},
 		},

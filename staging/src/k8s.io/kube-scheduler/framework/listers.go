@@ -166,6 +166,8 @@ type PodGroupState interface {
 	AssumedPods() sets.Set[types.UID]
 	// AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
 	AssignedPods() sets.Set[types.UID]
+	// ScheduledPods returns the list of all pods that are assumed or assigned for this group.
+	ScheduledPods() []*v1.Pod
 	// AssumePod marks a pod as having reached the Reserve stage.
 	AssumePod(podUID types.UID)
 	// ForgetPod removes a pod from the assumed state.

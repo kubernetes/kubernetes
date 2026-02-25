@@ -67,6 +67,9 @@ func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
 		applyGangScheduling(config)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.TopologyPlacementGenerator})
+	}
 }
 
 func applyDynamicResources(config *v1.Plugins) {
