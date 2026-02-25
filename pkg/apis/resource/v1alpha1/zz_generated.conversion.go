@@ -94,7 +94,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_v1alpha1_PoolStatus_To_resource_PoolStatus(in *resourcev1alpha1.PoolStatus, out *resource.PoolStatus, s conversion.Scope) error {
 	out.Driver = in.Driver
 	out.PoolName = in.PoolName
-	out.NodeName = in.NodeName
+	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	out.TotalDevices = (*int32)(unsafe.Pointer(in.TotalDevices))
 	out.AllocatedDevices = (*int32)(unsafe.Pointer(in.AllocatedDevices))
 	out.AvailableDevices = (*int32)(unsafe.Pointer(in.AvailableDevices))
@@ -112,7 +112,7 @@ func Convert_v1alpha1_PoolStatus_To_resource_PoolStatus(in *resourcev1alpha1.Poo
 func autoConvert_resource_PoolStatus_To_v1alpha1_PoolStatus(in *resource.PoolStatus, out *resourcev1alpha1.PoolStatus, s conversion.Scope) error {
 	out.Driver = in.Driver
 	out.PoolName = in.PoolName
-	out.NodeName = in.NodeName
+	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	out.TotalDevices = (*int32)(unsafe.Pointer(in.TotalDevices))
 	out.AllocatedDevices = (*int32)(unsafe.Pointer(in.AllocatedDevices))
 	out.AvailableDevices = (*int32)(unsafe.Pointer(in.AvailableDevices))
@@ -210,7 +210,7 @@ func autoConvert_v1alpha1_ResourcePoolStatusRequestStatus_To_resource_ResourcePo
 	out.Pools = *(*[]resource.PoolStatus)(unsafe.Pointer(&in.Pools))
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.ValidationErrors = *(*[]string)(unsafe.Pointer(&in.ValidationErrors))
-	out.Truncation = resource.TruncationStatus(in.Truncation)
+	out.Truncation = (*resource.TruncationStatus)(unsafe.Pointer(in.Truncation))
 	out.TotalMatchingPools = (*int32)(unsafe.Pointer(in.TotalMatchingPools))
 	return nil
 }
@@ -225,7 +225,7 @@ func autoConvert_resource_ResourcePoolStatusRequestStatus_To_v1alpha1_ResourcePo
 	out.Pools = *(*[]resourcev1alpha1.PoolStatus)(unsafe.Pointer(&in.Pools))
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.ValidationErrors = *(*[]string)(unsafe.Pointer(&in.ValidationErrors))
-	out.Truncation = resourcev1alpha1.TruncationStatus(in.Truncation)
+	out.Truncation = (*resourcev1alpha1.TruncationStatus)(unsafe.Pointer(in.Truncation))
 	out.TotalMatchingPools = (*int32)(unsafe.Pointer(in.TotalMatchingPools))
 	return nil
 }

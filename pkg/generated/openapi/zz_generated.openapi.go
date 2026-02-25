@@ -48940,7 +48940,7 @@ func schema_k8sio_api_resource_v1alpha1_PoolStatus(ref common.ReferenceCallback)
 					},
 					"nodeName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeName is the node this pool is associated with. Empty for non-node-local pools.",
+							Description: "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -49113,14 +49113,14 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestSpec(ref common
 					},
 					"poolName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a valid resource pool name (DNS subdomains separated by \"/\").",
+							Description: "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"limit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated and status.truncated will be set to true.\n\nDefault: 100 Maximum: 1000",
+							Description: "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated and status.truncation will be set to \"Truncated\".\n\nDefault: 100 Minimum: 1 Maximum: 1000",
 							Default:     100,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -49211,14 +49211,15 @@ func schema_k8sio_api_resource_v1alpha1_ResourcePoolStatusRequestStatus(ref comm
 					},
 					"truncation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Truncation indicates whether the response was truncated due to the limit. When set to \"Truncated\", there are more pools matching the filter criteria than were returned.",
+							Description: "Truncation indicates whether the response was truncated due to the limit. When set to \"Truncated\", there are more pools matching the filter criteria than were returned. When omitted, the response was not truncated.\n\n\nPossible enum values:\n - `\"Truncated\"` indicates the response was truncated due to the limit.",
 							Type:        []string{"string"},
 							Format:      "",
+							Enum:        []interface{}{"Truncated"},
 						},
 					},
 					"totalMatchingPools": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched.",
+							Description: "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. When nil, the status has not yet been populated. A value of 0 means no pools matched the filter criteria.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

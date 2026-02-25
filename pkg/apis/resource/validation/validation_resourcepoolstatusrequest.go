@@ -92,6 +92,16 @@ func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.R
 		allErrs = append(allErrs, validatePoolStatus(pool, fldPath.Child("pools").Index(i))...)
 	}
 
+	// Validate validation errors: max 10 entries, max 256 chars each
+	if len(status.ValidationErrors) > 10 {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("validationErrors"), len(status.ValidationErrors), 10))
+	}
+	for i, msg := range status.ValidationErrors {
+		if len(msg) > 256 {
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("validationErrors").Index(i), msg, 256))
+		}
+	}
+
 	// Validate conditions
 	allErrs = append(allErrs, metav1validation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
 
@@ -121,8 +131,12 @@ func validatePoolStatus(pool resource.PoolStatus, fldPath *field.Path) field.Err
 	}
 
 	// NodeName is optional, but if provided, must be valid
-	if pool.NodeName != "" {
-		allErrs = append(allErrs, validateNodeName(pool.NodeName, fldPath.Child("nodeName"))...)
+	if pool.NodeName != nil {
+		if *pool.NodeName == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodeName"), "nodeName must not be empty when specified"))
+		} else {
+			allErrs = append(allErrs, validateNodeName(*pool.NodeName, fldPath.Child("nodeName"))...)
+		}
 	}
 
 	// Device counts must be non-negative when specified

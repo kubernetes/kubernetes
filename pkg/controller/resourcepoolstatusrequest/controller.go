@@ -333,16 +333,20 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		totalDevices := info.totalDevices
 		allocDevices := allocatedDevices
 		availDevices := availableDevices
-		pools = append(pools, resourcev1alpha1.PoolStatus{
+		pool := resourcev1alpha1.PoolStatus{
 			Driver:           info.driver,
 			PoolName:         info.poolName,
-			NodeName:         info.nodeName,
 			TotalDevices:     &totalDevices,
 			AllocatedDevices: &allocDevices,
 			AvailableDevices: &availDevices,
 			SliceCount:       info.sliceCount,
 			Generation:       info.generation,
-		})
+		}
+		if info.nodeName != "" {
+			nodeName := info.nodeName
+			pool.NodeName = &nodeName
+		}
+		pools = append(pools, pool)
 	}
 
 	// Sort pools by driver, then pool name
@@ -354,7 +358,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	})
 
 	totalMatchingPools := int32(len(pools))
-	var truncation resourcev1alpha1.TruncationStatus
+	var truncation *resourcev1alpha1.TruncationStatus
 
 	// Apply limit if specified
 	limit := int32(100) // default
@@ -363,7 +367,8 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	}
 	if int32(len(pools)) > limit {
 		pools = pools[:limit]
-		truncation = resourcev1alpha1.TruncationStatusTruncated
+		truncatedStatus := resourcev1alpha1.TruncationStatusTruncated
+		truncation = &truncatedStatus
 	}
 
 	now := metav1.Now()

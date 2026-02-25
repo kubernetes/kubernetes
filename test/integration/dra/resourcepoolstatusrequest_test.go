@@ -243,8 +243,8 @@ func testProcessResourcePoolStatusRequest(tCtx ktesting.TContext) {
 	if pool.PoolName != poolName {
 		tCtx.Errorf("expected pool name %q, got %q", poolName, pool.PoolName)
 	}
-	if pool.NodeName != nodeName {
-		tCtx.Errorf("expected node name %q, got %q", nodeName, pool.NodeName)
+	if pool.NodeName == nil || *pool.NodeName != nodeName {
+		tCtx.Errorf("expected node name %q, got %v", nodeName, pool.NodeName)
 	}
 	if pool.TotalDevices == nil || *pool.TotalDevices != 4 {
 		tCtx.Errorf("expected 4 total devices, got %v", pool.TotalDevices)

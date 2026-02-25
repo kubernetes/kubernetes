@@ -61,12 +61,13 @@ type ResourcePoolStatusRequestSpec struct {
 	//
 	// +required
 	// +k8s:required
-	// +k8s:format=k8s-long-name-caseless
+	// +k8s:format=k8s-long-name
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
 
 	// PoolName optionally filters to a specific pool name.
 	// If not specified, all pools from the specified driver are included.
-	// When specified, must be a valid resource pool name (DNS subdomains separated by "/").
+	// When specified, must be a non-empty valid resource pool name
+	// (DNS subdomains separated by "/").
 	//
 	// +optional
 	// +k8s:optional
@@ -75,9 +76,10 @@ type ResourcePoolStatusRequestSpec struct {
 
 	// Limit optionally specifies the maximum number of pools to return in the status.
 	// If more pools match the filter criteria, the response will be truncated
-	// and status.truncated will be set to true.
+	// and status.truncation will be set to "Truncated".
 	//
 	// Default: 100
+	// Minimum: 1
 	// Maximum: 1000
 	//
 	// +optional
@@ -140,15 +142,16 @@ type ResourcePoolStatusRequestStatus struct {
 
 	// Truncation indicates whether the response was truncated due to the limit.
 	// When set to "Truncated", there are more pools matching the filter criteria
-	// than were returned.
+	// than were returned. When omitted, the response was not truncated.
 	//
 	// +optional
 	// +k8s:optional
-	Truncation TruncationStatus `json:"truncation,omitempty" protobuf:"bytes,5,opt,name=truncation"`
+	Truncation *TruncationStatus `json:"truncation,omitempty" protobuf:"bytes,5,opt,name=truncation"`
 
 	// TotalMatchingPools is the total number of pools that matched the filter criteria,
 	// regardless of truncation. This helps users understand how many pools exist
-	// even when the response is truncated. A value of 0 means no pools matched.
+	// even when the response is truncated. When nil, the status has not yet been
+	// populated. A value of 0 means no pools matched the filter criteria.
 	//
 	// +optional
 	// +k8s:optional
@@ -163,7 +166,7 @@ type PoolStatus struct {
 	//
 	// +required
 	// +k8s:required
-	// +k8s:format=k8s-long-name-caseless
+	// +k8s:format=k8s-long-name
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
 
 	// PoolName is the name of the pool.
@@ -175,11 +178,11 @@ type PoolStatus struct {
 	PoolName string `json:"poolName" protobuf:"bytes,2,name=poolName"`
 
 	// NodeName is the node this pool is associated with.
-	// Empty for non-node-local pools.
+	// When omitted, the pool is not associated with a specific node.
 	//
 	// +optional
 	// +k8s:optional
-	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
+	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
 
 	// TotalDevices is the total number of devices in the pool across all slices.
 	// A value of 0 means the pool has no devices.
@@ -231,6 +234,9 @@ type PoolStatus struct {
 }
 
 // TruncationStatus is a string enum indicating whether the response was truncated.
+//
+// +enum
+// +k8s:enum
 type TruncationStatus string
 
 const (

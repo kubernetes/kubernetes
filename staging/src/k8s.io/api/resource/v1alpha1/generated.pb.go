@@ -85,11 +85,13 @@ func (m *PoolStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x20
 	}
-	i -= len(m.NodeName)
-	copy(dAtA[i:], m.NodeName)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.NodeName)))
-	i--
-	dAtA[i] = 0x1a
+	if m.NodeName != nil {
+		i -= len(*m.NodeName)
+		copy(dAtA[i:], *m.NodeName)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.NodeName)))
+		i--
+		dAtA[i] = 0x1a
+	}
 	i -= len(m.PoolName)
 	copy(dAtA[i:], m.PoolName)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PoolName)))
@@ -268,11 +270,13 @@ func (m *ResourcePoolStatusRequestStatus) MarshalToSizedBuffer(dAtA []byte) (int
 		i--
 		dAtA[i] = 0x30
 	}
-	i -= len(m.Truncation)
-	copy(dAtA[i:], m.Truncation)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Truncation)))
-	i--
-	dAtA[i] = 0x2a
+	if m.Truncation != nil {
+		i -= len(*m.Truncation)
+		copy(dAtA[i:], *m.Truncation)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.Truncation)))
+		i--
+		dAtA[i] = 0x2a
+	}
 	if len(m.ValidationErrors) > 0 {
 		for iNdEx := len(m.ValidationErrors) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.ValidationErrors[iNdEx])
@@ -346,8 +350,10 @@ func (m *PoolStatus) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.PoolName)
 	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.NodeName)
-	n += 1 + l + sovGenerated(uint64(l))
+	if m.NodeName != nil {
+		l = len(*m.NodeName)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	if m.TotalDevices != nil {
 		n += 1 + sovGenerated(uint64(*m.TotalDevices))
 	}
@@ -441,8 +447,10 @@ func (m *ResourcePoolStatusRequestStatus) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
-	l = len(m.Truncation)
-	n += 1 + l + sovGenerated(uint64(l))
+	if m.Truncation != nil {
+		l = len(*m.Truncation)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	if m.TotalMatchingPools != nil {
 		n += 1 + sovGenerated(uint64(*m.TotalMatchingPools))
 	}
@@ -462,7 +470,7 @@ func (this *PoolStatus) String() string {
 	s := strings.Join([]string{`&PoolStatus{`,
 		`Driver:` + fmt.Sprintf("%v", this.Driver) + `,`,
 		`PoolName:` + fmt.Sprintf("%v", this.PoolName) + `,`,
-		`NodeName:` + fmt.Sprintf("%v", this.NodeName) + `,`,
+		`NodeName:` + valueToStringGenerated(this.NodeName) + `,`,
 		`TotalDevices:` + valueToStringGenerated(this.TotalDevices) + `,`,
 		`AllocatedDevices:` + valueToStringGenerated(this.AllocatedDevices) + `,`,
 		`AvailableDevices:` + valueToStringGenerated(this.AvailableDevices) + `,`,
@@ -532,7 +540,7 @@ func (this *ResourcePoolStatusRequestStatus) String() string {
 		`Pools:` + repeatedStringForPools + `,`,
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`ValidationErrors:` + fmt.Sprintf("%v", this.ValidationErrors) + `,`,
-		`Truncation:` + fmt.Sprintf("%v", this.Truncation) + `,`,
+		`Truncation:` + valueToStringGenerated(this.Truncation) + `,`,
 		`TotalMatchingPools:` + valueToStringGenerated(this.TotalMatchingPools) + `,`,
 		`}`,
 	}, "")
@@ -669,7 +677,8 @@ func (m *PoolStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.NodeName = string(dAtA[iNdEx:postIndex])
+			s := string(dAtA[iNdEx:postIndex])
+			m.NodeName = &s
 			iNdEx = postIndex
 		case 4:
 			if wireType != 0 {
@@ -1405,7 +1414,8 @@ func (m *ResourcePoolStatusRequestStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Truncation = TruncationStatus(dAtA[iNdEx:postIndex])
+			s := TruncationStatus(dAtA[iNdEx:postIndex])
+			m.Truncation = &s
 			iNdEx = postIndex
 		case 6:
 			if wireType != 0 {

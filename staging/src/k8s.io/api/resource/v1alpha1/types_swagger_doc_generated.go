@@ -31,7 +31,7 @@ var map_PoolStatus = map[string]string{
 	"":                   "PoolStatus contains status information for a single resource pool.",
 	"driver":             "Driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
 	"poolName":           "PoolName is the name of the pool. Must be a valid resource pool name (DNS subdomains separated by \"/\").",
-	"nodeName":           "NodeName is the node this pool is associated with. Empty for non-node-local pools.",
+	"nodeName":           "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node.",
 	"totalDevices":       "TotalDevices is the total number of devices in the pool across all slices. A value of 0 means the pool has no devices.",
 	"allocatedDevices":   "AllocatedDevices is the number of devices currently allocated to claims. A value of 0 means no devices are allocated.",
 	"availableDevices":   "AvailableDevices is the number of devices available for allocation. This equals TotalDevices - AllocatedDevices - UnavailableDevices. A value of 0 means no devices are currently available.",
@@ -68,8 +68,8 @@ func (ResourcePoolStatusRequestList) SwaggerDoc() map[string]string {
 var map_ResourcePoolStatusRequestSpec = map[string]string{
 	"":         "ResourcePoolStatusRequestSpec defines the filters for the pool status request.",
 	"driver":   "Driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. Must be a DNS subdomain (e.g., \"gpu.example.com\"). This field is immutable.",
-	"poolName": "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a valid resource pool name (DNS subdomains separated by \"/\").",
-	"limit":    "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated and status.truncated will be set to true.\n\nDefault: 100 Maximum: 1000",
+	"poolName": "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
+	"limit":    "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated and status.truncation will be set to \"Truncated\".\n\nDefault: 100 Minimum: 1 Maximum: 1000",
 }
 
 func (ResourcePoolStatusRequestSpec) SwaggerDoc() map[string]string {
@@ -82,8 +82,8 @@ var map_ResourcePoolStatusRequestStatus = map[string]string{
 	"pools":              "Pools contains the status of each pool matching the request filters. The list is sorted by driver, then pool name.",
 	"conditions":         "Conditions provide information about the state of the request.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
 	"validationErrors":   "ValidationErrors contains any validation errors encountered while processing the request. If present, the request may have partial or no results.",
-	"truncation":         "Truncation indicates whether the response was truncated due to the limit. When set to \"Truncated\", there are more pools matching the filter criteria than were returned.",
-	"totalMatchingPools": "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched.",
+	"truncation":         "Truncation indicates whether the response was truncated due to the limit. When set to \"Truncated\", there are more pools matching the filter criteria than were returned. When omitted, the response was not truncated.",
+	"totalMatchingPools": "TotalMatchingPools is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. When nil, the status has not yet been populated. A value of 0 means no pools matched the filter criteria.",
 }
 
 func (ResourcePoolStatusRequestStatus) SwaggerDoc() map[string]string {

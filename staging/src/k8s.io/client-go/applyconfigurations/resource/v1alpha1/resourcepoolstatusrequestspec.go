@@ -30,13 +30,15 @@ type ResourcePoolStatusRequestSpecApplyConfiguration struct {
 	Driver *string `json:"driver,omitempty"`
 	// PoolName optionally filters to a specific pool name.
 	// If not specified, all pools from the specified driver are included.
-	// When specified, must be a valid resource pool name (DNS subdomains separated by "/").
+	// When specified, must be a non-empty valid resource pool name
+	// (DNS subdomains separated by "/").
 	PoolName *string `json:"poolName,omitempty"`
 	// Limit optionally specifies the maximum number of pools to return in the status.
 	// If more pools match the filter criteria, the response will be truncated
-	// and status.truncated will be set to true.
+	// and status.truncation will be set to "Truncated".
 	//
 	// Default: 100
+	// Minimum: 1
 	// Maximum: 1000
 	Limit *int32 `json:"limit,omitempty"`
 }

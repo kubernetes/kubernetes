@@ -2085,7 +2085,7 @@ type ResourcePoolStatusRequestStatus struct {
 
 	// Truncation indicates whether the response was truncated due to the limit.
 	// +optional
-	Truncation TruncationStatus
+	Truncation *TruncationStatus
 
 	// TotalMatchingPools is the total number of pools that matched the filter criteria,
 	// regardless of truncation. This helps users understand how many pools exist
@@ -2111,9 +2111,9 @@ type PoolStatus struct {
 	PoolName string
 
 	// NodeName is the node this pool is associated with.
-	// Empty for non-node-local pools.
+	// When omitted, the pool is not associated with a specific node.
 	// +optional
-	NodeName string
+	NodeName *string
 
 	// TotalDevices is the total number of devices in the pool across all slices.
 	TotalDevices *int32

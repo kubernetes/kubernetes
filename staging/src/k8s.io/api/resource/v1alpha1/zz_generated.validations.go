@@ -31,6 +31,7 @@ import (
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -69,7 +70,7 @@ func Validate_PoolStatus(ctx context.Context, op operation.Operation, fldPath *f
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("driver"), &obj.Driver, safe.Field(oldObj, func(oldObj *PoolStatus) *string { return &oldObj.Driver }), oldObj != nil)...)
 
@@ -102,14 +103,14 @@ func Validate_PoolStatus(ctx context.Context, op operation.Operation, fldPath *f
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("nodeName"), &obj.NodeName, safe.Field(oldObj, func(oldObj *PoolStatus) *string { return &oldObj.NodeName }), oldObj != nil)...)
+		}(fldPath.Child("nodeName"), obj.NodeName, safe.Field(oldObj, func(oldObj *PoolStatus) *string { return oldObj.NodeName }), oldObj != nil)...)
 
 	// field PoolStatus.TotalDevices
 	errs = append(errs,
@@ -293,7 +294,7 @@ func Validate_ResourcePoolStatusRequestSpec(ctx context.Context, op operation.Op
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("driver"), &obj.Driver, safe.Field(oldObj, func(oldObj *ResourcePoolStatusRequestSpec) *string { return &oldObj.Driver }), oldObj != nil)...)
 
@@ -432,14 +433,16 @@ func Validate_ResourcePoolStatusRequestStatus(ctx context.Context, op operation.
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
+			// call the type's validation function
+			errs = append(errs, Validate_TruncationStatus(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("truncation"), &obj.Truncation, safe.Field(oldObj, func(oldObj *ResourcePoolStatusRequestStatus) *TruncationStatus { return &oldObj.Truncation }), oldObj != nil)...)
+		}(fldPath.Child("truncation"), obj.Truncation, safe.Field(oldObj, func(oldObj *ResourcePoolStatusRequestStatus) *TruncationStatus { return oldObj.Truncation }), oldObj != nil)...)
 
 	// field ResourcePoolStatusRequestStatus.TotalMatchingPools
 	errs = append(errs,
@@ -459,6 +462,16 @@ func Validate_ResourcePoolStatusRequestStatus(ctx context.Context, op operation.
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
 		}(fldPath.Child("totalMatchingPools"), obj.TotalMatchingPools, safe.Field(oldObj, func(oldObj *ResourcePoolStatusRequestStatus) *int32 { return oldObj.TotalMatchingPools }), oldObj != nil)...)
+
+	return errs
+}
+
+var symbolsForTruncationStatus = sets.New(TruncationStatusTruncated)
+
+// Validate_TruncationStatus validates an instance of TruncationStatus according
+// to declarative validation rules in the API schema.
+func Validate_TruncationStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TruncationStatus) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForTruncationStatus, nil)...)
 
 	return errs
 }

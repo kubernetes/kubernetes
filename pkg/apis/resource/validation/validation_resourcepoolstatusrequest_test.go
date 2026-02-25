@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -243,7 +244,7 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 						{
 							Driver:           "test.example.com",
 							PoolName:         "pool-1",
-							NodeName:         "node-1",
+							NodeName:         ptr.To("node-1"),
 							TotalDevices:     ptr.To(int32(4)),
 							AllocatedDevices: ptr.To(int32(2)),
 							AvailableDevices: ptr.To(int32(2)),
@@ -401,6 +402,32 @@ func TestValidateResourcePoolStatusRequestStatusUpdate(t *testing.T) {
 				return r
 			}(),
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "totalMatchingPools"), int32(-1), "must be non-negative")},
+		},
+		"too-many-validation-errors": {
+			oldRequest: baseRequest(),
+			newRequest: func() *resource.ResourcePoolStatusRequest {
+				r := baseRequest()
+				errors := make([]string, 11)
+				for i := range errors {
+					errors[i] = "error"
+				}
+				r.Status = resource.ResourcePoolStatusRequestStatus{
+					ValidationErrors: errors,
+				}
+				return r
+			}(),
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "validationErrors"), 11, 10)},
+		},
+		"validation-error-too-long": {
+			oldRequest: baseRequest(),
+			newRequest: func() *resource.ResourcePoolStatusRequest {
+				r := baseRequest()
+				r.Status = resource.ResourcePoolStatusRequestStatus{
+					ValidationErrors: []string{strings.Repeat("x", 257)},
+				}
+				return r
+			}(),
+			wantFailures: field.ErrorList{field.TooLong(field.NewPath("status", "validationErrors").Index(0), strings.Repeat("x", 257), 256)},
 		},
 	}
 

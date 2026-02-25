@@ -40,7 +40,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 		expectedPools int
 		expectedTotal int32
 		expectedAlloc int32
-		expectedTrunc resourcev1alpha1.TruncationStatus
+		expectedTrunc *resourcev1alpha1.TruncationStatus
 	}{
 		{
 			name: "single-pool-no-allocations",
@@ -161,7 +161,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 			},
 			claims:        []*resourcev1.ResourceClaim{},
 			expectedPools: 1,
-			expectedTrunc: resourcev1alpha1.TruncationStatusTruncated,
+			expectedTrunc: ptr.To(resourcev1alpha1.TruncationStatusTruncated),
 		},
 		{
 			name: "no-matching-pools",
@@ -223,7 +223,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 				t.Errorf("Expected %d pools, got %d", tc.expectedPools, len(status.Pools))
 			}
 
-			if tc.expectedPools > 0 && tc.expectedTrunc == "" {
+			if tc.expectedPools > 0 && tc.expectedTrunc == nil {
 				var totalDevices, allocatedDevices int32
 				for _, pool := range status.Pools {
 					if pool.TotalDevices != nil {
@@ -241,7 +241,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 				}
 			}
 
-			if status.Truncation != tc.expectedTrunc {
+			if (status.Truncation == nil) != (tc.expectedTrunc == nil) || (status.Truncation != nil && tc.expectedTrunc != nil && *status.Truncation != *tc.expectedTrunc) {
 				t.Errorf("Expected truncation=%v, got %v", tc.expectedTrunc, status.Truncation)
 			}
 

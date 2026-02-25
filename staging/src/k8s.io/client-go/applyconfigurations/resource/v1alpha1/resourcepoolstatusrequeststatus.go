@@ -47,11 +47,12 @@ type ResourcePoolStatusRequestStatusApplyConfiguration struct {
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 	// Truncation indicates whether the response was truncated due to the limit.
 	// When set to "Truncated", there are more pools matching the filter criteria
-	// than were returned.
+	// than were returned. When omitted, the response was not truncated.
 	Truncation *resourcev1alpha1.TruncationStatus `json:"truncation,omitempty"`
 	// TotalMatchingPools is the total number of pools that matched the filter criteria,
 	// regardless of truncation. This helps users understand how many pools exist
-	// even when the response is truncated. A value of 0 means no pools matched.
+	// even when the response is truncated. When nil, the status has not yet been
+	// populated. A value of 0 means no pools matched the filter criteria.
 	TotalMatchingPools *int32 `json:"totalMatchingPools,omitempty"`
 }
 

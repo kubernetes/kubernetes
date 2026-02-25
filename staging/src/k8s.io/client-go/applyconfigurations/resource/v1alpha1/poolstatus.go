@@ -30,7 +30,7 @@ type PoolStatusApplyConfiguration struct {
 	// Must be a valid resource pool name (DNS subdomains separated by "/").
 	PoolName *string `json:"poolName,omitempty"`
 	// NodeName is the node this pool is associated with.
-	// Empty for non-node-local pools.
+	// When omitted, the pool is not associated with a specific node.
 	NodeName *string `json:"nodeName,omitempty"`
 	// TotalDevices is the total number of devices in the pool across all slices.
 	// A value of 0 means the pool has no devices.
