@@ -103,7 +103,7 @@ func createHandler(kubeClient kubernetes.Interface, informerFactory informers.Sh
 	return createHandlerWithConfig(kubeClient, informerFactory, nil, stopCh)
 }
 
-func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory, config *resourcequotaapi.Configuration, stopCh chan struct{}) (*resourcequota.QuotaAdmission, error) {
+func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory, config *resourcequotaapi.Configuration, stopCh <-chan struct{}) (*resourcequota.QuotaAdmission, error) {
 	if config == nil {
 		config = &resourcequotaapi.Configuration{}
 	}
@@ -132,31 +132,16 @@ func createCommonHandler(t *testing.T, resourceQuotas ...runtime.Object) (*resou
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration, err := install.NewQuotaConfigurationForAdmission(informerFactory)
-	if err != nil {
-		t.Errorf("Error occurred while creating quota configuration: %v", err)
-	}
-
-	handler, err := resourcequota.NewResourceQuota(config, 5)
-	if err != nil {
-		t.Errorf("Error occurred while creating handler: %v", err)
-	}
 	stopCh := t.Context().Done()
 
-	initializers := admission.PluginInitializers{
-		genericadmissioninitializer.New(kubeClient, nil, informerFactory, nil, nil, nil, stopCh, nil),
-		controlplaneadmission.NewPluginInitializer(quotaConfiguration, nil),
+	handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
-	initializers.Initialize(handler)
 
 	informerFactory.Start(stopCh)
 	informerFactory.WaitForCacheSync(stopCh)
 	kubeClient.ClearActions()
-
-	err = admission.ValidateInitialization(handler)
-	if err != nil {
-		t.Errorf("Error occurred while creating admission plugin: %v", err)
-	}
 
 	return handler, kubeClient
 }
