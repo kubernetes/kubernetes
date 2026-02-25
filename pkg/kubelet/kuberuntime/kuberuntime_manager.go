@@ -422,16 +422,57 @@ func (m *kubeGenericRuntimeManager) Status(ctx context.Context) (*kubecontainer.
 	return toKubeRuntimeStatus(resp.GetStatus(), resp.GetRuntimeHandlers(), resp.GetFeatures()), nil
 }
 
+// GetPod fetches the current sandboxes & containers for a pod.
+func (m *kubeGenericRuntimeManager) GetPod(ctx context.Context, podUID kubetypes.UID) (*kubecontainer.Pod, error) {
+	pods, err := m.getPods(ctx, listOptions{podUID: podUID})
+	if err != nil {
+		return nil, err
+	}
+
+	pod := pods[podUID]
+	if pod == nil {
+		return nil, kubecontainer.ErrPodNotFound
+	}
+	return pod, nil
+}
+
 // GetPods returns a list of containers grouped by pods. The boolean parameter
 // specifies whether the runtime returns all containers including those already
 // exited and dead containers (used for garbage collection).
 func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*kubecontainer.Pod, error) {
 	logger := klog.FromContext(ctx)
-	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
-	sandboxes, err := m.getKubeletSandboxes(ctx, all)
+	pods, err := m.getPods(ctx, listOptions{onlyRunningReady: !all})
 	if err != nil {
 		return nil, err
 	}
+
+	// Convert map to list.
+	var result []*kubecontainer.Pod
+	for _, pod := range pods {
+		result = append(result, pod)
+	}
+
+	// There are scenarios where multiple pods are running in parallel having
+	// the same name, because one of them have not been fully terminated yet.
+	// To avoid unexpected behavior on container name based search (for example
+	// by calling *Kubelet.findContainer() without specifying a pod ID), we now
+	// return the list of pods ordered by their creation time.
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].CreatedAt > result[j].CreatedAt
+	})
+	logger.V(4).Info("Retrieved pods from runtime", "all", all)
+	return result, nil
+}
+
+func (m *kubeGenericRuntimeManager) getPods(ctx context.Context, opts listOptions) (map[kubetypes.UID]*kubecontainer.Pod, error) {
+	logger := klog.FromContext(ctx)
+	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
+	sandboxes, err := m.getSandboxes(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	// Sort sandboxes by creation time, newest first.
+	sort.Sort(podSandboxByCreated(sandboxes))
 	for i := range sandboxes {
 		s := sandboxes[i]
 		if s.Metadata == nil {
@@ -456,7 +497,7 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 		p.CreatedAt = uint64(s.GetCreatedAt())
 	}
 
-	containers, err := m.getKubeletContainers(ctx, all)
+	containers, err := m.getContainers(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -487,22 +528,7 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 		pod.Containers = append(pod.Containers, converted)
 	}
 
-	// Convert map to list.
-	var result []*kubecontainer.Pod
-	for _, pod := range pods {
-		result = append(result, pod)
-	}
-
-	// There are scenarios where multiple pods are running in parallel having
-	// the same name, because one of them have not been fully terminated yet.
-	// To avoid unexpected behavior on container name based search (for example
-	// by calling *Kubelet.findContainer() without specifying a pod ID), we now
-	// return the list of pods ordered by their creation time.
-	sort.SliceStable(result, func(i, j int) bool {
-		return result[i].CreatedAt > result[j].CreatedAt
-	})
-	logger.V(4).Info("Retrieved pods from runtime", "all", all)
-	return result, nil
+	return pods, nil
 }
 
 // containerKillReason explains what killed a given container
@@ -1924,7 +1950,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 	// Anyhow, we only promised "best-effort" restart count reporting, we can just ignore
 	// these limitations now.
 	// TODO: move this comment to SyncPod.
-	podSandboxIDs, err := m.getSandboxIDByPodUID(ctx, uid, nil)
+	podSandboxIDs, err := m.getSandboxIDByPodUID(ctx, uid)
 	if err != nil {
 		return nil, err
 	}

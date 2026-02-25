@@ -19,6 +19,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -89,6 +90,9 @@ type Runtime interface {
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
 	GetPods(ctx context.Context, all bool) ([]*Pod, error)
+	// GetPod fetches the current sandboxes & containers for a pod.
+	// Returns ErrPodNotFound when no sandboxes are found for the requested pod.
+	GetPod(ctx context.Context, podUID types.UID) (*Pod, error)
 	// GarbageCollect removes dead containers using the specified container gc policy
 	// If allSourcesReady is not true, it means that kubelet doesn't have the
 	// complete list of pods from all available sources (e.g., apiserver, http,
@@ -148,6 +152,11 @@ type Runtime interface {
 	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
 	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
 }
+
+var (
+	// ErrPodNotFound is returned by GetPod when no sandboxes are found for the requested pod.
+	ErrPodNotFound = errors.New("pod sandboxes not found")
+)
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
 // streaming calls (exec/attach/port-forward) themselves. In this case, Kubelet should redirect to
@@ -209,6 +218,7 @@ type Pod struct {
 	// List of sandboxes associated with this pod. The sandboxes are converted
 	// to Container temporarily to avoid substantial changes to other
 	// components. This is only populated by kuberuntime.
+	// Sandboxes are sorted by creation time, newest -> oldest.
 	// TODO: use the runtimeApi.PodSandbox type directly.
 	Sandboxes []*Container
 }
@@ -318,6 +328,10 @@ type Container struct {
 	Hash uint64
 	// State is the state of the container.
 	State State
+	// ID of the sandbox to which this container belongs.
+	PodSandboxID string
+	// Creation time of the container in nanoseconds.
+	CreatedAt int64
 }
 
 // PodStatus represents the status of the pod and its containers.

@@ -477,13 +477,15 @@ func TestGetPods(t *testing.T) {
 	for i := range containers {
 		fakeContainer := fakeContainers[i]
 		c, err := m.toKubeContainer(tCtx, &runtimeapi.Container{
-			Id:          fakeContainer.Id,
-			Metadata:    fakeContainer.Metadata,
-			State:       fakeContainer.State,
-			Image:       fakeContainer.Image,
-			ImageRef:    fakeContainer.ImageRef,
-			Labels:      fakeContainer.Labels,
-			Annotations: fakeContainer.Annotations,
+			Id:           fakeContainer.Id,
+			Metadata:     fakeContainer.Metadata,
+			State:        fakeContainer.State,
+			Image:        fakeContainer.Image,
+			ImageRef:     fakeContainer.ImageRef,
+			Labels:       fakeContainer.Labels,
+			Annotations:  fakeContainer.Annotations,
+			PodSandboxId: fakeContainer.SandboxID,
+			CreatedAt:    fakeContainer.CreatedAt,
 		})
 		if err != nil {
 			t.Fatalf("unexpected error %v", err)
@@ -503,23 +505,29 @@ func TestGetPods(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 
-	expected := []*kubecontainer.Pod{
-		{
-			ID:         types.UID("12345678"),
-			Name:       "foo",
-			Namespace:  "new",
-			CreatedAt:  uint64(fakeSandbox.CreatedAt),
-			Containers: []*kubecontainer.Container{containers[0], containers[1]},
-			Sandboxes:  []*kubecontainer.Container{sandbox},
-		},
+	expectedPod := &kubecontainer.Pod{
+		ID:         types.UID("12345678"),
+		Name:       "foo",
+		Namespace:  "new",
+		CreatedAt:  uint64(fakeSandbox.CreatedAt),
+		Containers: []*kubecontainer.Container{containers[0], containers[1]},
+		Sandboxes:  []*kubecontainer.Container{sandbox},
 	}
+	expected := []*kubecontainer.Pod{expectedPod}
 
 	actual, err := m.GetPods(tCtx, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	if !verifyPods(expected, actual) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
+
+	actualPod, err := m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	assert.Equal(t, expectedPod, actualPod)
+
+	_, err = m.GetPod(tCtx, "non-existent-uid")
+	assert.ErrorIs(t, err, kubecontainer.ErrPodNotFound)
 }
 
 func TestGetPodsSorted(t *testing.T) {
@@ -828,7 +836,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 
 	// 3. should create all app containers because init container finished.
 	// Stop init container instance 0.
-	sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID, nil)
+	sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID)
 	require.NoError(t, err)
 	sandboxID := sandboxIDs[0]
 	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
@@ -933,7 +941,7 @@ func TestSyncPodWithRestartAllContainers(t *testing.T) {
 
 	// 2. should run all app containers because init container finished.
 	// Stop init container instance 0.
-	sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID, nil)
+	sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID)
 	require.NoError(t, err)
 	sandboxID := sandboxIDs[0]
 	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
@@ -954,7 +962,7 @@ func TestSyncPodWithRestartAllContainers(t *testing.T) {
 
 	// 3. Exits the container foo2 with code 42, the pod should be marked for RestartAllContainers, and
 	// should remove all containers.
-	sandboxIDs, err = m.getSandboxIDByPodUID(tCtx, pod.UID, nil)
+	sandboxIDs, err = m.getSandboxIDByPodUID(tCtx, pod.UID)
 	require.NoError(t, err)
 	sandboxID = sandboxIDs[0]
 	foo2ID, err := fakeRuntime.GetContainerID(sandboxID, containers[1].Name, 0)

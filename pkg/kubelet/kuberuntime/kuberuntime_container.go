@@ -533,27 +533,6 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 	return volumeMounts
 }
 
-// getKubeletContainers lists containers managed by kubelet.
-// The boolean parameter specifies whether returns all containers including
-// those already exited and dead containers (used for garbage collection).
-func (m *kubeGenericRuntimeManager) getKubeletContainers(ctx context.Context, allContainers bool) ([]*runtimeapi.Container, error) {
-	logger := klog.FromContext(ctx)
-	filter := &runtimeapi.ContainerFilter{}
-	if !allContainers {
-		filter.State = &runtimeapi.ContainerStateValue{
-			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
-		}
-	}
-
-	containers, err := m.runtimeService.ListContainers(ctx, filter)
-	if err != nil {
-		logger.Error(err, "ListContainers failed")
-		return nil, err
-	}
-
-	return containers, nil
-}
-
 // makeUID returns a randomly generated string.
 func makeUID() string {
 	return fmt.Sprintf("%08x", rand.Uint32())
@@ -618,13 +597,54 @@ func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Con
 	return cStatus
 }
 
+type listOptions struct {
+	// podUID of the pod to filter to.
+	// Optional.
+	podUID kubetypes.UID
+	// onlyRunningReady filters the results to only ready sandboxes or running containers.
+	// Optional.
+	onlyRunningReady bool
+}
+
+func (o *listOptions) containerFilter() *runtimeapi.ContainerFilter {
+	filter := &runtimeapi.ContainerFilter{}
+	if o.podUID != "" {
+		filter.LabelSelector = map[string]string{kubelettypes.KubernetesPodUIDLabel: string(o.podUID)}
+	}
+	if o.onlyRunningReady {
+		filter.State = &runtimeapi.ContainerStateValue{
+			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+		}
+	}
+	return filter
+}
+
+func (o *listOptions) sandboxFilter() *runtimeapi.PodSandboxFilter {
+	filter := &runtimeapi.PodSandboxFilter{}
+	if o.podUID != "" {
+		filter.LabelSelector = map[string]string{kubelettypes.KubernetesPodUIDLabel: string(o.podUID)}
+	}
+	if o.onlyRunningReady {
+		filter.State = &runtimeapi.PodSandboxStateValue{
+			State: runtimeapi.PodSandboxState_SANDBOX_READY,
+		}
+	}
+	return filter
+}
+
+func (m *kubeGenericRuntimeManager) getContainers(ctx context.Context, opts listOptions) ([]*runtimeapi.Container, error) {
+	return m.runtimeService.ListContainers(ctx, opts.containerFilter())
+}
+
+func (m *kubeGenericRuntimeManager) getSandboxes(ctx context.Context, opts listOptions) ([]*runtimeapi.PodSandbox, error) {
+	return m.runtimeService.ListPodSandbox(ctx, opts.sandboxFilter())
+}
+
 // getPodContainerStatuses gets all containers' statuses for the pod.
 func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context, uid kubetypes.UID, name, namespace, activePodSandboxID string) ([]*kubecontainer.Status, []*kubecontainer.Status, error) {
 	logger := klog.FromContext(ctx)
 	// Select all containers of the given pod.
-	containers, err := m.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{
-		LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: string(uid)},
-	})
+	containers, err := m.getContainers(ctx, listOptions{podUID: uid})
 	if err != nil {
 		logger.Error(err, "ListContainers error")
 		return nil, nil, err
