@@ -274,7 +274,15 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- pfOptions.RunPortForwardContext(ctx)
+		// RunPortForwardContext may return nil on success. Only send
+		// non-nil errors into errChan to avoid sending a nil error
+		// which can be mis-handled by the select below.
+		if err := pfOptions.RunPortForwardContext(ctx); err != nil {
+			select {
+			case errChan <- err:
+			default:
+			}
+		}
 	}()
 
 	select {
