@@ -22,6 +22,7 @@ import (
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -69,7 +70,17 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 
 // ValidatePodGroup tests if all fields in a PodGroup are set correctly.
 func ValidatePodGroup(podGroup *scheduling.PodGroup) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodGroupSpec(&podGroup.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validatePodGroupSpec(spec *scheduling.PodGroupSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.SchedulingConstraints != nil {
+		allErrs = append(allErrs, validatePodGroupSchedulingConstraints(spec.SchedulingConstraints, fldPath.Child("schedulingConstraints"))...)
+	}
+	return allErrs
 }
 
 // ValidatePodGroupUpdate tests if an update to PodGroup is valid.
@@ -82,12 +93,70 @@ func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.Er
 func validatePodGroupSpecUpdate(spec, oldSpec *scheduling.PodGroupSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := apivalidation.ValidateImmutableField(spec.PodGroupTemplateRef, oldSpec.PodGroupTemplateRef, fldPath.Child("podGroupTemplateRef")).WithOrigin("immutable").MarkCoveredByDeclarative()
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SchedulingPolicy, oldSpec.SchedulingPolicy, fldPath.Child("schedulingPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SchedulingConstraints, oldSpec.SchedulingConstraints, fldPath.Child("schedulingConstraints")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 
 // ValidateWorkload tests if all fields in a Workload are set correctly.
 func ValidateWorkload(workload *scheduling.Workload) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateWorkloadSpec(&workload.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validatePodGroupTemplates(fldPath, spec)...)
+	return allErrs
+}
+
+func validatePodGroupTemplates(fldPath *field.Path, spec *scheduling.WorkloadSpec) field.ErrorList {
+	var allErrs field.ErrorList
+	existingPodGroups := sets.New[string]()
+	podGroupsPath := fldPath.Child("podGroupTemplates")
+	for i := range spec.PodGroupTemplates {
+		allErrs = append(allErrs, validatePodGroupTemplate(&spec.PodGroupTemplates[i], podGroupsPath.Index(i), existingPodGroups)...)
+	}
+	return allErrs
+}
+
+func validatePodGroupTemplate(podGroupTemplate *scheduling.PodGroupTemplate, fldPath *field.Path, existingPodGroupTemplates sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+	if podGroupTemplate.SchedulingConstraints != nil {
+		allErrs = append(allErrs, validatePodGroupSchedulingConstraints(podGroupTemplate.SchedulingConstraints, fldPath.Child("schedulingConstraints"))...)
+	}
+	return allErrs
+}
+
+func validatePodGroupSchedulingConstraints(constraints *scheduling.PodGroupSchedulingConstraints, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validatePodGroupTopologyConstraints(constraints.TopologyConstraints, fldPath.Child("topologyConstraints"))...)
+	return allErrs
+}
+
+func validatePodGroupTopologyConstraints(constraints []scheduling.TopologyConstraint, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(constraints) > 1 {
+		allErrs = append(allErrs, field.TooMany(fldPath, len(constraints), 1).WithOrigin("maxItems").MarkCoveredByDeclarative())
+	}
+	if len(constraints) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
+	}
+	for i, constraint := range constraints {
+		allErrs = append(allErrs, validatePodGroupTopologyConstraint(&constraint, fldPath.Index(i))...)
+	}
+	return allErrs
+
+}
+
+func validatePodGroupTopologyConstraint(constraint *scheduling.TopologyConstraint, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if constraint.TopologyKey == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "").MarkCoveredByDeclarative())
+	} else {
+		allErrs = append(allErrs, metav1validation.ValidateLabelName(constraint.TopologyKey, fldPath.Child("topologyKey")).WithOrigin("format=k8s-label-key").MarkCoveredByDeclarative()...)
+	}
+	return allErrs
 }
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.

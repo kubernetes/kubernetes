@@ -65,6 +65,15 @@ func (PodGroupList) SwaggerDoc() map[string]string {
 	return map_PodGroupList
 }
 
+var map_PodGroupSchedulingConstraints = map[string]string{
+	"":                    "PodGroupSchedulingConstraints defines optional scheduling constraints (e.g. topology) for a PodGroup.",
+	"topologyConstraints": "TopologyConstraints defines the topology constraints for the pod group. This field is required but we might loosen this assumption in the future if more types of constraints are added.",
+}
+
+func (PodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
+	return map_PodGroupSchedulingConstraints
+}
+
 var map_PodGroupSchedulingPolicy = map[string]string{
 	"":      "PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup. Exactly one policy must be set.",
 	"basic": "Basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior.",
@@ -76,9 +85,10 @@ func (PodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
 }
 
 var map_PodGroupSpec = map[string]string{
-	"":                    "PodGroupSpec defines the desired state of a PodGroup.",
-	"podGroupTemplateRef": "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable.",
-	"schedulingPolicy":    "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. It is copied from the template on PodGroup creation. This field is immutable.",
+	"":                      "PodGroupSpec defines the desired state of a PodGroup.",
+	"podGroupTemplateRef":   "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable.",
+	"schedulingPolicy":      "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. It is copied from the template on PodGroup creation. This field is immutable.",
+	"schedulingConstraints": "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup. It is copied from the template on PodGroup creation. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
 }
 
 func (PodGroupSpec) SwaggerDoc() map[string]string {
@@ -95,9 +105,10 @@ func (PodGroupStatus) SwaggerDoc() map[string]string {
 }
 
 var map_PodGroupTemplate = map[string]string{
-	"":                 "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
-	"name":             "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
-	"schedulingPolicy": "SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
+	"":                      "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
+	"name":                  "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
+	"schedulingPolicy":      "SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
+	"schedulingConstraints": "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
 }
 
 func (PodGroupTemplate) SwaggerDoc() map[string]string {
@@ -111,6 +122,15 @@ var map_PodGroupTemplateReference = map[string]string{
 
 func (PodGroupTemplateReference) SwaggerDoc() map[string]string {
 	return map_PodGroupTemplateReference
+}
+
+var map_TopologyConstraint = map[string]string{
+	"":            "TopologyConstraint defines a topology constraint for a PodGroup.",
+	"topologyKey": "TopologyKey specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
+}
+
+func (TopologyConstraint) SwaggerDoc() map[string]string {
+	return map_TopologyConstraint
 }
 
 var map_TypedLocalObjectReference = map[string]string{

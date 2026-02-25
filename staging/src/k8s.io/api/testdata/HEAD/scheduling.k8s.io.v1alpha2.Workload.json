@@ -57,6 +57,13 @@
           "gang": {
             "minCount": 1
           }
+        },
+        "schedulingConstraints": {
+          "topologyConstraints": [
+            {
+              "topologyKey": "topologyKeyValue"
+            }
+          ]
         }
       }
     ]

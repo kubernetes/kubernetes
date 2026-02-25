@@ -42,6 +42,11 @@ func (in PodGroupList) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodGroupSchedulingConstraints) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingConstraints"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodGroupSchedulingPolicy) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1alpha2.PodGroupSchedulingPolicy"
 }
@@ -64,6 +69,11 @@ func (in PodGroupTemplate) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodGroupTemplateReference) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1alpha2.PodGroupTemplateReference"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in TopologyConstraint) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1alpha2.TopologyConstraint"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

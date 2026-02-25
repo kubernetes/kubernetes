@@ -37,6 +37,9 @@ spec:
     workload:
       podGroupTemplateName: podGroupTemplateNameValue
       workloadName: workloadNameValue
+  schedulingConstraints:
+    topologyConstraints:
+    - topologyKey: topologyKeyValue
   schedulingPolicy:
     basic: {}
     gang:

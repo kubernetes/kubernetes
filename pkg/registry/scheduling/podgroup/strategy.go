@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // podGroupStrategy implements behavior for PodGroup objects.
@@ -66,6 +68,7 @@ func (*podGroupStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	podGroup := obj.(*scheduling.PodGroup)
 	// Status must not be set by user on create.
 	podGroup.Status = scheduling.PodGroupStatus{}
+	dropDisabledPodGroupFields(podGroup, nil)
 }
 
 func (*podGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -88,6 +91,7 @@ func (*podGroupStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	newPodGroup := obj.(*scheduling.PodGroup)
 	oldPodGroup := old.(*scheduling.PodGroup)
 	newPodGroup.Status = oldPodGroup.Status
+	dropDisabledPodGroupFields(newPodGroup, oldPodGroup)
 }
 
 func (*podGroupStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -144,4 +148,24 @@ func (r *podGroupStatusStrategy) ValidateUpdate(ctx context.Context, obj, old ru
 // WarningsOnUpdate returns warnings for the given update.
 func (*podGroupStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// dropDisabledPodGroupFields removes fields which are covered by a feature gate.
+func dropDisabledPodGroupFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
+	dropDisabledSchedulingConstraintsFields(newPodGroup, oldPodGroup)
+}
+
+// dropDisabledSchedulingConstraintsFields drops the SchedulingConstraints field
+// from the new PodGroup if the TopologyAwareWorkloadScheduling feature gate is disabled
+// and it was not used in the old PodGroup.
+func dropDisabledSchedulingConstraintsFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || schedulingConstraintsInUse(oldPodGroup) {
+		// No need to drop anything.
+		return
+	}
+	newPodGroup.Spec.SchedulingConstraints = nil
+}
+
+func schedulingConstraintsInUse(pg *scheduling.PodGroup) bool {
+	return pg != nil && pg.Spec.SchedulingConstraints != nil
 }
