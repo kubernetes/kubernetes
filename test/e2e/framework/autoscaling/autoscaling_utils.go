@@ -335,20 +335,7 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 		time.Sleep(200 * time.Millisecond)
 	}
 
-	ports, err := customPF.GetPorts()
-	if err != nil {
-		return fmt.Errorf("failed to get forwarded ports: %w", err)
-	}
-	if len(ports) == 0 {
-		return fmt.Errorf("no forwarded ports")
-	}
-
-	_, localPortStr, err := net.SplitHostPort(ports[0])
-	if err != nil {
-		return fmt.Errorf("failed to parse forwarded port: %w", err)
-	}
-
-	requestURL := fmt.Sprintf("https://localhost:%s/%s/%s", localPortStr, action, metricName)
+	requestURL := fmt.Sprintf("https://localhost:%d/%s/%s", localPort, action, metricName)
 	if len(params) > 0 {
 		requestURL += "?" + params.Encode()
 	}
