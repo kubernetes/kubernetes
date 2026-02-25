@@ -18,13 +18,14 @@ package grpc
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	grpchealth "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -56,11 +57,14 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration)
 	opts := []grpc.DialOption{
 		grpc.WithUserAgent(fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor)),
 		grpc.WithBlock(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()), //credentials are currently not supported
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+			InsecureSkipVerify: true,
+		})),    // added tls InsecureVerify which will encrypt the communication but authentication does not happen 
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return probe.ProbeDialer().DialContext(ctx, "tcp", addr)
 		}),
 	}
+
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
